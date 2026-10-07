@@ -1,0 +1,89 @@
+{
+  "results": [
+    {
+      "scenario": "canonical-omp-inherited-policy-real-model",
+      "pass": true
+    },
+    {
+      "scenario": "manual-parent-policy-pre-stop",
+      "pass": true
+    }
+  ],
+  "runs": [
+    {
+      "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/home",
+      "exit": 0,
+      "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/home\n"
+    },
+    {
+      "command": "git init -b lab-preserved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child",
+      "exit": 0,
+      "output": "Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child/.git/\n"
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child add bin .omp AGENTS.md .gitignore",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child -c user.name=Lab -c user.email=lab@example.invalid commit -q -m disposable fixture",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh name recovery",
+      "exit": 0,
+      "output": "fm-lab-recovery-88731-31076\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh provision fm-lab-recovery-88731-31076",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/bin/fm-spawn.sh policy-recovery-1791390212 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child --secondmate",
+      "exit": 0,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/home\nwarning: secondmate policy-recovery-1791390212 sync skipped before launch: primary default-branch commit cannot be resolved\nspawned policy-recovery-1791390212 harness=omp kind=secondmate mode=secondmate yolo=off window=fm-lab-recovery-88731-31076:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/bin/fm-peek.sh policy-recovery-1791390212",
+      "exit": 0,
+      "output": "\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nexport GOTMPDIR=/tmp/fm-policy-recovery-1791390212/gotmp\nexport COMPACT_ADVISER_DISABLE=1\n. '/tmp/fm-policy-recovery-1791390212+3f43efa70a917cdb4b9475ccfbf854e0111103ab68ec8ff3c63ed4129a434614/launch.s179139021\n5.89062.13924.sh'"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/bin/fm-peek.sh policy-recovery-1791390212",
+      "exit": 0,
+      "output": "WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nexport GOTMPDIR=/tmp/fm-policy-recovery-1791390212/gotmp\nexport COMPACT_ADVISER_DISABLE=1\n. '/tmp/fm-policy-recovery-1791390212+3f43efa70a917cdb4b9475ccfbf854e0111103ab68ec8ff3c63ed4129a434614/launch.s179139021\n5.89062.13924.sh'"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/bin/fm-peek.sh policy-recovery-1791390212",
+      "exit": 0,
+      "output": "WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n\n                                            \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n                                               \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                               \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                               \u2592\u2592  \u2588\u2588                  \u2588\n                                                   \u2588\u2588       v18.7.0\n\n                          Tip: Say `workflowz` in your message to drive the task with parallel\n                                     subagents in eval \u2014 watch it glow as you type\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n Update Available\n New version 18.8.0 is available. Run: omp update\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n\n FIRSTMATE_OP: v1 launch-brief: Disposable runtime check: reply exactly LIVE_RECOVERY_OMP_OK. Do not invoke tools,\n change files, start sessions, or administer any lifecycle. Then wait.\n\n\n LIVE_RECOVERY_OMP_OK\n\n\u276f\n \u03c0 \u00b7 \u25d4 GPT-6.1-Sol \ud83d\ude48 \u00b7 \ud83d\udcc1 \u2026YFQW/.fm-live-recovery-nd_t5o4f/child \u00b7 \u2442 lab-preserved ?3 \u00b7 \u25eb 7.2%/272K \u27f2 \u00b7 S0.04 + \ud83d\udc41 0.03"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-recovery-88731-31076 agent list",
+      "exit": 0,
+      "output": "{\"id\":\"cli:agent:list\",\"result\":{\"agents\":[{\"agent\":\"omp\",\"agent_session\":{\"agent\":\"omp\",\"kind\":\"path\",\"source\":\"herdr:omp\",\"value\":\"/Users/charlesabrooker/.omp/agent/sessions/-.no-mistakes-worktrees-32d18ed9638d-01M4BJ2A79FRTFKKM9EXJMYFQW-.fm-live-recovery-nd_t5o4f-child/2026-10-07T16-24-08-817Z_01a1172d-ef71-7779-bfe4-84891f53e3ca.jsonl\"},\"agent_status\":\"idle\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child\",\"pane_id\":\"w1:p2\",\"revision\":37,\"screen_detection_skipped\":true,\"state_change_seq\":3,\"tab_id\":\"w1:t2\",\"terminal_id\":\"term_65d42896e660b2\",\"terminal_title\":\"\u03c0 > child\",\"terminal_title_stripped\":\"\u03c0 > child\",\"workspace_id\":\"w1\"}],\"type\":\"agent_list\"}}\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/bin/fm-control.sh policy-recovery-1791390212 relaunch --harness codex",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/bin/fm-spawn.sh policy-recovery-1791390212 --relaunch --harness codex",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/home\nerror: task policy-recovery-1791390212's endpoint reads 'alive'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh policy-recovery-1791390212 exit)\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/code/bin/fm-teardown.sh policy-recovery-1791390212 --force",
+      "exit": 0,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown policy-recovery-1791390212 complete (window fm-lab-recovery-88731-31076:w1:p2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-recovery-nd_t5o4f/child)\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh teardown fm-lab-recovery-88731-31076",
+      "exit": 0,
+      "output": ""
+    }
+  ]
+}

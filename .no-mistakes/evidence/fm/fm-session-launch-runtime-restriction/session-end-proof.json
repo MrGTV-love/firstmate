@@ -1,0 +1,99 @@
+{
+  "results": [
+    {
+      "scenario": "ship-session-end-recorded-codex-refused-without-accounting",
+      "pass": true
+    },
+    {
+      "scenario": "scout-session-end-recorded-codex-refused-without-accounting",
+      "pass": true
+    }
+  ],
+  "runs": [
+    {
+      "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/home",
+      "exit": 0,
+      "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/home\n"
+    },
+    {
+      "command": "git init -b lab-preserved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child",
+      "exit": 0,
+      "output": "Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child/.git/\n"
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child add bin .omp AGENTS.md .gitignore",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child -c user.name=Lab -c user.email=lab@example.invalid commit -q -m disposable fixture",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh name sessionend",
+      "exit": 0,
+      "output": "fm-lab-sessionend-13752-21026\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh provision fm-lab-sessionend-13752-21026",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-sessionend-13752-21026 workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child --label session-end-fixture --no-focus",
+      "exit": 0,
+      "output": "{\"id\":\"cli:workspace:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d429fbb54d31\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"1\",\"number\":1,\"pane_count\":1,\"tab_id\":\"w1:t1\",\"workspace_id\":\"w1\"},\"type\":\"workspace_created\",\"workspace\":{\"active_tab_id\":\"w1:t1\",\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"session-end-fixture\",\"number\":1,\"pane_count\":1,\"tab_count\":1,\"workspace_id\":\"w1\"}}}\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code/bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/home/state session-end-ship",
+      "exit": 0,
+      "output": "g1791390591.19140.12137\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code/bin/fm-busy-event.sh apply /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/home/state session-end-ship idle --gen g1791390591.19140.12137 --source codex --event session-end",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-session-end-relaunch-lib.sh\"\nfm_session_end_bounds 300 || exit 2\nfm_session_end_relaunch_consider \"$FM_HOME/state\" \"$2\" || exit 3\nprintf 'ACTION=%s REASON=%s\\n' \"$FM_SESSION_END_ACTION\" \"$FM_SESSION_END_REASON\"\n session-end-live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code session-end-ship",
+      "exit": 0,
+      "output": "ACTION=skip REASON=check: session-end-ship auto-relaunch refused after session-end: error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native lau\n"
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-session-end-relaunch-lib.sh\"\nfm_session_end_bounds 300 || exit 2\nfm_session_end_relaunch_consider \"$FM_HOME/state\" \"$2\" || exit 3\nprintf 'ACTION=%s REASON=%s\\n' \"$FM_SESSION_END_ACTION\" \"$FM_SESSION_END_REASON\"\n session-end-live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code session-end-ship",
+      "exit": 0,
+      "output": "ACTION=skip REASON=\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code/bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/home/state session-end-scout",
+      "exit": 0,
+      "output": "g1791390592.23236.22038\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code/bin/fm-busy-event.sh apply /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/home/state session-end-scout idle --gen g1791390592.23236.22038 --source codex --event session-end",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-session-end-relaunch-lib.sh\"\nfm_session_end_bounds 300 || exit 2\nfm_session_end_relaunch_consider \"$FM_HOME/state\" \"$2\" || exit 3\nprintf 'ACTION=%s REASON=%s\\n' \"$FM_SESSION_END_ACTION\" \"$FM_SESSION_END_REASON\"\n session-end-live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code session-end-scout",
+      "exit": 0,
+      "output": "ACTION=skip REASON=check: session-end-scout auto-relaunch refused after session-end: error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native lau\n"
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-session-end-relaunch-lib.sh\"\nfm_session_end_bounds 300 || exit 2\nfm_session_end_relaunch_consider \"$FM_HOME/state\" \"$2\" || exit 3\nprintf 'ACTION=%s REASON=%s\\n' \"$FM_SESSION_END_ACTION\" \"$FM_SESSION_END_REASON\"\n session-end-live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/code session-end-scout",
+      "exit": 0,
+      "output": "ACTION=skip REASON=\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-sessionend-13752-21026 pane get w1:p1",
+      "exit": 0,
+      "output": "{\"id\":\"cli:pane:get\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-sessionend-a5ynbmmh/child\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d429fbb54d31\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh teardown fm-lab-sessionend-13752-21026",
+      "exit": 0,
+      "output": ""
+    }
+  ]
+}

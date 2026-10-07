@@ -1,0 +1,98 @@
+{
+  "results": [
+    {
+      "scenario": "automatic-retained-codex-no-attempt-no-kill-dedup",
+      "pass": true
+    },
+    {
+      "scenario": "acknowledged-refusal-not-repeated",
+      "pass": true
+    },
+    {
+      "scenario": "same-generation-repair-real-omp-recovery",
+      "pass": true
+    }
+  ],
+  "runs": [
+    {
+      "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/home",
+      "exit": 0,
+      "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/home\n"
+    },
+    {
+      "command": "git init -b lab-preserved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child",
+      "exit": 0,
+      "output": "Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child/.git/\n"
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child add bin .omp AGENTS.md .gitignore",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child -c user.name=Lab -c user.email=lab@example.invalid commit -q -m disposable fixture",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh name autoproof",
+      "exit": 0,
+      "output": "fm-lab-autoproof-42171-2797\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh provision fm-lab-autoproof-42171-2797",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-autoproof-42171-2797 workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child --label 2ndmate-policy-auto-1791390476 --no-focus",
+      "exit": 0,
+      "output": "{\"id\":\"cli:workspace:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d42990c02201\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"1\",\"number\":1,\"pane_count\":1,\"tab_id\":\"w1:t1\",\"workspace_id\":\"w1\"},\"type\":\"workspace_created\",\"workspace\":{\"active_tab_id\":\"w1:t1\",\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"2ndmate-policy-auto-1791390476\",\"number\":1,\"pane_count\":1,\"tab_count\":1,\"workspace_id\":\"w1\"}}}\n"
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-secondmate-liveness-lib.sh\"\nSTATE=\"$FM_HOME/state\"\nid=\"$2\"; meta=\"$STATE/$id.meta\"\nfm_secondmate_liveness_lock \"$id\" || exit 2\ntrap 'fm_secondmate_liveness_unlock \"$id\"' EXIT\nfm_secondmate_liveness_probe \"$meta\" \"$id\" poll\nprintf 'PROBE status=%s state=%s target=%s\\n' \"$FM_SM_LIVE_STATUS\" \"$FM_SM_LIVE_STATE\" \"${FM_SM_LIVE_KILL:-}\"\n[ \"$FM_SM_LIVE_STATUS\" = relaunchable ] || exit 3\nrc=0; fm_secondmate_liveness_relaunch \"$meta\" \"$id\" || rc=$?\nprintf 'RECOVERY rc=%s status=%s refused=%s wake=%s\\n%s\\n' \"$rc\" \"$FM_SM_LIVE_STATUS\" \"${FM_SM_LIVE_POLICY_REFUSED:-}\" \"${FM_SM_LIVE_WAKE:-}\" \"$FM_SM_LIVE_OUT\"\nexit \"$rc\"\n live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code policy-auto-1791390476",
+      "exit": 1,
+      "output": "PROBE status=relaunchable state=dead target=1\nRECOVERY rc=1 status=skipped refused=1 wake=check: secondmate policy-auto-1791390476 auto-relaunch refused: fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child/config: destination does not allow inherited item (not gitignored or guard failed)\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-autoproof-42171-2797 pane get w1:p1",
+      "exit": 0,
+      "output": "{\"id\":\"cli:pane:get\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d42990c02201\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n"
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-secondmate-liveness-lib.sh\"\nSTATE=\"$FM_HOME/state\"\nid=\"$2\"; meta=\"$STATE/$id.meta\"\nfm_secondmate_liveness_lock \"$id\" || exit 2\ntrap 'fm_secondmate_liveness_unlock \"$id\"' EXIT\nfm_secondmate_liveness_probe \"$meta\" \"$id\" poll\nprintf 'PROBE status=%s state=%s target=%s\\n' \"$FM_SM_LIVE_STATUS\" \"$FM_SM_LIVE_STATE\" \"${FM_SM_LIVE_KILL:-}\"\n[ \"$FM_SM_LIVE_STATUS\" = relaunchable ] || exit 3\nrc=0; fm_secondmate_liveness_relaunch \"$meta\" \"$id\" || rc=$?\nprintf 'RECOVERY rc=%s status=%s refused=%s wake=%s\\n%s\\n' \"$rc\" \"$FM_SM_LIVE_STATUS\" \"${FM_SM_LIVE_POLICY_REFUSED:-}\" \"${FM_SM_LIVE_WAKE:-}\" \"$FM_SM_LIVE_OUT\"\nexit \"$rc\"\n live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code policy-auto-1791390476",
+      "exit": 1,
+      "output": "PROBE status=relaunchable state=dead target=1\nRECOVERY rc=1 status=skipped refused=1 wake=\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-autoproof-42171-2797 pane get w1:p1",
+      "exit": 0,
+      "output": "{\"id\":\"cli:pane:get\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d42990c02201\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n"
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-secondmate-liveness-lib.sh\"\nSTATE=\"$FM_HOME/state\"\nid=\"$2\"; meta=\"$STATE/$id.meta\"\nfm_secondmate_liveness_lock \"$id\" || exit 2\ntrap 'fm_secondmate_liveness_unlock \"$id\"' EXIT\nfm_secondmate_liveness_probe \"$meta\" \"$id\" poll\nprintf 'PROBE status=%s state=%s target=%s\\n' \"$FM_SM_LIVE_STATUS\" \"$FM_SM_LIVE_STATE\" \"${FM_SM_LIVE_KILL:-}\"\n[ \"$FM_SM_LIVE_STATUS\" = relaunchable ] || exit 3\nrc=0; fm_secondmate_liveness_relaunch \"$meta\" \"$id\" || rc=$?\nprintf 'RECOVERY rc=%s status=%s refused=%s wake=%s\\n%s\\n' \"$rc\" \"$FM_SM_LIVE_STATUS\" \"${FM_SM_LIVE_POLICY_REFUSED:-}\" \"${FM_SM_LIVE_WAKE:-}\" \"$FM_SM_LIVE_OUT\"\nexit \"$rc\"\n live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code policy-auto-1791390476",
+      "exit": 1,
+      "output": "PROBE status=relaunchable state=dead target=1\nRECOVERY rc=1 status=skipped refused=1 wake=\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bash -c set -u\n. \"$1/bin/fm-secondmate-liveness-lib.sh\"\nSTATE=\"$FM_HOME/state\"\nid=\"$2\"; meta=\"$STATE/$id.meta\"\nfm_secondmate_liveness_lock \"$id\" || exit 2\ntrap 'fm_secondmate_liveness_unlock \"$id\"' EXIT\nfm_secondmate_liveness_probe \"$meta\" \"$id\" poll\nprintf 'PROBE status=%s state=%s target=%s\\n' \"$FM_SM_LIVE_STATUS\" \"$FM_SM_LIVE_STATE\" \"${FM_SM_LIVE_KILL:-}\"\n[ \"$FM_SM_LIVE_STATUS\" = relaunchable ] || exit 3\nrc=0; fm_secondmate_liveness_relaunch \"$meta\" \"$id\" || rc=$?\nprintf 'RECOVERY rc=%s status=%s refused=%s wake=%s\\n%s\\n' \"$rc\" \"$FM_SM_LIVE_STATUS\" \"${FM_SM_LIVE_POLICY_REFUSED:-}\" \"${FM_SM_LIVE_WAKE:-}\" \"$FM_SM_LIVE_OUT\"\nexit \"$rc\"\n live-driver /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code policy-auto-1791390476",
+      "exit": 0,
+      "output": "PROBE status=relaunchable state=dead target=1\nRECOVERY rc=0 status=relaunchable refused=0 wake=\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/home\nwarning: secondmate policy-auto-1791390476 sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child/config: destination does not allow inherited item (not gitignored or guard failed)\nspawned policy-auto-1791390476 harness=omp kind=secondmate mode=secondmate yolo=off window=fm-lab-autoproof-42171-2797:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code/bin/fm-peek.sh policy-auto-1791390476",
+      "exit": 0,
+      "output": "\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n                                            \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n                                               \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                               \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                               \u2592\u2592  \u2588\u2588                  \u2588\n                                                   \u2588\u2588       v18.7.0\n\n                                        Tip: You can /btw to ask a side question\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n Update Available\n New version 18.8.0 is available. Run: omp update\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n\n FIRSTMATE_OP: v1 launch-brief: Disposable runtime check: reply exactly LIVE_RECOVERY_OMP_OK. Do not invoke tools,\n change files, start sessions, or administer any lifecycle. Then wait.\n\n\n LIVE_RECOVERY_OMP_OK\n\n\u276f\n \u03c0 \u00b7 \u25d4 GPT-6.1-Sol \ud83d\udc41 \u00b7 \ud83d\udcc1 \u2026M9EXJMYFQW/.fm-live-auto-693wcttm/child \u00b7 \u2442 lab-preserved *1 ?4 \u00b7 \u25eb 7.2%/272K \u27f2 \u00b7 S0.04"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code/bin/fm-teardown.sh policy-auto-1791390476 --force",
+      "exit": 0,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown policy-auto-1791390476 complete (window fm-lab-autoproof-42171-2797:w2:p2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/child)\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh teardown fm-lab-autoproof-42171-2797",
+      "exit": 0,
+      "output": ""
+    }
+  ]
+}

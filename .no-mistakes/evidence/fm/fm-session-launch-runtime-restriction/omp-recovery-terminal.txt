@@ -1,0 +1,30 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-auto-693wcttm/code/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.7.0
+
+                                        Tip: You can /btw to ask a side question
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ FIRSTMATE_OP: v1 launch-brief: Disposable runtime check: reply exactly LIVE_RECOVERY_OMP_OK. Do not invoke tools,
+ change files, start sessions, or administer any lifecycle. Then wait.
+
+
+ LIVE_RECOVERY_OMP_OK
+
+❯
+ π · ◔ GPT-6.1-Sol 👁 · 📁 …M9EXJMYFQW/.fm-live-auto-693wcttm/child · ⑂ lab-preserved *1 ?4 · ◫ 7.2%/272K ⟲ · S0.04

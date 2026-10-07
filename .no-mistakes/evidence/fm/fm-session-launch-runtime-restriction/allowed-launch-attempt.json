@@ -1,0 +1,49 @@
+{
+  "runs": [
+    {
+      "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/home",
+      "exit": 0,
+      "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/home\n"
+    },
+    {
+      "command": "git init -b lab-preserved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/child",
+      "exit": 0,
+      "output": "Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/child/.git/\n"
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/child add bin .omp AGENTS.md .gitignore",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/child -c user.name=Lab -c user.email=lab@example.invalid commit -q -m disposable fixture",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh name policy",
+      "exit": 0,
+      "output": "fm-lab-policy-65534-2119\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh provision fm-lab-policy-65534-2119",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/code/bin/fm-spawn.sh policy-mate /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/child --secondmate --harness omp --model openai-codex/gpt-6.1-sol --effort low",
+      "exit": 0,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/home\nwarning: secondmate policy-mate sync skipped before launch: primary default-branch commit cannot be resolved\nspawned policy-mate harness=omp kind=secondmate mode=secondmate yolo=off window=fm-lab-policy-65534-2119:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/child\n"
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-policy-65534-2119 agent list --json",
+      "exit": 2,
+      "output": "usage: herdr agent list\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/code/bin/fm-peek.sh policy-mate",
+      "exit": 0,
+      "output": "\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/code/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allowed-8x2a5hgp/code/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n                                            \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n                                               \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                               \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                               \u2592\u2592  \u2588\u2588                  \u2588\n                                                   \u2588\u2588       v18.7.0\n\n                        Tip: With default keybindings, \u2303D deletes the character under the cursor\n                            instead of quitting your draft \u2014 see /hotkeys for your exit key\n\n Warning: Failed to load extension ~/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allow\u2026:\n Failed to load extension: Cannot find module '../../.pi/extensions/lib/fm-operational-input.ts?mtim\u2026\n\n Warning: Failed to load extension ~/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-allow\u2026:\n Failed to load extension: Cannot find module '../../.pi/extensions/lib/fm-operational-input.ts?mtim\u2026\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n Update Available\n New version 18.8.0 is available. Run: omp update\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n\n FIRSTMATE_OP: v1 launch-brief: This is a disposable runtime admission check. Reply with exactly LIVE_OMP_POLICY_OK. Do\n not invoke tools, modify files, launch sessions, or administer any lifecycle. Then wait.\n\n\n LIVE_OMP_POLICY_OK\n\n\u276f\n \u03c0 \u00b7 \u25d4 GPT-6.1-Sol \ud83d\ude48 \u00b7 \ud83d\udcc1 \u2026MYFQW/.fm-live-allowed-8x2a5hgp/child \u00b7 \u2442 lab-preserved ?2 \u00b7 \u25eb 6.9%/272K \u27f2 \u00b7 S0.04 + \ud83d\udc41 0.03"
+    }
+  ]
+}

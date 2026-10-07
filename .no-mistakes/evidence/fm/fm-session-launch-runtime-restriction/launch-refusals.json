@@ -1,0 +1,121 @@
+{
+  "runs": [
+    {
+      "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home",
+      "exit": 0,
+      "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh denied-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --mode local-only --yolo off --harness codex",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh denied-scout /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh denied-mate /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/child --secondmate",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh one=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project two=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness codex",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh denied-claude /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness claude",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh denied-raw /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness omp --model anything",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'omp --model anything'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh denied-tc /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness tc run",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy=omp-or-tc refuses launch 'tc run'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh malformed-empty /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness omp",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh malformed-trailing-space /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness omp",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh malformed-extra-newline /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness omp",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh malformed-unknown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness omp",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n"
+    },
+    {
+      "command": "bin/fm-spawn.sh dangling-policy /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/project --scout --harness omp",
+      "exit": 1,
+      "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-policy-dx8oxayg/home\nerror: config/session-launch-policy must be a readable regular file containing omp-or-tc\n"
+    }
+  ],
+  "results": [
+    {
+      "name": "explicit-ship-codex",
+      "pass": true
+    },
+    {
+      "name": "configured-scout-codex",
+      "pass": true
+    },
+    {
+      "name": "configured-secondmate-codex",
+      "pass": true
+    },
+    {
+      "name": "batch-codex",
+      "pass": true
+    },
+    {
+      "name": "claude-proxy-not-native",
+      "pass": true
+    },
+    {
+      "name": "opaque-omp-command",
+      "pass": true
+    },
+    {
+      "name": "opaque-tc-command",
+      "pass": true
+    },
+    {
+      "name": "malformed-empty",
+      "pass": true
+    },
+    {
+      "name": "malformed-trailing-space",
+      "pass": true
+    },
+    {
+      "name": "malformed-extra-newline",
+      "pass": true
+    },
+    {
+      "name": "malformed-unknown",
+      "pass": true
+    },
+    {
+      "name": "dangling-policy",
+      "pass": true
+    }
+  ],
+  "persisted_state": [],
+  "projects": []
+}

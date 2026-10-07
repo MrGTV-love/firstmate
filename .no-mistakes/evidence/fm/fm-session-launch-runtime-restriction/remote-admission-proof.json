@@ -1,0 +1,76 @@
+{
+  "results": [
+    {
+      "scenario": "parent-remote-codex-refused-before-transport",
+      "pass": true
+    },
+    {
+      "scenario": "destination-remote-launch-codex-refused-before-endpoint-mutation",
+      "pass": true
+    },
+    {
+      "scenario": "remote-equal-policy-checks-tooling-and-repairs",
+      "pass": true
+    },
+    {
+      "scenario": "remote-policy-removal-preserves-legacy-tooling",
+      "pass": true
+    }
+  ],
+  "runs": [
+    {
+      "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/home",
+      "exit": 0,
+      "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/home\n"
+    },
+    {
+      "command": "git init -b lab-preserved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/child",
+      "exit": 0,
+      "output": "Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/child/.git/\n"
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/child add bin .omp AGENTS.md .gitignore",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/child -c user.name=Lab -c user.email=lab@example.invalid commit -q -m disposable fixture",
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/code/bin/fm-remote-secondmate-relaunch.sh remote-policy codex default default",
+      "exit": 1,
+      "output": "error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/code/bin/fm-remote-secondmate-control.sh launch remote-policy codex - - herdr",
+      "exit": 1,
+      "output": "error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/code/bin/fm-remote-inherit.sh put config/session-launch-policy 10 b231f61af985380289f2be30d27aa6d84a1479446b8fcbcf80f8d3748007f6d8 1",
+      "stdin": "omp-or-tc\n",
+      "exit": 1,
+      "output": "error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/child/bin/fm-spawn.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/code/bin/fm-remote-inherit.sh put config/session-launch-policy 10 b231f61af985380289f2be30d27aa6d84a1479446b8fcbcf80f8d3748007f6d8 1",
+      "stdin": "omp-or-tc\n",
+      "exit": 1,
+      "output": "error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/child/bin/fm-spawn.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/code/bin/fm-remote-inherit.sh put config/session-launch-policy 10 b231f61af985380289f2be30d27aa6d84a1479446b8fcbcf80f8d3748007f6d8 1",
+      "stdin": "omp-or-tc\n",
+      "exit": 0,
+      "output": "unchanged: config/session-launch-policy\n"
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BJ2A79FRTFKKM9EXJMYFQW/.fm-live-remote-ltopxnnh/code/bin/fm-remote-inherit.sh absent config/session-launch-policy 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2",
+      "stdin": "",
+      "exit": 0,
+      "output": "removed: config/session-launch-policy\n"
+    }
+  ]
+}
