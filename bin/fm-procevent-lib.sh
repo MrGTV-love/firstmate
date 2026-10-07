@@ -1286,8 +1286,8 @@ fm_procevent_is_handled() {
 # same validation as every other source-id use. Atomically check-and-set - the
 # create uses O_EXCL so two concurrent callers can never both win - so a caller
 # pairing this with an external effect can trust the return code to authorize
-# that effect at most once per generation. This is the only terminal state:
-# announcing a result never blocks it from being re-announced, only this does.
+# that effect at most once per generation. docs/configuration.md owns replay
+# eligibility and queued-wake coalescing.
 # 0 = newly recorded (first-ever handling for this generation, safe to perform
 # a paired effect that has not yet run), 1 = already recorded (repeat call; do
 # not repeat a paired effect), 2 = error.

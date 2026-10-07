@@ -2065,9 +2065,8 @@ cmd_ensure_listening() {
 }
 
 # Stop a runner and the child it is blocked on. A runner started by reconcile is
-# its own process group leader, so the group signal is what actually reaches the
-# blocking child - signalling only the runner would leave that child alive and
-# reparented, which is exactly how a source that never completes leaks.
+# its own process group leader, so a verified group signal reaches the blocking
+# child and its descendants directly.
 # docs/configuration.md owns the operating contract and unproved-group limits.
 # A leaderless group nobody in this call ever proved remains refused for every
 # caller, and that untouched refusal is what makes a crashed leader's group

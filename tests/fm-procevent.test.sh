@@ -456,14 +456,18 @@ pass "late durable startup evidence suppresses an obsolete failure"
 ep_new late-claim
 cat > "$EP_SOURCE_CMD" <<SH
 #!/usr/bin/env bash
-exec "$BLOCKER" "$TMP_ROOT/episode-live-trigger" "live episode"
+exec "$STARTED_BLOCKER" "$TMP_ROOT/episode-live-started" "$BLOCKER" "$TMP_ROOT/episode-live-trigger" "live episode"
 SH
 ep_damage
 ep_pause episode-late-claim
 ep_repair
 pe "$HEP" start episode-src > "$TMP_ROOT/episode-live-start.out" 2>&1 &
 ep_live_pid=$!
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" || fail "attached recovery did not claim"
+# Claim publication precedes the runner's launch-boundary lock release. Wait
+# for source entry and a public live-owner read before resuming finalization.
+wait_for "$TMP_ROOT/episode-live-started" || fail "attached recovery did not start its source"
+ep_live_owner=$(pe "$HEP" list | awk '$1 == "episode-src" { print $3 }')
+[ "$ep_live_owner" = live ] || fail "attached recovery is not publicly live: $ep_live_owner"
 ep_finish "$ep_pid" "$ep_gate" 0
 assert_contains "$(cat "$ep_gate.out")" "started=1" "late live claim was not recognized"
 [ "$(launch_failed_wake_count "$HEP" episode-src)" = 0 ] \

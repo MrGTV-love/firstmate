@@ -390,12 +390,8 @@ fm_afk_mode() {
 #                                             the lock (the beacon is still fresh)
 #                              stale-beacon - the beacon is stale beyond grace or
 #                                             absent (a genuine supervision lapse)
-# autoarm: a fresh beacon within grace is healthy even with no live watcher,
-# because the watcher only runs between turns. A stale beacon is still healthy
-# while fm_autoarm_midturn_healthy proves a Claude auto-arm generation
-# explains the gap (a rewake bound to the current recovery generation and
-# live session lock), because turn-end re-arms.
-# Without that proof a stale or absent beacon is a genuine lapse.
+# autoarm: docs/turnend-guard.md "Pull-warning verdict by supervision model"
+# owns fresh-beacon tolerance and the proof required for a stale mid-turn gap.
 # extension: a live identity-matched watcher is the ordinary healthy state, but a
 # genuinely unheld lock is also healthy while the beacon is fresh AND a live Pi
 # session provably owns continuity (fm_extension_owns_supervision: the Pi or the

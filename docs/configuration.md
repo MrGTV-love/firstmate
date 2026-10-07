@@ -2529,7 +2529,7 @@ Once per cycle, unless that watcher process's previous run is still going, the w
 
 This single-flight limit is per watcher process, not home-wide: a successor watcher can overlap a reconcile started by its predecessor.
 
-In supported steady state, a home with no registered source runs nothing, generates no state, and keeps its ordinary cadence.
+In supported steady state, with no registered source, retained runner claim, unhandled capture, or unread wake, the process-event subsystem adds no work or state to the home's ordinary cadence.
 
 **Suppress only adapter-confirmed no-op results**
 
