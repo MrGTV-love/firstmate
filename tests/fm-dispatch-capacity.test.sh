@@ -316,24 +316,42 @@ for source in ratelimit-headers usage-endpoint; do
   done
 done
 for source in ratelimit-headers usage-endpoint; do
-  for warning_window in primary secondary; do
-    for remaining in 0 10; do
+  for positive_window in primary secondary; do
+    for positive in warning-zero warning-positive positive; do
       for negative in exhausted zero; do
-        jq -n --argjson at "$(date +%s)" --arg source "$source" --arg window "$warning_window" \
-          --argjson remaining "$remaining" --arg negative "$negative" '
-          {reports:[{provider:"openai-codex",fetchedAt:($at*1000),
-            metadata:{source:$source,headersUpdatedAt:($at*1000)},
-            limits:[
-              {id:("openai-codex:"+$window),status:"warning",amount:{unit:"percent",remaining:$remaining}},
-              {id:("openai-codex:"+(if $window=="primary" then "secondary" else "primary" end)),
-                status:(if $negative=="exhausted" then "exhausted" else "ok" end),
-                amount:{unit:"percent",remaining:0}}]}]}' > "$TMP_ROOT/partial-headers.json"
-        out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/partial-headers.json")")
-        assert_equals unknown "$(jq -r .status <<<"$out")" "merged $source $warning_window warning cannot order a sibling $negative verdict"
-        assert_equals unknown "$(jq -r '.accounts[0].status' <<<"$out")" "conflicting account evidence must remain unknown"
-        out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 \
-          '{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"}' '[]' "$out")
-        assert_equals false "$(jq -r .switched <<<"$out")" "unordered conflicting evidence cannot authorize fallback"
+        for representation in native scoped; do
+          jq -n --argjson at "$(date +%s)" --arg source "$source" --arg window "$positive_window" \
+            --arg positive "$positive" --arg negative "$negative" --arg representation "$representation" '
+            {reports:[{provider:"openai-codex",fetchedAt:($at*1000),
+              metadata:{source:$source,headersUpdatedAt:($at*1000)},
+              limits:[
+                {id:("openai-codex:"+$window),
+                  status:(if $positive=="positive" then "ok" else "warning" end),
+                  window:{resetsAt:(($at+1000)*1000)},
+                  amount:{unit:"percent",remaining:(if $positive=="warning-zero" then 0 else 80 end)}},
+                {id:("openai-codex:"+(if $window=="primary" then "secondary" else "primary" end)),
+                  status:(if $negative=="exhausted" then "exhausted" else "ok" end),
+                  window:{resetsAt:(($at+1000)*1000)},
+                  amount:{unit:"percent",remaining:0}}]},
+              {provider:"openai-codex",fetchedAt:($at*1000),
+                limits:[{id:"openai-codex:primary",status:"exhausted",
+                  window:{resetsAt:(($at+1000)*1000)},amount:{unit:"percent",remaining:0}}]}]} |
+            if $representation=="scoped" then
+              (.reports[].limits[]) |= (del(.id) | .scope={tier:"chat"})
+            else . end' > "$TMP_ROOT/partial-headers.json"
+          out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/partial-headers.json")")
+          assert_equals unknown "$(jq -r .status <<<"$out")" "merged $source $representation $positive_window $positive cannot order a sibling $negative verdict"
+          assert_equals unknown "$(jq -r '.accounts[0].status' <<<"$out")" "conflicting account evidence must remain unknown"
+          assert_equals exhausted "$(jq -r '.accounts[1].status' <<<"$out")" "the other exhausted account cannot resolve conflicting provenance"
+          out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 \
+            '{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"}' \
+            '[{"harness":"omp","model":"openrouter/deepseek/deepseek-v4-flash","effort":"high"}]' "$out")
+          assert_equals false "$(jq -r .switched <<<"$out")" "unordered conflicting evidence cannot authorize fallback"
+          assert_equals openai-codex/gpt-6.1-sol "$(jq -r .profile.model <<<"$out")" "uncertain exhaustion must retain the primary model"
+          jq 'del(.reports[0].metadata.headersUpdatedAt)' "$TMP_ROOT/partial-headers.json" > "$TMP_ROOT/unmerged-bounds.json"
+          out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/unmerged-bounds.json")")
+          assert_equals exhausted "$(jq -r .status <<<"$out")" "an unmerged $representation $negative bound remains authoritative beside $positive"
+        done
       done
     done
   done

@@ -116,6 +116,7 @@ init_changed_fixture_repo() {
     fm-dispatch-capacity.test.sh \
     fm-dispatch-resolve.test.sh \
     fm-omp-harness.test.sh \
+    fm-spawn-claude-api-key-guard.test.sh \
     fm-spawn-dispatch-profile.test.sh \
     fm-control-relaunch.test.sh \
     fm-session-end-relaunch.test.sh \
@@ -343,9 +344,10 @@ test_changed_dependency_selection_and_unmapped_failure() {
     tests/fm-omp-harness.test.sh \
     tests/fm-quota-choose.test.sh \
     tests/fm-session-end-relaunch.test.sh \
+    tests/fm-spawn-claude-api-key-guard.test.sh \
     tests/fm-spawn-dispatch-profile.test.sh)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
-    || fail "capacity-library-only change must select exactly its curated suites, including spawn dispatch profile: $listed"
+    || fail "capacity-library-only change must select exactly its curated suites, including spawn authentication and dispatch profile: $listed"
   git -C "$repo" add bin/fm-dispatch-capacity-lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm capacity-lib-change
 

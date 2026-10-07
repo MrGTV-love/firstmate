@@ -100,7 +100,8 @@ fm_omp_codex_capacity() {
        elif $entitlement == "unknown" or
             ($fetched | type) != "number" or $fetched < (($now - 300) * 1000)
        then "unknown"
-       elif $merged and any($limits[]; .status == "warning") and
+       elif $merged and any($limits[]; .status == "warning" or
+              (.status != "exhausted" and (.amount | percent) != null and (.amount | percent) > 0)) and
             any($limits[]; .status == "exhausted" or
               ((.amount | percent) != null and (.amount | percent) <= 0 and .status != "warning"))
        then "unknown"
