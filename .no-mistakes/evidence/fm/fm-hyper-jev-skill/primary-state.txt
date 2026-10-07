@@ -1,0 +1,3 @@
+$ tmux -L fm-lab -S .jev-live-lbyspat2/home/tmux/fm-lab display-message -p -t primary #{pane_dead} #{pane_current_command} #{pane_width}x#{pane_height}
+exit=0
+0 sleep 120x40

@@ -1,0 +1,10 @@
+$ bin/fm-skill-suggest.sh --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BQ8TREJB9SH1V1QBQ3JBGA/.jev-live-lbyspat2/task.txt --format brief
+exit=0
+
+# Skill selection advice
+
+Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
+This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
+Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
+Required named skill: hyper-jev - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BQ8TREJB9SH1V1QBQ3JBGA/.agents/skills/hyper-jev/SKILL.md.
+No optional suggestion (off: TypeSafe key unavailable); continue ordinary selection.

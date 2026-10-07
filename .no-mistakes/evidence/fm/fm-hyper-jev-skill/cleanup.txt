@@ -1,0 +1,3 @@
+Both private tmux lab primaries stopped with kill-server on the workspace-local fm-lab socket.
+Marked lab home, disposable selector repository, task fixture, synthetic credential, and all transient worktree state removed.
+No source or test files edited.

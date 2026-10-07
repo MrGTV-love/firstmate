@@ -1,0 +1,10 @@
+$ bash -c set -eu
+. bin/fm-typesafe-lib.sh
+fm_typesafe_key "$FM_HOME"
+[ "$TYPESAFE_API_KEY_PRIVATE" = "disposable-typesafe-fixture-not-a-credential" ]
+printf 'Credential resolved from isolated primary home .env: yes\n'
+node -e 'if (process.env.TYPESAFE_API_KEY || process.env.TYPESAFE_API_KEY_PRIVATE) process.exit(1); console.log("Credential exported to child process: no")'
+
+exit=0
+Credential resolved from isolated primary home .env: yes
+Credential exported to child process: no

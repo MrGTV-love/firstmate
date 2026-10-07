@@ -1,0 +1,3 @@
+$ bin/fm-test-run.sh --list --changed --base HEAD
+exit=2
+fm-test-run: no changed-test mapping for source path: .agents/skills/not-hyper-jev/src/client.ts

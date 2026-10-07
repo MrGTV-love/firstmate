@@ -1,0 +1,2 @@
+$ bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4BQ8TREJB9SH1V1QBQ3JBGA/.jev-live-lbyspat2/home
+exit=0

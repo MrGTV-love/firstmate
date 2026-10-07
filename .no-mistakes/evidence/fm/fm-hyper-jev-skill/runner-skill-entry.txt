@@ -1,0 +1,4 @@
+$ bin/fm-test-run.sh --list --changed --base HEAD
+exit=0
+tests/fm-ask-user-authority.test.sh
+tests/fm-test-run.test.sh

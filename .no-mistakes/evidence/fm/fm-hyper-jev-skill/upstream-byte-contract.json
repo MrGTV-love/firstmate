@@ -1,0 +1,452 @@
+{
+  "contract": "Upstream vendored files must remain byte-identical",
+  "source": "https://codeload.github.com/disler/ten-levels-of-jev/tar.gz/777adaf47d37ae0553220d35b2f15b3a3a063305",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "identical": true,
+      "sha256": "ef8257b7c1d5b7c788ccdf56fa1cfd94476375288c57e2552c4bdf36a4cada60"
+    },
+    {
+      "path": "cookbook/01-structure-and-setup.md",
+      "identical": true,
+      "sha256": "dbf230d89bf99bea24918e7475b9814c05ef8a714d6f6b69be403a5371a0559f"
+    },
+    {
+      "path": "cookbook/02-input-output.md",
+      "identical": true,
+      "sha256": "59d692c1f34b26e2dff4a2fe6b2f652db33679677a2ae2f50b60bf28ef5b0dfd"
+    },
+    {
+      "path": "cookbook/03-question-design.md",
+      "identical": true,
+      "sha256": "fe37015befcac7cd2034b405146e4d86416e11eb567a6de48c08738e0b2ac0e2"
+    },
+    {
+      "path": "cookbook/04-client-operations.md",
+      "identical": true,
+      "sha256": "5e7db9eb9c72de0b459727e518f925b389ac815ffee8fa775777c7872bae5bd2"
+    },
+    {
+      "path": "cookbook/05-production.md",
+      "identical": true,
+      "sha256": "41740bbfa78fa0fcc2bf56e80233e37c777aa378a05930183e44a58102a5e6cc"
+    },
+    {
+      "path": "cookbook/README.md",
+      "identical": true,
+      "sha256": "b69f410b20e8556ed3423f5875e657057ed2509ffaebe5349f8ca09b83eab993"
+    },
+    {
+      "path": "cookbook/use-cases/01-single-decisions.md",
+      "identical": true,
+      "sha256": "4ae6d258529f65fea2f00582452baae77f8caaf028ac275b48a920783b8c3723"
+    },
+    {
+      "path": "cookbook/use-cases/02-fan-out.md",
+      "identical": true,
+      "sha256": "43172d160d5096c65c357356b29e42be2cb09c93081509e7df535c0088ff305d"
+    },
+    {
+      "path": "cookbook/use-cases/03-composite-scoring.md",
+      "identical": true,
+      "sha256": "1055ac46f922d0740f087d507a6a99c190ad83af9430eabd56a0ed6238f684a6"
+    },
+    {
+      "path": "cookbook/use-cases/04-confidence-gating.md",
+      "identical": true,
+      "sha256": "38e5049492b5ebc5972b061d2faf8577bcbb3eef5a3311e2071a0e9463dda3b1"
+    },
+    {
+      "path": "cookbook/use-cases/05-routing.md",
+      "identical": true,
+      "sha256": "b350c4c20109a964c5570581a19ec8eb46cf964453c97e171e3743beb633810b"
+    },
+    {
+      "path": "cookbook/use-cases/06-interactive-decisions.md",
+      "identical": true,
+      "sha256": "37449e87e6c895d4c644c0271231fe3ec08c4c62782141d094b05eb0215674df"
+    },
+    {
+      "path": "cookbook/use-cases/07-guardrails.md",
+      "identical": true,
+      "sha256": "2dbdd8acf4227d8ed22d8657ca3635747038fdb569cdfa19f54a30d5bbc02004"
+    },
+    {
+      "path": "cookbook/use-cases/08-decision-loops.md",
+      "identical": true,
+      "sha256": "4a5f65083cbf222f3b0b69e0639dfd95f30868506b238f2e0b4a021fcc859593"
+    },
+    {
+      "path": "cookbook/use-cases/09-high-cardinality.md",
+      "identical": true,
+      "sha256": "7fed6659b44537be5f03a76728fdb9a74576e11a0b92db6dd9fc17fb6abdee6a"
+    },
+    {
+      "path": "cookbook/use-cases/10-dynamic-questions.md",
+      "identical": true,
+      "sha256": "a34a5ad0455296dd8eff5e3d43a9e71b9710854400d29f11118e1530a239865a"
+    },
+    {
+      "path": "cookbook/use-cases/README.md",
+      "identical": true,
+      "sha256": "88c90ae6633392e393c4d1d30d2b328d094c5403b0e44500a2153c6beb27a9f9"
+    },
+    {
+      "path": "templates/starter/.env.example",
+      "identical": true,
+      "sha256": "c19fe41a28215077c8b2734bd57669effd07f3b657822af9f6383fef2fde4190"
+    },
+    {
+      "path": "templates/starter/.gitignore",
+      "identical": true,
+      "sha256": "3a2a0fab25e452437a19f83e74861427450b673bb4c8a8a4410deb3de49c9a0e"
+    },
+    {
+      "path": "templates/starter/README.md",
+      "identical": true,
+      "sha256": "d68ad5dfdebb276d46f383aeb23f7947370365a24c4a284ce672be1ccab171d1"
+    },
+    {
+      "path": "templates/starter/package.json",
+      "identical": true,
+      "sha256": "ec872e1b1b569f9253549864e21c4ff13ccb6804c4d72f62094c36c793309855"
+    },
+    {
+      "path": "templates/starter/src/core/client.ts",
+      "identical": true,
+      "sha256": "ba7b3846de0a59f945928325f0882f293bdc88120dc9613f7a20326233b6cc36"
+    },
+    {
+      "path": "templates/starter/src/core/helpers.ts",
+      "identical": true,
+      "sha256": "73c0ffd6ace85a96ec0446456d2bf94bb3a5916282cc66626e94960cd95c445c"
+    },
+    {
+      "path": "templates/starter/src/core/mock.ts",
+      "identical": true,
+      "sha256": "c4cdb85793e799573fc84a99ca5f189b3feeb25e6ba7246d402569160175720d"
+    },
+    {
+      "path": "templates/starter/src/core/types.ts",
+      "identical": true,
+      "sha256": "6934e457a289f53a6c5dadd4c42fcfd7170ada6327c13c40c952d8af9a64b3de"
+    },
+    {
+      "path": "templates/starter/src/decisions/support-routing.ts",
+      "identical": true,
+      "sha256": "d13db5ebc31a64d61066c9cbc147c34d7424f35f8fd936fd11481727088e9aaa"
+    },
+    {
+      "path": "templates/starter/src/example.ts",
+      "identical": true,
+      "sha256": "56c58310f106c499dc67abc908168a95829af1ab3c6dd96eda35b8781ee5ebeb"
+    },
+    {
+      "path": "templates/starter/src/levels/level01/index.ts",
+      "identical": true,
+      "sha256": "f21ae4e93503e7a9120172a84a1d8becc59e4955900e4ecf861ec763f3e23562"
+    },
+    {
+      "path": "templates/starter/src/levels/level01/injection-gate.ts",
+      "identical": true,
+      "sha256": "4ddc3468d6763681b17f78161b36546e894f060bae9a6f37138e3c2b6c05c654"
+    },
+    {
+      "path": "templates/starter/src/levels/level01/ticket-classifier.ts",
+      "identical": true,
+      "sha256": "df47a8c404fe8908b12716e138d1c79afafde29386efb1d5341493cbbb795675"
+    },
+    {
+      "path": "templates/starter/src/levels/level01/urgency-gate.ts",
+      "identical": true,
+      "sha256": "53d9180a6e0424aabe81e018f1fa3480a3ad1337a5e0ef7b31ef78a96909f0e3"
+    },
+    {
+      "path": "templates/starter/src/levels/level02/index.ts",
+      "identical": true,
+      "sha256": "a8d8f63866f2a485e225af5ff6f10bda92569e248af1307df0c509e2c0ce86b1"
+    },
+    {
+      "path": "templates/starter/src/levels/level02/resume-screening.ts",
+      "identical": true,
+      "sha256": "b9c5ff7c311f71f75710e1f1044a4ef2359b4ae578465b21f050fb4eb4f63f9c"
+    },
+    {
+      "path": "templates/starter/src/levels/level02/sponsor-qualification.ts",
+      "identical": true,
+      "sha256": "1188586eb88bd432225225cee610d27de20fccb6048a3cc0596e756577dabf8a"
+    },
+    {
+      "path": "templates/starter/src/levels/level02/support-triage.ts",
+      "identical": true,
+      "sha256": "6bd9cdd7ed8b7742ff451163d4df3be2482444c13fa45e2ec64451257247cb8f"
+    },
+    {
+      "path": "templates/starter/src/levels/level03/code-review-risk.ts",
+      "identical": true,
+      "sha256": "fc1bff19290ae064965910b1d5a32d08dfa867e0046f00d171935c64c4e9b82e"
+    },
+    {
+      "path": "templates/starter/src/levels/level03/idea-verdict.ts",
+      "identical": true,
+      "sha256": "dc2098d3ce1a0bee2857d3400a3d5c3dbbb60fcf42cdc4d1fa70c973fdbe2dad"
+    },
+    {
+      "path": "templates/starter/src/levels/level03/index.ts",
+      "identical": true,
+      "sha256": "f128f77a548dc14ab06e1f8e668e690e2762dfbeda7318273b72c3b69989e233"
+    },
+    {
+      "path": "templates/starter/src/levels/level03/normalize.ts",
+      "identical": true,
+      "sha256": "39ff65c2797f9422687f55a4d9dc469eba1c5e61f966922a0b0bee4e5236ab0c"
+    },
+    {
+      "path": "templates/starter/src/levels/level03/ticket-priority.ts",
+      "identical": true,
+      "sha256": "650ce6f8e9af4a1d80f21fdd203de51f2fe0af38d8ff1c9609a426722f5935f3"
+    },
+    {
+      "path": "templates/starter/src/levels/level04/account-actions.ts",
+      "identical": true,
+      "sha256": "74b4eb66afffe4a3c363538d49f7c8a859dafa7602e60b86aa968826d693e098"
+    },
+    {
+      "path": "templates/starter/src/levels/level04/citation-check.ts",
+      "identical": true,
+      "sha256": "4f52110d3eb1029800c60fec64cf9f2dd0f8433eea73692dd26867ad5376dde0"
+    },
+    {
+      "path": "templates/starter/src/levels/level04/confidence.ts",
+      "identical": true,
+      "sha256": "af3a7bb5fc9c81ac0e72e59503f5e69266d57da417a1f0057be7bdfaa9ddba3c"
+    },
+    {
+      "path": "templates/starter/src/levels/level04/index.ts",
+      "identical": true,
+      "sha256": "d6bc403a0443e4c9a2aefdea3fa3115aac39999189856ee740cc53342ee6827b"
+    },
+    {
+      "path": "templates/starter/src/levels/level04/shell-command-gate.ts",
+      "identical": true,
+      "sha256": "fc9811a97b11aec93630ebc6fa7920d369c172dedcb8fbd9282f048aea486aa9"
+    },
+    {
+      "path": "templates/starter/src/levels/level05/agent-router.ts",
+      "identical": true,
+      "sha256": "02e7a02b1e0aeb8ed31ae0db73ea1f63ce2ac1bc79e90d8ae495eefe4db203f3"
+    },
+    {
+      "path": "templates/starter/src/levels/level05/index.ts",
+      "identical": true,
+      "sha256": "0a0d3264a181f034e4d323c5df98678f5b5eb0e8c00fb74098bf3d1d4f4dec5d"
+    },
+    {
+      "path": "templates/starter/src/levels/level05/intent-router.ts",
+      "identical": true,
+      "sha256": "0e6e8e300cb50952bf8e2dc0270f9ead2e4569e1da31b519f41d197e2bf747a3"
+    },
+    {
+      "path": "templates/starter/src/levels/level05/model-router.ts",
+      "identical": true,
+      "sha256": "073ad7a0139a709a6212f787be35c2de9075556877fb6fe92c1e585e594fc793"
+    },
+    {
+      "path": "templates/starter/src/levels/level06/adaptive-form.ts",
+      "identical": true,
+      "sha256": "db407dfb9c1fdc7fec8228ac37aee4172ff815100e4cd4a47ecf3e0da10b2f75"
+    },
+    {
+      "path": "templates/starter/src/levels/level06/editor-tone-watch.ts",
+      "identical": true,
+      "sha256": "130cdf60e6fd5ab69ced88af6adb3064c39486649de36a6fc34c256398836c1e"
+    },
+    {
+      "path": "templates/starter/src/levels/level06/feed-filter.ts",
+      "identical": true,
+      "sha256": "56acb9eb396bf3f95e1fff02f61e410a2153dd7b75e49c03c5f96568bf76e080"
+    },
+    {
+      "path": "templates/starter/src/levels/level06/index.ts",
+      "identical": true,
+      "sha256": "768f14dbaf50d6ee930090d3a706101ef37837b8dd5feae395cc87b1f9f8370f"
+    },
+    {
+      "path": "templates/starter/src/levels/level07/claim-verification.ts",
+      "identical": true,
+      "sha256": "1a1598c78d7cfb5abe8e24f43f8fd8f606c9179cc70030ddca54cec56a430a96"
+    },
+    {
+      "path": "templates/starter/src/levels/level07/index.ts",
+      "identical": true,
+      "sha256": "66c64f522a37f0e99100ba38995e147a9185a007351f8e6a98697c4fe6c7353e"
+    },
+    {
+      "path": "templates/starter/src/levels/level07/rag-passage-gate.ts",
+      "identical": true,
+      "sha256": "bf8aee9a64f8ada1e09c6626a8250ecc7b3f09d346fc1d8990b1027d1448ddab"
+    },
+    {
+      "path": "templates/starter/src/levels/level07/tool-risk-middleware.ts",
+      "identical": true,
+      "sha256": "c9dc78773ef69f0ab3a82594682214d3603fc48fa21f9c33cd7d8deb02fbcd80"
+    },
+    {
+      "path": "templates/starter/src/levels/level08/element-picker.ts",
+      "identical": true,
+      "sha256": "ce1892a13d656397367fccaff1300120d02dcaeb03ae4acf91fa4178acd8b151"
+    },
+    {
+      "path": "templates/starter/src/levels/level08/index.ts",
+      "identical": true,
+      "sha256": "b23e73a9d8d5bc503cf349ec1920da9bf19a1e59a42d47369c5d89fb31e5543f"
+    },
+    {
+      "path": "templates/starter/src/levels/level08/pacman-loop.ts",
+      "identical": true,
+      "sha256": "8c1db53f4f1a95130bcf1f7ae77dd87e379171c7e9f6b1d25dd352322e03983d"
+    },
+    {
+      "path": "templates/starter/src/levels/level08/trading-loop.ts",
+      "identical": true,
+      "sha256": "7598f552220410bfb928e572addf4c40b12c616f152cfcc22a5e60a44409b55c"
+    },
+    {
+      "path": "templates/starter/src/levels/level09/hierarchical-classify.ts",
+      "identical": true,
+      "sha256": "df13143008ab97f484fe922a397867f3fe1e3b29d487b12ecd4ae2ba6ab2c244"
+    },
+    {
+      "path": "templates/starter/src/levels/level09/index.ts",
+      "identical": true,
+      "sha256": "ee00b9a5d574b669d3906e7a6057967e55178d76b71cf4b4c7ef969dc7a32b5f"
+    },
+    {
+      "path": "templates/starter/src/levels/level09/shortlist-rerank.ts",
+      "identical": true,
+      "sha256": "0a286fb0d01644e61607c6630447b74959f83d24d5f3e7f636bed9a57920291f"
+    },
+    {
+      "path": "templates/starter/src/levels/level09/wikiracing.ts",
+      "identical": true,
+      "sha256": "ffbc871f5f5b3236c817469a7479ec497b4aceadeada48811a48ed768b189f3a"
+    },
+    {
+      "path": "templates/starter/src/levels/level10/authored-router.ts",
+      "identical": true,
+      "sha256": "c10e2ad201aa4979dab08a4814fce840b14067014eca9f152e10d7705de6cbca"
+    },
+    {
+      "path": "templates/starter/src/levels/level10/command-gate.ts",
+      "identical": true,
+      "sha256": "f9473c51570003d8b0042ba465f74d68e4acf2290ba19112f7c72c1519013b64"
+    },
+    {
+      "path": "templates/starter/src/levels/level10/index.ts",
+      "identical": true,
+      "sha256": "004c1e24bd195f09ebb9ee292b4c8abee6be70e81b9f62affbd12cf66fd5230c"
+    },
+    {
+      "path": "templates/starter/src/levels/level10/review-rubric.ts",
+      "identical": true,
+      "sha256": "d617e46f9ff271e5df30202486866011480c454f38173efdc31be73569a5c5a4"
+    },
+    {
+      "path": "templates/starter/src/levels/level10/toolkit.ts",
+      "identical": true,
+      "sha256": "d2b041a62b580aafa9957f78fc028bc78e493333d58708d6a575fa938458e9ef"
+    },
+    {
+      "path": "templates/starter/src/usage-ledger.ts",
+      "identical": true,
+      "sha256": "60e34eff559fa73c5e81cacacaf052c6136a4f59512dca30ef82b305c8d6ab07"
+    },
+    {
+      "path": "templates/starter/tests/client.test.ts",
+      "identical": true,
+      "sha256": "7ce9ff519dd0d77db3e5cf5b22b72383fd77122eba039b525883b3a83a7f4d07"
+    },
+    {
+      "path": "templates/starter/tests/core.test.ts",
+      "identical": true,
+      "sha256": "3726cee98e7612dd60a1839fb25154b1565b75c5f9243282300342a1d3a57f17"
+    },
+    {
+      "path": "templates/starter/tests/level01.test.ts",
+      "identical": true,
+      "sha256": "f723002f7a3507feb073b94fa4b78da2c48aa75b047a095bc79858a41d964142"
+    },
+    {
+      "path": "templates/starter/tests/level02.test.ts",
+      "identical": true,
+      "sha256": "ea0b60a3ea7990c2686359885534b27c352913bbfe9fcb4cf8b73a5f64cb60de"
+    },
+    {
+      "path": "templates/starter/tests/level03.test.ts",
+      "identical": true,
+      "sha256": "4f8ffcfaebb4dd63049643f3d7e19b13d6f5a8f1b1011fb716e07e1076be715e"
+    },
+    {
+      "path": "templates/starter/tests/level04.test.ts",
+      "identical": true,
+      "sha256": "3b92eb9434f035043b9cdd937cf60bbde6774e6441289fc430192385d69133c7"
+    },
+    {
+      "path": "templates/starter/tests/level05.test.ts",
+      "identical": true,
+      "sha256": "e56ed6c5eb7f515ce530c15e7eea3ca8d62921743580faeb977fb597b0d8ed8a"
+    },
+    {
+      "path": "templates/starter/tests/level06.test.ts",
+      "identical": true,
+      "sha256": "985fe02e645b0f398a685086401c4f9ea2be6b5d031c86a306654f3354843d34"
+    },
+    {
+      "path": "templates/starter/tests/level07.test.ts",
+      "identical": true,
+      "sha256": "9b448f404b4ae4b015b5288d4c3686964f3c4b81a515af5d9f3d4007c28456c5"
+    },
+    {
+      "path": "templates/starter/tests/level08.test.ts",
+      "identical": true,
+      "sha256": "7999e84a53bd12bf320aa4eafccb97b0e78c5f2cbb242ea8395de0697f215397"
+    },
+    {
+      "path": "templates/starter/tests/level09.test.ts",
+      "identical": true,
+      "sha256": "dcadc6a5ac39813143a8ea23decec9b346fc24d2f03e10b6950442ddd5cc67da"
+    },
+    {
+      "path": "templates/starter/tests/level10.test.ts",
+      "identical": true,
+      "sha256": "7792b1aca227c42d0a2fb30d68ba0dae16babec292912293bb17cd3e3c4709f4"
+    },
+    {
+      "path": "templates/starter/tests/starter-regressions.test.ts",
+      "identical": true,
+      "sha256": "f6e5374a60d594b7df07a717cec13c60dfca455dfd877b79e63530d771aaa37f"
+    },
+    {
+      "path": "templates/starter/tests/support-routing.test.ts",
+      "identical": true,
+      "sha256": "26e371f016c3e02cdb4e7cda661e0d8224b637b6b78a5cfb4c60c85c7835e969"
+    },
+    {
+      "path": "templates/starter/tests/usage-ledger.test.ts",
+      "identical": true,
+      "sha256": "9c6db96b6cc2edb2211b641bd18684c771612816a26be725e3e6c23d6dfba286"
+    },
+    {
+      "path": "templates/starter/tsconfig.json",
+      "identical": true,
+      "sha256": "3e8d81e98e49a8ffd9b4b90331ed9a0effdcb3c1172f997ec52ed0618626eb35"
+    },
+    {
+      "path": "LICENSE",
+      "identical": true,
+      "sha256": "f2af63c9daec6bc7234a7d754da7266c9102308f18ac73c077903dd4bdaaaa03"
+    }
+  ],
+  "all_identical": true
+}

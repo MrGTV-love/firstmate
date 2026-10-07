@@ -1,0 +1,3 @@
+$ bin/fm-test-run.sh --list --changed --base HEAD
+exit=0
+fm-test-run: no tests selected for changes vs HEAD (map is conservative; use --all for the complete suite)

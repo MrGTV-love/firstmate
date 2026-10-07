@@ -1,0 +1,2 @@
+$ tmux -L fm-lab -S .jev-live-lbyspat2/home/tmux/fm-lab kill-server
+exit=0

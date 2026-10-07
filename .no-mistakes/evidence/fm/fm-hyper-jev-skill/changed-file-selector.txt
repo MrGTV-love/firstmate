@@ -1,0 +1,15 @@
+$ bin/fm-test-run.sh --list --changed --base HEAD
+exit=0
+fm-test-run: no tests selected for changes vs HEAD (map is conservative; use --all for the complete suite)
+
+
+$ bin/fm-test-run.sh --list --changed --base HEAD
+exit=0
+tests/fm-ask-user-authority.test.sh
+tests/fm-test-run.test.sh
+
+
+$ bin/fm-test-run.sh --list --changed --base HEAD
+exit=2
+fm-test-run: no changed-test mapping for source path: .agents/skills/not-hyper-jev/src/client.ts
+

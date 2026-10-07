@@ -1,0 +1,45 @@
+I read the vendored skill's `SKILL.md`, the setup, client-operations and production cookbook chapters, `SOURCE.md`, the firstmate overlay `.agents/skills/hyper-jev/FIRSTMATE.md`, and the code in `bin/fm-typesafe-lib.sh` and its callers. I didn't run anything, change any files, call any API, or open any `.env` or credential file.
+
+## Which rules apply
+
+The upstream skill is MIT-licensed and vendored from `disler/ten-levels-of-jev`. In firstmate, a short overlay sits on top of it. `SOURCE.md:1` points to `FIRSTMATE.md`, and the overlay says it wins wherever the two disagree (`FIRSTMATE.md:5`).
+
+| Topic | Upstream skill | Firstmate (wins) |
+|---|---|---|
+| Provider | TypeSafe if `TYPESAFE_API_KEY` is set, otherwise OpenRouter (`cookbook/01-structure-and-setup.md:57-65`) | TypeSafe direct only. Never OpenRouter, and never set `JEV_BACKEND` or `provider` to `openrouter` |
+| Endpoint | TypeSafe or `https://openrouter.ai/api/alpha/decisions` | Only `POST https://api.typesafe.ai/v1/systemone` |
+| Key storage | Secret manager, or a service-local `.env` | Only `TYPESAFE_API_KEY` in the primary home `.env`. No service `.env`, no key in `.env.example`, no secret-manager entry, no copies |
+| Key timing | Read once when the client is constructed | Read at call time with `fm_typesafe_key` |
+| Failures | Retry 429/502/503/529 on the same provider, up to 3 attempts. Never switch provider | Never switch provider. The firstmate shell client makes one attempt with a 5-second limit and no retries (`bin/fm-typesafe-lib.sh:4-6`) |
+
+Both sources agree on one thing: a failed request must never cause a provider switch (`SKILL.md:21`, `cookbook/04-client-operations.md:18`). The overlay only makes this stricter.
+
+## The operator's three proposals
+
+1. **"Use `OPENROUTER_API_KEY` when TypeSafe is missing."** No. Upstream allows this at startup, but `FIRSTMATE.md:2` forbids OpenRouter in firstmate. If the TypeSafe key is missing, the Jev feature turns itself off and says so:
+   - `bin/fm-dispatch-resolve.sh:141-143` prints `dispatch-resolve: off (TYPESAFE_API_KEY absent …)` and exits 0.
+   - `bin/fm-skill-suggest.sh:201` does `fallback off "TypeSafe key unavailable"`.
+
+   It also must not quietly fall back to mock results (`SKILL.md:21`). The fix is for the operator to put the key in the primary home `.env`.
+
+2. **"Create a service `.env` from the primary key."** No. `FIRSTMATE.md:4` forbids any service `.env` or copy of the key. The primary home `.env` is the only place the key lives, and the helper reads it from there.
+
+3. **"Switch providers after a 503."** No, under both sets of rules. In firstmate, `fm_typesafe_post` makes a single attempt and returns only the HTTP code. `fm-dispatch-resolve.sh:438` treats anything other than 200 as an error. The right response is a visible error or advisory-off, with the app's own safe fallback (for dispatch, the operator's normal choice). There should be no OpenRouter request and no retry loop. If you need a retry later, schedule it outside this client and send it to TypeSafe again.
+
+## How the key is resolved (`bin/fm-typesafe-lib.sh`)
+
+- **When the file is sourced (lines 12-14):** any `TYPESAFE_API_KEY` already in the environment is moved into the private shell variable `TYPESAFE_API_KEY_PRIVATE`. That variable is removed from the exported environment, and `TYPESAFE_API_KEY` is unset, so child processes never inherit the key.
+- **`fm_typesafe_key <home>` (lines 19-22):** if the private variable is empty, it reads `TYPESAFE_API_KEY` from `<home>/.env` using `fmx_env_get`. It succeeds only if a non-empty key is found.
+- **`fm_typesafe_post` (lines 24-39):** the endpoint is hard-coded. The `Authorization: Bearer` header is passed to curl through file descriptor 3, so the key never appears on the command line. The function prints only the HTTP code, or `000` on a transport failure.
+- **`fm_typesafe_permitted`:** before sending, every request string is checked against the dispatch-never-send policy. If any text matches, the request is withheld.
+
+## A provenance issue
+
+`SOURCE.md:12-14` still says the upstream files are unmodified and that SOURCE.md is "the only file added by firstmate besides LICENSE." That's no longer accurate:
+- `FIRSTMATE.md` was added.
+- A pointer line was put at the top of `SOURCE.md`.
+- The skill lives under `.agents/skills/`, while `SKILL.md:18` says `.claude/skills/`.
+
+The upstream files themselves look untouched, so the explanation above still holds. But the provenance text should be updated to list the overlay. I didn't change it because you asked for read-only.
+
+I also didn't look inside the untracked `.jev-live-lbyspat2/` directory beyond seeing in search results that it mirrors these files.

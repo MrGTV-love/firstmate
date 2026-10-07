@@ -1,0 +1,47 @@
+Captain, here is how to integrate Jev for production support triage in firstmate. I only read files. I changed nothing, made no calls, ran no commands, and did not touch any credentials.
+
+## Which guidance wins
+
+The vendored upstream skill says to prefer `TYPESAFE_API_KEY`, fall back to `OPENROUTER_API_KEY`, and keep a service-local `.env`. This repo overrides that in `.agents/skills/hyper-jev/FIRSTMATE.md`. Its last line says the overlay wins in firstmate where the upstream text differs. Upstream's own `SOURCE.md` points to the overlay. Follow the overlay, not the upstream defaults.
+
+## Permitted provider and endpoint
+
+- **Provider:** TypeSafe direct, and nothing else.
+- **Endpoint:** `POST https://api.typesafe.ai/v1/systemone`. `bin/fm-typesafe-lib.sh` hard-codes it.
+- **Existing transport:** The shared helper `fm_typesafe_post` already provides a fixed five-second deadline and no retries. It prints only the HTTP code and keeps the key off argv. Use it rather than adding a second transport.
+- **Never-send policy:** `fm_typesafe_permitted` checks request text against the dispatch never-send list, which fits triage because support data can be sensitive. It withholds the request if a string matches or the list can't be inspected.
+
+## Where the key belongs and how to load it
+
+- **Location:** `TYPESAFE_API_KEY` goes in the primary home's `.env` and nowhere else.
+- **Loading:** Resolve it at call time with `fm_typesafe_key <home>` from `bin/fm-typesafe-lib.sh`. That reads `<home>/.env` through `fmx_env_get`.
+- **Process environment:** The library moves any inherited value into a private non-exported variable and unsets `TYPESAFE_API_KEY`, so children never inherit it.
+- **Never create** a service `.env`, an `.env.example` entry for the key, a secret-manager entry, or any other copy.
+- **Never print** the key, and keep Authorization headers out of audit records.
+
+The bundled starter has its own `.env.example` and constructs its client from process environment. In firstmate, don't copy that pattern. Adapt the decision module so the key comes through `fm_typesafe_key`.
+
+## If only an OpenRouter key is available
+
+Don't use it for Jev in firstmate. The overlay says never select OpenRouter and never set `JEV_BACKEND` or `provider` to `openrouter`. With no `TYPESAFE_API_KEY`, treat Jev as unavailable. Per the upstream skill, missing credentials must not quietly turn into mock results for production decisions.
+
+For triage, an unavailable Jev should send the ticket to the explicit human-review outcome. Only you can decide to add a TypeSafe key to the primary home `.env`, so that is the step to ask for. Upstream also notes that direct TypeSafe has not been live-verified as a deployment, so an authorized smoke test is still pending.
+
+## Should a failed call switch providers?
+
+No. The overlay says never switch provider after a failed call. A failure means timeout, non-2xx, malformed response, or transport error (`000`). Handle each one as follows:
+
+- **Provider choice:** Stay on TypeSafe.
+- **Retries:** The shared helper does no retries. Any retry policy is separate from provider choice, and you would need to add it deliberately.
+- **Fallback:** Route the ticket to the review path.
+- **Record:** Keep the failure and any raw payload alongside the decision, not a substitute answer.
+
+## Shape of the integration
+
+1. Define the decision with a small outcome set, such as category, blocked, and frustration, plus an explicit `review` outcome. Ask independent questions in one call.
+2. Keep the questions, thresholds, and pure policy function together in one named decision module. The starter's `src/decisions/support-routing.ts` is the model.
+3. Return `{ decision, result }` and keep the raw request, raw response, usage, and model ID. Don't keep only the derived decision.
+4. Keep arithmetic, date checks, and authorization in code. Jev is only an additional signal for bounded judgments.
+5. Test offline first with mocked HTTP for provider selection, malformed responses, raw-payload retention, and accounting. Run a live smoke test only when you authorize it, and report the provider and model actually observed.
+
+If you want this built, firstmate project work goes to a worker. The change would also touch shared tracked material, so the worker would need `firstmate-coding-guidelines`. Tell me the delivery path and I'll dispatch it.

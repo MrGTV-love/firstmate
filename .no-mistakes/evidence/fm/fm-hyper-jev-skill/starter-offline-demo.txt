@@ -1,0 +1,35 @@
+$ node src/example.ts
+exit=0
+{
+  "decision": {
+    "route": "engineering",
+    "reason": "Technical support"
+  },
+  "policyVersion": "support-routing-v1",
+  "meta": {
+    "provider": "mock",
+    "requestedModel": "jev-1.13.0-mock",
+    "resolvedModel": "jev-1.13.0-mock",
+    "elapsedMs": 0,
+    "attempts": 1,
+    "cost": {
+      "amount": 0,
+      "source": "mock"
+    }
+  },
+  "usage": {
+    "input_tokens": 38,
+    "output_tokens": 20
+  },
+  "totals": {
+    "successfulLiveCalls": 0,
+    "failedCalls": 0,
+    "mockCalls": 1,
+    "attemptsOnSuccessfulLiveCalls": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "reportedUsd": 0,
+    "estimatedUsd": 0,
+    "unknownCostCalls": 0
+  }
+}
