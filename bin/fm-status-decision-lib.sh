@@ -358,16 +358,20 @@ status_open_decisions() {  # <status-file> [<kind>]
 # key readers the fold uses, and its time comes from status_line_at_epoch, so a
 # tag quoted in another line's prose or a malformed stamp can never set an age.
 status_open_decisions_dated() {  # <status-file> [<kind>]
-  local f=$1 open key verb summary line line_verb opened
+  local f=$1 open key verb summary line line_verb opened kind resolve held line_open
   open=$(status_open_decisions "$f" "${2:-}")
   [ -n "$open" ] || return 0
+  kind=$(_fm_status_kind "$f" "${2:-}")
+  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   while IFS=$'\t' read -r key verb summary; do
     [ -n "$verb" ] || continue
     opened=
     while IFS= read -r line || [ -n "$line" ]; do
       status_line_verb "$line" line_verb
       [ "$line_verb" = "$verb" ] || continue
-      [ "$(_fm_decision_key "$line" 2>/dev/null || true)" = "$key" ] || continue
+      line_open=$(_fm_decision_fold_line '' "$line" "$resolve" "$held" "$kind")
+      _fm_open_set_has "$line_open" "$key" || continue
       opened=$(status_line_at_epoch "$line" 2>/dev/null || true)
     done < "$f"
     printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$opened" "$summary"

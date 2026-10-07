@@ -35,6 +35,19 @@ SH
   printf '%s\n' "$TMP_ROOT/$dir"
 }
 
+record_merged_pr() {
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$1/home/state/$2.meta"
+  cat > "$1/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+if [ "$1 $2 $3" = "pr view https://github.com/example/repo/pull/7" ]; then
+  printf '%s\n' MERGED
+  exit 0
+fi
+exit 1
+SH
+  chmod +x "$1/fakebin/gh"
+}
+
 mark_case_as_treehouse_pool() {  # <case>
   local dir=$1
   rm -rf "$dir/worktree"
@@ -929,11 +942,6 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   kill "$worker" 2>/dev/null || true
   wait "$worker" 2>/dev/null || true
 
-  # The same reassignment on a CLEAN slot: a landed ship task torn down without
-  # --force, which is the shape of the real incident. A clean, fully landed copy
-  # passes every unlanded-work check, so only the ownership determination can
-  # keep this slot out of the pool; a guard keyed off dirtiness would return it
-  # and destroy the live task's copy.
   dir=$(make_case slot-reassigned-clean)
   mark_case_as_treehouse_pool "$dir"
   rm -f "$dir/worktree/sentinel"
@@ -942,6 +950,7 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=ship"
+  record_merged_pr "$dir" "$id"
   claim_pool_slot "$dir" "$other" "$dir/other-home"
   ( cd "$dir/worktree" && exec sleep 30 ) &
   worker=$!
@@ -1061,6 +1070,7 @@ write_endpoint_close_meta() {  # <case-dir> <id> <window>
     "window=$3" "endpoint_task_id=$2" \
     "worktree=$1/nonexistent-worktree" "project=$1/nonexistent-project" \
     "kind=ship" "mode=no-mistakes"
+  record_merged_pr "$1" "$2"
 }
 
 test_failed_endpoint_close_refuses_before_removing_the_record() {

@@ -549,7 +549,7 @@ backlog_json() {  # [<backlog-path>] - defaults to this home's $BACKLOG
         else . end)
     | .records |= map(
         if .structured then
-          .captain_drop = any(.body_lines[]?; . == "dropped")
+          .captain_drop = any(.body_lines[]?; . == "dropped" or . == "Deliverable of the finished work: dropped")
         else . end)
     | .records as $records
     | (reduce ($records[] | select(.structured)) as $record ({};

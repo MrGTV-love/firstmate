@@ -384,6 +384,7 @@ case "\${1:-} \${2:-}" in
   "pr view")
     case " \$* " in
       *"state,headRefOid,url"*) printf '%s\t%s\t%s\n' 'MERGED' '$head' 'https://github.com/example/repo/pull/7' ; exit 0 ;;
+      *"--json state "*) printf '%s\n' MERGED ; exit 0 ;;
       *"headRefOid"*) printf '%s\n' '$head' ; exit 0 ;;
     esac
     ;;
@@ -958,6 +959,229 @@ test_drop_file_without_force_is_a_usage_error() {
   pass "--drop-file needs --force and a readable words file"
 }
 
+add_orca_teardown_mock() {
+  local case_dir=$1
+  cat > "$case_dir/fakebin/orca" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/orca.log"
+if [ "\${1:-} \${2:-}" = "worktree show" ]; then
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-test::$case_dir/wt","path":"$case_dir/wt"}}}\n'
+else
+  printf '{"ok":true,"result":{}}\n'
+fi
+SH
+  chmod +x "$case_dir/fakebin/orca"
+}
+
+test_ship_without_owned_copy_requires_recorded_landing_or_drop() {
+  local case_dir mode backend evidence rc head words window
+  for mode in no-mistakes local-only; do
+    for backend in tmux orca; do
+      for evidence in no-pr open error merged force; do
+        case_dir=$(make_case "missing-$mode-$backend-$evidence")
+        head=$(git -C "$case_dir/wt" rev-parse HEAD)
+        window=firstmate:fm-task-x1
+        [ "$backend" != orca ] || window=fm-task-x1
+        fm_write_meta "$case_dir/state/task-x1.meta" \
+          "window=$window" "endpoint_task_id=task-x1" \
+          "worktree=$case_dir/missing-wt" "project=$case_dir/project" \
+          "kind=ship" "mode=$mode" "spawn_gen=teardown-test-task-x1"
+        if [ "$backend" = orca ]; then
+          printf '%s\n' "backend=orca" "terminal=term-test" \
+            "orca_worktree_id=wt-test::$case_dir/missing-wt" >> "$case_dir/state/task-x1.meta"
+          add_orca_teardown_mock "$case_dir"
+        fi
+        seed_backlog_in_flight "$case_dir"
+        case "$evidence" in
+          open|error|merged)
+            append_pr_meta_url "$case_dir"
+            add_gh_pr_merged_for_head "$case_dir" "$head"
+            if [ "$evidence" = open ]; then
+              cat > "$case_dir/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' OPEN
+SH
+            elif [ "$evidence" = error ]; then
+              add_gh_axi_error "$case_dir"
+            fi
+            ;;
+        esac
+        rc=0
+        if [ "$evidence" = force ]; then
+          words="$case_dir/words.txt"
+          printf 'Drop the missing deliverable; do not claim it landed.\n' > "$words"
+          run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        else
+          run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        fi
+        case "$evidence" in
+          merged|force)
+            expect_code 0 "$rc" "missing-$mode-$backend-$evidence: authorized cleanup refused: $(cat "$case_dir/stderr")"
+            [ "$(backlog_row_state "$case_dir")" = done ] || fail "missing-$evidence: accepted cleanup did not close backlog"
+            assert_absent "$case_dir/state/task-x1.meta" "missing-$evidence: accepted cleanup retained metadata"
+            if [ "$evidence" = merged ]; then
+              assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" "missing-$mode: merged proof was not recorded"
+              assert_no_grep 'local main' "$case_dir/data/backlog.md" "missing-$mode: cleanup falsely claimed local landing"
+            else
+              cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "missing-force: captain words were lost"
+              grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" || fail "missing-force: unproved deliverable was not marked dropped"
+            fi
+            ;;
+          *)
+            expect_code 1 "$rc" "missing-$mode-$backend-$evidence: unproved ship cleanup must refuse"
+            [ "$(backlog_row_state "$case_dir")" = in_flight ] || fail "missing-$evidence: refusal closed backlog"
+            assert_present "$case_dir/state/task-x1.meta" "missing-$evidence: refusal removed metadata"
+            assert_absent "$case_dir/state/task-x1.backlog-close" "missing-$evidence: refusal left close replay authority"
+            assert_absent "$case_dir/orca.log" "missing-$evidence: refusal dispatched Orca cleanup"
+            ;;
+        esac
+      done
+    done
+  done
+  pass "missing ship copies require a merged recorded PR or captain-authorized drop for every delivery mode and backend"
+}
+
+add_reassigned_copy_spies() {
+  local case_dir=$1 state=$2
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  if [ "\$arg" = "$case_dir/wt" ] || [ "\$arg" = "$case_dir/pool/1/project" ]; then
+    printf 'git %s\n' "\$*" >> "$case_dir/slot-access.log"
+    exit 1
+  fi
+done
+if [ "\$PWD" = "$case_dir/pool/1/project" ]; then
+  printf 'git cwd %s\n' "\$*" >> "$case_dir/slot-access.log"
+  exit 1
+fi
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+if [ "\$(pwd -P)" = "$case_dir/pool/1/project" ]; then
+  printf 'gh cwd %s\n' "\$*" >> "$case_dir/slot-access.log"
+  exit 1
+fi
+printf '%s\n' "\$*" >> "$case_dir/forge.log"
+if [ "\${1:-} \${2:-} \${3:-}" != "pr view https://github.com/example/repo/pull/7" ]; then exit 1; fi
+case "$state" in
+  merged) printf '%s\n' MERGED ;;
+  open) printf '%s\n' OPEN ;;
+  *) exit 1 ;;
+esac
+SH
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/slot-cleanup.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/git" "$case_dir/fakebin/gh" "$case_dir/fakebin/treehouse"
+}
+
+test_reassigned_ship_copy_never_supplies_completion_proof() {
+  local case_dir evidence mode rc words state
+  for mode in no-mistakes local-only; do
+    for evidence in no-pr open error merged forced-drop forced-merged; do
+      case_dir=$(make_case "reassigned-$mode-$evidence")
+      write_meta "$case_dir" "$mode" ship
+      seed_backlog_in_flight "$case_dir"
+      mkdir -p "$case_dir/pool/1"
+      git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+      ln -s pool/1/project "$case_dir/wt"
+      printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' \
+        "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
+      printf 'task=other-task\nhome=%s\n' "$case_dir/other-home" > "$case_dir/pool/1/.fm-slot-owner"
+      cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/slot-owner.before"
+      printf 'new owner work\n' > "$case_dir/wt/sentinel"
+      state=error
+      case "$evidence" in
+        open|error|merged|forced-merged) append_pr_meta_url "$case_dir" ;;
+      esac
+      case "$evidence" in
+        merged|forced-merged) state=merged ;;
+        open) state=open ;;
+      esac
+      add_reassigned_copy_spies "$case_dir" "$state"
+      rc=0
+      case "$evidence" in
+        forced-*)
+          words="$case_dir/words.txt"
+          printf 'Discard only the old assignment; leave the new owner alone.\n' > "$words"
+          FM_HOME="$case_dir" run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+          ;;
+        *) FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$? ;;
+      esac
+      case "$evidence" in
+        merged|forced-*)
+          expect_code 0 "$rc" "reassigned-$mode-$evidence: authorized old-record cleanup refused: $(cat "$case_dir/stderr")"
+          [ "$(backlog_row_state "$case_dir")" = done ] || fail "reassigned-$evidence: accepted cleanup did not close backlog"
+          assert_absent "$case_dir/state/task-x1.meta" "reassigned-$evidence: old record was not removed"
+          if [ "$evidence" = forced-drop ]; then
+            grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" || fail "reassigned-force: new-owner content was mistaken for old-task landing"
+          else
+            assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" "reassigned-merged: recorded PR completion was lost"
+            ! grep -Eq 'local main|^[[:space:]]+dropped$' "$case_dir/data/backlog.md" || fail "reassigned-merged: wrong completion label"
+            assert_grep 'pr view https://github.com/example/repo/pull/7' "$case_dir/forge.log" "reassigned-merged: accepted without asking forge about recorded PR"
+          fi
+          case "$evidence" in
+            forced-*) cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "reassigned-force: captain words were lost" ;;
+          esac
+          ;;
+        *)
+          expect_code 1 "$rc" "reassigned-$mode-$evidence: an unproved old ship must refuse"
+          [ "$(backlog_row_state "$case_dir")" = in_flight ] || fail "reassigned-$evidence: refusal closed backlog"
+          assert_present "$case_dir/state/task-x1.meta" "reassigned-$evidence: refusal removed old metadata"
+          assert_absent "$case_dir/state/task-x1.backlog-close" "reassigned-$evidence: refusal left replay authority"
+          ;;
+      esac
+      cmp -s "$case_dir/slot-owner.before" "$case_dir/pool/1/.fm-slot-owner" || fail "reassigned-$evidence: changed new owner's claim"
+      [ "$(cat "$case_dir/wt/sentinel")" = "new owner work" ] || fail "reassigned-$evidence: discarded new owner's work"
+      assert_absent "$case_dir/slot-access.log" "reassigned-$evidence: inspected or fetched new owner's copy"
+      assert_absent "$case_dir/slot-cleanup.log" "reassigned-$evidence: returned new owner's slot"
+    done
+  done
+  pass "reassigned copies are never inspected or attributed; only recorded merged PRs or authorized old-task drops close backlog"
+}
+
+test_forced_dirty_landed_deliverables_retain_captain_words() {
+  local case_dir kind delivery mode rc words
+  for delivery in ship scout local-only; do
+    case_dir=$(make_case "forced-dirty-landed-$delivery")
+    kind=$delivery
+    mode=no-mistakes
+    if [ "$delivery" = local-only ]; then kind=ship; mode=local-only; fi
+    write_meta "$case_dir" "$mode" "$kind"
+    seed_backlog_in_flight "$case_dir" "$kind"
+    if [ "$kind" = ship ]; then
+      wt_commit_file "$case_dir" feature.txt landed "landed feature"
+      append_pr_meta_for_current_head "$case_dir"
+      add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
+    else
+      mkdir -p "$case_dir/data/task-x1"
+      printf 'Delivered investigation report.\n' > "$case_dir/data/task-x1/report.md"
+    fi
+    printf 'uncommitted scratch\n' > "$case_dir/wt/scratch.txt"
+    words="$case_dir/words.txt"
+    printf 'Discard the remaining scratch; keep the delivered result.\n' > "$words"
+    rc=0
+    run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "forced-dirty-$kind: authorized cleanup refused: $(cat "$case_dir/stderr")"
+    cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "forced-dirty-$kind: exact captain words were lost"
+    [ "$(backlog_row_state "$case_dir")" = done ] || fail "forced-dirty-$kind: backlog was not closed"
+    ! grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" || fail "forced-dirty-$kind: delivered result was mislabeled dropped"
+    if [ "$delivery" = local-only ]; then
+      assert_grep 'local main' "$case_dir/data/backlog.md" "forced-dirty-local-only: local completion was lost"
+    elif [ "$kind" = ship ]; then
+      assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" "forced-dirty-ship: PR completion was lost"
+    else
+      assert_grep 'task-x1/report.md' "$case_dir/data/backlog.md" "forced-dirty-scout: report completion was lost"
+      assert_present "$case_dir/data/task-x1/report.md" "forced-dirty-scout: delivered report was removed"
+    fi
+  done
+  pass "forced dirty cleanup retains captain authority separately from landed ship and delivered scout completion labels"
+}
+
 test_scout_report_must_be_a_regular_nonempty_file() {
   local case_dir rc
   case_dir=$(make_case scout-report-file)
@@ -1435,8 +1659,10 @@ test_windowless_legacy_record_with_gone_worktree_tears_down() {
   write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
   seed_backlog_in_flight "$case_dir"
 
+  append_pr_meta_url "$case_dir"
+  add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   out=$(run_teardown "$case_dir") \
-    || fail "windowless-gone: teardown refused a leftover with no window, no spawn_gen, and no worktree"
+    || fail "windowless-gone: teardown refused a leftover with a forge-confirmed merged recorded PR"
   printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
     || fail "windowless-gone: the teardown line did not log the missing-endpoint leftover: $out"
   printf '%s\n' "$out" | grep -Fq 'window none' \
@@ -1445,7 +1671,7 @@ test_windowless_legacy_record_with_gone_worktree_tears_down() {
     || fail "windowless-gone: teardown returned success with its backlog item still open"
   assert_absent "$case_dir/state/task-x1.meta" \
     "windowless-gone: teardown left the leftover record"
-  pass "a windowless leftover with no spawn_gen and no worktree tears down without --legacy-record"
+  pass "a windowless leftover with a merged recorded PR tears down without --legacy-record"
 }
 
 test_windowless_legacy_record_tears_down_with_the_legacy_flag() {
@@ -1454,15 +1680,17 @@ test_windowless_legacy_record_tears_down_with_the_legacy_flag() {
   write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
   seed_backlog_in_flight "$case_dir"
 
+  append_pr_meta_url "$case_dir"
+  add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   out=$(run_teardown "$case_dir" --legacy-record) \
-    || fail "windowless-flag: --legacy-record refused a leftover with no window and no spawn_gen"
+    || fail "windowless-flag: --legacy-record refused a leftover with a forge-confirmed merged recorded PR"
   printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
     || fail "windowless-flag: the teardown line did not log the missing-endpoint leftover: $out"
   assert_absent "$case_dir/state/task-x1.meta" \
     "windowless-flag: teardown left the leftover record"
   [ "$(backlog_row_state "$case_dir")" = "done" ] \
     || fail "windowless-flag: teardown returned success with its backlog item still open"
-  pass "a windowless leftover with no spawn_gen also tears down when --legacy-record is passed"
+  pass "a windowless leftover with a merged recorded PR also tears down when --legacy-record is passed"
 }
 
 test_windowless_legacy_record_still_refuses_unlanded_work() {
@@ -1562,6 +1790,7 @@ test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
   write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
   printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
+  add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   add_failing_truncate_perl "$case_dir"
   add_failing_close_publication_mv "$case_dir"
 
@@ -5196,6 +5425,9 @@ test_local_only_truly_unpushed_refuses
 test_local_only_merged_to_local_main_allows
 test_no_mistakes_pushed_branch_without_merge_refuses
 test_drop_file_without_force_is_a_usage_error
+test_ship_without_owned_copy_requires_recorded_landing_or_drop
+test_reassigned_ship_copy_never_supplies_completion_proof
+test_forced_dirty_landed_deliverables_retain_captain_words
 test_scout_report_must_be_a_regular_nonempty_file
 test_no_mistakes_truly_unpushed_refuses
 test_local_only_force_overrides_unpushed

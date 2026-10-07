@@ -2550,9 +2550,9 @@ open_loops_refresh_detached() {
 open_loops_stale_wake() {  # <ledger-path>
   local marker="$STATE/.open-loops-stale-surfaced"
   [ ! -e "$marker" ] || [ "$(age_of "$marker")" -ge "$OPEN_LOOPS_RESURFACE" ] || return 0
-  : > "$marker"
   fm_wake_append check open-loop-ledger-stale \
     "open-loop-ledger-stale: the reconciler stopped publishing $1; run bin/fm-open-loops.sh and restore its sources" || exit 1
+  : > "$marker"
   wake "check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)"
 }
 open_loops_surface() {
@@ -2574,9 +2574,9 @@ open_loops_surface() {
     return 0
   fi
   overdue=$(printf '%s\n' "$ids" | wc -l | tr -d '[:space:]')
-  printf '%s\n' "$digest" > "$marker"
   fm_wake_append check open-loop-ledger \
     "open-loop-ledger: $overdue overdue owned obligations; read $ledger" || exit 1
+  printf '%s\n' "$digest" > "$marker"
   wake "check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
 }
 

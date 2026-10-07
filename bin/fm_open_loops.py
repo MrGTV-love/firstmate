@@ -7,7 +7,7 @@ A source that cannot be read becomes one degraded row; it never reads as "nothin
 """
 import argparse
 import base64
-import concurrent.futures
+import fcntl
 import datetime as dt
 import hashlib
 import json
@@ -25,7 +25,7 @@ BIN = Path(__file__).resolve().parent
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
-    "open_pr": 3600, "red_check": 0, "completion_unproved": 0, "coverage": 0,
+    "open_pr": 3600, "red_check": 0, "coverage": 0,
 }
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
@@ -33,6 +33,10 @@ SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|
                        r"|timed? ?out|ECONN|ENOTFOUND", re.I)
 SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.TimeoutExpired,
                  sqlite3.Error, json.JSONDecodeError)
+
+
+class CollectionDeadline(Exception):
+    pass
 
 
 def epoch(value):
@@ -71,7 +75,7 @@ class Collector:
         self.degraded = []
         self.tasks = []
         self.backlog = []
-        self.open_pr_urls = set()
+        self.prs = {}
 
     def load_config(self):
         path = self.config / "open-loops.json"
@@ -90,9 +94,11 @@ class Collector:
         if type(self.timeout) is not int or not 1 <= self.timeout <= 300:
             raise ValueError("command_timeout_seconds must be 1..300")
 
-    def run(self, args, cwd=None):
+    def run(self, args, cwd=None, missing_ok=False):
         done = subprocess.run([str(a) for a in args], cwd=cwd, env=self.env, capture_output=True,
                               text=True, stdin=subprocess.DEVNULL, timeout=self.timeout)
+        if missing_ok and done.returncode == 1 and not done.stderr:
+            return ""
         if done.returncode:
             raise RuntimeError((done.stderr or done.stdout or "command failed").strip()[:300])
         return done.stdout
@@ -147,25 +153,18 @@ class Collector:
                   and not record.get("unresolved_blocker_ids")
                   and (not record.get("hold_until") or record["hold_until"] <= today)):
                 self.add("ready_not_started", record["id"], "dispatch the dependency-cleared work", since)
-            elif record["state"] == "done" and record.get("kind") in ("ship", "scout"):
-                if not self.completion_proved(record):
-                    self.add("completion_unproved", record["id"],
-                             "land the deliverable or record the captain's drop; Done needs proof", since)
-
-    def completion_proved(self, record):
-        if record.get("captain_drop"):
-            return (self.data / record["id"] / "captain-drop.md").is_file()
-        if record["kind"] == "scout":
-            return bool(record.get("report_path"))
-        verb = (record.get("completion") or {}).get("verb")
-        return (verb == "merged" and bool(record.get("pr_url"))) or (verb == "done" and bool(record.get("local_note")))
 
     def liveness(self, task):
         alive = task["endpoint"].get("agent_alive")
         if task["endpoint"].get("exists") is True and alive not in ("alive", "dead") \
                 and task.get("backend") and task["endpoint"].get("target"):
-            alive = self.bash('. "$1"; fm_backend_agent_state "$2" "$3"', BIN / "fm-backend.sh",
+            state = self.bash('. "$1"; fm_backend_agent_state "$2" "$3"', BIN / "fm-backend.sh",
                               task["backend"], task["endpoint"]["target"]).strip()
+            if state == "unverified" and task["current_state"].get("state") == "working":
+                return "alive"
+            alive = state
+        if task["endpoint"].get("exists") is not False and alive not in ("alive", "dead", "missing"):
+            raise ValueError("worker liveness is inconclusive: " + str(alive))
         return alive
 
     def worker_rows(self):
@@ -176,8 +175,9 @@ class Collector:
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
             elif task["current_state"].get("state") == "failed":
-                self.add("failed_task", task["id"], "recover the failed work or record why it ends",
-                         mtime(self.state / (task["id"] + ".status")))
+                if not self.source("failed deliverable " + task["id"], self.deliverable_landed, task):
+                    self.add("failed_task", task["id"], "recover the failed work or record why it ends",
+                             mtime(self.state / (task["id"] + ".status")))
             elif task["current_state"].get("state") == "working" and alive == "alive":
                 self.source("progress " + task["id"], self.stalled, task, runs)
             self.source("unlanded work " + task["id"], self.unlanded, task)
@@ -235,15 +235,64 @@ class Collector:
                 return ref.replace("refs/remotes/", "").replace("refs/heads/", "")
         raise ValueError("default branch is unknown")
 
+    def pending_commits(self, worktree, base):
+        return [line[2:] for line in self.git(worktree, "cherry", base, "HEAD").splitlines()
+                if line.startswith("+ ")]
+
+    def pr_pending(self, worktree, pending, pr):
+        head = pr["head"]["sha"]
+        self.git(worktree, "cat-file", "-e", head + "^{commit}")
+        uncovered = self.pending_commits(worktree, head)
+        if pending is None:
+            return uncovered
+        uncovered = set(uncovered)
+        return [commit for commit in pending if commit in uncovered]
+
+    def content_in_default(self, worktree, base):
+        default_tree = self.git(worktree, "rev-parse", base + "^{tree}")
+        try:
+            merged_tree = self.git(worktree, "merge-tree", "--write-tree", base, "HEAD").splitlines()[0]
+        except RuntimeError:
+            return False
+        return merged_tree == default_tree
+
+    def captain_dropped(self, task):
+        return any(record["id"] == task["id"] and record.get("captain_drop") for record in self.backlog)
+
+    def deliverable_landed(self, task):
+        if self.captain_dropped(task):
+            return True
+        if task["kind"] == "scout":
+            report = self.data / task["id"] / "report.md"
+            return report.is_file() and not report.is_symlink() and report.stat().st_size > 0
+        worktree = task["paths"]["worktree"].get("path")
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if not worktree or not Path(worktree).is_dir():
+            return bool(pr and pr.get("merged_at"))
+        if self.git(worktree, "status", "--porcelain"):
+            return False
+        if pr and pr.get("merged_at"):
+            uncovered = self.source("PR head " + task["id"], self.pr_pending, worktree, None, pr)
+            if uncovered == []:
+                return True
+        base = self.default_ref(worktree)
+        pending = self.pending_commits(worktree, base)
+        return not pending or self.content_in_default(worktree, base)
+
     def unlanded(self, task):
         worktree = task["paths"]["worktree"].get("path")
-        if task["kind"] != "ship" or not worktree or not Path(worktree).is_dir():
-            return
-        if task["pr"].get("url") and self.pr_merged(task["pr"]["url"]):
+        if task["kind"] != "ship" or not worktree or not Path(worktree).is_dir() or self.captain_dropped(task):
             return
         base = self.default_ref(worktree)
-        pending = [line[2:] for line in self.git(worktree, "cherry", base, "HEAD").splitlines() if line.startswith("+ ")]
-        if not pending or task["pr"].get("url") in self.open_pr_urls:
+        pending = self.pending_commits(worktree, base)
+        if not pending or self.content_in_default(worktree, base):
+            return
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if pr and (pr.get("merged_at") or pr.get("state") == "open"):
+            covered = self.source("PR head " + task["id"], self.pr_pending, worktree, pending, pr)
+            if covered is not None:
+                pending = covered
+        if not pending:
             return
         oldest = min(int(self.git(worktree, "show", "-s", "--format=%ct", c)) for c in pending)
         title = self.git(worktree, "show", "-s", "--format=%s", pending[-1])
@@ -260,15 +309,17 @@ class Collector:
         pages = [json.loads(base64.b64decode(line, validate=True)) for line in body.splitlines()]
         return [row for page in pages for row in (page if isinstance(page, list) else [page])]
 
-    def pr_merged(self, url):
+    def pr_state(self, url):
+        if url in self.prs:
+            return self.prs[url]
         match = re.fullmatch(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)", url)
         if not match:
-            return False
-        try:
-            return bool(self.forge(f"/repos/{match[1]}/pulls/{match[2]}")[0].get("merged_at"))
-        except SOURCE_ERRORS as error:
-            self.degraded.append(f"PR state {url}: {str(error)[:120]}")
-            return False
+            self.degraded.append("unsupported PR forge: " + url)
+            self.prs[url] = None
+            return None
+        pr = self.source("PR state " + url, lambda: self.forge(f"/repos/{match[1]}/pulls/{match[2]}")[0])
+        self.prs[url] = pr
+        return pr
 
     def repo_slugs(self):
         paths = {t["project"] for t in self.tasks if t.get("project")}
@@ -278,14 +329,20 @@ class Collector:
             paths |= {str(p) for p in self.projects_dir.iterdir() if (p / ".git").exists()}
         slugs = set()
         for path in sorted(paths):
-            try:
-                origin = self.git(path, "config", "--get", "remote.origin.url")
-            except RuntimeError:
+            origin = self.source("project origin " + path, self.repo_origin, path)
+            if not origin:
                 continue
             match = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", origin)
             if match:
                 slugs.add(match[1])
         return sorted(slugs)
+
+    def repo_origin(self, path):
+        self.git(path, "rev-parse", "--git-dir")
+        origin = self.run(["git", "-C", path, "config", "--get", "remote.origin.url"], missing_ok=True).strip()
+        if origin and not re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", origin):
+            raise ValueError("unsupported non-GitHub origin: " + origin)
+        return origin
 
     def latest_checks(self, slug, sha):
         runs = [c for page in self.forge(f"/repos/{slug}/commits/{sha}/check-runs?per_page=100")
@@ -328,22 +385,18 @@ class Collector:
         self.add("open_pr", url, action, epoch(pr.get("updated_at")), owner)
 
     def pr_rows(self, slug):
-        def one(pr):
-            try:
-                self.pr_row(slug, pr)
-            except SOURCE_ERRORS as error:
-                self.degraded.append(f"PR {slug}#{pr.get('number', '?')}: {str(error)[:120]}")
         pulls = self.forge(f"/repos/{slug}/pulls?state=open&per_page=100")
-        self.open_pr_urls.update(p["html_url"] for p in pulls)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-            list(pool.map(one, pulls))
+        self.prs.update((pr["html_url"], pr) for pr in pulls)
+        for pr in pulls:
+            self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
 
     def question_rows(self):
         for status in sorted(self.state.glob("*.status")):
             if status.is_symlink():
                 continue
             try:
-                out = self.bash('. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
+                out = self.bash('cat "$2" >/dev/null || exit 1; '
+                                '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
                 continue
@@ -359,7 +412,7 @@ class Collector:
         self.source("fleet snapshot", self.read_snapshot)
         self.source("backlog", self.backlog_rows)
         slugs = self.source("project origins", self.repo_slugs) or []
-        for slug in slugs:  # pull requests first: task rows consult the set of open PR urls
+        for slug in slugs:
             self.source("open PRs " + slug, self.pr_rows, slug)
         self.source("workers", self.worker_rows)
         self.source("questions", self.question_rows)
@@ -415,22 +468,30 @@ def main():
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--heartbeat", action="store_true", help="publish state/open-loops.json")
     args = parser.parse_args()
-    now = int(os.environ.get("FM_OPEN_LOOPS_NOW", time.time()))
-    home = os.environ.get("FM_HOME", os.environ.get("FM_ROOT_OVERRIDE", BIN.parent))
+    home = Path(os.environ.get("FM_HOME", os.environ.get("FM_ROOT_OVERRIDE", BIN.parent))).resolve()
     try:
+        lock_dir = Path(os.environ.get("FM_STATE_OVERRIDE", home / "state")).resolve()
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        lock_fd = os.open(lock_dir / ".open-loops.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | (fcntl.LOCK_NB if args.heartbeat else 0))
+        except BlockingIOError:
+            os.close(lock_fd)
+            return 0
+        now = int(os.environ.get("FM_OPEN_LOOPS_NOW", time.time()))
         collector = Collector(home, now)
     except (OSError, ValueError) as error:
         print("error: " + json.dumps(str(error)))
         return 1
 
     def deadline(_signum, _frame):
-        raise TimeoutError("collection exceeded its deadline")
+        raise CollectionDeadline("collection exceeded its deadline")
     signal.signal(signal.SIGALRM, deadline)
     signal.alarm(collector.timeout * 10)
     try:
         collector.collect()
-    except (TimeoutError, *SOURCE_ERRORS) as error:
-        collector.degraded.append("reconciler: " + str(error)[:160])
+    except (CollectionDeadline, *SOURCE_ERRORS) as error:
+        collector.degraded.insert(0, "reconciler: " + str(error)[:160])
         collector.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                       None, evidence="; ".join(collector.degraded))
     finally:

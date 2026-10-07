@@ -318,6 +318,70 @@ test_completion_by_the_captains_own_words() {
   pass "fm-tasks-axi.sh records a captain's drop with the exact words and refuses a live task"
 }
 
+test_completion_preserves_retained_captain_calls() {
+  local dir fakebin words before spelling evidence out
+  local command_args=() evidence_args=()
+  dir=$(make_split retained-captain-call)
+  fakebin=$(fm_fakebin "$dir")
+  words="$dir/drop.txt"
+  printf 'Discard the finished work.\n' > "$words"
+  wrapper_from_code "$dir" add held-ship "retained ship call" --kind ship --repo p >/dev/null \
+    || fail "could not create the retained ship"
+  wrapper_from_code "$dir" add held-scout "retained scout call" --kind scout --repo p >/dev/null \
+    || fail "could not create the retained scout"
+  for evidence in held-ship held-scout; do
+    wrapper_from_code "$dir" hold "$evidence" --reason "which route?" --kind captain >/dev/null \
+      || fail "could not hold $evidence for the captain"
+    printf 'kind=%s\n' "${evidence#held-}" > "$dir/home/state/$evidence.meta"
+    rm "$dir/home/state/$evidence.meta"
+  done
+  mkdir -p "$dir/home/data/held-scout"
+  printf '# findings\n' > "$dir/home/data/held-scout/report.md"
+  cat > "$fakebin/gh-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'called\n' >> "$FAKE_FORGE_LOG"
+printf 'api_response:\n  body: merged=true\n'
+SH
+  chmod +x "$fakebin/gh-axi"
+  before=$(cat "$dir/home/data/backlog.md")
+  for spelling in done close task-done task-close; do
+    case "$spelling" in
+      done|close) command_args=("$spelling") ;;
+      task-done) command_args=(task done) ;;
+      task-close) command_args=(task close) ;;
+    esac
+    for evidence in ship-drop scout-drop report pr; do
+      case "$evidence" in
+        ship-drop) evidence_args=(held-ship --drop-file "$words") ;;
+        scout-drop) evidence_args=(held-scout "--drop-file=$words") ;;
+        report) evidence_args=(held-scout --report data/held-scout/report.md) ;;
+        pr) evidence_args=(held-ship --pr=https://github.com/o/r/pull/9) ;;
+      esac
+      out=$(PATH="$fakebin:$PATH" FAKE_FORGE_LOG="$dir/forge-called" \
+        completion_refused "$dir" "$spelling with $evidence" "${command_args[@]}" "${evidence_args[@]}")
+      assert_contains "$out" "open captain call" "$spelling with $evidence missed the captain hold"
+      assert_contains "$out" "fm-captain-hold.sh answer" "$spelling with $evidence did not name the answer boundary"
+      assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" \
+        "$spelling with $evidence changed the retained captain call"
+    done
+  done
+  assert_absent "$dir/forge-called" "a retained captain call reached the forge evidence check"
+  assert_absent "$dir/home/data/held-ship/captain-drop.md" "a refused ship completion retained drop words"
+  assert_absent "$dir/home/data/held-scout/captain-drop.md" "a refused scout completion retained drop words"
+  printf 'Take the north route.\n' > "$dir/answer.txt"
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" \
+    answer held-ship --decision-file "$dir/answer.txt" >/dev/null \
+    || fail "the captain answer could not close the retained ship call"
+  [ "$(row_state "$dir" held-ship)" = x ] || fail "the answered ship call did not close"
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" \
+    answer held-scout --decision-file "$dir/answer.txt" --release >/dev/null \
+    || fail "the captain answer could not release the retained scout call"
+  wrapper_from_code "$dir" task close held-scout --report data/held-scout/report.md >/dev/null \
+    || fail "the released scout could not complete with its report"
+  [ "$(row_state "$dir" held-scout)" = x ] || fail "the released scout did not close"
+  pass "all completion spellings preserve retained captain calls before accepting drop, report, or merged PR evidence"
+}
+
 test_guard_reports_regular_code_root_backlog
 test_guard_reports_foreign_link_and_archive
 test_guard_silent_for_single_home
@@ -330,6 +394,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_single_home
   test_completion_needs_proof_of_the_deliverable
   test_completion_by_the_captains_own_words
+  test_completion_preserves_retained_captain_calls
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi

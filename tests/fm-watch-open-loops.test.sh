@@ -15,7 +15,12 @@ TMP_ROOT=$(fm_test_tmproot fm-watch-open-loops-tests)
 # for whole cycles instead of guessing durations.
 unset _FM_TEST_POLL_OWNER _FM_TEST_POLL_COUNT
 sleep() {
-  local completed
+  local completed deadline
+  if [ "${FUNCNAME[1]:-}" = fm_lock_acquire_wait ] \
+    && [ "${FUNCNAME[2]:-}" = fm_wake_append ] \
+    && [ "${BASHPID:-$$}" = "${WATCHER_PID:-}" ]; then
+    : > "$FM_STATE_OVERRIDE/.test-wake-append-wait-$WATCHER_PID"
+  fi
   if [ "${FUNCNAME[1]:-}" = event_wait_or_sleep ] \
     && [ "$BASH_SUBSHELL" -eq 0 ] \
     && [ "${BASHPID:-$$}" = "${WATCHER_PID:-}" ]; then
@@ -29,6 +34,11 @@ sleep() {
       || ! mv -f "$completed.tmp" "$completed"; then
       exit 1
     fi
+    deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+    while [ -e "$FM_STATE_OVERRIDE/.test-poll-hold" ]; do
+      [ "$SECONDS" -lt "$deadline" ] || exit 1
+      command sleep 0.1
+    done
   fi
   command sleep "$@"
 }
@@ -54,6 +64,16 @@ wait_poll_cycle() {  # <state> <pid> [limit-ticks]
         fi
         ;;
     esac
+    sleep 0.1
+    i=$((i + 1))
+  done
+  return 1
+}
+
+wait_for_file() {  # <path>
+  local path=$1 i=0
+  while [ "$i" -lt 100 ]; do
+    [ ! -e "$path" ] || return 0
     sleep 0.1
     i=$((i + 1))
   done
@@ -205,8 +225,178 @@ test_unpublished_ledger_is_its_own_wake() {
   pass "a ledger the reconciler stopped publishing is its own wake"
 }
 
+test_failed_publication_retries_the_same_ledger() {
+  local kind failure dir state fakebin out pid rc marker failed_path key count before
+  for kind in overdue stale missing; do
+    for failure in queue sequence recovery; do
+      dir=$(make_case "ledger-retry-$kind-$failure")
+      state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+      publish_ledger "$state"
+      printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/failing-open-loops"
+      chmod +x "$fakebin/failing-open-loops"
+      : > "$state/.test-poll-hold"
+      watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=60 \
+        FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+      pid=$!
+      wait_for_file "$state/.test-poll-completed-$pid" \
+        || { reap "$pid"; fail "$kind/$failure watcher did not arm"; }
+      case "$failure" in
+        queue) failed_path="$state/.wake-queue" ;;
+        sequence) failed_path="$state/.wake-queue.seq" ;;
+        recovery) failed_path="$state/.watcher-down" ;;
+      esac
+      mkdir "$failed_path" || fail "could not block $failure publication"
+      if [ "$kind" = overdue ]; then
+        marker="$state/.open-loops-surfaced"; key=open-loop-ledger
+        publish_ledger "$state" lost-launcher forgotten-guard
+      else
+        marker="$state/.open-loops-stale-surfaced"; key=open-loop-ledger-stale
+        if [ "$kind" = missing ]; then
+          rm -f "$state/open-loops.json"
+          : > "$state/.open-loops-started"
+          set_mtime "$(( $(date +%s) - 600 ))" "$state/.open-loops-started"
+        else
+          set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json"
+        fi
+      fi
+      rm -f "$state/.test-poll-hold"
+      wait_for_exit "$pid" 100
+      rc=$?
+      [ "$rc" -ne 124 ] || { reap "$pid"; fail "$kind/$failure did not refuse the failed publication"; }
+      [ "$rc" -ne 0 ] || fail "$kind/$failure reported success without publishing"
+      [ ! -e "$marker" ] || fail "$kind/$failure suppressed a wake that was never published"
+      if [ "$failure" != queue ]; then
+        [ ! -s "$state/.wake-queue" ] || fail "$kind/$failure queued an unexpected wake"
+      fi
+      rmdir "$failed_path" || fail "could not repair $failure publication"
+      watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=60 \
+        FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+      pid=$!
+      wait_for_exit "$pid" 100 \
+        || { reap "$pid"; fail "$kind/$failure retry lost the identical ledger notification"; }
+      count=$(awk -F '\t' -v key="$key" '$3 == "check" && $4 == key { n++ } END { print n+0 }' "$state/.wake-queue")
+      [ "$count" -eq 1 ] || fail "$kind/$failure retry published $count ledger notifications"
+      grep -q "check: $key" "$out" || fail "$kind/$failure retry delivered the wrong reason"
+      if [ "$kind" = overdue ]; then
+        grep -q '2 overdue owned obligations' "$state/.wake-queue" \
+          || fail "$kind/$failure retry changed the overdue set"
+      fi
+      [ -e "$marker" ] || fail "$kind/$failure successful retry did not record its cooldown"
+      before=$(file_mtime "$marker")
+      ack_stopped_cycle "$state" || fail "$kind/$failure retry could not be acknowledged"
+      watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=60 \
+        FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+      pid=$!
+      wait_poll_cycle "$state" "$pid" \
+        || { reap "$pid"; fail "$kind/$failure successful publication did not retain its cooldown"; }
+      [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "$kind/$failure cooldown queued another wake"; }
+      [ "$(file_mtime "$marker")" = "$before" ] \
+        || { reap "$pid"; fail "$kind/$failure cooldown advanced without a new notification"; }
+      reap "$pid"
+    done
+  done
+  pass "queue, sequence, and recovery publication failures retry identical overdue and stale ledgers without losing cooldown"
+}
+
+test_blocked_publication_does_not_commit_cooldown() {
+  local kind dir state fakebin out pid marker key
+  for kind in overdue stale; do
+    dir=$(make_case "ledger-lock-$kind")
+    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+    publish_ledger "$state"
+    printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/failing-open-loops"
+    chmod +x "$fakebin/failing-open-loops"
+    : > "$state/.test-poll-hold"
+    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=60 \
+      FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+    pid=$!
+    wait_for_file "$state/.test-poll-completed-$pid" \
+      || { reap "$pid"; fail "$kind lock fixture did not arm"; }
+    mkdir "$state/.wake-queue.lock" || fail "could not block the wake queue lock"
+    printf '%s\n' "$$" > "$state/.wake-queue.lock/pid"
+    if [ "$kind" = overdue ]; then
+      marker="$state/.open-loops-surfaced"; key=open-loop-ledger
+      publish_ledger "$state" lost-launcher
+    else
+      marker="$state/.open-loops-stale-surfaced"; key=open-loop-ledger-stale
+      set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json"
+    fi
+    rm -f "$state/.test-poll-hold"
+    wait_for_file "$state/.test-wake-append-wait-$pid" \
+      || { reap "$pid"; fail "$kind publication did not wait for its queue lock"; }
+    [ ! -e "$marker" ] || { reap "$pid"; fail "$kind committed cooldown while publication was blocked"; }
+    [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "$kind bypassed the queue lock"; }
+    rm -f "$state/.wake-queue.lock/pid"
+    rmdir "$state/.wake-queue.lock"
+    wait_for_exit "$pid" 100 \
+      || { reap "$pid"; fail "$kind notification was lost after its queue lock was repaired"; }
+    grep -q "check: $key" "$out" || fail "$kind lock repair delivered the wrong wake"
+    [ -e "$marker" ] || fail "$kind lock repair did not commit cooldown after publication"
+  done
+  pass "overdue and stale publication wait for their queue lock before committing cooldown"
+}
+
+test_retained_collector_survives_watcher_restart_without_overlap() {
+  local dir state fakebin out pid scanner scans retained
+  dir=$(make_case ledger-retained-collector)
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
+  cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$dir/collector-bin/"
+  cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --home-input ] || exit 2
+printf '%s\n' "$PPID" >> "$FM_HOME/.collector-pids"
+: > "$FM_HOME/.collector-started"
+deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+while [ ! -e "$FM_HOME/.collector-release" ]; do
+  [ -d "$FM_HOME" ] && [ "$SECONDS" -lt "$deadline" ] || exit 1
+  sleep 0.1
+done
+printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"retained-obligation","structured":true,"state":"queued","since":"2000-01-01T00:00:00Z"}]}}'
+SH
+  chmod +x "$dir/collector-bin/fm-fleet-snapshot.sh"
+  publish_ledger "$state" lost-launcher
+  set_mtime "$(( $(date +%s) - 90 ))" "$state/open-loops.json"
+  watch_ledger "$state" "$fakebin" "$out" FM_HOME="$dir" NM_HOME="$dir/nm" \
+    FM_DATA_OVERRIDE="$dir/data" FM_CONFIG_OVERRIDE="$dir/config" \
+    FM_PROJECTS_OVERRIDE="$dir/projects" FM_OPEN_LOOPS_INTERVAL=60 \
+    FM_OPEN_LOOPS_BIN="$dir/collector-bin/fm-open-loops.sh"
+  pid=$!
+  wait_for_exit "$pid" 100 \
+    || { : > "$dir/.collector-release"; reap "$pid"; fail "the first watcher did not wake during its detached scan"; }
+  wait_for_file "$dir/.collector-started" \
+    || { : > "$dir/.collector-release"; fail "the detached real collector never reached its source"; }
+  scanner=$(cat "$dir/.collector-pids")
+  ack_stopped_cycle "$state" \
+    || { : > "$dir/.collector-release"; fail "the first detached-scan wake could not be acknowledged"; }
+  watch_ledger "$state" "$fakebin" "$out" FM_HOME="$dir" NM_HOME="$dir/nm" \
+    FM_DATA_OVERRIDE="$dir/data" FM_CONFIG_OVERRIDE="$dir/config" \
+    FM_PROJECTS_OVERRIDE="$dir/projects" FM_OPEN_LOOPS_INTERVAL=60 \
+    FM_OPEN_LOOPS_BIN="$dir/collector-bin/fm-open-loops.sh"
+  pid=$!
+  wait_poll_cycle "$state" "$pid" \
+    || { : > "$dir/.collector-release"; reap "$pid"; fail "the restarted watcher blocked or woke before the retained scan completed"; }
+  scans=$(wc -l < "$dir/.collector-pids" | tr -d '[:space:]')
+  retained=0
+  kill -0 "$scanner" 2>/dev/null && retained=1
+  : > "$dir/.collector-release"
+  wait_for_exit "$pid" 100 \
+    || { reap "$pid"; fail "the retained scan did not publish and wake the restarted watcher"; }
+  [ "$retained" -eq 1 ] || fail "the original scan did not survive its watcher's actionable exit"
+  [ "$scans" -eq 1 ] || fail "watcher restart overlapped $scans collectors before publication"
+  [ "$(wc -l < "$dir/.collector-pids" | tr -d '[:space:]')" -eq 1 ] \
+    || fail "a queued collector scanned after the retained publication"
+  jq -e '.complete == true and any(.rows[]; .subject == "retained-obligation" and .category == "ready_not_started" and .overdue)' \
+    "$state/open-loops.json" >/dev/null || fail "the retained scan did not publish its actual owned obligation"
+  grep -q 'open-loop-ledger' "$state/.wake-queue" || fail "the retained scan publication was not surfaced durably"
+  pass "a retained collector survives watcher exit, rejects overlapping restart scans, and publishes without starvation"
+}
+
 test_overdue_row_wakes_with_a_durable_row
 test_unchanged_overdue_set_stays_quiet_then_new_row_wakes
 test_ledger_without_overdue_rows_is_silent
 test_detached_helper_runs_and_a_blind_ledger_wakes
 test_unpublished_ledger_is_its_own_wake
+test_failed_publication_retries_the_same_ledger
+test_blocked_publication_does_not_commit_cooldown
+test_retained_collector_survives_watcher_restart_without_overlap

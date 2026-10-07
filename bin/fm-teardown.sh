@@ -425,6 +425,19 @@ if [ "$FORCE" = --force ] && [ "$(fm_lease_actor)" = branch ]; then
 fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
 
+teardown_treehouse_pool_slot() {
+  local project=$1 worktree=$2 task_id=$3 slot pool
+  [ -d "$project" ] && [ -d "$worktree" ] || return 1
+  slot=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || return 1
+  pool=$(dirname "$(dirname "$slot")")
+  [ -f "$pool/treehouse-state.json" ] && [ ! -L "$pool/treehouse-state.json" ] || return 1
+  fm_treehouse_slot_owner_state "$slot" "$task_id"
+  case "$FM_TREEHOUSE_SLOT_OWNER" in
+    other|unsafe) return 0 ;;
+  esac
+  fm_treehouse_pool_slot "$project" "$slot"
+}
+
 META="$STATE/$ID.meta"
 TREEHOUSE_PROJECT_LOCK=
 TREEHOUSE_PROJECT_LOCK_HELD=0
@@ -438,7 +451,7 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
   TEARDOWN_LOCK_PROJECT=$(fm_meta_get "$META" project)
   if [ "$TEARDOWN_LOCK_KIND" != secondmate ] \
      && [ "$TEARDOWN_LOCK_BACKEND" != orca ] \
-     && fm_treehouse_pool_slot "$TEARDOWN_LOCK_PROJECT" "$TEARDOWN_LOCK_WT"; then
+     && teardown_treehouse_pool_slot "$TEARDOWN_LOCK_PROJECT" "$TEARDOWN_LOCK_WT" "$ID"; then
     TREEHOUSE_SLOT_LOCK_REQUIRED=1
     TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$TEARDOWN_LOCK_PROJECT") || {
       echo "REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missing>}; nothing was changed" >&2
@@ -1167,7 +1180,7 @@ CLEANUP_RECOVERY=$TEARDOWN_CLEANUP_RECOVERY
 KIND=$TEARDOWN_META_KIND
 EXPECTED_TREEHOUSE_PROJECT_LOCK=
 if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] \
-   && fm_treehouse_pool_slot "$PROJ" "$WT"; then
+   && teardown_treehouse_pool_slot "$PROJ" "$WT" "$ID"; then
   EXPECTED_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ") || {
     echo "REFUSED: cannot resolve the shared Treehouse project lock for ${PROJ:-<missing>}; nothing was changed" >&2
     exit 1
@@ -1551,6 +1564,16 @@ $unpushed
 EOF
 }
 
+recorded_pr_is_merged() {
+  local state
+  [[ "$PR_URL" =~ ^https://github\.com/[^/[:space:]]+/[^/[:space:]]+/pull/[0-9]+$ ]] || return 1
+  state=$(gh pr view "$PR_URL" --json state -q '.state' 2>/dev/null) || return 1
+  case "$state" in
+    MERGED|merged) TEARDOWN_LANDED_WITHOUT_WORKTREE=1; return 0 ;;
+  esac
+  return 1
+}
+
 # Is the worktree's PR merged for local work contained in that PR? Resolves the
 # PR from the recorded pr= URL first, then from the branch name, and asks GitHub
 # for both the PR state and head. Returns non-zero when the PR is not merged, the
@@ -1558,6 +1581,7 @@ EOF
 # occurs - the caller then falls back to the content check.
 pr_is_merged() {
   local branch=$1 target view state remainder head resolved_url current landed=0
+  teardown_owns_worktree && [ -d "$WT" ] || return 1
   if [ -n "$PR_URL" ]; then
     target=$PR_URL
   else
@@ -1600,6 +1624,7 @@ pr_is_merged() {
 # so the caller refuses rather than guesses.
 content_in_default() {
   local name ref default_tree merged_tree
+  teardown_owns_worktree && [ -d "$WT" ] || return 1
   name=$(default_branch) || return 1
   if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
     git -C "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
@@ -1623,12 +1648,14 @@ content_in_default() {
 # only for genuinely unlanded work.
 work_is_landed() {
   local branch=$1
+  if ! teardown_owns_worktree || ! inspectable_git_worktree "$WT"; then
+    recorded_pr_is_merged
+    return $?
+  fi
   pr_is_merged "$branch" && return 0
   content_in_default
 }
 
-# A drop is recorded only when the deliverable did not land. A scout that wrote its report, or a
-# ship whose PR merged or whose content reached the default branch, keeps its own completion note.
 TEARDOWN_DROPPING=0
 teardown_is_dropping() {
   local report="$DATA/$ID/report.md"
@@ -1637,7 +1664,11 @@ teardown_is_dropping() {
     [ -f "$report" ] && [ ! -L "$report" ] && [ -s "$report" ] && return 1
     return 0
   fi
-  [ ! -d "$WT" ] || ! work_is_landed "$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)" || return 1
+  if ! teardown_owns_worktree || ! inspectable_git_worktree "$WT"; then
+    recorded_pr_is_merged && return 1
+  elif work_is_landed "$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"; then
+    return 1
+  fi
   return 0
 }
 
@@ -1658,7 +1689,7 @@ backlog_done_args() {
       BACKLOG_DONE_ARGS=(--report "$data_relative/$ID/report.md")
       ;;
     *)
-      if [ "$MODE" = local-only ]; then
+      if [ "$MODE" = local-only ] && [ "${TEARDOWN_LANDED_WITHOUT_WORKTREE:-0}" != 1 ]; then
         BACKLOG_DONE_ARGS=(--note "local main")
       elif [ -n "$PR_URL" ]; then
         BACKLOG_DONE_ARGS=(--pr "$PR_URL")
@@ -1910,11 +1941,18 @@ teardown_treehouse_return() {
 
 validate_worktree_teardown_safety() {
   local dirty_raw dirty unpushed_raw unpushed DEFAULT unmerged_raw unmerged branch
-  [ -d "$WT" ] || return 0
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
     secondmate|scout) return 0 ;;
   esac
+  if ! teardown_owns_worktree || ! inspectable_git_worktree "$WT"; then
+    if recorded_pr_is_merged; then
+      return 0
+    fi
+    echo "REFUSED: the ship deliverable has no inspectable git worktree owned by this task and no forge-confirmed merged recorded GitHub PR." >&2
+    echo "Restore its owned copy or pass --force --drop-file with the captain's own words to drop it." >&2
+    return 1
+  fi
 
   if ! dirty_raw=$(git -C "$WT" status --porcelain 2>/dev/null); then
     if worktree_safety_blocked_by_lock "uncommitted changes"; then
@@ -2469,7 +2507,7 @@ require_orca_worktree_path_match_if_present() {
 # record with nothing live to return skips them rather than refusing.
 teardown_live_slot_path() {
   [ "$KIND" != secondmate ] || return 1
-  fm_treehouse_pool_slot "$PROJ" "$WT" || return 1
+  teardown_treehouse_pool_slot "$PROJ" "$WT" "$ID" || return 1
   canonical_existing_dir "$WT"
 }
 
@@ -3102,7 +3140,7 @@ preflight_descendant_treehouse_slots() {
     if [ "$kind" = secondmate ] || [ "$backend" = orca ]; then
       continue
     fi
-    if ! fm_treehouse_pool_slot "$project" "$worktree"; then
+    if ! teardown_treehouse_pool_slot "$project" "$worktree" "$task_id"; then
       continue
     fi
     lock_path=$(fm_treehouse_project_lock_path "$project") || {
@@ -3135,7 +3173,7 @@ preflight_descendant_treehouse_slots() {
     if [ "$kind" = secondmate ] || [ "$backend" = orca ]; then
       continue
     fi
-    if ! fm_treehouse_pool_slot "$project" "$worktree"; then
+    if ! teardown_treehouse_pool_slot "$project" "$worktree" "$task_id"; then
       continue
     fi
     fm_backend_validate_task_endpoint "$meta" "$task_id" || return 1
@@ -3501,7 +3539,7 @@ cleanup_firstmate_home_children() {
       # or return, so only its records are cleaned up. The preflight above
       # already named the reassignment on stderr under the same lock.
       child_owner_rc=0
-      if fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
+      if teardown_treehouse_pool_slot "$child_proj" "$child_wt" "$child_id"; then
         require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
       fi
       if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
@@ -3670,16 +3708,13 @@ if [ -n "$X_REQUEST" ]; then
 fi
 
 if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$FORCE" != "--force" ]; then
-  if ! inspectable_git_worktree "$WT"; then
-    echo "REFUSED: Orca ship task $ID has no inspectable git worktree at ${WT:-<missing>}." >&2
-    echo "Cannot verify dirty or unlanded work; restore the worktree path or get explicit OK to discard, then --force." >&2
-    exit 1
+  if teardown_owns_worktree && inspectable_git_worktree "$WT"; then
+    require_orca_worktree_path_match "$ORCA_WORKTREE_ID" "$WT" || exit 1
+    ORCA_PATH_MATCH_VERIFIED=1
   fi
-  require_orca_worktree_path_match "$ORCA_WORKTREE_ID" "$WT" || exit 1
-  ORCA_PATH_MATCH_VERIFIED=1
 fi
 
-if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
+if [ "$FORCE" != "--force" ]; then
   if validate_worktree_teardown_safety; then
     :
   else
@@ -3707,6 +3742,8 @@ teardown_release_herdr_locks
 # the legacy stamp and authoritative publication wait for exact reacquisition.
 if teardown_is_dropping; then
   TEARDOWN_DROPPING=1
+fi
+if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
   fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
     echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
     exit 1
@@ -3899,11 +3936,11 @@ teardown_release_herdr_locks
 
 # Best-effort: drop the local task branch so the shared repo does not accumulate refs.
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
-  if [ "$ORCA_PATH_MATCH_VERIFIED" != 1 ]; then
+  if teardown_owns_worktree && [ "$ORCA_PATH_MATCH_VERIFIED" != 1 ]; then
     require_orca_worktree_path_match_if_present "$ORCA_WORKTREE_ID" "$WT" || exit 1
     ORCA_PATH_MATCH_VERIFIED=1
   fi
-  if [ -d "$WT" ]; then
+  if teardown_owns_worktree && [ -d "$WT" ]; then
     branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
     if [ "$branch" != "HEAD" ]; then
       if git -C "$WT" checkout --detach -q 2>/dev/null; then
@@ -3918,7 +3955,9 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
     fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
       || { endpoint_close_refusal "$ID" "$BACKEND" "$T" 0; exit 1; }
   fi
-  fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
+  if teardown_owns_worktree; then
+    fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
+  fi
 elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
   :
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then

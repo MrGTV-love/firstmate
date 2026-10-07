@@ -164,6 +164,9 @@ guard_completion() {
   case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) return 0 ;; esac
   [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
     || fail "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
+  if [ "${FM_BACKLOG_ROW_STATE%% *}" != done ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
+    fail "$id is an open captain call; resolve it with bin/fm-captain-hold.sh answer or reconcile close before completing the deliverable"
+  fi
   if [ -n "$drop" ]; then
     [ -z "$pr$report" ] && [ "$note" = 0 ] \
       || fail "a captain's drop is its own completion; do not combine --drop-file with --pr, --report, or --note"
