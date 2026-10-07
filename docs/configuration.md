@@ -1433,7 +1433,7 @@ Quota recovery does not infer a retired event from a control transaction journal
 Deliberate manual relaunch remains available, and a fresh worker generation is evaluated independently.
 A failed recovery without a replacement does not prevent later eligible tasks from being considered within the scan's shared execution budget; scans prioritize the least recently attempted tasks and break timestamp ties by attempt count and task name.
 Each scan stops after one successful relaunch or a transaction-bound confirmed or published-alive replacement, retaining any control failure report.
-Launch and successful replacement report the selected route on command output, and automatic quota recovery includes the served profile in its supervisor notification, without appending a task-status declaration; control reports and completes its transaction using the replacement's published harness, model, and effort rather than preflight choices.
+Launch and successful replacement report the selected route on command output without appending a task-status declaration; control reports and completes its transaction using the replacement's published harness, model, and effort rather than preflight choices.
 The quota-recovery instruction preserves work context without claiming a model switch or established pool exhaustion.
 No account pin, saved reset, or global reviewer configuration is changed.
 
