@@ -958,7 +958,10 @@ printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
 if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ]; then
   : > "$FM_HOME/state/.e2e-fired"
   sleep 1
-  printf 'signal: omp-restore done\n'
+  case "${SCENARIO:-}" in
+    editor-normalized*) printf 'signal: omp-restore ready\tdetail\rcarriage\001control\013vertical\037unit done\n' ;;
+    *) printf 'signal: omp-restore done\n' ;;
+  esac
   exit 0
 fi
 exec sleep 30
@@ -997,7 +1000,12 @@ const pi = {
   },
 };
 // The composer omp would show, with the editor calls the extension may use.
-const composer = { text: "", sets: [] };
+let editorText = "";
+const composer = {
+  get text() { return editorText; },
+  set text(t) { editorText = t.replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, ""); },
+  sets: [],
+};
 let idle = true; let queued = false;
 const ctx = {
   hasUI: true,
@@ -1047,6 +1055,31 @@ const settle = async () => { await handlers.get("agent_end")({ type: "agent_end"
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "editor-normalized":
+  case "editor-normalized-message":
+  case "editor-normalized-edited": {
+    composer.text = wake;
+    if (composer.text !== wake || !wake.includes("ready   detail\ncarriagecontrolverticalunit done")) throw new Error("emitted wake is not editor-stable");
+    if (process.env.SCENARIO === "editor-normalized-edited") {
+      composer.text = composer.text.replace("detail", "operator edit");
+      const edited = composer.text;
+      await settle();
+      if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== edited) throw new Error("edited normalized wake was submitted or changed");
+      break;
+    }
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "") throw new Error("untouched normalized wake was not resubmitted");
+    if (process.env.SCENARIO === "editor-normalized-message") {
+      await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: sent[1].m }] } }, ctx);
+    } else {
+      await handlers.get("before_agent_start")({ prompt: sent[1].m }, ctx);
+    }
+    composer.text = wake;
+    const sets = composer.sets.length;
+    await settle();
+    if (sent.length !== 2 || composer.sets.length !== sets || composer.text !== wake) throw new Error("consumed normalized wake was recovered again");
+    break;
+  }
   case "custom-tail": {
     if (!queued || turns.length !== 0) throw new Error("regular wake did not remain queued");
     queued = false;
@@ -1180,7 +1213,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
