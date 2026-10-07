@@ -119,16 +119,10 @@
 #                          while the mate was not in an active turn (a busy mate
 #                          is exempt only until the queue has been frozen for
 #                          BUSY_TURN_MAX_SECS); declared external-wait pause
-#                          rows do not feed this escalation; a live mate whose
-#                          pending composer holds nothing but injected watcher
-#                          wakes (a harness put the wake back unsubmitted when
-#                          a run was interrupted) gets one bare Enter and no
-#                          typed text, so an operator draft is never touched; a
-#                          mate whose
+#                          rows do not feed this escalation; a mate whose
 #                          semantic busy class is exactly idle, whose agent is
 #                          alive, and whose composer is not pending is rung
-#                          once so its own home can drain; after either
-#                          recovery the parent
+#                          once so its own home can drain; after that ring the parent
 #                          notification is withheld until that same row stays
 #                          frozen for another stall interval; unknown or
 #                          ring-unsafe panes keep the parent alarm; empty
@@ -926,21 +920,6 @@ secondmate_idle_ring_safe() {  # <window>
   [ "$cstate" = empty ]
 }
 
-secondmate_submit_held_wake() {
-  local w=$1 backend task meta home
-  [ -n "$w" ] || return 1
-  task=$(window_to_task "$w" "$STATE")
-  [ -n "$task" ] || return 1
-  meta="$STATE/$task.meta"
-  [ -f "$meta" ] || return 1
-  home=$(fm_meta_get "$meta" home)
-  [ -n "$home" ] || return 1
-  backend=$(window_backend "$w")
-  [ "$(fm_backend_agent_state "$backend" "$w" 2>/dev/null || true)" = alive ] || return 1
-  fm_task_inbox_submit_held_wake "$backend" "$w" \
-    "$home/state/extensions/omp-primary-watch" secondmate_busy_class "$(window_label "$w")"
-}
-
 # Write one fire-and-forget drain steer and ring the child's doorbell. The
 # steer carries the same from-firstmate fire-and-forget carrier fm-send uses
 # for a secondmate (marker, then delivery=<16-hex-id>, then the text), so the
@@ -982,7 +961,7 @@ secondmate_ring_to_drain() {  # <task> <window>
 secondmate_wake_stall_tick() {
   local now=$(( $(date +%s) )) threshold=$SECONDMATE_WAKE_STALL_SECS
   local meta task kind remote_host home queue row epoch seq row_key marker progress_marker ring_marker progress observed_at observed_key
-  local receipt receipt_dir notify_key queued idle reason episode_alerted already_rung w submit_rc
+  local receipt receipt_dir notify_key queued idle reason episode_alerted already_rung w
   # Endpoint metadata admits this queue-loop check; secondmate-liveness owns registered mates whose endpoint is missing or dead.
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
@@ -1050,16 +1029,7 @@ EOF
       [ -f "$ring_marker" ] && [ ! -L "$ring_marker" ] || return 1
       [ "$(cat "$ring_marker" 2>/dev/null || true)" = "$row_key" ] && already_rung=1
     fi
-    submit_rc=1
-    if [ "$already_rung" -eq 0 ]; then
-      secondmate_submit_held_wake "$w" && submit_rc=0 || submit_rc=$?
-    fi
-    if [ "$submit_rc" -eq 0 ]; then
-      fm_wake_secondmate_ring_marker_write "$task" "$row_key" || return 1
-      fm_wake_secondmate_progress_marker_write "$task" "$now" "$row_key" || return 1
-      continue
-    fi
-    if [ "$already_rung" -eq 0 ] && [ "$submit_rc" -eq 1 ] && secondmate_idle_ring_safe "$w"; then
+    if [ "$already_rung" -eq 0 ] && secondmate_idle_ring_safe "$w"; then
       if secondmate_ring_to_drain "$task" "$w"; then
         fm_wake_secondmate_ring_marker_write "$task" "$row_key" || return 1
         fm_wake_secondmate_progress_marker_write "$task" "$now" "$row_key" || return 1

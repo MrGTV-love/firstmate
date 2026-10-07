@@ -2,17 +2,14 @@
 # tests/fm-omp-wake-restore-live-e2e.test.sh - the live omp injected-text guard
 # (live-harness-optin family; task fm-omp-lane-wake-unsubmitted).
 #
-# Two real defects left Firstmate-injected text sitting unsubmitted in an omp
-# lane's box composer, and both are vendor behavior the portable suites can only
-# model, so per .agents/skills/firstmate-coding-guidelines this guard drives the
+# Firstmate-injected text sat unsubmitted in an omp lane's box composer.
+# These vendor behaviors are modeled by portable suites; the guard drives the
 # INSTALLED omp in an isolated Herdr lab:
 #   1. omp puts a queued user follow-up back into the composer when the run is
 #      interrupted (Esc, as bin/fm-control.sh interrupt sends). A watcher wake
 #      queued behind a running turn then sat in the composer, consumed by no
-#      turn. The omp watch extension must submit it again on its own, leave an
-#      operator draft exactly as typed, and the parent's stalled-loop recovery
-#      (fm_task_inbox_submit_held_wake) must do the same with one bare Enter when
-#      the extension cannot, and refuse a composer that also holds a draft.
+#      turn. The omp watch extension must submit it again on its own and leave
+#      an operator draft exactly as typed.
 #   2. While a turn runs, omp's box top border carries a spinner and the elapsed
 #      time instead of its identity glyph. The shared classifier read that screen
 #      as `unknown`, so a doorbell typed into a working lane (fm-send, the
@@ -106,9 +103,6 @@ export PATH="$FAKEBIN:$ORIGINAL_PATH"
 
 # shellcheck source=/dev/null
 . "$ROOT/bin/backends/herdr.sh"
-# shellcheck source=/dev/null
-. "$ROOT/bin/fm-task-inbox-lib.sh"
-. "$ROOT/bin/fm-busy-lib.sh"
 set +e
 
 lab() { env PATH="$ORIGINAL_PATH" "$LAB_HELPER" run "$SESSION" "$@"; }
@@ -158,10 +152,9 @@ wait_for() {  # <seconds> <command...>
 }
 
 live_busy_class() {
-  local verdict
   [ "$1" = "$TARGET" ] || { printf unknown; return; }
-  verdict=$(fm_busy_classify_meta "$PARENT/state/wakemate.meta" wakemate "$PARENT/state")
-  printf '%s' "${verdict%% *}"
+  [ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] || { printf unknown; return; }
+  fm_backend_herdr_rendered_busy_state "$TARGET" omp
 }
 is_idle() { [ "$(live_busy_class "$TARGET")" = idle ]; }
 is_busy() { [ "$(live_busy_class "$TARGET")" = busy ]; }
@@ -213,8 +206,7 @@ busy_turn() {
 # queue_wake: write a status line so the watcher wakes main while the turn runs,
 # and wait until omp has queued the wake behind it.
 queue_wake() {
-  rm -f "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state"/wakelab*.status "$PROJECT/state"/wakelab*.meta \
-    "$PROJECT/state/extensions/omp-primary-watch"/unconsumed-*.wake
+  rm -f "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state"/wakelab*.status "$PROJECT/state"/wakelab*.meta
   WAKE_PROBE=$((WAKE_PROBE + 1))
   WAKE_TASK="wakelab$WAKE_PROBE"
   : > "$PROJECT/state/$WAKE_TASK.meta"
@@ -224,18 +216,11 @@ queue_wake() {
 }
 
 wake_is_queued() {
-  local record capture queued
+  local capture queued
   is_busy || return 1
   awk -F '\t' -v key="$WAKE_TASK.status" \
     '$3 == "signal" && $4 == key { found = 1 } END { exit !found }' \
     "$PROJECT/state/.wake-queue" 2>/dev/null || return 1
-  record=
-  for record in "$PROJECT/state/extensions/omp-primary-watch"/unconsumed-*.wake; do
-    [ -f "$record" ] || continue
-    grep -Fq -- "$PROJECT/state/$WAKE_TASK.status" "$record" && break
-    record=
-  done
-  [ -n "$record" ] && [ -f "$record" ] || return 1
   capture=$(screen)
   queued=$(printf '%s\n' "$capture" | awk '
     /After yield.*[1-9][0-9]*/ { in_queue = 1; next }
@@ -246,7 +231,7 @@ wake_is_queued() {
     *"FIRSTMATEWATCHERWAKE:"*"$WAKE_TASK.status"*) ;;
     *) return 1 ;;
   esac
-  [ -f "$record" ] && is_busy && \
+  is_busy && \
     awk -F '\t' -v key="$WAKE_TASK.status" \
       '$3 == "signal" && $4 == key { found = 1 } END { exit !found }' \
       "$PROJECT/state/.wake-queue" 2>/dev/null
@@ -298,49 +283,6 @@ for marker in .omp-turnend-extension-loaded .omp-watch-extension-loaded; do
     || fail "$SUBJECT: a descendant omp left $marker naming '$(sed -n 2p "$PROJECT/state/$marker")' instead of the session pid $lock_pid"
 done
 pass "live omp markers: $SUBJECT kept both loaded markers on the session pid $lock_pid after a descendant omp ran"
-
-# ---------------------------------------------------------------------------
-# Session B: the extension recovery is switched off, so the parent's recovery
-# must carry a wake the harness left in the composer.
-# ---------------------------------------------------------------------------
-lab pane close "$PANE" >/dev/null 2>&1 || true
-reap_lab
-rm -rf "$PROJECT/state/.watch.lock" "$PROJECT/state/.lock" "$PROJECT/state/.omp-turnend-extension-loaded" "$PROJECT/state/.omp-watch-extension-loaded"
-node --input-type=module - "$PROJECT/.omp/extensions/fm-primary-omp-watch.ts" <<'EOF' || fail "could not delay restored-wake recovery in the disposable lab extension"
-import { readFileSync, writeFileSync } from "node:fs";
-const file = process.argv[2];
-writeFileSync(file, readFileSync(file, "utf8").replace(/const restoreCheckMs = \d+;/, "const restoreCheckMs = 3600000;"));
-EOF
-start_omp wake-parent
-
-busy_turn
-queue_wake
-send_key Escape
-wait_for 30 composer_is pending || { screen >&2; fail "$SUBJECT: the restored wake never showed as a pending composer"; }
-fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
-  || fail "$SUBJECT: the pending composer was not recognized as holding only the restored wake"
-[ "$(queue_rows)" -gt 0 ] || fail "the wake queue drained before the parent recovery ran, so the case is vacuous"
-
-# An operator draft next to the wake makes the composer the operator's.
-send_text ' operator words'
-sleep 1
-before=$(fm_backend_herdr_composer_content "$TARGET" '')
-fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
-  && fail "$SUBJECT: a composer holding a draft beside the wake was read as wake-only"
-fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_busy_class
-[ $? -eq 1 ] || fail "$SUBJECT: the recovery did not refuse a composer that also holds a draft"
-[ "$(fm_backend_herdr_composer_content "$TARGET" '')" = "$before" ] \
-  || fail "$SUBJECT: the refused recovery changed the composer"
-pass "live omp parent recovery: $SUBJECT refused a composer that holds a draft beside the wake and changed nothing"
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do send_key backspace; done
-wait_for 20 fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
-  || { screen >&2; fail "$SUBJECT: could not remove the operator words from the composer"; }
-
-fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_busy_class
-rc=$?
-[ "$rc" -eq 0 ] || { screen >&2; fail "$SUBJECT: the parent recovery did not submit the restored wake (rc=$rc)"; }
-wait_for 90 queue_drained || fail "$SUBJECT: the lane did not handle the wake the parent submitted"
-pass "live omp parent recovery: $SUBJECT submitted the restored wake with one bare Enter and the lane handled it"
 
 # ---------------------------------------------------------------------------
 # A working lane's composer is readable, so injected text is detected and lands.

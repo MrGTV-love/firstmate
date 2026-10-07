@@ -233,9 +233,12 @@
 #   claude-bridge, which omp never lists) passes through unvalidated with a
 #   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
 #   own matcher. Indexed selections follow docs/configuration.md "Fleet model
-#   index". Every task loads its per-task busy-state extension with -e from
-#   state/, outside cwd auto-discovery. Secondmates discover their home's
-#   tracked primary .omp/extensions/ separately.
+#   index". A crewmate or scout loads its per-task busy-state extension with -e
+#   from state/ (outside the worktree, so
+#   auto-discovery cannot load it a second time); a secondmate passes no -e at
+#   all and relies on omp auto-discovering the home's tracked .omp/extensions/
+#   (verified, omp 18.1.11: a file named both ways loads twice, and discovery is
+#   cwd-only with no trust dialog).
 #   config/secondmate-harness may also carry an optional model and effort as extra
 #   whitespace-separated tokens ("<harness> [<model>] [<effort>]"). For a
 #   --secondmate spawn, those tokens apply only when this spawn also resolves its
@@ -2195,7 +2198,7 @@ launch_template() {
   omp)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
-      printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
+      printf '%s' ' __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
       printf '%s' ' --config __OMPWORKERCFG__ __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
@@ -4649,7 +4652,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_REPLACEMENT_STATE=$STATE_REAL
   RELAUNCH_REPLACEMENT_WT=$WT
 fi
-if [ "$KIND" != secondmate ] || { [ "$HARNESS" = omp ] && [ "$RAW_LAUNCH" -eq 0 ]; }; then
+if [ "$KIND" != secondmate ]; then
   # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
   # adapter with a verified semantic source. The launch brief sent below IS a
   # submitted turn, so the seed record is busy/fm-spawn. The minted gen is
@@ -4872,8 +4875,11 @@ EOF
     # omp 18.1.11). Lives in state/, cleaned by teardown.
     omp_busy_executable=$(jq -cn --arg path "$FM_ROOT/bin/fm-busy-event.sh" '$path') || exit 1
     omp_state_path=$(jq -cn --arg path "$STATE_REAL" '$path') || exit 1
-    {
-      cat <<EOF
+    omp_guardrail_import=$(jq -cn --arg path "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts" '$path') || exit 1
+    omp_turnend_path=$(jq -cn --arg path "$TURNEND" '$path') || exit 1
+    guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
+      '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
+    cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
 // Semantic state: "agent_start" -> busy when a low-level agent run begins;
@@ -4886,17 +4892,7 @@ EOF
 // because session_stop is awaited before the session settles, so gating on it
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
-EOF
-      if [ "$KIND" != secondmate ]; then
-        omp_guardrail_import=$(jq -cn --arg path "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts" '$path') || exit 1
-        omp_turnend_path=$(jq -cn --arg path "$TURNEND" '$path') || exit 1
-        guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
-          '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
-        cat <<EOF
 import { installGuardrail } from $omp_guardrail_import;
-EOF
-      fi
-      cat <<EOF
 let busyEvents = Promise.resolve();
 const busyEvent = (state: string, event: string) =>
   busyEvents = busyEvents.then(() => new Promise<void>((resolve) => {
@@ -4906,32 +4902,16 @@ const busyEvent = (state: string, event: string) =>
     ], () => resolve());
   }));
 export default function (pi: any) {
-EOF
-      if [ "$KIND" = secondmate ]; then
-        cat <<EOF
-  pi.on("session_start", () => busyEvent("unknown", "session-start"));
-  pi.on("session_shutdown", () => busyEvent("unknown", "session-shutdown"));
-EOF
-      else
-        cat <<EOF
   installGuardrail(pi, $guardrail_context);
-EOF
-      fi
-      cat <<EOF
   pi.on("before_agent_start", () => busyEvent("busy", "before-agent-start"));
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
     return busyEvent("idle", "agent-end");
   });
-EOF
-      if [ "$KIND" != secondmate ]; then
-        cat <<EOF
   pi.on("turn_end", () => execFile("touch", [$omp_turnend_path]));
+}
 EOF
-      fi
-      printf '}\n'
-    } >"$STATE/$ID.omp-ext.ts"
     ;;
   codex*)
     # Semantic busy-state source negotiation (bin/fm-busy-lib.sh owns the
@@ -5059,15 +5039,6 @@ EOF
     exclude_path '.fm-kimi-turnend'
     ;;
   esac
-elif [ "$HARNESS" = omp ]; then
-  "$FM_ROOT/bin/fm-busy-event.sh" retire "$STATE_REAL" "$ID" --current-gen || {
-    echo "error: could not retire busy-state authority for raw omp secondmate $ID; refusing to launch the replacement" >&2
-    exit 1
-  }
-  clear_relaunch_harness_wiring omp "$WT" "$STATE_REAL" "$ID" || {
-    echo "error: could not retire omp wiring for raw secondmate $ID; refusing to launch the replacement" >&2
-    exit 1
-  }
 fi
 
 # Per-task git hooksPath that strips AI commit trailers at the commit object.
