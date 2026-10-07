@@ -560,8 +560,8 @@ fm_session_launch_policy_enabled() {  # <config-dir>; prints 0 or 1
 fm_session_launch_policy_check_child() {
   local enabled child_enabled home=$2 source_bin file
   enabled=$(fm_session_launch_policy_enabled "$1") || return 1
-  [ "$enabled" = 1 ] || return 0
   child_enabled=$(fm_session_launch_policy_enabled "$home/config") || return 1
+  [ "$enabled" = 1 ] || [ "$child_enabled" = 1 ] || return 0
   if [ "$child_enabled" != 1 ]; then
     printf 'error: secondmate config/session-launch-policy must be enabled at %s before launch\n' "$home/config" >&2
     return 1

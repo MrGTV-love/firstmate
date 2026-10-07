@@ -778,6 +778,46 @@ for entry in fresh direct control auto; do
 done
 
 for entry in fresh direct control auto; do
+  for scenario in guarded-outdated guarded-capable removed-outdated removed-malformed; do
+    make_secondmate_case "child-$entry-absent-primary-$scenario" omp "$entry"
+    set_child_policy_case valid
+    case "$scenario" in
+      guarded-*)
+        printf '/config/*\n!/config/session-launch-policy\n/data/\n/state/\n/projects/\n' > "$CHILD_HOME/.gitignore"
+        EXPECT_CHILD_POLICY=1 ;;
+      removed-malformed)
+        printf 'invalid\n' > "$CHILD_HOME/config/session-launch-policy" ;;
+    esac
+    if [ "$scenario" != guarded-capable ]; then
+      rm "$CHILD_HOME/bin/fm-spawn.sh"
+      printf 'obsolete launcher\n' > "$CHILD_HOME/bin/fm-spawn.sh"
+      cp "$CHILD_HOME/bin/fm-spawn.sh" "$CASE/tooling-prior"
+    fi
+    set_secondmate_endpoint "$entry" omp
+    rc=0
+    out=$(run_secondmate_entry "$entry") || rc=$?
+    case "$scenario" in
+      guarded-outdated)
+        [ "$rc" -ne 0 ] || fail "$entry accepted an incompatible retained child policy: $out"
+        assert_contains "$out" 'session-launch-policy tooling is not verified' 'retained child refusal identifies tooling boundary'
+        assert_contains "$out" "$CHILD_HOME/bin/fm-spawn.sh" 'retained child refusal names the incapable launcher'
+        assert_secondmate_refused "$entry" ;;
+      guarded-capable)
+        [ "$rc" = 0 ] || fail "$entry refused a capable retained child policy: $out"
+        assert_secondmate_launched "$entry" omp enabled ;;
+      removed-*)
+        [ "$rc" = 0 ] || fail "$entry required capable tooling after policy removal: $out"
+        assert_secondmate_launched "$entry" omp absent
+        [ ! -e "$CHILD_HOME/config/session-launch-policy" ] || fail 'primary absence did not remove the writable child policy' ;;
+    esac
+    if [ "$scenario" != guarded-capable ]; then
+      cmp -s "$CASE/tooling-prior" "$CHILD_HOME/bin/fm-spawn.sh" || fail 'absent-primary admission rewrote child tooling'
+    fi
+    pass "$entry checks effective child policy with absent primary: $scenario"
+  done
+done
+
+for entry in fresh direct control auto; do
   make_secondmate_case "child-$entry-preserved-current-tooling" omp "$entry"
   restrict
   EXPECT_CHILD_POLICY=1

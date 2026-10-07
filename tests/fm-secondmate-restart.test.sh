@@ -559,7 +559,7 @@ test_remote_fleet_restart_obeys_initiating_policy() {
   expect_code 3 "$rc" "fleet restart misreported a refused remote profile"$'\n'"$out"
   assert_contains "$out" "summary: 0 of 1 restarted, 0 nudged, 1 unreached" "fleet restart claimed a refused replacement succeeded"
   assert_contains "$out" "config/session-launch-policy" "fleet restart lost the initiating policy reason"
-  assert_no_grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
+  assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
     "fleet restart transported a forbidden replacement"
   cmp -s "$dir/meta-before" "$dir/home/state/sm2.meta" || fail "fleet refusal changed route metadata"
   pass "remote fleet restart retains its route without transporting a forbidden replacement"

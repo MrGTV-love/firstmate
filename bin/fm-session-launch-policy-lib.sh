@@ -83,9 +83,12 @@ fm_session_launch_policy_refusal_notify() {
 }
 
 fm_session_launch_policy_converge_child() (
-  local config=$1 home=$2 id=$3 enabled lock dir
+  local config=$1 home=$2 id=$3 enabled child_present lock dir
   enabled=$(fm_session_launch_policy_enabled "$config") || return 1
-  [ "$enabled" = 1 ] || return 0
+  if [ "$enabled" != 1 ]; then
+    child_present=$(fm_config_source_present "$home/config/session-launch-policy") || return 1
+    [ "$child_present" = 1 ] || return 0
+  fi
   if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
     if [ -z "$home" ] || [ "$(cat "$home/.fm-secondmate-home" 2>/dev/null)" != "$id" ]; then
       printf 'error: cannot converge session-launch-policy into an unseeded secondmate home: %s\n' "$home" >&2
