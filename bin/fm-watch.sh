@@ -119,16 +119,10 @@
 #                          while the mate was not in an active turn (a busy mate
 #                          is exempt only until the queue has been frozen for
 #                          BUSY_TURN_MAX_SECS); declared external-wait pause
-#                          rows do not feed this escalation; a mate whose
-#                          semantic busy class is exactly idle, whose agent is
-#                          alive, and whose composer is not pending is rung
-#                          once so its own home can drain; after that ring the parent
-#                          notification is withheld until that same row stays
-#                          frozen for another stall interval; unknown or
-#                          ring-unsafe panes keep the parent alarm; empty
-#                          inbox and a fresh child beacon are not idle proof;
-#                          the foreign queue itself stays read-only, and one
-#                          parent notification covers each no-progress episode
+#                          rows do not feed this escalation; docs/architecture.md
+#                          "Event-driven supervision" owns idle-ring eligibility
+#                          and the one-alarm no-progress episode contract;
+#                          the foreign queue itself stays read-only
 #   check: secondmate <id> auto-relaunched after <cause> (<where>)
 #                          the liveness tick probed a registered secondmate's
 #                          recorded endpoint, got the recovery-grade `dead` or
@@ -951,11 +945,9 @@ secondmate_ring_to_drain() {  # <task> <window>
 # a later genuine freeze remains visible. A mate demonstrably inside an active
 # turn defers its escalation, but only while this same interval is under
 # BUSY_TURN_MAX_SECS, so a turn that never ends cannot hide a frozen queue.
-# A mate whose busy class is exactly idle, whose agent is alive, and whose
-# composer is not pending is rung once so its own home can drain, and the
-# parent notification is withheld until that same row stays frozen for another
-# stall interval. Unknown, busy-over-bound, and ring-unsafe panes keep the
-# parent alarm. Empty inbox and a fresh child beacon are not idle proof.
+# Idle-ring eligibility and parent alarm policy are owned by
+# docs/architecture.md "Event-driven supervision"; secondmate_idle_ring_safe enforces the
+# no-draft boundary before any drain steer.
 # Receipts close the append-before-marker crash window without changing the
 # foreign queue.
 secondmate_wake_stall_tick() {
