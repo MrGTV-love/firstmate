@@ -109,6 +109,10 @@ SH
     cat > "$FAKEBIN/$executable" <<'SH'
 #!/usr/bin/env bash
 set -eu
+if [ "${0##*/}" = omp ] && [ "${1:-}" = models ] && [ "${2:-}" = --json ]; then
+  printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}'
+  exit 0
+fi
 if [ -n "${FM_POLICY_CHILD:-}" ]; then
   printf 'launch-attempt:%s\n' "${0##*/}" >> "$FM_POLICY_CASE/effects"
   [ "$FM_HOME" = "$FM_POLICY_CHILD" ] || exit 97
@@ -559,14 +563,14 @@ printf 'claude\n' > "$CASE/command"
 out=$(run_cli "$ROOT/bin/fm-control.sh" "$ID" relaunch --harness omp --model openai-codex/gpt-6.1-sol --effort high --note 'explicit replacement') || fail "$out"
 assert_contains "$out" 'harness=omp' 'explicit replacement is allowed'
 grep -Fx 'stop' "$CASE/effects" >/dev/null || fail 'replacement never stopped old agent'
-grep -Fx 'launch:omp' "$CASE/effects" >/dev/null || fail 'replacement never ran omp executable'
+[ "$(grep -Fxc 'launch:omp' "$CASE/effects")" = 1 ] || fail 'replacement did not run omp exactly once'
 [ "$(cat "$WT/unpublished")" = 'unpublished work' ] || fail 'replacement lost work'
 pass 'explicit omp replacement allows the openai-codex provider'
 
 make_case fresh-omp omp
 restrict
 out=$(run_cli "$ROOT/bin/fm-spawn.sh" "$ID" "$CASE/project" --model openai-codex/gpt-6.1-sol --mode no-mistakes --yolo off) || fail "$out"
-grep -Fx 'launch:omp' "$CASE/effects" >/dev/null || fail 'fresh omp never launched'
+[ "$(grep -Fxc 'launch:omp' "$CASE/effects")" = 1 ] || fail 'fresh omp did not launch exactly once'
 pass 'fresh omp launch works with Codex provider'
 
 make_case secondmate codex
@@ -808,6 +812,10 @@ for denied in codex claude malformed legacy; do
   make_secondmate_case "child-auto-repeat-$denied" omp auto
   EXPECT_CHILD_POLICY=1
   set_secondmate_endpoint auto omp
+  if [ "$denied" = legacy ]; then
+    awk '!/^(home|worktree)=/' "$HOME_DIR/state/$ID.meta" > "$CASE/meta-legacy"
+    mv "$CASE/meta-legacy" "$HOME_DIR/state/$ID.meta"
+  fi
   cp "$HOME_DIR/state/$ID.meta" "$CASE/meta-generation-base"
   case "$denied" in
     codex) generation_key=spawn_gen ;;
@@ -838,6 +846,15 @@ for denied in codex claude malformed legacy; do
     assert_secondmate_auto_refusal first 1
     assert_secondmate_auto_refusal quiet 1
     printf 'codex\n' > "$HOME_DIR/config/secondmate-harness"
+    assert_secondmate_auto_refusal quiet 1
+    ack_refusal_queue
+    assert_secondmate_auto_refusal quiet 0
+  elif [ "$denied" = legacy ]; then
+    printf 'invalid\n' > "$CHILD_HOME/config/session-launch-policy"
+    cp "$CHILD_HOME/config/session-launch-policy" "$CASE/child-policy-prior"
+    assert_secondmate_auto_refusal first 1
+    assert_secondmate_auto_refusal quiet 1
+    rm "$CHILD_HOME/config/session-launch-policy" "$CASE/child-policy-prior"
     assert_secondmate_auto_refusal quiet 1
     ack_refusal_queue
     assert_secondmate_auto_refusal quiet 0

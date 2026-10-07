@@ -791,6 +791,7 @@ Local admission also requires the child's policy parser/configuration dependency
 This conservative tooling-capability check does not invoke child scripts or rewrite the child checkout: missing, outdated, unreadable, or locally changed policy owners refuse, even when inheritance is skipped and the child already has a valid policy.
 Dirty edits outside those owners, wrong-branch homes, and preserved divergence remain supported when their policy tooling matches; restore the named owner from the primary while preserving unrelated work before retrying a refusal.
 Local recovery converges this setting and verifies the tooling before stopping the old endpoint or consuming a recovery attempt, while unrelated inheritance remains best-effort.
+Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
 
 This opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
 Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.

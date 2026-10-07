@@ -60,6 +60,8 @@ FM_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$FM_SM_LIVE_LIB_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$FM_SM_LIVE_LIB_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-secondmate-registry-lib.sh
+. "$FM_SM_LIVE_LIB_DIR/fm-secondmate-registry-lib.sh"
 
 # Per-task probe+kill+relaunch serialization. A busy lock means another
 # supervisor (the other sweep, or a racing tick) is mid-episode on this mate;
@@ -278,13 +280,14 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-}
   FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
   local policy_error config home generation reason
+  home=$(fm_meta_get "$meta" home)
+  [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
+  [ -n "$home" ] || home=$(secondmate_registry_field "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" home || true)
   if ! policy_error=$(
     {
       config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
       fm_sm_live_replacement_admit || exit 1
       if [ -z "$(fm_meta_get "$meta" remote_host)" ]; then
-        home=$(fm_meta_get "$meta" home)
-        [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
         fm_session_launch_policy_converge_child "$config" "$home" "$id"
       fi
     } 2>&1
@@ -294,8 +297,6 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
     FM_SM_LIVE_REASON=$(fm_sm_live_first_line "$policy_error")
     FM_SM_LIVE_RC=1
     config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
-    home=$(fm_meta_get "$meta" home)
-    [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
     generation=$(fm_meta_get "$meta" spawn_gen)
     [ -n "$generation" ] || generation=$(fm_meta_get "$meta" busy_gen)
     if [ -z "$generation" ]; then
