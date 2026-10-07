@@ -119,10 +119,16 @@
 #                          while the mate was not in an active turn (a busy mate
 #                          is exempt only until the queue has been frozen for
 #                          BUSY_TURN_MAX_SECS); declared external-wait pause
-#                          rows do not feed this escalation; a mate whose
+#                          rows do not feed this escalation; a live mate whose
+#                          pending composer holds nothing but injected watcher
+#                          wakes (a harness put the wake back unsubmitted when
+#                          a run was interrupted) gets one bare Enter and no
+#                          typed text, so an operator draft is never touched; a
+#                          mate whose
 #                          semantic busy class is exactly idle, whose agent is
 #                          alive, and whose composer is not pending is rung
-#                          once so its own home can drain, and the parent
+#                          once so its own home can drain; after either
+#                          recovery the parent
 #                          notification is withheld until that same row stays
 #                          frozen for another stall interval; unknown or
 #                          ring-unsafe panes keep the parent alarm; empty
@@ -924,6 +930,20 @@ secondmate_idle_ring_safe() {  # <window>
   return 0
 }
 
+# 0 iff the mate's pending composer held nothing but injected watcher wakes and
+# one bare Enter submitted them. A harness can put a queued wake back into the
+# composer unsubmitted (omp does when a run is interrupted), which leaves the
+# mate idle with its queue frozen and, because the composer is pending, outside
+# secondmate_idle_ring_safe. fm_task_inbox_submit_held_wake owns the safety: it
+# refuses any composer that holds anything besides wakes and types nothing.
+secondmate_submit_held_wake() {  # <window>
+  local w=$1 backend
+  [ -n "$w" ] || return 1
+  backend=$(window_backend "$w")
+  [ "$(fm_backend_agent_state "$backend" "$w" 2>/dev/null || true)" = alive ] || return 1
+  fm_task_inbox_submit_held_wake "$backend" "$w" "$(window_label "$w")"
+}
+
 # Write one fire-and-forget drain steer and ring the child's doorbell. The
 # steer carries the same from-firstmate fire-and-forget carrier fm-send uses
 # for a secondmate (marker, then delivery=<16-hex-id>, then the text), so the
@@ -1032,6 +1052,11 @@ EOF
     if [ -e "$ring_marker" ] || [ -L "$ring_marker" ]; then
       [ -f "$ring_marker" ] && [ ! -L "$ring_marker" ] || return 1
       [ "$(cat "$ring_marker" 2>/dev/null || true)" = "$row_key" ] && already_rung=1
+    fi
+    if [ "$already_rung" -eq 0 ] && secondmate_submit_held_wake "$w"; then
+      fm_wake_secondmate_ring_marker_write "$task" "$row_key" || return 1
+      fm_wake_secondmate_progress_marker_write "$task" "$now" "$row_key" || return 1
+      continue
     fi
     if [ "$already_rung" -eq 0 ] && secondmate_idle_ring_safe "$w"; then
       if secondmate_ring_to_drain "$task" "$w"; then

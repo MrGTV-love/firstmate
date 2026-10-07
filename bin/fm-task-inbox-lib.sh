@@ -78,6 +78,8 @@ _FM_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_FM_TASK_INBOX_LIB_DIR/fm-wake-lib.sh"
 # shellcheck source=/dev/null
 . "$_FM_TASK_INBOX_LIB_DIR/fm-backend.sh"
+# shellcheck source=bin/fm-operational-input.sh
+. "$_FM_TASK_INBOX_LIB_DIR/fm-operational-input.sh"
 
 FM_TASK_INBOX_SCHEMA='fm-task-inbox.v1'
 FM_TASK_INBOX_GRACE_DEFAULT=90
@@ -329,6 +331,38 @@ fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
   cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 1
   held=$(fm_composer_extract_selected_content styled=0 "$cap") || return 1
   [ -n "$held" ] && [ "$(printf '%s' "$held" | tr -d '[:space:]')" = "$(printf '%s' "$3" | tr -d '[:space:]')" ]
+}
+
+# Whether the composer holds nothing but injected watcher wakes: a harness
+# (omp restores a queued follow-up into the composer when a run is interrupted)
+# put the wake text back unsubmitted, and no operator draft is mixed into it.
+fm_task_inbox_composer_holds_wake() {  # <backend> <target> [expected-label]
+  local cap held
+  fm_backend_source "$1" || return 1
+  cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${3:-}" 2>/dev/null) || return 1
+  held=$(fm_composer_extract_selected_content styled=0 "$cap") || return 1
+  [ -n "$held" ] && fm_operational_watcher_wakes_only "$held"
+}
+
+# Submit a watcher wake that sits unsubmitted in a pending composer, by pressing
+# Enter and nothing else: no text is typed, so an operator's own draft can never
+# be concatenated with or overwritten by this recovery, and a composer that holds
+# anything but wakes is refused. A busy agent is left alone, since a submit there
+# would only queue the wake behind the running turn. Returns 0 once the composer
+# no longer holds the wake, 1 when nothing applies, 2 when the key could not be
+# sent, 3 when the wake is still held after the retry.
+fm_task_inbox_submit_held_wake() {  # <backend> <target> [expected-label]
+  local backend=$1 target=$2 label=${3:-}
+  [ "$(fm_backend_composer_state "$backend" "$target" "$label" 2>/dev/null)" = pending ] || return 1
+  fm_task_inbox_composer_holds_wake "$backend" "$target" "$label" || return 1
+  [ "$(fm_backend_busy_state "$backend" "$target" 2>/dev/null)" != busy ] || return 1
+  fm_backend_send_key "$backend" "$target" Enter "$label" >/dev/null 2>&1 || return 2
+  sleep "${FM_TASK_INBOX_SUBMIT_CONFIRM_SECS:-0.5}"
+  fm_task_inbox_composer_holds_wake "$backend" "$target" "$label" || return 0
+  fm_backend_send_key "$backend" "$target" Enter "$label" >/dev/null 2>&1 || return 2
+  sleep "${FM_TASK_INBOX_SUBMIT_CONFIRM_SECS:-0.5}"
+  fm_task_inbox_composer_holds_wake "$backend" "$target" "$label" || return 0
+  return 3
 }
 
 fm_task_inbox_is_fire_and_forget() {  # <record-path>

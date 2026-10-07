@@ -3609,6 +3609,14 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
         && [ "$(fm_backend_herdr_rendered_busy_state "$target")" = busy ]; then
         verdict=busy
       fi
+      if [ "$verdict" = pending ]; then
+        # A frame drawn before the harness consumed the Enter also reads
+        # pending, and a second Enter on the by-now empty composer can abort a
+        # running omp turn that has queued messages (its empty-submit rule).
+        # Read once more before any retry is allowed to press again.
+        sleep "$sleep_s"
+        verdict=$(fm_backend_herdr_composer_state_as "$target" "$identity")
+      fi
       case "$verdict" in
         busy) printf 'empty'; return 0 ;;
         empty) printf 'empty'; return 0 ;;

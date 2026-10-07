@@ -152,6 +152,7 @@ It accepts either the Pi pair (`fm_pi_extension_owns_supervision`) or the omp pa
 The proof requires all of these:
 
 - Both primary extensions of one family must be recorded in their state markers at their current on-disk builds by the process named in `state/.lock`.
+  On omp only that exact process records itself or arms a watcher: a descendant omp that auto-discovers the same extensions (an `omp -p` child a turn runs) is another session, and the turn-end guard re-asserts its marker at every turn boundary once the session-start hook has claimed the lock.
 - That process must still be alive.
 - Pi's watcher marker must additionally name an active generation rather than a retiring handoff.
 

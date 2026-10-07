@@ -247,6 +247,30 @@ test_record_prune_outgrows_one_argument_list() {
   pass "record pruning: expired records past one argument list are all pruned on a write"
 }
 
+# The watcher submits a wake that a harness put back into a composer only when
+# the composer holds nothing but wakes. The text is produced by the extensions;
+# the omp harness suite proves the real producer's text against this predicate.
+test_watcher_wakes_only_predicate() {
+  local wake two squeezed
+  wake=$(printf '%s' $'FIRSTMATE WATCHER WAKE: signal: /home/x/state/lane.status\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' | "$OWNER" encode watcher)
+  fm_operational_watcher_wakes_only "$wake" || fail "a single current watcher wake must qualify"
+  squeezed=$(printf '%s' "$wake" | tr -d '[:space:]')
+  fm_operational_watcher_wakes_only "$squeezed" || fail "a composer re-wraps text, so whitespace must not matter"
+  fm_operational_watcher_wakes_only "${wake//$FM_OPERATIONAL_MARK/}" || fail "a composer that strips the invisible mark must still qualify"
+  two="$wake"$'\n\n'"$wake"
+  fm_operational_watcher_wakes_only "$two" || fail "two restored wakes must qualify"
+  fm_operational_watcher_wakes_only "$wake my draft" && fail "a draft after the wake must refuse"
+  fm_operational_watcher_wakes_only "my draft $wake" && fail "a draft before the wake must refuse"
+  fm_operational_watcher_wakes_only "$wake"$'\n\nmy draft\n\n'"$wake" && fail "a draft between two wakes must refuse"
+  fm_operational_watcher_wakes_only '' && fail "an empty composer is not a wake"
+  fm_operational_watcher_wakes_only 'FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: x' && fail "a wake without its continuity sentence is incomplete"
+  fm_operational_watcher_wakes_only "$(printf '%s' 'launch the build' | "$OWNER" encode launch-brief)" && fail "another operational kind is not a watcher wake"
+  fm_operational_watcher_wakes_only $'FIRSTMATE WATCHER WAKE: x\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' \
+    && fail "the untyped legacy form is not a current wake"
+  pass "fm_operational_watcher_wakes_only: accepts only current watcher wakes with nothing else in the composer"
+}
+
+test_watcher_wakes_only_predicate
 test_current_generic_matrix
 test_current_from_firstmate_carrier
 test_landed_untyped_prefix_is_explicitly_legacy

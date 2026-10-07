@@ -794,6 +794,258 @@ EOF
   pass ".omp watch extension: a host close split across stream chunks reaches main as one whole follow-up"
 }
 
+# omp puts a queued user follow-up back into the composer when a run is
+# interrupted (Esc, including fm-control interrupt) or dequeued (Alt+Up), which
+# leaves a delivered watcher wake unsubmitted. The watch extension must find that
+# wake, remove only its own text, and submit it again, while never touching an
+# operator's draft or a wake a run already consumed. Each scenario runs in its
+# own process because the arm fixture fires exactly one actionable close.
+run_watch_restore_scenario() {  # <scenario>
+  local scenario=$1 repo home
+  repo="$TMP_ROOT/watch-restore-$scenario/repo"; home="$TMP_ROOT/watch-restore-$scenario/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+# The extension confirms a handling handoff through this same script; answering
+# at once keeps its synchronous call from blocking the whole run.
+[ "${1:-}" != --handling-delivered ] || exit 0
+printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
+if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ]; then
+  : > "$FM_HOME/state/.e2e-fired"
+  sleep 1
+  printf 'signal: omp-restore done\n'
+  exit 0
+fi
+exec sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  # Output goes to a file, not a pipe: the fixture's long-lived arm child would
+  # otherwise hold a command substitution open for its whole sleep.
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_OMP_WAKE_RESTORE_CHECK_MS=100 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync } from "node:fs";
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null; const sent = [];
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage(m, o) { sent.push({ m, o }); return undefined; },
+};
+// The composer omp would show, with the editor calls the extension may use.
+const composer = { text: "", sets: [] };
+let idle = true; let queued = false;
+const ctx = {
+  hasUI: true,
+  isIdle: () => idle,
+  hasPendingMessages: () => queued,
+  ui: { getEditorText: () => composer.text, setEditorText: (t) => { composer.sets.push(t); composer.text = t; } },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, ctx);
+await tool.execute();
+for (let i = 0; i < 60 && sent.length < 1; i += 1) await sleep(100);
+if (sent.length !== 1) throw new Error(`expected the first wake, saw ${sent.length}`);
+const wake = sent[0].m;
+const bare = wake.replace(/⁣/g, "");
+const settle = async () => { await handlers.get("agent_end")({ type: "agent_end" }, ctx); await sleep(500); };
+const same = (item) => item.m === wake && item.o?.deliverAs === "followUp";
+
+switch (process.env.SCENARIO) {
+  case "consumed": {
+    await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    await settle();
+    if (sent.length !== 1) throw new Error(`a consumed wake was sent again: ${sent.length}`);
+    if (composer.sets.length !== 0) throw new Error("a consumed wake changed the composer");
+    break;
+  }
+  case "draft": {
+    // omp joins restored messages and the operator's draft with a blank line.
+    composer.text = `${wake}\n\nmy unsent draft`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1])) throw new Error(`the restored wake was not submitted again: ${JSON.stringify(sent)}`);
+    if (composer.text !== "my unsent draft") throw new Error(`the operator draft was not preserved exactly: ${JSON.stringify(composer.text)}`);
+    // The resubmitted wake starts the run that consumes it; nothing is left to recover.
+    await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    await settle();
+    if (sent.length !== 2) throw new Error(`a consumed resubmission was sent a third time: ${sent.length}`);
+    if (composer.text !== "my unsent draft") throw new Error("the draft changed after the wake was consumed");
+    break;
+  }
+  case "draft-before": {
+    composer.text = `my unsent draft\n\n${bare}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1])) throw new Error(`the restored wake was not submitted again: ${JSON.stringify(sent)}`);
+    if (composer.text !== "my unsent draft") throw new Error(`the operator draft was not preserved exactly: ${JSON.stringify(composer.text)}`);
+    break;
+  }
+  case "alone": {
+    // The wake text the real producer sends, kept for the shell side to check
+    // against the parent's wake-only predicate.
+    writeFileSync(`${process.env.FM_HOME}/wake.txt`, wake);
+    // A composer that drops the invisible mark still holds the same wake.
+    composer.text = bare;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1])) throw new Error(`the restored wake was not submitted again: ${JSON.stringify(sent)}`);
+    if (composer.text !== "") throw new Error(`the composer still holds text after the resubmission: ${JSON.stringify(composer.text)}`);
+    break;
+  }
+  case "busy": {
+    composer.text = wake; idle = false;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0) throw new Error("a running turn was disturbed");
+    break;
+  }
+  case "queued": {
+    composer.text = wake; queued = true;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0) throw new Error("a wake with messages still queued was submitted again");
+    break;
+  }
+  case "elsewhere": {
+    composer.text = "an unrelated operator draft";
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0) throw new Error("a composer without the wake was touched");
+    break;
+  }
+  case "limit": {
+    // An operator who keeps interrupting must not turn recovery into a loop.
+    for (let i = 0; i < 6; i += 1) { composer.text = wake; await settle(); }
+    if (sent.length !== 4) throw new Error(`recovery was not bounded to three resubmissions: ${sent.length}`);
+    break;
+  }
+  default:
+    throw new Error(`unknown scenario ${process.env.SCENARIO}`);
+}
+await handlers.get("session_shutdown")({}, ctx);
+process.exit(0);
+EOF
+  local status=$?
+  cat "$home/scenario.out"
+  return "$status"
+}
+
+test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
+  local scenario out status
+  for scenario in consumed draft draft-before alone busy queued elsewhere limit; do
+    out=$(run_watch_restore_scenario "$scenario")
+    status=$?
+    expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
+    [ -z "$out" ] || fail "omp watch restore scenario $scenario printed output: $out"
+  done
+  # The parent submits a restored wake only when the composer holds nothing but
+  # wakes, so the real producer's text must satisfy that predicate.
+  bash -c '. "$1/bin/fm-operational-input.sh"; fm_operational_watcher_wakes_only "$(cat "$2")"' _ "$ROOT" "$TMP_ROOT/watch-restore-alone/home/wake.txt" \
+    || fail "the omp watch extension's wake text is not recognized as a watcher wake by fm_operational_watcher_wakes_only"
+  pass ".omp watch extension: a wake omp restored to the composer is submitted again alone, bounded, and never over a draft or a running turn"
+}
+
+# Only the omp process that holds the session lock may record itself as the
+# loaded session or arm a watcher. A descendant omp (an `omp -p` child a turn
+# runs) auto-discovers the same extensions from the same directory; it used to
+# overwrite the marker with its own pid, and its death left the dead pid in the
+# marker, so the supervision proof read "not loaded" under a healthy session.
+test_primary_extensions_ignore_a_descendant_session() {
+  local repo home out status
+  repo="$TMP_ROOT/descendant/repo"; home="$TMP_ROOT/descendant/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  # The session lock names this shell, an ancestor of the node process below.
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" GUARD_EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" \
+    WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" FM_SESSIONSTART_OFF=1 node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+writeFileSync(`${state}/.lock`, `${process.ppid}\n`);
+const record = "sha256:parent-session-build\n" + process.ppid + "\n";
+for (const marker of [".omp-turnend-extension-loaded", ".omp-watch-extension-loaded"]) writeFileSync(`${state}/${marker}`, record);
+const load = async (file) => {
+  const handlers = new Map(); let tool = null;
+  const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage() {}, sendMessage() {} };
+  (await import(pathToFileURL(file).href)).default(pi);
+  return { handlers, tool };
+};
+const guard = await load(process.env.GUARD_EXT);
+const watch = await load(process.env.WATCH_EXT);
+const ctx = { sessionManager: { getSessionId: () => "child" } };
+await guard.handlers.get("session_start")({ type: "session_start" }, ctx);
+await watch.handlers.get("session_start")({ type: "session_start" }, ctx);
+await guard.handlers.get("session_stop")({ type: "session_stop", stop_hook_active: true }, ctx);
+await watch.handlers.get("before_agent_start")({ type: "before_agent_start", prompt: "x" }, ctx);
+for (const marker of [".omp-turnend-extension-loaded", ".omp-watch-extension-loaded"]) {
+  if (readFileSync(`${state}/${marker}`, "utf8") !== record) throw new Error(`a descendant session overwrote ${marker}: ${readFileSync(`${state}/${marker}`, "utf8")}`);
+}
+const arm = await watch.tool.execute();
+if (!/read-only/.test(arm.content[0].text)) throw new Error(`a descendant session armed a watcher: ${arm.content[0].text}`);
+if (existsSync(`${state}/.watch.lock`)) throw new Error("a descendant session took the watcher lock");
+await watch.handlers.get("session_shutdown")({}, ctx);
+await guard.handlers.get("session_shutdown")({}, ctx);
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "descendant omp session must not claim the home: $out"
+  [ -z "$out" ] || fail "descendant omp session test printed output: $out"
+  pass ".omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher"
+}
+
+# The turn-end guard used to record itself only while the extension loaded,
+# before the session-start hook claimed the lock, so a lock that was foreign or
+# absent at that moment left a marker naming a dead pid until the next restart.
+test_turnend_marker_follows_the_lock_owner_at_turn_boundaries() {
+  local repo home out status
+  repo="$TMP_ROOT/marker-heal/repo"; home="$TMP_ROOT/marker-heal/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+cat >/dev/null
+exit 0
+SH
+  chmod +x "$repo/bin/fm-turnend-guard.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" GUARD_EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" \
+    node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { spawn } from "node:child_process";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+const marker = `${state}/.omp-turnend-extension-loaded`;
+const pidOf = () => readFileSync(marker, "utf8").split("\n")[1];
+// A live session that is not this process holds the lock while the extension loads.
+const other = spawn("sleep", ["60"], { stdio: "ignore" });
+writeFileSync(`${state}/.lock`, `${other.pid}\n`);
+const handlers = new Map();
+const pi = { on(e, h) { handlers.set(e, h); }, sendMessage() {} };
+(await import(pathToFileURL(process.env.GUARD_EXT).href)).default(pi);
+const ctx = { sessionManager: { getSessionId: () => "s1" } };
+await handlers.get("session_start")({ type: "session_start" }, ctx);
+if (existsSync(marker)) throw new Error("a foreign live lock holder must not be recorded as this session's marker");
+// The session-start hook then claims the lock for this process.
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: "hi" }, ctx);
+if (pidOf() !== String(process.pid)) throw new Error(`the marker was not recorded once the lock was claimed: ${readFileSync(marker, "utf8")}`);
+// A stale record (a dead build or pid) is repaired at the next turn boundary.
+writeFileSync(marker, "sha256:stale\n999999\n");
+await handlers.get("session_stop")({ type: "session_stop", stop_hook_active: true }, ctx);
+if (pidOf() !== String(process.pid)) throw new Error(`the stale marker was not repaired at the turn boundary: ${readFileSync(marker, "utf8")}`);
+other.kill();
+await handlers.get("session_shutdown")({}, ctx);
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "turn-end marker self-repair: $out"
+  [ -z "$out" ] || fail "turn-end marker self-repair test printed output: $out"
+  pass ".omp turn-end guard: the loaded marker follows the lock owner at turn boundaries instead of only at load"
+}
+
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
@@ -808,3 +1060,6 @@ test_watch_extension_arms_and_delivers
 test_watch_extension_runs_the_supervision_host
 test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
+test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
+test_primary_extensions_ignore_a_descendant_session
+test_turnend_marker_follows_the_lock_owner_at_turn_boundaries

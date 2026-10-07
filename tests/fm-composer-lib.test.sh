@@ -968,17 +968,56 @@ test_matrix_omp_box_composer() {
   pass "matrix: omp's box composer (status in the top border, folded last row) reads empty, pending, and never a typed glyph as empty"
 }
 
+# While a turn runs, omp's box top border carries a spinner frame and the elapsed
+# time where the idle border carries its identity glyph. These are real omp
+# 18.6.3 captures through Herdr of a worker running `sleep 60`: the empty
+# composer, a draft typed while the turn ran, and the same draft wrapped onto a
+# second row. Reading the border as unknown hid a typed line that never
+# submitted from every busy caller.
+omp_box_busy_top() {  # <spinner> <elapsed>
+  printf '╭── %s %s > ◔ GPT-6-Astra 👁 > 🗑 …lab.m13m2O/project > ⑂ fm/fm-omp-lane-wake-unsubmitted *7 > S0.27 + 👁 0.05 ▶─7%%─┃272K───╮' "$1" "$2"
+}
+
+test_omp_box_busy_status_border_reads_the_composer() {
+  local busy empty_last typed wrapped frame elapsed
+  busy=$'transcript\n\n  ⎋ Waiting requested sixty seconds\n\n'
+  empty_last=$(omp_box_last '')
+  assert_screen "omp busy box empty on herdr" empty "$CAPS_STYLED" \
+    "$busy$(omp_box_busy_top ⠦ 13s)"$'\n'"$empty_last" '' probe-absent
+  assert_screen "omp busy box empty on plain backends" empty "$CAPS_PLAIN" \
+    "$busy$(omp_box_busy_top ⠦ 13s)"$'\n'"$empty_last"
+  typed=$busy$(omp_box_busy_top ⠦ 13s)$'\n'$(omp_box_last 'half typed draft while busy')
+  assert_screen "omp busy box typed on herdr" pending "$CAPS_STYLED" "$typed" '' probe-absent
+  assert_screen "omp busy box typed on plain backends" pending "$CAPS_PLAIN" "$typed"
+  [ "$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$typed")" = 'half typed draft while busy' ] \
+    || fail "omp busy box extraction must return the typed draft"
+  wrapped=$busy$(omp_box_busy_top ⠹ 16s)$'\n│  half typed draft while busy and a long wrapped continuation that goes on and on and on and on  │\n'$(omp_box_last 'on and on and on and on')
+  assert_screen "omp busy box wrapped draft" pending "$CAPS_STYLED" "$wrapped" '' probe-absent
+  # Every spinner frame and a minutes-long elapsed cell keep the identity.
+  for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏ ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷; do
+    assert_screen "omp busy box frame $frame" empty "$CAPS_STYLED" \
+      "$busy$(omp_box_busy_top "$frame" 5s)"$'\n'"$empty_last" '' probe-absent
+  done
+  for elapsed in 59s 1m3s 2h5m; do
+    assert_screen "omp busy box elapsed $elapsed" empty "$CAPS_STYLED" \
+      "$busy$(omp_box_busy_top ⠧ "$elapsed")"$'\n'"$empty_last" '' probe-absent
+  done
+  pass "matrix: omp's box composer is readable while a turn runs (spinner and elapsed time in the top border), so a typed line that never submitted reads pending"
+}
+
 test_omp_box_requires_omp_identity_and_complete_shape() {
   local top empty_last
   top=$(omp_box_top)
   empty_last=$(omp_box_last '')
   # Only omp's own status identity proves the container; an arbitrary titled
-  # rounded border, a busy spinner status, or the ascii preset's `pi` stays
-  # an unprovable shape and reads unknown, never empty.
+  # rounded border, a spinner with no elapsed cell, or the ascii preset's `pi`
+  # stays an unprovable shape and reads unknown, never empty.
   assert_screen "titled non-omp border" unknown "$CAPS_STYLED" \
     $'transcript\n\n╭── some other title ──╮\n'"$empty_last" '' probe-absent
-  assert_screen "omp busy spinner status" unknown "$CAPS_STYLED" \
-    $'transcript\n\n╭── ⠧ 11s > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "spinner without an elapsed cell" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── ⠧ > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "elapsed cell without a spinner" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── 11s > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
   assert_screen "omp ascii-preset status" unknown "$CAPS_STYLED" \
     $'transcript\n\n╭── pi - GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
   # A bare rule closing the box is not the folded last row.
@@ -1558,6 +1597,7 @@ test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_omp_effort_hint_remnant
 test_matrix_omp_box_composer
+test_omp_box_busy_status_border_reads_the_composer
 test_omp_box_requires_omp_identity_and_complete_shape
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
