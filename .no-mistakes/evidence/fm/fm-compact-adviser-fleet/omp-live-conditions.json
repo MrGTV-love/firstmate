@@ -1,0 +1,91 @@
+{
+  "argv": [
+    "omp",
+    "--cwd",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/compact-adviser-live-proof-20261007/omp-corrected/work",
+    "--no-extensions",
+    "-e",
+    "/tmp/fm-fm-compact-adviser-fleet/bakeoff-ref/experiments/compaction-bakeoff/observer.ts",
+    "-e",
+    "/Users/charlesabrooker/.omp/plugins/node_modules/compact-adviser/src/index.ts",
+    "--config",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/compact-adviser-live-proof-20261007/omp-corrected/overlay.json",
+    "--no-skills",
+    "--no-rules",
+    "--no-title",
+    "--no-lsp",
+    "--no-pty",
+    "--no-prewalk",
+    "--auto-approve",
+    "--tools",
+    "read,write,bash",
+    "--session-dir",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/compact-adviser-live-proof-20261007/omp-corrected/sessions",
+    "--model",
+    "openai-codex/gpt-6.1-sol",
+    "--thinking",
+    "low",
+    "--system-prompt",
+    "You are implementing a synthetic Python shop migration. Follow the user contract exactly. Work only inside the current directory; do not access credentials, network, other projects or personal files. Use read/write/bash only as needed. Write real runnable Python, not placeholders. Do not delegate. Do not create extra summaries or restate the long contract unless requested. When the requested phase is finished, stop and await the next request.",
+    "--max-time",
+    "10m",
+    "Read the ENTIRE source.txt into context using the read tool, including all historical ledger rows. Read exactly these ranges in order, without skipping lines: source.txt:1-250, source.txt:251-500, source.txt:501-750, source.txt:751-1000, source.txt:1001-1250, source.txt:1251-1500, source.txt:1501-1625. Do not summarize, filter, implement, or write a report yet. The exact contracts are in that file, not this message. After loading every chunk, write checkpoint.json containing only {\"discovery\":\"complete\"}. All currently requested discovery work is complete; reply DISCOVERY_COMPLETE only, then wait."
+  ],
+  "config": {
+    "version": 1,
+    "mode": "auto",
+    "minContextTokens": 20000,
+    "autoAcknowledged": true,
+    "logRequests": true
+  },
+  "native_overlay": {
+    "autoResume": false,
+    "advisor": {
+      "enabled": false
+    },
+    "memory": {
+      "backend": "off"
+    },
+    "mnemopi": {
+      "autoRecall": false,
+      "autoRetain": false
+    },
+    "recap": {
+      "enabled": false
+    },
+    "startup": {
+      "setupWizard": false,
+      "checkUpdate": false
+    },
+    "telemetry": {
+      "otlpExportEnabled": false
+    },
+    "git": {
+      "enabled": false
+    },
+    "completion": {
+      "notify": "off"
+    },
+    "error": {
+      "notify": "off"
+    },
+    "retry": {
+      "modelFallback": false
+    },
+    "contextPromotion": {
+      "enabled": false
+    },
+    "compaction": {
+      "enabled": true,
+      "thresholdTokens": -1,
+      "thresholdPercent": -1,
+      "idleEnabled": false,
+      "idleThresholdTokens": 40000,
+      "idleTimeoutSeconds": 60,
+      "keepRecentTokens": 20000,
+      "experimentalContextManagement": false
+    }
+  },
+  "credential_values_persisted": false,
+  "auth_route": "supplied isolated-auth reference in-memory Codex/Jev environment"
+}

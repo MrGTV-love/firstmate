@@ -1,0 +1,62 @@
+Scenario: authenticate isolated Claude through real fm-teamclaude-launch.sh, then obtain Jev/native-compaction proof.
+
+Environment: marked disposable FM_HOME; lab HOME, CLAUDE_CONFIG_DIR, XDG_CONFIG_HOME and TEAMCLAUDE_CONFIG; workspace-local @karpeleslab/teamclaude 1.1.24; private fm-lab tmux socket, 120x40 grid.
+No operator config/credential store was read/copied/attached.
+
+Initial real wrapper result (default proxy port):
+error: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it
+LAB_LAUNCH_EXIT=1
+
+Workaround: provision a real lab-owned TeamClaude proxy with autoUpdate=false, an empty account list and a random loopback port. Run teamclaude server --headless in the same private tmux server.
+Actual proxy output:
+No accounts configured.
+
+Add an account first:
+  teamclaude import           Import from Claude Code
+  teamclaude login            OAuth login via browser
+  teamclaude login --api      Add an API key (last resort by default; --priority <n>)
+  teamclaude callback login   Sign in to callback.net and take the accounts of your other installs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 1, Tue Oct  6 19:48:15 2026)
+
+Actual isolated teamclaude status output:
+Cannot connect to proxy at localhost:58007
+Is the server running? Start with: teamclaude server
+Details: fetch failed
+
+Real wrapper re-attempt again returned LAB_LAUNCH_EXIT=1 before Claude could start.
+No OAuth/login/import was attempted, no upstream credential was invented, and no Jev/native-compaction proof was obtained.
+
+Cleanup: private fm-lab tmux kill-server exit=0; fm-lab-home.sh teardown exit=0; disposable lab and both workspace-local npm installs removed.

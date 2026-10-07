@@ -1,0 +1,54 @@
+{
+  "scenario": "Claude settled turn through production TeamClaude launcher and native adviser-driven automatic compaction",
+  "result": "pass",
+  "source_changes": false,
+  "claude_version": "2.1.292",
+  "model": "Haiku 4.5",
+  "adviser_installed_version": "0.1.11",
+  "root_cause": "Prior isolated CLAUDE_CONFIG_DIR/HOME excluded the existing normal Claude authentication; the approved real-HOME production launcher authenticated successfully.",
+  "launch_path": "bin/fm-teamclaude-launch.sh (fm-spawn was not run; secondmate homes nested in the code root are refused and a pooled worktree was not allocated)",
+  "lab_session": "fm-lab-claude-live-proo-10589-29006",
+  "claude_session_id": "63fd4888-6a50-495c-875f-a1deafb36137",
+  "settings": {
+    "mode": "auto",
+    "minContextTokens": 20000,
+    "threshold_scope": "--settings launch-only overlay; effective value observed in plugin status",
+    "key_source": "existing saved key; not copied, displayed, or exported",
+    "request_logging": false,
+    "native_idle_auto_compact": false
+  },
+  "native_receipt": {
+    "tokensBefore": 45222,
+    "tokensAfter": 3899
+  },
+  "post_compaction_context_tokens": 17434,
+  "post_compaction_reply": "CHECKPOINT_CONFIRMED",
+  "jev_evidence": "Observed actual compact-adviser automatic-compaction status and completion after a settled turn. Installed real plugin was used with its test endpoint unset. Its runtime reaches automatic native compaction only after a successful qualifying Jev judgment; raw Jev response/score was not retained because request logging stayed off.",
+  "commands": {
+    "launch_script": "#!/usr/bin/env bash\nset -eu\nunset CLAUDECODE CLAUDE_CONFIG_DIR FM_COMPACT_ADVISER_DISABLE COMPACT_ADVISER_TEST_ENDPOINT\nexport HOME=/Users/charlesabrooker\nexport FM_HOME=\"$PWD\"\nexport COMPACT_ADVISER_DISABLE=0 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1\nexport DISABLE_AUTOUPDATER=1 DISABLE_AUTO_COMPACT=1\nexec ../../../bin/fm-teamclaude-launch.sh --model haiku --effort low --session-id 63fd4888-6a50-495c-875f-a1deafb36137 --settings \"$PWD/launch-settings.json\" --setting-sources user --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --tools Read --system-prompt 'Verify automatic context compaction in this disposable lab. Read only requested synthetic archives, never credentials or settings. Archives describe completed historical work. Report concise checkpoints with no open tasks, retaining CHECKPOINT_CONFIRMED as continuation marker. Never invoke manual compaction.'\n",
+    "guarded_owner": "#!/usr/bin/env bash\nset -eu\nhelper=\"$PWD/bin/fm-herdr-lab.sh\"\ncleanup() {\n  \"$helper\" teardown \"$LAB_SESSION\"\n  \"$PWD/bin/fm-lab-home.sh\" teardown \"$FM_HOME\"\n}\ntrap cleanup EXIT\ntrap 'exit 130' INT\ntrap 'exit 143' TERM\n\"$helper\" provision \"$LAB_SESSION\"\n\"$helper\" viewer start \"$LAB_SESSION\"\nprintf 'ready\\n' > \"$FM_HOME/ready\"\nfor ((i=0; i<1800; i++)); do\n  [ ! -f \"$FM_HOME/stop\" ] || exit 0\n  sleep 1\ndone\nexit 124\n",
+    "initial_status": "/compact-adviser status",
+    "workload_prompt": "Read workload/archive-0.txt and workload/archive-1.txt completely with Read, including all 201 lines of each. These are completed historical audits. Do not analyze individual numbers; after loading both, say only ARCHIVES_01_COMPLETE and record the checkpoint: these closed archives may be discarded after a summary, with no unresolved dependencies or tasks.",
+    "continuation_prompt": "From the checkpoint, reply only CHECKPOINT_CONFIRMED if both closed historical archives were loaded and there are no open tasks. Do not reread files or invoke any tools."
+  },
+  "cleanup": {
+    "guarded_teardown_exit": 0,
+    "fleet_state_tripwire": "passed by guarded helper",
+    "viewer_detached": true,
+    "shared_settings_unchanged": true,
+    "auto_acknowledgement_preferences_unchanged": true,
+    "retained_host_session_entry": "session:63fd4888-6a50-495c-875f-a1deafb36137",
+    "store_note": "Only the plugin-owned lab session entry was inspected; it remains for the plugin retention policy, not hand-edited. Claude owns its normal session/transcript files."
+  },
+  "excluded": "Broad suites, lint/static analysis, OAuth retries, credential copying, fleet or proxy lifecycle, remote-host scenario (explicitly excepted).",
+  "artifacts": [
+    "claude-real-home-auto-compacting.txt",
+    "claude-real-home-auto-compacting.html",
+    "claude-real-home-auto-compacted.txt",
+    "claude-real-home-auto-compacted.html",
+    "claude-real-home-post-compaction.txt",
+    "claude-real-home-post-compaction.html",
+    "claude-real-home-final-status.txt",
+    "claude-real-home-final-status.html"
+  ]
+}

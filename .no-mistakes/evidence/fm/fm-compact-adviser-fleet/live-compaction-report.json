@@ -1,0 +1,87 @@
+{
+  "omp_version": "18.6.3",
+  "claude_version": "2.1.292",
+  "model": "openai-codex/gpt-6.1-sol",
+  "installed_adviser_entry": "/Users/charlesabrooker/.omp/plugins/node_modules/compact-adviser/src/index.ts",
+  "installed_adviser_entry_sha256": "eafc5586065030a54b356a4d3615cb2fcb6e22c64f20fa821a18c1fb2580f9d0",
+  "native_idle_compaction_enabled": false,
+  "native_keepRecentTokens": 20000,
+  "experimental_minContextTokens": 1000,
+  "synthetic_ledger_lines": 1301,
+  "before_context": {
+    "tokens": 81380,
+    "contextWindow": 272000,
+    "percent": 29.919117647058822
+  },
+  "native_tokensBefore": 81389,
+  "after_context": {
+    "tokens": 529,
+    "contextWindow": 272000,
+    "percent": 0.19448529411764706
+  },
+  "jev_decision": {
+    "at": "2026-10-07T01:04:05.089Z",
+    "kind": "response",
+    "id": "6afeff4b5a1946f2",
+    "answers": {
+      "done": {
+        "choice": "finished",
+        "probabilities": {
+          "unclear": 0,
+          "not_finished": 0.03,
+          "finished": 0.97
+        }
+      },
+      "shape": {
+        "choice": "hands_on",
+        "probabilities": {
+          "unclear": 0,
+          "hands_on": 1,
+          "coordinating": 0
+        }
+      }
+    },
+    "score": 0.97,
+    "usage": 0.29919117647058824,
+    "floor": 0.8,
+    "qualifies": true
+  },
+  "post_compaction_assistant_usage": [
+    {
+      "input": 881,
+      "output": 32,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 913,
+      "cost": {
+        "input": 0.001762,
+        "output": 0.00032,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.002082
+      }
+    },
+    {
+      "input": 934,
+      "output": 9,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 943,
+      "cost": {
+        "input": 0.0018679999999999999,
+        "output": 9e-05,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0019579999999999997
+      }
+    }
+  ],
+  "checkpoint": {
+    "archive_review": "complete",
+    "pending_work": false
+  },
+  "claude_route": "fm-teamclaude-launch.sh --exec env HOME=<disposable-lab> CLAUDE_CONFIG_DIR=<disposable-lab-config> claude --plugin-dir <disposable-real-plugin>",
+  "claude_result": "Stopped at Select login method; no OAuth or credential-store access attempted",
+  "remote_result": "Excepted by current recorded decision; no remote host or shared lifecycle accessed",
+  "setup_correction": "Initial keepRecentTokens=1000 was refused by installed adviser safety gate. Corrected disposable overlay to supported 20000 and reran fresh OMP session."
+}

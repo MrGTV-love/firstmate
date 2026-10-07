@@ -1,0 +1,56 @@
+{
+  "initial_setup_retention_guard": {
+    "at": "2026-10-07T01:03:23.632Z",
+    "kind": "response",
+    "id": "6afeff4b5a1946f2",
+    "answers": {
+      "done": {
+        "choice": "finished",
+        "probabilities": {
+          "finished": 0.98,
+          "not_finished": 0.02,
+          "unclear": 0
+        }
+      },
+      "shape": {
+        "choice": "hands_on",
+        "probabilities": {
+          "coordinating": 0,
+          "unclear": 0,
+          "hands_on": 1
+        }
+      }
+    },
+    "score": 0.98,
+    "usage": 0.2991875,
+    "floor": 0.8,
+    "qualifies": true
+  },
+  "corrected_live_compaction": {
+    "at": "2026-10-07T01:04:05.089Z",
+    "kind": "response",
+    "id": "6afeff4b5a1946f2",
+    "answers": {
+      "done": {
+        "choice": "finished",
+        "probabilities": {
+          "unclear": 0,
+          "not_finished": 0.03,
+          "finished": 0.97
+        }
+      },
+      "shape": {
+        "choice": "hands_on",
+        "probabilities": {
+          "unclear": 0,
+          "hands_on": 1,
+          "coordinating": 0
+        }
+      }
+    },
+    "score": 0.97,
+    "usage": 0.29919117647058824,
+    "floor": 0.8,
+    "qualifies": true
+  }
+}

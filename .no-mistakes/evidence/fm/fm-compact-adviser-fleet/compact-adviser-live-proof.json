@@ -1,0 +1,110 @@
+{
+  "omp": {
+    "result": "passed",
+    "live": true,
+    "model": "openai-codex/gpt-6.1-sol",
+    "host_version": "18.6.3",
+    "before_context_tokens": 79259,
+    "after_context_tokens": 2358,
+    "native_method": "remote",
+    "native_from_extension": false,
+    "native_remote_usage": {
+      "inputTokens": 79242,
+      "outputTokens": 657,
+      "totalTokens": 79899,
+      "cachedInputTokens": 0,
+      "reasoningOutputTokens": 0
+    },
+    "next_request_usage": {
+      "input": 1683,
+      "output": 9,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 1692,
+      "cost": {
+        "input": 0.0033659999999999996,
+        "output": 9e-05,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0034559999999999994
+      }
+    },
+    "jev_response": [
+      {
+        "at": "2026-10-07T00:59:27.069Z",
+        "kind": "response",
+        "id": "2567496dc6807086",
+        "answers": {
+          "done": {
+            "choice": "finished",
+            "probabilities": {
+              "finished": 0.99,
+              "unclear": 0,
+              "not_finished": 0.01
+            }
+          },
+          "shape": {
+            "choice": "hands_on",
+            "probabilities": {
+              "coordinating": 0,
+              "hands_on": 0.99,
+              "unclear": 0.01
+            }
+          }
+        },
+        "score": 0.98505,
+        "usage": 0.2913676470588235,
+        "floor": 0.804,
+        "qualifies": true
+      }
+    ],
+    "provenance": {
+      "version": "0.1.11",
+      "installed_source_sha256": {
+        "key-input.ts": "52ebde2b71d75e7b118b8afd2cb4fb6de3455014df2b87c5a5c48ca368b570be",
+        "log.ts": "6c622dbdca03383692fce7c2c4eafdd73f80333ed99aa5653f7e91610582cce1",
+        "minimum-input.ts": "db17c389938d5f124571d0bfcdd88fc143696960769082d180d23a36af6e6340",
+        "profile.ts": "3dfd83dc91ee0d9fe471578b0d1ebc0e6d28088033375cae63e48382e2c8f2e3",
+        "state.ts": "6c02904bc857843fff4abac8de4363ba4868144f6da8835d2fc3d903c8613fb8",
+        "index.ts": "eafc5586065030a54b356a4d3615cb2fcb6e22c64f20fa821a18c1fb2580f9d0",
+        "judge.ts": "7926dfe1c93e9febd4298313d5bff03e9b0eb35d936dfd3e31eb298b0276aa9c",
+        "context.ts": "1c5a0adcfda08f0593a5c8a059c72aa19d76e99a12d200ee513f6c5d2c6aea68",
+        "disable.ts": "801c6ef523af24dc61805471674acfe4e7516a78bb595f592a693d8615134492",
+        "env.ts": "fe65cf76cb3aeb3eed916eb95dd57acd165108531a3ea582e40f8f761a72f819",
+        "adviser.ts": "cc7547f962942f6d527cdb9ba6b4e97096ac0748bea5ed5604b63352ec01bbe0",
+        "config.ts": "c16d323cc546100476238da9d07dc9488ec6e3a0b25cce12781b18bb2aa75816"
+      }
+    },
+    "limits": "Synthetic functional smoke only; not recall, accuracy, speed or cost improvement evidence. Uses approved isolated-auth in-memory env route; no saved key persisted."
+  },
+  "claude": {
+    "result": "blocked",
+    "live": true,
+    "host_version": "2.1.292",
+    "actual_wrapper_preflight_exit": 0,
+    "proxy_route": "Existing host TeamClaude MITM configuration resolved for lab process only",
+    "observed_screen": "Select login method: 1. Claude account with subscription; 2. Anthropic Console account; 3. 3rd-party platform",
+    "reason": "Real isolated TeamClaude-backed TUI requires login. User explicitly requires capturing this screen and stopping; no OAuth retried or operator credential store copied or attached. No Jev judgment/native compaction obtained.",
+    "screen_artifact": "claude-teamclaude-login-screen.txt"
+  },
+  "remote_secondmate": {
+    "result": "excepted",
+    "reason": "Recorded Main decision; no live remote host scenario executed."
+  },
+  "fixture_correction": {
+    "before": "keepRecentTokens=2000 cancelled automatic compaction under the plugin 20k retention safety floor",
+    "after": "Restored supplied reference keepRecentTokens=20000 and reran only exact qualifying-turn scenario"
+  },
+  "tracked_changes": [],
+  "verification_scope": "Only two live scenarios and OMP post-compaction probe; no broad suite, linter, formatter or static analysis.",
+  "cleanup": {
+    "owned_omp_tui_stopped": true,
+    "private_claude_tmux_server_stopped": true,
+    "supported_socket_teardown_complete": true,
+    "exact_lab_process_scan": "no remaining matching processes",
+    "disposable_worktree_lab_removed": true,
+    "dependencies_materialized_by_prepare_removed": false,
+    "shared_state_modified": false
+  },
+  "verdict": "partial: OMP passed; Claude blocked at user-defined login stop condition; remote scenario excepted"
+}

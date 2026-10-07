@@ -1,0 +1,61 @@
+{
+  "target_commit": "f0dd557368517f358d087951583cd16a4df34db6",
+  "scope": "Only two required real-Jev/native automatic-compaction scenarios; real remote secondmate host excepted by latest Main decision.",
+  "fresh_native_interface_checks": [
+    "command -v omp claude tmux bun node npm",
+    "omp login --help",
+    "omp --help",
+    "claude --help",
+    "claude auth --help"
+  ],
+  "provider_environment_presence_only": {
+    "ANTHROPIC_API_KEY": false,
+    "ANTHROPIC_OAUTH_TOKEN": false,
+    "OPENAI_API_KEY": false,
+    "GEMINI_API_KEY": false,
+    "OPENROUTER_API_KEY": false,
+    "CLAUDE_CODE_OAUTH_TOKEN": false
+  },
+  "supported_routes_assessed": {
+    "omp": "Native --profile isolates authentication as well as state. Prior exact adapter install and approved regular 0600 settings copy succeeded; omp login openai-codex reached a real account-login page. No human authentication is available to complete that login; no provider API-key fallback is present in this process. The adviser key does not authenticate the task/summary model. Failed OAuth was not retried.",
+    "claude": "Prior isolated HOME and CLAUDE_CONFIG_DIR routes both returned loggedIn=false and native TUI required login. Native --settings supplies settings, not documented relocation of plugin storage; the actual plugin writes acknowledgement/checkpoint state through $.store and options through $.config.set. Using normal authenticated storage would violate the shared-store boundary; no such launch was performed.",
+    "fixtures": "Adapter end-to-end fixtures replace model and Jev responses. They cannot establish this real-Jev proof and were not run."
+  },
+  "missing_prerequisite": "Captain-provisioned lab-owned authenticated native OMP and Claude sessions, without copying or attaching operator credential stores; Claude also needs an authorized supported lab-only saved TypeSafe-key/settings route. The account owner must complete native OAuth so the lab can generate qualifying settled turns and native summaries.",
+  "prior_product_evidence": [
+    "main031-retry-omp-prerequisite.json",
+    "main031-retry-omp-own-login.png",
+    "main031-retry-claude-auth-routing.json",
+    "main031-retry-claude-prerequisite.json",
+    "main031-retry-claude-login-required.html"
+  ],
+  "baseline_indexes_reviewed_not_rerun": [
+    "targeted-commands.json",
+    "current-manual-command-index.json",
+    "main031-retry-command-index.json"
+  ],
+  "cleanup": {
+    "new_labs": 0,
+    "new_settings_or_credential_copies": 0,
+    "new_worktree_artifacts": 0,
+    "source_or_test_edits": false,
+    "shared_store_changes": false,
+    "prior_receipts": [
+      "main031-retry-omp-cleanup.json",
+      "main031-retry-claude-cleanup.json"
+    ]
+  },
+  "observed": {
+    "qualifying_turn": false,
+    "jev_judgment": false,
+    "native_automatic_compaction": false,
+    "before_after_context": null
+  },
+  "verdict": "inconclusive",
+  "remote_host": {
+    "result": "untested",
+    "live": false,
+    "reason": "Latest Main decision explicitly excepts live remote propagation because this fleet has no remote secondmate host. Retained offline transport proof stands; no provisioning or shared-endpoint actions performed.",
+    "retained_evidence": "compact-remote.log"
+  }
+}

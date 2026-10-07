@@ -1,0 +1,47 @@
+{
+  "target_commit": "f0dd557368517f358d087951583cd16a4df34db6",
+  "scope": "Assigned Test phase; evidence retained from earlier rounds of this same active run.",
+  "fresh_product_execution_this_turn": false,
+  "source_or_test_changes_this_turn": false,
+  "new_fixture_or_lifecycle_actions_this_turn": false,
+  "rerun_restrictions": "No passing-subject reruns, broad suites, isolated OAuth retries, shared endpoints or broadened Test exception.",
+  "baseline_command_indexes": [
+    "targeted-commands.json",
+    "current-manual-command-index.json",
+    "main031-retry-command-index.json"
+  ],
+  "product_evidence": [
+    "current-native-policy-ledger.json",
+    "current-default-off.json",
+    "current-invalid-policy-refusals.json",
+    "current-native-batch-emergency.json",
+    "current-calm-hook-ownership.json",
+    "current-calm-terminal-replay.png",
+    "current-local-secondmate-child.json",
+    "current-fresh-server-nonsticky.json",
+    "round2-tmux-normal-state.json",
+    "zellij-boundary/round2-result.json",
+    "round2-live-policy-ledger.json",
+    "current-live-foreign-worker-preservation.json",
+    "current-pending-draft-guard.txt"
+  ],
+  "unproven_acceptance": [
+    "Qualifying OMP turn with real Jev judgment and native automatic compaction",
+    "Qualifying Claude turn with real Jev judgment and native automatic compaction",
+    "Policy and emergency propagation on a real remote secondmate host"
+  ],
+  "authentication_evidence": [
+    "main031-retry-omp-prerequisite.json",
+    "main031-retry-claude-prerequisite.json",
+    "main031-retry-claude-auth-routing.json"
+  ],
+  "cleanup_receipts": [
+    "current-native-cleanup.json",
+    "main031-retry-omp-cleanup.json",
+    "main031-retry-claude-cleanup.json"
+  ],
+  "final_head_limit": "Inspected post-baseline executable delta removes a residual spawn conflict marker and makes mechanical test quoting/annotation changes. Earlier live evidence is not a fresh final-head rerun.",
+  "visual_limit": "Retained Calm PNG is terminal-grid replay; OAuth screenshot and Claude login replay demonstrate authentication prerequisites, not compaction.",
+  "findings": [],
+  "verdict": "inconclusive"
+}

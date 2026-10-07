@@ -1,0 +1,29 @@
+[
+  {
+    "at": "2026-10-07T00:56:30.939Z",
+    "kind": "response",
+    "id": "2567496dc6807086",
+    "answers": {
+      "done": {
+        "choice": "finished",
+        "probabilities": {
+          "not_finished": 0.01,
+          "finished": 0.99,
+          "unclear": 0
+        }
+      },
+      "shape": {
+        "choice": "hands_on",
+        "probabilities": {
+          "hands_on": 0.98,
+          "unclear": 0.01,
+          "coordinating": 0.01
+        }
+      }
+    },
+    "score": 0.9801,
+    "usage": 0.2913602941176471,
+    "floor": 0.804,
+    "qualifies": true
+  }
+]

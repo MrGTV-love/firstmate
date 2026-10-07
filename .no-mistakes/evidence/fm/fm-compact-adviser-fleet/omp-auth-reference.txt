@@ -1,0 +1,13 @@
+$ git show fm/fm-compaction-bakeoff:experiments/compaction-bakeoff/run.py
+fatal: invalid object name 'fm/fm-compaction-bakeoff'.
+$ git show fm/fm-compaction-bakeoff:experiments/compaction-bakeoff/README.md
+fatal: invalid object name 'fm/fm-compaction-bakeoff'.
+$ git for-each-ref --format='%(refname)' '*compaction-bakeoff*'
+(no output)
+$ gh api 'repos/MrGTV-love/firstmate/contents/experiments/compaction-bakeoff/run.py?ref=fm%2Ffm-compaction-bakeoff' -H 'Accept: application/vnd.github.raw+json'
+HTTP 404: No commit found for the ref fm/fm-compaction-bakeoff.
+Raw GitHub run.py and README.md URLs also returned HTTP 404.
+$ env HOME=<disposable-lab> XDG_CONFIG_HOME=<disposable-lab>/.config omp --version
+omp/18.6.3
+No provider API-key fallback was present in the process (values not printed). Other clones and the gate bare repository were not accessed. No operator credential store was read/copied/attached, and interactive OAuth was not retried.
+No authentic OMP turn, Jev judgment, or compaction was obtained.

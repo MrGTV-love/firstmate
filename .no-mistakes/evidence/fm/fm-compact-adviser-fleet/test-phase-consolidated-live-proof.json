@@ -1,0 +1,71 @@
+{
+  "target_commit": "f0dd557368517f358d087951583cd16a4df34db6",
+  "scope": "Assigned Test phase; retained product execution from this same active run, not a new passing-scenario rerun.",
+  "fresh_checks_this_turn": [
+    {
+      "command": "bin/fm-teamclaude-launch.sh --check",
+      "exit_code": 0
+    },
+    {
+      "command": "bin/fm-herdr-lab.sh run fm-lab-claude-live-proo-10589-29006 session list --json",
+      "exit_code": 0,
+      "owned_lab_absent": true
+    },
+    {
+      "check": "Worktree .no-mistakes/test-tmp entries",
+      "remaining": []
+    },
+    {
+      "check": "Read only lab-owned session:63fd4888-6a50-495c-875f-a1deafb36137",
+      "compacted": true,
+      "baseline": 17434,
+      "failures": 0
+    }
+  ],
+  "claude": {
+    "evidence": "claude-real-home-live-report.json",
+    "launch": "Real production bin/fm-teamclaude-launch.sh with authorized real HOME in guarded Herdr lab. Final workload did not use fm-spawn; earlier native spawn/relaunch captures separately cover policy.",
+    "adviser_version": "0.1.11",
+    "tokensBefore": 45222,
+    "tokensAfter": 3899,
+    "subsequent_context_tokens": 17434,
+    "continuation": "CHECKPOINT_CONFIRMED",
+    "jev_evidence_limit": "Raw Jev response/score not retained because request logging stayed off. [INFERENCE] Observed real adviser automatic action consumed a qualifying Jev response: installed consumer awaits judge, returns on error/nonqualifying result, then calls native session.compact. Native automatic-compaction receipt is direct product evidence, not a network trace.",
+    "settings": "Existing saved auto mode/key; launch-only --settings threshold 20000; native idle auto-compaction disabled. No shared settings/preferences edit.",
+    "cleanup": "Guarded teardown 0 and fleet tripwire passed per original capture. Lab absence independently confirmed this turn. Plugin-owned session entry remains for normal retention, never hand-edited."
+  },
+  "omp": {
+    "evidence": [
+      "live-compaction-report.json",
+      "omp-jev-decisions.json",
+      "omp-native-events.jsonl"
+    ],
+    "real_jev_score": 0.97,
+    "qualifies": true,
+    "context_before": 81380,
+    "native_tokens_before": 81389,
+    "native_compaction_entry_tokens_after": 1229,
+    "fresh_context_after": 529,
+    "native_method": "remote",
+    "cleanup": "Owned TUI and disposable lab removed during original evidence turn."
+  },
+  "baseline_commands": "See targeted-commands.json and current-manual-command-index.json. Initial local regression staging refusal corrected using identical tracked bytes in confined sibling source package. Startup composer/setup problems corrected before successful observations.",
+  "launch_boundary_evidence": [
+    "current-default-off.json",
+    "current-invalid-policy-refusals.json",
+    "current-native-policy-ledger.json",
+    "current-native-batch-emergency.json",
+    "current-calm-hook-ownership.json",
+    "current-unfiltered-raw-hook.json",
+    "current-local-secondmate-child.json",
+    "current-fresh-server-nonsticky.json",
+    "round2-tmux-normal-state.json",
+    "zellij-boundary/round2-result.json",
+    "current-live-foreign-worker-preservation.json",
+    "targeted-interruptions.json"
+  ],
+  "remote_secondmate": "Untested; expressly excepted by latest recorded decisions. Transport fixtures not live remote-host evidence.",
+  "visual_evidence": "Actual Claude terminal captures rendered to HTML; Calm terminal-grid replay PNG. No OS-window screenshot claimed.",
+  "limits": "Synthetic functional smoke only, not recall/accuracy/speed/aggregate-cost improvement proof. No source edits, OAuth retry, credential copying, shared saved-config edit, shared lifecycle, broad suites, lint/static analysis, pipeline control, push/PR/CI.",
+  "verdict": "go"
+}
