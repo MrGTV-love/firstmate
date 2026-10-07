@@ -1,0 +1,12 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-native-exit-b176pnak/home
+error: task native-band-exit's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+
+Transport calls:
+pane get w1:p1 --session fm-lab-native-exit-50837-29805 
+agent get w1:p1 --session fm-lab-native-exit-50837-29805 
+pane process-info --pane w1:p1 --session fm-lab-native-exit-50837-29805 
+pane process-info --pane w1:p1 --session fm-lab-native-exit-50837-29805 
+status --json --session fm-lab-native-exit-50837-29805 
+agent get w1:p1 --session fm-lab-native-exit-50837-29805 
+status --json --session fm-lab-native-exit-50837-29805 
+pane read w1:p1 --source visible --format ansi --session fm-lab-native-exit-50837-29805 

@@ -1,0 +1,40 @@
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home/stat
+ e/gate-restored-06244ba9.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home/stat
+ e/gate-restored-06244ba9.inbox/handled/. A steer sent before the relaunch survives there.
+
+ Herdr restored the previous agent without Firstmate's launch settings. This relaunch restores the recorded profile in
+ the same local copy and pane, preserving all work. Read the latest task status and instruction inbox before
+ continuing. Respect completed outcomes and outstanding decisions or external waits; do not repeat finished work.
+
+ Current no-mistakes intent contract
+
+ This section supersedes every earlier brief instruction about constructing --intent, but not later clarifications
+ actually supplied by the captain.
+ Use everything under ## Captain intent authorized for --intent through the end of this brief, including any nested
+ subheadings but excluding that heading, plus any later words the captain actually supplied as --intent; never include
+ Firstmate specification or other mixed Task content.
+ Preserve those words without adding speaker labels or direct address.
+ Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are
+ specification, not captain intent.
+ The Definition of done's rule that --intent must be self-sufficient still governs the string you pass: resolve any
+ report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+ Captain intent authorized for --intent
+
+ Disposable recovery verification. Reply only 'Recovery lab ready.' and wait. Do not run tools, inspect or change
+ files, delegate, supervise, or start any pipeline.
+
+
+ Warning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+ compaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+ or switch to a larger-context model.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ✘ Prompt is too long: Provided 8,616 tokens, but the maximum allowed is 8,192. (context_size_exceeded)
+ Dismissed when you send your next message.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+❯
+ π · ⬢ Apple AFM 3 Core Advanced · 🌳 work/restored-wt · ⑂ fm/gate-restored-06244ba9 ?1 · ◫ 92.5%/8.2K ⟲

@@ -1,0 +1,18 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home
+error: task ownership-same-cwd-different-conversation cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+
+Transport calls:
+pane get w6:p1 --session fm-lab-status-owned-24852-10877 
+agent get w6:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w6:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w6:p1 --session fm-lab-status-owned-24852-10877 
+
+Preserved SHA256:
+{
+  "fm-home/state/ownership-same-cwd-different-conversation.meta": "6727f138af53cf1f38e7ef6c090572d72daa515891d7880b1fc6b474c86f748f",
+  "fm-home/data/ownership-same-cwd-different-conversation/brief.md": "207db2287e3fd2eb91812b6b8ec222bde2792e9d2e7b34785fd4663a0dc0afa9",
+  "work/unlanded.txt": "ffb895cab050e49cfe4e1e2f7897a815834f175574a3049ebe435c5ba99f9ddd",
+  "same-cwd-different-conversation.jsonl": "decedf2117804706acee3a2120cedff0c1e9a019bd857f0babbbfa48133f8645",
+  "fm-home/state/ownership-same-cwd-different-conversation.busy-gen": "cfcb29d574a63c864da95fda21e57b65404f6901b9adc639f6fc99c96c0ae876",
+  "fm-home/state/ownership-same-cwd-different-conversation.busy-state": "ab52558031f2870ad3628d646caf5d64a19a71f7f8637c1f8059bf9b57d082da"
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "action": "recover",
+    "rc": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home\nerror: task owned-native-resume's recovery composer state is 'pending', not proven empty; refusing launch recovery before interrupting its agent\n",
+    "native_proof": "unmanaged",
+    "draft": "!git diff",
+    "same_screen": true,
+    "same_files": true,
+    "no_lifecycle_input": true,
+    "pass": true
+  },
+  {
+    "action": "sweep",
+    "rc": 1,
+    "output": "REBOOT_RECOVERY: owned-native-resume: failed: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home\nerror: task owned-native-resume's recovery composer state is 'pending', not proven empty; refusing launch recovery before interrupting its agent\nREBOOT_RECOVERY: ownership-different-cwd: live launch settings are unreadable; no lifecycle action taken\nREBOOT_RECOVERY: ownership-same-cwd-different-conversation: live launch settings are unreadable; no lifecycle action taken\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home\n",
+    "native_proof": "unmanaged",
+    "draft": "!git diff",
+    "same_screen": true,
+    "same_files": true,
+    "no_lifecycle_input": true,
+    "pass": true
+  },
+  {
+    "action": "exit",
+    "rc": 0,
+    "output": "stopped owned-native-resume harness=omp backend=herdr endpoint=fm-lab-status-owned-24852-10877:w7:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/work\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home\n",
+    "agent_state_after": "dead",
+    "preserved_work_and_identity": true,
+    "pass": true
+  }
+]

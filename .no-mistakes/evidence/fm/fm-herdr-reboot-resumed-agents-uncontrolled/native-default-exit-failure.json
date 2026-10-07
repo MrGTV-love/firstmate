@@ -1,0 +1,12 @@
+{
+  "omp_version": "18.6.3",
+  "native_launch_proof": "unmanaged",
+  "agent_state_before": "alive",
+  "native_empty_composer_exit_rc": 1,
+  "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-native-exit-b176pnak/home\nerror: task native-band-exit's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'\n",
+  "same_screen": true,
+  "same_files": true,
+  "transport": "pane get w1:p1 --session fm-lab-native-exit-50837-29805 \nagent get w1:p1 --session fm-lab-native-exit-50837-29805 \npane process-info --pane w1:p1 --session fm-lab-native-exit-50837-29805 \npane process-info --pane w1:p1 --session fm-lab-native-exit-50837-29805 \nstatus --json --session fm-lab-native-exit-50837-29805 \nagent get w1:p1 --session fm-lab-native-exit-50837-29805 \nstatus --json --session fm-lab-native-exit-50837-29805 \npane read w1:p1 --source visible --format ansi --session fm-lab-native-exit-50837-29805 \n",
+  "no_lifecycle_input": true,
+  "surface": "omp default band layout, bare exact --resume argv, no Firstmate config overlay"
+}

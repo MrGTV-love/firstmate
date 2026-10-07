@@ -1,0 +1,34 @@
+[
+  {
+    "name": "native-bordered-empty",
+    "states_default_and_C": [
+      "unknown",
+      "unknown"
+    ],
+    "content_default_and_C": [
+      "",
+      ""
+    ],
+    "extract_rc": [
+      1,
+      1
+    ],
+    "pass": false
+  },
+  {
+    "name": "native-bordered-pending",
+    "states_default_and_C": [
+      "unknown",
+      "unknown"
+    ],
+    "content_default_and_C": [
+      "",
+      ""
+    ],
+    "extract_rc": [
+      1,
+      1
+    ],
+    "pass": false
+  }
+]

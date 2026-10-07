@@ -1,0 +1,16 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home
+error: task ownership-different-cwd cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+
+Transport calls:
+pane get w5:p1 --session fm-lab-status-owned-24852-10877 
+agent get w5:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w5:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w5:p1 --session fm-lab-status-owned-24852-10877 
+
+Preserved SHA256:
+{
+  "fm-home/state/ownership-different-cwd.meta": "09c8b45ff3911f58e7cdf7bbe81fa10d2de9a7c8e3a27618dae45a5f5b9e0a7d",
+  "fm-home/data/ownership-different-cwd/brief.md": "207db2287e3fd2eb91812b6b8ec222bde2792e9d2e7b34785fd4663a0dc0afa9",
+  "work/unlanded.txt": "ffb895cab050e49cfe4e1e2f7897a815834f175574a3049ebe435c5ba99f9ddd",
+  "different-cwd.jsonl": "426599700f9af27ac5a31dd4f1a453a4d43684998b968fb6c4439db50cfaa024"
+}

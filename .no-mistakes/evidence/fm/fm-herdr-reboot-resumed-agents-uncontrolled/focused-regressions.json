@@ -1,0 +1,50 @@
+[
+  {
+    "selector": "test_live_herdr_lifecycle_refuses_stale_personal_panes_without_mutation",
+    "rc": 0,
+    "stdout": "ok - all live Herdr lifecycle paths refuse different-cwd and same-cwd personal conversations without input or task mutation\n",
+    "stderr": ""
+  },
+  {
+    "selector": "test_live_herdr_lifecycle_accepts_managed_and_attributable_native_launches",
+    "rc": 0,
+    "stdout": "ok - managed versioned and legacy launches plus attributable bare native resumes retain interrupt, exit, busy-exit and same-pane relaunch\n",
+    "stderr": ""
+  },
+  {
+    "selector": "test_reboot_recovery_requires_recorded_native_identity",
+    "rc": 0,
+    "stdout": "ok - env-v1/direct/different-cwd preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/direct/different-resume preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/direct/updated-registration preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/direct/header-only preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/direct/exact preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/direct/managed preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/sweep/different-cwd preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/sweep/different-resume preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/sweep/updated-registration preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/sweep/header-only preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/sweep/exact preserves personal panes and binds lifecycle to recorded native identity\nok - env-v1/sweep/managed preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/direct/different-cwd preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/direct/different-resume preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/direct/updated-registration preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/direct/header-only preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/direct/exact preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/direct/managed preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/sweep/different-cwd preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/sweep/different-resume preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/sweep/updated-registration preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/sweep/header-only preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/sweep/exact preserves personal panes and binds lifecycle to recorded native identity\nok - legacy/sweep/managed preserves personal panes and binds lifecycle to recorded native identity\n",
+    "stderr": ""
+  },
+  {
+    "selector": "test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal",
+    "rc": 0,
+    "stdout": "ok - bounded reboot ticks advance past pending a to recover b, preserve both copies, and wrap without replacing managed b\n",
+    "stderr": ""
+  },
+  {
+    "selector": "test_bounded_reboot_recovery_advances_after_interrupted_inspection",
+    "rc": 0,
+    "stdout": "ok - bounded recovery persists early inspection progress before interruption and repairs only the later bare omp next tick\n",
+    "stderr": ""
+  },
+  {
+    "script": "tests/fm-composer-native-continuation.test.sh",
+    "selector": "test_owned_frame_status_substrings_remain_input (unchanged group extracted to disposable runner)",
+    "rc": 0,
+    "stdout": "ok - owned frame header, body and floor status substrings preserve the entire draft\n",
+    "stderr": ""
+  },
+  {
+    "script": "tests/fm-launch-proof.test.sh",
+    "selector": "test_launch_proof_recorded_native_identity",
+    "rc": 0,
+    "stdout": "ok - live process environment distinguishes managed, missing, mismatched, and gone launches\nok - native resume proof requires exact recorded harness, endpoint, cwd, bare argv and persisted startup provenance\nok - foreground agent ancestry owns launch proof, independently of shells, helpers and executable packaging\nok - legacy recovery is limited to exact compiled omp equals-form resume with recorded task startup provenance\nok - versioned and legacy provenance reject generic, foreign, malformed and personal sessions while preserving exact secondmate startup\nok - env-v1 unmanaged recovery requires recorded native startup while matching pins remain managed for every harness\n",
+    "stderr": ""
+  },
+  {
+    "script": "tests/fm-composer-native-continuation.test.sh",
+    "result": "full-file attempt exceeded 180-second local subprocess bound; the owned-status group was subsequently executed unchanged in isolation and passed"
+  }
+]

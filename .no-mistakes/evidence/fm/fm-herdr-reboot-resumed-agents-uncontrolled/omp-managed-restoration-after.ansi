@@ -1,0 +1,40 @@
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home/stat [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22me/gate-restored-06244ba9.inbox/*.msg, act on[0m[48;2;15;18;22m                                                                           [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22meach message in numeric order, then mv each handled file into[0m[48;2;15;18;22m                                                          [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home/stat [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22me/gate-restored-06244ba9.inbox/handled/. A steer sent before the relaunch survives there.[0m[48;2;15;18;22m                              [0m
+[0m[48;2;15;18;22m                                                                                                                        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mHerdr restored the previous agent without Firstmate's launch settings. This relaunch restores the recorded profile in  [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mthe same local copy and pane, preserving all work. Read the latest task status and instruction inbox before            [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mcontinuing. Respect completed outcomes and outstanding decisions or external waits; do not repeat finished work.[0m[48;2;15;18;22m       [0m
+[0m[48;2;15;18;22m                                                                                                                        [0m
+[0m[48;2;15;18;22m [0m[1m[4m[38;2;229;229;231m[48;2;15;18;22mCurrent no-mistakes intent contract[0m[48;2;15;18;22m                                                                                    [0m
+[0m[48;2;15;18;22m                                                                                                                        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis section supersedes every earlier brief instruction about constructing [0m[38;2;0;255;136m[48;2;15;18;22m--intent[0m[38;2;229;229;231m[48;2;15;18;22m, but not later clarifications      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mactually supplied by the captain.[0m[48;2;15;18;22m                                                                                      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mUse everything under [0m[38;2;0;255;136m[48;2;15;18;22m## Captain intent authorized for --intent[0m[38;2;229;229;231m[48;2;15;18;22m through the end of this brief, including any nested     [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22msubheadings but excluding that heading, plus any later words the captain actually supplied as [0m[38;2;0;255;136m[48;2;15;18;22m--intent[0m[38;2;229;229;231m[48;2;15;18;22m; never include  [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirstmate specification or other mixed Task content.[0m[48;2;15;18;22m                                                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mPreserve those words without adding speaker labels or direct address.[0m[48;2;15;18;22m                                                  [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are              [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mspecification, not captain intent.[0m[48;2;15;18;22m                                                                                     [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThe Definition of done's rule that [0m[38;2;0;255;136m[48;2;15;18;22m--intent[0m[38;2;229;229;231m[48;2;15;18;22m must be self-sufficient still governs the string you pass: resolve any     [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mreport, decision, or PR the intent below refers to into its substance rather than passing the pointer.[0m[48;2;15;18;22m                 [0m
+[0m[48;2;15;18;22m                                                                                                                        [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mCaptain intent authorized for --intent[0m[48;2;15;18;22m                                                                                 [0m
+[0m[48;2;15;18;22m                                                                                                                        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mDisposable recovery verification. Reply only 'Recovery lab ready.' and wait. Do not run tools, inspect or change       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mfiles, delegate, supervise, or start any pipeline.[0m[48;2;15;18;22m                                                                     [0m
+[0m[48;2;15;18;22m                                                                                                                        [0m
+
+ [0m[38;2;255;179;71mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a   [0m
+ [0m[38;2;255;179;71mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)   [0m
+ [0m[38;2;255;179;71mor switch to a larger-context model.[0m                                                                                   
+
+[0m[38;2;255;71;87m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+ [0m[1m[38;2;255;71;87m✘ Prompt is too long: Provided 8,616 tokens, but the maximum allowed is 8,192. (context_size_exceeded)[0m                 
+ [0m[38;2;107;114;128mDismissed when you send your next message.[0m                                                                             
+[0m[38;2;255;71;87m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+
+❯                                                                                                                       
+ [0m[38;2;107;114;128mπ[0m [0m[38;2;42;48;56m·[0m [0m[38;2;0;180;255m⬢ Apple AFM 3 Core Advanced[0m [0m[38;2;42;48;56m·[0m [0m[38;2;232;236;244m🌳 work/restored-wt[0m [0m[38;2;42;48;56m·[0m [0m[38;2;255;179;71m⑂ fm/gate-restored-06244ba9 [0m[38;2;156;163;176m?1[0m [0m[38;2;42;48;56m·[0m ◫ [0m[38;2;255;71;87m92.5%/8.2K[0m [0m[38;2;255;71;87m⟲[0m 

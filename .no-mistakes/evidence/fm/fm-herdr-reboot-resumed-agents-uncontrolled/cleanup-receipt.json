@@ -1,0 +1,57 @@
+{
+  "session": "fm-lab-status-owned-24852-10877",
+  "teardown_rc": 0,
+  "tripwire_unchanged": true,
+  "session_absent_after": true,
+  "before": {
+    "sessions": [
+      {
+        "default": true,
+        "name": "default",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-status-owned-24852-10877",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-status-owned-24852-10877",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-status-owned-24852-10877/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-vernant-overview-81566-23025",
+        "running": false,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025/herdr.sock"
+      }
+    ]
+  },
+  "after": {
+    "sessions": [
+      {
+        "default": true,
+        "name": "default",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-vernant-overview-81566-23025",
+        "running": false,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025/herdr.sock"
+      }
+    ]
+  },
+  "private_worktree_fixture_removed": true,
+  "owned_staging_removed": true,
+  "staging_names": [
+    "/tmp/fm-gate-managed-da5918bf",
+    "/tmp/fm-gate-managed-da5918bf+993cb33345a1556d53a41de215965fff2e246628b70dee25dbe9f06ea5983aff",
+    "/tmp/fm-gate-restored-06244ba9",
+    "/tmp/fm-gate-restored-06244ba9+993cb33345a1556d53a41de215965fff2e246628b70dee25dbe9f06ea5983aff"
+  ]
+}

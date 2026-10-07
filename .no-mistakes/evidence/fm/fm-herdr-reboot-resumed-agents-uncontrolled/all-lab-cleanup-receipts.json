@@ -1,0 +1,45 @@
+{
+  "teardowns": [
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/bin/fm-herdr-lab.sh teardown fm-lab-status-owned-24852-10877",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/bin/fm-herdr-lab.sh teardown fm-lab-native-band-57585-10903",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/bin/fm-herdr-lab.sh teardown fm-lab-native-band-47222-16888",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/bin/fm-herdr-lab.sh teardown fm-lab-native-exit-90526-3813",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/bin/fm-herdr-lab.sh teardown fm-lab-native-exit-50837-29805",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "all_guarded_teardowns_succeeded": true,
+  "private_fixture_paths": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-band-4x8mz9te",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-band-yxxt1z3z",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-native-exit-b176pnak",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-native-exit-uuoq_n5g"
+  ],
+  "all_private_fixtures_removed": true,
+  "owned_staging_removed": true,
+  "production_default_tripwires_preserved_by_successful_helpers": true
+}

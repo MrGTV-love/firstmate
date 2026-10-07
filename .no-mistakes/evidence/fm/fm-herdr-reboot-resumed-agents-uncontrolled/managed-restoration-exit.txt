@@ -1,0 +1,2 @@
+stopped gate-restored-06244ba9 harness=omp backend=herdr endpoint=fm-lab-status-owned-24852-10877:w9:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/restored-wt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home

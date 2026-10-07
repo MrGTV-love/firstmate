@@ -1,0 +1,150 @@
+[
+  {
+    "name": "native-empty",
+    "action": "classify",
+    "locale": "default",
+    "output": "empty",
+    "rc": 0
+  },
+  {
+    "name": "native-empty",
+    "action": "extract",
+    "locale": "default",
+    "output": "",
+    "rc": 0
+  },
+  {
+    "name": "native-empty",
+    "action": "classify",
+    "locale": "C",
+    "output": "empty",
+    "rc": 0
+  },
+  {
+    "name": "native-empty",
+    "action": "extract",
+    "locale": "C",
+    "output": "",
+    "rc": 0
+  },
+  {
+    "name": "native-pending",
+    "action": "classify",
+    "locale": "default",
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "native-pending",
+    "action": "extract",
+    "locale": "default",
+    "output": "!git diff",
+    "rc": 0
+  },
+  {
+    "name": "native-pending",
+    "action": "classify",
+    "locale": "C",
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "native-pending",
+    "action": "extract",
+    "locale": "C",
+    "output": "!git diff",
+    "rc": 0
+  },
+  {
+    "name": "native-pending-exit",
+    "rc": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-band-fix-_vj0l730/home\nerror: task native-band-exit's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'\n",
+    "preserved": true
+  },
+  {
+    "name": "literal-native-band-continuations",
+    "action": "classify",
+    "locale": "default",
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "literal-native-band-continuations",
+    "action": "extract",
+    "locale": "default",
+    "output": "\u2502 literal \u2502 \u03c0 \u00b7 model \u00b7 15.4%/272K \u03c0 > \u2b22 Apple AFM 3 Core Advanced > \ud83d\udcc1 /work > \u2442 main \u25b6\u2500\u2500\u2500\u250086%\u2503\u2500\u25008.2K\u2500 \u2570\u2500",
+    "rc": 0
+  },
+  {
+    "name": "literal-native-band-continuations",
+    "action": "classify",
+    "locale": "C",
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "literal-native-band-continuations",
+    "action": "extract",
+    "locale": "C",
+    "output": "\u2502 literal \u2502 \u03c0 \u00b7 model \u00b7 15.4%/272K \u03c0 > \u2b22 Apple AFM 3 Core Advanced > \ud83d\udcc1 /work > \u2442 main \u25b6\u2500\u2500\u2500\u250086%\u2503\u2500\u25008.2K\u2500 \u2570\u2500",
+    "rc": 0
+  },
+  {
+    "name": "literal-native-band-cursor",
+    "locale": "default",
+    "cursor": 35,
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "literal-native-band-cursor",
+    "locale": "default",
+    "cursor": 39,
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "literal-native-band-cursor",
+    "locale": "C",
+    "cursor": 35,
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "literal-native-band-cursor",
+    "locale": "C",
+    "cursor": 39,
+    "output": "pending",
+    "rc": 0
+  },
+  {
+    "name": "attributable-native-empty-exit",
+    "before_rc": 1,
+    "after_rc": 0,
+    "proof": "unmanaged",
+    "output": "stopped native-band-exit harness=omp backend=herdr endpoint=fm-lab-band-fix-23762-16407:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-band-fix-_vj0l730/work\n",
+    "process_after": {
+      "id": "cli:pane:process_info",
+      "result": {
+        "process_info": {
+          "foreground_process_group_id": 31892,
+          "foreground_processes": [
+            {
+              "argv": [
+                "-zsh"
+              ],
+              "argv0": "zsh",
+              "cmdline": "-zsh",
+              "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-band-fix-_vj0l730/work",
+              "name": "zsh",
+              "pid": 31892
+            }
+          ],
+          "pane_id": "w1:p1",
+          "shell_pid": 31892
+        },
+        "type": "pane_process_info"
+      }
+    }
+  }
+]

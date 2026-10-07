@@ -1,0 +1,160 @@
+{
+  "runtime": "omp 18.6.3",
+  "scenarios": [
+    {
+      "name": "Empty native composer excludes unowned status furniture",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"composer\": {\"state\": \"empty\", \"extract_rc\": 0, \"content\": \"\"}, \"launch_proof\": \"unmanaged\"}",
+      "reason": ""
+    },
+    {
+      "name": "native-command-draft",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"composer\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"!git diff\"}, \"expected\": \"!git diff\", \"exit\": {\"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-a141fa5c08/home\\nerror: task native-live-5e57de10's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'\\n\"}, \"unchanged\": true}",
+      "reason": ""
+    },
+    {
+      "name": "status-in-pasted-header",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"composer\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"╭── π > model > path · 15.4%/272K ─╮ ╰─ ─╯\"}, \"expected\": \"╭── π > model > path · 15.4%/272K ─╮ ╰─ ─╯\", \"exit\": {\"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-a141fa5c08/home\\nerror: task native-live-5e57de10's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'\\n\"}, \"unchanged\": true}",
+      "reason": ""
+    },
+    {
+      "name": "status-in-pasted-body",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"composer\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"╭── π > model > path ─╮ │ text · 15.4%/272K │ ╰─ ─╯\"}, \"expected\": \"╭── π > model > path ─╮ │ text · 15.4%/272K │ ╰─ ─╯\", \"exit\": {\"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-a141fa5c08/home\\nerror: task native-live-5e57de10's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'\\n\"}, \"unchanged\": true}",
+      "reason": ""
+    },
+    {
+      "name": "status-in-pasted-floor",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"composer\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"╭── π > model > path ─╮ ╰─ text · 15.4%/272K ─╯\"}, \"expected\": \"╭── π > model > path ─╮ ╰─ text · 15.4%/272K ─╯\", \"exit\": {\"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-a141fa5c08/home\\nerror: task native-live-5e57de10's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'\\n\"}, \"unchanged\": true}",
+      "reason": ""
+    },
+    {
+      "name": "leading-empty-edge-pasted-frame",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"composer\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"│ │ ╭── π > model > path ─╮ ╰─ ─╯\"}, \"expected\": \"│ │ ╭── π > model > path ─╮ ╰─ ─╯\", \"exit\": {\"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-a141fa5c08/home\\nerror: task native-live-5e57de10's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'\\n\"}, \"unchanged\": true}",
+      "reason": ""
+    },
+    {
+      "name": "Exit attributable empty native resume preserves task and work",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"exit\": {\"rc\": 0, \"stdout\": \"stopped native-live-d57ea88f harness=omp backend=herdr endpoint=fm-lab-gate-native-63316-20980:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-770484479b/wt\\n\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-770484479b/home\\n\"}, \"agent_state\": \"dead\", \"unchanged\": true, \"process_info\": {\"id\": \"cli:pane:process_info\", \"result\": {\"process_info\": {\"foreground_process_group_id\": 64352, \"foreground_processes\": [{\"argv\": [\"-sh\"], \"argv0\": \"sh\", \"cmdline\": \"-sh\", \"cwd\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-770484479b/wt\", \"name\": \"bash\", \"pid\": 64352}], \"pane_id\": \"w1:p1\", \"shell_pid\": 64352}, \"type\": \"pane_process_info\"}}}",
+      "reason": ""
+    },
+    {
+      "name": "Personal stale-pane different-cwd refuses every lifecycle and recovery path",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"proof\": \"unknown\", \"outcomes\": [{\"command\": [\"exit\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: task native-live-159af3e8 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\\n\"}, {\"command\": [\"relaunch\", \"--note\", \"must refuse foreign task\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: task native-live-159af3e8 cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input\\n\"}, {\"command\": [\"interrupt\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: task native-live-159af3e8 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\\n\"}, {\"command\": [\"relaunch\", \"--recover-launch\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: launch recovery for native-live-159af3e8 cannot prove its live launch settings\\n\"}, {\"command\": [\"sweep\"], \"rc\": 1, \"stdout\": \"REBOOT_RECOVERY: native-live-159af3e8: live launch settings are unreadable; no lifecycle action taken\\n\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\n\"}], \"draft_before\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"draft_after\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"records_unchanged\": true, \"same_omp_pid\": true}",
+      "reason": ""
+    },
+    {
+      "name": "Personal stale-pane same-cwd refuses every lifecycle and recovery path",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"proof\": \"unknown\", \"outcomes\": [{\"command\": [\"exit\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: task native-live-159af3e8 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\\n\"}, {\"command\": [\"relaunch\", \"--note\", \"must refuse foreign task\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: task native-live-159af3e8 cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input\\n\"}, {\"command\": [\"interrupt\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: task native-live-159af3e8 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\\n\"}, {\"command\": [\"relaunch\", \"--recover-launch\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\nerror: launch recovery for native-live-159af3e8 cannot prove its live launch settings\\n\"}, {\"command\": [\"sweep\"], \"rc\": 1, \"stdout\": \"REBOOT_RECOVERY: native-live-159af3e8: live launch settings are unreadable; no lifecycle action taken\\n\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-6b0f1995c6/home\\n\"}], \"draft_before\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"draft_after\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"records_unchanged\": true, \"same_omp_pid\": true}",
+      "reason": ""
+    },
+    {
+      "name": "Borderless empty composer excludes unowned status footer",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"state\": \"empty\", \"extract_rc\": 0, \"content\": \"\"}",
+      "reason": ""
+    },
+    {
+      "name": "Borderless owned pasted header status text stays pending and complete",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"╭── π > model > path · 15.4%/272K ─╮ ╰─ ─╯\"}",
+      "reason": ""
+    },
+    {
+      "name": "Borderless owned pasted body status text stays pending and complete",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"╭── π > model > path ─╮ │ text · 15.4%/272K │ ╰─ ─╯\"}",
+      "reason": ""
+    },
+    {
+      "name": "Borderless owned pasted floor status text stays pending and complete",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"╭── π > model > path ─╮ ╰─ text · 15.4%/272K ─╯\"}",
+      "reason": ""
+    },
+    {
+      "name": "Captured glyph-only empty root cannot promote blocked pasted frame to empty proof",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"composer\": {\"state\": \"unknown\", \"extract_rc\": 1, \"content\": \"\"}, \"glyph_root_row\": 41, \"cursor_verdicts\": {\"41\": \"unknown\", \"44\": \"unknown\"}}",
+      "reason": ""
+    },
+    {
+      "name": "Busy-marked personal stale-pane different-cwd refuses exit without interruption",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"proof\": \"unknown\", \"outcomes\": [{\"command\": [\"exit\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-770484479b/home\\nerror: task native-live-d57ea88f cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\\n\"}], \"draft_before\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"draft_after\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"records_unchanged\": true, \"same_omp_pid\": true, \"busy_marked\": true}",
+      "reason": ""
+    },
+    {
+      "name": "Busy-marked personal stale-pane same-cwd refuses exit without interruption",
+      "result": "pass",
+      "live": true,
+      "evidence": "{\"proof\": \"unknown\", \"outcomes\": [{\"command\": [\"exit\"], \"rc\": 1, \"stdout\": \"\", \"stderr\": \"fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-validation-770484479b/home\\nerror: task native-live-d57ea88f cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\\n\"}], \"draft_before\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"draft_after\": {\"state\": \"pending\", \"extract_rc\": 0, \"content\": \"preserve personal draft\"}, \"records_unchanged\": true, \"same_omp_pid\": true, \"busy_marked\": true}",
+      "reason": ""
+    }
+  ],
+  "cleanup": [
+    {
+      "session": "fm-lab-gate-native-20774-32741",
+      "claimed": true,
+      "teardown_rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "private_tree_removed": true,
+      "default_tripwire_verified": true
+    },
+    {
+      "session": "fm-lab-gate-native-34669-20959",
+      "claimed": true,
+      "teardown_rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "private_tree_removed": true,
+      "default_tripwire_verified": true
+    },
+    {
+      "session": "fm-lab-gate-native-63316-20980",
+      "claimed": true,
+      "teardown_rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "private_tree_removed": true,
+      "default_tripwire_verified": true
+    }
+  ],
+  "setup_corrections": [
+    "The external helper rejected prepare followed by provision; validation used the worktree helper as required by the trusted current runbook.",
+    "One stale-pane before-capture was taken while paste rendering was incomplete. A fresh named lab re-drive waited for the actual full draft before asserting preservation."
+  ],
+  "test_repairs": [
+    "Passed the actual native identity into Herdr composer extraction.",
+    "Recognized session posture and worker memory overlays separately in live runtime profile assertions; secondmates require the session overlay."
+  ],
+  "recorded_recovery": {
+    "command": "env FM_OMP_REBOOT_LIVE=1 HERDR_LAB_HELPER=bin/fm-herdr-lab.sh bash tests/fm-omp-reboot-live-e2e.test.sh",
+    "exit_status": 0,
+    "runtime": "omp 18.6.3 / Herdr 0.9.1 protocol 22",
+    "evidence": "recorded-recovery-live.log"
+  }
+}

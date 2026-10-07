@@ -1,0 +1,61 @@
+[
+  {
+    "name": "empty-status-footer",
+    "state": "empty",
+    "extracted": "",
+    "pass": true
+  },
+  {
+    "name": "header",
+    "draft": "\n╭── π > model > path · 15.4%/272K ─╮\n╰─ ─╯",
+    "state": "pending",
+    "extracted": "╭── π > model > path · 15.4%/272K ─╮ ╰─ ─╯",
+    "expected": "╭── π > model > path · 15.4%/272K ─╮ ╰─ ─╯",
+    "pass": true
+  },
+  {
+    "name": "body",
+    "draft": "\n╭── π > model > path ─╮\n│ text · 15.4%/272K │\n╰─ ─╯",
+    "state": "pending",
+    "extract_rc": 0,
+    "extracted": "╭── π > model > path ─╮ │ text · 15.4%/272K │ ╰─ ─╯",
+    "expected": "╭── π > model > path ─╮ │ text · 15.4%/272K │ ╰─ ─╯",
+    "pass": true
+  },
+  {
+    "name": "floor",
+    "draft": "\n╭── π > model > path ─╮\n╰─ text · 15.4%/272K ─╯",
+    "state": "pending",
+    "extract_rc": 0,
+    "extracted": "╭── π > model > path ─╮ ╰─ text · 15.4%/272K ─╯",
+    "expected": "╭── π > model > path ─╮ ╰─ text · 15.4%/272K ─╯",
+    "pass": true
+  },
+  {
+    "name": "glyph-only-root-blocker",
+    "draft": "\n│ │\n╭── π > model > path ─╮\n╰─ ─╯",
+    "proof": [
+      {
+        "locale": "default",
+        "states_cursorless_root_floor": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ],
+        "extract_rc": 1,
+        "extracted": ""
+      },
+      {
+        "locale": "C",
+        "states_cursorless_root_floor": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ],
+        "extract_rc": 1,
+        "extracted": ""
+      }
+    ],
+    "pass": true
+  }
+]

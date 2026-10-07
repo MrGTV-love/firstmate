@@ -1,0 +1,25 @@
+REBOOT_RECOVERY: owned-native-resume: failed: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home
+error: task owned-native-resume's recovery composer state is 'pending', not proven empty; refusing launch recovery before interrupting its agent
+REBOOT_RECOVERY: ownership-different-cwd: live launch settings are unreadable; no lifecycle action taken
+REBOOT_RECOVERY: ownership-same-cwd-different-conversation: live launch settings are unreadable; no lifecycle action taken
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.test-live-i10ok5hq/fm-home
+
+Transport calls:
+pane get w7:p1 --session fm-lab-status-owned-24852-10877 
+agent get w7:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w7:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w7:p1 --session fm-lab-status-owned-24852-10877 
+pane get w7:p1 --session fm-lab-status-owned-24852-10877 
+agent get w7:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w7:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w7:p1 --session fm-lab-status-owned-24852-10877 
+status --json --session fm-lab-status-owned-24852-10877 
+pane read w7:p1 --source visible --format ansi --session fm-lab-status-owned-24852-10877 
+pane get w5:p1 --session fm-lab-status-owned-24852-10877 
+agent get w5:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w5:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w5:p1 --session fm-lab-status-owned-24852-10877 
+pane get w6:p1 --session fm-lab-status-owned-24852-10877 
+agent get w6:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w6:p1 --session fm-lab-status-owned-24852-10877 
+pane process-info --pane w6:p1 --session fm-lab-status-owned-24852-10877 

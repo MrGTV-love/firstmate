@@ -1,0 +1,15 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                          Tip: Press ⌃R to search your prompt history and reuse a past message
+
+
+ Personal conversation unrelated to Firstmate. Do not execute tools.
+
+
+❯ !git diff
+ π · ⬢ Apple AFM 3 Core Advanced · 🌳 32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR · ⑂ detached ?1 · ◫ 238.3%/8.2K ⟲
