@@ -610,6 +610,8 @@ case "$fault:$*" in
   # Advance once before the parallel read wave; its readers share this clock.
   reserve:'api repos/o/r/issues/9')
     printf '%s\n' "$(( $(cat "$FORGE/clock") + 6 ))" > "$FORGE/clock" ;;
+  deadline:'api repos/o/r/pulls/8')
+    printf '%s\n' "$(( $(cat "$FORGE/clock") + 1 ))" > "$FORGE/clock" ;;
   slow-wave:'api repos/o/r/pulls/8') sleep 3 ;;
   slow-wave:'api repos/o/r/pulls/8/reviews?'*) sleep 6 ;;
   exhaust:'api repos/o/r/issues/8/comments?'*)
@@ -949,7 +951,16 @@ test_arm_plumbs_a_configured_budget_into_the_check_shim() {
     wrap_forge "$home"
     mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
     cp "$home/data/delivery/contributions.json" "$home/prior.json"
-    printf 'hang\n' > "$home/forge/fault"
+    # Expire the logical budget after the core read, not during child startup.
+    /bin/date +%s > "$home/forge/clock"
+    printf 'deadline\n' > "$home/forge/fault"
+    # Real timeout behavior is covered separately; this fixture checks plumbing.
+    cat > "$home/fakebin/timeout" <<'SH'
+#!/bin/sh
+shift 3
+exec "$@"
+SH
+    chmod +x "$home/fakebin/timeout"
     if [ "$mode" = configured ]; then
       with_home "$home" env FM_CONTRIBUTIONS_BUDGET=1 "$ROOT/bin/fm-contributions.sh" arm >/dev/null \
         || fail 'arm with a configured budget failed'
