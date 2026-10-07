@@ -70,7 +70,7 @@ fm_worker_account_claude_quota_unbound() {
   local name value cwd project
   case "${HOME:-}" in /*) ;; *) return 0 ;; esac
   [ -z "${CLAUDE_CONFIG_DIR:-}" ] || return 0
-  for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+  for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS; do
     value=${!name-}
     case "$name" in
       CLAUDE_CODE_USE_*)
@@ -86,7 +86,7 @@ fm_worker_account_claude_quota_unbound() {
   project=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || project=$cwd
   perl -MJSON::PP -MErrno=ENOENT -e '
     my ($home, $cwd, $project, @shed) = @ARGV;
-    my %selectors = map { $_ => 1 } (@shed, qw(HOME CLAUDE_CONFIG_DIR ANTHROPIC_ORGANIZATION_ID ANTHROPIC_BASE_URL CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR));
+    my %selectors = map { $_ => 1 } (@shed, qw(HOME CLAUDE_CONFIG_DIR ANTHROPIC_ORGANIZATION_ID ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR));
     sub inspect {
       my ($file) = @_;
       unless (lstat $file) { return $! == ENOENT ? 1 : 0; }
@@ -96,7 +96,7 @@ fm_worker_account_claude_quota_unbound() {
       return 0 unless defined $body;
       my $settings = eval { decode_json($body) };
       return 0 if $@ || ref($settings) ne "HASH";
-      for my $helper (qw(apiKeyHelper policyHelper)) {
+      for my $helper (qw(apiKeyHelper policyHelper forceLoginMethod forceLoginGatewayUrl)) {
         next unless exists $settings->{$helper};
         my $value = $settings->{$helper};
         return 0 if ref($value) || (defined($value) && $value ne "");

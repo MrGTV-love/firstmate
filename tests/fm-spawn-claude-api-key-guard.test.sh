@@ -16,8 +16,10 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS
 TMP_ROOT=$(fm_test_tmproot fm-spawn-claude-api-key-guard)
+fm_test_copy_managed_bin "$ROOT" "$TMP_ROOT/repository"
+ROOT="$TMP_ROOT/repository"
 
 # make_case <name> <harness> <id>...
 # Echoes "<case-dir>|<home>|<project>|<worktree>|<fakebin>|<launch-log>|<pane-log>".

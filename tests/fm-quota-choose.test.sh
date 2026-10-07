@@ -2,15 +2,16 @@
 # Unit tests for bin/fm-quota-choose.sh.
 # Drives the public argv interface with a mocked quota-axi JSON source.
 set -u
-unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID ANTHROPIC_ORGANIZATION_ID
+unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID ANTHROPIC_ORGANIZATION_ID
 unset CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE
 unset PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-BIN="$FM_ROOT/bin"
+. "$SCRIPT_DIR/fixtures.sh"
 
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-quota-choose.XXXXXX")
+fm_test_copy_managed_bin "$ROOT" "$LAB/repository"
+BIN="$LAB/repository/bin"
 FIXTURE="$LAB/quota.json"
 MALFORMED="$LAB/malformed.json"
 MULTI_JSON="$LAB/multi-json.json"
@@ -477,7 +478,7 @@ ok "ambient alternate Claude authentication has no native default quota mapping"
 CLAUDE_EXHAUSTED="$LAB/claude-exhausted.json"
 jq '(.providers[] | select(.provider == "claude").quotaSemantics.effectiveAvailability[]) |=
   (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$LAB/captured.json" > "$CLAUDE_EXHAUSTED"
-for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE; do
+for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS; do
   export "$credential=worker-alternate"
   printf -- '-%s\n' "$credential" > "$FM_AUTH_DESTINATION"
   for policy in inherited retained stripped; do
@@ -493,6 +494,9 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN
     fi
     [ "$out" = none ] || fail "$credential $policy unmapped worker auth returned: $out"
   done
+  export "$credential="
+  out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+  [ "$out" = "claude default" ] || fail "empty $credential concealed native worker quota: $out"
   unset "$credential"
   printf '%s=destination-alternate\n' "$credential" > "$FM_AUTH_DESTINATION"
   printf '%s=destination-global\n' "$credential" > "$FM_AUTH_DESTINATION.global"
@@ -540,7 +544,9 @@ rm "$FM_AUTH_DESTINATION"
 ok "native Claude classification uses worker selectors, truth switches and paired federation"
 
 for source in "$LAB/user-home/.claude/settings.json" "$LAB/user-home/.claude/remote-settings.json" \
-  "$LAB/project/.claude/settings.json" "$LAB/project/.claude/settings.local.json"; do
+  "$LAB/project/.claude/settings.json" "$LAB/project/.claude/settings.local.json" \
+  "$LAB/repository/managed/macos/managed-settings.json" "$LAB/repository/managed/macos/managed-settings.d/auth.json" \
+  "$LAB/repository/managed/linux/managed-settings.json" "$LAB/repository/managed/linux/managed-settings.d/auth.json"; do
   for helper in apiKeyHelper policyHelper; do
     jq -n --arg helper "$helper" --arg command "touch '$LAB/helper-ran'; printf settings-secret" \
       '{($helper):$command}' > "$source"
@@ -552,8 +558,21 @@ for source in "$LAB/user-home/.claude/settings.json" "$LAB/user-home/.claude/rem
     fi
     [ "$out" = none ] || fail "$source $helper leaked settings: $out"
   done
+  for selector in forceLoginMethod forceLoginGatewayUrl; do
+    case "$selector" in
+      forceLoginMethod) value=gateway ;;
+      forceLoginGatewayUrl) value=https://gateway.invalid ;;
+    esac
+    jq -n --arg selector "$selector" --arg value "$value" '{($selector):$value}' > "$source"
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol 2>&1)
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$source $selector borrowed or leaked default quota: $out"
+    if out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default 2>&1); then
+      fail "$source $selector ranked an unbound Claude candidate"
+    fi
+    [ "$out" = none ] || fail "$source $selector leaked settings: $out"
+  done
   for selector in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR ANTHROPIC_PROFILE \
-    CLAUDE_CONFIG_DIR HOME ANTHROPIC_BASE_URL ANTHROPIC_FEDERATION_RULE_ID ANTHROPIC_ORGANIZATION_ID \
+    CLAUDE_CONFIG_DIR HOME ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS ANTHROPIC_FEDERATION_RULE_ID ANTHROPIC_ORGANIZATION_ID \
     CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE; do
     jq -n --arg selector "$selector" '{env:{($selector):"settings-secret"}}' > "$source"
     out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol 2>&1)
@@ -564,7 +583,7 @@ for source in "$LAB/user-home/.claude/settings.json" "$LAB/user-home/.claude/rem
     out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
     [ "$out" = "codex gpt-6.1-sol" ] || fail "$source uncertain settings borrowed default quota: $out"
   done
-  printf '%s\n' '{"model":"opus","permissions":{"allow":[]},"hooks":{},"env":{},"apiKeyHelper":""}' > "$source"
+  printf '%s\n' '{"model":"opus","permissions":{"allow":[]},"hooks":{},"env":{},"apiKeyHelper":"","forceLoginMethod":"","forceLoginGatewayUrl":""}' > "$source"
   out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
   [ "$out" = "claude default" ] || fail "$source neutral settings concealed default quota: $out"
   chmod 000 "$source"

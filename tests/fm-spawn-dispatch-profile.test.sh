@@ -10,10 +10,12 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-SPAWN="$ROOT/bin/fm-spawn.sh"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-dispatch-profile)
+fm_test_copy_managed_bin "$ROOT" "$TMP_ROOT/repository"
+ROOT="$TMP_ROOT/repository"
+SPAWN="$ROOT/bin/fm-spawn.sh"
 unset LAVISH_AXI_HOST
-unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
+unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
 
 make_spawn_pi_probe() {
   local fakebin=$1 tool=$2
@@ -252,8 +254,15 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
 }
 
 test_claude_dispatch_inspects_initialized_settings() {
-  local rec id scenario quota out status source expected launch querylog selector worker_home worker_cwd
-  for scenario in user-helper project-helper env-key split-federation neutral caller-only; do
+  local rec id scenario quota out status source expected launch querylog selector worker_home worker_cwd origin kind
+  local -a scenarios
+  scenarios=(user-helper project-helper env-key split-federation neutral caller-only inherited-base-url inherited-headers inherited-empty-base-url inherited-empty-headers)
+  for origin in user remote project local managed-macos managed-macos-fragment managed-linux managed-linux-fragment; do
+    for kind in headers gateway-method gateway-url neutral; do
+      scenarios+=("$origin-$kind")
+    done
+  done
+  for scenario in "${scenarios[@]}"; do
     for quota in exhausted healthy; do
       id="settings-$scenario-$quota"
       rec=$(make_spawn_case "$id" claude "$id")
@@ -262,14 +271,33 @@ test_claude_dispatch_inspects_initialized_settings() {
       mkdir -p "$HOME_DIR/user-home/.claude" "$WT_DIR/.claude" "$CASE_DIR/caller/.claude"
       source="$HOME_DIR/user-home/.claude/settings.json"
       case "$scenario" in
-        project-helper) source="$WT_DIR/.claude/settings.json" ;;
+        project-*) source="$WT_DIR/.claude/settings.json" ;;
+        local-*) source="$WT_DIR/.claude/settings.local.json" ;;
+        remote-*) source="$HOME_DIR/user-home/.claude/remote-settings.json" ;;
+        managed-macos-fragment-*) source="$ROOT/managed/macos/managed-settings.d/auth.json" ;;
+        managed-macos-*) source="$ROOT/managed/macos/managed-settings.json" ;;
+        managed-linux-fragment-*) source="$ROOT/managed/linux/managed-settings.d/auth.json" ;;
+        managed-linux-*) source="$ROOT/managed/linux/managed-settings.json" ;;
         caller-only) source="$CASE_DIR/caller/.claude/settings.json" ;;
       esac
       case "$scenario" in
+        inherited-*)
+          case "$scenario" in
+            *base-url) selector=ANTHROPIC_BASE_URL ;;
+            *headers) selector=ANTHROPIC_CUSTOM_HEADERS ;;
+          esac
+          case "$scenario" in
+            inherited-empty-*) printf 'export %s=%q\n' "$selector" '' >> "$HOME_DIR/pane-init.sh" ;;
+            *) printf 'export %s=%q\n' "$selector" settings-secret >> "$HOME_DIR/pane-init.sh" ;;
+          esac
+          ;;
         *helper|caller-only)
           jq -n --arg command "touch '$CASE_DIR/helper-ran'; printf settings-secret" \
             '{apiKeyHelper:$command}' > "$source"
           ;;
+        *-headers) printf '%s\n' '{"env":{"ANTHROPIC_CUSTOM_HEADERS":"X-Test: settings-secret"}}' > "$source" ;;
+        *-gateway-method) printf '%s\n' '{"forceLoginMethod":"gateway"}' > "$source" ;;
+        *-gateway-url) printf '%s\n' '{"forceLoginGatewayUrl":"https://gateway.invalid"}' > "$source" ;;
         env-key|split-federation)
           case "$scenario" in
             env-key) selector=ANTHROPIC_API_KEY ;;
@@ -280,11 +308,11 @@ test_claude_dispatch_inspects_initialized_settings() {
           esac
           jq -n --arg selector "$selector" '{env:{($selector):"settings-secret"}}' > "$source"
           ;;
-        neutral) printf '%s\n' '{"hooks":{},"permissions":{"allow":[]},"model":"opus","env":{}}' > "$source" ;;
+        neutral|*-neutral) printf '%s\n' '{"hooks":{},"permissions":{"allow":[]},"model":"opus","env":{},"forceLoginMethod":"","forceLoginGatewayUrl":""}' > "$source" ;;
       esac
       case "$scenario" in
-        project-helper)
-          git -C "$WT_DIR" add .claude/settings.json
+        project-*|local-*)
+          git -C "$WT_DIR" add -f "$source"
           git -C "$WT_DIR" -c user.name=test -c user.email=test@example.invalid commit -qm project-auth-settings
           git -C "$WT_DIR" push --quiet origin HEAD:main
           ;;
@@ -309,7 +337,7 @@ SH
       [ -s "$querylog" ] || fail "$scenario $quota did not execute an initialized pane query"
       expected=claude
       case "$scenario" in
-        neutral|caller-only)
+        neutral|*-neutral|caller-only|inherited-empty-*)
           [ -s "$FAKEBIN_DIR/quota.calls" ] || fail "$scenario $quota never queried default quota"
           [ "$quota" != exhausted ] || expected=omp
           ;;
@@ -332,6 +360,9 @@ SH
       [ ! -e "$CASE_DIR/helper-ran" ] || fail "$scenario $quota executed a settings helper"
       case "$out$(cat "$CASE_DIR/worker.out")" in
         *settings-secret*|*"helper-ran"*) fail "$scenario $quota leaked a settings helper or credential" ;;
+      esac
+      case "$scenario" in
+        managed-*) rm "$source" ;;
       esac
     done
   done

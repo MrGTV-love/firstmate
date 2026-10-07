@@ -30,6 +30,21 @@ export FM_TEST_NO_MISTAKES_FAKE_VERSION="no-mistakes version v${FM_TEST_NO_MISTA
 export FM_TEST_NO_MISTAKES_FAKE_VERSION_TS="${FM_TEST_NO_MISTAKES_FAKE_VERSION} 2026-06-27T00:02:18Z"
 export FM_TEST_GH_AXI_VERSION=0.1.29
 
+fm_test_copy_managed_bin() {
+  local repository=$1 fixture=$2 asset
+  mkdir -p "$fixture" "$fixture/managed/macos/managed-settings.d" "$fixture/managed/linux/managed-settings.d"
+  cp -R "$repository/bin" "$fixture/bin"
+  for asset in AGENTS.md docs .agents .omp; do
+    [ ! -e "$repository/$asset" ] || ln -s "$repository/$asset" "$fixture/$asset"
+  done
+  FM_TEST_MANAGED_ROOT="$fixture/managed" perl -pi -e '
+    s{\Q/Library/Application Support/ClaudeCode\E}{$ENV{FM_TEST_MANAGED_ROOT}/macos}g;
+    s{\Q/etc/claude-code\E}{$ENV{FM_TEST_MANAGED_ROOT}/linux}g;
+  ' "$fixture/bin/fm-worker-account-lib.sh"
+  git -C "$fixture" init -q
+  git -C "$fixture" add bin
+}
+
 # --- fake no-mistakes -------------------------------------------------------
 
 # fm_test_fake_no_mistakes <fakebin>
