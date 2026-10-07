@@ -299,6 +299,46 @@ test_secondmate_launch_relies_on_discovery() {
   pass "fm-spawn: omp secondmates publish parent-bound busy/settled evidence without duplicate primary loading"
 }
 
+test_raw_secondmate_launch_has_no_busy_contract() {
+  local world repo home fakebin launchlog out status launch state
+  world="$TMP_ROOT/raw-secondmate"
+  repo="$world/repo"
+  fm_git_init_commit "$repo"
+  ln -s "$ROOT/bin" "$repo/bin"
+  ln -s "$ROOT/.omp" "$repo/.omp"
+  home="$world/sm"
+  mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
+  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'charter\n' > "$home/data/charter.md"
+  printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
+  git -C "$home" init -q -b main
+  fakebin=$(make_spawn_fakebin "$world/fake" claude)
+  make_fake_omp "$fakebin"
+  launchlog="$world/launch.log"
+  : > "$launchlog"
+  out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
+    FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
+    FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
+    FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
+    FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+    "$ROOT/bin/fm-spawn.sh" sm "$home" 'omp --auto-approve' --secondmate 2>&1)
+  status=$?
+  expect_code 0 "$status" "raw omp secondmate spawn should succeed: $out"
+  state="$world/home/state"
+  launch=$(cat "$launchlog")
+  assert_contains "$launch" "omp --auto-approve" "raw secondmate command was not preserved in the emitted launch: $launch"
+  assert_present "$state/sm.meta" "raw secondmate spawn did not write its metadata"
+  [ "$(fm_meta_get "$state/sm.meta" harness)" = omp ] || fail "raw secondmate metadata lost its omp harness"
+  assert_absent "$state/sm.busy-state" "raw secondmate spawn armed a busy-state record without a lifecycle adapter"
+  assert_absent "$state/sm.busy-gen" "raw secondmate spawn minted a busy generation without a lifecycle adapter"
+  assert_absent "$state/sm.omp-ext.ts" "raw secondmate spawn generated a lifecycle extension"
+  [ -z "$(fm_meta_get "$state/sm.meta" busy_gen)" ] || fail "raw secondmate metadata published a busy generation"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown missing" ] \
+    || fail "raw secondmate without lifecycle evidence must classify unknown, not false busy"
+  pass "fm-spawn: raw omp secondmates preserve their command without arming an unobservable busy contract"
+}
+
 test_secondmate_config_pinned_model_is_validated() {
   # The same seeded secondmate home, but the harness and model come from the
   # primary's config/secondmate-harness rather than the command line: the
@@ -1281,6 +1321,7 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
+test_raw_secondmate_launch_has_no_busy_contract
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
 test_generated_extension_preserves_hostile_paths

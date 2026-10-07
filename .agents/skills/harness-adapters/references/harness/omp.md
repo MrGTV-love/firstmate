@@ -41,7 +41,7 @@ The optional claude-bridge extension runs a nested executable literally named `c
 ## Extension loading
 
 omp auto-discovers `<cwd>/.omp/extensions/*.ts` (top level only, cwd only, no ancestor walk, no trust dialog) and the active profile's `agent/extensions/`; `.pi/extensions/` is not a discovery root.
-A file that is both auto-discovered and named with `-e` loads twice, so every task's semantic busy extension lives in the parent's `state/` and is loaded explicitly; a secondmate's tracked primary extensions load separately through home-local auto-discovery.
+A file that is both auto-discovered and named with `-e` loads twice, so a canonical task launch loads its semantic busy extension explicitly from the parent's `state/`; a secondmate's tracked primary extensions load separately through home-local auto-discovery. Raw secondmate launch commands do not attach this generated lifecycle extension and do not arm its busy contract.
 There is no `agent_settled` event; `agent_end` plus `willContinue` replaces it.
 
 ## Primary integration
