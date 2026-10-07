@@ -45,8 +45,9 @@ Each adapter:
 A failed follow-up never cancels continuity restoration.
 
 OpenCode treats launch-policy-refused readiness as close-handler-owned, including on a scheduled retry after a non-actionable startup failure.
-The refused host's close restores the ordinary watcher and delivers the actual refusal once after successor readiness; the retry callback does not emit a competing launch-failure prompt.
-`tests/fm-supervision-session-launch-policy.test.sh` exercises this transition with the real plugin and policy-refusal executable under a fake local runtime, without launching a vendor model session.
+At refusal close, OpenCode rechecks current policy and engine admission, suppressing only a still-denied configuration rather than the configuration captured before launch.
+The close restores currently permitted monitoring and delivers the actual refusal once after successor readiness; the retry callback does not emit a competing launch-failure prompt.
+`tests/fm-supervision-session-launch-policy.test.sh` exercises scheduled retries, policy enablement between spawn and admission, and policy removal before refusal close with the real plugin and policy-refusal executable under a fake local runtime, without launching a vendor model session.
 
 ### Pi session replacement
 

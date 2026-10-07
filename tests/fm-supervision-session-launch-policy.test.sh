@@ -566,7 +566,7 @@ SH
 
 test_away_launch_policy_guidance
 
-test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <initial|successor|retry>
+test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <initial|successor|retry|admission>
   local consumer=$1 publication=$2 phase=$3 replay_policy=${4:-denied} selection=${5:-claude} case_dir repo home out status
   case_dir="$TMP_ROOT/$consumer-$publication-$phase-$replay_policy-$selection"
   repo="$case_dir/repo"
@@ -582,7 +582,7 @@ test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <i
     unverified) printf 'omp\n' ;;
     extra) printf 'claude sonnet extra\n' ;;
   esac > "$home/config/supervision-host"
-  if [ "$phase" != retry ]; then
+  if [ "$phase" != retry ] && [ "$phase" != admission ]; then
     printf 'omp-or-tc\n' > "$home/config/session-launch-policy"
   fi
   cp "$TMP_ROOT/prior-host" "$home/state/.supervision-host"
@@ -615,7 +615,15 @@ if [ "$FM_POLICY_CONSUMER" = opencode ] && [ "$FM_POLICY_PHASE" = retry ] && [ !
   while [ ! -e "$FM_HOME/state/release-startup" ]; do sleep 0.02; done
   exit 1
 fi
+if [ "$FM_POLICY_PHASE" = admission ] && [ ! -e "$FM_HOME/state/admission-reached" ]; then
+  : > "$FM_HOME/state/admission-reached"
+  while [ ! -e "$FM_HOME/state/release-admission" ]; do sleep 0.02; done
+fi
 if [ ! -e "$FM_HOME/config/session-launch-policy" ]; then
+  if [ "$FM_POLICY_CONSUMER" = opencode ] && [ "$FM_POLICY_REPLAY_POLICY" = removed ]; then
+    : > "$FM_HOME/state/restoring-host"
+    while [ ! -e "$FM_HOME/state/release-restoration" ]; do sleep 0.02; done
+  fi
   printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-%s\n' "$$" "$$"
   trap 'exit 0' TERM INT
   while :; do sleep 0.02; done
@@ -628,7 +636,7 @@ if [ "$FM_POLICY_PHASE" = successor ] && [ ! -e "$FM_HOME/state/first-host" ]; t
   printf 'signal: prior host close\n'
   exit 0
 fi
-if [ "$FM_POLICY_CONSUMER" = opencode ] && { [ "$FM_POLICY_PHASE" = initial ] || [ "$FM_POLICY_PHASE" = retry ]; }; then
+if [ "$FM_POLICY_CONSUMER" = opencode ] && { [ "$FM_POLICY_PHASE" = initial ] || [ "$FM_POLICY_PHASE" = retry ] || [ "$FM_POLICY_PHASE" = admission ]; }; then
   "$FM_POLICY_ROOT/bin/fm-supervision-host.sh" "$@" > "$FM_HOME/state/refusal-output" 2>&1
   status=$?
   cat "$FM_HOME/state/refusal-output"
@@ -645,7 +653,7 @@ if [ "${1:-}" = --handling-delivered ]; then
   exit 0
 fi
 printf 'plain=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/state/launches"
-if [ "$FM_POLICY_CONSUMER" = opencode ] && { [ "$FM_POLICY_PHASE" = initial ] || [ "$FM_POLICY_PHASE" = retry ]; } && [ ! -e "$FM_HOME/state/first-plain" ]; then
+if [ "$FM_POLICY_CONSUMER" = opencode ] && { [ "$FM_POLICY_PHASE" = initial ] || [ "$FM_POLICY_PHASE" = retry ] || [ "$FM_POLICY_PHASE" = admission ]; } && [ ! -e "$FM_HOME/state/first-plain" ]; then
   : > "$FM_HOME/state/restoring-plain"
   while [ ! -e "$FM_HOME/state/release-restoration" ]; do sleep 0.02; done
 fi
@@ -679,6 +687,8 @@ const phase = process.env.FM_POLICY_PHASE;
 const expectedHosts = phase === "successor" || phase === "retry" ? 2 : 1;
 const replayAllowed = process.env.FM_POLICY_REPLAY_POLICY === "removed";
 const replaying = process.env.FM_POLICY_REPLAY_STAGE === "replacement";
+const removedAtClose = consumer === "opencode" && replayAllowed;
+const restoredHosts = expectedHosts + (removedAtClose ? 1 : 0);
 const records = [".supervision-host", ".supervision-host-turn", ".supervision-host-engine", "task.meta", "task.lease", "wakes.jsonl"];
 const before = records.map((name) => readFileSync(`${state}/${name}`, "utf8"));
 const rows = () => existsSync(`${state}/launches`) ? readFileSync(`${state}/launches`, "utf8").trim().split("\n") : [];
@@ -715,6 +725,8 @@ async function until(predicate, label) {
   throw new Error(`${label}: ${JSON.stringify({ sent, launches: rows() })}`);
 }
 const refusal = (message) => message.includes("supervision-host: launch policy refused:");
+const refusalLines = () => received.reduce((count, message) =>
+  count + [...message.matchAll(/supervision-host: launch policy refused:/g)].length, 0);
 const ordinary = (message) => message.includes("signal: ordinary monitoring continues");
 async function arm() {
   if (consumer === "omp") return tool.execute();
@@ -772,15 +784,25 @@ try {
     if (received.length) throw new Error(`retry refusal delivered before ordinary readiness: ${JSON.stringify(received)}`);
     writeFileSync(`${state}/release-restoration`, "release\n");
   }
-  if (turnend && phase === "initial") {
+  if (turnend && (phase === "initial" || phase === "admission")) {
     const idle = { event: { type: "session.idle", properties: { sessionID: "fixture-policy" } } };
+    let admissionArm;
+    if (phase === "admission") {
+      admissionArm = arm();
+      await until(() => existsSync(`${state}/admission-reached`), "host did not reach admission after spawn");
+      if (hosts().length !== 1 || received.length) throw new Error("admission gate did not hold the first host without delivery");
+      writeFileSync(`${process.env.FM_HOME}/config/session-launch-policy`, "omp-or-tc\n");
+      writeFileSync(`${state}/release-admission`, "release\n");
+    }
     await turnend.event(idle);
+    if (admissionArm && await admissionArm !== "refused") throw new Error("spawn-time absent policy did not refuse at admission");
     if (!readFileSync(`${state}/refusal-output`, "utf8").includes("supervision-host: launch policy refused:")) throw new Error("idle did not reach initial policy refusal");
-    if (existsSync(`${state}/generic-guard`) || sent.length) throw new Error("initial refusal idle invoked generic guard or delivered a competing prompt");
+    if (existsSync(`${state}/generic-guard`) || received.length) throw new Error("initial refusal idle invoked generic guard or delivered a competing prompt");
+    if (removedAtClose) unlinkSync(`${process.env.FM_HOME}/config/session-launch-policy`);
     writeFileSync(`${state}/release-refusal`, "release\n");
-    await until(() => existsSync(`${state}/restoring-plain`), "refusal did not start ordinary restoration");
+    await until(() => existsSync(`${state}/${removedAtClose ? "restoring-host" : "restoring-plain"}`), "refusal did not start current-policy restoration");
     const restorationIdle = turnend.event(idle);
-    if (existsSync(`${state}/generic-guard`) || sent.length) throw new Error("restoration invoked generic guard or delivered refusal before readiness");
+    if (existsSync(`${state}/generic-guard`) || received.length) throw new Error("restoration invoked generic guard or delivered refusal before readiness");
     writeFileSync(`${state}/release-restoration`, "release\n");
     await restorationIdle;
     if (existsSync(`${state}/generic-guard`)) throw new Error("restoration idle invoked generic guard");
@@ -792,8 +814,8 @@ try {
     writeFileSync(`${state}/release-host`, "release\n");
   }
   await until(() => sent.some(refusal), "refusal was not delivered");
-  if (sent.filter(refusal).length !== 1) throw new Error(`refusal was delivered more than once: ${JSON.stringify(sent)}`);
-  if (hosts().length !== expectedHosts || plains().length !== 1) throw new Error(`denied host was retried or monitoring was not restored: ${rows().join(" | ")}`);
+  if (sent.filter(refusal).length !== 1 || refusalLines() !== 1) throw new Error(`refusal diagnostic was not delivered exactly once: ${JSON.stringify(received)}`);
+  if (hosts().length !== restoredHosts || plains().length !== (removedAtClose ? 0 : 1)) throw new Error(`denied host was retried or current-policy monitoring was not restored: ${rows().join(" | ")}`);
   const refusalMessage = sent.find(refusal);
   const detail = process.env.FM_POLICY_PUBLICATION === "failed" ? "could not record the hand-back" : "predecessor custody is unchanged";
   if (!refusalMessage.includes(detail) || (process.env.FM_POLICY_SELECTION === "claude" && !refusalMessage.includes("session-launch-policy"))) throw new Error(`refusal lost selection or publication detail: ${refusalMessage}`);
@@ -805,10 +827,12 @@ try {
     if (turnend) await turnend.event({ event: { type: "session.idle", properties: { sessionID: "fixture-policy" } } });
   }
   await new Promise((resolve) => setTimeout(resolve, 150));
-  if (hosts().length !== expectedHosts || sent.filter(refusal).length !== 1) throw new Error(`idle or repair retried the denial: ${JSON.stringify({ sent, launches: rows() })}`);
-  writeFileSync(`${state}/release-plain`, "release\n");
-  await until(() => sent.some(ordinary) && plains().length === 2, "ordinary close did not continue monitoring");
-  if (sent.filter(ordinary).length !== 1 || sent.filter(refusal).length !== 1 || hosts().length !== expectedHosts) throw new Error(`ordinary close repeated denial or delivery: ${JSON.stringify({ sent, launches: rows() })}`);
+  if (hosts().length !== restoredHosts || sent.filter(refusal).length !== 1 || refusalLines() !== 1) throw new Error(`idle or repair retried the denial: ${JSON.stringify({ sent, launches: rows() })}`);
+  if (!removedAtClose) {
+    writeFileSync(`${state}/release-plain`, "release\n");
+    await until(() => sent.some(ordinary) && plains().length === 2, "ordinary close did not continue monitoring");
+    if (sent.filter(ordinary).length !== 1 || sent.filter(refusal).length !== 1 || refusalLines() !== 1 || hosts().length !== expectedHosts) throw new Error(`ordinary close repeated denial or delivery: ${JSON.stringify({ sent, launches: rows() })}`);
+  }
   if (phase === "retry" && (received.filter(refusal).length !== 1 ||
       received.some((message) => message.includes("could not launch a continuity retry (refused)")) ||
       received.length !== sent.length)) {
@@ -870,6 +894,8 @@ if command -v bun >/dev/null 2>&1; then
   done
   for publication in published failed; do
     test_primary_consumer_policy_refusal opencode "$publication" retry
+    test_primary_consumer_policy_refusal opencode "$publication" admission
+    test_primary_consumer_policy_refusal opencode "$publication" initial removed
   done
   for selection in empty default unverified extra; do
     for replay_policy in denied removed; do

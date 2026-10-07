@@ -466,7 +466,14 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
     const classification = classifyArmClose(paths, hostMode, stdout, stderr, code, signal);
     const refused = hostMode && hostLaunchRefused(classification.message);
     if (refused) {
-      refusedHostConfiguration = hostConfiguration;
+      const currentConfiguration = hostConfigurationKey(paths);
+      const result = spawnSync(
+        "bash",
+        ["-c", '. "$1"; policy_enabled=$(fm_session_launch_policy_enabled "$2" 2>/dev/null) || exit 1; [ "$policy_enabled" = 1 ] || exit 0; fm_supervision_host_config "$2" opencode && [ -n "$FM_SUPERVISION_ENGINE" ]', "_",
+          `${paths.root}/bin/fm-supervision-engine-lib.sh`, paths.config],
+        { cwd: paths.root, encoding: "utf8", env: { ...process.env, FM_HOME: paths.home, FM_CONFIG_OVERRIDE: paths.config } },
+      );
+      refusedHostConfiguration = result.status === 1 ? currentConfiguration : null;
       armHostRefusal.set(armChild, classification.message);
     }
     resolveClosed();
