@@ -49,6 +49,7 @@ proof_meta omp
 BRIEF="$(fm_brief_worker_role "$FM_HOME/state" t)"$'\n\nTask assigned by Firstmate.'
 fm_operational_input_encode launch-brief "$BRIEF" MESSAGE
 jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"recorded",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
+# shellcheck disable=SC2153 # fm_operational_input_encode assigns MESSAGE by name.
 jq -nc --arg text "$MESSAGE" '{type:"message",message:{role:"user",content:[{type:"text",text:$text}]}}' \
   >> "$WORKTREE/recorded.jsonl"
 jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"personal",cwd:$cwd}' > "$WORKTREE/personal.jsonl"

@@ -935,10 +935,10 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     esac
     if [ -z "$kind" ] && _fm_composer_omp_band_header "$trimmed"; then
       kind=top
-      family=omp-band
+      family='omp-band'
     fi
     if [ "$current_family" = omp-band ] && [ "$row" -eq "$((top + 1))" ]; then
-      case "$trimmed" in '╰─'|'╰─ '*) kind=bottom; family=omp-band ;; esac
+      case "$trimmed" in '╰─'|'╰─ '*) kind=bottom; family='omp-band' ;; esac
     fi
     if [ "$current_family" = omp ] && [[ "$trimmed" == '╰─ '*' ─╯' ]]; then
       kind=bottom
