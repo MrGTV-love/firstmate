@@ -1,0 +1,19 @@
+{
+  "name": "hyper-jev-starter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "JEV_BACKEND=mock node --test \"tests/**/*.test.ts\"",
+    "demo": "JEV_BACKEND=mock node src/example.ts",
+    "start": "node src/example.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
+  }
+}
