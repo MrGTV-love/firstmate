@@ -69,7 +69,7 @@ A guard that would not have caught a recorded instance is not a remedy.
 When a guard already exists and missed the instance, the remedy is repairing that guard.
 Stop at the first rung that works rather than stacking several.
 Some judgments cannot be reduced to a deterministic check; say so and use the strongest rung that honestly applies.
-This ladder only orders remedies, so the diagnosis-is-evidence rule above still holds and every remedy ships through a normal task and its delivery mode.
+This ladder only orders remedies, so the diagnosis-is-evidence rule above still holds and every remedy ships through a normal task following normal intake and the project's delivery mode.
 
 ## Repeat-mistake sweep
 
@@ -81,11 +81,11 @@ The sweep reads and files; it never fixes.
 2. Group instances into mistake classes by root cause, using the trigger, masking condition, and symptom separation above, not by matching wording.
 3. Count evidence per class: list every instance with its source and date.
    A class qualifies for a guard at two or more instances from different tasks.
-   Report every class found, including single-instance watch items, so nothing is hidden by the threshold.
 4. For each qualifying class, pick the ladder rung, name the recorded instance it would have rejected, and name any existing guard that missed.
-5. File each proposed guard as an ordinary backlog task through `bin/fm-tasks-axi.sh add`, after checking the backlog for an existing item on the same class.
+5. File each proposed guard as an ordinary backlog task following the configured-backend contract in [`docs/configuration.md`](../../../docs/configuration.md#required-tools-and-manual-mode), after checking the backlog for an existing item on the same class.
+   Use `bin/fm-tasks-axi.sh add` for tasks-axi homes and the documented manual path for manual homes.
    Dispatch follows normal intake and the project's delivery mode.
    Never fix inline, and never edit a project's `AGENTS.md` or `CLAUDE.md`; guidance for firstmate's own material goes through `firstmate-coding-guidelines`.
-6. Report every class with its evidence count, chosen rung, and filed task id.
+6. Report each qualifying class with its evidence count, chosen rung, and filed task id.
 
 A learnings entry records the gotcha until a guard lands; it is never the remedy for a class that qualified for one.
