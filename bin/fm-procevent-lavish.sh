@@ -72,8 +72,8 @@
 #            Lavish session, so the board stays readable and `arm` brings it back.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
-#            and prints its response verbatim, absorbing only the one exact
-#            transient interruption described below. A staged reply still
+#            and prints its response verbatim, absorbing only the exact
+#            transient interruptions described below. A staged reply still
 #            present when it starts is posted before the long-poll: through
 #            `lavish-axi reply` when supported, otherwise through the legacy
 #            best-effort `poll --agent-reply` path.
@@ -198,6 +198,16 @@
 #
 # while the winner's server comes up. With <port> exactly the port this poll
 # routes to, that is the same restart and takes the same bounded retry.
+#
+# A supported restart can also return exactly these two lines:
+#
+#   error: Lavish Editor server connection failed
+#   code: SERVER_ERROR
+#
+# This response, bare or followed by the exact generated help[2] footer above,
+# takes the same bounded retry; it does not establish which transport step
+# failed. Other connection-error wording or help text remains an unknown error,
+# not a reconnect signal.
 #
 # That is an internal retry, not news, so registering the raw poll made the
 # generic runner capture it and wake the whole fleet. `poll` therefore re-runs
@@ -541,26 +551,22 @@ POLL_RETRY_DELAY_DEFAULT=5
 POLL_RETRY_DELAY_MIN=1
 POLL_RETRY_DELAY_MAX=60
 
-# Exit 10 only for the exact interruption, and nothing else. The whole response
-# must be one of its published forms with those exact bytes: the bare two-line
-# form, that form followed by the one help footer lavish-axi 0.1.79 generates
-# for it, or 0.1.79's three-line server-did-not-start response naming the exact
-# port this poll routes to. Whitespace variants, any other help text or port, a
-# longer response that merely opens with them, and any other SERVER_ERROR are
-# genuine errors this adapter must never swallow.
+# Exit 10 only for the exact restart responses, and nothing else. The whole
+# response must be one of the forms described above with those exact bytes.
+# Whitespace variants, any other help text or port, a longer response that
+# merely opens with them, and any other SERVER_ERROR are genuine errors this
+# adapter must never swallow.
 poll_response_filter() {  # <response-file>
   perl -e '
     use strict;
     use warnings;
     my ($stage) = @ARGV;
     my $bare = "error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n";
-    # The bare form is a prefix of the footer form, so one comparison against
-    # the footer form tracks a candidate for either.
-    my $footer = $bare
-      . "help[2]: Run `lavish-axi server --verbose` or inspect `~/.lavish-axi/server.log`"
+    my $help = "help[2]: Run `lavish-axi server --verbose` or inspect `~/.lavish-axi/server.log`"
       . " (`LAVISH_AXI_STATE_DIR/server.log` when set) for server startup or crash diagnostics,"
       . "Re-run the last `lavish-axi poll <html-file>` command after the server is healthy\n";
-    my @forms = ($footer);
+    my $connection = "error: Lavish Editor server connection failed\ncode: SERVER_ERROR\n";
+    my @forms = ($bare . $help, $connection, $connection . $help);
     my $port = $ENV{LAVISH_AXI_PORT} // "";
     # A restart race: another poll auto-started the server on the port this poll routes to.
     push @forms, "error: Lavish Editor server did not start\ncode: SERVER_ERROR\n"
