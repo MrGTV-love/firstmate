@@ -76,11 +76,26 @@ $session_env"
 }
 
 fm_dispatch_omp_query() {
-  local config=$1 session=$2 executable=$3 backend=${BACKEND:-} shell_bin
+  local config=$1 session=$2 executable=$3 backend=${BACKEND:-} shell_bin dir
   shift 3
-  executable=$(command -v "$executable") || return 127
-  case "$executable" in /*) ;; *) return 127 ;; esac
-  shell_bin=$(command -v bash) || return 127
+  executable=$(type -P -- "$executable" 2>/dev/null) || return 127
+  [ -x "$executable" ] || return 127
+  case "$executable" in
+    /*) ;;
+    *)
+      dir=$(cd "$(dirname "$executable")" 2>/dev/null && pwd -P) || return 127
+      executable="$dir/$(basename "$executable")"
+      ;;
+  esac
+  shell_bin=$(type -P -- bash 2>/dev/null) || return 127
+  [ -x "$shell_bin" ] || return 127
+  case "$shell_bin" in
+    /*) ;;
+    *)
+      dir=$(cd "$(dirname "$shell_bin")" 2>/dev/null && pwd -P) || return 127
+      shell_bin="$dir/$(basename "$shell_bin")"
+      ;;
+  esac
   if [ -z "$backend" ]; then
     backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 125
   fi

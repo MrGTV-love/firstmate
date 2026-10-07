@@ -632,5 +632,4 @@ export default function (pi: ExtensionAPI) {
     return { continue: true, additionalContext: content };
   });
 
-  markLoaded();
 }

@@ -333,15 +333,23 @@ test_failed_quota_origin_stays_contained_after_session_end() {
 }
 
 test_interrupted_quota_attempt_escalates_without_retry() {
-  local dir state mode gen seq identity before
-  for mode in quota session-end journal; do
+  local dir state mode gen seq identity before event
+  for mode in quota quota-dead quota-missing quota-unreadable turn-busy turn-idle session-end journal published-journal; do
     dir="$TMP_ROOT/interrupted-quota-$mode"
     if [ "$mode" = journal ]; then
       add_partial_quota_lane "$dir" lane
       gen=$(fm_meta_get "$dir/state/lane.control-relaunch" quota_gen)
       seq=$(fm_meta_get "$dir/state/lane.control-relaunch" quota_seq)
     else
-      add_lane "$dir" lane omp
+      if [ "$mode" = published-journal ]; then
+        add_partial_quota_lane "$dir" lane
+        "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state busy --source fm-spawn --event launch-brief >/dev/null
+        gen=$(cat "$dir/state/lane.busy-gen")
+        printf 'busy_gen=%s\ncontrol_relaunch_tx=fixture-tx\n' "$gen" >> "$dir/state/lane.meta"
+        printf 'rollback=none-new-record-kept\n' >> "$dir/state/lane.control-relaunch"
+      else
+        add_lane "$dir" lane omp
+      fi
       gen=$(cat "$dir/state/lane.busy-gen")
       "$ROOT/bin/fm-busy-event.sh" apply "$dir/state" lane idle --gen "$gen" \
         --source omp-ext --event quota-exhausted >/dev/null || fail "quota event fixture failed"
@@ -361,11 +369,37 @@ test_interrupted_quota_attempt_escalates_without_retry() {
         --source omp-ext --event quota-exhausted >/dev/null || fail "advanced quota fixture failed"
       FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "interrupted quota scan failed"
     else
-      if [ "$mode" = session-end ]; then
-        "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
-          --source omp-ext --event session-end >/dev/null || fail "session-end fixture failed"
-      fi
-      scan_lane "$dir" || fail "$mode interrupted scan failed"
+      case "$mode" in
+        session-end)
+          "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+            --source omp-ext --event session-end >/dev/null || fail "session-end fixture failed"
+          ;;
+        published-journal)
+          "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+            --source omp-ext --event agent-end >/dev/null || fail "published worker turn fixture failed"
+          ;;
+        turn-busy|turn-idle)
+          if [ "$mode" = turn-busy ]; then event=agent-start; else event=agent-end; fi
+          "$ROOT/bin/fm-busy-event.sh" apply "$state" lane "${mode#turn-}" --gen "$gen" \
+            --source omp-ext --event "$event" >/dev/null || fail "ordinary turn fixture failed"
+          printf 'gen=%s\n' "$gen" > "$state/lane.control-exit"
+          FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "cancelled interrupted scan failed"
+          [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
+            || fail "explicit exit did not suppress interrupted escalation"
+          rm "$state/lane.control-exit"
+          printf 'phase=launching\n' > "$state/lane.control-relaunch"
+          FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "active interrupted scan failed"
+          [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
+            || fail "active control did not suppress interrupted escalation"
+          rm "$state/lane.control-relaunch"
+          ;;
+      esac
+      case "$mode" in
+        quota-missing) FM_FAKE_WINDOW_GONE=1 scan_lane "$dir" ;;
+        quota-unreadable) FM_FAKE_TMUX_READ_FAIL=1 scan_lane "$dir" ;;
+        turn-busy) FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" ;;
+        *) scan_lane "$dir" ;;
+      esac || fail "$mode interrupted scan failed"
     fi
     [ "$FM_SESSION_END_ACTION" = failed ] && [ ! -s "$dir/control.log" ] \
       || fail "$mode interrupted allowance invoked control again"
@@ -383,7 +417,7 @@ test_interrupted_quota_attempt_escalates_without_retry() {
         || fail "interrupted journal containment resurrected busy state"
     fi
   done
-  pass "interrupted automatic quota attempts escalate once through current, ended, and journal-backed origins"
+  pass "interrupted quota attempts escalate once independently of later events and worker liveness"
 }
 
 test_quota_recovery_ignores_daily_cap_and_capped_handling() {

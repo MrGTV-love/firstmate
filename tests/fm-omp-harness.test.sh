@@ -736,6 +736,75 @@ install_omp_extension_fixture() {  # <repo>
   printf 'export const Type = { Object(p) { return { type: "object", properties: p }; } };\n' > "$repo/node_modules/typebox/index.js"
 }
 
+test_primary_extension_discovery_preserves_ownership() {
+  local repo home out status mode
+  repo="$TMP_ROOT/discovery-ownership/repo"; home="$TMP_ROOT/discovery-ownership/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'watcher: started pid=%s (beacon 0s) recovery-generation=discovery-test\n' "$$"
+exec sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/fm-sessionstart-run.sh"
+  chmod +x "$repo/bin/fm-sessionstart-run.sh"
+  for mode in existing absent; do
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FIXTURE_REPO="$repo" MARKER_MODE="$mode" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+writeFileSync(`${state}/.lock`, `${process.ppid}\n`);
+const extensions = [
+  ["fm-primary-omp-watch.ts", ".omp-watch-extension-loaded"],
+  ["fm-primary-turnend-guard.ts", ".omp-turnend-extension-loaded"],
+];
+const loaded = [];
+for (const [file, markerName] of extensions) {
+  const filePath = `${process.env.FIXTURE_REPO}/.omp/extensions/${file}`;
+  const markerPath = `${state}/${markerName}`;
+  const version = `sha256:${createHash("sha256").update(readFileSync(filePath)).digest("hex")}`;
+  const evidence = Buffer.from(`${version}\n${process.ppid}\n`);
+  if (process.env.MARKER_MODE === "existing") writeFileSync(markerPath, evidence);
+  else if (existsSync(markerPath)) unlinkSync(markerPath);
+  const handlers = new Map();
+  const pi = {
+    on(name, handler) { handlers.set(name, handler); },
+    registerCommand() {},
+    registerTool() {},
+    sendMessage() {},
+    sendUserMessage() { throw new Error("discovery unexpectedly sent a watcher wake"); },
+  };
+  const mod = await import(pathToFileURL(filePath).href);
+  mod.default(pi);
+  loaded.push({ markerPath, version, evidence, handlers });
+}
+for (const { markerPath, evidence } of loaded) {
+  if (process.env.MARKER_MODE === "existing") {
+    if (!readFileSync(markerPath).equals(evidence)) throw new Error(`discovery replaced ownership evidence: ${markerPath}`);
+  } else if (existsSync(markerPath)) throw new Error(`discovery created ownership evidence: ${markerPath}`);
+}
+try {
+  for (const { handlers } of loaded) {
+    await handlers.get("session_start")({ type: "session_start" }, { sessionManager: { getSessionId: () => "discovery-session" } });
+  }
+  for (const { markerPath, version } of loaded) {
+    const expected = `${version}\n${process.pid}\n`;
+    if (readFileSync(markerPath, "utf8") !== expected) throw new Error(`session_start did not publish valid ownership evidence: ${markerPath}`);
+  }
+} finally {
+  for (const { handlers } of loaded) await handlers.get("session_shutdown")({}, {});
+}
+EOF
+)
+    status=$?
+    expect_code 0 "$status" "omp discovery ownership ($mode): $out"
+    [ -z "$out" ] || fail "omp discovery ownership test printed output: $out"
+  done
+  pass ".omp discovery leaves existing and absent ownership markers untouched; session_start publishes both"
+}
+
 test_turnend_guard_extension_compels_one_continuation() {
   local repo home out status
   repo="$TMP_ROOT/guard/repo"; home="$TMP_ROOT/guard/home"
@@ -1562,6 +1631,7 @@ test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
 test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed
+test_primary_extension_discovery_preserves_ownership
 test_turnend_guard_extension_compels_one_continuation
 test_watch_extension_arms_and_delivers
 test_watch_extension_runs_the_supervision_host

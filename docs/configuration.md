@@ -1400,6 +1400,8 @@ An unreadable tmux destination or a non-tmux daemon whose authentication environ
 
 Each fallback profile requires `harness`, `model`, and `effort`; `floor` declarations are unsupported and rejected in both rule `fallback` and top-level `default_fallback` arrays.
 An OMP fallback uses a concrete selector from a catalog discovered in the same established destination authentication scope as capacity, including provider credentials retained by the launch allowlist; a caller-only catalog cannot establish support.
+Capacity and catalog probes normalize relative-PATH executables in the same way as launch.
+Standalone discovery preserves primary ownership evidence: the paired OMP primary extensions publish their loaded-build and process markers on `session_start`, not factory initialization.
 A Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 A bare `claude` executable or a shell alias is not proof of that route.
 For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only the named stand-in, not a general downgrade.
@@ -1422,6 +1424,7 @@ When adopted-target selection returns unknown capacity, automatic quota control 
 Under the lifecycle lock, control rechecks explicit-exit cancellation, terminal status, declared waits, the absence of an open captain call, and the absence of a pending authoritative close (`state/<id>.backlog-close`, including a dangling symlink) before automatic quota recovery checkpoints, changes instructions, or stops an agent; deliberate manual relaunch remains exempt.
 Automatic quota recovery spends one attempt per quota-origin generation before invoking control; advancing the event sequence or emitting a later session-end from that incarnation does not reset a failed or interrupted allowance, and ordinary session-end attempt history does not consume it.
 The quota-exhausted recovery check is queued once, duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
+An interrupted attempt bound to the current generation reports once even after ordinary turn events or endpoint death; cancellation and active-control guards still apply, and an older replacement journal cannot override that generation's pending or failed quota outcome.
 The limit applies both to a still-current quota event and to its journal-backed partial recovery; a matching control transaction journal establishes the original event identity only when the current endpoint is proven dead.
 Retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
 Deliberate manual relaunch remains available, and a fresh worker generation is evaluated independently.

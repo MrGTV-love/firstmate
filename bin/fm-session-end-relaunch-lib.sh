@@ -290,9 +290,22 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   esac
   wt=$(fm_meta_get "$meta" worktree 2>/dev/null || true)
   [ -n "$wt" ] && [ -d "$wt" ] || return 0
+  handled=$(fm_session_end_handled_path "$state" "$id")
+  handled_gen='' handled_seq='' handled_outcome=''
+  if [ -f "$handled" ] && [ ! -L "$handled" ]; then
+    IFS=$'\t' read -r handled_gen handled_seq handled_outcome < "$handled" || true
+  fi
   quota_event=0
   journal_retry=0
-  if identity=$(fm_session_end_quota_journal_identity "$state" "$id" "$meta"); then
+  if { [ "$handled_outcome" = quota-attempted ] || [ "$handled_outcome" = quota-failed ]; } \
+       && fm_busy_token_valid "$handled_gen" \
+       && [ "$(fm_meta_get "$meta" harness)" = omp ] \
+       && [ ! -L "$state/$id.busy-gen" ] \
+       && [ "$handled_gen" = "$(fm_busy_current_gen "$state" "$id" 2>/dev/null)" ] \
+       && [[ -n "$handled_seq" && "$handled_seq" != *[!0-9]* ]]; then
+    identity="$handled_gen $handled_seq"
+    quota_event=1
+  elif identity=$(fm_session_end_quota_journal_identity "$state" "$id" "$meta"); then
     quota_event=1
     journal_retry=1
   else
@@ -311,11 +324,6 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   if [ "$quota_event" = 0 ]; then
     recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
     day=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_DAY_SECS") || return 1
-  fi
-  handled=$(fm_session_end_handled_path "$state" "$id")
-  handled_gen='' handled_seq='' handled_outcome=''
-  if [ -f "$handled" ] && [ ! -L "$handled" ]; then
-    IFS=$'\t' read -r handled_gen handled_seq handled_outcome < "$handled" || true
   fi
   if [ "$handled_gen" = "$gen" ]; then
     case "$handled_outcome" in
@@ -355,12 +363,6 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   [ -n "$backend" ] || backend=tmux
   window=$(fm_meta_get "$meta" window 2>/dev/null || true)
   [ -n "$window" ] || return 0
-  agent=$(fm_backend_agent_state "$backend" "$window" 2>/dev/null || printf 'unreadable')
-  if [ "$quota_event" = 1 ] && [ "$journal_retry" = 0 ]; then
-    [ "$agent" = alive ] || return 0
-  else
-    [ "$agent" = dead ] || return 0
-  fi
   if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
     hold_rc=0
     FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
@@ -399,6 +401,12 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     FM_SESSION_END_ACTION=failed
     FM_SESSION_END_REASON=$reason
     return 0
+  fi
+  agent=$(fm_backend_agent_state "$backend" "$window" 2>/dev/null || printf 'unreadable')
+  if [ "$quota_event" = 1 ] && [ "$journal_retry" = 0 ]; then
+    [ "$agent" = alive ] || return 0
+  else
+    [ "$agent" = dead ] || return 0
   fi
   if [ -n "$which" ]; then
     if [ "$which" = min ]; then

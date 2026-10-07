@@ -457,6 +457,29 @@ for policy in inherited retained filtered removed empty; do
   assert_equals "$expected" "$(jq -r .profile.model <<<"$out")" "$policy catalog must retain only destination provider auth"
   rm -f "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/config/launch-env-allowlist"
 done
+(
+  ln -s "$(type -P bash)" "$FAKEBIN/bash"
+  cd "$(dirname "$FAKEBIN")" || exit 1
+  export PATH="$(basename "$FAKEBIN"):$PATH" OPENROUTER_API_KEY=caller
+  printf 'OPENROUTER_API_KEY=destination\n' > "$TMP_ROOT/tmux-global-env"
+  printf 'OPENROUTER_API_KEY\n' > "$TMP_ROOT/config/launch-env-allowlist"
+  write_pool 98
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  assert_equals usable "$(jq -r .status <<<"$out")" "relative PATH executables must measure healthy pooled capacity"
+  write_pool 0
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  assert_equals exhausted "$(jq -r .status <<<"$out")" "relative PATH executables must measure whole-pool exhaustion"
+  resolved="$(cd "$(dirname "$(type -P omp)")" && pwd -P)/$(basename "$(type -P omp)")"
+  catalog=$(fm_dispatch_omp_query "$TMP_ROOT/config" '' "$resolved" models --json)
+  assert_equals openrouter/z-ai/glm-5.3-flash "$(jq -r '.models[0].selector' <<<"$catalog")" "explicit launch-resolved executable must query the destination catalog"
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered")
+  assert_equals true "$(jq -r .switched <<<"$out")" "relative PATH exhaustion must authorize declared selection"
+  assert_equals openrouter/z-ai/glm-5.3-flash "$(jq -r .profile.model <<<"$out")" "relative PATH catalog must accept the destination selector"
+  : > "$TMP_ROOT/config/launch-env-allowlist"
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered")
+  assert_equals openrouter/deepseek/deepseek-v4-flash "$(jq -r .profile.model <<<"$out")" "relative PATH normalization must preserve catalog authentication filtering"
+  rm "$FAKEBIN/bash" "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/config/launch-env-allowlist"
+) || fail "relative PATH queries must match executable launch normalization"
 for scope in adopted unreadable daemon relative; do
   case "$scope" in
     adopted) session=recorded:fm-existing.0 ;;
