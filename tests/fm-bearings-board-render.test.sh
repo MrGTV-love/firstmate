@@ -272,15 +272,22 @@ test_overdue_obligations_cannot_be_omitted_by_the_board_composer() {
   cat > "$home/state/open-loops.json" <<'JSON'
 {"schema":"fm-open-loops.v1","generated_epoch":1790770000,"home":"lane","complete":true,"rows":[
   {"id":"expired","category":"red_check","subject":"failing PR","owner":"firstmate","next_action":"diagnose: code or test","age_seconds":3600,"overdue":true},
+  {"id":"stalled","category":"stalled_worker","subject":"disk worker","owner":"firstmate","next_action":"inspect stalled worker","age_seconds":7200,"overdue":true,"evidence":"Error: ENOSPC: no space left on device"},
   {"id":"recent","category":"ready_not_started","subject":"recently assigned","owner":"firstmate","next_action":"dispatch","age_seconds":1,"overdue":false}
 ]}
 JSON
   out=$(render "$home" '[]')
   printf '%s' "$out" | jq -e '
-    (.charted | length) == 1
+    (.charted | length) == 2
     and (.charted[0] | .pickable == false
       and (.title | contains("failing PR"))
       and (.sub | contains("firstmate") and contains("diagnose: code or test") and contains("3600s"))
+      and [.badges[].tone] == ["danger"])
+    and (.charted[1] | .pickable == false
+      and (.title | contains("disk worker"))
+      and (.sub | contains("firstmate") and contains("inspect stalled worker")
+        and contains("7200s") and contains("1790770000")
+        and contains("Error: ENOSPC: no space left on device"))
       and [.badges[].tone] == ["danger"])
   ' >/dev/null || fail "the overdue obligation was omitted or rendered as dispatchable work: $out"
   pass "overdue obligations survive an empty composed board with owner, next action, and age"

@@ -733,7 +733,7 @@ if [ -n "$dir" ] && [ "${args[2]:-}" = status ] && [ "${args[3]:-}" = --porcelai
     exit 128
   fi
 fi
-exec "$real" "${args[@]}"
+exec "$real" ${args[@]+"${args[@]}"}
 SH
   chmod +x "$case_dir/fakebin/git"
 }
@@ -875,7 +875,7 @@ test_local_only_truly_unpushed_refuses() {
   local case_dir rc
   case_dir=$(make_case truly-unpushed)
   write_meta "$case_dir" local-only ship
-  wt_commit "$case_dir" "unpushed work"
+  wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
   # No fork, no push to origin, not merged into main.
 
   set +e
@@ -889,25 +889,26 @@ test_local_only_truly_unpushed_refuses() {
 }
 
 test_local_only_merged_to_local_main_allows() {
-  local case_dir rc
-  case_dir=$(make_case merged-main)
-  write_meta "$case_dir" local-only ship
-  wt_commit "$case_dir" "merged work"
-  # Fast-forward the project's main to the worktree's HEAD commit so HEAD is
-  # reachable from main. update-ref works whether or not main is checked out,
-  # and the worktree shares the project's object db so the commit is visible.
-  local wt_head
-  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
-
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
-
-  expect_code 0 "$rc" "merged-main: teardown should succeed when work is merged into local main"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "merged-main: teardown printed a REFUSED line"
-  pass "local-only worktree with work merged into local main is torn down (no regression)"
+  local case_dir rc variant wt_head
+  for variant in unpushed pushed offline no-remote; do
+    case_dir=$(make_case "merged-main-$variant")
+    write_meta "$case_dir" local-only ship
+    wt_commit_file "$case_dir" feature.txt landed "merged work"
+    wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+    if [ "$variant" = pushed ]; then
+      git -C "$case_dir/wt" push -q origin fm/task-x1
+    elif [ "$variant" = no-remote ]; then
+      git -C "$case_dir/wt" remote remove origin
+    elif [ "$variant" = offline ]; then
+      git -C "$case_dir/wt" remote set-url origin "$case_dir/nonexistent-origin"
+    fi
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "merged-main-$variant: local landing refused: $(cat "$case_dir/stderr")"
+    ! grep -q REFUSED "$case_dir/stderr" || fail "merged-main-$variant: teardown printed a refusal"
+  done
+  pass "local main landing succeeds independently of pushed and remote availability"
 }
 
 test_no_mistakes_pushed_branch_without_merge_refuses() {
@@ -990,6 +991,7 @@ test_ship_without_owned_copy_requires_recorded_landing_or_drop() {
           printf '%s\n' "backend=orca" "terminal=term-test" \
             "orca_worktree_id=wt-test::$case_dir/missing-wt" >> "$case_dir/state/task-x1.meta"
           add_orca_teardown_mock "$case_dir"
+          printf 'uninspected dirty copy\n' > "$case_dir/wt/preserved.txt"
         fi
         seed_backlog_in_flight "$case_dir"
         case "$evidence" in
@@ -1019,6 +1021,10 @@ SH
             expect_code 0 "$rc" "missing-$mode-$backend-$evidence: authorized cleanup refused: $(cat "$case_dir/stderr")"
             [ "$(backlog_row_state "$case_dir")" = done ] || fail "missing-$evidence: accepted cleanup did not close backlog"
             assert_absent "$case_dir/state/task-x1.meta" "missing-$evidence: accepted cleanup retained metadata"
+            if [ "$backend" = orca ]; then
+              assert_no_grep 'worktree rm' "$case_dir/orca.log" "missing-$evidence: removed an uninspected backend copy"
+              assert_grep 'uninspected dirty copy' "$case_dir/wt/preserved.txt" "missing-$evidence: damaged the backend copy"
+            fi
             if [ "$evidence" = merged ]; then
               assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" "missing-$mode: merged proof was not recorded"
               assert_no_grep 'local main' "$case_dir/data/backlog.md" "missing-$mode: cleanup falsely claimed local landing"
@@ -1155,8 +1161,13 @@ test_forced_dirty_landed_deliverables_retain_captain_words() {
     seed_backlog_in_flight "$case_dir" "$kind"
     if [ "$kind" = ship ]; then
       wt_commit_file "$case_dir" feature.txt landed "landed feature"
-      append_pr_meta_for_current_head "$case_dir"
-      add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
+      if [ "$delivery" = local-only ]; then
+        git -C "$case_dir/project" update-ref refs/heads/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
+        git -C "$case_dir/wt" remote set-url origin "$case_dir/nonexistent-origin"
+      else
+        append_pr_meta_for_current_head "$case_dir"
+        add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
+      fi
     else
       mkdir -p "$case_dir/data/task-x1"
       printf 'Delivered investigation report.\n' > "$case_dir/data/task-x1/report.md"
@@ -2381,7 +2392,7 @@ test_local_only_force_overrides_unpushed() {
   local case_dir rc
   case_dir=$(make_case force-override)
   write_meta "$case_dir" local-only ship
-  wt_commit "$case_dir" "unpushed work"
+  wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 
   set +e
   run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr"
@@ -4321,7 +4332,9 @@ test_process_refusal_has_no_close_replay_authority() {
     case_dir=$(make_case "refusal-replay-$scenario")
     mkdir -p "$case_dir/home/state"
     write_meta "$case_dir" no-mistakes ship
-    land_shippable_commit "$case_dir"
+    wt_commit_file "$case_dir" landed.txt "delivered work" "landed process fixture"
+    git -C "$case_dir/wt" push -q origin HEAD:main
+    git -C "$case_dir/project" fetch -q origin
     seed_backlog_in_flight "$case_dir"
     root="$case_dir/wt"
     flags=(--force --drop-file "$(fm_test_drop_file)")
@@ -4371,6 +4384,10 @@ test_process_refusal_has_no_close_replay_authority() {
     cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+if [ "\${1:-}" = list-windows ]; then
+  echo "can't find session: firstmate" >&2
+  exit 1
+fi
 if [ "\${1:-}" = kill-window ]; then
   printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
 fi
@@ -4397,10 +4414,10 @@ SH
     fi
     rc=0
     if [ "$scenario" = missing-lsof ]; then
-      FM_HOME="$case_dir/home" FM_TEARDOWN_TEST_PATH="$path_without_lsof" run_teardown "$case_dir" "${flags[@]}" \
+      FM_HOME="$case_dir/home" FM_TEARDOWN_TEST_PATH="$path_without_lsof" run_teardown "$case_dir" ${flags[@]+"${flags[@]}"} \
         > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     else
-      FM_HOME="$case_dir/home" run_teardown "$case_dir" "${flags[@]}" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      FM_HOME="$case_dir/home" run_teardown "$case_dir" ${flags[@]+"${flags[@]}"} > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     expect_code 1 "$rc" "refusal-replay-$scenario: teardown must refuse"
     case "$scenario" in

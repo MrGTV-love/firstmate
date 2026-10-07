@@ -534,8 +534,68 @@ fm_backlog_mutate() {  # <data-dir> <verb> <id> [flag...]
   return "$command_status"
 }
 
+fm_backlog_new_work_transition() {
+  local data=$1 id=$2 out status tmp saved_error
+  shift 2
+  FM_BACKLOG_TRANSITION_ERROR=
+  out=$(fm_backlog_row_show "$data" "$id" --full)
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    FM_BACKLOG_TRANSITION_ERROR=${out%%$'\n'*}
+    return "$status"
+  fi
+  tmp=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-backlog-new-work.XXXXXX") || {
+    FM_BACKLOG_TRANSITION_ERROR="cannot stage the task body of $id"
+    return 1
+  }
+  if ! printf '%s\n' "$out" | LC_ALL=C perl -MJSON::PP -e '
+    local $/;
+    my $shown = <STDIN>;
+    my $value = $shown =~ /^  body: (.*)$/m ? $1 : "";
+    $value = $value =~ /\A"/
+      ? JSON::PP->new->utf8->allow_nonref->decode($value) : $value;
+    $value = "" if $value eq "-";
+    my $prior_value = $value;
+    utf8::encode($prior_value) if utf8::is_utf8($prior_value);
+    open my $prior, ">:raw", "$ARGV[0]/prior" or die $!;
+    print {$prior} $prior_value;
+    close $prior or die $!;
+    $value =~ s/^([^\S\n]*)dropped([^\S\n]*)$/${1}Historical captain disposition: dropped${2}/mg;
+    $value =~ s/^([^\S\n]*)Deliverable of the finished work: dropped([^\S\n]*)$/${1}Historical deliverable of the finished work: dropped${2}/mg;
+    utf8::encode($value) if utf8::is_utf8($value);
+    open my $next, ">:raw", "$ARGV[0]/next" or die $!;
+    print {$next} $value;
+    close $next or die $!;
+  ' "$tmp"; then
+    rm -rf -- "$tmp"
+    FM_BACKLOG_TRANSITION_ERROR="could not decode the task body of $id"
+    return 1
+  fi
+  if cmp -s "$tmp/prior" "$tmp/next"; then
+    rm -rf -- "$tmp"
+    "$@"
+    return $?
+  fi
+  if ! fm_backlog_mutate "$data" update "$id" --body-file "$tmp/next"; then
+    rm -rf -- "$tmp"
+    return 1
+  fi
+  "$@"
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    saved_error=$FM_BACKLOG_TRANSITION_ERROR
+    if fm_backlog_mutate "$data" update "$id" --body-file "$tmp/prior"; then
+      FM_BACKLOG_TRANSITION_ERROR=$saved_error
+    else
+      FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }could not restore prior drop provenance: $FM_BACKLOG_TRANSITION_ERROR"
+    fi
+  fi
+  rm -rf -- "$tmp"
+  return "$status"
+}
+
 fm_backlog_start() {  # <data-dir> <id>
-  fm_backlog_mutate "$1" start "$2"
+  fm_backlog_new_work_transition "$1" "$2" fm_backlog_mutate "$1" start "$2"
 }
 
 fm_backlog_done() {  # <data-dir> <id> [flag...]
@@ -852,7 +912,7 @@ fm_backlog_dispatch_transition() {
     return 1
   fi
   case "$row" in
-    in_flight\ no\ no) return 0 ;;
+    in_flight\ no\ no) fm_backlog_new_work_transition "$data" "$id" : ;;
     queued\ no\ no) fm_backlog_start "$data" "$id" ;;
   esac
 }

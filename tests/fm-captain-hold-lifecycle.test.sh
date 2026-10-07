@@ -4035,6 +4035,42 @@ test_retained_body_keeps_its_utf8_bytes() {
 }
 
 test_uninventoried_report_decision_refuses_completion
+test_internal_retention_preserves_active_drop_provenance() (
+  local home id stored before
+  home=$(make_home retain-drop-provenance)
+  id=retained-drop
+  tasks_in "$home" add "$id" "retained captain disposition" --kind scout --start >/dev/null \
+    || fail "could not create retained drop fixture"
+  printf '%s\n' 'Body café 航海' 'dropped' 'Deliverable of the finished work: dropped' \
+    'Question: which route?' > "$home/body.txt"
+  tasks_in "$home" update "$id" --body-file "$home/body.txt" >/dev/null \
+    || fail "could not attach retained body"
+  tasks_in "$home" hold "$id" --kind captain --reason "which route?" >/dev/null \
+    || fail "could not hold retained drop fixture"
+  mkdir -p "$home/data/$id"
+  printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+  cp "$home/data/$id/captain-drop.md" "$home/words-before"
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  before=$(cat "$home/data/backlog.md")
+  fm_backlog_relaunch_admission "$home/config" "$home/data" scout "$id" 1 \
+    || fail "read-only reconciliation admission failed: $FM_BACKLOG_TRANSITION_ERROR"
+  assert_equals "$before" "$(cat "$home/data/backlog.md")" "read-only admission changed active provenance"
+  fm_backlog_retain "$home/data" "$id" --note dropped \
+    || fail "internal retain failed: $FM_BACKLOG_TRANSITION_ERROR"
+  stored=$(tasks_in "$home" show "$id" --full) || fail "retained row disappeared"
+  assert_contains "$stored" "state: queued" "internal retain did not reopen the row"
+  assert_contains "$stored" "hold_kind: captain" "internal retain lost captain classification"
+  assert_contains "$stored" "Deliverable of the finished work: dropped" "internal retain retired active deliverable"
+  assert_not_contains "$stored" "Historical captain disposition:" "internal retain retired active disposition"
+  assert_not_contains "$stored" "Historical deliverable of the finished work:" "internal retain retired active deliverable"
+  assert_contains "$stored" "Body café 航海" "internal retain changed Unicode bytes"
+  assert_contains "$stored" "Question: which route?" "internal retain changed the question"
+  cmp -s "$home/words-before" "$home/data/$id/captain-drop.md" || fail "internal retain changed captain words"
+  pass "internal retention and read-only admission preserve active captain drop classification"
+)
+
+test_internal_retention_preserves_active_drop_provenance
 test_hold_decodes_a_bare_scalar_body_without_the_nonref_default
 test_retained_body_keeps_its_utf8_bytes
 test_completion_gate_attests_and_transfers

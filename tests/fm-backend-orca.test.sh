@@ -590,7 +590,7 @@ test_spawn_writes_orca_metadata_and_launches_harness() {
   )
   for dir in "${expected_dirs[@]}"; do
     found=0
-    for arg in "${add_dirs[@]}"; do
+    for arg in ${add_dirs[@]+"${add_dirs[@]}"}; do
       if [ "$arg" = "$dir" ]; then found=1; fi
     done
     [ "$found" -eq 1 ] || fail "the staged Orca Claude launch did not allow directory $dir"
@@ -948,8 +948,12 @@ test_scout_teardown_refuses_orca_id_path_mismatch() {
   pass "fm-teardown.sh backend=orca: scout teardown refuses id/path mismatches"
 }
 
-test_teardown_removes_orca_worktree_when_path_missing() {
-  local proj wt data state config id out rc neutral
+test_teardown_skips_orca_worktree_when_path_missing() {
+  local proj wt data state config id out rc neutral variant
+  local -a teardown_args
+  for variant in normal forced; do
+  teardown_args=()
+  if [ "$variant" = forced ]; then teardown_args=(--force --drop-file "$(fm_test_drop_file)"); fi
   id="orcamissingpathz7"
   proj="$TMP_ROOT/missing-path-project"
   wt="$TMP_ROOT/missing-path-wt"
@@ -965,20 +969,25 @@ test_teardown_removes_orca_worktree_when_path_missing() {
     "backend=orca" "orca_worktree_id=wt-missing-path::/orca/wt-missing-path" \
     "decisions_reviewed=1" "decision_keys="
   orca_case missing-path
+  mkdir -p "$CASE_DIR/other-copy"
+  printf 'dirty backend copy\n' > "$CASE_DIR/other-copy/sentinel"
+  printf '{"ok":true,"result":{"worktree":{"path":"%s"}}}\n' "$CASE_DIR/other-copy" > "$RESP/2.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
   out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
+    "$ROOT/bin/fm-teardown.sh" "$id" ${teardown_args[@]+"${teardown_args[@]}"} 2>&1 )
   rc=$?
   set -e
   expect_code 0 "$rc" "Orca teardown should release helpers even when the path is absent"$'\n'"$out"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-missing-path'$'\x1f''--json' \
     "teardown did not close the recorded Orca terminal when the path was absent"
-  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:wt-missing-path::/orca/wt-missing-path'$'\x1f''--force'$'\x1f''--json' \
-    "teardown did not remove the recorded Orca worktree when the path was absent"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "teardown removed an uninspected Orca worktree when the recorded path was absent"
+  assert_contains "$(cat "$CASE_DIR/other-copy/sentinel")" "dirty backend copy" "record-only cleanup damaged the other copy"
   assert_absent "$state/$id.meta" "successful helper cleanup should remove task metadata"
-  pass "fm-teardown.sh backend=orca: releases terminal/worktree when path is absent"
+  done
+  pass "fm-teardown.sh backend=orca: absent recorded path releases terminal without removing a backend copy"
 }
 
 test_teardown_preserves_metadata_when_orca_remove_error_json() {
@@ -989,6 +998,7 @@ test_teardown_preserves_metadata_when_orca_remove_error_json() {
   data="$TMP_ROOT/remove-error-data"
   state="$TMP_ROOT/remove-error-state"
   config="$TMP_ROOT/remove-error-config"
+  fm_git_worktree "$proj" "$wt" "fm/$id"
   mkdir -p "$data/$id" "$state" "$config"
   printf 'report\n' > "$data/$id/report.md"
   touch "$state/.last-watcher-beat"
@@ -998,8 +1008,9 @@ test_teardown_preserves_metadata_when_orca_remove_error_json() {
     "backend=orca" "orca_worktree_id=wt-remove-error::/orca/wt-remove-error" \
     "decisions_reviewed=1" "decision_keys="
   orca_case remove-error-teardown
-  printf '{"ok":true,"result":{}}\n' > "$RESP/1.out"
-  printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/2.out"
+  printf '{"ok":true,"result":{"worktree":{"path":"%s"}}}\n' "$wt" > "$RESP/1.out"
+  printf '{"ok":true,"result":{}}\n' > "$RESP/2.out"
+  printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/3.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
   out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
@@ -1271,8 +1282,10 @@ test_secondmate_force_teardown_removes_orca_child_via_orca() {
   orca_case secondmate-child-cleanup
   printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/1.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/2.out"
-  printf '{"ok":true,"result":{}}\n' > "$RESP/3.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/3.out"
   printf '{"ok":true,"result":{}}\n' > "$RESP/4.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/5.out"
+  printf '{"ok":true,"result":{}}\n' > "$RESP/6.out"
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
@@ -1421,7 +1434,7 @@ test_peek_and_crew_state_fail_closed_on_orca_error_json
 test_target_exists_rejects_orca_error_json
 test_scout_teardown_removes_orca_worktree_via_helper
 test_scout_teardown_refuses_orca_id_path_mismatch
-test_teardown_removes_orca_worktree_when_path_missing
+test_teardown_skips_orca_worktree_when_path_missing
 test_teardown_preserves_metadata_when_orca_remove_error_json
 test_scout_teardown_refuses_orca_missing_report_when_path_missing
 test_ship_teardown_refuses_orca_missing_worktree_path

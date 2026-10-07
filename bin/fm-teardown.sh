@@ -1652,6 +1652,13 @@ work_is_landed() {
     recorded_pr_is_merged
     return $?
   fi
+  if [ "$MODE" = local-only ]; then
+    local name
+    name=$(default_branch) || name=
+    if [ -n "$name" ] && git -C "$WT" merge-base --is-ancestor HEAD "refs/heads/$name" 2>/dev/null; then
+      return 0
+    fi
+  fi
   pr_is_merged "$branch" && return 0
   content_in_default
 }
@@ -1940,7 +1947,7 @@ teardown_treehouse_return() {
 }
 
 validate_worktree_teardown_safety() {
-  local dirty_raw dirty unpushed_raw unpushed DEFAULT unmerged_raw unmerged branch
+  local dirty_raw dirty unpushed_raw unpushed branch
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
     secondmate|scout) return 0 ;;
@@ -1974,25 +1981,7 @@ validate_worktree_teardown_safety() {
   fi
   unpushed=$(printf '%s\n' "$unpushed_raw" | head -5)
 
-  if [ -n "$unpushed" ] && [ "$MODE" = local-only ]; then
-    DEFAULT=$(default_branch) || { echo "REFUSED: cannot determine default branch for $PROJ; expected origin/HEAD, main, or master." >&2; return 1; }
-    if ! unmerged_raw=$(git -C "$WT" log --oneline HEAD --not "$DEFAULT" -- 2>/dev/null); then
-      if worktree_safety_blocked_by_lock "commits not on $DEFAULT"; then
-        return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
-      fi
-      echo "REFUSED: cannot inspect worktree $WT for commits not on $DEFAULT." >&2
-      echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
-      return 1
-    fi
-    unmerged=$(printf '%s\n' "$unmerged_raw" | head -5)
-    if [ -n "$dirty" ] || [ -n "$unmerged" ]; then
-      echo "REFUSED: local-only worktree $WT has work not yet merged into $DEFAULT and not on any remote." >&2
-      [ -n "$dirty" ] && echo "uncommitted changes present" >&2
-      [ -n "$unmerged" ] && printf 'commits not yet on %s:\n%s\n' "$DEFAULT" "$unmerged" >&2
-      echo "Merge the branch into local $DEFAULT first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force." >&2
-      return 1
-    fi
-  elif [ -n "$dirty" ]; then
+  if [ -n "$dirty" ]; then
     echo "REFUSED: worktree $WT has uncommitted changes." >&2
     echo "uncommitted changes present" >&2
     echo "Commit them (or get the captain's explicit OK to discard, then --force)." >&2
@@ -2006,7 +1995,11 @@ validate_worktree_teardown_safety() {
     if ! work_is_landed "$branch"; then
       echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
       [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
-      echo "Land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+      if [ "$MODE" = local-only ]; then
+        echo "Merge the branch into local $(default_branch 2>/dev/null || echo main) first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+      else
+        echo "Land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+      fi
       return 1
     fi
   fi
@@ -2495,11 +2488,6 @@ require_orca_worktree_path_match() {
   fi
 }
 
-require_orca_worktree_path_match_if_present() {
-  local worktree_id=$1 inspected=$2
-  [ -n "$inspected" ] && [ -e "$inspected" ] || return 0
-  require_orca_worktree_path_match "$worktree_id" "$inspected"
-}
 
 # The task's own live slot, canonicalized, or empty when this record has no slot
 # to release (a secondmate home, a record with no worktree=, or a path that is
@@ -3494,6 +3482,7 @@ cleanup_firstmate_home_children() {
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
       if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
+        require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" || return 1
       fi
     fi
     if [ -n "$child_t" ]; then
@@ -3529,10 +3518,11 @@ cleanup_firstmate_home_children() {
     elif [ "$child_backend" = orca ]; then
       if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
+        require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
+        fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
       fi
-      fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       # The same ownership determination as the parent's own slot: a child
       # slot reassigned to another task is not this child's to kill, reset,
@@ -3707,11 +3697,9 @@ if [ -n "$X_REQUEST" ]; then
   echo "warning: task $ID still carries an unreconciled Relay request link ($X_REQUEST) on its task record." >&2
 fi
 
-if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$FORCE" != "--force" ]; then
-  if teardown_owns_worktree && inspectable_git_worktree "$WT"; then
-    require_orca_worktree_path_match "$ORCA_WORKTREE_ID" "$WT" || exit 1
-    ORCA_PATH_MATCH_VERIFIED=1
-  fi
+if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ] && teardown_owns_worktree && [ -e "$WT" ]; then
+  require_orca_worktree_path_match "$ORCA_WORKTREE_ID" "$WT" || exit 1
+  ORCA_PATH_MATCH_VERIFIED=1
 fi
 
 if [ "$FORCE" != "--force" ]; then
@@ -3936,8 +3924,8 @@ teardown_release_herdr_locks
 
 # Best-effort: drop the local task branch so the shared repo does not accumulate refs.
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
-  if teardown_owns_worktree && [ "$ORCA_PATH_MATCH_VERIFIED" != 1 ]; then
-    require_orca_worktree_path_match_if_present "$ORCA_WORKTREE_ID" "$WT" || exit 1
+  if teardown_owns_worktree && [ -e "$WT" ] && [ "$ORCA_PATH_MATCH_VERIFIED" != 1 ]; then
+    require_orca_worktree_path_match "$ORCA_WORKTREE_ID" "$WT" || exit 1
     ORCA_PATH_MATCH_VERIFIED=1
   fi
   if teardown_owns_worktree && [ -d "$WT" ]; then
@@ -3955,7 +3943,7 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
     fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
       || { endpoint_close_refusal "$ID" "$BACKEND" "$T" 0; exit 1; }
   fi
-  if teardown_owns_worktree; then
+  if teardown_owns_worktree && [ -d "$WT" ]; then
     fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
   fi
 elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then

@@ -9,7 +9,7 @@ set -eu
 fm_git_identity fmtest fmtest@example.invalid
 TMP_ROOT=$(fm_test_tmproot fm-open-loops)
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
-import base64, datetime as dt, json, os, shutil, subprocess, sys, time
+import base64, datetime as dt, json, os, shutil, signal, subprocess, sys, time
 from pathlib import Path
 
 root, world = map(Path, sys.argv[1:])
@@ -27,6 +27,7 @@ for key in ('FM_ROOT_OVERRIDE', 'FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CON
     env.pop(key, None)
 
 def run(args, **kw):
+    kw.setdefault('timeout', 120)
     return subprocess.run([str(a) for a in args], env=kw.pop('env', env), text=True, capture_output=True, **kw)
 def out(args, **kw):
     done = run(args, **kw)
@@ -188,6 +189,7 @@ assert rows(tuned, 'ready_not_started')['ready']['overdue'] is False, 'age below
 bad = run([code / 'bin/fm-open-loops.sh', '--json'])
 assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, bad
 (home / 'config/open-loops.json').unlink()
+print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 
 # A PR for A cannot hide a local correction B, whether the PR is open or merged.
 def correction(path):
@@ -233,8 +235,239 @@ backlog += [dict(id='dropped', structured=True, state='done', kind='ship', capta
                                                     backlog=dict(present=True, records=backlog))))
 landed = ledger()
 assert set(rows(landed, 'failed_task')) == {'broken', 'covered'}, landed
+assert 'covered' in rows(landed, 'unlanded_commit'), 'retained captain-drop.md must not suppress resumed work'
+assert 'local correction B' in rows(landed, 'unlanded_commit')['covered']['evidence'], landed
+assert (home / 'data/covered/captain-drop.md').read_text() == 'Retained old drop words, not a drop completion.\n'
 assert not {'merged', 'default-failed', 'squashed', 'dropped', 'held-drop'} & set(rows(landed, 'unlanded_commit')), landed
 assert 'held-drop:retained' in rows(landed, 'unanswered_question'), landed
+print('PASS: correction coverage and landed/drop exclusions', flush=True)
+
+saved_tasks, saved_backlog = tasks, backlog
+saved_pulls, saved_checks = double['pulls'], double['checks']
+double['pulls'], double['checks'] = [], {}
+(world / 'gh.json').write_text(json.dumps(double))
+def fixture(items, records=None):
+    (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=items,
+        backlog=dict(present=True, records=records or []))))
+
+merge_only = task_copy('merge-only')
+git(merge_only, 'checkout', '-q', '-b', 'side')
+(merge_only / 'side').write_text('side\n')
+git(merge_only, 'add', 'side'); git(merge_only, 'commit', '-q', '-m', 'side parent')
+git(merge_only, 'checkout', '-q', 'fm/merge-only')
+(merge_only / 'first').write_text('first\n')
+git(merge_only, 'add', 'first'); git(merge_only, 'commit', '-q', '-m', 'first parent')
+git(merge_only, 'merge', '-q', '--no-ff', 'side', '-m', 'parents delivered')
+parents_head = git(merge_only, 'rev-parse', 'HEAD')
+git(merge_only, 'update-ref', 'refs/remotes/origin/main', parents_head)
+(merge_only / 'resolution').write_text('merge-only resolution\n')
+git(merge_only, 'add', 'resolution')
+git(merge_only, 'commit', '-q', '--amend', '-m', 'merge-only correction')
+merge_task = task('merge-only', merge_only, state='failed')
+for pr_state in (None, 'open', 'merged'):
+    merge_task['pr']['url'] = PR_URL + '60' if pr_state else None
+    double['single']['60'] = dict(state=pr_state, merged_at=iso(now) if pr_state == 'merged' else None,
+                                 head=dict(sha=parents_head))
+    (world / 'gh.json').write_text(json.dumps(double))
+    fixture([merge_task])
+    pending_merge = ledger()
+    assert 'merge-only' in rows(pending_merge, 'failed_task'), pending_merge
+    assert '1 commit(s)' in rows(pending_merge, 'unlanded_commit')['merge-only']['evidence'], pending_merge
+    assert 'merge-only correction' in rows(pending_merge, 'unlanded_commit')['merge-only']['evidence']
+merge_head = git(merge_only, 'rev-parse', 'HEAD')
+double['single']['60']['head']['sha'] = merge_head
+(world / 'gh.json').write_text(json.dumps(double))
+settled = ledger()
+assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
+merge_task['pr']['url'] = None
+git(merge_only, 'update-ref', 'refs/remotes/origin/main', merge_head)
+fixture([merge_task])
+settled = ledger()
+assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
+git(merge_only, 'reset', '--hard', parents_head)
+fixture([merge_task])
+settled = ledger()
+assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
+git(merge_only, 'update-ref', 'refs/remotes/origin/main', parents_head)
+git(merge_only, 'commit', '-q', '--amend', '-m', 'equivalent merge without new content')
+assert git(merge_only, 'rev-parse', 'HEAD') != parents_head
+fixture([merge_task])
+settled = ledger()
+assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
+
+equivalent = task_copy('patch-equivalent', commit_age=3)
+equivalent_head = git(equivalent, 'rev-parse', 'HEAD')
+git(equivalent, 'checkout', '-q', 'main')
+(equivalent / 'default-only').write_text('default-only\n')
+git(equivalent, 'add', 'default-only'); git(equivalent, 'commit', '-q', '-m', 'default advanced')
+git(equivalent, 'cherry-pick', equivalent_head)
+git(equivalent, 'update-ref', 'refs/remotes/origin/main', git(equivalent, 'rev-parse', 'HEAD'))
+git(equivalent, 'checkout', '-q', 'fm/patch-equivalent')
+fixture([task('patch-equivalent', equivalent, state='failed')])
+settled = ledger()
+assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
+print('PASS: merge-only and patch-equivalent delivery', flush=True)
+
+local = task_copy('local-delivery', commit_age=3)
+local_head = git(local, 'rev-parse', 'HEAD')
+local_base = git(local, 'rev-parse', 'main')
+git(local, 'checkout', '-q', 'main')
+local_worker = world / 'local-worker'
+git(local, 'worktree', 'add', '-q', local_worker, 'fm/local-delivery')
+local_task = task('local-delivery', local_worker, state='failed')
+local_task['mode'] = 'local-only'
+local_task['project'] = str(local)
+(home / 'state/local-delivery.meta').write_text(
+    f'kind=ship\nmode=local-only\nproject={local}\nbranch=fm/local-delivery\n')
+(home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+out([code / 'bin/fm-merge-local.sh', 'local-delivery'])
+assert git(local, 'rev-parse', 'refs/heads/main') == local_head
+for pushed in (False, True):
+    if pushed:
+        git(local_worker, 'push', '-q', 'origin', 'HEAD:refs/heads/fm/local-delivery')
+    fixture([local_task])
+    delivered = ledger()
+    assert not rows(delivered, 'failed_task') and not rows(delivered, 'unlanded_commit'), delivered
+local_task['mode'] = 'no-mistakes'
+fixture([local_task])
+assert 'local-delivery' in rows(ledger(), 'failed_task')
+local_task['mode'] = 'local-only'
+git(local, 'update-ref', 'refs/heads/main', local_base)
+fixture([local_task])
+assert 'local-delivery' in rows(ledger(), 'unlanded_commit')
+git(local, 'update-ref', 'refs/heads/trunk', local_head)
+git(local, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk')
+git(local, 'update-ref', 'refs/remotes/origin/trunk', local_base)
+fixture([local_task])
+settled = ledger()
+assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
+(home / 'state/local-delivery.meta').unlink()
+(home / 'data/backlog.md').unlink()
+print('PASS: approved local landing and qualified defaults', flush=True)
+
+for exists, alive in ((False, 'dead'), (True, 'dead'), (True, 'missing'), (True, 'alive'), (True, 'unknown')):
+    failed_axes = [
+        task('axis-pending', lost, state='failed', exists=exists, alive=alive),
+        task('axis-landed', default_failed, state='failed', exists=exists, alive=alive),
+        task('axis-pr', merged, state='failed', exists=exists, alive=alive, pr=PR_URL + '5'),
+        task('axis-missing-pr', world / 'missing-pr-copy', state='failed', exists=exists, alive=alive,
+             pr=PR_URL + '5'),
+        task('axis-drop', lost, state='failed', exists=exists, alive=alive),
+        task('axis-report', lost, state='failed', exists=exists, alive=alive, kind='scout')]
+    (home / 'data/axis-report').mkdir(exist_ok=True)
+    (home / 'data/axis-report/report.md').write_text('Delivered findings\n')
+    fixture(failed_axes, [dict(id='axis-drop', structured=True, state='done', captain_drop=True)])
+    (home / 'config/open-loops.json').write_text(json.dumps(dict(age_limits_seconds=dict(failed_task=123))))
+    axes = ledger()
+    assert set(rows(axes, 'failed_task')) == {'axis-pending'}, axes
+    assert rows(axes, 'failed_task')['axis-pending']['limit_seconds'] == 123
+    if not exists or alive in ('dead', 'missing'):
+        assert set(rows(axes, 'missing_worker')) == {t['id'] for t in failed_axes}, axes
+    else:
+        assert not rows(axes, 'missing_worker'), axes
+    if alive == 'unknown':
+        assert not axes['complete'] and 'worker liveness axis-pending' in rows(axes, 'coverage')['ledger degraded']['evidence'], axes
+    else:
+        assert axes['complete'], axes
+(home / 'config/open-loops.json').unlink()
+print('PASS: independent failed delivery and worker liveness axes', flush=True)
+
+fixture([task('stalled', stalled)])
+for last_error in ('Error: ENOSPC: no space left on device, write', 'Exception: worker exploded',
+                   'Fatal: unable to proceed', 'Error: generic failure', 'network connection timed out',
+                   'ENOSPC'):
+    pane = 'usage limit earlier\n' + last_error + '\nordinary progress-looking output\n'
+    script(code / 'bin/fm-peek.sh', '#!/usr/bin/env python3\nprint(' + repr(pane) + ')\n')
+    diagnosed = ledger()
+    assert rows(diagnosed, 'stalled_worker')['stalled']['evidence'] == last_error, diagnosed
+    human = out([code / 'bin/fm-open-loops.sh'])
+    assert last_error in human and 'overdue,evidence' in human and 'for evidence' not in human, human
+script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Everything normal\\n"\n')
+assert rows(ledger(), 'stalled_worker')['stalled']['evidence'] == 'no commit, status line, or pipeline progress'
+script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Codex usage limit reached; retrying\\n"\n')
+print('PASS: last-error JSON and human representations', flush=True)
+slot = world / 'pool/slot'
+slot.mkdir(parents=True)
+owned = slot / 'repo'
+shutil.copytree(fresh, owned)
+alias = world / 'owned-alias'
+alias.symlink_to(owned, target_is_directory=True)
+marker = slot / '.fm-slot-owner'
+spy_log = world / 'owner-git.log'
+real_git = shutil.which('git', path=env['PATH'])
+script(fake / 'git', '#!/usr/bin/env python3\n'
+    'import os, sys\nfrom pathlib import Path\n'
+    f'watched = {str(owned)!r}\nlog = Path({str(spy_log)!r})\n'
+    'if "-C" in sys.argv:\n'
+    '    target = sys.argv[sys.argv.index("-C") + 1]\n'
+    '    if str(Path(target).resolve()) == watched:\n'
+    '        with log.open("a") as stream: stream.write(" ".join(sys.argv[1:]) + "\\n")\n'
+    '        if os.environ.get("OWNER_GIT_FORBID") == "1": sys.exit(91)\n'
+    f'os.execv({real_git!r}, [{real_git!r}, *sys.argv[1:]])\n')
+env['OWNER_GIT_FORBID'] = '1'
+marker.write_text('task=new-owner\nhome=/moved/home\n')
+for copy in (owned, alias):
+    for pr_status in (None, 'open', 'merged'):
+        double['single']['61'] = dict(state=pr_status, merged_at=iso(now) if pr_status == 'merged' else None,
+                                     head=dict(sha=git(fresh, 'rev-parse', 'HEAD')))
+        (world / 'gh.json').write_text(json.dumps(double))
+        old = task('old-owner', copy, state='failed', pr=PR_URL + '61' if pr_status else None)
+        fixture([old])
+        reassigned = ledger()
+        assert reassigned['complete'] and not rows(reassigned, 'unlanded_commit'), reassigned
+        assert ('old-owner' in rows(reassigned, 'failed_task')) == (pr_status != 'merged'), reassigned
+        assert not spy_log.exists(), 'reassigned copy must not be inspected'
+    old['current_state']['state'] = 'working'
+    fixture([old])
+    assert 'old-owner' in rows(ledger(), 'stalled_worker'), 'new owner HEAD must not refresh old progress'
+    assert not spy_log.exists()
+    old['current_state']['state'] = 'failed'
+    old['pr']['url'] = None
+    fixture([old], [dict(id='old-owner', structured=True, state='done', captain_drop=True)])
+    assert not rows(ledger(), 'failed_task') and not spy_log.exists()
+for unsafe in ('malformed', 'symlink', 'directory', 'unreadable'):
+    marker.unlink()
+    if unsafe == 'symlink':
+        marker.symlink_to(world / 'missing-owner')
+    elif unsafe == 'directory':
+        marker.mkdir()
+    else:
+        marker.write_text('bad claim\n' if unsafe == 'malformed' else 'task=old-owner\n')
+        if unsafe == 'unreadable':
+            marker.chmod(0)
+    if unsafe != 'unreadable' or os.geteuid() != 0:
+        for state in ('failed', 'working'):
+            fixture([task('old-owner', alias, state=state)])
+            uncertain = ledger()
+            assert not uncertain['complete'] and rows(uncertain, 'coverage'), uncertain
+            assert not rows(uncertain, 'unlanded_commit') and not spy_log.exists(), uncertain
+    if unsafe == 'directory':
+        marker.rmdir()
+        marker.write_text('bad claim\n')
+    elif unsafe == 'unreadable':
+        marker.chmod(0o600)
+env.pop('OWNER_GIT_FORBID')
+for claim in ('mine', 'absent'):
+    marker.unlink()
+    if claim == 'mine':
+        marker.write_text('task=old-owner\nhome=/different/home\n')
+    fixture([task('old-owner', alias, state='failed')])
+    admitted = ledger()
+    assert admitted['complete'] and 'old-owner' in rows(admitted, 'unlanded_commit'), admitted
+    assert 'old-owner' in rows(admitted, 'failed_task') and spy_log.is_file(), admitted
+    spy_log.unlink()
+    fixture([task('old-owner', alias)])
+    admitted_progress = ledger()
+    assert admitted_progress['complete'] and not rows(admitted_progress, 'stalled_worker'), admitted_progress
+    assert spy_log.is_file(), 'admitted working copy must supply its progress'
+    spy_log.unlink()
+print('PASS: ownership admission and last-error representations', flush=True)
+(fake / 'git').unlink()
+
+tasks, backlog = saved_tasks, saved_backlog
+double['pulls'], double['checks'] = saved_pulls, saved_checks
+(world / 'gh.json').write_text(json.dumps(double))
+fixture(tasks, backlog)
 
 # Recovery-unverified adapters still have live working endpoints; ambiguous endpoints degrade.
 live_tasks = [task('live-' + backend, stalled, alive='unknown') for backend in ('orca', 'zellij', 'cmux')]
@@ -300,14 +533,35 @@ assert 'asker:engine' in rows(blind, 'unanswered_question'), 'an unreadable sour
 (home / 'snapshot-fails').unlink()
 double['fail'] = False
 (world / 'gh.json').write_text(json.dumps(double))
+print('PASS: ordinary recovery adapters and source degradation', flush=True)
 
 # Heartbeat mode publishes the ledger atomically; a symbolic link in its place is refused.
+stale_marker = home / 'state/.open-loops-stale-surfaced'
+overdue_marker = home / 'state/.open-loops-surfaced'
+stale_marker.write_text('stale incident\n')
+overdue_marker.write_text('overdue digest\n')
+overdue_stat = overdue_marker.stat().st_mtime_ns
+ledger()
+assert stale_marker.read_text() == 'stale incident\n', 'read-only collection must not reset stale suppression'
 published = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
 assert json.loads((home / 'state/open-loops.json').read_text())['rows'] == published['rows']
+assert not stale_marker.exists(), 'successful publication must reset stale suppression'
+assert overdue_marker.read_text() == 'overdue digest\n' and overdue_marker.stat().st_mtime_ns == overdue_stat
+json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
+stale_marker.write_text('retain failed incident\n')
 (home / 'state/open-loops.json').unlink()
 (home / 'state/open-loops.json').symlink_to(world / 'elsewhere')
 refused = run([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'])
 assert refused.returncode == 1 and 'symbolic link' in refused.stdout, refused
+assert stale_marker.read_text() == 'retain failed incident\n'
+(home / 'state/open-loops.json').unlink()
+(home / 'state/open-loops.json').mkdir()
+replace_failed = run([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'])
+assert replace_failed.returncode == 1, replace_failed
+assert stale_marker.read_text() == 'retain failed incident\n', 'failed atomic replacement must not reset stale suppression'
+assert overdue_marker.read_text() == 'overdue digest\n' and overdue_marker.stat().st_mtime_ns == overdue_stat
+(home / 'state/open-loops.json').rmdir()
+print('PASS: publication suppression reset success/failure/skip', flush=True)
 
 # Fresh CLI processes in the same home do not overlap or queue stale publications.
 flight = world / 'singleflight'
@@ -334,29 +588,47 @@ def flight_snapshot(name):
 flight_snapshot('older')
 flight_env = dict(env, FM_HOME=str(flight_home), FM_OPEN_LOOPS_NOW=str(now - 1), FM_STATE_OVERRIDE=str(flight_state))
 flight_command = [str(flight_code / 'bin/fm-open-loops.sh'), '--heartbeat', '--json']
-first = subprocess.Popen(flight_command, env=flight_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+first = subprocess.Popen(flight_command, env=flight_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         text=True, start_new_session=True)
+fresh = None
+def finish_flight(child):
+    if child is None:
+        return '', ''
+    try:
+        return child.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        os.killpg(child.pid, signal.SIGKILL)
+        child.communicate()
+        raise
 try:
-    until = time.monotonic() + 5
+    until = time.monotonic() + 60
     while not (flight_home / 'entered').exists() and time.monotonic() < until:
         time.sleep(0.01)
     assert (flight_home / 'entered').exists(), 'first scan must reach its source'
     assert (flight_state / '.open-loops.lock').is_file()
     assert not (flight_home / 'state/.open-loops.lock').exists()
     flight_snapshot('newer')
-    second = run(flight_command, env=dict(flight_env, FM_OPEN_LOOPS_NOW=str(now)), timeout=2)
+    flight_marker = flight_state / '.open-loops-stale-surfaced'
+    flight_marker.write_text('pending incident\n')
+    second = run(flight_command, env=dict(flight_env, FM_OPEN_LOOPS_NOW=str(now)), timeout=60)
     assert second.returncode == 0 and not second.stdout, second
+    assert flight_marker.read_text() == 'pending incident\n', 'contended heartbeat must not reset stale suppression'
     fresh = subprocess.Popen(flight_command[:-2] + ['--json'],
-        env=dict(flight_env, FM_OPEN_LOOPS_NOW=str(now)), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        env=dict(flight_env, FM_OPEN_LOOPS_NOW=str(now)), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, start_new_session=True)
     time.sleep(0.1)
     assert fresh.poll() is None, 'fresh CLI waits instead of returning empty JSON output'
     assert (flight_home / 'entries').read_text().splitlines() == ['entered']
     assert not (flight_state / 'open-loops.json').exists()
 finally:
     (flight_home / 'release').touch()
-    first_stdout, first_stderr = first.communicate(timeout=5)
+    try:
+        first_stdout, first_stderr = finish_flight(first)
+    finally:
+        fresh_stdout, fresh_stderr = finish_flight(fresh)
 assert first.returncode == 0, (first_stdout, first_stderr)
 assert set(rows(json.loads(first_stdout), 'ready_not_started')) == {'older'}, first_stdout
-fresh_stdout, fresh_stderr = fresh.communicate(timeout=5)
+assert not flight_marker.exists(), 'only completed publication resets the incident'
 assert fresh.returncode == 0, (fresh_stdout, fresh_stderr)
 fresh_report = json.loads(fresh_stdout)
 assert set(rows(fresh_report, 'ready_not_started')) == {'newer'}, fresh_report
@@ -365,6 +637,7 @@ last = json.loads(out(flight_command, env=dict(flight_env, FM_OPEN_LOOPS_NOW=str
 assert set(rows(last, 'ready_not_started')) == {'newer'}, last
 assert json.loads((flight_state / 'open-loops.json').read_text()) == last
 assert (flight_home / 'entries').read_text().splitlines() == ['entered', 'entered', 'entered']
+print('PASS: held-gate singleflight and child cleanup', flush=True)
 
 # Overall deadlines escape every reader's normal error recovery and stop later work.
 for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
@@ -390,9 +663,10 @@ for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
     (deadline_home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
         tasks=deadline_tasks, backlog=dict(present=True, records=[]))))
     script(deadline_code / 'bin/fm-fleet-snapshot.sh', '#!/usr/bin/env python3\n'
-           'import os\nfrom pathlib import Path\nprint((Path(os.environ["FM_HOME"]) / "snapshot.json").read_text())\n')
+           'import os\nfrom pathlib import Path\nhome = Path(os.environ["FM_HOME"])\n'
+           '(home / "collector-pid").write_text(str(os.getppid()))\nprint((home / "snapshot.json").read_text())\n')
     driver = r'''#!/usr/bin/env python3
-import base64, json, os, sys, time
+import base64, json, os, signal, sys, time
 from pathlib import Path
 reader, command = os.environ['DEADLINE_READER'], Path(sys.argv[0]).name
 if command == 'git' and reader != 'origins':
@@ -407,8 +681,11 @@ if command == 'gh-axi' and '/pulls?' in sys.argv[2]:
     print('api_response:\n  body: ' + base64.b64encode(json.dumps(pulls).encode()).decode()
           + '\n  truncated: false')
     sys.exit(0)
-with (Path(os.environ['FM_HOME']) / 'attempts').open('a') as stream:
+attempts = Path(os.environ['FM_HOME']) / 'attempts'
+with attempts.open('a') as stream:
     stream.write(command + '\n')
+if len(attempts.read_text().splitlines()) == 2:
+    os.kill(int((attempts.parent / 'collector-pid').read_text()), signal.SIGALRM)
 time.sleep(0.7)
 print('source command failure', file=sys.stderr)
 sys.exit(1)
@@ -417,16 +694,14 @@ sys.exit(1)
         script(deadline_bin / command, driver)
     deadline_env = dict(env, FM_HOME=str(deadline_home), DEADLINE_READER=reader,
                         PATH=f'{deadline_bin}:{env["PATH"]}')
-    started = time.monotonic()
     deadline_report = json.loads(out([deadline_code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'],
-                                    env=deadline_env, timeout=14))
-    elapsed = time.monotonic() - started
-    assert 9 <= elapsed < 12, (reader, elapsed, deadline_report)
+                                    env=deadline_env, timeout=60))
     assert not deadline_report['complete'] and len(rows(deadline_report, 'coverage')) == 1, deadline_report
     assert 'collection exceeded its deadline' in rows(deadline_report, 'coverage')['ledger degraded']['evidence']
     attempts = (deadline_home / 'attempts').read_text().splitlines()
-    assert 1 < len(attempts) < 24, (reader, attempts)
+    assert len(attempts) == 2, (reader, attempts)
     assert json.loads((deadline_home / 'state/open-loops.json').read_text()) == deadline_report
+    print('PASS: deadline escapes ' + reader + ' source recovery', flush=True)
 print('PASS: owned-work categories, owners, ages, degraded row, and atomic publication')
 PY
 

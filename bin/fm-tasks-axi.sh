@@ -141,14 +141,14 @@ guard_completion() {
     if [ -n "$expect" ]; then
       case "$expect" in
         --pr) pr=$token ;; --report) report=$token ;; --drop-file) drop=$token ;; --note) note=1 ;;
-        --keep) ;;
+        --keep|--backend) ;;
       esac
       expect=''
       continue
     fi
     case "$token" in
       -h|--help) help=1 ;;
-      --pr|--report|--drop-file|--note|--keep) expect=$token ;;
+      --pr|--report|--drop-file|--note|--keep|--backend) expect=$token ;;
       --pr=*) pr=${token#*=} ;; --report=*) report=${token#*=} ;;
       --drop-file=*) drop=${token#*=} ;; --note=*) note=1 ;;
       -*) ;;
@@ -221,4 +221,37 @@ if [ "$GUARD_STRIP_DROP" = 1 ]; then
 fi
 
 cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI_ROOT"
+new_work_command=${ARGS[0]:-}
+new_work_offset=1
+if [ "$new_work_command" = task ]; then
+  new_work_command=${ARGS[1]:-}
+  new_work_offset=2
+fi
+case "$new_work_command" in
+  reopen|start)
+    new_work_id=''
+    new_work_help=0
+    new_work_backend_next=0
+    for arg in "${ARGS[@]:$new_work_offset}"; do
+      if [ "$new_work_backend_next" = 1 ]; then
+        new_work_backend_next=0
+        continue
+      fi
+      case "$arg" in
+        -h|--help) new_work_help=1 ;;
+        --backend) new_work_backend_next=1 ;;
+        -*) ;;
+        *) [ -n "$new_work_id" ] || new_work_id=$arg ;;
+      esac
+    done
+    if [ "$new_work_help" = 0 ] && [[ "$new_work_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      fm_backlog_new_work_transition "$DATA" "$new_work_id" tasks-axi "${ARGS[@]}"
+      result=$?
+      if [ "$result" -ne 0 ] && [ -n "$FM_BACKLOG_TRANSITION_ERROR" ]; then
+        printf 'fm-tasks-axi: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2
+      fi
+      exit "$result"
+    fi
+    ;;
+esac
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

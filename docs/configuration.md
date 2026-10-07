@@ -581,13 +581,14 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 | `ready_not_started` | a Queued item has no hold, no open blocker, and a due date | 1800 s |
 | `unanswered_question` | a `needs-decision` or `blocked` status key is still open, aged from its stamped opening | 1800 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
-| `stalled_worker` | a live worker reads `working` but has no commit, status line, or pipeline progress; the row carries the pane's last usage, authentication, or network error | 3600 s |
+| `stalled_worker` | a live worker reads `working` but has no commit, status line, or pipeline progress; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
 | `unlanded_commit` | a ship task's copy holds commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR of this home's projects waits on checks, a reviewer, or firstmate's review routing | 3600 s |
 | `red_check` | the latest run of a check on an open PR failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
+For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof.
 Registered non-GitHub origins are disclosed as degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
 The ledger covers this home only; each secondmate home runs its own watcher and reports through its own parent channel.
@@ -597,9 +598,10 @@ The helper's `--heartbeat` mode atomically publishes the dated result to `state/
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
 A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
+Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults. Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication clears stale suppression even if the watcher misses the recovery, without resetting the unchanged-overdue-set cooldown.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
 Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
-Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops`, dated by the ledger's observation time.
+The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors. Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
 No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
 
 Create the optional local `config/open-loops.json` to override the limits:
@@ -619,10 +621,13 @@ A work item reaches Done only with its deliverable, or with the captain's own wo
 `bin/fm-tasks-axi.sh done|close` of a ship or scout row requires a written non-empty report (scout), a GitHub PR the forge reports merged (ship), or `--drop-file` holding the captain's words.
 A retained captain-held question must be resolved through `bin/fm-captain-hold.sh answer` or `reconcile close`; delivery evidence or drop authority cannot answer it.
 A live task record completes only through `bin/fm-teardown.sh`, whose landed-work test treats a pushed branch as recoverable work, not a delivered result.
+In local-only mode, an owned, clean ship copy whose `HEAD` is contained in `refs/heads/<default>` is landed regardless of remote reachability or pushed status. A genuinely merged GitHub PR or default-content proof remains an alternative, including fork delivery. Normal and forced teardown use the same landing predicate.
 If a ship's copy is missing or its pool slot has been reassigned, teardown refuses unless the recorded GitHub PR is forge-confirmed merged, or `--force --drop-file` authorizes dropping the work; it never inspects the reassigned copy or infers a local merge.
+If a recorded Orca copy path is missing, record-only cleanup never removes a backend copy by ID.
 `bin/fm-teardown.sh --force` on ordinary work additionally requires `--drop-file`; the words (1..8192 bytes) are retained at `data/<id>/captain-drop.md` before anything is discarded.
 A delivered PR, report, or local merge keeps its normal completion label even when forced cleanup discards additional work; only an undelivered work item records the fixed note `dropped`.
 Dropped work is never presented as recently landed. A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
+Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`. A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 

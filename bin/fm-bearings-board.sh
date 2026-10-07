@@ -346,7 +346,8 @@ effective_payload() {  # <data.json> <dest.json>
         | {id:("loop-" + .id),repo:$ledger[0].home,title:(.category + ": " + .subject),
            reason:(.owner + " - " + .next_action + " - age "
              + (if .age_seconds == null then "unknown" else (.age_seconds|tostring) + "s" end)
-             + " - observed " + ($ledger[0].generated_epoch|tostring)),
+             + " - observed " + ($ledger[0].generated_epoch|tostring)
+             + (if (.evidence // "") == "" then "" else " - " + .evidence end)),
            dispatchable:false,kind:"warning"}]
     ' "$dest" > "$staged"; then
       rm -f -- "$staged"

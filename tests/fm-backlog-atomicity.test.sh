@@ -584,8 +584,8 @@ write_task_meta() {  # <case-dir> <id> <kind> <mode> [extra-line...]
   fm_write_meta "$(home_of "$case_dir")/state/$id.meta" \
     "window=firstmate:fm-$id" \
     "endpoint_task_id=$id" \
-    "worktree=$case_dir/absent-worktree" \
-    "project=$case_dir/absent-project" \
+    "worktree=$case_dir/wt" \
+    "project=$case_dir/project" \
     "harness=claude" \
     "kind=$kind" \
     "mode=$mode" \
@@ -612,9 +612,6 @@ run_ship_spawn() {  # <case-dir> <id>
   run_spawn "$case_dir" "$id" "$case_dir/project" --mode no-mistakes --yolo off
 }
 
-# Teardown against a recorded worktree that no longer exists: the landed-work and
-# worktree-return steps are then no-ops, which keeps these cases about the
-# backlog transition rather than re-testing tests/fm-teardown.test.sh's matrix.
 run_teardown() {  # <case-dir> <id> [args...]
   local case_dir=$1
   shift
@@ -2999,11 +2996,99 @@ test_a_persistent_secondmate_is_never_a_backlog_item() {
   pass "dispatching a persistent secondmate needs no backlog item"
 }
 
+test_dispatch_retires_drop_only_after_commit() (
+  local case_dir home id initial stored before rc
+  case_dir=$(make_home dispatch-drop-provenance)
+  home=$(home_of "$case_dir")
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  printf '%s\n' 'Body café 航海' ' dropped ' ' Deliverable of the finished work: dropped ' \
+    'Question: keep this?' 'dropped later' > "$case_dir/body.txt"
+  for initial in queued in_flight; do
+    id="drop-$initial"
+    add_item "$case_dir" "$id"
+    [ "$initial" = queued ] || start_item "$case_dir" "$id"
+    tasks-axi update "$id" --body-file "$case_dir/body.txt" --file "$(backlog_of "$case_dir")" >/dev/null \
+      || fail "could not attach dispatch body"
+    mkdir -p "$home/data/$id"
+    printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+    cp "$home/data/$id/captain-drop.md" "$case_dir/words-$id"
+    before=$(cat "$(backlog_of "$case_dir")")
+    fm_backlog_relaunch_admission "$home/config" "$home/data" ship "$id" 0 \
+      || fail "ordinary admission failed: $FM_BACKLOG_TRANSITION_ERROR"
+    assert_equals "$before" "$(cat "$(backlog_of "$case_dir")")" "admission retired active provenance"
+    printf 'spawn_gen=fixture\n' > "$home/state/$id.meta"
+    fm_backlog_dispatch_transition "$home/state/$id.meta" "$home/data" "$id" "$home/state" \
+      || fail "dispatch failed: $FM_BACKLOG_TRANSITION_ERROR"
+    stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") || fail "dispatch row disappeared"
+    assert_contains "$stored" "state: in_flight" "dispatch did not start the row"
+    assert_contains "$stored" "Historical captain disposition: dropped" "dispatch left active disposition"
+    assert_contains "$stored" "Historical deliverable of the finished work: dropped" "dispatch left active deliverable"
+    assert_contains "$stored" "Body café 航海" "dispatch changed Unicode bytes"
+    assert_contains "$stored" "Question: keep this?" "dispatch changed the question"
+    assert_contains "$stored" "dropped later" "dispatch rewrote non-exact text"
+    cmp -s "$case_dir/words-$id" "$home/data/$id/captain-drop.md" || fail "dispatch changed captain words"
+  done
+  id=drop-failure
+  add_item "$case_dir" "$id"
+  tasks-axi update "$id" --body-file "$case_dir/body.txt" --file "$(backlog_of "$case_dir")" >/dev/null \
+    || fail "could not attach failed dispatch body"
+  mkdir -p "$home/data/$id"
+  printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+  cp "$home/data/$id/captain-drop.md" "$case_dir/words-$id"
+  printf 'spawn_gen=fixture\n' > "$home/state/$id.meta"
+  before=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
+    || fail "could not read failed dispatch body before transition"
+  before=$(printf '%s\n' "$before" | sed -n 's/^  body: //p')
+  [ -n "$before" ] || fail "failed dispatch fixture exposed no complete task body"
+  break_verb "$case_dir" start
+  PATH="$case_dir/fakebin:$PATH"
+  rc=0
+  fm_backlog_dispatch_transition "$home/state/$id.meta" "$home/data" "$id" "$home/state" || rc=$?
+  [ "$rc" -ne 0 ] || fail "failed start reported dispatch success"
+  stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
+    || fail "failed dispatch row disappeared"
+  assert_equals "$before" "$(printf '%s\n' "$stored" | sed -n 's/^  body: //p')" \
+    "failed dispatch did not restore the complete original task body"
+  assert_contains "$stored" "state: queued" "failed dispatch changed the original row state"
+  assert_contains "$stored" "Deliverable of the finished work: dropped" "failed dispatch retired the active deliverable"
+  assert_not_contains "$stored" "Historical captain disposition:" "failed dispatch retired the active disposition"
+  assert_not_contains "$stored" "Historical deliverable of the finished work:" "failed dispatch retired the active deliverable"
+  cmp -s "$case_dir/words-$id" "$home/data/$id/captain-drop.md" || fail "failed dispatch changed retained captain words"
+  pass "queued and in-flight dispatch retire drop provenance only at successful commit"
+)
+
+test_spawn_retires_queued_and_inflight_drop_provenance() {
+  local initial case_dir home id out stored
+  for initial in queued in_flight; do
+    id="spawn-drop-$initial"
+    case_dir=$(make_home "$id" "$id")
+    home=$(home_of "$case_dir")
+    add_item "$case_dir" "$id"
+    [ "$initial" = queued ] || start_item "$case_dir" "$id"
+    printf '%s\n' 'dropped' 'Deliverable of the finished work: dropped' 'Body café 航海' > "$case_dir/body"
+    tasks-axi update "$id" --body-file "$case_dir/body" --file "$(backlog_of "$case_dir")" >/dev/null \
+      || fail "could not prepare spawn provenance"
+    mkdir -p "$home/data/$id"
+    printf 'Captain words\n' > "$home/data/$id/captain-drop.md"
+    out=$(run_ship_spawn "$case_dir" "$id") || fail "resumed spawn failed: $out"
+    stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") || fail "spawn row disappeared"
+    assert_contains "$stored" "Historical captain disposition: dropped" "spawn kept active disposition"
+    assert_contains "$stored" "Historical deliverable of the finished work: dropped" "spawn kept active deliverable"
+    assert_contains "$stored" "Body café 航海" "spawn changed Unicode body"
+    assert_present "$home/state/$id.meta" "spawn did not publish worker record"
+    assert_equals "Captain words" "$(cat "$home/data/$id/captain-drop.md")" "spawn changed retained words"
+  done
+  pass "actual queued and in-flight spawn retire old drop provenance"
+}
+
+test_spawn_retires_queued_and_inflight_drop_provenance
 test_backend_resolution_preserves_config_errors
 test_backend_resolution_preserves_precedence_and_defaults
 test_backlog_callers_refuse_unreadable_backend_config
 test_captain_hold_preserves_relocated_backlog_on_backend_error
 test_dispatch_moves_the_item_in_flight_in_the_same_run
+test_dispatch_retires_drop_only_after_commit
 test_dispatch_omits_the_file_for_a_beads_show
 test_a_leftover_markdown_symlink_does_not_brick_a_beads_home
 test_completion_omits_the_file_for_a_beads_done

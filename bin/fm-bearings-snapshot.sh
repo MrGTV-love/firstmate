@@ -704,7 +704,7 @@ if [ -f "$OPEN_LOOPS_LEDGER" ] && [ ! -L "$OPEN_LOOPS_LEDGER" ]; then
     if $ledger[0].schema != "fm-open-loops.v1" then error("unsupported open-loop ledger") else . end
     | .open_loops = {generated_epoch:$ledger[0].generated_epoch,complete:$ledger[0].complete,
         rows:[$ledger[0].rows[] | select(.overdue)
-          | {id,category,subject,owner,next_action,age_seconds}]}
+          | {id,category,subject,owner,next_action,age_seconds,evidence:(.evidence // "")}]}
   ') || { echo "fm-bearings-snapshot: unreadable open-loop ledger" >&2; exit 1; }
 fi
 

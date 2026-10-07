@@ -330,12 +330,16 @@ esac
 # helper at this cadence and re-surfaced to firstmate when it still lists the same overdue rows.
 OPEN_LOOPS_INTERVAL=${FM_OPEN_LOOPS_INTERVAL:-600}
 case "$OPEN_LOOPS_INTERVAL" in
-  ''|*[!0-9]*|0) OPEN_LOOPS_INTERVAL=600 ;;
+  ''|*[!0-9]*) OPEN_LOOPS_INTERVAL=600 ;;
+  *) OPEN_LOOPS_INTERVAL=$((10#$OPEN_LOOPS_INTERVAL)) ;;
 esac
+[ "$OPEN_LOOPS_INTERVAL" -gt 0 ] || OPEN_LOOPS_INTERVAL=600
 OPEN_LOOPS_RESURFACE=${FM_OPEN_LOOPS_RESURFACE:-21600}
 case "$OPEN_LOOPS_RESURFACE" in
-  ''|*[!0-9]*|0) OPEN_LOOPS_RESURFACE=21600 ;;
+  ''|*[!0-9]*) OPEN_LOOPS_RESURFACE=21600 ;;
+  *) OPEN_LOOPS_RESURFACE=$((10#$OPEN_LOOPS_RESURFACE)) ;;
 esac
+[ "$OPEN_LOOPS_RESURFACE" -gt 0 ] || OPEN_LOOPS_RESURFACE=21600
 OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-$SCRIPT_DIR/fm-open-loops.sh}
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's

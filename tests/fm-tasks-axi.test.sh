@@ -264,6 +264,13 @@ test_completion_needs_proof_of_the_deliverable() {
   completion_refused "$dir" "close alias" "close" ship-a >/dev/null
   completion_refused "$dir" "task noun" "task" "done" ship-a >/dev/null
   completion_refused "$dir" "task noun and close" "task" "close" ship-a >/dev/null
+  wrapper_from_code "$dir" add markdown "backend-value decoy" --kind docs >/dev/null \
+    || fail "could not create backend-value decoy"
+  completion_refused "$dir" "backend between done and id" done --backend markdown ship-a >/dev/null
+  completion_refused "$dir" "backend between noun close and id" task close --backend=markdown ship-a >/dev/null
+  completion_refused "$dir" "backend after target id" done ship-a --backend=markdown >/dev/null
+  completion_refused "$dir" "split backend after target id" task close ship-a --backend markdown >/dev/null
+  [ "$(row_state "$dir" markdown)" = " " ] || fail "backend parsing completed the decoy row"
   out=$(completion_refused "$dir" "help text inside a note" "done" ship-a --note=$'a note\n--help')
   assert_contains "$out" "completion needs proof" "a note naming --help skipped the guard"
   completion_refused "$dir" "a note alone is no proof" "done" ship-a --note "local main" >/dev/null
@@ -276,7 +283,8 @@ test_completion_needs_proof_of_the_deliverable() {
   completion_refused "$dir" "empty report" "done" scout-a --report data/scout-a/report.md >/dev/null
   printf '# findings\n' > "$dir/home/data/scout-a/report.md"
   completion_refused "$dir" "report for a ship" "done" ship-a --report data/scout-a/report.md >/dev/null
-  wrapper_from_code "$dir" "done" scout-a --report data/scout-a/report.md >/dev/null || fail "a written report was refused"
+  out=$(wrapper_from_code "$dir" task close --backend markdown scout-a --report data/scout-a/report.md 2>&1) \
+    || fail "a written report was refused: $out"
   [ "$(row_state "$dir" scout-a)" = x ] || fail "the reported scout did not close"
   completion_refused "$dir" "non-GitHub pull request" "done" ship-a --pr https://forge.example.com/o/r/pulls/3 >/dev/null
   cat > "$fakebin/gh-axi" <<'SH'
@@ -296,7 +304,7 @@ SH
 }
 
 test_completion_by_the_captains_own_words() {
-  local dir words
+  local dir words out
   dir=$(make_split drop)
   words="$dir/words.txt"
   wrapper_from_code "$dir" add ship-d "ship d" --kind ship --repo p >/dev/null
@@ -307,7 +315,8 @@ test_completion_by_the_captains_own_words() {
   printf 'Drop it; the premise is gone.\n' > "$words"
   completion_refused "$dir" "symbolic link words" "done" ship-d --drop-file "$dir/words-link.txt" >/dev/null
   completion_refused "$dir" "words with a pull request" "done" ship-d --drop-file "$words" --pr https://github.com/o/r/pull/9 >/dev/null
-  wrapper_from_code "$dir" "done" ship-d --drop-file "$words" >/dev/null || fail "the captain's words were refused"
+  out=$(wrapper_from_code "$dir" task done --backend=markdown ship-d --drop-file "$words" 2>&1) \
+    || fail "the captain's words were refused: $out"
   [ "$(row_state "$dir" ship-d)" = x ] || fail "the dropped row did not close"
   cmp -s "$words" "$dir/home/data/ship-d/captain-drop.md" || fail "the exact words were not retained"
   assert_grep "dropped" "$dir/home/data/backlog.md" "the row does not record the fixed drop note"
@@ -319,8 +328,8 @@ test_completion_by_the_captains_own_words() {
 }
 
 test_completion_preserves_retained_captain_calls() {
-  local dir fakebin words before spelling evidence out
-  local command_args=() evidence_args=()
+  local dir fakebin words before spelling evidence out backend
+  local command_args=() evidence_args=() backend_args=()
   dir=$(make_split retained-captain-call)
   fakebin=$(fm_fakebin "$dir")
   words="$dir/drop.txt"
@@ -350,6 +359,11 @@ SH
       task-done) command_args=(task done) ;;
       task-close) command_args=(task close) ;;
     esac
+    for backend in split equals; do
+      case "$backend" in
+        split) backend_args=(--backend markdown) ;;
+        equals) backend_args=(--backend=markdown) ;;
+      esac
     for evidence in ship-drop scout-drop report pr; do
       case "$evidence" in
         ship-drop) evidence_args=(held-ship --drop-file "$words") ;;
@@ -358,11 +372,12 @@ SH
         pr) evidence_args=(held-ship --pr=https://github.com/o/r/pull/9) ;;
       esac
       out=$(PATH="$fakebin:$PATH" FAKE_FORGE_LOG="$dir/forge-called" \
-        completion_refused "$dir" "$spelling with $evidence" "${command_args[@]}" "${evidence_args[@]}")
+        completion_refused "$dir" "$backend $spelling with $evidence" "${command_args[@]}" "${backend_args[@]}" "${evidence_args[@]}")
       assert_contains "$out" "open captain call" "$spelling with $evidence missed the captain hold"
       assert_contains "$out" "fm-captain-hold.sh answer" "$spelling with $evidence did not name the answer boundary"
       assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" \
         "$spelling with $evidence changed the retained captain call"
+    done
     done
   done
   assert_absent "$dir/forge-called" "a retained captain call reached the forge evidence check"
@@ -382,6 +397,106 @@ SH
   pass "all completion spellings preserve retained captain calls before accepting drop, report, or merged PR evidence"
 }
 
+test_public_restart_retires_drop_provenance() {
+  local dir verb body stored out
+  dir=$(make_split public-restart-drop)
+  printf 'Keep these exact captain words: café 航海.\n' > "$dir/words.txt"
+  printf '%s\n' 'Body café 航海' '  dropped  ' ' Deliverable of the finished work: dropped ' \
+    'Question: keep dropped as a word?' 'dropped later' > "$dir/body.txt"
+  for verb in reopen start; do
+    wrapper_from_code "$dir" add "restart-$verb" "restart $verb" --kind scout >/dev/null \
+      || fail "could not add restart fixture"
+    wrapper_from_code "$dir" done "restart-$verb" --drop-file "$dir/words.txt" >/dev/null \
+      || fail "could not drop restart fixture"
+    wrapper_from_code "$dir" update "restart-$verb" --body-file "$dir/body.txt" >/dev/null \
+      || fail "could not attach restart body"
+    out=$(wrapper_from_code "$dir" task "$verb" --backend=markdown "restart-$verb" 2>&1) \
+      || fail "public $verb failed: $out"
+    stored=$(wrapper_from_code "$dir" show "restart-$verb" --full) || fail "could not read restarted row"
+    assert_contains "$stored" "Historical captain disposition: dropped" "$verb left drop disposition active"
+    assert_contains "$stored" "Historical deliverable of the finished work: dropped" "$verb left dropped deliverable active"
+    assert_contains "$stored" "Body café 航海" "$verb changed Unicode body bytes"
+    assert_contains "$stored" "Question: keep dropped as a word?" "$verb changed the captain question"
+    assert_contains "$stored" "dropped later" "$verb rewrote a non-exact dropped line"
+    cmp -s "$dir/words.txt" "$dir/home/data/restart-$verb/captain-drop.md" \
+      || fail "$verb changed retained captain words"
+  done
+  pass "public reopen and start retire exact drop provenance without changing body text or retained words"
+}
+
+test_restart_handles_sole_drop_and_failed_body_update() {
+  local dir fakebin real before rc
+  dir=$(make_split restart-body-boundaries)
+  fakebin=$(fm_fakebin "$dir")
+  real=$(command -v tasks-axi)
+  wrapper_from_code "$dir" add sole-drop "sole dropped body" --kind scout >/dev/null || fail "could not add sole drop"
+  printf 'dropped\n' > "$dir/body"
+  wrapper_from_code "$dir" update sole-drop --body-file "$dir/body" >/dev/null || fail "could not set sole body"
+  wrapper_from_code "$dir" start sole-drop >/dev/null || fail "sole drop restart failed"
+  assert_contains "$(wrapper_from_code "$dir" show sole-drop --full)" \
+    "Historical captain disposition: dropped" "sole dropped body was not retired"
+  wrapper_from_code "$dir" add failed-drop "failed body update" --kind scout >/dev/null || fail "could not add failed drop"
+  wrapper_from_code "$dir" update failed-drop --body-file "$dir/body" >/dev/null || fail "could not set failed body"
+  before=$(cat "$dir/home/data/backlog.md")
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  case "\$arg" in --body-file|--body-file=*) exit 1 ;; esac
+done
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  rc=0
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" start failed-drop >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "restart ignored failed retirement body update"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "failed retirement changed the original backlog"
+  pass "restart handles sole dropped bodies and refuses failed retirement updates without changing the row"
+}
+
+test_resumed_deliveries_reach_landed_output() {
+  local dir fakebin id kind json out
+  command -v jq >/dev/null 2>&1 || { printf 'skip: jq not found for resumed landed output\n'; return; }
+  dir=$(make_split resumed-landed)
+  fakebin=$(fm_fakebin "$dir")
+  fm_fake_exit0 "$fakebin" tmux treehouse gh
+  cat > "$fakebin/gh-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'api_response:\n  body: merged=true\n'
+SH
+  chmod +x "$fakebin/gh-axi"
+  printf 'Drop this work.\n' > "$dir/words"
+  for id in resumed-scout resumed-ship untouched-drop; do
+    case "$id" in resumed-scout) kind=scout ;; *) kind=ship ;; esac
+    wrapper_from_code "$dir" add "$id" "$id" --kind "$kind" >/dev/null || fail "could not create landed fixture"
+    out=$(wrapper_from_code "$dir" task done --backend=markdown "$id" --drop-file "$dir/words" 2>&1) \
+      || fail "could not drop landed fixture: $out"
+  done
+  out=$(wrapper_from_code "$dir" task reopen --backend markdown resumed-scout 2>&1) \
+    || fail "could not reopen scout: $out"
+  out=$(wrapper_from_code "$dir" task start --backend=markdown resumed-ship 2>&1) \
+    || fail "could not restart ship: $out"
+  json=$(FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --home-input) || fail "resumed snapshot failed"
+  printf '%s' "$json" | jq -e '
+    (.backlog.records | any(.id == "resumed-scout" and .captain_drop == false))
+    and (.backlog.records | any(.id == "resumed-ship" and .captain_drop == false))
+    and (.backlog.records | any(.id == "untouched-drop" and .captain_drop == true))
+  ' >/dev/null || fail "snapshot conflated resumed and untouched captain drops"
+  printf '# Fresh findings\n' > "$dir/home/data/resumed-scout/report.md"
+  out=$(wrapper_from_code "$dir" task done --backend markdown resumed-scout --report data/resumed-scout/report.md 2>&1) \
+    || fail "resumed scout report was refused: $out"
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" task close --backend=markdown resumed-ship --pr https://github.com/o/r/pull/9 2>&1) \
+    || fail "resumed merged ship was refused: $out"
+  json=$(FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
+    "$ROOT/bin/fm-bearings-snapshot.sh" --json --all-landed) || fail "resumed bearings failed"
+  printf '%s' "$json" | jq -e '
+    (.landed | any(.id == "resumed-scout"))
+    and (.landed | any(.id == "resumed-ship"))
+    and (.landed | any(.id == "untouched-drop") | not)
+  ' >/dev/null || fail "Recently Landed did not select resumed deliveries and exclude untouched drop"
+  pass "real snapshot and landed projection distinguish resumed deliveries from untouched captain drops"
+}
+
 test_guard_reports_regular_code_root_backlog
 test_guard_reports_foreign_link_and_archive
 test_guard_silent_for_single_home
@@ -395,6 +510,9 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_completion_needs_proof_of_the_deliverable
   test_completion_by_the_captains_own_words
   test_completion_preserves_retained_captain_calls
+  test_public_restart_retires_drop_provenance
+  test_resumed_deliveries_reach_landed_output
+  test_restart_handles_sole_drop_and_failed_body_update
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi

@@ -30,7 +30,8 @@ DEFAULT_AGES = {
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
-                       r"|timed? ?out|ECONN|ENOTFOUND", re.I)
+                       r"|timed? ?out|ECONN|ENOTFOUND|\b(?:error|failure|failed|exception|fatal)\b"
+                       r"|\b(?-i:E[A-Z][A-Z0-9_]{2,})\b", re.I)
 SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.TimeoutExpired,
                  sqlite3.Error, json.JSONDecodeError)
 
@@ -156,7 +157,7 @@ class Collector:
 
     def liveness(self, task):
         alive = task["endpoint"].get("agent_alive")
-        if task["endpoint"].get("exists") is True and alive not in ("alive", "dead") \
+        if task["endpoint"].get("exists") is True and alive not in ("alive", "dead", "missing") \
                 and task.get("backend") and task["endpoint"].get("target"):
             state = self.bash('. "$1"; fm_backend_agent_state "$2" "$3"', BIN / "fm-backend.sh",
                               task["backend"], task["endpoint"]["target"]).strip()
@@ -174,7 +175,7 @@ class Collector:
             if task["endpoint"].get("exists") is False or alive in ("dead", "missing"):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
-            elif task["current_state"].get("state") == "failed":
+            if task["current_state"].get("state") == "failed":
                 if not self.source("failed deliverable " + task["id"], self.deliverable_landed, task):
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")))
@@ -207,8 +208,8 @@ class Collector:
 
     def stalled(self, task, runs):
         stamps = [mtime(self.state / (task["id"] + ".status"))]
-        worktree = task["paths"]["worktree"].get("path")
-        if worktree and Path(worktree).is_dir():
+        worktree = self.admitted_worktree(task)
+        if worktree:
             stamps.append(int(self.git(worktree, "show", "-s", "--format=%ct", "HEAD")))
             # The reflog stamps when a commit was observed, not when it was authored.
             stamps.append(mtime(Path(self.git(worktree, "rev-parse", "--absolute-git-dir")) / "logs/HEAD"))
@@ -222,22 +223,47 @@ class Collector:
         self.add("stalled_worker", task["id"], "inspect and recover the stalled-but-alive worker", since,
                  evidence=signatures[-1][:300] if signatures else "no commit, status line, or pipeline progress")
 
-    def default_ref(self, worktree):
-        for ref in ("refs/remotes/origin/HEAD", "refs/remotes/origin/main", "refs/remotes/origin/master",
-                    "refs/heads/main", "refs/heads/master"):
+    def admitted_worktree(self, task):
+        worktree = task["paths"]["worktree"].get("path")
+        if not worktree:
+            return None
+        owner = self.bash('. "$1"; fm_treehouse_slot_owner_state "$2" "$3"; '
+                          'printf "%s" "$FM_TREEHOUSE_SLOT_OWNER"',
+                          BIN / "fm-wake-lib.sh", worktree, task["id"]).strip()
+        if owner == "other":
+            return None
+        if not Path(worktree).is_dir():
+            return None
+        if owner not in ("mine", "absent"):
+            raise ValueError("worktree ownership is inconclusive")
+        return worktree
+
+    def default_ref(self, worktree, mode=None):
+        refs = ("refs/remotes/origin/HEAD", "refs/remotes/origin/main", "refs/remotes/origin/master",
+                "refs/heads/main", "refs/heads/master")
+        if mode == "local-only":
+            try:
+                remote = self.git(worktree, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+            except RuntimeError:
+                remote = ""
+            refs = tuple(dict.fromkeys(
+                ([remote.replace("refs/remotes/origin/", "refs/heads/", 1)]
+                 if remote.startswith("refs/remotes/origin/") else [])
+                + ["refs/heads/main", "refs/heads/master"]))
+        for ref in refs:
             try:
                 self.git(worktree, "rev-parse", "--verify", "--quiet", ref)
             except RuntimeError:
                 continue
-            try:  # origin/HEAD is a symbolic ref; name the branch it points at
-                return self.git(worktree, "symbolic-ref", "--quiet", "--short", ref)
+            try:
+                return self.git(worktree, "symbolic-ref", "--quiet", ref)
             except RuntimeError:
-                return ref.replace("refs/remotes/", "").replace("refs/heads/", "")
+                return ref
         raise ValueError("default branch is unknown")
 
     def pending_commits(self, worktree, base):
-        return [line[2:] for line in self.git(worktree, "cherry", base, "HEAD").splitlines()
-                if line.startswith("+ ")]
+        return self.git(worktree, "rev-list", "--reverse", "--cherry-pick", "--right-only",
+                        base + "...HEAD").splitlines()
 
     def pr_pending(self, worktree, pending, pr):
         head = pr["head"]["sha"]
@@ -265,9 +291,9 @@ class Collector:
         if task["kind"] == "scout":
             report = self.data / task["id"] / "report.md"
             return report.is_file() and not report.is_symlink() and report.stat().st_size > 0
-        worktree = task["paths"]["worktree"].get("path")
+        worktree = self.admitted_worktree(task)
         pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
-        if not worktree or not Path(worktree).is_dir():
+        if not worktree:
             return bool(pr and pr.get("merged_at"))
         if self.git(worktree, "status", "--porcelain"):
             return False
@@ -275,15 +301,17 @@ class Collector:
             uncovered = self.source("PR head " + task["id"], self.pr_pending, worktree, None, pr)
             if uncovered == []:
                 return True
-        base = self.default_ref(worktree)
+        base = self.default_ref(worktree, task.get("mode"))
         pending = self.pending_commits(worktree, base)
         return not pending or self.content_in_default(worktree, base)
 
     def unlanded(self, task):
-        worktree = task["paths"]["worktree"].get("path")
-        if task["kind"] != "ship" or not worktree or not Path(worktree).is_dir() or self.captain_dropped(task):
+        if task["kind"] != "ship" or self.captain_dropped(task):
             return
-        base = self.default_ref(worktree)
+        worktree = self.admitted_worktree(task)
+        if not worktree:
+            return
+        base = self.default_ref(worktree, task.get("mode"))
         pending = self.pending_commits(worktree, base)
         if not pending or self.content_in_default(worktree, base):
             return
@@ -437,6 +465,10 @@ class Collector:
                 json.dump(report, stream)
                 stream.write("\n")
             os.replace(temp, target)
+            try:
+                (self.state / ".open-loops-stale-surfaced").unlink()
+            except FileNotFoundError:
+                pass
         finally:
             if os.path.exists(temp):
                 os.unlink(temp)
@@ -447,13 +479,13 @@ def render(report):
     lines = ["bin: " + str(BIN / "fm-open-loops.sh"),
              "description: Reconcile assigned work against live delivery evidence",
              "complete: " + str(report["complete"]).lower(), f"generated_epoch: {report['generated_epoch']}"]
-    fields = ["category", "subject", "owner", "next_action", "age_seconds", "overdue"]
+    fields = ["category", "subject", "owner", "next_action", "age_seconds", "overdue", "evidence"]
     if report["rows"]:
         lines.append(f"rows[{len(report['rows'])}]{{{','.join(fields)}}}:")
         lines += ["  " + ",".join(json.dumps(r.get(f), ensure_ascii=False) for f in fields) for r in report["rows"]]
     else:
         lines.append("rows: []")
-    lines.append("help: Run bin/fm-open-loops.sh --json for evidence and age limits")
+    lines.append("help: Run bin/fm-open-loops.sh --json for age limits and structured rows")
     return "\n".join(lines)
 
 

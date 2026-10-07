@@ -1300,6 +1300,49 @@ test_forced_secondmate_child_close_failure_still_refuses() {
   pass "fm-teardown: forced secondmate cleanup still refuses on a child endpoint close that failed"
 }
 
+test_absent_orca_descendant_preserves_backend_copy() {
+  local dir mate nested parent=mate-orca child=nested-orca leaf=leaf-orca rc
+  dir=$(make_case absent-orca-descendant)
+  mate="$dir/mate"
+  nested="$mate/nested"
+  mkdir -p "$mate/state" "$mate/data" "$mate/config" "$nested/state" "$nested/data" "$nested/config" "$dir/backend-copy"
+  printf '%s' "$parent" > "$mate/.fm-secondmate-home"
+  printf '%s' "$child" > "$nested/.fm-secondmate-home"
+  printf 'uninspected dirty copy\n' > "$dir/backend-copy/sentinel"
+  fm_write_meta "$dir/home/state/$parent.meta" \
+    "window=test:fm-$parent" "endpoint_task_id=$parent" "worktree=$mate" "project=$mate" "home=$mate" \
+    "kind=secondmate" "mode=secondmate" "harness=echo" "yolo=off" "projects=alpha"
+  fm_write_meta "$mate/state/$child.meta" \
+    "window=test:fm-$child" "endpoint_task_id=$child" "worktree=$nested" "project=$nested" "home=$nested" \
+    "kind=secondmate" "mode=secondmate" "harness=echo" "yolo=off" "projects=alpha"
+  fm_write_meta "$nested/state/$leaf.meta" \
+    "window=fm-$leaf" "endpoint_task_id=$leaf" "terminal=term-leaf" \
+    "worktree=$dir/absent-copy" "project=$dir/project" \
+    "backend=orca" "orca_worktree_id=leaf::$dir/backend-copy" "kind=ship" "harness=echo"
+  cat > "$dir/fakebin/orca" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$dir/orca.log"
+if [ "\${1:-} \${2:-}" = "worktree show" ]; then
+  printf '{"ok":true,"result":{"worktree":{"path":"$dir/backend-copy"}}}\n'
+elif [ "\${1:-} \${2:-}" = "worktree rm" ]; then
+  rm -rf "$dir/backend-copy"
+  printf '{"ok":true,"result":{}}\n'
+else
+  printf '{"ok":true,"result":{}}\n'
+fi
+SH
+  chmod +x "$dir/fakebin/orca"
+  rc=0
+  env -u TMUX -u TMUX_PANE FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$parent" --force --drop-file "$(fm_test_drop_file)" \
+    > "$dir/child.out" 2> "$dir/child.err" || rc=$?
+  expect_code 0 "$rc" "absent nested Orca record cleanup refused: $(cat "$dir/child.err")"
+  assert_grep 'uninspected dirty copy' "$dir/backend-copy/sentinel" "nested cleanup removed the different backend copy"
+  assert_no_grep 'worktree rm' "$dir/orca.log" "nested cleanup dispatched backend worktree removal"
+  assert_absent "$dir/home/state/$parent.meta" "nested cleanup retained parent metadata"
+  pass "forced recursive descendant cleanup leaves an uninspected Orca backend copy intact"
+}
+
 test_orca_close_failure_refuses_even_under_force() {
   local dir orca_free id=orca-strand rc
   dir=$(make_case orca-close-failure)
@@ -1406,6 +1449,7 @@ test_failed_endpoint_close_refuses_before_removing_the_record
 test_forced_teardown_continues_past_a_close_it_could_not_make
 test_unreadable_close_read_refuses_while_a_definitive_absence_completes
 test_forced_secondmate_child_close_failure_still_refuses
+test_absent_orca_descendant_preserves_backend_copy
 test_orca_close_failure_refuses_even_under_force
 test_already_gone_endpoint_still_completes_without_a_refusal
 test_bare_relative_origin_shares_project_lock_with_clone

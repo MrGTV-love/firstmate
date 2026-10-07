@@ -60,9 +60,10 @@ Grok alone retains its isolated rendered-tail fallback.
 Cleanup keeps all shared Firstmate safety checks.
 A scout still requires its report and completed decision inventory.
 A ship still refuses dirty or unlanded work.
-Before release, cleanup resolves the recorded Orca worktree id and verifies its path matches the recorded worktree path.
-A missing, unreadable, or mismatched identity preserves metadata and stops rather than deleting anything.
-After those checks, Firstmate closes the exact terminal and releases the exact worktree with Orca's worktree command.
+When the recorded worktree path exists, cleanup resolves the recorded Orca worktree id and verifies its path strictly matches that inspected copy before mutations.
+An unreadable or mismatched backend identity preserves metadata and stops rather than deleting anything.
+When the recorded path is absent, cleanup closes the recorded terminal and retires task records without issuing an Orca worktree removal: the id may now identify a different, uninspected copy. This rule also applies to scouts, authorized forced drops, and recursive descendant cleanup.
+After the existing-copy checks, Firstmate closes the exact terminal and releases the exact worktree with Orca's worktree command.
 It never raw-deletes an Orca worktree.
 A close the CLI never attempted, because `orca` is not on the path, stops cleanup with the metadata intact even under `--force`: removing those records would leave nothing on disk naming a terminal that may still be live.
 Reinstall the CLI and rerun; [`verification/runtime-backends.md`](verification/runtime-backends.md) "Endpoint close" owns what this arm can and cannot prove about its own close.

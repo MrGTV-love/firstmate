@@ -392,6 +392,152 @@ SH
   pass "a retained collector survives watcher exit, rejects overlapping restart scans, and publishes without starvation"
 }
 
+install_failing_helper() {
+  printf '#!/usr/bin/env bash\n: > "$FM_STATE_OVERRIDE/.helper-ran"\nexit 1\n' > "$1/failing-open-loops"
+  chmod +x "$1/failing-open-loops"
+}
+
+test_decimal_interval_and_zero_defaults() {
+  local value dir state fakebin out pid
+  for value in 08 09 0100 0 00 000 invalid; do
+    dir=$(make_case "ledger-interval-$value")
+    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+    install_failing_helper "$fakebin"
+    publish_ledger "$state"
+    case "$value" in
+      08|09) set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json" ;;
+      0100) set_mtime "$(( $(date +%s) - 250 ))" "$state/open-loops.json" ;;
+      *) set_mtime "$(( $(date +%s) - 100 ))" "$state/open-loops.json" ;;
+    esac
+    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL="$value" \
+      FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+    pid=$!
+    case "$value" in
+      08|09)
+        wait_for_exit "$pid" 100 || { reap "$pid"; fail "decimal interval $value did not surface stale publication"; }
+        grep -q 'open-loop-ledger-stale' "$state/.wake-queue" || fail "interval $value did not queue a durable stale wake"
+        ;;
+      *)
+        wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "interval $value woke before its decimal stale threshold"; }
+        [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "interval $value queued an early stale wake"; }
+        if [ "$value" = 0100 ]; then
+          [ -e "$state/.helper-ran" ] || { reap "$pid"; fail "decimal interval 0100 did not refresh after 250 seconds"; }
+        else
+          [ ! -e "$state/.helper-ran" ] || { reap "$pid"; fail "interval $value did not use the 600-second default"; }
+        fi
+        reap "$pid"
+        ;;
+    esac
+  done
+  pass "leading-zero intervals use decimal refresh/stale thresholds and all zero spellings fall back"
+}
+
+test_decimal_resurface_and_zero_defaults() {
+  local kind value dir state fakebin out pid marker interval age
+  for kind in overdue stale; do
+    for value in 0100 0 00 000 invalid; do
+      dir=$(make_case "ledger-resurface-$kind-$value")
+      state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+      install_failing_helper "$fakebin"
+      interval=999999
+      if [ "$kind" = overdue ]; then
+        publish_ledger "$state" unchanged-obligation
+        marker="$state/.open-loops-surfaced"
+      else
+        publish_ledger "$state"
+        set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json"
+        marker="$state/.open-loops-stale-surfaced"
+        interval=10
+      fi
+      watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL="$interval" \
+        FM_OPEN_LOOPS_RESURFACE="$value" FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+      pid=$!
+      wait_for_exit "$pid" 100 || { reap "$pid"; fail "$kind initial wake failed for resurface $value"; }
+      ack_stopped_cycle "$state" || fail "could not acknowledge $kind resurface fixture"
+      age=100
+      [ "$value" != 0100 ] || age=85
+      set_mtime "$(( $(date +%s) - age ))" "$marker"
+      watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL="$interval" \
+        FM_OPEN_LOOPS_RESURFACE="$value" FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+      pid=$!
+      wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "$kind resurface $value did not preserve its decimal/default cooldown"; }
+      [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "$kind resurface $value queued prematurely"; }
+      if [ "$value" = 0100 ]; then
+        set_mtime "$(( $(date +%s) - 120 ))" "$marker"
+        wait_for_exit "$pid" 100 || { reap "$pid"; fail "$kind decimal resurface did not expire after 100 seconds"; }
+        grep -q 'open-loop-ledger' "$state/.wake-queue" || fail "$kind decimal resurface expiry was not durable"
+      else
+        reap "$pid"
+      fi
+    done
+  done
+  pass "both stale and overdue cooldowns use decimal resurface seconds and all zero spellings fall back"
+}
+
+test_real_publication_rearms_stale_incidents_without_resetting_overdue() {
+  local second dir state fakebin out pid digest surfaced
+  for second in aged missing; do
+    dir=$(make_case "ledger-recovery-$second")
+    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+    mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
+    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$dir/collector-bin/"
+    cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --home-input ] || exit 2
+printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"recovery-obligation","structured":true,"state":"queued","since":"2000-01-01T00:00:00Z"}]}}'
+SH
+    chmod +x "$dir/collector-bin/fm-fleet-snapshot.sh"
+    install_failing_helper "$fakebin"
+    FM_HOME="$dir" NM_HOME="$dir/nm" FM_STATE_OVERRIDE="$state" \
+      FM_DATA_OVERRIDE="$dir/data" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_PROJECTS_OVERRIDE="$dir/projects" "$dir/collector-bin/fm-open-loops.sh" --heartbeat \
+      || fail "real collector could not publish initial recovery fixture"
+    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
+    pid=$!
+    wait_for_exit "$pid" 100 || { reap "$pid"; fail "initial real overdue publication did not wake"; }
+    ack_stopped_cycle "$state" || fail "could not acknowledge initial overdue recovery fixture"
+    digest=$(cat "$state/.open-loops-surfaced")
+    surfaced=$(file_mtime "$state/.open-loops-surfaced")
+    set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json"
+    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=10 \
+      FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+    pid=$!
+    wait_for_exit "$pid" 100 || { reap "$pid"; fail "first stale incident did not wake"; }
+    [ -e "$state/.open-loops-stale-surfaced" ] || fail "first incident did not commit stale cooldown"
+    ack_stopped_cycle "$state" || fail "could not acknowledge first stale incident"
+    FM_HOME="$dir" NM_HOME="$dir/nm" FM_STATE_OVERRIDE="$state" \
+      FM_DATA_OVERRIDE="$dir/data" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_PROJECTS_OVERRIDE="$dir/projects" "$dir/collector-bin/fm-open-loops.sh" --heartbeat \
+      || fail "real collector could not publish recovery while watcher was stopped"
+    jq -e '.complete == true and any(.rows[]; .subject == "recovery-obligation" and .overdue)' \
+      "$state/open-loops.json" >/dev/null || fail "recovery did not publish the actual obligation"
+    [ ! -e "$state/.open-loops-stale-surfaced" ] || fail "successful real publication did not rearm stale suppression"
+    [ "$(cat "$state/.open-loops-surfaced")" = "$digest" ] \
+      && [ "$(file_mtime "$state/.open-loops-surfaced")" = "$surfaced" ] \
+      || fail "recovery publication reset unchanged overdue cooldown"
+    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
+    pid=$!
+    wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "fresh recovery re-alerted unchanged overdue rows"; }
+    [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "fresh recovery queued unchanged overdue rows"; }
+    reap "$pid"
+    if [ "$second" = aged ]; then
+      set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json"
+    else
+      rm "$state/open-loops.json"
+      : > "$state/.open-loops-started"
+      set_mtime "$(( $(date +%s) - 600 ))" "$state/.open-loops-started"
+    fi
+    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=10 \
+      FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+    pid=$!
+    wait_for_exit "$pid" 100 || { reap "$pid"; fail "$second second stale incident was suppressed by the first cooldown"; }
+    grep -q 'check: open-loop-ledger-stale' "$out" || fail "$second second incident was not an actionable stale exit"
+    grep -q 'open-loop-ledger-stale' "$state/.wake-queue" || fail "$second second stale incident was not durable"
+    [ -e "$state/.open-loops-stale-surfaced" ] || fail "$second second incident did not commit its own cooldown"
+  done
+  pass "real publication between stopped watchers rearms aged/missing stale incidents without resetting overdue cooldown"
+}
+
 test_overdue_row_wakes_with_a_durable_row
 test_unchanged_overdue_set_stays_quiet_then_new_row_wakes
 test_ledger_without_overdue_rows_is_silent
@@ -400,3 +546,6 @@ test_unpublished_ledger_is_its_own_wake
 test_failed_publication_retries_the_same_ledger
 test_blocked_publication_does_not_commit_cooldown
 test_retained_collector_survives_watcher_restart_without_overlap
+test_decimal_interval_and_zero_defaults
+test_decimal_resurface_and_zero_defaults
+test_real_publication_rearms_stale_incidents_without_resetting_overdue
