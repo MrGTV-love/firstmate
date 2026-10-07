@@ -24,7 +24,7 @@ install_runner() {  # <case-dir>
   mkdir -p "$dir/bin" "$dir/home/state" "$dir/home/data" "$dir/home/config"
   cp "$ROOT/bin/fm-afk-return.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/"
-  cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-path-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-classify-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-status-record-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-status-decision-lib.sh" "$ROOT/bin/fm-status-event-lib.sh" \
