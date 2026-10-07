@@ -367,3 +367,24 @@ test_failed_baseline_capture_keeps_busy_unknown_unconfirmed
 test_busy_pane_ambiguous_pending_retries_without_conversion
 test_unrecognized_state_skips_busy_conversion
 test_claude_busy_signature_uses_real_capture_shapes
+
+test_pending_frame_clears_before_retry() (
+  local dir="$TMP_ROOT/stale-pending" state out initial final
+  mkdir -p "$dir"
+  for initial in pending pending-unproven; do
+    for final in empty unknown; do
+      : > "$dir/enters"; printf '0' > "$dir/reads"
+      tmux() { printf 'Enter\n' >> "$dir/enters"; }
+      fm_tmux_composer_state() {
+        local n
+        n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
+        if [ "$n" -eq 1 ]; then printf '%s' "$initial"; else printf '%s' "$final"; fi
+      }
+      out=$(fm_tmux_submit_enter_core win 3 0)
+      [ "$out" = "$final" ] || fail "tmux $initial then $final must return fresh verdict, got '$out'"
+      [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "tmux must not Enter after fresh $final"
+    done
+  done
+  pass "tmux refreshes proven and unproven pending frames before retry"
+)
+test_pending_frame_clears_before_retry

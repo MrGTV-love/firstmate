@@ -3329,10 +3329,6 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 #     across herdr's per-attempt confirmation budget (not once at the end), so a
 #     transition landing partway through a window is still caught before this
 #     loop gives up and sends a needless extra Enter.
-#   - Instant round-trip or a native status that never leaves idle: bounded by
-#     the composer fallback. A cleared composer is delivery; a proven-pending
-#     composer on an idle pane is a swallow; extra Enter on an already-empty
-#     composer is a no-op, not a duplicate delivery of <text>.
 # Fallback path, for a harness whose native agent-state is never legibly idle
 # (measured live: herdr reports a cursor pane `blocked` in every state - idle,
 # mid-turn, and after - so the idle-baseline path above is structurally
@@ -3341,14 +3337,6 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 # right-aligned `ctrl+c to stop`, so the content verdict is `pending` on a
 # composer that holds no user text at all and every steer reported delivery
 # unconfirmed on a message that had actually landed.
-# The escape is the SAME semantic signal the idle-baseline path uses, read from
-# the pane's verified busy footer instead of native agent-state, and it is the
-# rendered-footer twin of the tmux submit core's turn-started confirmation
-# (bin/fm-tmux-lib.sh): an idle-to-busy transition ACROSS our Enter is proof the
-# harness accepted the submission. The baseline is taken before the first Enter
-# and only when the native baseline was not legibly idle, so the idle-baseline
-# path still never reads pane content until native stays idle. A pane already
-# mid-turn cannot use a rendered-footer transition as proof of this Enter;
 # Echoes empty|pending|unknown|send-failed, a subset of the proof-carrying
 # submit vocabulary. Empty means confirmed submitted for every backend; how
 # each backend confirms it is an internal decision.
@@ -3565,11 +3553,14 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       verdict=$(fm_backend_herdr_wait_for_working "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE" \
         "$confirm_sleep" "$FM_BACKEND_HERDR_SUBMIT_POLLS")
       case "$verdict" in
-        busy) printf 'empty'; return 0 ;;
+        busy)
+          case "${identity%%$'\t'*}" in
+            claude|codex)
+              printf 'empty'; return 0 ;;
+          esac
+          ;;
         unknown) printf 'unknown'; return 0 ;;
       esac
-      # Native stayed idle. Composer empty is positive delivery (a landed
-      # Claude turn that never flipped agent_status). Proven pending retries.
       verdict=$(fm_backend_herdr_composer_state_as "$target" "$identity")
       case "$verdict" in
         empty) printf 'empty'; return 0 ;;
@@ -3579,12 +3570,12 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
     else
       sleep "$sleep_s"
       verdict=$(fm_backend_herdr_composer_state_as "$target" "$identity")
-      if [ "$verdict" = pending ] && [ "${identity%%$'\t'*}" != omp ] && [ "$raw_status" != working ] \
+      if [ "$verdict" = pending ] && [ "${identity%%$'\t'*}" = cursor ] && [ "$raw_status" != working ] \
         && [ "$footer_baseline" = idle ] \
         && [ "$(fm_backend_herdr_rendered_busy_state "$target")" = busy ]; then
         verdict=busy
       fi
-      if [ "$verdict" = pending ]; then
+      if [ "$verdict" = pending ] || [ "$verdict" = pending-unproven ]; then
         # A frame drawn before the harness consumed the Enter also reads
         # pending, and a second Enter on the by-now empty composer can abort a
         # running omp turn that has queued messages (its empty-submit rule).
@@ -3607,6 +3598,14 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
           "$(fm_backend_herdr_queued_enter_busy)" "${identity%%$'\t'*}"
       fi
       return 0
+    fi
+    if [ "$baseline" = idle ]; then
+      sleep "$sleep_s"
+      verdict=$(fm_backend_herdr_composer_state_as "$target" "$identity")
+      case "$verdict" in
+        pending|pending-unproven) ;;
+        *) printf '%s' "$verdict"; return 0 ;;
+      esac
     fi
   done
 }

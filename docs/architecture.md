@@ -253,6 +253,9 @@ Endpoint death is the only process-level override and yields dead; child process
 `state/<id>.turn-ended` files remain wake notifications, not current state.
 
 Each record is bound to an incarnation token minted when the task's wiring is armed, so an event from a superseded incarnation is rejected rather than applied, and a record left behind by one classifies unknown.
+Ordinary omp secondmates load the same state-resident, per-task busy adapter as crewmates, bound to their parent's task id and generation; their home-local primary extensions still load once through cwd auto-discovery.
+The secondmate adapter publishes unknown at session replacement and busy before a new turn, then publishes idle only at a final `agent_end` without `willContinue`.
+Stalled-loop recovery submits an exact recorded restored watcher wake only with that positive idle classification and a live agent; busy, unknown, native Herdr idle alone, or operator text in the composer leave the parent alarm intact.
 Three rendered-text checks deliberately remain outside this contract because they answer delivery questions: submit acknowledgement and the away-mode supervisor-pane busy guard consume the shared delivery-footer matcher owned by `bin/fm-composer-lib.sh`, while `bin/fm-pending-reply-lib.sh` owns the secondmate delivery-confirmation observation.
 All are harness-scoped rather than a global pattern union, and none is a recorded worker state source.
 

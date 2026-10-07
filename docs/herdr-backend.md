@@ -635,14 +635,14 @@ Their pre-Enter typed-payload proof has not been live-verified; composer classif
 
 On an idle or done native baseline, submit confirmation proceeds in this order:
 
-1. Wait for `working` or `blocked` across a bounded polling window.
-2. If native status stays idle, use the shared composer verdict as the next positive signal.
-   A cleared composer is delivery, and proven pending text retries Enter.
+1. Wait for `working` or `blocked` across a bounded polling window. Native transition alone confirms only positively identified Claude or Codex; omp and missing or other identities still require composer clearance, because resumed work on another turn cannot prove this Enter delivered retained text.
+2. If native status stays idle, or identity is ineligible for native-transition-only proof, use the shared composer verdict as the next positive signal.
+   A cleared composer is delivery; pending and unproven pending text receive a fresh composer read before another Enter is allowed.
 3. After the retry budget, `fm_composer_queued_enter_verdict` accepts retained proven pending text only for positively identified OpenCode with native `working`, whose Enter queue semantics are verified.
    omp, Claude, unknown harnesses, and idle or unreadable busy signals remain pending; a different active turn is not delivery proof.
 
 On an already active or unreadable baseline, the adapter falls back to conservative composer clearance.
-That fallback adds a pre-Enter rendered-footer transition when the baseline is unavailable.
+That fallback accepts a pre-Enter rendered-footer idle-to-busy transition only for positively identified Cursor, whose mid-turn placeholder includes a busy token; missing and unsupported identity preserve pending text.
 A fully unreadable target stops retrying and reports unknown.
 
 `blocked` is not treated as a queued-Enter busy signal, so a Cursor pane that reports blocked in every state does not receive that conversion.
@@ -659,7 +659,7 @@ Cursor is one such harness:
 
 That fallback alone reported every delivered steer as unconfirmed.
 So it is paired with a rendered-footer transition.
-The pane's verified busy footer is read once before the first Enter, and an idle-to-busy transition across that Enter confirms the submit.
+For a positively identified Cursor pane, the verified busy footer is read once before the first Enter, and an idle-to-busy transition across that Enter confirms the submit.
 It is the same semantic signal the native path uses and the same one the tmux submit core reads.
 
 A pane already mid-turn cannot borrow a rendered-footer transition as proof of this delivery.

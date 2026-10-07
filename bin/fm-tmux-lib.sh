@@ -263,6 +263,12 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     esac
     i=$((i + 1))
     [ "$i" -lt "$retries" ] || break
+    sleep "$sleep_s"
+    state=$(fm_tmux_composer_state "$target")
+    case "$state" in
+      pending|pending-unproven) ;;
+      *) printf '%s' "$state"; return 0 ;;
+    esac
   done
   if [ "$state" != pending ]; then
     printf '%s' "$state"

@@ -336,27 +336,41 @@ fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
 fm_task_inbox_composer_holds_wake() {
   local cap held
   [ -n "${3:-}" ] || return 1
-  fm_backend_source "$1" || return 1
-  cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 1
-  held=$(fm_composer_extract_selected_content styled=0 "$cap") || return 1
+  [ -d "$3" ] && [ -r "$3" ] || return 2
+  fm_backend_source "$1" || return 2
+  cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 2
+  held=$(fm_composer_extract_selected_content styled=0 "$cap") || return 2
   [ -n "$held" ] && fm_operational_watcher_wakes_only "$held" "$3"
 }
 
 fm_task_inbox_submit_held_wake() {
-  local backend=$1 target=$2 record_dir=${3:-} idle_callback=${4:-} label=${5:-} idle_class
+  local backend=$1 target=$2 record_dir=${3:-} idle_callback=${4:-} label=${5:-} idle_class match_status
   [ -n "$record_dir" ] && [ -n "$idle_callback" ] || return 1
-  [ "$(fm_backend_composer_state "$backend" "$target" "$label" 2>/dev/null)" = pending ] || return 1
   fm_task_inbox_composer_holds_wake "$backend" "$target" "$record_dir" "$label" || return 1
   idle_class=$("$idle_callback" "$target" 2>/dev/null) || return 1
   [ "$idle_class" = idle ] || return 1
   fm_backend_send_key "$backend" "$target" Enter "$label" >/dev/null 2>&1 || return 2
   sleep "${FM_TASK_INBOX_SUBMIT_CONFIRM_SECS:-0.5}"
-  fm_task_inbox_composer_holds_wake "$backend" "$target" "$record_dir" "$label" || return 0
+  if fm_task_inbox_composer_holds_wake "$backend" "$target" "$record_dir" "$label"; then
+    match_status=0
+  else
+    match_status=$?
+  fi
+  case "$match_status" in
+    0) ;;
+    1) return 0 ;;
+    *) return 3 ;;
+  esac
   idle_class=$("$idle_callback" "$target" 2>/dev/null) || return 3
   [ "$idle_class" = idle ] || return 3
   fm_backend_send_key "$backend" "$target" Enter "$label" >/dev/null 2>&1 || return 2
   sleep "${FM_TASK_INBOX_SUBMIT_CONFIRM_SECS:-0.5}"
-  fm_task_inbox_composer_holds_wake "$backend" "$target" "$record_dir" "$label" || return 0
+  if fm_task_inbox_composer_holds_wake "$backend" "$target" "$record_dir" "$label"; then
+    return 3
+  else
+    match_status=$?
+  fi
+  [ "$match_status" -eq 1 ] && return 0
   return 3
 }
 

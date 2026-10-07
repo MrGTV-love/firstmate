@@ -199,19 +199,25 @@ fm_operational_input_classify() {  # <message> <result-var>
 }
 
 fm_operational_watcher_wakes_only() {
-  local text=${1-} record_dir=${2-} squeezed record saved
+  local text=${1-} record_dir=${2-} squeezed record saved status=1
   [ -n "$record_dir" ] && [ -d "$record_dir" ] || return 1
+  if ! command -v fm_composer_normalize_spaces_var >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-composer-lib.sh
+    . "$(dirname "${BASH_SOURCE[0]}")/fm-composer-lib.sh" || return 2
+  fi
   squeezed=${text//"$FM_OPERATIONAL_MARK"/}
-  squeezed=${squeezed//[[:space:]]/}
+  fm_composer_normalize_spaces_var squeezed
+  squeezed=${squeezed//[$' \t\r\n\v\f']/}
   [ -n "$squeezed" ] || return 1
   for record in "$record_dir"/unconsumed-*.wake; do
     [ -f "$record" ] || continue
-    saved=$(cat "$record" 2>/dev/null) || continue
+    saved=$(cat "$record" 2>/dev/null) || { status=2; continue; }
     saved=${saved//"$FM_OPERATIONAL_MARK"/}
-    saved=${saved//[[:space:]]/}
+    fm_composer_normalize_spaces_var saved
+    saved=${saved//[$' \t\r\n\v\f']/}
     [ "$squeezed" = "$saved" ] && return 0
   done
-  return 1
+  return "$status"
 }
 
 fm_message_from_firstmate() {  # <message>

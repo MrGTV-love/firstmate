@@ -662,6 +662,34 @@ test_composer_footer_zone_refuses_rather_than_allows() {
   pass "fm_composer_classify_screen: the footer zone only ever refuses, never allows"
 }
 
+test_extraction_retains_blank_paragraphs() {
+  local caps screen out expected='first paragraph second paragraph final line'
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    for screen in \
+      $'transcript\n❯ first paragraph\n\nsecond paragraph\n   \nfinal line' \
+      $'transcript\n╭────────────────────────╮\n│ ❯ first paragraph      │\n│                        │\n│ second paragraph       │\n│                        │\n│ final line             │\n╰────────────────────────╯' \
+      $'transcript\n❯ first paragraph\n\nsecond paragraph\n   \nfinal line\n│ boundary\nfooter must not leak' \
+      $'transcript\n❯ first paragraph\n\nsecond paragraph\n   \nfinal line\nπ · model\nfooter must not leak' \
+      $'transcript\n❯ first paragraph\n\nsecond paragraph\n   \nfinal line\n⠁⠂\nfooter must not leak' \
+      $'transcript\n❯ first paragraph\n\nsecond paragraph\n   \nfinal line\n▀▀▀▀▀▀▀▀\n  gpt-5.5 xhigh · Context 100% left'
+    do
+      out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+        || fail "a complete multiline composer must remain extractable"
+      [ "$out" = "$expected" ] || fail "blank paragraphs must not truncate content or admit footer text, got '$out'"
+      out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+        || fail "a complete multiline composer must remain extractable under LC_ALL=C"
+      [ "$out" = "$expected" ] || fail "blank paragraphs under LC_ALL=C must preserve complete content, got '$out'"
+    done
+    screen=$'❯ first paragraph\n\nsecond paragraph\n\noperator edit'
+    out=$(fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = 'first paragraph second paragraph operator edit' ] \
+      || fail "an edit beyond a blank paragraph must survive extraction, got '$out'"
+    out=$(fm_composer_extract_selected_content "$caps" $'❯\n\n')
+    [ -z "$out" ] || fail "empty trailing rows must terminate without creating draft content"
+  done
+  pass "composer extraction: boxed and borderless blank paragraphs preserve all content through EOF or a structural boundary"
+}
+
 test_matrix_codex_dim_hint_row() {
   # Real idle codex: bold `›`, reset, then an SGR-2 dim hint. Styled captures
   # strip the ghost and prove empty; plain captures must defer as unknown -
@@ -1376,16 +1404,24 @@ test_lower_dead_shell_invalidates_cursorless_candidate() {
 }
 
 test_cursorless_bare_wrap_region_classifies() {
-  local activity status bounded ghost out
+  local activity status bounded ghost out caps
   activity=$'❯\nWorking on request...'
   assert_screen "cursorless activity below bare row on herdr" pending "$CAPS_STYLED" "$activity"
   assert_screen "cursorless activity below bare row on zellij" pending "$CAPS_STYLED_NOID" "$activity"
   assert_screen "cursorless activity below bare row on cmux/orca" unknown "$CAPS_PLAIN" "$activity"
 
-  status=$'›\n\ncodex status line'
-  assert_screen "blank-separated codex status on herdr" empty "$CAPS_STYLED" "$status"
-  assert_screen "blank-separated codex status on zellij" empty "$CAPS_STYLED_NOID" "$status"
-  assert_screen "blank-separated codex status on cmux/orca" empty "$CAPS_PLAIN" "$status"
+  for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    for status in \
+      $'›\n\n  gpt-5.5 xhigh · Context 100% left' \
+      $'›\n\n  gpt-5.5 xhigh · Context 97% left · /private/tmp · 2…'
+    do
+      assert_screen "bare Codex above its blank-separated footer" empty "$caps" "$status"
+    done
+  done
+  status=$'› '"${ESC}[2mSummarize recent commits${ESC}[0m"$'\n\n  gpt-5.5 xhigh · Context 97% left · /private/tmp · 2…'
+  assert_screen "Codex ghost suggestion above its footer on herdr" empty "$CAPS_STYLED" "$status"
+  assert_screen "Codex ghost suggestion above its footer on zellij" empty "$CAPS_STYLED_NOID" "$status"
+  assert_screen "Codex suggestion without styling stays unproven" unknown "$CAPS_PLAIN" "$status"
 
   bounded=$'────────────────────────\n❯\n────────────────────────\nClaude 4.1'
   assert_screen "rule-bounded claude footer on herdr" empty "$CAPS_STYLED" "$bounded" '' probe-absent
@@ -1484,10 +1520,6 @@ test_selected_content_is_composer_scoped_and_wrap_normalized() {
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
   [ "$out" = 'Type a message...' ] \
     || fail "surviving placeholder-like input should remain extracted user content, got '$out'"
-  screen=$'❯ a legitimately long steer that\nwraps across the next bare row\n\ntranscript below the break'
-  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
-  [ "$out" = 'a legitimately long steer that wraps across the next bare row' ] \
-    || fail "bare extraction should include only its contiguous wrap region, got '$out'"
   screen=$'❯ wrapped user content\ncontinuation preserves a mid-row ❯ glyph'
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
   [ "$out" = 'wrapped user content continuation preserves a mid-row ❯ glyph' ] \
@@ -1567,6 +1599,7 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
   pass "slash-menu demotion cannot select an empty parent or replace a real lower draft or shell"
 }
 
+test_extraction_retains_blank_paragraphs
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty
@@ -1662,3 +1695,39 @@ test_queued_enter_requires_supported_harness
 test_queued_enter_verdict_busy_pending_is_empty
 test_queued_enter_verdict_idle_pending_stays_pending
 test_queued_enter_verdict_does_not_convert_other_states
+
+test_cursorless_submit_refreshes_pending_before_retry() (
+  local dir backend initial final out
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-composer-retry.XXXXXX")
+  trap 'rm -rf "$dir"' EXIT
+  for backend in cmux orca zellij; do
+    . "$ROOT/bin/backends/$backend.sh"
+    eval "fm_backend_${backend}_send_literal() { printf 'literal\n' >> \"\$dir/literals\"; }"
+    eval "fm_backend_${backend}_send_key() { printf '%s\n' \"\$2\" >> \"\$dir/enters\"; }"
+    eval "fm_backend_${backend}_composer_state() { retry_test_state; }"
+    fm_backend_cmux_parse_target() { return 0; }
+    fm_backend_orca_tool_check() { return 0; }
+    fm_backend_zellij_composer_content() { printf ''; }
+    fm_backend_zellij_composer_observed_append() { return 0; }
+    for initial in pending pending-unproven; do
+      for final in empty unknown pending; do
+        : > "$dir/enters"; : > "$dir/literals"; printf '0' > "$dir/reads"
+        retry_test_state() {
+          local n
+          n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
+          if [ "$n" -eq 1 ]; then printf '%s' "$initial"; else printf '%s' "$final"; fi
+        }
+        out=$("fm_backend_${backend}_send_text_submit" target payload 2 0 0 label)
+        [ "$out" = "$final" ] || fail "$backend $initial then $final returned '$out'"
+        [ "$(wc -l < "$dir/literals" | tr -d ' ')" -eq 1 ] || fail "$backend must type only once"
+        if [ "$final" = pending ]; then
+          [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 2 ] || fail "$backend must retry fresh pending"
+        else
+          [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "$backend must not retry fresh $final"
+        fi
+      done
+    done
+  done
+  pass "cmux orca and zellij submit refresh pending frames without retyping"
+)
+test_cursorless_submit_refreshes_pending_before_retry

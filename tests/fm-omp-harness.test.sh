@@ -19,8 +19,8 @@
 #      ancestor: it beats an inherited CLAUDECODE under omp and is inert when it
 #      leaks into a worker whose ancestry holds no omp.
 #   3. Every omp launch clears foreign markers, carries the tracked posture
-#      overlay, --auto-approve, --cwd, and (for a crewmate) one -e pointing at
-#      state/<id>.omp-ext.ts; a secondmate launch names no -e at all.
+#      overlay, --auto-approve, --cwd, and one -e pointing at
+#      state/<id>.omp-ext.ts, with secondmate primary extensions auto-discovered.
 #   4. A <provider>/<id> model is validated only when `omp models --json` lists
 #      that provider; an unlisted provider passes through with a notice.
 #   5. Busy state: agent_start is busy, agent_end with willContinue stays busy,
@@ -56,10 +56,38 @@ export NODE_NO_WARNINGS=1
 make_named_shells() {  # <dir> -> echoes <bindir>
   local dir=$1 name
   mkdir -p "$dir"
-  for name in omp ompd comp; do
+  for name in omp ompd comp bash; do
     ln -sf /bin/bash "$dir/$name"
   done
+  cat > "$dir/ps" <<'SH'
+#!/usr/bin/env bash
+set -u
+field= pid= prev=
+for arg in "$@"; do
+  [ "$prev" = -o ] && field=$arg
+  [ "$prev" = -p ] && pid=$arg
+  prev=$arg
+done
+if [ "$field" = ppid= ] && [ "$pid" = "${FM_TEST_ANCESTRY_ROOT:?}" ]; then
+  printf '0\n'
+else
+  exec "${FM_TEST_REAL_PS:?}" "$@"
+fi
+SH
+  chmod +x "$dir/ps"
   printf '%s' "$dir"
+}
+
+under_named_shell() {
+  local bin=$1 name=$2
+  shift 2
+  # shellcheck disable=SC2016
+  env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u FM_PI_HARNESS \
+    -u GROK_AGENT -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+    -u ATLASSIAN_AGENT_TYPE -u ROVODEV_CLI \
+    -u FM_SUPERVISION_ACTOR -u FM_SUPERVISION_PRIMARY_HARNESS \
+    PATH="$bin:$PATH" FM_TEST_REAL_PS="$(command -v ps)" "$@" \
+    "$bin/$name" -c 'export FM_TEST_ANCESTRY_ROOT=$$; "$1"; :' _ "$HARNESS"
 }
 
 # --- 1. Detection --------------------------------------------------------------
@@ -67,25 +95,17 @@ make_named_shells() {  # <dir> -> echoes <bindir>
 test_detection_anchored_name_and_marker_precedence() {
   local bin out
   bin=$(make_named_shells "$TMP_ROOT/named")
-  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-  out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+  out=$(under_named_shell "$bin" omp)
   [ "$out" = omp ] || fail "a process named omp must detect as omp, got '$out'"
   for decoy in ompd comp; do
-    # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-    out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-      "$bin/$decoy" -c '"$1"; :' _ "$HARNESS")
-    [ "$out" != omp ] || fail "'$decoy' merely contains omp and must not detect as omp"
+    out=$(under_named_shell "$bin" "$decoy")
+    [ "$out" = unknown ] || fail "'$decoy' merely contains omp and must detect as unknown, got '$out'"
   done
   # The marker beats an inherited CLAUDECODE only under a real omp ancestor.
-  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+  out=$(under_named_shell "$bin" omp CLAUDECODE=1 FM_OMP_HARNESS=omp)
   [ "$out" = omp ] || fail "FM_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
   # ...and is inert when it leaks into a worker with no omp ancestor.
-  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    bash -c '"$1"; :' _ "$HARNESS")
+  out=$(under_named_shell "$bin" bash CLAUDECODE=1 FM_OMP_HARNESS=omp)
   [ "$out" = claude ] || fail "a leaked FM_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
   pass "fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry"
 }
@@ -210,12 +230,12 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 }
 
 test_secondmate_launch_relies_on_discovery() {
-  # A seeded secondmate home, launched for real through fm-spawn on omp: the
-  # launch must carry the posture overlay and pin --cwd to the home, and must
-  # name NO -e, because omp auto-discovers the home's tracked .omp/extensions
-  # and a file named both ways loads twice.
-  local world home fakebin launchlog out status launch
+  local world repo home fakebin launchlog out status launch state ext
   world="$TMP_ROOT/secondmate"
+  repo="$world/repo"
+  fm_git_init_commit "$repo"
+  ln -s "$ROOT/bin" "$repo/bin"
+  ln -s "$ROOT/.omp" "$repo/.omp"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
   printf '# Firstmate\n' > "$home/AGENTS.md"
@@ -230,7 +250,7 @@ test_secondmate_launch_relies_on_discovery() {
   # FM_BACKEND=tmux pins the fake tmux even where the developer shell carries a
   # live Herdr environment; without it auto-detection would spawn a real pane.
   out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
+    FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
     FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
     FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
@@ -239,15 +259,44 @@ test_secondmate_launch_relies_on_discovery() {
   expect_code 0 "$status" "omp secondmate spawn should succeed: $out"
   assert_grep "harness=omp" "$world/home/state/sm.meta" "secondmate meta missing harness=omp"
   launch=$(cat "$launchlog")
-  case "$launch" in
-    *" -e "*) fail "an omp secondmate launch must name no -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch" ;;
-  esac
-  assert_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
+  state="$world/home/state"
+  ext="$state/sm.omp-ext.ts"
+  assert_contains "$launch" "-e '$ext'" "secondmate launch must load its distinct semantic busy adapter"
+  assert_not_contains "$launch" "-e '$home/.omp/extensions/" "secondmate primary extensions must not be explicitly loaded twice"
+  assert_contains "$launch" "--config '$repo/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
   assert_not_contains "$launch" "fm-worker-overlay.yml" "secondmate launch must preserve the lane's memory settings"
   assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
   assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
-  assert_absent "$world/home/state/sm.omp-ext.ts" "a secondmate must not receive a per-task worker extension"
-  pass "fm-spawn: a real omp secondmate launch relies on auto-discovery while crewmates load one -e"
+  assert_present "$ext" "secondmate spawn did not write its task-bound busy extension"
+  out=$(drive_omp_ext "$ext" handlers) || fail "secondmate handler registration failed: $out"
+  case " $out " in
+    *" tool_call "*|*" turn_end "*) fail "a secondmate registered worker guardrail or turn-end handlers: $out" ;;
+  esac
+  for handler in before_agent_start agent_start agent_end session_start session_shutdown; do
+    case " $out " in
+      *" $handler "*) ;;
+      *) fail "secondmate missing lifecycle handler $handler: $out" ;;
+    esac
+  done
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy fm-spawn" ] || fail "secondmate spawn did not arm the parent's task contract"
+  drive_omp_ext "$ext" session-start || fail "secondmate session_start drive failed"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown omp-ext" ] || fail "a replacement session must invalidate settled evidence"
+  drive_omp_ext "$ext" before-start || fail "secondmate before_agent_start drive failed"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy omp-ext" ] || fail "a new secondmate turn must be busy before it runs"
+  drive_omp_ext "$ext" end-continuing || fail "secondmate continuing agent_end drive failed"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy omp-ext" ] || fail "a continuing secondmate run was falsely settled"
+  drive_omp_ext "$ext" end-final || fail "secondmate final agent_end drive failed"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "idle omp-ext" ] || fail "a settled secondmate must publish positive idle to its parent"
+  drive_omp_ext "$ext" end-and-restart || fail "secondmate restarted turn drive failed"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy omp-ext" ] || fail "an old settled write overrode a new secondmate turn"
+  drive_omp_ext "$ext" session-shutdown || fail "secondmate shutdown drive failed"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown omp-ext" ] || fail "secondmate shutdown retained stale settled evidence"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" sm >/dev/null || fail "could not rearm the replacement secondmate"
+  drive_omp_ext "$ext" end-final || fail "stale secondmate end drive failed"
+  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy fm-spawn" ] || fail "an old secondmate extension overwrote its replacement generation"
+  [ ! -e "$state/sm.turn-ended" ] || fail "secondmate busy wiring wrote a parent turn notification"
+  [ ! -e "$home/state/sm.busy-state" ] || fail "secondmate busy wiring published under the child's own worker id"
+  pass "fm-spawn: omp secondmates publish parent-bound busy/settled evidence without duplicate primary loading"
 }
 
 test_secondmate_config_pinned_model_is_validated() {
@@ -255,8 +304,12 @@ test_secondmate_config_pinned_model_is_validated() {
   # primary's config/secondmate-harness rather than the command line: the
   # durable pin lands on MODEL after the harness case arm, so an unlisted id
   # under a listed provider must still be refused before endpoint creation.
-  local world home fakebin launchlog out status
+  local world repo home fakebin launchlog out status
   world="$TMP_ROOT/secondmate-config-model"
+  repo="$world/repo"
+  fm_git_init_commit "$repo"
+  ln -s "$ROOT/bin" "$repo/bin"
+  ln -s "$ROOT/.omp" "$repo/.omp"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
   printf '# Firstmate\n' > "$home/AGENTS.md"
@@ -270,7 +323,7 @@ test_secondmate_config_pinned_model_is_validated() {
   launchlog="$world/launch.log"
   : > "$launchlog"
   out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
+    FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
     FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
     FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
@@ -298,6 +351,15 @@ const ctx = { isIdle: () => false };
 switch (process.env.MODE) {
   case "handlers": console.log(Object.keys(handlers).sort().join(" ")); break;
   case "agent-start": await handlers["agent_start"]({ type: "agent_start" }, ctx); break;
+  case "before-start": await handlers["before_agent_start"]({ type: "before_agent_start", prompt: "next" }, ctx); break;
+  case "session-start": await handlers["session_start"]({ type: "session_start" }, ctx); break;
+  case "session-shutdown": await handlers["session_shutdown"]({ type: "session_shutdown" }, ctx); break;
+  case "end-and-restart": {
+    const ending = handlers["agent_end"]({ type: "agent_end" }, ctx);
+    const starting = handlers["before_agent_start"]({ type: "before_agent_start", prompt: "next" }, ctx);
+    await Promise.all([ending, starting]);
+    break;
+  }
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
@@ -322,7 +384,10 @@ test_busy_extension_lifecycle() {
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
   esac
-  for handler in agent_start agent_end turn_end; do
+  case " $out " in
+    *" session_start "*|*" session_shutdown "*) fail "a worker registered secondmate session handlers: $out" ;;
+  esac
+  for handler in before_agent_start agent_start agent_end tool_call turn_end; do
     case " $out " in
       *" $handler "*) ;;
       *) fail "the omp extension must register $handler, got '$out'" ;;

@@ -52,6 +52,8 @@ SESSION=$("$LAB_HELPER" name omp-wake-restore)
 LAB=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-omp-wake-restore.XXXXXX")
 PROJECT="$LAB/project"
 FAKEBIN="$LAB/fakebin"
+PARENT="$LAB/parent"
+REAL_OMP=$(PATH="$ORIGINAL_PATH" command -v omp)
 MODEL=${FM_OMP_WAKE_RESTORE_LIVE_MODEL:-openai-codex/gpt-6-astra}
 mkdir -p "$FAKEBIN"
 
@@ -104,6 +106,7 @@ export PATH="$FAKEBIN:$ORIGINAL_PATH"
 . "$ROOT/bin/backends/herdr.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-task-inbox-lib.sh"
+. "$ROOT/bin/fm-busy-lib.sh"
 set +e
 
 lab() { env PATH="$ORIGINAL_PATH" "$LAB_HELPER" run "$SESSION" "$@"; }
@@ -126,6 +129,9 @@ mkdir -p "$PROJECT/state" "$PROJECT/config" "$PROJECT/data"
 # The session overlay with the composer shape every lane that lost its pin shows.
 BOX_OVERLAY="$LAB/box-overlay.yml"
 sed 's/^  shape: borderless$/  shape: box/' "$ROOT/.omp/fm-session-overlay.yml" > "$BOX_OVERLAY"
+cp "$BOX_OVERLAY" "$PROJECT/.omp/fm-session-overlay.yml"
+mkdir -p "$PARENT/state" "$PARENT/config" "$PARENT/data" "$PARENT/projects"
+printf 'Live wake recovery lab: arm watcher when asked, perform only requested checks, and otherwise stay idle.\n' > "$PROJECT/data/charter.md"
 
 PANE=
 TARGET=
@@ -147,29 +153,34 @@ wait_for() {  # <seconds> <command...>
   return 1
 }
 
-# omp draws its identity glyph in the box status line only while it is idle.
-is_idle() { screen | grep -Eq '^╭── (π|󰵗) [>·] '; }
-is_busy() { screen | grep -Eq '^╭── [⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷] [0-9]+[smh]'; }
+live_busy_class() {
+  local verdict
+  [ "$1" = "$TARGET" ] || { printf unknown; return; }
+  verdict=$(fm_busy_classify_meta "$PARENT/state/wakemate.meta" wakemate "$PARENT/state")
+  printf '%s' "${verdict%% *}"
+}
+is_idle() { [ "$(live_busy_class "$TARGET")" = idle ]; }
+is_busy() { [ "$(live_busy_class "$TARGET")" = busy ]; }
 queue_drained() { [ "$(queue_rows)" -eq 0 ]; }
 composer_is() { [ "$(composer)" = "$1" ]; }
-live_idle_class() {
-  fm_backend_capture herdr "$1" 40 '' 2>/dev/null | grep -Eq '^╭── (π|󰵗) [>·] ' || return 1
-  printf '%s' idle
-}
 
-# start_omp <label> [ENV=value...]: a fresh omp in its own pane, idle and armed.
+# start_omp <label> [ENV=value...]
 start_omp() {
-  local label=$1 ws
+  local label=$1
   shift
-  rm -f "$PROJECT/state/.wake-queue" "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state/wakelab.status"
-  ws=$(lab workspace create --cwd "$PROJECT" --label "$label" --no-focus) \
-    || fail "could not create the isolated workspace for $label"
-  PANE=$(printf '%s' "$ws" | jq -er '.result.root_pane.pane_id') \
-    || fail "workspace create did not return a pane id"
-  TARGET="$SESSION:$PANE"
-  lab pane run "$PANE" "env -u CLAUDECODE FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 $* FM_HOME='$PROJECT' FM_ROOT_OVERRIDE='$PROJECT' FM_STATE_OVERRIDE='$PROJECT/state' FM_CONFIG_OVERRIDE='$PROJECT/config' FM_DATA_OVERRIDE='$PROJECT/data' omp --config '$BOX_OVERLAY' --auto-approve --cwd '$PROJECT' --model $MODEL --thinking low" >/dev/null \
-    || fail "could not launch $SUBJECT for $label"
-  wait_for 90 is_idle || { screen >&2; fail "$SUBJECT never drew its idle box composer for $label"; }
+  rm -f "$PROJECT/state/.wake-queue" "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state/wakelab.status" "$PARENT/state/wakemate.meta"
+  printf 'wakemate\n' > "$PROJECT/.fm-secondmate-home"
+  printf '#!/usr/bin/env bash\nexec env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 %s %q "$@"\n' "$*" "$REAL_OMP" > "$FAKEBIN/omp"
+  chmod +x "$FAKEBIN/omp"
+  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_SKIP_SECONDMATE_SYNC=1 FM_SKIP_SECONDMATE_INHERIT=1 \
+    FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$PROJECT" FM_STATE_OVERRIDE="$PARENT/state" \
+    FM_CONFIG_OVERRIDE="$PARENT/config" FM_DATA_OVERRIDE="$PARENT/data" \
+    HERDR_SESSION="$SESSION" "$PROJECT/bin/fm-spawn.sh" wakemate "$PROJECT" omp --secondmate \
+    --backend herdr --model "$MODEL" --effort low > "$LAB/spawn-$label.out" 2>&1 \
+    || fail "could not launch the ordinary omp secondmate for $label: $(cat "$LAB/spawn-$label.out")"
+  TARGET=$(fm_backend_target_of_meta "$PARENT/state/wakemate.meta")
+  PANE=${TARGET#*:}
+  wait_for 120 is_idle || { screen >&2; fail "$SUBJECT never published settled task evidence for $label"; }
   sleep 2
   send_text 'Call the fm_watch_arm_omp tool exactly once now, then reply with only the word ARMED.'
   sleep 1
@@ -266,7 +277,7 @@ sleep 1
 before=$(fm_backend_herdr_composer_content "$TARGET" '')
 fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
   && fail "$SUBJECT: a composer holding a draft beside the wake was read as wake-only"
-fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_idle_class
+fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_busy_class
 [ $? -eq 1 ] || fail "$SUBJECT: the recovery did not refuse a composer that also holds a draft"
 [ "$(fm_backend_herdr_composer_content "$TARGET" '')" = "$before" ] \
   || fail "$SUBJECT: the refused recovery changed the composer"
@@ -275,7 +286,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do send_key backspace; done
 wait_for 20 fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
   || { screen >&2; fail "$SUBJECT: could not remove the operator words from the composer"; }
 
-fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_idle_class
+fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_busy_class
 rc=$?
 [ "$rc" -eq 0 ] || { screen >&2; fail "$SUBJECT: the parent recovery did not submit the restored wake (rc=$rc)"; }
 wait_for 90 queue_drained || fail "$SUBJECT: the lane did not handle the wake the parent submitted"
