@@ -1009,7 +1009,11 @@ case "${1:-}" in
             && [ "$(cat "${FM_FAKE_TMUX_SENT:?}")" = '[ENTER]' ]; then
             :
           else
-            printf '╭── π > ◒ GPT-6-Astra ──╮\n╰─  ─╯\n' > "${FM_FAKE_TMUX_SCREEN:?}"
+            if [ "${FM_FAKE_CLEAR_WAKE_SHAPE:-box}" = bare ]; then
+              printf '❯ \033[38;2;0;180;255m⇧⇥\033[38;2;229;229;231m \033[38;2;107;114;128mto change thinking effort\033[0m\nπ · model · ◫ 7.5%%/272K\n' > "${FM_FAKE_TMUX_SCREEN:?}"
+            else
+              printf '╭── π > ◒ GPT-6-Astra ──╮\n╰─ \033[38;2;0;180;255m⇧⇥\033[0m \033[3m\033[38;2;107;114;128mto change thinking effort\033[0m ─╯\n' > "${FM_FAKE_TMUX_SCREEN:?}"
+            fi
             if [ -n "${FM_FAKE_CHILD_WAKE_QUEUE:-}" ]; then
               : > "$FM_FAKE_CHILD_WAKE_QUEUE"
             fi
@@ -1102,7 +1106,7 @@ test_secondmate_wake_left_unsubmitted_in_the_composer_is_submitted() {
     [ ! -s "$state/.wake-queue" ] || fail "the first observation of a frozen row produced an alert"
     [ ! -e "$dir/sent" ] || fail "the pane was touched before the stall interval"
 
-    LC_ALL=C stall_composer_leg submit 1002 ring mate 100-7
+    FM_FAKE_CLEAR_WAKE_SHAPE="$shape" LC_ALL=C stall_composer_leg submit 1002 ring mate 100-7
     [ "$(cat "$dir/sent")" = '[ENTER]' ] \
       || fail "an omp $shape wake must get one bare Enter and no typed text: $(cat "$dir/sent" 2>/dev/null)"
     [ "$(cat "$dir/submit-sleeps")" = 0.5 ] \
@@ -1121,7 +1125,7 @@ test_secondmate_composer_draft_next_to_a_wake_is_never_submitted() {
   wake=$(secondmate_wake_text)
   for shape in box bare; do
     for direction in before after; do
-      for draft in 'my unsent draft' '| my unsent draft' '│ my unsent draft' 'π · my unsent draft' '⠁⠂'; do
+      for draft in 'my unsent draft' '| my unsent draft' '│ my unsent draft' 'π · my unsent draft' '⠁⠂' '❯ my unsent draft'; do
         case_index=$((case_index + 1))
         if [ "$direction" = before ]; then
           composer="$draft"$'\n\n'"$wake"
@@ -1286,13 +1290,13 @@ test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm() {
   wake=$(secondmate_wake_text)
   for shape in box bare; do
     for confirmation in 1 2; do
-      for content in edited mixed; do
+      for content in edited mixed hint; do
         setup_secondmate_composer_case "secondmate-wake-edit-$shape-$confirmation-$content" "$wake" "$shape"
-        if [ "$content" = edited ]; then
-          edited=${wake/lane.status/operator-edited.status}
-        else
-          edited="$wake operator draft"
-        fi
+        case "$content" in
+          edited) edited=${wake/lane.status/operator-edited.status} ;;
+          mixed) edited="$wake operator draft" ;;
+          hint) edited='⇧⇥ to change thinking effort' ;;
+        esac
         render_secondmate_composer "$shape" "$edited" > "$dir/edited-screen"
         stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
         FM_FAKE_EDIT_AFTER_WAKE_ENTER="$confirmation" FM_FAKE_EDITED_COMPOSER="$dir/edited-screen" \
@@ -1322,18 +1326,20 @@ test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm() {
 }
 
 test_secondmate_restored_wake_lost_enter_retries_while_idle() {
-  local dir state sub fakebin wake
+  local dir state sub fakebin wake shape
   wake=$(secondmate_wake_text)
-  setup_secondmate_composer_case secondmate-restored-wake-idle-retry "$wake"
-  stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-  FM_FAKE_LOSE_FIRST_WAKE_ENTER=1 stall_composer_leg submit 1002 ring mate 100-7
-  [ "$(cat "$dir/sent")" = "$(printf '[ENTER]\n[ENTER]')" ] \
-    || fail "a lost Enter while still idle must get exactly one bare retry: $(cat "$dir/sent" 2>/dev/null)"
-  [ "$(cat "$dir/submit-sleeps")" = "$(printf '0.5\n0.5')" ] \
-    || fail "the first Enter and its idle retry must each use the fixed confirmation wait"
-  [ ! -s "$sub/state/.wake-queue" ] || fail "the submitted retry did not drain the foreign queue"
-  [ ! -s "$state/.wake-queue" ] || fail "a successful idle retry alarmed the parent"
-  [ ! -e "$state/mate.inbox" ] || fail "an idle retry typed a drain steer"
+  for shape in box bare; do
+    setup_secondmate_composer_case "secondmate-restored-wake-idle-retry-$shape" "$wake" "$shape"
+    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
+    FM_FAKE_CLEAR_WAKE_SHAPE="$shape" FM_FAKE_LOSE_FIRST_WAKE_ENTER=1 stall_composer_leg submit 1002 ring mate 100-7
+    [ "$(cat "$dir/sent")" = "$(printf '[ENTER]\n[ENTER]')" ] \
+      || fail "a lost Enter while still idle must get exactly one bare retry: $(cat "$dir/sent" 2>/dev/null)"
+    [ "$(cat "$dir/submit-sleeps")" = "$(printf '0.5\n0.5')" ] \
+      || fail "the first Enter and its idle retry must each use the fixed confirmation wait"
+    [ ! -s "$sub/state/.wake-queue" ] || fail "the submitted retry did not drain the foreign queue"
+    [ ! -s "$state/.wake-queue" ] || fail "a successful idle retry alarmed the parent"
+    [ ! -e "$state/mate.inbox" ] || fail "an idle retry typed a drain steer"
+  done
   pass "an exact recorded restored wake gets one confirmed Enter retry only while semantically idle"
 }
 

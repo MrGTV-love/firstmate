@@ -662,112 +662,40 @@ test_composer_footer_zone_refuses_rather_than_allows() {
   pass "fm_composer_classify_screen: the footer zone only ever refuses, never allows"
 }
 
-test_extraction_retains_blank_paragraphs() {
+test_extraction_retains_boxed_blank_paragraphs() {
   local caps screen out expected='first paragraph second paragraph final line'
+  screen=$'transcript\n╭────────────────────────╮\n│ ❯ first paragraph      │\n│                        │\n│ second paragraph       │\n│                        │\n│ final line             │\n╰────────────────────────╯'
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-    for screen in \
-      $'transcript\n❯ first paragraph\n\nsecond paragraph\n   \nfinal line' \
-      $'transcript\n╭────────────────────────╮\n│ ❯ first paragraph      │\n│                        │\n│ second paragraph       │\n│                        │\n│ final line             │\n╰────────────────────────╯' \
-      $'transcript\n────────────────────────\n❯ first paragraph\n\nsecond paragraph\n   \nfinal line\n────────────────────────'
-    do
-      out=$(fm_composer_extract_selected_content "$caps" "$screen") \
-        || fail "a complete multiline composer must remain extractable"
-      [ "$out" = "$expected" ] || fail "blank paragraphs must not truncate content or admit footer text, got '$out'"
-      out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
-        || fail "a complete multiline composer must remain extractable under LC_ALL=C"
-      [ "$out" = "$expected" ] || fail "blank paragraphs under LC_ALL=C must preserve complete content, got '$out'"
-    done
-    screen=$'❯ first paragraph\n\nsecond paragraph\n\noperator edit'
     out=$(fm_composer_extract_selected_content "$caps" "$screen") \
-      || fail "EOF bare paragraphs must remain extractable"
-    [ "$out" = 'first paragraph second paragraph operator edit' ] \
-      || fail "an edit beyond a blank paragraph must survive extraction, got '$out'"
+      || fail "a complete boxed multiline composer must remain extractable"
+    [ "$out" = "$expected" ] || fail "boxed blank paragraphs must preserve content, got '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+      || fail "a complete boxed multiline composer must remain extractable under LC_ALL=C"
+    [ "$out" = "$expected" ] || fail "boxed blank paragraphs under LC_ALL=C must preserve content, got '$out'"
     out=$(fm_composer_extract_selected_content "$caps" $'❯\n\n') \
       || fail "EOF blank bare composer must remain extractable"
     [ -z "$out" ] || fail "empty trailing rows must terminate without creating draft content"
   done
-  pass "composer extraction: boxed and borderless blank paragraphs preserve all content through EOF or a structural boundary"
+  pass "composer extraction preserves blank paragraphs inside a complete box"
 }
 
-test_extraction_refuses_reanchored_editor_suffixes() {
-  local caps glyph suffix gap screen out
+test_extraction_preserves_boxed_prompt_looking_paragraphs() {
+  local caps screen out
+  screen=$'╭────────────────────────╮\n│ ❯ my unsent draft      │\n│                        │\n│ ❯ exact wake           │\n╰────────────────────────╯'
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-    for glyph in '❯' '›' '⟩' '→' '❭'; do
-      for gap in $'\n' $'\n\n' $'\n   \n'; do
-        for suffix in '' $'\nπ · model · ◫ 15.4%/272K'; do
-          screen="$glyph my unsent draft$gap$glyph exact wake$suffix"
-          if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-            fail "a later prompt-looking paragraph must not replace the complete editor: '$out'"
-          fi
-          if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
-            fail "a later prompt-looking paragraph must refuse suffix extraction under LC_ALL=C"
-          fi
-        done
-      done
-    done
-    for screen in \
-      $'❯ my unsent draft\n\n╭────────────────────────╮\n│ ❯ exact wake           │\n╰────────────────────────╯' \
-      $'❯ my unsent draft\n\n'"$(omp_box_top)"$'\n'"$(omp_box_last 'exact wake')" \
-      $'❯ my unsent draft\n\n┃ exact wake' \
-      $'❯ my unsent draft\n\n────────────────────────\n\n────────────────────────' \
-      $'┃ my unsent draft\n\n❯ exact wake' \
-      $'┃ my unsent draft\n\n┃ exact wake'; do
-      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "a lower envelope must not discard an unbounded earlier editor: '$out'"
-      fi
-      if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "an unbounded earlier editor must refuse envelope suffix extraction under LC_ALL=C"
-      fi
-    done
-    screen=$'╭────────────────────────╮\n│ ❯ my unsent draft      │\n│                        │\n│ ❯ exact wake           │\n╰────────────────────────╯'
     out=$(fm_composer_extract_selected_content "$caps" "$screen") \
       || fail "a bounded box must retain all prompt-looking paragraphs"
     [ "$out" = 'my unsent draft ❯ exact wake' ] \
       || fail "a box must strip only its actual prompt glyph: '$out'"
-  done
-  pass "composer extraction refuses reanchored suffixes across bare and bounded selections"
-}
-
-test_extraction_refuses_unproven_suffixes() {
-  local caps suffix screen out
-  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-    for suffix in '| my unsent draft' '| preserve draft' '| |' '│ preserve draft' 'preserve draft │' \
-      '+--------+' '▀▀▀▀▀▀▀▀' 'π · model' '⠋ 12s' 'model · ◫ 7.5%/272K' '⠁⠂'; do
-      screen=$'❯ first paragraph\n\nsecond paragraph\n   \n'"$suffix"$'\noperator edit'
-      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "unproven suffix must refuse extraction: '$suffix' yielded '$out'"
-      fi
-      if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "unproven suffix must refuse extraction under LC_ALL=C: '$suffix'"
-      fi
-      screen=$'❯ exact wake\n\n'"$suffix"
-      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "terminal draft paragraph must not yield only the wake: '$suffix' yielded '$out'"
-      fi
-      if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "terminal draft paragraph must refuse extraction under LC_ALL=C: '$suffix'"
-      fi
-    done
-    screen=$'❯ ⠁⠂\n\nexact wake'
-    out=$(fm_composer_extract_selected_content "$caps" "$screen") \
-      || fail "first-row bright braille must remain extractable"
-    [ "$out" = '⠁⠂ exact wake' ] || fail "first-row braille draft must not disappear: '$out'"
     out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
-      || fail "first-row bright braille must remain extractable under LC_ALL=C"
-    [ "$out" = '⠁⠂ exact wake' ] || fail "C-locale first-row braille draft must not disappear"
-    screen=$'❯ \033[2m⠁⠂\033[0m\n\nexact wake'
-    out=$(fm_composer_extract_selected_content "$caps" "$screen") \
-      || fail "styled first-row braille extraction must remain available"
-    if [ "$caps" = "$CAPS_PLAIN" ]; then
-      [ "$out" = '⠁⠂ exact wake' ] || fail "plain capture must retain ghost-looking braille"
-    else
-      [ "$out" = 'exact wake' ] || fail "proven dim braille may be removed as ghost furniture"
-    fi
+      || fail "boxed prompt-looking paragraphs must remain extractable under LC_ALL=C"
+    [ "$out" = 'my unsent draft ❯ exact wake' ] \
+      || fail "a box must preserve later prompt glyphs under LC_ALL=C: '$out'"
   done
-  pass "composer extraction refuses unproven edge, status and braille suffixes"
+  pass "composer extraction retains prompt-looking paragraphs inside a complete box"
 }
 
-test_extraction_codex_terminal_footer() {
+test_extraction_codex_blank_separated_footer() {
   local caps footer screen out
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
     for footer in '  gpt-5.5 xhigh · Context 100% left' \
@@ -775,88 +703,54 @@ test_extraction_codex_terminal_footer() {
       '  gpt-6-astra high · Context 97% left · /private/my project · 2…'; do
       screen=$'›\n\n'"$footer"$'\n\n'
       out=$(fm_composer_extract_selected_content "$caps" "$screen") \
-        || fail "terminal Codex footer must permit empty extraction"
-      [ -z "$out" ] || fail "terminal Codex footer leaked into empty content"
-      screen=$'› first paragraph\n\nsecond paragraph\n\n'"$footer"$'\n\n'
+        || fail "blank-separated Codex footer must permit empty extraction"
+      [ -z "$out" ] || fail "blank-separated Codex footer leaked into empty content"
+      screen=$'› payload\n\n'"$footer"
       out=$(fm_composer_extract_selected_content "$caps" "$screen") \
-        || fail "terminal Codex footer must permit payload extraction"
-      [ "$out" = 'first paragraph second paragraph' ] || fail "Codex footer corrupted payload: '$out'"
-      screen=$'› payload\n\n'"$footer"$'\noperator edit'
-      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "nonterminal Codex footer must refuse extraction"
-      fi
+        || fail "blank-separated Codex footer must permit payload extraction"
+      [ "$out" = payload ] || fail "Codex footer corrupted payload: '$out'"
       screen=$'› payload\n'"$footer"
-      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-        [ "$out" != payload ] || fail "unseparated Codex-looking text must not be discarded"
-      fi
-      screen=$'❯ payload\n\n'"$footer"
-      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-        [ "$out" != payload ] || fail "foreign glyph must not discard Codex-looking draft"
-        case "$out" in *'Context 97% left'*|*'Context 100% left'*) ;; *) fail "foreign glyph lost footer-looking content" ;; esac
-      fi
+      out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+        || fail "unseparated footer-looking text must remain extractable"
+      [ "$out" = "payload ${footer#  }" ] \
+        || fail "unseparated Codex-looking text must not be discarded: '$out'"
     done
   done
   screen=$'› '"${ESC}[2mSummarize recent commits${ESC}[0m"$'\n\n  gpt-5.5 xhigh · Context 97% left'
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
-    || fail "styled Codex ghost must extract above terminal footer"
+    || fail "styled Codex ghost must extract above blank-separated footer"
   [ -z "$out" ] || fail "Codex ghost leaked into content"
   out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$screen") \
     || fail "plain Codex ghost-looking text must remain extractable"
   [ "$out" = 'Summarize recent commits' ] || fail "plain ghost-looking text must remain content"
-  pass "composer extraction scopes terminal Codex footer to its selected glyph"
+  pass "composer extraction ends Codex's bare wrap region at the blank row"
 }
 
-test_extraction_omp_terminal_footer() {
-  local caps footer screen out out_c prefix glyph
+test_extraction_omp_status_bounds_bare_wrap() {
+  local caps footer screen out out_c prefix expected
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
     for footer in \
       ' π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%/272K ⟲ · (sub)' \
       ' 󰵗  ·  qwen3:8b ·  kun-agent-workspace/… ·  detached ?1 ·  36.7%/41K' \
       ' ⠧ 11s  · ◔ GPT-6-Astra · ◫ 15.4%/272K' \
       ' ⣾ 3s  · ◔ GPT-6-Astra · ◫ 15.4%/272K'; do
-      for prefix in '❯' '❯ exact wake' $'❯ first paragraph\n\nsecond paragraph'; do
+      for prefix in '❯' '❯ exact wake' $'❯ first line\nsecond line'; do
         screen="$prefix"$'\n'"$footer"$'\n\n'
-        out=$(fm_composer_extract_selected_content "$caps" "$screen") \
-          || fail "terminal omp footer must permit complete extraction"
         case "$prefix" in
-          '❯') [ -z "$out" ] || fail "omp footer leaked into empty content: '$out'" ;;
-          '❯ exact wake') [ "$out" = 'exact wake' ] || fail "omp wake extraction lost exact content: '$out'" ;;
-          *) [ "$out" = 'first paragraph second paragraph' ] || fail "omp paragraphs lost content: '$out'" ;;
+          '❯') expected= ;;
+          '❯ exact wake') expected='exact wake' ;;
+          *) expected='first line second line' ;;
         esac
+        out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "omp status footer must permit bare extraction"
+        [ "$out" = "$expected" ] || fail "omp status footer corrupted content: '$out'"
         out_c=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
-          || fail "terminal omp footer must remain extractable under LC_ALL=C"
-        [ "$out_c" = "$out" ] || fail "omp extraction must preserve complete content under LC_ALL=C"
+          || fail "omp status footer must remain extractable under LC_ALL=C"
+        [ "$out_c" = "$out" ] || fail "omp extraction must preserve content under LC_ALL=C"
       done
-      for screen in \
-        $'❯ exact wake\n\n'"$footer" \
-        $'❯ exact wake\n'"$footer"$'\noperator edit' \
-        $'❯ exact wake\nπ · my unsent draft\n'"$footer"; do
-        if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-          fail "ambiguous omp footer must not truncate a draft: '$out'"
-        fi
-        if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
-          fail "ambiguous omp footer must refuse extraction under LC_ALL=C"
-        fi
-      done
-      for glyph in '›' '⟩' '→' '❭'; do
-        screen="$glyph exact wake"$'\n'"$footer"
-        if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-          fail "foreign composer glyph must not discard omp-looking draft: '$out'"
-        fi
-      done
-    done
-    for footer in 'π · my unsent draft' '󰵗 · my unsent draft' \
-      '⠧ 11s · my unsent draft' 'model · ◫ 7.5%/272K' '⠋ 12s' '⠁⠂'; do
-      screen=$'❯ exact wake\n'"$footer"
-      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "unproven terminal status or animation must not yield only the wake: '$out'"
-      fi
-      if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
-        fail "unproven terminal status or animation must refuse extraction under LC_ALL=C"
-      fi
     done
   done
-  pass "composer extraction scopes adjacent terminal omp footer to its selected glyph"
+  pass "composer extraction stops bare omp wraps at the existing status-furniture boundary"
 }
 
 test_matrix_codex_dim_hint_row() {
@@ -1692,6 +1586,10 @@ test_selected_content_is_composer_scoped_and_wrap_normalized() {
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
   [ "$out" = 'Type a message...' ] \
     || fail "surviving placeholder-like input should remain extracted user content, got '$out'"
+  screen=$'❯ a legitimately long steer that\nwraps across the next bare row\n\ntranscript below the break'
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ "$out" = 'a legitimately long steer that wraps across the next bare row' ] \
+    || fail "bare extraction should include only its contiguous wrap region, got '$out'"
   screen=$'❯ wrapped user content\ncontinuation preserves a mid-row ❯ glyph'
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
   [ "$out" = 'wrapped user content continuation preserves a mid-row ❯ glyph' ] \
@@ -1705,6 +1603,39 @@ test_selected_content_is_composer_scoped_and_wrap_normalized() {
   [ "$out" = 'wrapped user content ❯ preserves its leading glyph' ] \
     || fail "box extraction should strip only its actual prompt-row glyph, got '$out'"
   pass "fm_composer_extract_selected_content: scopes user content and excludes furniture"
+}
+
+test_shared_extraction_preserves_transcript_and_long_claude_editor() {
+  local caps screen out expected n FM_COMPOSER_PI_MAX_LINES=8
+  for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    screen=$'❯ hi\nHello!\n────────────────\n❯\n────────────────'
+    out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+      || fail "a submitted transcript prompt must not invalidate the live composer"
+    [ -z "$out" ] || fail "submitted transcript content leaked into the live composer: '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+      || fail "submitted transcript prompts must remain extractable under LC_ALL=C"
+    [ -z "$out" ] || fail "submitted transcript content leaked under LC_ALL=C: '$out'"
+    screen=$'────────────────\n❯ initial line'
+    expected='initial line'
+    for n in 1 2 3 4 5 6 7 8; do
+      screen="$screen"$'\n'"continuation $n"
+      expected="$expected continuation $n"
+    done
+    screen="$screen"$'\n────────────────'
+    out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+      || fail "Pi's eight-row limit must not reject a complete glyph-proven Claude editor"
+    [ "$out" = "$expected" ] || fail "long Claude editor content was lost: '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+      || fail "long Claude editor must remain extractable under LC_ALL=C"
+    [ "$out" = "$expected" ] || fail "long Claude editor content was lost under LC_ALL=C: '$out'"
+  done
+  screen='────────────────'
+  for n in 1 2 3 4 5 6 7 8; do screen="$screen"$'\n '; done
+  assert_screen "Pi pair at its baseline row limit" empty "$CAPS_STYLED" \
+    "$screen"$'\n────────────────' '' $'pi\tidle'
+  assert_screen "Pi pair exceeding its baseline row limit" unknown "$CAPS_STYLED" \
+    "$screen"$'\n \n────────────────' '' $'pi\tidle'
+  pass "shared extraction keeps submitted transcript prompts and long Claude editors while Pi retains its baseline limit"
 }
 
 test_claude_selected_slash_menu_extracts_only_the_composer() {
@@ -1738,7 +1669,7 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
   local pair menu screen want out caps scenario
   pair=$'────────────────────────\n❯ /exit\n────────────────────────'
   menu='  ❯ /exit                       Exit the CLI'
-  for scenario in unindented same-indent draft unpadded mismatch empty slash-only blank activity; do
+  for scenario in unindented same-indent draft unpadded mismatch empty slash-only unproven blank activity; do
     want='/exit Exit the CLI'
     case "$scenario" in
       unindented) screen="$pair"$'\n❯ /exit                       Exit the CLI' ;;
@@ -1748,6 +1679,7 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
       mismatch) screen=$'────────────────────────\n❯ /context\n────────────────────────\n'"$menu" ;;
       empty) screen=$'────────────────────────\n❯\n────────────────────────\n'"$menu" ;;
       slash-only) screen=$'────────────────────────\n❯ /\n────────────────────────\n'"$menu" ;;
+      unproven) screen=$'❯ /exit\n────────────────────────\n'"$menu" ;;
       blank) screen="$pair"$'\n\n'"$menu" ;;
       activity) screen="$pair"$'\nWorking on request...\n'"$menu" ;;
     esac
@@ -1760,12 +1692,6 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
     assert_screen "$scenario lower candidate on styled backends" pending "$CAPS_STYLED_NOID" "$screen"
     assert_screen "$scenario lower candidate on plain backends" unknown "$CAPS_PLAIN" "$screen"
   done
-  screen=$'❯ /exit\n────────────────────────\n'"$menu"
-  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-    if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
-      fail "a lone rule cannot prove the earlier editor closed: '$out'"
-    fi
-  done
   screen="$pair"$'\n'"$menu"$'\n$ live shell'
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
     if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
@@ -1776,11 +1702,10 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
   pass "slash-menu demotion cannot select an empty parent or replace a real lower draft or shell"
 }
 
-test_extraction_retains_blank_paragraphs
-test_extraction_refuses_reanchored_editor_suffixes
-test_extraction_refuses_unproven_suffixes
-test_extraction_codex_terminal_footer
-test_extraction_omp_terminal_footer
+test_extraction_retains_boxed_blank_paragraphs
+test_extraction_preserves_boxed_prompt_looking_paragraphs
+test_extraction_codex_blank_separated_footer
+test_extraction_omp_status_bounds_bare_wrap
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty
@@ -1831,6 +1756,7 @@ test_incomplete_lower_box_invalidates_stale_candidate
 test_titled_bottom_requires_matching_width
 test_cursor_on_proven_box_bottom_classifies_content
 test_selected_content_is_composer_scoped_and_wrap_normalized
+test_shared_extraction_preserves_transcript_and_long_claude_editor
 test_claude_selected_slash_menu_extracts_only_the_composer
 test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells
 

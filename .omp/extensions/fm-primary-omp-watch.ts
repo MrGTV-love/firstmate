@@ -680,7 +680,7 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.setEditorText(remainder);
         // Idle, so this starts the turn that consumes the wake; the next
         // agent_end re-checks any further restored wake.
-        pi.sendUserMessage(wake.content, { deliverAs: "followUp" });
+        pi.sendUserMessage(wake.content);
         return;
       }
     } catch {

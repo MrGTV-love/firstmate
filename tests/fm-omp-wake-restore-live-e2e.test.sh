@@ -29,6 +29,7 @@
 # Every Herdr call, including adapter calls, is routed through bin/fm-herdr-lab.sh.
 set -u
 unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE
+unset FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -135,6 +136,8 @@ printf 'Live wake recovery lab: arm watcher when asked, perform only requested c
 
 PANE=
 TARGET=
+WAKE_PROBE=0
+WAKE_TASK=
 
 screen() { lab pane read "$PANE" --source visible 2>/dev/null || true; }
 send_text() { fm_backend_herdr_send_literal "$TARGET" "$1" >/dev/null; }
@@ -167,7 +170,7 @@ composer_is() { [ "$(composer)" = "$1" ]; }
 # start_omp <label>
 start_omp() {
   local label=$1
-  rm -f "$PROJECT/state/.wake-queue" "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state/wakelab.status" "$PARENT/state/wakemate.meta"
+  rm -f "$PROJECT/state/.wake-queue" "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state"/wakelab*.status "$PROJECT/state"/wakelab*.meta "$PARENT/state/wakemate.meta"
   printf 'wakemate\n' > "$PROJECT/.fm-secondmate-home"
   printf '#!/usr/bin/env bash\nexec env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 %q "$@"\n' "$REAL_OMP" > "$FAKEBIN/omp"
   chmod +x "$FAKEBIN/omp"
@@ -186,7 +189,6 @@ start_omp() {
   send_key Enter
   wait_for 120 test -f "$PROJECT/state/.watch.lock/pid" || { screen >&2; fail "$SUBJECT never armed the watcher for $label"; }
   wait_for 120 is_idle || fail "$SUBJECT did not return to idle after arming for $label"
-  : > "$PROJECT/state/wakelab.meta"
 }
 
 # busy_turn: start a long tool call so the lane is mid-turn.
@@ -203,10 +205,43 @@ busy_turn() {
 # queue_wake: write a status line so the watcher wakes main while the turn runs,
 # and wait until omp has queued the wake behind it.
 queue_wake() {
-  printf 'done: wake lab signal\n' > "$PROJECT/state/wakelab.status"
-  wait_for 60 grep -q 'successor=started' "$PROJECT/state/.watch-cycle-exits.log" \
-    || fail "the watcher never closed with the wake for the running turn"
-  sleep 3
+  rm -f "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state"/wakelab*.status "$PROJECT/state"/wakelab*.meta \
+    "$PROJECT/state/extensions/omp-primary-watch"/unconsumed-*.wake
+  WAKE_PROBE=$((WAKE_PROBE + 1))
+  WAKE_TASK="wakelab$WAKE_PROBE"
+  : > "$PROJECT/state/$WAKE_TASK.meta"
+  printf 'done: wake lab signal %s\n' "$WAKE_TASK" > "$PROJECT/state/$WAKE_TASK.status"
+  wait_for 60 wake_is_queued \
+    || { screen >&2; fail "$SUBJECT: $WAKE_TASK was not submitted into the running turn's follow-up queue (queue rows: $(queue_rows))"; }
+}
+
+wake_is_queued() {
+  local record capture queued
+  is_busy || return 1
+  awk -F '\t' -v key="$WAKE_TASK.status" \
+    '$3 == "signal" && $4 == key { found = 1 } END { exit !found }' \
+    "$PROJECT/state/.wake-queue" 2>/dev/null || return 1
+  record=
+  for record in "$PROJECT/state/extensions/omp-primary-watch"/unconsumed-*.wake; do
+    [ -f "$record" ] || continue
+    grep -Fq -- "$PROJECT/state/$WAKE_TASK.status" "$record" && break
+    record=
+  done
+  [ -n "$record" ] && [ -f "$record" ] || return 1
+  capture=$(screen)
+  queued=$(printf '%s\n' "$capture" | awk '
+    /After yield.*[1-9][0-9]*/ { in_queue = 1; next }
+    in_queue && /to edit/ { printf "%s", rows; exit }
+    in_queue { rows = rows $0 }
+  ' | tr -d '[:space:]')
+  case "$queued" in
+    *"FIRSTMATEWATCHERWAKE:"*"$WAKE_TASK.status"*) ;;
+    *) return 1 ;;
+  esac
+  [ -f "$record" ] && is_busy && \
+    awk -F '\t' -v key="$WAKE_TASK.status" \
+      '$3 == "signal" && $4 == key { found = 1 } END { exit !found }' \
+      "$PROJECT/state/.wake-queue" 2>/dev/null
 }
 
 # ---------------------------------------------------------------------------
