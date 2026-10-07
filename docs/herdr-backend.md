@@ -693,6 +693,7 @@ It hands the visible pane's ANSI viewport plus Herdr's capability facts to the f
 
 - Bordered boxes.
 - omp's rounded box, with its status in the top border and its last input row folded into the bottom border.
+  The status opens with omp's identity glyph while idle and with a spinner frame plus the elapsed time while a turn runs, so a working lane's composer reads `empty` or `pending` like an idle one.
 - Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
 - opencode's left bar.
 - The Pi separator region this adapter pioneered, admitted only when native `agent get` identity is exactly Pi and state is idle or done.

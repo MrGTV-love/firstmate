@@ -1210,6 +1210,46 @@ ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm
 
 With the classifier change reverted, the same run stopped at `an idle empty titled-border composer read 'unknown', not empty`.
 
+### 2026-10-06 omp injected text through Herdr
+
+Verified on 2026-10-06 on macOS arm64 against omp 18.6.3 (reproduction) and omp 18.7.0 (guard run) in isolated Herdr 0.9.1 lab sessions, with the box composer shape pinned and the omp watch extension loaded from a lab checkout.
+Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a lane's composer; each is vendor behavior, so this entry records what omp does and the guard that keeps the handling honest.
+
+- **Interrupt restores a queued wake.**
+  A watcher wake the extension delivered with `sendUserMessage(..., { deliverAs: "followUp" })` while a turn was running was shown as a queued message.
+  One Escape (the key `bin/fm-control.sh <id> interrupt` sends) put the wake text back into the composer instead of delivering it, and no turn consumed it.
+  The composer then read `pending`, the lane read idle, and a bare Enter submitted the wake, which the lane then handled.
+  omp joins restored messages and any operator draft with a blank line (`<wake>` blank line `<draft>`).
+  The extension now finds its own wake in the composer after `agent_end`, removes only that text, and sends it again; the operator's draft stayed exactly as typed in the guard run.
+  With the extension recovery switched off (`FM_OMP_WAKE_RESTORE_CHECK_MS=3600000`), `fm_task_inbox_submit_held_wake` submitted the wake with one bare Enter and typed nothing, and it refused a composer that also held operator words.
+- **A working lane's box composer is readable.**
+  While a turn runs, the box top border carries a braille spinner frame and the elapsed time (`╭── ⠦ 13s > ◔ GPT-6-Astra …`) instead of the idle `π >` identity.
+  The shared classifier used to read that border as `unknown`, so a doorbell typed into a working lane could not be seen as unsubmitted and the adapter's submit never retried a dropped Enter.
+  The border is now an omp identity, an empty working composer reads `empty`, and typed text reads `pending`, wrapped or not.
+  A second Enter on an empty composer while queued messages exist aborts the running omp turn (omp's empty-submit rule), so the adapter re-reads a pending verdict once before it may retry.
+- **A descendant omp must not take the markers.**
+  An `omp --print` child that a turn ran loaded the same `.omp/extensions` from the same directory, wrote its own pid into `state/.omp-turnend-extension-loaded`, and died, leaving the supervision proof reading `not loaded` under a healthy session.
+  Only the process named in `state/.lock` records itself or arms a watcher now, and the turn-end guard re-asserts its marker at every turn boundary.
+
+`tests/fm-omp-harness.test.sh` (restored-wake recovery, descendant sessions, marker self-repair), `tests/fm-composer-lib.test.sh` (the working-box fixtures are captures from this verification), `tests/fm-backend-herdr.test.sh` (the dropped-Enter and stale-frame submit cases), `tests/fm-operational-input.test.sh`, and `tests/fm-wake-queue.test.sh` (the stalled-loop Enter) carry the portable regressions.
+The live guard that refreshes this entry submits real prompts and stays opt-in:
+
+```sh
+FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
+```
+
+Observed output:
+
+```text
+ok - live omp wake restore: omp (omp/18.7.0) on herdr 0.9.1 re-submitted a wake that Esc restored to the composer, and the lane handled it
+ok - live omp wake restore: omp (omp/18.7.0) on herdr 0.9.1 left the operator's draft exactly as typed while it re-submitted the wake
+ok - live omp markers: omp (omp/18.7.0) on herdr 0.9.1 kept both loaded markers on the session pid 34771 after a descendant omp ran
+ok - live omp parent recovery: omp (omp/18.7.0) on herdr 0.9.1 refused a composer that holds a draft beside the wake and changed nothing
+ok - live omp parent recovery: omp (omp/18.7.0) on herdr 0.9.1 submitted the restored wake with one bare Enter and the lane handled it
+ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 reads empty and pending while a turn runs
+ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
+```
+
 ## Steering-inbox doorbell
 
 The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).

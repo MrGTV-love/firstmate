@@ -521,9 +521,15 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # The status opens with the same identity cell as the borderless status row,
 # then a `>` (or `·`) separator. That identity is the whole proof that a
 # rounded top border belongs to an omp composer; any other titled border stays
-# an ambiguous box. The ascii preset's `pi` and a busy spinner cell are left
-# out on purpose: an unverified shape must read `unknown`, never `empty`.
-FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT='^(π|󰵗)[[:space:]]+(>|·)[[:space:]]'
+# an ambiguous box. While a turn runs, omp swaps the identity cell for one of
+# its spinner frames plus the elapsed cell (`╭── ⠏ 14s > ◔ GPT-6-Astra …`,
+# verified live through Herdr on omp 18.6.3, empty and typed composers alike),
+# the same two-cell busy signal the status-row rule above accepts. Reading that
+# border as `unknown` hid a typed line that never submitted from every busy
+# caller, which is how an injected doorbell stayed in a working lane's
+# composer unnoticed. The ascii preset's `pi` is left out on purpose: an
+# unverified shape must read `unknown`, never `empty`.
+FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT='^(π|󰵗)[[:space:]]+(>|·)[[:space:]]|^'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+([0-9]+[smh])+[[:space:]]+(>|·)[[:space:]]'
 # omp draws this hint, right-aligned, in the box shape's EMPTY last row until a
 # turn has completed. Its key glyphs are bright and its words dim, so a styled
 # read keeps `⇧⇥` and a plain read cannot tell the whole hint from typed text.

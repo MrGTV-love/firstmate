@@ -4495,6 +4495,59 @@ test_send_text_submit_confirms_blocked_after_enter() {
   pass "fm_backend_herdr_send_text_submit: a post-Enter blocked state confirms delivery without retrying into the prompt"
 }
 
+# An omp box composer draws its status line in the top border, and while a turn
+# runs that border carries a spinner and the elapsed time instead of the idle
+# identity glyph. It used to read `unknown` mid-turn, so a doorbell whose Enter
+# was dropped stayed in a working lane's composer and the submit reported
+# success. These are the real omp 18.6.3 shapes (the lane was running a tool).
+omp_busy_box_screen() {  # <editor text>
+  printf '  %s\n\n' '⎋ Waiting requested sixty seconds'
+  printf '%s\n' '╭── ⠦ 13s > ◔ GPT-6-Astra 👁 > 🗑 …lab.m13m2O/project > ⑂ fm/fm-omp-lane-wake-unsubmitted *7 > S0.27 + 👁 0.05 ▶─7%─┃272K───╮'
+  printf '╰─ %-100s ─╯\n' "$1"
+}
+
+test_send_text_submit_retries_a_dropped_enter_in_a_busy_omp_box() {
+  local dir log resp fb out enter_count
+  dir="$TMP_ROOT/submit-omp-busy-dropped"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # 2: agent get - working. 3: footer baseline. 4: send-keys enter (dropped).
+  # 5 and 6: the composer still holds the typed line on both reads, so the
+  # retried Enter is allowed. 7: send-keys enter. 8: the composer is empty.
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/2.out"
+  printf '  ready\n' > "$resp/3.out"
+  omp_busy_box_screen 'hello captain' > "$resp/5.out"
+  omp_busy_box_screen 'hello captain' > "$resp/6.out"
+  omp_busy_box_screen '' > "$resp/8.out"
+  herdr_submit_identity_prefix "$resp" codex
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a busy omp box whose first Enter was dropped must be retried until the composer is empty, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 2 ] || fail "the dropped Enter must be retried exactly once, sent $enter_count Enter(s)"
+  pass "fm_backend_herdr_send_text_submit: a busy omp box that still holds the typed line is retried until it reads empty"
+}
+
+test_send_text_submit_never_double_presses_on_a_stale_busy_omp_frame() {
+  local dir log resp fb out enter_count
+  dir="$TMP_ROOT/submit-omp-busy-stale"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # The first composer read still shows the typed line (a frame drawn before omp
+  # consumed the Enter); the re-read shows it queued and the composer empty. A
+  # second Enter here would hit an empty composer mid-turn, which omp treats as
+  # an abort of the running turn.
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/2.out"
+  printf '  ready\n' > "$resp/3.out"
+  omp_busy_box_screen 'hello captain' > "$resp/5.out"
+  omp_busy_box_screen '' > "$resp/6.out"
+  herdr_submit_identity_prefix "$resp" codex
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a stale busy omp frame that clears on the re-read must report empty, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 1 ] || fail "a stale frame must not provoke a second Enter into an empty composer, sent $enter_count Enter(s)"
+  pass "fm_backend_herdr_send_text_submit: a stale pending frame in a busy omp box never earns a second Enter"
+}
+
 test_send_text_submit_preexisting_working_pending_is_queued_enter() {
   local dir log resp fb out enter_count
   dir="$TMP_ROOT/submit-preexisting-working-queued"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -4505,7 +4558,9 @@ test_send_text_submit_preexisting_working_pending_is_queued_enter() {
   printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/2.out"
   printf '  ready\n' > "$resp/3.out"
   printf '  \xe2\x9d\xaf hello captain\n' > "$resp/5.out"
-  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/6.out"
+  # The pending read is repeated once before any retry may press Enter again.
+  printf '  \xe2\x9d\xaf hello captain\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
   herdr_submit_identity_prefix "$resp" codex
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
@@ -4686,8 +4741,12 @@ test_send_text_submit_never_idle_native_state_keeps_pending_without_a_transition
   # borrowing someone else's turn as proof of our delivery.
   printf '{"result":{"agent":{"agent_status":"blocked"}}}\n' > "$resp/2.out"
   herdr_cursor_midturn_plain > "$resp/3.out"
+  # Each pending composer read is repeated once before a retry may press Enter
+  # again (reads 5 and 6, then 8 and 9 after the retried Enter at 7).
   herdr_cursor_midturn_ansi > "$resp/5.out"
-  herdr_cursor_midturn_ansi > "$resp/7.out"
+  herdr_cursor_midturn_ansi > "$resp/6.out"
+  herdr_cursor_midturn_ansi > "$resp/8.out"
+  herdr_cursor_midturn_ansi > "$resp/9.out"
   herdr_submit_identity_prefix "$resp" codex
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
@@ -6145,6 +6204,8 @@ test_send_text_submit_detects_swallowed_enter
 test_send_text_submit_replays_literal_send_stderr
 test_send_text_submit_popup_autocomplete_requires_second_enter
 test_send_text_submit_confirms_blocked_after_enter
+test_send_text_submit_retries_a_dropped_enter_in_a_busy_omp_box
+test_send_text_submit_never_double_presses_on_a_stale_busy_omp_frame
 test_send_text_submit_preexisting_working_pending_is_queued_enter
 test_send_text_submit_preexisting_working_does_not_confirm_failed_enter
 test_send_text_submit_idle_baseline_does_not_confirm_failed_enter

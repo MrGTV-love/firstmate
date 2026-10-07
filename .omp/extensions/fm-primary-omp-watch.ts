@@ -56,6 +56,16 @@
 // consumes at the user message_start carrying the exact wake text; either
 // event finishes the pending record, and a still-unconsumed record rides the
 // replacement handoff.
+//
+// Restored wakes (stated once here):
+// omp puts a queued user follow-up back into the composer when a run is
+// interrupted or dequeued, so a wake queued behind a running turn can sit there
+// unsubmitted: omp accepted it and no turn consumes it. After agent_end the
+// extension waits briefly for the normal drain, then, when the agent is idle
+// and the composer holds that exact wake, removes only the wake text and sends
+// it again (three attempts per wake). Operator text in the composer is left
+// exactly as typed. bin/fm-watch.sh's stalled-loop check is the parent's
+// backstop for a composer this extension cannot read.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
@@ -208,12 +218,6 @@ function positiveInteger(name: string, fallback: number): number {
   return Math.floor(value);
 }
 
-function parentPid(pid: string): string {
-  const result = spawnSync("ps", ["-o", "ppid=", "-p", pid], { encoding: "utf8" });
-  if (result.status !== 0) return "";
-  return result.stdout.trim();
-}
-
 function pidAlive(pid: string): boolean {
   try {
     process.kill(Number(pid), 0);
@@ -223,6 +227,12 @@ function pidAlive(pid: string): boolean {
   }
 }
 
+// The lock records the omp process that runs the extensions, and omp loads them
+// in that same process (verified live, omp 18.6.3: the recorded pid equals
+// process.pid). Only that process owns the home. A descendant omp that
+// auto-discovers these files from the same working directory - an `omp -p`
+// child a turn runs, for example - is another session: it must not arm a second
+// watcher in this home or record itself as the loaded session.
 function lockOwnership(): LockOwnership {
   let lockPid = "";
   try {
@@ -231,19 +241,21 @@ function lockOwnership(): LockOwnership {
     return "missing";
   }
   if (!/^[0-9]+$/.test(lockPid) || lockPid === "1") return "other";
-  let pid = String(process.pid);
-  for (let i = 0; i < 8; i += 1) {
-    if (pid === lockPid) return "owned";
-    pid = parentPid(pid);
-    if (!pid || pid === "1") break;
-  }
+  if (lockPid === String(process.pid)) return "owned";
   return pidAlive(lockPid) ? "other" : "missing";
 }
 
+// Writes only on a change, so the turn-boundary calls below stay cheap.
 function markLoaded(): void {
   if (lockOwnership() === "other") return;
+  const record = `${extensionVersion}\n${process.pid}\n`;
+  try {
+    if (readFileSync(marker, "utf8") === record) return;
+  } catch {
+    // Absent or unreadable: write it below.
+  }
   mkdirSync(state, { recursive: true });
-  writeFileSync(marker, `${extensionVersion}\n${process.pid}\n`);
+  writeFileSync(marker, record);
 }
 
 function actionableLine(output: string): string {
@@ -530,6 +542,25 @@ async function stopSessionGeneration(generation: SessionGeneration, replacement:
   }
 }
 
+// omp restores a queued user follow-up into the composer instead of delivering
+// it when the run is interrupted (Esc, including bin/fm-control.sh interrupt)
+// or the operator dequeues it (Alt+Up). A watcher wake queued behind a running
+// turn then sits in the composer unsubmitted: omp accepted it, no turn ever
+// consumes it, and the lane looks idle. omp joins restored messages and the
+// operator's own draft with blank lines, and the composer may or may not carry
+// the invisible operational-input mark, so the wake is located with the mark
+// ignored and removed on its own, leaving every other character of the draft
+// exactly as the operator left it.
+function removeRestoredWake(editor: string, content: string): string | null {
+  const text = editor.replace(/\u2063/g, "");
+  const needle = content.replace(/\u2063/g, "");
+  const at = text.indexOf(needle);
+  if (at < 0) return null;
+  const before = text.slice(0, at).replace(/\n+$/, "");
+  const after = text.slice(at + needle.length).replace(/^\n+/, "");
+  return before && after ? `${before}\n\n${after}` : before || after;
+}
+
 const cleanupOnProcessExit = () => {
   if (activeGeneration) stopGeneration(activeGeneration);
 };
@@ -578,6 +609,57 @@ export default function (pi: ExtensionAPI) {
       }
       return;
     }
+  }
+
+  // Restored-wake recovery state. The context is whichever one omp passed to
+  // the latest event: timers run outside any handler, and a context that went
+  // stale with a replaced session throws on use, which only skips the check.
+  const restoreCheckMs = positiveInteger("FM_OMP_WAKE_RESTORE_CHECK_MS", 2000);
+  const restoreAttemptLimit = 3;
+  const restoreAttempts = new Map<string, number>();
+  let restoreTimer: ReturnType<typeof setTimeout> | null = null;
+  let latestContext: any = null;
+
+  function rememberContext(ctx: unknown): void {
+    if (typeof ctx === "object" && ctx !== null) latestContext = ctx;
+  }
+
+  function recoverRestoredWake(owner: SessionGeneration): void {
+    if (!generationIsLive(owner) || owner.unconsumedWakes.size === 0) return;
+    const ctx = latestContext;
+    if (!ctx?.hasUI || typeof ctx.isIdle !== "function" || typeof ctx.ui?.getEditorText !== "function" || typeof ctx.ui?.setEditorText !== "function") return;
+    try {
+      // A turn that already started, or a queue that still holds messages,
+      // will consume the wake itself.
+      if (!ctx.isIdle() || ctx.hasPendingMessages?.()) return;
+      let editor = String(ctx.ui.getEditorText() ?? "");
+      for (const [token, wake] of [...owner.unconsumedWakes]) {
+        const attempts = restoreAttempts.get(token) ?? 0;
+        if (attempts >= restoreAttemptLimit) continue;
+        const remainder = removeRestoredWake(editor, wake.content);
+        if (remainder === null) continue;
+        restoreAttempts.set(token, attempts + 1);
+        editor = remainder;
+        ctx.ui.setEditorText(remainder);
+        // Idle, so this starts the turn that consumes the wake; the next
+        // agent_end re-checks any further restored wake.
+        pi.sendUserMessage(wake.content, { deliverAs: "followUp" });
+        return;
+      }
+    } catch {
+      // A stale or unavailable context: the parent's stalled-loop check still
+      // recovers a wake left in the composer.
+    }
+  }
+
+  function scheduleRestoredWakeCheck(owner: SessionGeneration): void {
+    if (restoreTimer || owner.unconsumedWakes.size === 0) return;
+    const timer = setTimeout(() => {
+      restoreTimer = null;
+      recoverRestoredWake(owner);
+    }, restoreCheckMs);
+    timer.unref();
+    restoreTimer = timer;
   }
 
   function confirmHandlingDelivery(recovery: { generation: string; watcherPid: string }): {
@@ -1077,16 +1159,26 @@ export default function (pi: ExtensionAPI) {
     return result;
   }
 
-  pi.on?.("before_agent_start", (event) => {
+  pi.on?.("before_agent_start", (event, ctx) => {
+    rememberContext(ctx);
+    markLoaded();
     consumeWake(generation, String((event as { prompt?: unknown })?.prompt ?? ""));
   });
-  pi.on?.("message_start", (event) => {
+  pi.on?.("message_start", (event, ctx) => {
+    rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
     consumeWake(generation, userMessageText(message.content));
   });
+  // A run that ends with a wake still unconsumed either drains it into the next
+  // run at once or left it in the composer; the delayed check tells the two apart.
+  pi.on?.("agent_end", (_event, ctx) => {
+    rememberContext(ctx);
+    scheduleRestoredWakeCheck(generation);
+  });
 
-  pi.on?.("session_start", async () => {
+  pi.on?.("session_start", async (_event, ctx) => {
+    rememberContext(ctx);
     if (generation.stopping) generation = createGeneration();
     activateGeneration(generation);
     markLoaded();
@@ -1098,6 +1190,9 @@ export default function (pi: ExtensionAPI) {
     // replacement handoff is always persisted when anything is pending; a
     // terminal quit then merely replays an already-drained wake next start.
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
+    if (restoreTimer) clearTimeout(restoreTimer);
+    restoreTimer = null;
+    latestContext = null;
     await stopSessionGeneration(generation, true);
   });
 
