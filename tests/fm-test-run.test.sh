@@ -312,17 +312,17 @@ test_changed_dependency_selection_and_unmapped_failure() {
   init_changed_fixture_repo "$repo"
 
   : >"$repo/bin/fm-env-lib.sh"
-  for script in fm-dispatch-resolve.test.sh fm-skill-suggest.test.sh; do
+  for script in fm-dispatch-resolve.test.sh fm-skill-pick.test.sh; do
     printf '#!/usr/bin/env bash\n' >"$repo/tests/$script"
     chmod +x "$repo/tests/$script"
   done
-  git -C "$repo" add bin/fm-env-lib.sh tests/fm-dispatch-resolve.test.sh tests/fm-skill-suggest.test.sh
+  git -C "$repo" add bin/fm-env-lib.sh tests/fm-dispatch-resolve.test.sh tests/fm-skill-pick.test.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm typesafe-fixture
   printf '\n' >>"$repo/bin/fm-env-lib.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/fm-pr-merge.test.sh" "environment accessor retains pr-forge coverage"
   assert_contains "$listed" "tests/fm-dispatch-resolve.test.sh" "environment accessor selects dispatch coverage"
-  assert_contains "$listed" "tests/fm-skill-suggest.test.sh" "environment accessor selects picker coverage"
+  assert_contains "$listed" "tests/fm-skill-pick.test.sh" "environment accessor selects picker coverage"
   assert_not_contains "$listed" "tests/fm-daemon.test.sh" "environment accessor selection stays focused"
   git -C "$repo" add bin/fm-env-lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm environment-change

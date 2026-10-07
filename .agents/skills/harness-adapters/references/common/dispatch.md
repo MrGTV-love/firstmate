@@ -11,10 +11,10 @@ When the opt-in `bin/fm-dispatch-resolve.sh` is on, its `clear` answer already n
 
 [`secondmate-provisioning`](../secondmate-provisioning/SKILL.md) owns inherited harness defaults and routing configuration.
 
-## Skill advice at intake
+## Skill selection at launch
 
-Apply every existing mandatory explicit/named and safety trigger before considering optional advice.
-Follow [advisory skill selection](../../../docs/configuration.md#advisory-skill-selection) at intake and on material intent changes; it owns permitted input, worker overlays, privacy, role coverage, and supported limits.
+Every ship and scout spawn adds a picked project skill to the worker's launch instructions, after every existing mandatory explicit/named and safety trigger.
+[Worker skill selection](../../../docs/configuration.md#worker-skill-selection) owns its input, privacy, provider order, and recorded result.
 
 
 ## Owners

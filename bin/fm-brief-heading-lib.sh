@@ -3,8 +3,8 @@
 # Usage: . bin/fm-brief-heading-lib.sh
 #
 # This file is the single owner of brief-section parsing for intent,
-# validation, dispatch resolution, and advisory skill selection.
-# Every consumer shares parsing semantics; resolver-only privacy preprocessing
+# validation, dispatch resolution, and worker skill selection.
+# Every consumer shares parsing semantics; never-send privacy preprocessing
 # is owned by docs/configuration.md "Never-send list".
 
 # Parse an exact ATX heading outside fenced blocks. Body mode prints through
