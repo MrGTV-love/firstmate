@@ -38,7 +38,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section reader |
 | [`fm-skill-suggest.sh`](../bin/fm-skill-suggest.sh) | Suggest optional skill bodies to inspect ([operator contract](configuration.md#advisory-skill-selection)) |
 | [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe boundary for dispatch resolution and advisory skill selection; resolves the key from the environment, the home `.env`, then the primary home `.env` |
-| [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker Stop hook that runs the pinned jev-belay `belay.mjs` with the TypeSafe key set for that process only ([contract](configuration.md#jev-belay-stop-hook)) |
+| [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker Stop wrapper that runs pinned upstream belay with a Node-only TypeSafe key before publishing accepted completion; rejection keeps the task busy ([contract](configuration.md#jev-belay-stop-hook)) |
+| [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload that gates each actual belay JSON request, including task, final message, and checks, through dispatch-never-send using credential-free policy children; withheld requests never reach the network |
 | [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index and resolve dispatch model roles |
 | `fm-herdr-lab.sh`        | Provision and guardedly operate an isolated, never-default Herdr lab session         |
 | `fm-herdr-lab-viewer.py` | The pty engine behind `fm-herdr-lab.sh viewer`: one real foreground Herdr client on a non-zero window grid |

@@ -1042,9 +1042,10 @@ It applies to fresh launches, relaunches, raw launch commands with an identifiab
 For an unidentifiable raw command, the adviser stays off.
 
 Auto allows the installed plugin to act; it does not install the plugin or supply a credential.
-Use the plugin's supported saved settings to select `mode: auto`, acknowledge experimental automatic mode, and save the TypeSafe key without adding `TYPESAFE_API_KEY` to launch text or the worker environment.
-For omp's Pi plugin, these fields are `mode`, `autoAcknowledged`, and `typesafeApiKey` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
-Claude stores mode and saved key in its plugin options and acknowledgement in the plugin's own preferences store.
+Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
+Use the plugin's supported settings to select `mode: auto` and acknowledge experimental automatic mode.
+For omp's Pi plugin, these fields are `mode` and `autoAcknowledged` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
+Claude stores mode in its plugin options and acknowledgement in the plugin's own preferences store.
 Claude auto launches enable `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without changing the global function-hook setting, unless a leading raw-command assignment explicitly supplies the flag's value.
 When automatic activation supplies that flag rather than preserving a captain's opt-in, the launch also sets `FM_COMPACT_ADVISER_HOOKS=1`, which keeps the [firstmate-calm mod](calm.md#enabling-function-hooks) inert, so enabling the adviser does not enable Calm.
 Every launch first drops a flag that an earlier launch in the same pane marked this way, so an off or emergency-off relaunch runs without it.
@@ -1116,7 +1117,8 @@ COMPACT_ADVISER_DISABLE=1 FM_JEV_OMP_PIPELINE=1 \
 The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and exported redaction and recent-window helpers, with its full dependency tree and `@earendil-works/pi-coding-agent` resolvable from the copied static entry; the unadapted registry package is not a substitute.
 The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
 Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
-The controller reuses that package's request format, profile parsing, snapshot/redaction and environment/saved/`.env` key resolution without creating another credential store.
+The controller reuses that package's request format, profile parsing and snapshot/redaction without creating another credential store.
+Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
 `FM_JEV_PIPELINE_AGENT_DIR` selects the adviser configuration directory; when omitted, the controller uses omp's public `getAgentDir()` and reads that configuration without modifying it.
 `TYPESAFE_BASE` follows compact-adviser's HTTPS-or-loopback-only endpoint policy.
 Neither installation nor loading changes global plugins or settings.
@@ -1391,7 +1393,7 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution or advisory skill-selection requests, and keeps marked brief regions out of Jev resolver requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, advisory skill-selection, or [belay Stop-hook](#jev-belay-stop-hook) requests, and keeps marked brief regions out of Jev resolver requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
 Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so both tools there withhold the same values.
 
@@ -1592,14 +1594,20 @@ This implementation cannot enable blocking or reset that date.
 ## Jev belay Stop hook
 
 Firstmate-launched Claude ship and scout workers run the published [jev-belay](https://github.com/valentynkit/jev-belay) Stop hook, which blocks a turn that reports work as done when nothing verified it.
-`bin/fm-spawn.sh` adds `bin/fm-jev-belay-hook.sh` to the Stop group of the worker's gitignored `.claude/settings.local.json`; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
+`bin/fm-spawn.sh` installs one combined Stop command in the worker's gitignored `.claude/settings.local.json`, running `bin/fm-jev-belay-hook.sh` before publishing completion; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
+Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event; acceptance (exit 0) clears busy and publishes completion.
 Secondmate sessions and other harnesses do not run it.
 
 The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
 The wrapper therefore resolves the key at call time with `fm_typesafe_key` (the environment, the home `.env`, then the primary home `.env`) and sets it for the one `node` process it execs.
-The key is never in Claude's environment, in a file, in the Keychain, in plugin options, or on argv.
-`JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are cleared first, so nothing ambient can redirect the key or change the model pin.
+The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
+Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
 Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
+
+The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs), leaving the pinned upstream `belay.mjs` unchanged.
+Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.
+The policy comes from the resolved `FM_CONFIG_OVERRIDE` or `FM_HOME/config`, and each policy-check child runs without credentials; only the upstream Node process receives the resolved TypeSafe key.
+A forbidden value, invalid policy, or policy-check refusal withholds the entire request without network egress, and upstream catches the withheld-request error and allows the stop.
 
 `belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
 Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.

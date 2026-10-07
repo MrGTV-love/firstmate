@@ -22,12 +22,18 @@
 # FM_JEV_BELAY_BLOB overrides the pin only when FM_TEST_SEAM=1.
 set -u
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR=${BASH_SOURCE[0]%/*}
+[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ] || SCRIPT_DIR=.
+case "$SCRIPT_DIR" in
+  /*) ;;
+  *) SCRIPT_DIR=$PWD/$SCRIPT_DIR ;;
+esac
 JEV_BELAY_BLOB=2dec6cfbeeefb364d916176680e2598abc4e0dde
 if [ "${FM_TEST_SEAM:-}" = 1 ] && [ -n "${FM_JEV_BELAY_BLOB:-}" ]; then
   JEV_BELAY_BLOB=$FM_JEV_BELAY_BLOB
 fi
 
+unset JEV_BASE_URL JEV_MODEL JEV_API_KEY CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY
 # shellcheck source=bin/fm-typesafe-lib.sh
 . "$SCRIPT_DIR/fm-typesafe-lib.sh"
 
@@ -39,5 +45,4 @@ command -v node >/dev/null 2>&1 || exit 0
 [ "$(git hash-object -- "$belay" 2>/dev/null)" = "$JEV_BELAY_BLOB" ] || exit 0
 fm_typesafe_key "$home" || exit 0
 
-unset JEV_BASE_URL JEV_MODEL JEV_API_KEY CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY
-TYPESAFE_API_KEY=$TYPESAFE_API_KEY_PRIVATE exec node "$belay"
+FM_HOME=$home TYPESAFE_API_KEY=$TYPESAFE_API_KEY_PRIVATE exec node --import "$SCRIPT_DIR/fm-jev-belay-policy.mjs" "$belay"

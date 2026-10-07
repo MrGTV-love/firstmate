@@ -83,26 +83,72 @@ BELAY_ROOT="$PRIMARY/data/vendor/jev-belay"
 mkdir -p "$BELAY_ROOT"
 cat > "$BELAY_ROOT/belay.mjs" <<'JS'
 import { readFileSync, writeFileSync } from 'node:fs';
+const stdin = readFileSync(0, 'utf8');
 const seen = {
   key: process.env.TYPESAFE_API_KEY ?? null,
+  privateKey: process.env.TYPESAFE_API_KEY_PRIVATE ?? null,
   base: process.env.JEV_BASE_URL ?? null,
   model: process.env.JEV_MODEL ?? null,
   alt: process.env.JEV_API_KEY ?? null,
   option: process.env.CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY ?? null,
-  argvHasKey: process.argv.some(arg => arg.includes('primary-key')),
-  stdin: readFileSync(0, 'utf8'),
+  argvHasKey: process.argv.some(arg => /primary-key|public-key|private-key/.test(arg)),
+  stdin,
 };
 writeFileSync(process.env.FM_TEST_BELAY_SEEN, JSON.stringify(seen));
+const request = process.env.FM_TEST_BELAY_REQUEST
+  ? JSON.parse(process.env.FM_TEST_BELAY_REQUEST)
+  : { model: 'jev-1.13.0', state: { task: 'ordinary task', final_message: 'ordinary result', run: { file_changes: 1, checks_run: ['ordinary check'] } }, questions: {} };
+for (let attempt = 0; attempt < 2; attempt++) {
+  try {
+    const body = attempt === 1 && process.env.FM_TEST_BELAY_RETRY_REQUEST
+      ? JSON.parse(process.env.FM_TEST_BELAY_RETRY_REQUEST) : request;
+    const response = await fetch('https://api.typesafe.ai/v1/systemone', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${seen.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    await response.json();
+  } catch {
+    process.exit(0);
+  }
+}
 process.exit(Number(process.env.FM_TEST_BELAY_EXIT || 0));
 JS
 SEEN="$TMP_ROOT/belay-seen.json"
+REQUESTS="$TMP_ROOT/belay-requests.jsonl"
+LEAKS="$TMP_ROOT/belay-leaks"
+COMMANDS="$TMP_ROOT/belay-commands"
+TRANSPORT_MODULE="$TMP_ROOT/belay-transport.mjs"
+cat > "$TRANSPORT_MODULE" <<'JS'
+import { appendFileSync } from 'node:fs';
+globalThis.fetch = async (url, init) => {
+  appendFileSync(process.env.FM_TEST_BELAY_REQUESTS, JSON.stringify({
+    url: String(url), body: JSON.parse(init.body), authorization: init.headers.Authorization,
+  }) + '\n');
+  return { ok: true, status: 200, json: async () => ({ allowed: true }) };
+};
+JS
+SHIMBIN="$TMP_ROOT/belay-shims"
+mkdir -p "$SHIMBIN"
+for command in dirname git jq grep tr mktemp rm cat; do
+  real_command=$(command -v "$command") || fail "missing fixture command: $command"
+  printf '#!/bin/bash\nprintf "%%s\\n" "%s" >> "$FM_TEST_BELAY_COMMANDS"\nif [ "${TYPESAFE_API_KEY+x}" = x ] || [ "${TYPESAFE_API_KEY_PRIVATE+x}" = x ]; then printf "%%s\\n" "%s" >> "$FM_TEST_BELAY_LEAKS"; fi\nexec "%s" "$@"\n' \
+    "$command" "$command" "$real_command" > "$SHIMBIN/$command"
+  chmod +x "$SHIMBIN/$command"
+done
 run_belay() {  # <home> [KEY=VALUE...]; stdin payload fixed
-  local home=$1
+  local home=$1 blob
   shift
+  blob=$(git hash-object "$BELAY_ROOT/belay.mjs" 2>/dev/null || true)
   rm -f "$SEEN"
+  : > "$REQUESTS"
+  : > "$LEAKS"
+  : > "$COMMANDS"
   printf 'payload' | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE FM_HOME="$home" \
-    FM_JEV_BELAY_BLOB="$(git hash-object "$BELAY_ROOT/belay.mjs" 2>/dev/null || true)" FM_TEST_BELAY_SEEN="$SEEN" "$@" \
-    bash "$ROOT/bin/fm-jev-belay-hook.sh"
+    FM_CONFIG_OVERRIDE='' FM_JEV_BELAY_BLOB="$blob" FM_TEST_BELAY_SEEN="$SEEN" \
+    FM_TEST_BELAY_REQUESTS="$REQUESTS" FM_TEST_BELAY_LEAKS="$LEAKS" FM_TEST_BELAY_COMMANDS="$COMMANDS" \
+    NODE_OPTIONS="--import=$TRANSPORT_MODULE" PATH="$SHIMBIN:$PATH" "$@" \
+    "$ROOT/bin/fm-jev-belay-hook.sh"
 }
 
 run_belay "$LANE" JEV_BASE_URL=https://evil.invalid JEV_MODEL=other JEV_API_KEY=alt \
@@ -112,6 +158,72 @@ run_belay "$LANE" JEV_BASE_URL=https://evil.invalid JEV_MODEL=other JEV_API_KEY=
 [ "$(jq -c '[.base,.model,.alt,.option,.argvHasKey]' "$SEEN")" = '[null,null,null,null,false]' ] \
   || fail "belay saw a redirecting variable or the key on argv"
 pass "the wrapper hands the primary key to belay only, with redirecting variables cleared"
+[ ! -s "$LEAKS" ] || fail "primary key leaked to a wrapper child"
+[ "$(jq -s length "$REQUESTS")" = 2 ] || fail "absent policy must allow both actual fetch requests"
+jq -se 'all(.[]; .authorization == "Bearer primary-key")' "$REQUESTS" >/dev/null \
+  || fail "transport did not receive the resolved key"
+
+mkdir -p "$LANE/config"
+POLICY="$LANE/config/dispatch-never-send"
+printf 'classified phrase\n' > "$POLICY"
+for keys in public private both; do
+  case "$keys" in
+    public) run_belay "$LANE" TYPESAFE_API_KEY=public-key; expected=public-key ;;
+    private) run_belay "$LANE" TYPESAFE_API_KEY_PRIVATE=private-key; expected=private-key ;;
+    both) run_belay "$LANE" TYPESAFE_API_KEY=public-key TYPESAFE_API_KEY_PRIVATE=private-key; expected=private-key ;;
+  esac
+  [ "$(jq -r .key "$SEEN")" = "$expected" ] || fail "$keys exported key precedence was lost"
+  [ "$(jq -r .privateKey "$SEEN")" = null ] || fail "private key variable reached vendor"
+  [ ! -s "$LEAKS" ] || fail "$keys exported key leaked to an external command"
+  [ "$(jq -s length "$REQUESTS")" = 2 ] || fail "allowed policy must permit every fetch attempt"
+  jq -se --arg auth "Bearer $expected" 'all(.[]; .authorization == $auth)' "$REQUESTS" >/dev/null \
+    || fail "$keys exported key did not reach transport"
+  for command in dirname git jq grep; do
+    grep -qx "$command" "$COMMANDS" || fail "$command leakage shim was not exercised"
+  done
+done
+pass "exported keys retain private/public precedence and never reach wrapper or policy children"
+
+for field in task final_message checks_run; do
+  request=$(jq -cn --arg field "$field" \
+    '{model:"jev-1.13.0",state:{task:"ordinary task",final_message:"ordinary result",run:{file_changes:1,checks_run:["ordinary check"]}},questions:{}} |
+     if $field == "checks_run" then .state.run.checks_run = ["CLASSIFIED \n\t PHRASE"]
+     else .state[$field] = "CLASSIFIED \n\t PHRASE" end')
+  run_belay "$LANE" TYPESAFE_API_KEY=public-key TYPESAFE_API_KEY_PRIVATE=private-key \
+    FM_TEST_BELAY_REQUEST="$request" || fail "$field withholding must allow stop"
+  [ -f "$SEEN" ] || fail "$field policy fixture did not run vendor"
+  [ ! -s "$REQUESTS" ] || fail "$field confidential text reached transport"
+  [ ! -s "$LEAKS" ] || fail "$field policy checker leaked exported credentials"
+done
+pass "actual task, final_message and checks_run JSON is gated with case and whitespace normalization"
+run_belay "$LANE" FM_TEST_BELAY_RETRY_REQUEST='{"model":"jev-1.13.0","state":{"task":"classified phrase","final_message":"ordinary","run":{"file_changes":1,"checks_run":[]}},"questions":{}}' \
+  || fail "retry withholding must allow stop"
+[ "$(jq -s length "$REQUESTS")" = 1 ] || fail "confidential retry request reached transport"
+pass "each fetch attempt is checked against its own request body"
+
+OVERRIDE="$TMP_ROOT/override-config"
+mkdir -p "$OVERRIDE"
+printf 'override phrase\n' > "$OVERRIDE/dispatch-never-send"
+run_belay "$LANE" FM_CONFIG_OVERRIDE="$OVERRIDE" \
+  FM_TEST_BELAY_REQUEST='{"model":"jev-1.13.0","state":{"task":"OVERRIDE phrase","final_message":"ordinary","run":{"file_changes":1,"checks_run":[]}},"questions":{}}' \
+  || fail "override policy withholding must allow stop"
+[ ! -s "$REQUESTS" ] || fail "config override policy was ignored"
+run_belay "$LANE" FM_CONFIG_OVERRIDE="$OVERRIDE" \
+  FM_TEST_BELAY_REQUEST='{"model":"jev-1.13.0","state":{"task":"classified phrase","final_message":"ordinary","run":{"file_changes":1,"checks_run":[]}},"questions":{}}' \
+  || fail "override allowed request failed"
+[ "$(jq -s length "$REQUESTS")" = 2 ] || fail "home policy incorrectly overrode config override"
+pass "config override selects the effective policy"
+
+printf '# dispatch-never-send malformed directive\n' > "$POLICY"
+run_belay "$LANE" || fail "invalid policy must allow stop"
+[ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "invalid policy reached transport"
+printf 'classified phrase\n' > "$POLICY"
+chmod 000 "$POLICY"
+run_belay "$LANE" || fail "unreadable policy must allow stop"
+chmod 600 "$POLICY"
+[ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "unreadable policy reached transport"
+rm -f "$POLICY"
+pass "invalid and unreadable policy refuse before transport"
 
 run_belay "$LANE" FM_TEST_BELAY_EXIT=2 && fail "belay exit status must pass through"
 [ -f "$SEEN" ] || fail "belay did not run for the exit-status case"
