@@ -217,15 +217,17 @@ destination_allows_inherited_pair() {
 # churns mtimes). A source item proven absent is mirrored as a missing
 # destination item, so clearing the primary's value clears it downstream too
 # (primary-authoritative). Inspection errors or existing nonregular sources
-# leave that destination item unchanged and report an error; inaccessible paths
-# and dangling source links must never silently remove an inherited grant.
+# leave destinations unchanged; inaccessible paths and dangling source links
+# must never silently remove an inherited grant. The coupled routing-pair
+# exception is owned by .agents/skills/secondmate-provisioning/SKILL.md.
 # The destination dir is created lazily, only when there is something to copy;
 # absence on both sides is a no-op. When FM_CONFIG_INHERIT_REPORT points at a writable
 # file, one tab-separated line per item is appended there:
 #   <item> <status> <reason>
-# Status is pushed, unchanged, skipped, or error. Skipped items are warnings and
-# do not affect the exit code. Returns non-zero only when a real propagation
-# error, such as copy or remove failure, occurs.
+# Status is pushed, unchanged, skipped, or error. Destination-guard skips are
+# warnings and do not affect the exit code. Routing-source staging or validation
+# refusal reports both members as skipped but returns non-zero, as do copy,
+# remove, and other propagation errors.
 record_inheritable_config_result() {
   local item=$1 status=$2 reason=${3:-}
   [ -n "${FM_CONFIG_INHERIT_REPORT:-}" ] || return 0

@@ -871,9 +871,9 @@ A final newline is optional; any other line, a relative path, or a control chara
 For Claude, `ordinary` unsets `CLAUDE_CONFIG_DIR` rather than pointing it at `~/.claude`, because Claude reads `$CLAUDE_CONFIG_DIR/.claude.json` and keys its macOS Keychain entry to any directory that is set ([authentication, "Credential management"](https://code.claude.com/docs/en/authentication#credential-management)).
 
 A Pi root can hold several provider logins at once, so the root alone does not say which account a launch spends.
-A pinned Pi launch therefore needs `--model <provider>/<id>` naming a declared provider, and Firstmate also passes `--provider <that provider>` so Pi cannot resolve the model under another signed-in provider.
+A pinned Pi launch therefore needs a resolved `<provider>/<id>` model under the [fleet model-index contract](#fleet-model-index-configmodel-indexjson), and Firstmate also passes `--provider <that provider>` so Pi cannot resolve the model under another signed-in provider.
 
-An unqualified model, an undeclared provider, or a raw Pi launch command, which cannot receive that flag, refuses; Firstmate never guesses a provider.
+An unqualified resolved model, an undeclared provider, or a raw Pi launch command, which cannot receive that flag, refuses; Firstmate never guesses a provider.
 
 ### Launch scope and sign-in checks
 
@@ -1181,13 +1181,8 @@ Run `bin/fm-model-index.sh check` after every index edit; it checks every active
 The Vernant steward lane owner must also run `FM_HOME="/path/to/lane-home" bin/fm-model-index.sh check-registry "/path/to/vernant-checkout/scripts/model_registry.json"` after every index edit and before every Vernant model change, replacing the placeholder paths with that lane's home and Vernant checkout.
 This read-only comparison writes nothing to Vernant; the command header and `--help` own its registry scanning and refusal semantics.
 `bin/fm-config-push.sh` runs the active-id catalog check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
-Each propagation boundary stages the index and inheritable dispatch document once, validates that staged pair, and publishes those same bytes or absences.
-Before either routing file is replaced or removed, local and remote inheritance validate the staged pair offline and preflight both destination guards; refusal retains both files while unrelated inherited material continues to propagate.
-Remote propagation also requires both selected payloads to be readable regular files, without symlinks or multiple hardlinks, and no larger than 1,048,576 bytes each; local inheritance continues to accept readable regular-file source links.
-When both selected routing sources are proven absent, propagation mirrors their absence without requiring jq.
-Remote live callers still notify unrelated successfully published inherited changes when a destination pair guard refuses, and pending sends still retry despite that guard.
-When the index is malformed, an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
-Spawn-time propagation and bootstrap run this offline coherence check, including when the primary removes its index, but do not fetch live catalogs.
+The [`secondmate-provisioning` inheritance contract](../.agents/skills/secondmate-provisioning/SKILL.md#charter-and-seed) owns routing-pair staging, offline coherence validation, source and destination guards, and absence propagation.
+When the index is malformed, an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, `fm-config-push.sh` withholds both `model-index.json` and `crew-dispatch.json` from every home, retaining each home's current pair, and exits non-zero; an unavailable catalog is only a notice.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
 Typed intake freezes the index alongside its rules snapshot, applies the never-send filter before any live catalog request, and checks only the chosen profile's id, under that harness's `config/claude-account` or `config/pi-account` pin when one is set.

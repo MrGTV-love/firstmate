@@ -227,12 +227,14 @@
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written.
-#   A model written as <provider>/<id> is validated against `omp models --json`
-#   only when that provider appears in the listing; a provider absent from the
-#   listing (an extension-registered provider such as claude-bridge, which omp
-#   never lists) passes through unvalidated with a stderr notice, and a bare
-#   fuzzy pattern is left to omp's own matcher. A crewmate or scout loads its
-#   per-task busy-state extension with -e from state/ (outside the worktree, so
+#   A non-index-entry literal <provider>/<id> is validated against
+#   `omp models --json` only when that provider appears in the listing; a
+#   provider absent from the listing (an extension-registered provider such as
+#   claude-bridge, which omp never lists) passes through unvalidated with a
+#   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
+#   own matcher. Indexed selections follow docs/configuration.md "Fleet model
+#   index". A crewmate or scout loads its per-task busy-state extension with -e
+#   from state/ (outside the worktree, so
 #   auto-discovery cannot load it a second time); a secondmate passes no -e at
 #   all and relies on omp auto-discovering the home's tracked .omp/extensions/
 #   (verified, omp 18.1.11: a file named both ways loads twice, and discovery is
@@ -373,7 +375,7 @@
 #   refuses before any endpoint, worktree, or record exists when the file is
 #   malformed, the root is unusable, or the runner's own check says it is not
 #   signed in. A pinned Claude launch sheds the environment credentials Claude
-#   ranks above the root's login; a pinned Pi launch needs --model
+#   ranks above the root's login; a pinned Pi launch needs a resolved model
 #   <provider>/<id> for a declared provider and also carries --provider, and a
 #   raw Pi command refuses. The pin is recorded as account= (and Pi's
 #   account_provider=) in the task record and on the spawned line. A local
