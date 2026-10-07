@@ -247,6 +247,108 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
   pass "Claude spawn retains forwarded API auth, filters excluded credentials, and treats an allow flag alone as native authentication"
 }
 
+test_direct_relaunch_preserves_rule_and_honors_overrides() {
+  local rec id variant out status launch expected_rule expected_harness expected_model expected_effort tool
+  local -a args
+  for variant in recorded recorded-model recorded-effort recorded-profile rule harness model effort nondefault-model-override nondefault-effort-override ambiguous-harness ambiguous-model ambiguous-effort explicit-profile-rule; do
+    id="profile-relaunch-$variant"
+    rec=$(make_spawn_case "$id" claude "$id")
+    read_case_record "$rec"
+    expected_model=default expected_effort=default
+    case "$variant" in recorded-model|recorded-profile|nondefault-*) expected_model=sonnet ;; esac
+    case "$variant" in recorded-effort|recorded-profile|nondefault-*|ambiguous-effort|explicit-profile-rule) expected_effort=high ;; esac
+    jq -c --arg m "$expected_model" --arg e "$expected_effort" \
+      '.rules |= map(.use += {model:$m,effort:$e})' \
+      <<< '{"rules":[{"when":"first task","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]},{"when":"second task","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/qwen/qwen3.5","effort":"medium"}]}]}' \
+      > "$HOME_DIR/config/crew-dispatch.json"
+    cat > "$FAKEBIN_DIR/quota-axi" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '{"schemaVersion":6,"providers":[]}'
+SH
+    for tool in claude codex; do
+      cat > "$FAKEBIN_DIR/$tool" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${0##*/}" "$@" > "${0%/*}/worker.argv"
+SH
+      chmod +x "$FAKEBIN_DIR/$tool"
+    done
+    chmod +x "$FAKEBIN_DIR/quota-axi"
+    args=("$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
+    [ "$expected_model" = default ] || args+=(--model "$expected_model")
+    [ "$expected_effort" = default ] || args+=(--effort "$expected_effort")
+    out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "${args[@]}")
+    status=$?
+    expect_code 0 "$status" "$variant initial Claude spawn must succeed: $out"
+    assert_meta_profile "$HOME_DIR/state/$id.meta" claude "$expected_model" "$expected_effort"
+    grep -Fxq 'dispatch_rule=rule_1' "$HOME_DIR/state/$id.meta" || fail "$variant initial spawn lost its rule"
+
+    mkdir -p "$FAKEBIN_DIR/relaunch"
+    cat > "$FAKEBIN_DIR/relaunch/tmux" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = display-message ]; then
+  case "${!#}" in
+    '#{pane_current_command}') printf 'bash\n'; exit 0 ;;
+    '#{pane_tty}') exit 0 ;;
+  esac
+fi
+exec "${0%/*}/../tmux" "$@"
+SH
+    chmod +x "$FAKEBIN_DIR/relaunch/tmux"
+    args=("$id" --relaunch)
+    expected_rule=rule_1 expected_harness=claude
+    case "$variant" in
+      recorded|recorded-model|recorded-effort|recorded-profile) ;;
+      rule) args+=(--dispatch-rule rule_2); expected_rule=rule_2 ;;
+      harness) args+=(--harness codex); expected_rule=; expected_harness=codex ;;
+      model) args+=(--model sonnet); expected_rule=; expected_model=sonnet ;;
+      effort) args+=(--effort high); expected_rule=; expected_effort=high ;;
+      nondefault-model-override)
+        args+=(--model opus)
+        expected_rule= expected_model=opus expected_effort=default
+        ;;
+      nondefault-effort-override)
+        args+=(--effort low)
+        expected_rule= expected_model=default expected_effort=low
+        ;;
+      ambiguous-harness) args+=(--harness claude) ;;
+      ambiguous-model) args+=(--model default) ;;
+      ambiguous-effort) args+=(--effort high) ;;
+      explicit-profile-rule)
+        args+=(--harness claude --model default --effort high --dispatch-rule rule_2)
+        expected_rule=rule_2
+        ;;
+    esac
+    out=$(PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_DUPLICATE_WINDOW="fm-$id" \
+      run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR/relaunch" "$LAUNCH_LOG" "${args[@]}")
+    status=$?
+    case "$variant" in
+      ambiguous-*)
+        expect_code 1 "$status" "$variant must not inherit the recorded rule after a profile override: $out"
+        assert_contains "$out" 'different fallback lists match this profile' "$variant did not require a new rule selection"
+        [ ! -s "$LAUNCH_LOG" ] || fail "$variant launched despite ambiguous fallback rules"
+        grep -Fxq 'dispatch_rule=rule_1' "$HOME_DIR/state/$id.meta" || fail "$variant refusal changed the prior rule"
+        continue
+        ;;
+    esac
+    expect_code 0 "$status" "$variant direct relaunch must succeed: $out"
+    assert_meta_profile "$HOME_DIR/state/$id.meta" "$expected_harness" "$expected_model" "$expected_effort"
+    if [ -n "$expected_rule" ]; then
+      grep -Fxq "dispatch_rule=$expected_rule" "$HOME_DIR/state/$id.meta" || fail "$variant did not retain the selected dispatch rule"
+    else
+      assert_no_grep 'dispatch_rule=' "$HOME_DIR/state/$id.meta" "$variant retained an unrelated recorded dispatch rule"
+    fi
+    launch=$(cat "$LAUNCH_LOG")
+    [ -n "$launch" ] || fail "$variant sent no replacement launch"
+    fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" HOME="$HOME_DIR/user-home" \
+      > "$CASE_DIR/worker.out" 2>&1 || fail "$variant replacement launch could not be consumed"
+    grep -Fxq "$expected_harness" "$FAKEBIN_DIR/worker.argv" || fail "$variant ran the wrong replacement harness"
+    [ "$expected_model" = default ] || grep -Fxq "$expected_model" "$FAKEBIN_DIR/worker.argv" || fail "$variant lost the model override at launch"
+    [ "$expected_effort" = default ] || grep -Fxq "$expected_effort" "$FAKEBIN_DIR/worker.argv" || fail "$variant lost the effort override at launch"
+    ! grep -Fxq default "$FAKEBIN_DIR/worker.argv" || fail "$variant emitted a persisted default as a native launch argument"
+  done
+  pass "direct stopped-Claude relaunch preserves its recorded rule, resolves new profiles independently, and honors explicit rule selection with profile overrides"
+}
+
 # Claude Code strips U+2063 from the launch-prompt argument, so a claude launch
 # publishes the launch-brief envelope as a record in the receiving home's
 # operational inbox and passes only a printable doorbell naming it. Parsing the
@@ -1960,6 +2062,7 @@ test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
 test_no_dispatch_non_omp_spawn_does_not_require_jq
 test_claude_dispatch_binds_only_forwarded_api_credentials
+test_direct_relaunch_preserves_rule_and_honors_overrides
 test_claude_launch_brief_publishes_record_doorbell
 test_claude_secondmate_launch_brief_publishes_into_its_own_home
 test_claude_spawn_refuses_when_the_brief_record_cannot_publish

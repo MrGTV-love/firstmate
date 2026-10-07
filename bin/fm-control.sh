@@ -1041,7 +1041,7 @@ resolve_relaunch_profile() {
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
-        "$dispatch_profile" "$dispatch_fallback" "" "${T%%:*}") || return 1
+        "$dispatch_profile" "$dispatch_fallback" "" "$T") || return 1
       TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
@@ -1175,6 +1175,7 @@ record_note() {
 
 do_relaunch() {
   local exit_result state note_line secondmate_home quota_identity quota_record quota_current_gen=
+  local quota_last quota_verb quota_hold_rc
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1250,6 +1251,17 @@ do_relaunch() {
     if fm_session_end_exit_cancelled "$STATE" "$ID" "$FM_CONTROL_QUOTA_GEN" "$quota_current_gen"; then
       die "quota recovery cancelled by explicit exit for $ID"
     fi
+    quota_last=$(last_status_line "$STATE/$ID.status" 2>/dev/null || true)
+    quota_verb=$(status_line_verb "$quota_last" 2>/dev/null || true)
+    case "$quota_verb" in
+      done|failed) die "quota recovery refused for terminal task $ID" ;;
+    esac
+    [ -z "$(status_declared_wait_line "$STATE/$ID.status" 2>/dev/null || true)" ] \
+      || die "quota recovery refused for paused or captain-held task $ID"
+    quota_hold_rc=0
+    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" >/dev/null 2>&1 || quota_hold_rc=$?
+    [ "$quota_hold_rc" -eq 1 ] \
+      || die "quota recovery requires a proven absence of an open captain hold for $ID"
     RELAUNCH_QUOTA_GEN=$FM_CONTROL_QUOTA_GEN
     RELAUNCH_QUOTA_SEQ=$FM_CONTROL_QUOTA_SEQ
     RELAUNCH_FROM_BUSY_GEN=$(fm_meta_get "$META" busy_gen)

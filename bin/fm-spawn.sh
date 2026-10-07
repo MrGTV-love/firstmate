@@ -1945,6 +1945,15 @@ if [ "$RELAUNCH" -eq 1 ]; then
       ;;
   esac
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
+  if [ -z "$DISPATCH_RULE" ] && [ "$HARNESS_SET" -eq 0 ] && [ "$MODEL_SET" -eq 0 ] && [ "$EFFORT_SET" -eq 0 ]; then
+    DISPATCH_RULE=$(fm_meta_get "$RELAUNCH_META" dispatch_rule)
+    if [ -n "$DISPATCH_RULE" ]; then
+      MODEL=$(fm_meta_get "$RELAUNCH_META" model)
+      EFFORT=$(fm_meta_get "$RELAUNCH_META" effort)
+      [ "$MODEL" != default ] || MODEL=
+      [ "$EFFORT" != default ] || EFFORT=
+    fi
+  fi
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
   # Keep the instruction owner's recovery scope through direct and automatic
@@ -2525,8 +2534,8 @@ fi
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
 if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   dispatch_tmux_session=
-  if [ "$BACKEND" = tmux ] && [ "$RELAUNCH" -eq 1 ]; then
-    dispatch_tmux_session=${RELAUNCH_TARGET%%:*}
+  if [ "$BACKEND" = tmux ] && [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_REBIND" -eq 0 ]; then
+    dispatch_tmux_session=$RELAUNCH_TARGET
   fi
   if [ -f "$CONFIG/crew-dispatch.json" ]; then
     dispatch_set=$(fm_dispatch_fallbacks "$CONFIG" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1

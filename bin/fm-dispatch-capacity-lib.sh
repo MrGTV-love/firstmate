@@ -36,15 +36,59 @@ fm_omp_codex_capacity() {
       elif .unit == "percent" and (.remaining | type) == "number" then .remaining
       elif (.limit | type) == "number" and .limit > 0 and (.used | type) == "number"
       then (100 * (1 - .used / .limit)) else null end;
+    ($model | contains("-spark")) as $spark |
+    (if $spark then "spark" else "chat" end) as $tier |
+    (if $spark then "pro"
+     elif (["gpt-5.6","gpt-5.6-sol","gpt-5.6-sol-pro","gpt-5.6-luna","gpt-5.6-luna-pro"] | index($model)) != null
+     then "paid" else "none" end) as $requirement |
+    def entitlement:
+      (.metadata.planType // "" |
+       if type == "string" then
+         gsub("^\\s+|\\s+$"; "") | ascii_downcase | gsub("[\\s-]+"; "_") | sub("^chatgpt_"; "")
+       else "" end) as $plan |
+      ($plan | split("_")) as $tokens |
+      (if $plan == "prolite" or $plan == "pro_lite" then "paid"
+       elif any($tokens[]; . == "pro") then "pro"
+       elif any($tokens[]; . as $token |
+         ["plus","business","team","enterprise","edu","education","teacher","teachers","health","gov","government"] | index($token))
+       then "paid"
+       elif any($tokens[]; . == "free" or . == "go") then "free"
+       else "unknown" end) as $class |
+      if $requirement == "none" then "eligible"
+      elif $class == "unknown" then "unknown"
+      elif ($requirement == "pro" and $class != "pro") or
+           ($requirement == "paid" and $class == "free") then "ineligible"
+      else "eligible" end;
+    def scoped:
+      if (.id // "" | startswith("openai-codex:")) then
+        if .id == "openai-codex:primary" or .id == "openai-codex:secondary" then $tier == "chat"
+        else (.id | split(":")[1]) == $tier end
+      elif .scope.tier != null then
+        .scope.tier == $tier and
+          ($tier == "spark" or .scope.modelId == null or .scope.modelId == $model)
+      else
+        (.scope.modelId == $model) or ($tier == "chat" and .scope.modelId == null)
+      end;
     def account:
-      (.limits // [] | map(select(
-        (.scope.modelId == null and (.scope.tier // "chat") == "chat") or .scope.modelId == $model
-      ))) as $limits |
-      (.metadata.meterStates.chat // .metadata // {}) as $meter |
-      (if (.fetchedAt | type) != "number" or .fetchedAt < (($now - 300) * 1000)
+      entitlement as $entitlement |
+      .fetchedAt as $fetched |
+      (.limits // [] | map(select(scoped))) as $scoped |
+      ($scoped | map(select((.window.resetsAt | type) == "number" and
+        ($fetched | type) == "number" and $fetched < .window.resetsAt and
+        .window.resetsAt <= ($now * 1000)))) as $expired |
+      ($scoped - $expired) as $limits |
+      (if ($expired | length) > 0 then {}
+       elif $tier == "chat" then (.metadata.meterStates.chat // .metadata // {})
+       else (.metadata.meterStates.spark // {}) end) as $meter |
+      (if $entitlement == "ineligible" then "ineligible"
+       elif $entitlement == "unknown" or
+            ($fetched | type) != "number" or $fetched < (($now - 300) * 1000)
        then "unknown"
        elif $meter.allowed == false or $meter.limitReached == true or
             any($limits[]; .status == "exhausted") then "exhausted"
+       elif ($expired | length) > 0 then
+         (if any($limits[]; (.amount | percent) != null and (.amount | percent) <= 0 and .status != "warning")
+          then "exhausted" else "unknown" end)
        elif $meter.allowed == true and $meter.limitReached == false then "usable"
        elif .metadata.source == "ratelimit-headers" and ($limits | length) > 0 and
             all($limits[]; (.amount | percent) != null and
@@ -60,9 +104,11 @@ fm_omp_codex_capacity() {
       {status: "unknown", accounts: [], reason: "omp usage failed or returned an invalid report"}
     else
       [.reports[] | select(.provider == "openai-codex") | account] as $accounts |
+      [(.accountsWithoutUsage // [])[] | select(.provider == "openai-codex")] as $missing |
       {status: (if any($accounts[]; .status == "usable") then "usable"
-                elif ($accounts | length) == 0 or any($accounts[]; .status == "unknown") or
-                  any((.accountsWithoutUsage // [])[]; .provider == "openai-codex")
+                elif (($accounts | length) == 0 and ($missing | length) == 0) or
+                  any($accounts[]; .status == "unknown") or
+                  any($missing[]; entitlement != "ineligible")
                 then "unknown" else "exhausted" end), accounts: $accounts}
     end
   ' 2>/dev/null || printf '%s\n' '{"status":"unknown","accounts":[],"reason":"invalid omp usage JSON"}'
@@ -71,6 +117,7 @@ fm_omp_codex_capacity() {
 fm_dispatch_claude_quota_unbound() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
   local name names present value session=${2:-} backend=${BACKEND:-}
+  case "$session" in *:*) return 0 ;; esac
   if [ -z "$backend" ]; then
     backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 0
   fi

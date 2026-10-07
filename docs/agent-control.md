@@ -187,6 +187,7 @@ The worktree and the task's records are unaffected either way.
 - If the launch owner already published the new record but no running agent can be confirmed, the new record is kept: the task is recorded on the new harness with no agent confirmed, which is exactly what recovery reconciles.
   Rewriting it back to the old harness would be a second, worse inaccuracy.
 - Automatic quota recovery carries its original event identity across journal transitions and rollback, separately from the current incarnation and publication transaction; the session-end library validates those bindings for [retryable partial recovery](configuration.md#pooled-omp-capacity-and-declared-stand-ins).
+- Control rechecks cancellation, terminal status, declared waits, and captain holds under the lifecycle lock before automatic quota recovery mutates task state or stops the worker; deliberate manual relaunch is unaffected.
 
 ## Fail-closed boundaries
 

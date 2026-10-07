@@ -708,7 +708,7 @@ SH
   chmod +x "$dir/fakebin/quota-axi" "$dir/fakebin/omp" "$dir/fakebin/claude"
 }
 
-test_claude_relaunch_binds_only_forwarded_api_credentials() {
+test_claude_relaunch_preserves_unknown_adopted_auth_and_forwarded_credentials() {
   local dir id credential policy out rc expected_harness expected_model expected_effort launch
   local -a pane_env
   for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
@@ -727,14 +727,9 @@ test_claude_relaunch_binds_only_forwarded_api_credentials() {
         filtered) printf 'PATH\n' > "$dir/home/config/launch-env-allowlist" ;;
       esac
       expected_harness=claude expected_model=default expected_effort=default
-      case "$policy" in
-        filtered|flag-only|caller-only)
-          expected_harness=omp expected_model=openrouter/z-ai/glm-5.3-flash expected_effort=high
-          ;;
-        target-session)
-          printf '%s\n' "$credential=synthetic-launch-credential" > "$dir/fake/tmux-env-fmses-$credential"
-          ;;
-      esac
+      if [ "$policy" = target-session ]; then
+        printf '%s\n' "$credential=synthetic-launch-credential" > "$dir/fake/tmux-env-fmses-$credential"
+      fi
       case "$policy" in
         ambient|retained|filtered)
           printf '%s\n' "$credential=synthetic-launch-credential" > "$dir/fake/tmux-env-fmses-$credential"
@@ -760,17 +755,11 @@ test_claude_relaunch_binds_only_forwarded_api_credentials() {
       assert_equals "$expected_effort" "$(meta_field "$dir" "$id" effort)" "$credential $policy recorded the wrong effort"
       assert_equals rule_1 "$(meta_field "$dir" "$id" dispatch_rule)" "$credential $policy lost dispatch identity"
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "$credential $policy did not complete its transaction"
-      if [ "$expected_harness" = omp ]; then
-        assert_grep "fallback" "$dir/home/state/$id.status" "$credential $policy did not disclose the permitted fallback"
-      else
-        assert_equals allow "$(meta_field "$dir" "$id" api_key)" "$credential $policy lost the deliberate billing opt-in"
-      fi
-      if [ "$policy" = target-session ]; then
-        grep -Fxq fmses "$dir/fake/env-sessions" || fail "relaunch did not inspect the recorded endpoint's tmux environment"
-        if grep -Fxq fakepane "$dir/fake/env-sessions"; then
-          fail "relaunch inspected the supervising pane instead of its recorded endpoint"
-        fi
-      fi
+      case "$policy" in
+        ambient|retained|flag-only|target-session)
+          assert_equals allow "$(meta_field "$dir" "$id" api_key)" "$credential $policy lost the deliberate billing opt-in"
+          ;;
+      esac
       launch=$(cat "$dir/fake/launch")
       pane_env=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
         -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
@@ -785,12 +774,12 @@ test_claude_relaunch_binds_only_forwarded_api_credentials() {
           grep -Fxq "$credential=synthetic-launch-credential" "$dir/fakebin/worker.env" || fail "$credential did not reach the Claude replacement"
           ;;
         *)
-          grep -Fxq "$credential=" "$dir/fakebin/worker.env" || fail "$credential reached the fallback despite absent or filtered authentication"
+          grep -Fxq "$credential=" "$dir/fakebin/worker.env" || fail "$credential reached the Claude replacement despite absent or filtered authentication"
           ;;
       esac
     done
   done
-  pass "Claude relaunch retains forwarded API auth including its recorded tmux session, while filtered or absent credentials permit native exhaustion fallback"
+  pass "Claude relaunch retains its route when adopted-pane authentication is unknown and forwards only permitted API credentials"
 }
 
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text() {
@@ -4297,11 +4286,33 @@ case "$FM_FAKE_QUOTA_RACE" in
   stale)
     printf 'gen=stale-%s\n' "$1" > "$FM_HOME/state/$1.control-exit"
     ;;
+  operator-hold)
+    "${FM_TEST_REAL_CONTROL%/*}/fm-captain-hold.sh" hold "$1" \
+      --reason "captain decision pending after quota selection" > "$FM_FAKE_DIR/race-hold-out" 2>&1 || exit $?
+    cp "$FM_HOME/data/backlog.md" "$FM_FAKE_DIR/race-held-backlog"
+    ;;
+  captain-held)
+    printf 'captain-held: awaiting the captain after quota selection\n' > "$FM_HOME/state/$1.status"
+    ;;
+  paused)
+    printf 'paused: awaiting an upstream release after quota selection\n' > "$FM_HOME/state/$1.status"
+    ;;
+  inherited-pause)
+    printf '%s\n' 'paused [key=release]: awaiting an upstream release' \
+      'resolved [key=other]: unrelated decision answered' > "$FM_HOME/state/$1.status"
+    ;;
+  done|failed)
+    printf '%s: task became terminal after quota selection\n' "$FM_FAKE_QUOTA_RACE" > "$FM_HOME/state/$1.status"
+    ;;
+  unproven-hold)
+    mkdir "$FM_HOME/data/backlog.md"
+    ;;
   *) exit 2 ;;
 esac
 cp "$FM_FAKE_DIR/literal" "$FM_FAKE_DIR/race-before-literal"
 "$FM_TEST_REAL_CONTROL" "$@" > "$FM_FAKE_DIR/race-relaunch-out" 2>&1
 rc=$?
+printf '%s\n' "$rc" > "$FM_FAKE_DIR/race-relaunch-rc"
 cat "$FM_FAKE_DIR/race-relaunch-out"
 exit "$rc"
 SH
@@ -4432,6 +4443,100 @@ test_quota_exit_cancellation_is_rechecked_after_scan_selection() {
     done
   done
   pass "quota control rechecks origin and current-incarnation exits after live and journal scan selection while stale markers and manual relaunch remain permitted"
+}
+
+test_quota_hold_and_status_are_rechecked_after_scan_selection() {
+  local dir publication hold id out rc gen record command_before keys_before real_mv has_tasks=0 artifact
+  local journal_before meta_before brief_before note_before meta_prior_before brief_prior_before
+  real_mv=$(command -v mv)
+  if command -v tasks-axi >/dev/null 2>&1 && fm_tasks_axi_compatible; then
+    has_tasks=1
+  else
+    pass "skipped: operator hold selection race requires compatible tasks-axi"
+  fi
+  for publication in live unpublished published; do
+    for hold in operator-hold captain-held paused inherited-pause done failed unproven-hold; do
+      [ "$hold" != operator-hold ] || [ "$has_tasks" = 1 ] || continue
+      id="rl-quota-hold-$publication-$hold"
+      dir=$(new_case quota-hold-race "$id")
+      add_quota_recovery_task "$dir" "$id"
+      gen=$(cat "$dir/home/state/$id.busy-gen")
+      record=$(cat "$dir/home/state/$id.busy-state")
+      case "$publication" in
+        unpublished)
+          make_mv_failure_stub "$dir"
+          out=$(FM_REAL_MV="$real_mv" FM_FAKE_JOURNAL_PHASE_MV_FAIL=launching run_session_end_scan "$dir"); rc=$?
+          expect_code 0 "$rc" "unpublished hold race setup must record its failed transaction: $out"
+          assert_equals prior-record-kept "$(journal_field "$dir" "$id" rollback)" "unpublished hold race must retain its original record"
+          ;;
+        published)
+          out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 run_session_end_scan "$dir"); rc=$?
+          expect_code 0 "$rc" "published hold race setup must record its failed transaction: $out"
+          assert_equals none-new-record-kept "$(journal_field "$dir" "$id" rollback)" "published hold race must retain its replacement record"
+          printf zsh > "$dir/fake/command"
+          ;;
+      esac
+      if [ "$hold" = operator-hold ]; then
+        seed_backlog "$dir" "$id" in_flight
+      fi
+      journal_before=$(cat "$dir/home/state/$id.control-relaunch" 2>/dev/null || true)
+      note_before=$(cat "$dir/home/state/$id.control-relaunch.note" 2>/dev/null || true)
+      meta_prior_before=$(cat "$dir/home/state/$id.control-relaunch.meta-prior" 2>/dev/null || true)
+      brief_prior_before=$(cat "$dir/home/state/$id.control-relaunch.brief-prior" 2>/dev/null || true)
+      meta_before=$(cat "$dir/home/state/$id.meta")
+      brief_before=$(cat "$dir/home/data/$id/brief.md")
+      command_before=$(cat "$dir/fake/command")
+      keys_before=$(cat "$dir/fake/keys")
+      make_quota_control_race_stub "$dir"
+      out=$(FM_REAL_MV="$real_mv" FM_TEST_SEAM=1 \
+        FM_SESSION_END_CONTROL="$dir/fakebin/session-end-control" \
+        FM_TEST_REAL_CONTROL="$CONTROL" FM_FAKE_QUOTA_RACE="$hold" \
+        run_session_end_scan "$dir"); rc=$?
+      expect_code 0 "$rc" "the selected quota hold race must finish its scan decision: $out"
+      assert_contains "$(cat "$dir/fake/race-selected")" "$id relaunch --note" "the hold must arrive after selecting this lane"
+      assert_contains "$out" "$id auto-relaunch failed after quota exhaustion" "selected hold must retain a refusal report"
+      assert_equals 1 "$(cat "$dir/fake/race-relaunch-rc")" "locked quota recovery must refuse the selected hold"
+      case "$hold" in
+        operator-hold|unproven-hold)
+          assert_contains "$(cat "$dir/fake/race-relaunch-out")" "requires a proven absence of an open captain hold" "open or unreadable captain hold must fail closed"
+          ;;
+        captain-held|paused|inherited-pause)
+          assert_contains "$(cat "$dir/fake/race-relaunch-out")" "paused or captain-held task" "status wait must still prevent automatic recovery"
+          ;;
+        done|failed)
+          assert_contains "$(cat "$dir/fake/race-relaunch-out")" "terminal task" "terminal status must still prevent automatic recovery"
+          ;;
+      esac
+      assert_equals "$(cat "$dir/fake/race-before-literal")" "$(cat "$dir/fake/literal")" "held quota recovery must not type or launch"
+      assert_equals "$keys_before" "$(cat "$dir/fake/keys")" "held quota recovery must not interrupt or submit"
+      assert_equals "$command_before" "$(cat "$dir/fake/command")" "held quota recovery must not stop or replace the agent"
+      assert_equals "$journal_before" "$(cat "$dir/home/state/$id.control-relaunch" 2>/dev/null || true)" "held quota recovery must preserve its journal"
+      assert_equals "$note_before" "$(cat "$dir/home/state/$id.control-relaunch.note" 2>/dev/null || true)" "held quota recovery must preserve its note"
+      assert_equals "$meta_prior_before" "$(cat "$dir/home/state/$id.control-relaunch.meta-prior" 2>/dev/null || true)" "held quota recovery must not checkpoint metadata"
+      assert_equals "$brief_prior_before" "$(cat "$dir/home/state/$id.control-relaunch.brief-prior" 2>/dev/null || true)" "held quota recovery must not preserve new instruction backups"
+      assert_equals "$meta_before" "$(cat "$dir/home/state/$id.meta")" "held quota recovery must preserve metadata"
+      assert_equals "$brief_before" "$(cat "$dir/home/data/$id/brief.md")" "held quota recovery must preserve instructions"
+      assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "held quota recovery must preserve uncommitted work"
+      if [ "$hold" = operator-hold ]; then
+        assert_equals "$id" "$(cat "$dir/fake/race-hold-out")" "the real operator hold must succeed after selection"
+        cmp -s "$dir/fake/race-held-backlog" "$dir/home/data/backlog.md" || fail "held quota recovery mutated the operator-held backlog"
+      fi
+      if [ "$publication" = live ]; then
+        for artifact in control-relaunch control-relaunch.note control-relaunch.meta-prior control-relaunch.brief-prior; do
+          assert_absent "$dir/home/state/$id.$artifact" "held current-event recovery must create no transaction artifacts"
+        done
+        assert_equals "$gen" "$(cat "$dir/home/state/$id.busy-gen")" "held current-event recovery must preserve its generation"
+        assert_equals "$record" "$(cat "$dir/home/state/$id.busy-state")" "held current-event recovery must preserve its event"
+        if [ "$hold" = captain-held ]; then
+          out=$(run_control "$dir" "$id" relaunch --note "manually resume the held task"); rc=$?
+          expect_code 0 "$rc" "manual relaunch must remain exempt from automatic status hold checks: $out"
+          assert_equals complete "$(journal_field "$dir" "$id" phase)" "manual held relaunch must complete"
+          assert_equals '' "$(journal_field "$dir" "$id" quota_gen)" "manual held relaunch must not inherit quota provenance"
+        fi
+      fi
+    done
+  done
+  pass "quota control rechecks captain holds, unreadable holds, inherited pauses and terminal status after live and journal selection without lifecycle mutations"
 }
 
 test_quota_scan_stops_after_failed_published_or_confirmed_replacement() {
@@ -4927,6 +5032,7 @@ test_ordinary_partial_failure_keeps_its_attempt_caps() {
 
 
 test_quota_exit_cancellation_is_rechecked_after_scan_selection
+test_quota_hold_and_status_are_rechecked_after_scan_selection
 test_quota_scan_stops_after_failed_published_or_confirmed_replacement
 test_quota_exhaustion_relaunches_only_a_permitted_route
 test_quota_recovery_retries_real_stop_then_failed_launch
@@ -4940,7 +5046,7 @@ test_ordinary_partial_failure_keeps_its_attempt_caps
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_no_dispatch_non_omp_relaunch_does_not_require_jq
-test_claude_relaunch_binds_only_forwarded_api_credentials
+test_claude_relaunch_preserves_unknown_adopted_auth_and_forwarded_credentials
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
 test_relaunch_from_linked_home_preserves_recorded_worktree

@@ -80,6 +80,115 @@ out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/serving.j
 assert_equals usable "$(jq -r .status <<<"$out")" "a serving verdict remains authoritative even with zero percentage"
 pass "pool capacity preserves serving, missing-account, freshness, and saved-reset semantics"
 
+write_model_pool() {
+  jq -n --argjson at "$(date +%s)" --argjson chat "$1" --argjson spark "$2" --arg plan "$3" '
+    {reports:[{provider:"openai-codex",fetchedAt:($at*1000),
+      metadata:{planType:$plan,meterStates:{
+        chat:{allowed:($chat>0),limitReached:($chat<=0)},
+        spark:{allowed:($spark>0),limitReached:($spark<=0)}}},
+      limits:[
+        {id:"openai-codex:primary",scope:{shared:true},amount:{unit:"percent",remaining:$chat}},
+        {id:"openai-codex:secondary",scope:{shared:true},amount:{unit:"percent",remaining:$chat}},
+        {id:"openai-codex:spark:primary",scope:{tier:"spark",modelId:"GPT-5.3-Codex-Spark"},
+         amount:{unit:"percent",remaining:$spark}},
+        {id:"openai-codex:review:primary",scope:{tier:"review",modelId:"gpt-6.1-sol"},
+         status:"exhausted",amount:{unit:"percent",remaining:0}}]}]}' > "$OMP_USAGE_FIXTURE"
+}
+for chat in 0 80; do
+  if [ "$chat" = 0 ]; then spark=80; chat_status=exhausted; spark_status=usable
+  else spark=0; chat_status=usable; spark_status=exhausted; fi
+  write_model_pool "$chat" "$spark" pro
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  assert_equals "$chat_status" "$(jq -r .status <<<"$out")" "chat only consumes its native primary and secondary meters"
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-5.3-codex-spark --json)
+  assert_equals "$spark_status" "$(jq -r .status <<<"$out")" "Spark uses native display-name windows rather than chat"
+  jq '(.reports[].limits[]) |= del(.id)' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/scoped.json"
+  out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/scoped.json")")
+  assert_equals "$spark_status" "$(jq -r .status <<<"$out")" "explicit Spark tier scopes display-name limits without native IDs"
+done
+write_model_pool 80 80 pro
+jq '.reports[0].metadata |= del(.meterStates.spark) |
+  .reports[0].limits |= map(select(.scope.tier != "spark"))' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/no-spark.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/no-spark.json")")
+assert_equals unknown "$(jq -r .status <<<"$out")" "missing Spark evidence never borrows the healthy chat meter"
+jq '.reports[0].metadata={planType:"pro",allowed:false,limitReached:true}' "$TMP_ROOT/no-spark.json" > "$TMP_ROOT/chat-negative.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/chat-negative.json")")
+assert_equals unknown "$(jq -r .status <<<"$out")" "missing Spark evidence never borrows exhausted broad chat metadata"
+pass "model-scoped native and explicit-tier meters stay independent"
+
+for plan in pro ' ChatGPT-Pro ' CHATGPT_PRO plus business team enterprise edu education teacher teachers health gov government prolite pro_lite 'ChatGPT Pro-Lite' free go mystery ''; do
+  case "$plan" in
+    pro|' ChatGPT-Pro '|CHATGPT_PRO) paid_status=usable; spark_status=usable ;;
+    free|go) paid_status=exhausted; spark_status=exhausted ;;
+    mystery|'') paid_status=unknown; spark_status=unknown ;;
+    *) paid_status=usable; spark_status=exhausted ;;
+  esac
+  write_model_pool 80 80 "$plan"
+  for model in gpt-5.6 gpt-5.6-sol gpt-5.6-sol-pro gpt-5.6-luna gpt-5.6-luna-pro; do
+    out=$(fm_omp_codex_capacity "openai-codex/$model")
+    assert_equals "$paid_status" "$(jq -r .status <<<"$out")" "$plan entitlement is respected for $model"
+    if [ "$paid_status" = exhausted ]; then
+      assert_equals ineligible "$(jq -r '.accounts[0].status' <<<"$out")" "a known free account is excluded rather than unmeasured"
+    fi
+  done
+  out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark)
+  assert_equals "$spark_status" "$(jq -r .status <<<"$out")" "$plan entitlement is respected for Pro-only Spark"
+  for model in gpt-6.1-sol gpt-5.6-terra gpt-5.6-sol-fast; do
+    out=$(fm_omp_codex_capacity "openai-codex/$model")
+    assert_equals usable "$(jq -r .status <<<"$out")" "$model must not inherit an unlisted plan requirement"
+  done
+done
+write_model_pool 0 80 pro
+jq '.reports += [(.reports[0] | .metadata.planType="plus" |
+  .metadata.meterStates.spark={allowed:true,limitReached:false})]' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/ineligible-sibling.json"
+jq '.reports[0].metadata.meterStates.spark={allowed:false,limitReached:true} |
+  (.reports[0].limits[] | select(.scope.tier=="spark").amount.remaining)=0' "$TMP_ROOT/ineligible-sibling.json" > "$TMP_ROOT/entitled-pool.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/entitled-pool.json")")
+assert_equals exhausted "$(jq -r .status <<<"$out")" "a usable but ineligible paid sibling cannot revive the Spark pool"
+jq '.reports[1].metadata.planType="mystery"' "$TMP_ROOT/entitled-pool.json" > "$TMP_ROOT/unknown-plan.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/unknown-plan.json")")
+assert_equals unknown "$(jq -r .status <<<"$out")" "unknown entitlement cannot prove whole-pool exhaustion"
+for plan in plus mystery pro; do
+  jq --arg plan "$plan" '.reports |= [.[0]] |
+    .accountsWithoutUsage=[{provider:"openai-codex",metadata:{planType:$plan}}]' "$TMP_ROOT/entitled-pool.json" > "$TMP_ROOT/missing-plan.json"
+  out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/missing-plan.json")")
+  if [ "$plan" = plus ]; then expected=exhausted; else expected=unknown; fi
+  assert_equals "$expected" "$(jq -r .status <<<"$out")" "$plan unmeasured sibling respects entitlement exclusion"
+done
+pass "native plan requirements exclude known ineligible accounts and preserve unknown eligibility"
+
+for tier in chat spark; do
+  for current in absent positive exhausted zero warning; do
+    jq -n --argjson at "$(date +%s)" --arg tier "$tier" --arg current "$current" '
+      {reports:[{provider:"openai-codex",fetchedAt:(($at-10)*1000),
+        metadata:{planType:"pro",meterStates:{($tier):{allowed:false,limitReached:true}}},
+        limits:([{id:("openai-codex:"+(if $tier=="spark" then "spark:" else "" end)+"primary"),
+          scope:{tier:$tier},window:{resetsAt:(($at-1)*1000)},
+          status:"exhausted",amount:{unit:"percent",remaining:0}}] +
+          if $current=="absent" then [] else
+            [{id:("openai-codex:"+(if $tier=="spark" then "spark:" else "" end)+"secondary"),
+              scope:{tier:$tier},window:{resetsAt:(($at+1000)*1000)},
+              status:(if $current=="exhausted" then "exhausted" elif $current=="warning" then "warning" else "ok" end),
+              amount:{unit:"percent",remaining:(if $current=="positive" then 80 else 0 end)}}] end)}]}' > "$OMP_USAGE_FIXTURE"
+    if [ "$tier" = spark ]; then model=gpt-5.3-codex-spark; else model=gpt-6.1-sol; fi
+    if [ "$current" = exhausted ] || [ "$current" = zero ]; then expected=exhausted; else expected=unknown; fi
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+    assert_equals "$expected" "$(jq -r .status <<<"$out")" "$tier expired exhaustion with $current current bound must not invent renewed capacity"
+    if [ "$current" = absent ]; then
+      assert_equals null "$(jq -r '.accounts[0].remaining' <<<"$out")" "obsolete exhaustion is removed from remaining evidence"
+    elif [ "$current" = positive ]; then
+      assert_equals 80 "$(jq -r '.accounts[0].remaining' <<<"$out")" "remaining evidence omits the obsolete zero window"
+    fi
+  done
+  jq '.reports[0].fetchedAt=.reports[0].limits[0].window.resetsAt' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/post-reset.json"
+  out=$(fm_omp_codex_capacity "openai-codex/$model" "$(cat "$TMP_ROOT/post-reset.json")")
+  assert_equals exhausted "$(jq -r .status <<<"$out")" "$tier a snapshot fetched at reset retains its fresh rejection"
+  jq --argjson at "$(date +%s)" '.reports[0].limits[0].window.resetsAt=(($at+1000)*1000)' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/future-reset.json"
+  out=$(fm_omp_codex_capacity "openai-codex/$model" "$(cat "$TMP_ROOT/future-reset.json")")
+  assert_equals exhausted "$(jq -r .status <<<"$out")" "$tier a future reset retains measured exhaustion"
+done
+pass "reset-crossed snapshots invalidate meter verdicts without inferring replenished quota"
+
 primary='{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}'
 allowed='[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]'
 jq -n --argjson use "$primary" --argjson fallback "$allowed" '{rules:[{when:"easy work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
@@ -312,6 +421,17 @@ rm "$TMP_ROOT/config/launch-env-allowlist"
 out=$(FM_BACKEND=herdr "$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
 assert_equals unknown "$(jq -r .status <<<"$out")" "unreadable daemon destination does not prove default auth"
 pass "destination tmux credential layering respects removal, emptiness, and filtering"
+for credential in absent present; do
+  if [ "$credential" = present ]; then
+    printf 'ANTHROPIC_API_KEY=new-session-key\n' > "$TMP_ROOT/tmux-recorded-env"
+  fi
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" "" recorded:fm-existing.0)
+  assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "an adopted shell cannot establish authentication from $credential session credentials"
+  assert_equals false "$(jq -r .switched <<<"$out")" "session credential changes cannot authorize an adopted shell model switch"
+  assert_equals "$native_primary" "$(jq -c .profile <<<"$out")" "unverifiable adopted authentication retains the route"
+done
+rm "$TMP_ROOT/tmux-recorded-env"
+pass "adopted shell authentication remains uncertain across tmux environment changes"
 printf 'teamclaude\n' > "$TMP_ROOT/config/claude-launcher"
 out=$(fm_dispatch_capacity claude claude-opus-5-5)
 assert_equals unknown "$(jq -r .status <<<"$out")" "native Claude's exhausted account is not the TeamClaude proxy's quota"
