@@ -329,15 +329,28 @@
 #   CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID CMUX_SOCKET_PATH
 #   ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION, plus the task
 #   marker FM_TASK_ID that ship and scout panes receive above, plus the
-#   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor also
-#   pins to 1 with a literal assignment so it survives the cleared environment
-#   even on a host that never had it set.
+#   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor pins
+#   to the resolved per-home policy even when no pane export arrived, plus
+#   FM_COMPACT_ADVISER_HOOKS, which travels with a retained function-hooks flag
+#   so an adviser-only flag cannot pass as the captain's own opt-in, plus the
+#   Lavish server address LAVISH_AXI_HOST.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment.
 #   This is an exec environment boundary, not a sandbox for the pane's startup
 #   shell, credential files, same-user processes, or later shell initialization.
 #   See docs/configuration.md for provider/Git setup, raw-command shell
 #   compatibility, and supported limits.
+# Compact adviser (config/compact-adviser):
+#   docs/configuration.md owns the policy format, defaults, supported harnesses,
+#   and installed-plugin prerequisites.
+#   The resolved switch reaches the pane export, compound launch, and env -i
+#   floor, replacing any inherited COMPACT_ADVISER_DISABLE. A truthy invoking
+#   FM_COMPACT_ADVISER_DISABLE is the operator's emergency override; Firstmate
+#   never exports it. Claude auto supplies
+#   CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 unless a leading raw-command assignment
+#   supplies the flag; automatic activation adds FM_COMPACT_ADVISER_HOOKS=1
+#   unless the worker shell already opted in, keeping firstmate-calm inert.
+#   No TypeSafe credential is read or embedded here; use plugin saved keys.
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
 #   secondmate, and relaunch) carries. Absent or `bypass` keeps today's
@@ -576,6 +589,32 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 fm_api_key_guard_launch_env_config "$CONFIG" || exit 1
 LAUNCH_ENV_ENABLED=$FM_API_KEY_LAUNCH_ENV_ENABLED
 LAUNCH_ENV_NAMES=$FM_API_KEY_LAUNCH_ENV_NAMES
+if ! COMPACT_ADVISER_PRESENT=$(fm_config_source_present "$CONFIG/compact-adviser"); then
+  exit 1
+fi
+COMPACT_ADVISER_CONFIG='{}'
+if [ "$COMPACT_ADVISER_PRESENT" = 1 ]; then
+  if [ ! -f "$CONFIG/compact-adviser" ] || [ ! -r "$CONFIG/compact-adviser" ]; then
+    echo "error: config/compact-adviser must be a readable JSON object mapping claude or omp to off or auto" >&2
+    exit 1
+  fi
+  if ! COMPACT_ADVISER_CONFIG=$(jq -ces '
+    if length == 1 then .[0] else error("expected one JSON object") end |
+    if type == "object" and all(to_entries[];
+      (.key | IN("claude", "omp")) and (.value | IN("off", "auto")))
+    then . else error("unsupported harness or mode") end
+  ' "$CONFIG/compact-adviser" 2>/dev/null); then
+    echo "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off" >&2
+    exit 1
+  fi
+fi
+# shellcheck source=bin/fm-compact-adviser-lib.sh
+. "$SCRIPT_DIR/fm-compact-adviser-lib.sh"
+COMPACT_ADVISER_FORCE_OFF=$(fm_compact_adviser_force_off)
+# The override and an adviser-only hooks flag belong to this one invocation, so
+# no backend server or pane started below may inherit them.
+[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS
+unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
 # config/claude-permission-mode (header above): resolved once per spawn or
 # relaunch, before any mutation, so a malformed file refuses instead of
 # launching a worker on a permission posture the captain did not choose.
@@ -1121,6 +1160,9 @@ spawn_remote_secondmate() {
   fi
   launch_args=("$id" "$harness" "$model" "$effort" "$backend")
   [ -z "$remote_traceparent" ] || launch_args+=("$remote_traceparent")
+  # The transport clears ambient variables. Carry only the normalized emergency
+  # override, never the invoking environment or any TypeSafe credential.
+  [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ] || launch_args+=(--compact-adviser-disable)
   if out=$("$SCRIPT_DIR/fm-on.sh" "$id" fm-remote-secondmate-control.sh launch \
     "${launch_args[@]}" </dev/null 2>&1); then
     rc=0
@@ -1555,12 +1597,12 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
       rc=2
       continue
     elif [ "$KIND" = scout ]; then
-      if FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}" --scout; then :; else
+      if FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}" --scout; then :; else
         echo "batch: FAILED to spawn ${pair%%=*} (${pair#*=})" >&2
         rc=1
       fi
     else
-      if FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}"; then :; else
+      if FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}"; then :; else
         echo "batch: FAILED to spawn ${pair%%=*} (${pair#*=})" >&2
         rc=1
       fi
@@ -2286,13 +2328,17 @@ launch_template() {
   esac
 }
 
+RAW_FUNCTION_HOOKS_SET=0
 case "$ARG3" in
 *' '*) # raw launch command (unverified-adapter escape hatch)
   RAW_LAUNCH=1
   LAUNCH=$ARG3
   HARNESS=""
   for word in $LAUNCH; do
-    case "$word" in [A-Za-z_]*=*) continue ;; *)
+    case "$word" in
+    CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=*) RAW_FUNCTION_HOOKS_SET=1 ;;
+    [A-Za-z_]*=*) continue ;;
+    *)
       HARNESS=$(basename "$word")
       break
       ;;
@@ -2332,6 +2378,19 @@ case "$ARG3" in
   }
   ;;
 esac
+COMPACT_ADVISER_MODE=$(jq -r --arg harness "$HARNESS" '.[$harness] // "off"' <<<"$COMPACT_ADVISER_CONFIG")
+COMPACT_ADVISER_SWITCH=1
+# A reused pane shell may still hold the flag an earlier automatic launch
+# marked as adviser-only; drop it before this launch resolves its own policy.
+# shellcheck disable=SC2016
+COMPACT_ADVISER_HOOKS='[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; '
+if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; then
+  COMPACT_ADVISER_SWITCH=0
+  if [ "$HARNESS" = claude ] && [ "$RAW_FUNCTION_HOOKS_SET" = 0 ]; then
+    # shellcheck disable=SC2016
+    COMPACT_ADVISER_HOOKS+='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
+  fi
+fi
 
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
   echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
@@ -5376,22 +5435,10 @@ fm_launch_git_hooks() {
 SH
 GIT_HOOKS_LAUNCH_PREFIX="$GIT_HOOKS_LAUNCH_PREFIX
 fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks;"
-# Every agent this fleet launches - crewmate, scout, and secondmate, on a fresh
-# spawn and on a relaunch alike - runs with the compact-adviser kill switch on.
-# This is an export statement rather than a forwarded ambient name or a
-# command-prefix assignment, so it carries the value across an entire compound
-# raw launch expression. A pane that never had it, and a remote host whose
-# transport never carried it, both still start the agent with it set. It is
-# unconditional, with no config file or flag gating it, and is inserted outside
-# every generated launch prefix; relaunch trace cleanup may execute first but
-# cannot change this value. The cleared-environment floor in the
-# LAUNCH_ENV_PREFIX construction below sets it again at the `env -i` boundary,
-# so under an enabled allowlist the switch is established before the wrapping
-# `/bin/sh` starts rather than only inside the command that shell runs.
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
-LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
+LAUNCH="export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH; $COMPACT_ADVISER_HOOKS$LAUNCH"
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the
@@ -5439,7 +5486,7 @@ spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
 # Export the compact-adviser kill switch into the pane shell through the same
 # pre-launch channel, so later commands in that shell inherit it too. The launch
 # command independently establishes the value for the agent process itself.
-spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=1"
+spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
 fi
@@ -5470,14 +5517,12 @@ if [ -n "$SPAWN_TRACEPARENT" ]; then
 fi
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH_ENV_PREFIX='/usr/bin/env -i'
-  # COMPACT_ADVISER_DISABLE is the intentional declarative floor-membership
-  # entry; the explicit COMPACT_ADVISER_DISABLE=1 assignment below is the
-  # authoritative setter.
+  # The resolved literal below wins over any retained ambient switch.
   for env_name in HOME PATH USER LOGNAME SHELL TERM COLORTERM LANG LC_ALL LC_CTYPE \
     TMPDIR TMP TEMP GOTMPDIR TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH \
     HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID \
     CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION \
-    FM_TASK_ID COMPACT_ADVISER_DISABLE LAVISH_AXI_HOST \
+    FM_TASK_ID COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS LAVISH_AXI_HOST \
     $LAUNCH_ENV_NAMES; do
     # Only validated names enter shell syntax. Values expand once, quoted, in
     # the pane shell and never become source text or spawn-process snapshots.
@@ -5485,16 +5530,9 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     printf -v env_arg '${%s+"%s=$%s"}' "$env_name" "$env_name" "$env_name"
     LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX $env_arg"
   done
-  # COMPACT_ADVISER_DISABLE is retained by the floor loop above, which forwards
-  # whatever the pane export set, and then pinned here to the one value Firstmate
-  # launches on. The literal assignment comes last deliberately: `env` applies
-  # assignments left to right, so this one wins over a forwarded pane value, and
-  # it still delivers the switch on a pane whose export never landed. Unlike the
-  # trace carrier below it carries no gate, so it is appended unconditionally.
-  # Setting it here rather than relying on the assignment already carried by
-  # $LAUNCH is what gives the wrapping `/bin/sh` itself the switch, not only the
-  # agent command it runs.
-  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=1"
+  # Establish the policy before the wrapper shell starts, even if a pane export
+  # was lost.
+  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
   if [ -n "$SPAWN_TRACEPARENT" ]; then
     # shellcheck disable=SC2016
     LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'

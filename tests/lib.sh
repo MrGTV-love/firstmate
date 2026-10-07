@@ -58,6 +58,12 @@ export FM_TEST_SEAM=1
 # under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
 unset FM_TASK_ID
 
+# Clear the compact-adviser emergency switch and adviser-only function-hooks
+# marker an adviser-enabled worker carries, so they can neither force a
+# fixture's launch off nor make a Calm fixture inert. A case that verifies
+# either sets it itself.
+unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
+
 # Clear the tasks-axi env overrides. An operator shell exports TASKS_AXI_FILE
 # (and may export TASKS_AXI_BACKEND) at its real home's backlog, and tasks-axi
 # resolves that env AHEAD of the .tasks.toml a fixture copies, so a suite that

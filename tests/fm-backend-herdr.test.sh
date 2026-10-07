@@ -147,10 +147,16 @@ case "${1:-}" in
     ;;
   server)
     {
-      for name in FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL FM_HERDR_SENTINEL HERDR_SESSION; do
+      for name in FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL FM_HERDR_SENTINEL HERDR_SESSION \
+        COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS CLAUDE_CODE_ENABLE_FUNCTION_HOOKS; do
         eval 'value=${'"$name"'-<unset>}'
         printf '%s=%s\n' "$name" "$value"
       done
+      # What a later fm-spawn run from a pane on this server would resolve.
+      if [ -n "${FM_HERDR_TEST_ROOT:-}" ]; then
+        . "$FM_HERDR_TEST_ROOT/bin/fm-compact-adviser-lib.sh"
+        printf 'force_off=%s\n' "$(fm_compact_adviser_force_off)"
+      fi
       printf 'args=%s\n' "$*"
     } > "$FM_HERDR_SERVER_ENV_LOG"
     : > "$FM_HERDR_SERVER_MARKER"
@@ -1211,6 +1217,34 @@ test_server_ensure_scrubs_home_and_harness_identity() {
   assert_contains "$output" "HERDR_SESSION=fmtest" "server_ensure lost explicit Herdr session routing"
   assert_contains "$output" "args=server --session fmtest" "server_ensure lost the trailing Herdr session flag"
   pass "fm_backend_herdr_server_ensure: scrubs home and harness identity without disturbing unrelated environment or session routing"
+}
+
+# A server started by an emergency-disabled or adviser-enabled launch must not
+# turn that one launch's state into every later pane's ambient environment,
+# while a captain's own unmarked function-hooks opt-in survives.
+test_server_ensure_drops_per_launch_compact_adviser_state() {
+  local dir log marker fb output
+  dir="$TMP_ROOT/server-env-adviser"; mkdir -p "$dir"; log="$dir/env"; marker="$dir/running"
+  fb=$(make_herdr_server_env_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_SERVER_ENV_LOG="$log" FM_HERDR_SERVER_MARKER="$marker" FM_HERDR_TEST_ROOT="$ROOT" \
+    COMPACT_ADVISER_DISABLE=0 FM_COMPACT_ADVISER_DISABLE=1 FM_COMPACT_ADVISER_HOOKS=1 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure fmtest' "$ROOT"
+  expect_code 0 $? "server_ensure should start under a launch carrying adviser state"
+  output=$(cat "$log")
+  for name in COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS CLAUDE_CODE_ENABLE_FUNCTION_HOOKS; do
+    assert_contains "$output" "$name=<unset>" "server_ensure leaked per-launch $name into the long-lived Herdr server"
+  done
+  assert_contains "$output" "force_off=0" "an emergency-disabled launch made the adviser kill sticky for later launches"
+
+  rm -f "$marker"
+  PATH="$fb:$PATH" FM_HERDR_SERVER_ENV_LOG="$log" FM_HERDR_SERVER_MARKER="$marker" FM_HERDR_TEST_ROOT="$ROOT" \
+    CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure fmtest' "$ROOT"
+  expect_code 0 $? "server_ensure should start under a captain's function-hooks opt-in"
+  output=$(cat "$log")
+  assert_contains "$output" "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1" "server_ensure dropped the captain's own function-hooks opt-in"
+  assert_contains "$output" "force_off=0" "a fresh server without an emergency switch forced the adviser off"
+  pass "fm_backend_herdr_server_ensure: drops per-launch adviser state and keeps an explicit function-hooks opt-in"
 }
 
 test_container_ensure_reuses_existing_workspace() {
@@ -4806,25 +4840,25 @@ herdr_wrapped_composer() {  # <text> <width> <drop>
   done
 }
 
-# herdr_popup_composer_screen: a Claude Code 2.1.283-shaped screen after a
-# typed slash command, with the command popup rendered BETWEEN the composer
+# herdr_popup_composer_screen: a Claude Code 2.1.291-shaped screen after a
+# typed slash command, with the selected command popup rendered BETWEEN the composer
 # and the pane bottom. Verified live: the popup is ~19 menu rows, so the
 # composer row lands outside a 20-row tail window - a bounded tail read
 # reports the composer as empty while it holds typed text, which broke
 # fm-control exit (the typed /exit was judged unsent and cleared). The
 # composer reads capture the full visible viewport instead. The composer
 # sits inside a solid-rule pair (rule above, rule below), exactly as live
-# Claude draws it, with the menu rows below the closing rule; the rules are
-# structural edge rows, so the composer's content block ends there and the
-# menu rows never read as typed text.
+# Claude draws it, with the menu rows below the closing rule. The selected
+# menu choice repeats Claude's prompt glyph, indented farther than the composer;
+# extraction must still prove the typed command, not the selected description.
 herdr_popup_composer_screen() {  # <typed-text>
   local i typed=$1 rule
   rule=$(printf '%0.s\xe2\x94\x80' $(seq 1 60))
-  printf ' \xe2\x95\xad\xe2\x94\x80\xe2\x94\x80 Claude Code v2.1.283 \xe2\x94\x80\xe2\x94\x80\xe2\x95\xae\n'
+  printf ' \xe2\x95\xad\xe2\x94\x80\xe2\x94\x80 Claude Code v2.1.291 \xe2\x94\x80\xe2\x94\x80\xe2\x95\xae\n'
   printf '  %s\n' "$rule"
   printf '  \xe2\x9d\xaf %s\n' "$typed"
   printf '  %s\n' "$rule"
-  printf '  %s    Exit the CLI\n' "$typed"
+  printf '    \xe2\x9d\xaf %s    Exit the CLI\n' "$typed"
   for ((i = 0; i < 21; i++)); do
     printf '  /skill-%02d    A skill description long enough to read as a popup row\n' "$i"
   done
@@ -5978,6 +6012,7 @@ test_workspace_ensure_other_home_ignores_the_launcher_identity
 test_container_ensure_refuses_an_ambiguous_home_label
 test_container_ensure_starts_server_and_workspace
 test_server_ensure_scrubs_home_and_harness_identity
+test_server_ensure_drops_per_launch_compact_adviser_state
 test_container_ensure_reuses_existing_workspace
 test_container_ensure_creates_with_no_focus_flag
 test_container_ensure_uses_secondmate_home_label
