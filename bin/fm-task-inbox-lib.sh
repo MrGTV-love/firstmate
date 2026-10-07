@@ -334,7 +334,7 @@ fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
 }
 
 fm_task_inbox_wake_composer_content() {
-  local caps=$1 screen=$2 plain row raw content glyph joined='' first last prefix close is_last styled_content
+  local caps=$1 screen=$2 plain row raw content glyph joined='' first last prefix is_last styled_content
   local footer_re='^(π|󰵗)[[:space:]]+·[[:space:]]|^'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh][[:space:]]+·[[:space:]]'
   local context_re='[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K([[:space:]]|$)'
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
@@ -342,6 +342,14 @@ fm_task_inbox_wake_composer_content() {
   _fm_composer_select_cursorless "$plain" || return 1
   first=$FM_COMPOSER_SELECTED_FIRST
   last=$FM_COMPOSER_SELECTED_LAST
+  prefix=$(printf '%s\n' "$plain" | awk -v end="$first" 'NR <= end')
+  if [ "$first" -gt 0 ]; then
+    (
+      _fm_composer_scan_screen "$prefix" ''
+      [ "$FM_COMPOSER_SCAN_BARE_ROW" -lt 0 ] \
+        && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -lt 0 ]
+    ) || return 1
+  fi
   case "$FM_COMPOSER_SELECTED_KIND" in
     ompbox)
       row=$first
@@ -353,22 +361,23 @@ fm_task_inbox_wake_composer_content() {
         joined="${joined}${joined:+$'\n'}$content"
         row=$((row + 1))
       done
+      last=${plain//[!$'\n']/}
+      last=${#last}
+      while [ "$row" -le "$last" ]; do
+        raw=$(_fm_composer_screen_row "$row" "$plain")
+        fm_composer_normalize_trim_var raw
+        if [ -n "$raw" ]; then
+          [[ "$raw" =~ $footer_re ]] && [[ "$raw" =~ $context_re ]] || return 1
+          row=$((row + 1))
+          break
+        fi
+        row=$((row + 1))
+      done
       ;;
     bare)
       raw=$(_fm_composer_screen_row "$first" "$plain")
       fm_composer_normalize_trim_var raw
       fm_composer_leading_agent_glyph_var glyph "$raw" && [ "$glyph" = '❯' ] || return 1
-      prefix=$(printf '%s\n' "$plain" | awk -v end="$first" 'NR <= end')
-      if [ "$first" -gt 0 ]; then
-        (
-          _fm_composer_scan_screen "$prefix" ''
-          close=$FM_COMPOSER_SCAN_BOX_BOTTOM
-          [ "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM" -le "$close" ] || close=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
-          [ "$FM_COMPOSER_SCAN_PI_CLOSE" -le "$close" ] || close=$FM_COMPOSER_SCAN_PI_CLOSE
-          [ "$FM_COMPOSER_SCAN_BARE_ROW" -le "$close" ] \
-            && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -le "$close" ]
-        ) || return 1
-      fi
       joined=${raw#*"$glyph"}
       last=${plain//[!$'\n']/}
       last=${#last}
@@ -379,12 +388,6 @@ fm_task_inbox_wake_composer_content() {
         fm_composer_normalize_trim_var content
         if [[ "$content" =~ $footer_re ]] && [[ "$content" =~ $context_re ]]; then
           row=$((row + 1))
-          while [ "$row" -le "$last" ]; do
-            raw=$(_fm_composer_screen_row "$row" "$plain")
-            fm_composer_normalize_trim_var raw
-            [ -z "$raw" ] || return 1
-            row=$((row + 1))
-          done
           break
         fi
         joined="$joined"$'\n'"$raw"
@@ -393,6 +396,12 @@ fm_task_inbox_wake_composer_content() {
       ;;
     *) return 1 ;;
   esac
+  while [ "$row" -le "$last" ]; do
+    raw=$(_fm_composer_screen_row "$row" "$plain")
+    fm_composer_normalize_trim_var raw
+    [ -z "$raw" ] || return 1
+    row=$((row + 1))
+  done
   fm_composer_normalize_spaces_var joined
   fm_composer_normalize_trim_var joined
   if [ "$caps" = styled=1 ] \

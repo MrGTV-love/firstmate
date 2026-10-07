@@ -80,6 +80,7 @@ cleanup() {
   fi
   chmod -R u+w "$LAB" 2>/dev/null || true
   rm -rf "$LAB"
+  fm_test_cleanup
   exit "$rc"
 }
 trap cleanup EXIT
