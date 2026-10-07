@@ -339,6 +339,81 @@ test_raw_secondmate_launch_has_no_busy_contract() {
   pass "fm-spawn: raw omp secondmates preserve their command without arming an unobservable busy contract"
 }
 
+test_raw_secondmate_replacement_retires_busy_contract() {
+  local world repo home fakebin launchlog out status launch state predecessor mode ext retired_ext
+  local gen retired_gen=
+  world="$TMP_ROOT/raw-secondmate-replacement"
+  repo="$world/repo"
+  fm_git_init_commit "$repo"
+  ln -s "$ROOT/bin" "$repo/bin"
+  ln -s "$ROOT/.omp" "$repo/.omp"
+  home="$world/sm"
+  mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
+  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'charter\n' > "$home/data/charter.md"
+  printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
+  git -C "$home" init -q -b main
+  fakebin=$(make_spawn_fakebin "$world/fake" claude)
+  make_fake_omp "$fakebin"
+  launchlog="$world/launch.log"
+  state="$world/home/state"
+  ext="$state/sm.omp-ext.ts"
+  for predecessor in busy idle; do
+    : > "$launchlog"
+    out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
+      FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
+      FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$world/home/data" \
+      FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
+      FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+      "$ROOT/bin/fm-spawn.sh" sm "$home" omp --secondmate 2>&1)
+    status=$?
+    expect_code 0 "$status" "canonical omp secondmate before $predecessor replacement should succeed: $out"
+    assert_present "$ext" "canonical secondmate did not generate its busy adapter"
+    assert_contains "$(cat "$launchlog")" "-e '$ext'" "canonical secondmate did not load its busy adapter"
+    [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy fm-spawn" ] \
+      || fail "canonical secondmate did not rearm its busy contract"
+    gen=$(fm_busy_current_gen "$state" sm) || fail "canonical secondmate has no busy generation"
+    [ "$gen" != "$retired_gen" ] || fail "canonical secondmate reused a retired busy generation"
+    [ "$(fm_meta_get "$state/sm.meta" busy_gen)" = "$gen" ] || fail "canonical secondmate metadata lost its armed generation"
+    retired_gen=$gen
+    retired_ext="$world/retired-$predecessor.ts"
+    cp "$ext" "$retired_ext"
+    mode=before-start
+    [ "$predecessor" != idle ] || mode=end-final
+    drive_omp_ext "$ext" "$mode" || fail "could not publish predecessor $predecessor evidence"
+    [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "$predecessor omp-ext" ] \
+      || fail "canonical predecessor did not publish trusted $predecessor evidence"
+    : > "$launchlog"
+    out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
+      FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
+      FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$world/home/data" \
+      FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
+      FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+      "$ROOT/bin/fm-spawn.sh" sm "$home" 'omp --auto-approve' --secondmate 2>&1)
+    status=$?
+    expect_code 0 "$status" "raw omp secondmate should replace its $predecessor predecessor: $out"
+    launch=$(cat "$launchlog")
+    assert_contains "$launch" "omp --auto-approve" "replacement lost its ordinary raw omp command"
+    assert_not_contains "$launch" "-e '$ext'" "raw replacement loaded its predecessor's generated extension"
+    [ "$(fm_meta_get "$state/sm.meta" harness)" = omp ] || fail "raw replacement metadata lost its omp harness"
+    [ -z "$(fm_meta_get "$state/sm.meta" busy_gen)" ] || fail "raw replacement metadata retained predecessor busy authority"
+    assert_absent "$state/sm.busy-gen" "raw replacement retained its $predecessor predecessor's busy generation"
+    assert_absent "$state/sm.busy-state" "raw replacement retained its $predecessor predecessor's busy record"
+    assert_absent "$ext" "raw replacement retained its predecessor's generated extension"
+    [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown missing" ] \
+      || fail "raw replacement reused predecessor $predecessor authority"
+    for mode in before-start end-final; do
+      drive_omp_ext "$retired_ext" "$mode" || fail "could not drive the retired secondmate's $mode callback"
+      assert_absent "$state/sm.busy-gen" "retired callback rearmed raw replacement authority"
+      assert_absent "$state/sm.busy-state" "retired callback recreated raw replacement authority"
+      [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown missing" ] \
+        || fail "retired callback changed the raw replacement's unknown state"
+    done
+  done
+  pass "fm-spawn: raw omp replacements retire busy and idle predecessor authority; canonical spawns still rearm"
+}
+
 test_secondmate_config_pinned_model_is_validated() {
   # The same seeded secondmate home, but the harness and model come from the
   # primary's config/secondmate-harness rather than the command line: the
@@ -1322,6 +1397,7 @@ test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_raw_secondmate_launch_has_no_busy_contract
+test_raw_secondmate_replacement_retires_busy_contract
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
 test_generated_extension_preserves_hostile_paths

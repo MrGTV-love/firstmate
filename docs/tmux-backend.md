@@ -90,7 +90,7 @@ Text left in established structure remains `pending`, text in ambiguous structur
 An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
 
-Restored wake submission requires the complete composer to equal one unconsumed emitted record after identical Unicode White_Space, ASCII whitespace, and U+2063 normalization. Blank paragraphs remain part of the extracted composer; any non-whitespace edit refuses submission. Both held-wake Enter attempts require positively observed semantic idle. Capture, extraction, or record-read unavailability after Enter remains unconfirmed (status 3), rather than proving disappearance or delivery.
+Parent recovery does not submit restored omp wakes on tmux: its bounded capture cannot prove complete composer coverage. That recovery is restricted to Herdr's full visible ANSI viewport, requires one exact unconsumed emitted record and positively observed semantic idle before either Enter, and leaves the parent alarm intact on all other backends.
 
 OpenCode 1.18.4 has one busy-queue exception.
 While OpenCode is mid-turn, Enter queues the message but leaves its text visible until the turn completes.

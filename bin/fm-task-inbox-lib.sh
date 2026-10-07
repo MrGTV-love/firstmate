@@ -334,7 +334,7 @@ fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
 }
 
 fm_task_inbox_wake_composer_content() {
-  local caps=$1 screen=$2 plain row raw content glyph joined='' first last prefix is_last styled_content
+  local screen=$1 plain row raw content glyph joined='' first last prefix prefix_end is_last styled_content
   local footer_re='^(π|󰵗)[[:space:]]+·[[:space:]]|^'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh][[:space:]]+·[[:space:]]'
   local context_re='[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K([[:space:]]|$)'
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
@@ -342,12 +342,18 @@ fm_task_inbox_wake_composer_content() {
   _fm_composer_select_cursorless "$plain" || return 1
   first=$FM_COMPOSER_SELECTED_FIRST
   last=$FM_COMPOSER_SELECTED_LAST
-  prefix=$(printf '%s\n' "$plain" | awk -v end="$first" 'NR <= end')
-  if [ "$first" -gt 0 ]; then
+  prefix_end=$first
+  [ "$FM_COMPOSER_SELECTED_KIND" != ompbox ] || prefix_end=$((first - 1))
+  prefix=$(printf '%s\n' "$plain" | awk -v end="$prefix_end" 'NR <= end')
+  if [ "$prefix_end" -gt 0 ]; then
     (
       _fm_composer_scan_screen "$prefix" ''
       [ "$FM_COMPOSER_SCAN_BARE_ROW" -lt 0 ] \
-        && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -lt 0 ]
+        && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -lt 0 ] \
+        && [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -lt 0 ] \
+        && [ "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM" -lt 0 ] \
+        && [ "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -lt 0 ] \
+        && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -lt 0 ]
     ) || return 1
   fi
   case "$FM_COMPOSER_SELECTED_KIND" in
@@ -393,6 +399,8 @@ fm_task_inbox_wake_composer_content() {
         joined="$joined"$'\n'"$raw"
         row=$((row + 1))
       done
+      fm_composer_normalize_trim_var raw
+      [[ "$raw" =~ $footer_re ]] && [[ "$raw" =~ $context_re ]] || return 1
       ;;
     *) return 1 ;;
   esac
@@ -404,9 +412,8 @@ fm_task_inbox_wake_composer_content() {
   done
   fm_composer_normalize_spaces_var joined
   fm_composer_normalize_trim_var joined
-  if [ "$caps" = styled=1 ] \
-     && fm_composer_idle_matches "$joined" "$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT" sensitive \
-     && styled_content=$(fm_composer_extract_selected_content "$caps" "$screen") \
+  if fm_composer_idle_matches "$joined" "$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT" sensitive \
+     && styled_content=$(fm_composer_extract_selected_content styled=1 "$screen") \
      && [ -z "$styled_content" ]; then
     joined=
   fi
@@ -414,34 +421,14 @@ fm_task_inbox_wake_composer_content() {
 }
 
 fm_task_inbox_composer_holds_wake() {
-  local cap held caps=styled=0
+  local cap held
   [ -n "${3:-}" ] || return 2
   [ -d "$3" ] && [ -r "$3" ] || return 2
+  [ "$1" = herdr ] || return 2
   fm_backend_source "$1" || return 2
-  case "$1" in
-    tmux)
-      cap=$(fm_tmux_composer_capture "$2") || return 2
-      caps=styled=1
-      ;;
-    herdr)
-      if cap=$(fm_backend_herdr_visible_capture_ansi "$2" 2>/dev/null) && [ -n "$cap" ]; then
-        caps=styled=1
-      else
-        cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 2
-      fi
-      ;;
-    zellij)
-      if cap=$(fm_backend_zellij_composer_capture "$2" "${4:-}"); then
-        caps=styled=1
-      else
-        cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 2
-      fi
-      ;;
-    *)
-      cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 2
-      ;;
-  esac
-  held=$(fm_task_inbox_wake_composer_content "$caps" "$cap") || return 2
+  cap=$(fm_backend_herdr_visible_capture_ansi "$2" 2>/dev/null) || return 2
+  [ -n "$cap" ] || return 2
+  held=$(fm_task_inbox_wake_composer_content "$cap") || return 2
   [ -n "$held" ] || return 4
   fm_operational_watcher_wakes_only "$held" "$3"
 }
