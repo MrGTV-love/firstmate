@@ -1386,7 +1386,7 @@ A fresh usable entitled sibling keeps the model available; an unmeasured or unkn
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 Chat and Spark consume independent windows and meter verdicts; paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify.
 A snapshot fetched before a window's elapsed reset cannot establish current capacity; another still-current exhausted bound can establish exhaustion, but dropping obsolete windows never proves replenishment.
-The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
+The pool has no synthesized `spendPriority` or completion runway: manual intake and typed resolution can dispatch a sole eligible native-usable OMP route when every alternative is proven exhausted or blocked and no explicit floor remains unverifiable, disclosing both economics as `unknown`; unknown or unmeasured pools do not qualify, and percentages cannot economically rank competing unranked routes.
 An OMP Codex profile that omits its model retains unknown, unranked capacity without preventing evaluation of other profiles.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a pinned account's capacity, an alternate store selected through `CLAUDE_CONFIG_DIR`, or a route using retained API credentials, `CLAUDE_CODE_OAUTH_TOKEN`, or supported cloud-auth overrides.
@@ -1416,7 +1416,7 @@ A failure before stopping the original worker remains retryable through its stil
 After a failed stop or replacement launch, a matching control transaction journal retains the original quota-event identity for another attempt only when the current endpoint is proven dead; retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
 A failed recovery without a replacement does not prevent later eligible tasks from being considered within the scan's shared execution budget; scans prioritize the least recently attempted tasks and break timestamp ties by attempt count and task name.
 Each scan stops after one successful relaunch or a transaction-bound confirmed or published-alive replacement, retaining any control failure report.
-Launch and successful replacement append the selected route to task status; control reports and completes its transaction using the replacement's published harness, model, and effort rather than preflight choices.
+Launch and successful replacement report the selected route on command output, and automatic quota recovery includes the served profile in its supervisor notification, without appending a task-status declaration; control reports and completes its transaction using the replacement's published harness, model, and effort rather than preflight choices.
 No account pin, saved reset, or global reviewer configuration is changed.
 
 

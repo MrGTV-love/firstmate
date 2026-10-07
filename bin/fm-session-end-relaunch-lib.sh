@@ -204,11 +204,8 @@ fm_session_end_quota_journal_identity() {
   elif [ -e "$state/$id.busy-state" ] || [ -L "$state/$id.busy-state" ]; then
     return 1
   fi
-  case "$phase" in
-    failed:checkpoint|failed:noted)
-      [ "$(fm_backend_agent_state "${backend:-tmux}" "$(fm_meta_get "$meta" window)" 2>/dev/null)" = dead ] || return 1
-      ;;
-  esac
+  backend=$(fm_meta_get "$meta" backend)
+  [ "$(fm_backend_agent_state "${backend:-tmux}" "$(fm_meta_get "$meta" window)" 2>/dev/null)" = dead ] || return 1
   printf '%s %s\n' "$gen" "$seq"
 }
 
@@ -423,7 +420,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     FM_SESSION_END_ACTION=relaunch
     fm_session_end_ledger_add "$state" "$id" relaunched || return 1
     if [ "$quota_event" = 1 ]; then
-      reason="check: $id auto-relaunched after quota exhaustion"
+      reason="check: $id auto-relaunched after quota exhaustion harness=$(fm_meta_get "$meta" harness) model=$(fm_meta_get "$meta" model) effort=$(fm_meta_get "$meta" effort)"
     else
       reason="check: $id auto-relaunched after session-end"
     fi

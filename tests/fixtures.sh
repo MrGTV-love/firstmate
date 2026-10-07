@@ -143,7 +143,7 @@ case "${1:-}" in
     exit 0
     ;;
   send-keys)
-    if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
+    if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ] || { [ -n "${FM_FAKE_LAUNCH_STATUS_PATH:-}" ] && [ -n "${FM_FAKE_LAUNCH_STATUS_EVENT:-}" ]; }; then
       prev=
       for a in "$@"; do
         if [ "$prev" = "-l" ]; then
@@ -167,7 +167,14 @@ case "${1:-}" in
               fi
               ;;
           esac
-          printf '%s\n' "$a" >> "$FM_FAKE_LAUNCH_LOG"
+          [ -z "${FM_FAKE_LAUNCH_LOG:-}" ] || printf '%s\n' "$a" >> "$FM_FAKE_LAUNCH_LOG"
+          case "$a" in
+            *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
+              if [ -n "${FM_FAKE_LAUNCH_STATUS_PATH:-}" ] && [ -n "${FM_FAKE_LAUNCH_STATUS_EVENT:-}" ]; then
+                printf '%s\n' "$FM_FAKE_LAUNCH_STATUS_EVENT" > "$FM_FAKE_LAUNCH_STATUS_PATH"
+              fi
+              ;;
+          esac
         fi
         prev=$a
       done

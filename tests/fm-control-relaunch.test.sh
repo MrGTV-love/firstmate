@@ -161,6 +161,9 @@ case "${1:-}" in
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
           printf '%s\n' "$payload" > "$D/launch"
           cat "$D/becomes" > "$D/command"
+          if [ -n "${FM_FAKE_LAUNCH_STATUS_PATH:-}" ] && [ -n "${FM_FAKE_LAUNCH_STATUS_EVENT:-}" ]; then
+            printf '%s\n' "$FM_FAKE_LAUNCH_STATUS_EVENT" > "$FM_FAKE_LAUNCH_STATUS_PATH"
+          fi
           [ -z "${FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START:-}" ] || exit 1
           ;;
       esac
@@ -681,7 +684,7 @@ SH
   assert_equals default "$(meta_field "$dir" "$id" effort)" "ordinary relaunch corrupted the durable effort"
   assert_equals complete "$(journal_field "$dir" "$id" phase)" "ordinary relaunch did not complete its transaction"
   assert_equals "$dir/wt" "$(meta_field "$dir" "$id" worktree)" "ordinary relaunch changed the worktree"
-  assert_no_grep 'model-matrix fallback' "$dir/home/state/$id.status" "ordinary relaunch must not invent matrix routing"
+  assert_not_contains "$out" 'model-matrix fallback' "ordinary relaunch must not invent matrix routing"
   pass "an ordinary non-OMP relaunch without crew-dispatch.json succeeds without required jq and preserves its durable profile"
 }
 
@@ -4671,7 +4674,7 @@ test_relaunch_reports_the_profile_spawn_actually_served() {
       expect_code 0 "$rc" "served fallback must complete: $out"
       assert_contains "$out" 'model=openrouter/z-ai/glm-5.3-flash effort=high' "success must report actual served profile"
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "served fallback must complete journal"
-      assert_grep 'fallback relaunched omp openrouter/z-ai/glm-5.3-flash effort=high' "$dir/home/state/$id.status" "control must report actual served fallback effort"
+      assert_contains "$out" 'fallback relaunched omp openrouter/z-ai/glm-5.3-flash effort=high' "control must report actual served fallback effort"
     else
       expect_code 1 "$rc" "published failure must remain a failure: $out"
       assert_equals failed:launching "$(journal_field "$dir" "$id" phase)" "published failure must retain durable phase"
@@ -4683,6 +4686,39 @@ test_relaunch_reports_the_profile_spawn_actually_served() {
     fi
   done
   pass "control reports actual spawn fallback after preflight Codex availability changes, including published failure journals"
+}
+
+test_relaunch_fallback_preserves_launch_delivery_declarations() {
+  local dir id event declaration expected out rc
+  for event in done failed paused; do
+    id="rl-fallback-$event"
+    dir=$(new_case fallback-declaration "$id")
+    add_quota_recovery_task "$dir" "$id"
+    cp "$dir/usage.json" "$dir/usage-after-stop.json"
+    jq '.reports[].metadata.meterStates.chat = {allowed:true,limitReached:false}' \
+      "$dir/usage-after-stop.json" > "$dir/usage.json"
+    declaration="$event [at=2026-10-06T00:00:00Z]: replacement declared $event during launch delivery"
+    expected="$dir/expected.status"
+    printf '%s\n' "$declaration" > "$expected"
+
+    out=$(FM_FAKE_LAUNCH_STATUS_PATH="$dir/home/state/$id.status" \
+      FM_FAKE_LAUNCH_STATUS_EVENT="$declaration" \
+      run_control "$dir" "$id" relaunch --note "serve the current permitted profile")
+    rc=$?
+    expect_code 0 "$rc" "$event declaration must not fail fallback relaunch: $out"
+    assert_grep 'to_model=openai-codex/gpt-6-luna' "$dir/preflight-journal" "preflight must select Codex before launch capacity changes"
+    assert_contains "$out" 'fallback relaunched omp openrouter/z-ai/glm-5.3-flash effort=high for rule_1' "control must disclose the served fallback after $event"
+    assert_equals omp "$(meta_field "$dir" "$id" harness)" "relaunch must publish the served harness"
+    assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "relaunch must publish the served model"
+    assert_equals high "$(meta_field "$dir" "$id" effort)" "relaunch must publish the served effort"
+    assert_equals complete "$(journal_field "$dir" "$id" phase)" "fallback relaunch must complete its transaction"
+    assert_equals openrouter/z-ai/glm-5.3-flash "$(journal_field "$dir" "$id" to_model)" "journal must record the served fallback"
+    [ -s "$dir/fake/launch" ] || fail "$event declaration must come from an actual launch"
+    cmp -s "$expected" "$dir/home/state/$id.status" || fail "spawn or control fallback announcement changed the $event declaration"
+    assert_equals "$declaration" "$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_current_line "$2" ship' \
+      bash "$ROOT" "$dir/home/state/$id.status")" "the $event declaration must remain authoritative"
+  done
+  pass "real control fallback relaunches preserve done, failed, and paused declarations published before spawn and control announcements"
 }
 
 test_quota_recovery_retries_real_stop_then_failed_launch() {
@@ -4857,6 +4893,47 @@ test_quota_published_failure_retries_only_its_dead_transaction() {
   pass "published quota recovery requires transaction match and a dead endpoint while retaining current metadata"
 }
 
+test_quota_live_published_replacement_handles_its_new_event() {
+  local dir id=rl-quota-new-live out rc old_gen gen seq record tx
+  dir=$(new_case quota-new-live "$id")
+  add_quota_recovery_task "$dir" "$id"
+  old_gen=$(cat "$dir/home/state/$id.busy-gen")
+  out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "postpublication quota failure must finish the scanner decision: $out"
+  assert_contains "$out" 'auto-relaunch failed after quota exhaustion' "the transport seam must fail after starting the replacement"
+  assert_equals failed:launching "$(journal_field "$dir" "$id" phase)" "the old quota transaction must remain a failed launch"
+  assert_equals none-new-record-kept "$(journal_field "$dir" "$id" rollback)" "the failed launch must retain the published replacement"
+  assert_equals omp "$(cat "$dir/fake/command")" "the published replacement must still be alive"
+  tx=$(meta_field "$dir" "$id" control_relaunch_tx)
+  assert_equals "$tx" "$(journal_field "$dir" "$id" relaunch_tx)" "the failed journal must match the live published replacement"
+  gen=$(cat "$dir/home/state/$id.busy-gen")
+  [ "$gen" != "$old_gen" ] || fail "the replacement must have a new busy generation"
+  assert_equals "$gen" "$(meta_field "$dir" "$id" busy_gen)" "the replacement record must own its new busy generation"
+  printf 'x_request=new-live-quota\n' >> "$dir/home/state/$id.meta"
+  "$ROOT/bin/fm-busy-event.sh" apply "$dir/home/state" "$id" idle --gen "$gen" --source omp-ext --event quota-exhausted >/dev/null
+  record=$(cat "$dir/home/state/$id.busy-state")
+  seq=${record#*seq=}
+  seq=${seq%% *}
+  assert_contains "$record" "gen=$gen" "the fresh quota event must belong to the live replacement"
+  assert_contains "$record" 'event=quota-exhausted' "the replacement must publish a fresh quota event"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "the live replacement's new quota event must be handled: $out"
+  assert_contains "$out" "$id auto-relaunched after quota exhaustion" "the old failed journal must not hide the live replacement's new event"
+  assert_equals complete "$(journal_field "$dir" "$id" phase)" "the new quota transaction must complete"
+  assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "the completed journal must bind the new generation rather than the failed origin"
+  assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "the completed journal must bind the fresh event sequence"
+  assert_equals omp "$(cat "$dir/fake/command")" "the new quota recovery must leave a live replacement"
+  assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "new recovery must retain the permitted published model"
+  assert_equals high "$(meta_field "$dir" "$id" effort)" "new recovery must retain the published effort"
+  assert_equals new-live-quota "$(meta_field "$dir" "$id" x_request)" "new recovery must preserve concurrent replacement metadata"
+  assert_equals "$dir/wt" "$(meta_field "$dir" "$id" worktree)" "new recovery must retain the recorded worktree"
+  assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "new recovery must preserve unfinished work"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "the completed new quota recovery must deduplicate"
+  assert_equals '' "$out" "the handled replacement quota event must not relaunch again"
+  pass "a live published replacement handles its own fresh quota generation despite an older failed journal"
+}
+
 test_quota_retry_preserves_identity_after_pre_stop_failure() {
   local dir publication rejected_phase id out rc gen seq record current_gen tx real_mv expected_phase
   real_mv=$(command -v mv)
@@ -4934,16 +5011,21 @@ test_quota_confirmed_replacement_is_not_retried() {
 }
 
 test_quota_exhaustion_relaunches_only_a_permitted_route() {
-  local dir model id out rc
+  local dir model id out rc declaration expected
   for model in openai-codex/gpt-6-luna openai-codex/gpt-6.1-sol; do
     id=rl-pool
     dir=$(new_case pooled-quota "$id")
     add_quota_recovery_task "$dir" "$id" "$model"
+    declaration='done [at=2026-10-06T00:00:00Z]: replacement completed during launch delivery'
+    expected="$dir/expected.status"
+    printf '%s\n' "$declaration" > "$expected"
     mkdir -p "$dir/user-home"
     out=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
       -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
       PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
       FM_WAKE_QUEUE="$dir/home/state/.wake-queue" \
+      FM_FAKE_LAUNCH_STATUS_PATH="$dir/home/state/$id.status" \
+      FM_FAKE_LAUNCH_STATUS_EVENT="$declaration" \
       HOME="$dir/user-home" FM_SPAWN_NO_GUARD=1 \
       FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
       bash -s -- "$ROOT" "$id" <<'SH'
@@ -4968,7 +5050,10 @@ SH
       assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
       assert_equals high "$(meta_field "$dir" "$id" effort)" "an omitted primary effort must permit the explicitly configured fallback effort"
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
-      assert_grep 'fallback relaunched' "$dir/home/state/$id.status" "the served route must be reported"
+      assert_contains "$out" 'harness=omp model=openrouter/z-ai/glm-5.3-flash effort=high' "the supervisor wake must disclose the served route"
+      cmp -s "$expected" "$dir/home/state/$id.status" || fail "automatic routing disclosure changed the replacement's done declaration"
+      assert_equals "$declaration" "$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_current_line "$2" ship' \
+        bash "$ROOT" "$dir/home/state/$id.status")" "the replacement's done declaration must remain authoritative"
     else
       assert_contains "$out" 'auto-relaunch failed' "strongest-model exhaustion must be surfaced without a weak stand-in"
       assert_equals omp "$(cat "$dir/fake/command")" "an unavailable strongest route must refuse before stopping the old agent"
@@ -5037,11 +5122,13 @@ test_quota_scan_stops_after_failed_published_or_confirmed_replacement
 test_quota_exhaustion_relaunches_only_a_permitted_route
 test_quota_recovery_retries_real_stop_then_failed_launch
 test_quota_published_failure_retries_only_its_dead_transaction
+test_quota_live_published_replacement_handles_its_new_event
 test_quota_confirmed_replacement_is_not_retried
 test_quota_retry_preserves_identity_after_pre_stop_failure
 test_live_quota_retries_after_initial_pre_stop_failure
 test_explicit_exit_cancels_partial_quota_recovery
 test_relaunch_reports_the_profile_spawn_actually_served
+test_relaunch_fallback_preserves_launch_delivery_declarations
 test_ordinary_partial_failure_keeps_its_attempt_caps
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint

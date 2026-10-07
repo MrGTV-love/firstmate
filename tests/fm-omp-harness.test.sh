@@ -221,7 +221,7 @@ JSON
   status=$?
   expect_code 0 "$status" "whole-pool exhaustion must select the permitted Luna stand-in: $out"
   assert_grep 'model=openrouter/z-ai/glm-5.3-flash' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
-  assert_grep 'fallback launched' "$HOME_DIR/state/$id.status" "the changed serving route must be reported"
+  assert_contains "$out" 'fallback launched' "the changed serving route must be reported"
   pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
 }
 

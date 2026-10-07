@@ -113,6 +113,12 @@ init_changed_fixture_repo() {
     fm-pr-merge.test.sh \
     fm-procevent-quota.test.sh \
     fm-quota-choose.test.sh \
+    fm-dispatch-capacity.test.sh \
+    fm-dispatch-resolve.test.sh \
+    fm-omp-harness.test.sh \
+    fm-spawn-dispatch-profile.test.sh \
+    fm-control-relaunch.test.sh \
+    fm-session-end-relaunch.test.sh \
     fm-pi-watch-extension.test.sh \
     fm-pi-windows-shell-invocation.test.sh \
     fm-afk-return.test.sh \
@@ -132,6 +138,7 @@ init_changed_fixture_repo() {
   : >"$repo/bin/fm-procevent-quota.sh"
   : >"$repo/bin/fm-quota-axi-lib.sh"
   : >"$repo/bin/fm-quota-choose.sh"
+  : >"$repo/bin/fm-dispatch-capacity-lib.sh"
   : >"$repo/bin/unmapped-source.sh"
   # A shared top-level test fixture read by two suites in different families,
   # beside a tests/ file nothing reads at all.
@@ -306,7 +313,7 @@ test_shell_line_ending_policy_selects_runner_contract() {
 }
 
 test_changed_dependency_selection_and_unmapped_failure() {
-  local tmp repo listed rc
+  local tmp repo listed rc expected
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-changed.XXXXXX")
   repo="$tmp/repo"
   init_changed_fixture_repo "$repo"
@@ -326,6 +333,21 @@ test_changed_dependency_selection_and_unmapped_failure() {
   assert_not_contains "$listed" "tests/fm-daemon.test.sh" "environment accessor selection stays focused"
   git -C "$repo" add bin/fm-env-lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm environment-change
+
+  printf '\n' >>"$repo/bin/fm-dispatch-capacity-lib.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
+  expected=$(printf '%s\n' \
+    tests/fm-control-relaunch.test.sh \
+    tests/fm-dispatch-capacity.test.sh \
+    tests/fm-dispatch-resolve.test.sh \
+    tests/fm-omp-harness.test.sh \
+    tests/fm-quota-choose.test.sh \
+    tests/fm-session-end-relaunch.test.sh \
+    tests/fm-spawn-dispatch-profile.test.sh)
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "capacity-library-only change must select exactly its curated suites, including spawn dispatch profile: $listed"
+  git -C "$repo" add bin/fm-dispatch-capacity-lib.sh
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm capacity-lib-change
 
   printf '\n' >>"$repo/tests/lib.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)

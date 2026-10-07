@@ -273,7 +273,7 @@ test_quota_recovery_retries_after_recent_relaunch_and_failure() {
   grep -F 'auto-relaunch failed after quota exhaustion' <<<"$FM_SESSION_END_WAKE" >/dev/null \
     || fail "the failed quota attempt did not report quota exhaustion: ${FM_SESSION_END_WAKE:-<empty>}"
   FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "quota retry scan failed"
-  [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after quota exhaustion" ] \
+  [ "$FM_SESSION_END_ACTION" = relaunch ] \
     || fail "a previous failed quota attempt suppressed recovery: ${FM_SESSION_END_WAKE:-<empty>}"
   [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
     || fail "quota retry did not invoke control exactly once"
@@ -293,8 +293,13 @@ test_quota_recovery_retries_after_recent_relaunch_and_failure() {
   [ "$(fm_session_end_identity "$state" lane)" != "$gen $seq" ] \
     || fail "a later quota event did not advance its identity"
   FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "later quota recovery scan failed"
-  [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after quota exhaustion" ] \
+  [ "$FM_SESSION_END_ACTION" = relaunch ] \
     || fail "successful handling of an older sequence suppressed a new quota event"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "the new quota event did not invoke control exactly once"
+  identity=$(fm_session_end_identity "$state" lane) || fail "the new quota identity was lost"
+  [ "$(cat "$state/.session-end-handled-lane")" = "$(printf '%s\t%s\trelaunched' "${identity%% *}" "${identity#* }")" ] \
+    || fail "the new quota identity was not marked successfully handled"
   pass "quota recovery ignores recent relaunches and failed attempts but deduplicates successful identities"
 }
 
@@ -318,10 +323,12 @@ test_quota_recovery_ignores_daily_cap_and_capped_handling() {
     seq=${identity#* }
     printf '%s\t%s\tcapped-%s\n' "$gen" "$seq" "$which" > "$state/.session-end-handled-lane"
     FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "$which-capped quota scan failed"
-    [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after quota exhaustion" ] \
+    [ "$FM_SESSION_END_ACTION" = relaunch ] \
       || fail "$which cap or its handled marker suppressed quota recovery: ${FM_SESSION_END_WAKE:-<empty>}"
     [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
       || fail "$which-capped quota recovery did not invoke control exactly once"
+    [ "$(cat "$state/.session-end-handled-lane")" = "$(printf '%s\t%s\trelaunched' "$gen" "$seq")" ] \
+      || fail "$which-capped quota recovery did not replace the handled marker with its successful identity"
   done
   pass "quota recovery bypasses recent and daily caps and their same-identity handled markers"
 }
@@ -450,7 +457,7 @@ SH
     if [ "$scan" = 2 ]; then
       [ "$(cut -d' ' -f1 "$dir/control.log")" = b-luna ] \
         || fail "the slow failed task starved the usable later route: $(cat "$dir/control.log")"
-      [ "$FM_SESSION_END_WAKE" = "check: b-luna auto-relaunched after quota exhaustion" ] \
+      [ "$FM_SESSION_END_ACTION" = relaunch ] \
         || fail "the later quota task did not recover"
     else
       [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] \
@@ -723,8 +730,13 @@ test_partial_quota_retries_are_uncapped_and_deduplicated() {
   grep -Fx "FM_CONTROL_QUOTA_SEQ=$seq" "$dir/control-env.log" >/dev/null \
     || fail "the stable quota sequence was not passed to control"
   scan_lane "$dir" || fail "partial quota success scan failed"
-  [ "$FM_SESSION_END_WAKE" = "check: $id auto-relaunched after quota exhaustion" ] \
+  [ "$FM_SESSION_END_ACTION" = relaunch ] \
     || fail "partial quota recovery did not remain eligible after repeated failures"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    && [ "$(cut -d' ' -f1 "$dir/control.log")" = "$id" ] \
+    || fail "partial quota recovery did not invoke control exactly once for its task"
+  [ "$(cat "$dir/state/.session-end-handled-$id")" = "$(printf '%s\t%s\trelaunched' "$gen" "$seq")" ] \
+    || fail "partial quota recovery did not mark its stable journal identity successfully handled"
   printf '%s\tattempt\n' "$((now - 90000))" > "$dir/state/.session-end-relaunch-$id"
   scan_lane "$dir" || fail "handled partial quota scan failed"
   [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \

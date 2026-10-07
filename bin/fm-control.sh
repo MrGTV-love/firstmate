@@ -1342,7 +1342,7 @@ do_relaunch() {
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
-    printf 'working [at=%s]: model-matrix fallback relaunched %s %s effort=%s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+    printf 'model-matrix fallback relaunched %s %s effort=%s for %s\n' "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" "${TARGET_DISPATCH_RULE:-matching profiles}"
   fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }

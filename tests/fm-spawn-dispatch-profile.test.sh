@@ -219,7 +219,7 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
       case "$policy" in
         filtered|flag-only|caller-only)
           expected_harness=omp expected_model=openrouter/z-ai/glm-5.3-flash expected_effort=high
-          assert_grep "fallback launched omp" "$HOME_DIR/state/$id.status" "$credential $policy did not disclose the permitted fallback"
+          assert_contains "$out" "fallback launched omp" "$credential $policy did not disclose the permitted fallback"
           ;;
       esac
       assert_contains "$out" "spawned $id harness=$expected_harness" "$credential $policy launched the wrong harness"
@@ -245,6 +245,34 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
     done
   done
   pass "Claude spawn retains forwarded API auth, filters excluded credentials, and treats an allow flag alone as native authentication"
+}
+
+test_fallback_spawn_preserves_launch_delivery_declarations() {
+  local rec id event declaration expected out status
+  for event in done failed paused; do
+    id="profile-fallback-$event"
+    rec=$(make_spawn_case "$id" claude "$id")
+    read_case_record "$rec"
+    enable_exhausted_claude_dispatch "$HOME_DIR" "$FAKEBIN_DIR"
+    declaration="$event [at=2026-10-06T00:00:00Z]: replacement declared $event during launch delivery"
+    expected="$CASE_DIR/expected.status"
+    printf '%s\n' "$declaration" > "$expected"
+
+    out=$(FM_FAKE_LAUNCH_STATUS_PATH="$HOME_DIR/state/$id.status" \
+      FM_FAKE_LAUNCH_STATUS_EVENT="$declaration" \
+      run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
+    status=$?
+    expect_code 0 "$status" "$event declaration must not fail fallback spawn: $out"
+    assert_contains "$out" "fallback launched omp openrouter/z-ai/glm-5.3-flash for rule_1" "spawn must disclose the served fallback after $event"
+    assert_contains "$out" "spawned $id harness=omp" "spawn must report the served harness after $event"
+    assert_meta_profile "$HOME_DIR/state/$id.meta" omp openrouter/z-ai/glm-5.3-flash high
+    [ -s "$LAUNCH_LOG" ] || fail "$event declaration must come from an actual launch"
+    cmp -s "$expected" "$HOME_DIR/state/$id.status" || fail "fallback announcement changed the $event declaration"
+    assert_equals "$declaration" "$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_current_line "$2" ship' \
+      bash "$ROOT" "$HOME_DIR/state/$id.status")" "the $event declaration must remain authoritative"
+  done
+  pass "fresh fallback spawns preserve done, failed, and paused declarations published during launch delivery"
 }
 
 test_direct_relaunch_preserves_rule_and_honors_overrides() {
@@ -2062,6 +2090,7 @@ test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
 test_no_dispatch_non_omp_spawn_does_not_require_jq
 test_claude_dispatch_binds_only_forwarded_api_credentials
+test_fallback_spawn_preserves_launch_delivery_declarations
 test_direct_relaunch_preserves_rule_and_honors_overrides
 test_claude_launch_brief_publishes_record_doorbell
 test_claude_secondmate_launch_brief_publishes_into_its_own_home

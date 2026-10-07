@@ -5951,6 +5951,6 @@ SPAWN_ACCOUNT=
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
 [ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
 if [ "$DISPATCH_SWITCHED" = true ]; then
-  printf 'working [at=%s]: model-matrix fallback launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+  printf 'model-matrix fallback launched %s %s for %s\n' "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}"
 fi
 echo "spawned $ID harness=$HARNESS kind=$KIND$SPAWN_DELIVERY window=$META_WINDOW worktree=$WT$SPAWN_ACCOUNT"
