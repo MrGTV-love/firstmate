@@ -1720,10 +1720,10 @@ assert_contains "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.addit
 assert_absent "$POST_HOME/state/.wake-queue" "the fixture models capture before publication"
 post_context=$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.additionalContext')
 post_read_command=$(printf '%s' "$post_context" | perl -0777 -ne \
-  'm{(bin/fm-procevent-lavish\.sh read .*)\. Handle the result,}s and print $1')
+  'm{read it directly with `(.*?)`\. Handle the result,}s and print $1')
 [ -n "$post_read_command" ] || fail "unpublished capture has no executable recovery command"
-post_read_out=$(env -u FM_HOME -u FM_STATE_OVERRIDE FM_ROOT_OVERRIDE="$POST_HOME" bash -c "$post_read_command") \
-  || fail "recovery command depends on FM_HOME being exported to the tool"
+post_read_out=$(env -u FM_HOME -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE bash -c "$post_read_command") \
+  || fail "recovery command depends on selector overrides being exported to the tool"
 assert_contains "$post_read_out" "review answer" "recovery reads the actual unpublished answer"
 assert_contains "$post_context" 'handled lavish-review 1' \
   "the notice identifies the exact durable acknowledgement"
@@ -1743,6 +1743,17 @@ printf 'other\n' > "$POST_BASE.adapter"
 printf 'lavish\n' > "$POST_BASE.adapter"
 mkdir -p "$POST_HOME/state/procevent"
 printf 'adapter=lavish\nargc=1\nargv:\n/bin/true\n' > "$POST_HOME/state/procevent/lavish-review.source"
+printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
+for post_payload in '{"agent_id":"helper-1"}' '{"agent_id":""}' '{"agent_id":null}'; do
+  [ -z "$(posttool "$post_payload")" ] || fail "helper PostToolUse received primary review feedback"
+  [ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "helper refreshed the primary lease"
+  assert_absent "$POST_BASE.handled" "helper acknowledged a result owned by the primary"
+done
+post_notice=$(posttool)
+[ "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ] \
+  || fail "helper events hid the capture from the subsequent primary event"
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" != 0 ] \
+  || fail "subsequent primary event did not refresh its owner lease"
 printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
 for post_payload in '{"cursor_version":"2026.09"}' '{"transcript_path":"/home/test/.pi/sessions/test.jsonl"}'; do
   [ -z "$(posttool "$post_payload")" ] || fail "foreign host received Claude review feedback"
@@ -1764,3 +1775,55 @@ printf '{"session_id":"competing"}\n' \
 FM_HOME="$POST_HOME" "$ROOT/bin/fm-procevent.sh" handled lavish-review 1 >/dev/null
 [ -z "$(posttool)" ] || fail "handled review kept interrupting the primary"
 pass "PostToolUse reveals unhandled reviews only to their active primary, keeps listeners leased, and goes silent after handling"
+
+POST_SCRIPTS="$TMP_ROOT/posttool shipped scripts' directory"
+POST_ROOT=$(make_primary_dir "$TMP_ROOT/posttool root's directory")
+POST_SELECTED_HOME="$TMP_ROOT/posttool home's directory"
+POST_STATE="$TMP_ROOT/posttool selected state's directory"
+POST_OTHER=$(make_primary_dir "$TMP_ROOT/posttool other cwd's directory")
+mkdir -p "$POST_SCRIPTS" "$POST_SELECTED_HOME/state" "$POST_STATE/procevent-inbox" "$POST_OTHER/state/procevent-inbox"
+cp -R "$ROOT/bin" "$POST_SCRIPTS/bin"
+POST_SELECTED_BASE="$POST_STATE/procevent-inbox/lavish-recovery.1"
+POST_OTHER_BASE="$POST_OTHER/state/procevent-inbox/lavish-recovery.1"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,selected home answer\n' > "$POST_SELECTED_BASE.result"
+printf 'lavish\n' > "$POST_SELECTED_BASE.adapter"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,wrong home answer\n' > "$POST_OTHER_BASE.result"
+printf 'lavish\n' > "$POST_OTHER_BASE.adapter"
+printf '%s\t1\tcheck\tprocevent:lavish-recovery:1\tcheck: wrong home wake\n' "$(date +%s)" \
+  > "$POST_OTHER/state/.wake-queue"
+post_other_queue=$(cat "$POST_OTHER/state/.wake-queue")
+post_recovery_notice=$(printf '{"session_id":"posttool-recovery"}\n' \
+  | FM_HOME="posttool home's directory" FM_STATE_OVERRIDE="posttool selected state's directory" \
+    FM_ROOT_OVERRIDE="posttool root's directory" "$FAKE_CLAUDE" -c '
+      cd "$1" || exit 1
+      printf "%s\n" "$$" > "$FM_STATE_OVERRIDE/.lock"
+      "$2/bin/fm-procevent-posttool-check.sh"
+    ' _ "$TMP_ROOT" "$POST_SCRIPTS")
+post_recovery_context=$(printf '%s' "$post_recovery_notice" | jq -r '.hookSpecificOutput.additionalContext')
+post_drain_command=$(printf '%s' "$post_recovery_context" | perl -0777 -ne 'm{Run `(.*?)` now\.}s and print $1')
+post_read_command=$(printf '%s' "$post_recovery_context" | perl -0777 -ne \
+  'm{read it directly with `(.*?)`\. Handle the result,}s and print $1')
+post_handled_command=$(printf '%s' "$post_recovery_context" | perl -0777 -ne \
+  'm{acknowledge it with `(.*?)` before continuing\.}s and print $1')
+[ -n "$post_drain_command" ] && [ -n "$post_read_command" ] && [ -n "$post_handled_command" ] \
+  || fail "selected home notice omitted an executable recovery command"
+run_post_recovery_command() {
+  FM_HOME="$POST_OTHER" FM_STATE_OVERRIDE="$POST_OTHER/state" FM_ROOT_OVERRIDE="$POST_OTHER" \
+    bash -c 'cd "$1" && eval "$2"' _ "$POST_OTHER" "$1"
+}
+post_drain_out=$(run_post_recovery_command "$post_drain_command") || fail "wrong-cwd recovery drain failed"
+assert_not_contains "$post_drain_out" "wrong home wake" "recovery drain inspected a different home's queue"
+assert_present "$POST_STATE/.wake-queue" "recovery drain did not inspect the selected state override"
+[ ! -s "$POST_STATE/.wake-queue" ] || fail "unpublished selected capture unexpectedly gained a wake row"
+[ "$(cat "$POST_OTHER/state/.wake-queue")" = "$post_other_queue" ] || fail "recovery drain changed the wrong queue"
+assert_absent "$POST_SELECTED_HOME/state/.wake-queue" "recovery drain ignored the selected state override"
+assert_absent "$POST_ROOT/state/.wake-queue" "recovery drain used the root's default state"
+post_read_out=$(run_post_recovery_command "$post_read_command") || fail "wrong-cwd direct recovery read failed"
+assert_contains "$post_read_out" "selected home answer" "wrong-cwd recovery did not read the selected capture"
+assert_not_contains "$post_read_out" "wrong home answer" "wrong-cwd recovery read a different home's capture"
+assert_absent "$POST_SELECTED_BASE.handled" "drain or read acknowledged before handling"
+post_handled_out=$(run_post_recovery_command "$post_handled_command") || fail "wrong-cwd recovery acknowledgement failed"
+assert_contains "$post_handled_out" "handled: lavish-recovery 1" "recovery did not acknowledge the captured round"
+assert_present "$POST_SELECTED_BASE.handled" "recovery acknowledgement missed the selected state override"
+assert_absent "$POST_OTHER_BASE.handled" "recovery acknowledgement changed a different home's capture"
+pass "PostToolUse recovery commands retain the inspected home and state from another cwd with conflicting selectors and quoted paths"

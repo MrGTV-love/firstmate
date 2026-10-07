@@ -6047,19 +6047,23 @@ PATH="$CONT/bin:$PATH" FM_HOME="$CONT/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
 assert_contains "$(cat "$CONT/arm.out")" "armed: $cont_id" "the continuous listener was not reported ready"
 wait_for_lines "$CONT/started" 1 || fail "continuous listener never started"
 cont_claim=$(cat "$FM_PROCEVENT_CLAIM_ROOT/$cont_id.claim")
-printf 'session:\n  status: browser_disconnected\n' > "$CONT/round1"
+printf 'session:\n  status: browser_disconnected\n' > "$CONT/round1.tmp" \
+  && mv -f -- "$CONT/round1.tmp" "$CONT/round1" || fail "disconnect round publication failed"
 wait_for_lines "$CONT/started" 2 || fail "disconnect did not resume listening without reconcile"
 assert_present "$CONT/home/state/procevent-inbox/$cont_id.1.handled" \
   "the disconnect remains a silent no-op"
 : > "$CONT/round2"
 wait_for_lines "$CONT/started" 3 || fail "empty poll return stranded the listener"
-printf 'session:\n  status: waiting\n' > "$CONT/round3"
+printf 'session:\n  status: waiting\n' > "$CONT/round3.tmp" \
+  && mv -f -- "$CONT/round3.tmp" "$CONT/round3" || fail "waiting round publication failed"
 wait_for_lines "$CONT/started" 4 || fail "spurious waiting return stranded the listener"
-printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,first answer\n' > "$CONT/round4"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,first answer\n' > "$CONT/round4.tmp" \
+  && mv -f -- "$CONT/round4.tmp" "$CONT/round4" || fail "first answer publication failed"
 wait_for_lines "$CONT/started" 5 || fail "unhandled answer stranded the listener"
 assert_absent "$CONT/home/state/procevent-inbox/$cont_id.4.handled" \
   "keeping the listener never acknowledges the answer"
-printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,second answer\n' > "$CONT/round5"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,second answer\n' > "$CONT/round5.tmp" \
+  && mv -f -- "$CONT/round5.tmp" "$CONT/round5" || fail "second answer publication failed"
 wait_for_lines "$CONT/started" 6 || fail "second answer stranded the listener"
 assert_contains "$(wake_payloads "$CONT/home")" "procevent lavish $cont_id 4" \
   "first answer is announced with its own sequence"
@@ -6073,7 +6077,8 @@ assert_absent "$CONT/duplicate" "each source has at most one active polling chil
 assert_contains "$(pe "$CONT/home" list --age)" "$cont_id" "age report retains the open review"
 age_row=$(pe "$CONT/home" list --age | awk -v id="$cont_id" '$1 == id { print $3, $5 }')
 case "$age_row" in live\ [0-9]*) ;; *) fail "age report did not show live owner and numeric age: $age_row" ;; esac
-printf 'session:\n  status: ended\n  ended_by: user\n' > "$CONT/round6"
+printf 'session:\n  status: ended\n  ended_by: user\n' > "$CONT/round6.tmp" \
+  && mv -f -- "$CONT/round6.tmp" "$CONT/round6" || fail "ended round publication failed"
 for _ in $(seq 1 100); do
   [ -e "$CONT/home/state/procevent/$cont_id.source" ] || break
   sleep 0.1
