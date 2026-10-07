@@ -90,7 +90,7 @@ n=\${#args[@]}
 if [ "\$n" -ge 2 ] && [ "\${args[\$((n-2))]}" = --session ]; then
   [ "\${args[\$((n-1))]}" = "$SESSION" ] || { echo "wrapper refused foreign session" >&2; exit 97; }
   args=("\${args[@]:0:\$((n-2))}")
-else
+elif [ "\$n" -ne 2 ] || [ "\${args[0]}" != status ] || [ "\${args[1]}" != --json ]; then
   echo "wrapper requires trailing --session $SESSION" >&2
   exit 98
 fi

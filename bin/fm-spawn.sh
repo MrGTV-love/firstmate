@@ -4893,17 +4893,15 @@ EOF
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installGuardrail } from $omp_guardrail_import;
-let busyEvents = Promise.resolve();
 const busyEvent = (state: string, event: string) =>
-  busyEvents = busyEvents.then(() => new Promise<void>((resolve) => {
+  new Promise<void>((resolve) => {
     execFile($omp_busy_executable, [
       "apply", $omp_state_path, "$ID", state,
       "--gen", "$BUSY_GEN", "--source", "omp-ext", "--event", event,
     ], () => resolve());
-  }));
+  });
 export default function (pi: any) {
   installGuardrail(pi, $guardrail_context);
-  pi.on("before_agent_start", () => busyEvent("busy", "before-agent-start"));
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
