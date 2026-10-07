@@ -1421,7 +1421,8 @@ Omitted model and effort fields match their persisted `default` metadata values 
 An explicitly selected rule with an empty or omitted fallback list also permits completing unspecified effort at intake and retains that rule's identity and zero fallback permission during recovery.
 Harness and model matching remain exact after default normalization; rules granting stand-ins and implicit rule selection also require matching effort.
 OMP 18.6.1 natively rotates pooled credentials on `usage_limit_reached`, including review processes launched with extensions disabled.
-Firstmate's worker overlay enables usage-aware selection without a generic percentage reserve or reset wait and preserves destination-owned native model-fallback settings.
+Firstmate's worker overlay enables usage-aware selection without a generic percentage reserve and preserves destination-owned native model-fallback settings.
+Its `retry.waitForUsageReset: false` keeps reset-derived waits subject to the destination's inherited `retry.maxDelayMs` ceiling (five minutes by default), rather than disabling all reset waits; `retry.maxDelayMs: 0` disables that ceiling.
 In-worker model switching belongs to OMP's `retry.fallbackChains`; for example, an operator may configure `openai-codex/gpt-6.1-sol` -> `openrouter/openai/gpt-6.1-sol` -> `openrouter/deepseek/deepseek-v4-flash`.
 Firstmate neither installs nor changes that chain.
 Firstmate does not promise live terminal fallback: its shared selector applies declared stand-ins at fresh spawn and at relaunch only where authoritative destination capacity proves exhaustion.

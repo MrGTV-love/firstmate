@@ -7,8 +7,9 @@ mnemopi:
   noEmbeddings: true
 
 retry:
-  # Avoid interactive reserve confirmation and reset waits after quota exhaustion;
-  # native retry retains the destination's own model-fallback policy.
+  # Avoid interactive reserve confirmation; reset-derived waits remain subject to
+  # the inherited retry.maxDelayMs ceiling (five minutes by default; 0 disables it).
+  # Native retry retains the destination's own model-fallback policy.
   enabled: true
   usageAwareFallback: true
   usageReservePct: 0
