@@ -6386,3 +6386,35 @@ test_submit_idle_pi_native_transition_confirms() {
   pass "identified idle Pi retains native turn-start delivery proof"
 }
 test_submit_idle_pi_native_transition_confirms
+
+test_submit_idle_pi_delayed_native_transition_confirms() {
+  local dir log resp fb out phase status cleared
+  cleared=$'─────────────────────────────────────────────────────\n\n─────────────────────────────────────────────────────\n$0.000 (sub) 5.4%/272k (auto)'
+  for phase in initial refresh; do
+    for status in working blocked; do
+      dir="$TMP_ROOT/native-pi-delayed-$phase-$status"; mkdir -p "$dir/responses"
+      log="$dir/log"; resp="$dir/responses"; : > "$log"
+      printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/1.out"
+      printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+      printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+      if [ "$phase" = initial ]; then
+        printf '%s\n' "$cleared" > "$resp/6.out"
+        printf '{"result":{"agent":{"agent":"pi","agent_status":"%s"}}}\n' "$status" > "$resp/7.out"
+        printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/8.out"
+      else
+        printf '%s\n' '❯ hello captain' > "$resp/6.out"
+        printf '%s\n' "$cleared" > "$resp/7.out"
+        printf '{"result":{"agent":{"agent":"pi","agent_status":"%s"}}}\n' "$status" > "$resp/8.out"
+        printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/9.out"
+      fi
+      fb=$(make_herdr_fakebin "$dir")
+      out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+        bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+      [ "$out" = empty ] || fail "Pi transition to $status after $phase composer read must confirm delivery, got '$out'"
+      [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+        || fail "delayed Pi transition must not provoke another Enter"
+    done
+  done
+  pass "identified idle Pi confirms delayed native transitions after initial and refreshed composer reads"
+}
+test_submit_idle_pi_delayed_native_transition_confirms

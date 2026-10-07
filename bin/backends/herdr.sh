@@ -3565,6 +3565,15 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       case "$verdict" in
         empty) printf 'empty'; return 0 ;;
         pending|pending-unproven) ;;
+        unknown)
+          case "${identity%%$'\t'*}" in
+            claude|codex|pi)
+              [ "$(fm_backend_herdr_wait_for_working "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE" \
+                "$confirm_sleep" "$FM_BACKEND_HERDR_SUBMIT_POLLS")" != busy ] \
+                || { printf 'empty'; return 0; }
+              ;;
+          esac
+          printf 'unknown'; return 0 ;;
         *) printf '%s' "$verdict"; return 0 ;;
       esac
     else
@@ -3604,6 +3613,15 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       verdict=$(fm_backend_herdr_composer_state_as "$target" "$identity")
       case "$verdict" in
         pending|pending-unproven) ;;
+        unknown)
+          case "${identity%%$'\t'*}" in
+            claude|codex|pi)
+              [ "$(fm_backend_herdr_wait_for_working "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE" \
+                "$confirm_sleep" "$FM_BACKEND_HERDR_SUBMIT_POLLS")" != busy ] \
+                || { printf 'empty'; return 0; }
+              ;;
+          esac
+          printf 'unknown'; return 0 ;;
         *) printf '%s' "$verdict"; return 0 ;;
       esac
     fi
