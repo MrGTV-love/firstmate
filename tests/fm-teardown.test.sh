@@ -24,7 +24,7 @@
 #   (a) local-only + HEAD on a fork remote-tracking branch     -> ALLOW  (fork fix)
 #   (b) local-only + truly unpushed work (no remote, not main) -> REFUSE (safety)
 #   (c) local-only + merged into local main, no remote         -> ALLOW  (no regression)
-#   (d) no-mistakes + HEAD on origin remote-tracking branch    -> ALLOW  (no regression)
+#   (d) no-mistakes + real work pushed to origin, PR not merged -> REFUSE (pushed is not landed)
 #   (e) no-mistakes + unpushed, no PR, content not in default  -> REFUSE (safety)
 #   (f) local-only + truly unpushed + --force                  -> ALLOW  (escape hatch)
 #   (g) no-mistakes + squash-merged PR, exact PR head          -> ALLOW  (squash fix)
@@ -909,25 +909,70 @@ test_local_only_merged_to_local_main_allows() {
   pass "local-only worktree with work merged into local main is torn down (no regression)"
 }
 
-test_no_mistakes_origin_remote_allows() {
-  local case_dir rc
+test_no_mistakes_pushed_branch_without_merge_refuses() {
+  local case_dir rc words
   case_dir=$(make_case nm-origin)
   write_meta "$case_dir" no-mistakes ship
-  wt_commit "$case_dir" "shippable work"
-  # Push the task branch to origin and fetch so the worktree sees it.
+  seed_backlog_in_flight "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "shippable work"
+  # The branch reached origin, but no PR merged it and main lacks its content: recoverable, not delivered.
   git -C "$case_dir/wt" push -q origin fm/task-x1
   git -C "$case_dir/project" fetch -q origin
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "nm-origin: a pushed but unmerged ship must refuse"
+  grep -q "a pushed branch alone is not completion" "$case_dir/stderr" || fail "nm-origin: the refusal did not say pushed is not landed"
+  [ -e "$case_dir/state/task-x1.meta" ] || fail "nm-origin: the refusal removed the task record"
 
-  expect_code 0 "$rc" "nm-origin: teardown should succeed when HEAD is on origin"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "nm-origin: teardown printed a REFUSED line"
-  grep -F 'blockers are gone and date is due' "$case_dir/stdout" >/dev/null \
-    || fail "nm-origin: teardown manual prompt did not preserve date-gate check"
-  pass "no-mistakes worktree with HEAD on origin is torn down (no regression)"
+  # Without the captain's words, --force is refused too, and nothing is discarded.
+  rc=0
+  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "nm-origin: --force without the captain's words must refuse"
+  grep -q "requires --drop-file" "$case_dir/stderr" || fail "nm-origin: the refusal did not ask for the captain's words"
+  [ -e "$case_dir/state/task-x1.meta" ] || fail "nm-origin: a refused --force removed the task record"
+
+  # With the words, the discard proceeds: the words are kept, and the row records a drop.
+  words="$case_dir/words.txt"
+  printf 'Drop it; the premise is gone.\n' > "$words"
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "nm-origin: a drop with the captain's words must complete: $(cat "$case_dir/stderr")"
+  cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "nm-origin: the captain's exact words were not retained"
+  grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "nm-origin: the dropped row was not closed"
+  grep -E '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" >/dev/null || fail "nm-origin: the row does not record the fixed drop note"
+  pass "a pushed but unmerged ship refuses, and only the captain's own words discard it"
+}
+
+test_drop_file_without_force_is_a_usage_error() {
+  local case_dir rc
+  case_dir=$(make_case drop-no-force)
+  write_meta "$case_dir" no-mistakes ship
+  rc=0
+  run_teardown "$case_dir" --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 2 "$rc" "drop-no-force: --drop-file alone must be a usage error"
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$case_dir/empty.txt" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "drop-no-force: an unreadable words file must refuse"
+  [ -e "$case_dir/state/task-x1.meta" ] || fail "drop-no-force: a refusal removed the task record"
+  pass "--drop-file needs --force and a readable words file"
+}
+
+test_scout_report_must_be_a_regular_nonempty_file() {
+  local case_dir rc
+  case_dir=$(make_case scout-report-file)
+  write_meta "$case_dir" no-mistakes scout
+  mkdir -p "$case_dir/data/task-x1/report.md"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "scout-report-file: a directory named report.md is not a report"
+  rmdir "$case_dir/data/task-x1/report.md"
+  : > "$case_dir/data/task-x1/report.md"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "scout-report-file: an empty report is not a report"
+  grep -q "has no report" "$case_dir/stderr" || fail "scout-report-file: the refusal did not name the missing report"
+  pass "a scout completes only with a regular non-empty report"
 }
 
 test_no_mistakes_truly_unpushed_refuses() {
@@ -2110,7 +2155,7 @@ test_local_only_force_overrides_unpushed() {
   wt_commit "$case_dir" "unpushed work"
 
   set +e
-  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr"
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
 
@@ -2261,7 +2306,7 @@ test_teardown_missing_busy_sidecar_completes() {
   rm -f "$case_dir/state/task-x1.busy-gen"
 
   set +e
-  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr"
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
 
@@ -2300,7 +2345,7 @@ SH
   marker="$case_dir/state/.herdr-escalated-default_wG_pQ"
   : > "$marker"
 
-  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "herdr-marker-cleanup: forced teardown failed: $(cat "$case_dir/stderr")"
   [ ! -e "$marker" ] || fail "herdr-marker-cleanup: teardown left the pane's escalation marker behind"
   pass "herdr teardown removes pane-owned escalation dedupe state"
@@ -2407,7 +2452,7 @@ SH
 
   rc=0
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   if [ "$rc" -eq 0 ]; then
     : > "$release"; wait "$holder_pid" 2>/dev/null || true
     fail "herdr-orphan-refusal: teardown reported success while the exact pane still existed under lock contention"
@@ -2434,7 +2479,7 @@ SH
   : > "$release"
   wait "$holder_pid" 2>/dev/null || true
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout2" 2> "$case_dir/stderr2" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout2" 2> "$case_dir/stderr2" \
     || fail "herdr-orphan-refusal: the retry after lock release failed: $(cat "$case_dir/stderr2")"
   [ -e "$closed" ] || fail "herdr-orphan-refusal: the retry never closed the pane under the lock"
   [ -s "$thlog" ] || fail "herdr-orphan-refusal: the successful retry never returned the isolated copy"
@@ -2456,7 +2501,7 @@ test_herdr_flat_teardown_refuses_records_on_unparseable_presence() {
   rc=0
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_PANE_GET_GARBAGE=1 \
     FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] \
     || fail "herdr-garbage-presence: teardown erased records on an unparseable pane presence"
   [ -e "$case_dir/state/task-x1.meta" ] \
@@ -2509,7 +2554,7 @@ SH
     FM_CONFIG_OVERRIDE="$case_dir/config" FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
     FM_FAKE_HERDR_SESSION_LIST_GARBAGE="$([ "$mode" = unresolvable-lock ] && printf 1 || printf 0)" \
     PATH="$case_dir/fakebin:$PATH" \
-    "$teardown_bin" task-x1 --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    "$teardown_bin" task-x1 --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "herdr-preflight-$mode: teardown continued without its required preflight"
   [ -d "$case_dir/wt" ] || fail "herdr-preflight-$mode: refusal removed the isolated copy"
   [ "$(git -C "$case_dir/wt" rev-parse --abbrev-ref HEAD 2>/dev/null)" = "fm/task-x1" ] \
@@ -2599,7 +2644,7 @@ SH
   rc=0
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
     FM_FAKE_HERDR_SESSION_LIST_GARBAGE=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "herdr-child-preflight: teardown continued through an unresolvable child lock"
   [ -e "$case_dir/state/task-x1.meta" ] || fail "herdr-child-preflight: refusal erased the parent record"
   [ -e "$home/state/child-herdr.meta" ] || fail "herdr-child-preflight: refusal erased the child record"
@@ -2669,7 +2714,7 @@ SH
   [ -e "$ready" ] || fail "descendant-locks: the contending lifecycle action never acquired its lock"
 
   rc=0
-  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   if [ "$rc" -eq 0 ]; then
     : > "$release"
     wait "$holder_pid" 2>/dev/null || true
@@ -2694,7 +2739,7 @@ SH
   : > "$release"
   wait "$holder_pid" 2>/dev/null || true
   rc=0
-  run_teardown "$case_dir" --force > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
   expect_code 0 "$rc" "descendant-locks: uncontended retry should complete"
   [ ! -e "$case_dir/state/task-x1.meta" ] && [ ! -d "$home" ] \
     || fail "descendant-locks: uncontended retry retained retired task state"
@@ -2712,7 +2757,7 @@ test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed() {
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
   rc=0
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_PRESENCE_UNKNOWN=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "herdr-child-unconfirmed-close: teardown erased records after an ambiguous close"
   [ -e "$closed" ] || fail "herdr-child-unconfirmed-close: fixture did not attempt the child close"
   [ -e "$home/state/child-herdr.meta" ] || fail "herdr-child-unconfirmed-close: ambiguous close erased child metadata"
@@ -2784,7 +2829,7 @@ test_forced_teardown_retains_nested_secondmate_home_when_grandchild_close_unconf
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
   rc=0
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] \
     || fail "herdr-grandchild-unconfirmed-close: teardown erased records after an ambiguous grandchild close"
   [ -e "$closed" ] \
@@ -2887,7 +2932,7 @@ test_herdr_projection_teardown_retires_journal_only_after_confirmed_close() {
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "herdr-projection-confirmed-close: forced teardown failed"
   [ ! -e "$case_dir/state/task-x1.herdr-presentation" ] \
     || fail "confirmed exact-pane close did not retire the presentation journal"
@@ -2907,7 +2952,7 @@ test_herdr_projection_teardown_retains_journal_when_close_unconfirmed() {
 
   local rc=0
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" FM_FAKE_HERDR_PRESENCE_UNKNOWN=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] \
     || fail "herdr-projection-unconfirmed-close: teardown reported success after an unknown post-close presence read"
   [ -e "$closed" ] \
@@ -2934,7 +2979,7 @@ test_herdr_projection_teardown_surfaces_restore_failure_without_blocking_cleanup
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
     FM_FAKE_HERDR_RESTORE_FAIL=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "herdr-projection-restore-failure: a confirmed close with a failed focus restore blocked teardown"
   [ -e "$closed" ] \
     || fail "herdr-projection-restore-failure: regression did not exercise the exact projected-pane close"
@@ -2972,7 +3017,7 @@ test_teardown_retires_task_watcher_markers_and_orphan_journal() {
     > "$case_dir/state/task-y2.herdr-presentation"
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retire-watcher-markers: teardown failed: $(cat "$case_dir/stderr")"
   for marker in .seen-task-x1_status .seen-task-x1_turn-ended .hb-surfaced-task-x1 task-x1.herdr-presentation; do
     assert_absent "$case_dir/state/$marker" "teardown left the torn-down task's $marker behind"
@@ -3000,7 +3045,7 @@ test_teardown_retains_journal_bound_to_another_pane() {
     > "$case_dir/state/task-x1.herdr-presentation"
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retain-drifted-journal: teardown failed: $(cat "$case_dir/stderr")"
   assert_present "$case_dir/state/task-x1.herdr-presentation" \
     "teardown retired a journal bound to a pane it never proved gone"
@@ -3076,7 +3121,7 @@ test_teardown_retires_v1_journal_when_projected_workspace_gone() {
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_WS_COLLAPSED=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retire-v1-journal-workspace-gone: teardown failed: $(cat "$case_dir/stderr")"
   assert_absent "$case_dir/state/task-x1.herdr-presentation" \
     "a v1 journal whose token workspace is confirmed gone was not retired"
@@ -3095,7 +3140,7 @@ test_teardown_retains_v1_journal_when_projected_workspace_present() {
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retain-v1-journal-workspace-present: teardown failed: $(cat "$case_dir/stderr")"
   assert_present "$case_dir/state/task-x1.herdr-presentation" \
     "a v1 journal whose token workspace is still present was wrongly retired, stranding the workspace"
@@ -3118,7 +3163,7 @@ test_teardown_retains_v1_journal_when_workspace_query_ambiguous() {
   # A malformed workspace-list entry makes the token query ambiguous: teardown
   # cannot prove the token workspace gone, so it must keep the journal.
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_WS_MALFORMED=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retain-v1-journal-workspace-ambiguous: teardown failed: $(cat "$case_dir/stderr")"
   assert_present "$case_dir/state/task-x1.herdr-presentation" \
     "a v1 journal was retired even though the workspace query was ambiguous"
@@ -3196,10 +3241,11 @@ assert_head_absent_from_worktree() {  # <worktree> <short-sha> <label>
     || fail "$3: fixture broke - the pipeline head resolved in the task copy"
 }
 
-# Land a shippable commit on the task branch and push it to origin, the same
-# "definitely landed, teardown must ALLOW" shape test_no_mistakes_origin_remote_allows
-# uses, so these new cases exercise the abort/reap steps on a real successful
-# teardown rather than a refusal path.
+# Land a shippable commit on the task branch and push it to origin. The commit
+# carries no content of its own, so the default branch already holds it: the
+# "definitely landed, teardown must ALLOW" shape, which lets these new cases
+# exercise the abort/reap steps on a real successful teardown rather than a
+# refusal path.
 land_shippable_commit() {
   local case_dir=$1
   wt_commit "$case_dir" "shippable work"
@@ -3927,7 +3973,7 @@ assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|
     identity="lstart=$(LC_ALL=C ps -p "$pid" -o lstart= | sed 's/^ *//; s/ *$//')"
   fi
   rc=0
-  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   local survived=0 other_survived=0
   kill -0 "$pid" 2>/dev/null && survived=1
   kill -0 "$other_pid" 2>/dev/null && other_survived=1
@@ -4009,7 +4055,7 @@ assert_unknown_descendant_process_is_not_reaped() {
     identity="lstart=$(LC_ALL=C ps -p "$pid" -o lstart= | sed 's/^ *//; s/ *$//')"
   fi
   rc=0
-  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   kill -0 "$pid" 2>/dev/null && survived=1
   teardown_fixture_stop "$pid"
   expect_code 1 "$rc" "$name: teardown must refuse even with force"
@@ -4049,7 +4095,7 @@ test_process_refusal_has_no_close_replay_authority() {
     land_shippable_commit "$case_dir"
     seed_backlog_in_flight "$case_dir"
     root="$case_dir/wt"
-    flags=(--force)
+    flags=(--force --drop-file "$(fm_test_drop_file)")
     case "$scenario" in
       descendant|existing-marker|legacy)
         mkdir "$root/dist"
@@ -4521,7 +4567,7 @@ EOF
 
   rc=0
   FM_TEARDOWN_TEST_PATH="$path_without_lsof" \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   kill -0 "$pid" 2>/dev/null && survived=1
   teardown_fixture_stop "$pid"
 
@@ -4966,7 +5012,7 @@ test_missing_startup_source_refuses_before_cleanup() {
   prepare_teardown_source_copy "$case_dir"
   rm -f "$case_dir/test-root/bin/fm-nm-run-lib.sh"
   rc=0
-  run_copied_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_copied_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   assert_source_refusal_preserved_state "$case_dir" "missing-startup-source" "required source fm-nm-run-lib.sh"
   pass "a missing teardown startup source refuses before cleanup"
 }
@@ -4984,7 +5030,7 @@ test_unreadable_startup_source_refuses_before_cleanup() {
     return 0
   fi
   rc=0
-  run_copied_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_copied_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   assert_source_refusal_preserved_state "$case_dir" "unreadable-startup-source" "required source fm-nm-run-lib.sh"
   pass "an unreadable teardown startup source refuses before cleanup"
 }
@@ -4996,7 +5042,7 @@ test_missing_adapter_sibling_refuses_before_cleanup() {
   prepare_teardown_source_copy "$case_dir"
   rm -f "$case_dir/test-root/bin/fm-session-lock-lib.sh"
   rc=0
-  run_copied_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_copied_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   assert_source_refusal_preserved_state "$case_dir" "missing-adapter-sibling" "required tmux source"
   pass "a missing adapter sibling refuses before cleanup"
 }
@@ -5010,7 +5056,7 @@ test_forced_child_missing_adapter_sibling_refuses_before_cleanup() {
   prepare_teardown_source_copy "$case_dir"
   rm -f "$case_dir/test-root/bin/fm-transition-lib.sh"
   rc=0
-  run_copied_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_copied_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   assert_source_refusal_preserved_state "$case_dir" "missing-child-source" "required herdr source"
   [ -e "$home/state/child-herdr.meta" ] || fail "missing-child-source: the refusal erased the child record"
   [ -d "$home" ] || fail "missing-child-source: the refusal removed the secondmate home"
@@ -5054,7 +5100,7 @@ SH
   : > "$case_dir/tmux.log"
   rm -f "$case_dir/test-root/bin/fm-backend-hometag-lib.sh"
   rc=0
-  run_copied_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_copied_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   assert_source_refusal_preserved_state "$case_dir" "missing-own-source" "required zellij source"
   [ -e "$home/state/child-tmux.meta" ] || fail "missing-own-source: the refusal erased the child record"
   [ -e "$home/state/child-tmux.status" ] || fail "missing-own-source: the refusal erased the child status"
@@ -5148,7 +5194,9 @@ test_teardown_closes_the_backlog_item_itself
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator
 test_local_only_truly_unpushed_refuses
 test_local_only_merged_to_local_main_allows
-test_no_mistakes_origin_remote_allows
+test_no_mistakes_pushed_branch_without_merge_refuses
+test_drop_file_without_force_is_a_usage_error
+test_scout_report_must_be_a_regular_nonempty_file
 test_no_mistakes_truly_unpushed_refuses
 test_local_only_force_overrides_unpushed
 test_secondmate_pr_registration_publishes_ready_line

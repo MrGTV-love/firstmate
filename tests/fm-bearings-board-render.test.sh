@@ -266,6 +266,27 @@ test_charted_rows_without_a_filed_date_follow_the_dated_rows_in_payload_order() 
   pass "charted rows with no filed date follow the dated rows in payload order"
 }
 
+test_overdue_obligations_cannot_be_omitted_by_the_board_composer() {
+  local home out
+  home=$(make_home overdue-obligations)
+  cat > "$home/state/open-loops.json" <<'JSON'
+{"schema":"fm-open-loops.v1","generated_epoch":1790770000,"home":"lane","complete":true,"rows":[
+  {"id":"expired","category":"red_check","subject":"failing PR","owner":"firstmate","next_action":"diagnose: code or test","age_seconds":3600,"overdue":true},
+  {"id":"recent","category":"ready_not_started","subject":"recently assigned","owner":"firstmate","next_action":"dispatch","age_seconds":1,"overdue":false}
+]}
+JSON
+  out=$(render "$home" '[]')
+  printf '%s' "$out" | jq -e '
+    (.charted | length) == 1
+    and (.charted[0] | .pickable == false
+      and (.title | contains("failing PR"))
+      and (.sub | contains("firstmate") and contains("diagnose: code or test") and contains("3600s"))
+      and [.badges[].tone] == ["danger"])
+  ' >/dev/null || fail "the overdue obligation was omitted or rendered as dispatchable work: $out"
+  pass "overdue obligations survive an empty composed board with owner, next action, and age"
+}
+
+test_overdue_obligations_cannot_be_omitted_by_the_board_composer
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first

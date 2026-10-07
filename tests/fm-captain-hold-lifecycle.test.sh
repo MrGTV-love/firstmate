@@ -2627,7 +2627,7 @@ test_teardown_never_closes_a_captain_held_task() {
     || fail "could not hold the forced fixture for the captain"
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$forced" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$forced" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/forced.out" 2> "$home/forced.err" \
     || fail "forced cleanup failed: $(cat "$home/forced.err")"
   show=$(tasks_in "$home" show "$forced" --full) || fail "forced cleanup erased the captain-held row"
@@ -2931,7 +2931,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -2990,7 +2990,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3044,7 +3044,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3108,7 +3108,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3485,7 +3485,7 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
     FM_TEST_REUSE_TEARDOWN_READY="$teardown_ready" \
     FM_TEST_REUSE_TEARDOWN_RELEASE="$teardown_release" \
     FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
-    "$TEARDOWN" "$id" --force > "$home/reuse-teardown.out" \
+    "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" > "$home/reuse-teardown.out" \
     2> "$home/reuse-teardown.err" &
   teardown_pid=$!
   if ! wait_for_test_file "$teardown_ready" "$teardown_pid"; then
@@ -3575,7 +3575,7 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
     FM_TEST_REUSE_TEARDOWN_READY="$local_teardown_ready" \
     FM_TEST_REUSE_TEARDOWN_RELEASE="$local_teardown_release" \
     FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
-    "$TEARDOWN" "$local_id" --force > "$local_home/reuse-teardown.out" \
+    "$TEARDOWN" "$local_id" --force --drop-file "$(fm_test_drop_file)" > "$local_home/reuse-teardown.out" \
     2> "$local_home/reuse-teardown.err" &
   local_teardown_pid=$!
   if ! wait_for_test_file "$local_teardown_ready" "$local_teardown_pid"; then
@@ -3710,7 +3710,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/race-pr-teardown.out" 2> "$home/race-pr-teardown.err"
   teardown_rc=$?
   set -e
@@ -3793,7 +3793,7 @@ SH
   set +e
   PATH="$local_home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$local_home" \
     FM_STATE_OVERRIDE="$local_home/state" FM_DATA_OVERRIDE="$local_home/data" \
-    FM_CONFIG_OVERRIDE="$local_home/config" "$TEARDOWN" "$local_id" --force \
+    FM_CONFIG_OVERRIDE="$local_home/config" "$TEARDOWN" "$local_id" --force --drop-file "$(fm_test_drop_file)" \
     > "$local_home/race-local-teardown.out" 2> "$local_home/race-local-teardown.err"
   local_teardown_rc=$?
   set -e
@@ -3849,7 +3849,7 @@ test_released_merge_passes_the_entrypoint_and_lands() {
     || fail "the released merge was refused: $(cat "$home/merge.err")"
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err" \
     || fail "the released merge cleanup failed: $(cat "$home/teardown.err")"
   json=$(run_bearings "$home") || fail "Bearings failed after the released merge lifecycle"
@@ -3889,7 +3889,7 @@ SH
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     TASKS_AXI_FAIL_SHOW_ID="$id" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e

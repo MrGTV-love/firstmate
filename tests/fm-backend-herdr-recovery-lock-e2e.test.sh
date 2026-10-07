@@ -11,6 +11,11 @@ HERDR_LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 LAB_HOME_HELPER=${LAB_HOME_HELPER:-$ROOT/bin/fm-lab-home.sh}
 TEST_DIR=$(mktemp -d "$ROOT/.fm-herdr-recovery-lock.XXXXXX")
 TEST_DIR=$(cd "$TEST_DIR" && pwd -P)
+# This standalone suite does not source tests/lib.sh; ordinary-work teardown --force needs the captain's words.
+fm_test_drop_file() {
+  [ -f "$TEST_DIR/captain-words.txt" ] || printf 'Fixture: the captain approved discarding this work.\n' > "$TEST_DIR/captain-words.txt"
+  printf '%s\n' "$TEST_DIR/captain-words.txt"
+}
 mkdir "$TEST_DIR/tmp"
 export TMPDIR="$TEST_DIR/tmp"
 HERDR_ORIGINAL_PATH=$PATH
@@ -385,7 +390,7 @@ spawn() { # <home> <task-id> <lane>
 teardown() { # <home> <task-id>
   exec env PATH="$TEST_DIR/teardownbin:$PATH" FIXTURE_REAP_LANE="${FIXTURE_REAP_LANE:-}" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$TEST_DIR/home-$1/state" FM_DATA_OVERRIDE="$TEST_DIR/home-$1/data" FM_CONFIG_OVERRIDE="$TEST_DIR/home-$1/config" \
-    bash "$ROOT/bin/fm-teardown.sh" "$2" --force
+    bash "$ROOT/bin/fm-teardown.sh" "$2" --force --drop-file "$(fm_test_drop_file)"
 }
 await_marker() { # <marker> <pid> <name>
   for ((i=0; i<600; i++)); do
@@ -667,7 +672,7 @@ FORCED_CHILD_PANE=$(field "$FORCED_NESTED_HOME/state/$FORCED_CHILD_ID.meta" herd
 cp "$FORCED_NESTED_HOME/state/$FORCED_CHILD_ID.meta" "$TEST_DIR/forced-child-before.meta"
 touch "$TEST_DIR/hold-return-forced-child"
 env PATH="$TEST_DIR/teardownbin:$PATH" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-primary" \
-  FM_ROOT_OVERRIDE="$TEST_DIR/forced-code-root" bash "$ROOT/bin/fm-teardown.sh" "$FORCED_PARENT_ID" --force >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
+  FM_ROOT_OVERRIDE="$TEST_DIR/forced-code-root" bash "$ROOT/bin/fm-teardown.sh" "$FORCED_PARENT_ID" --force --drop-file "$(fm_test_drop_file)" >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
 TEARDOWN_PID=$!
 await_marker forced-child-at-return "$TEARDOWN_PID" teardown
 assert_forced_return_held() {

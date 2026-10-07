@@ -351,6 +351,30 @@ status_open_decisions() {  # <status-file> [<kind>]
   done < "$f"
   printf '%s' "$open"
 }
+# The same open set with each decision's opening time: one
+# "<key>\t<verb>\t<epoch>\t<summary>" line per still-open decision, <epoch> empty
+# when the opening line carries no readable time stamp (age unknown, never zero).
+# The opening is the LAST line that opens the key, found with the same verb and
+# key readers the fold uses, and its time comes from status_line_at_epoch, so a
+# tag quoted in another line's prose or a malformed stamp can never set an age.
+status_open_decisions_dated() {  # <status-file> [<kind>]
+  local f=$1 open key verb summary line line_verb opened
+  open=$(status_open_decisions "$f" "${2:-}")
+  [ -n "$open" ] || return 0
+  while IFS=$'\t' read -r key verb summary; do
+    [ -n "$verb" ] || continue
+    opened=
+    while IFS= read -r line || [ -n "$line" ]; do
+      status_line_verb "$line" line_verb
+      [ "$line_verb" = "$verb" ] || continue
+      [ "$(_fm_decision_key "$line" 2>/dev/null || true)" = "$key" ] || continue
+      opened=$(status_line_at_epoch "$line" 2>/dev/null || true)
+    done < "$f"
+    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$opened" "$summary"
+  done <<EOF
+$open
+EOF
+}
 # 0 when <key> has a record in a folded "<key>\t<verb>\t<note>" open set.
 _fm_open_set_has() {  # <open-set> <key>
   case "$1" in

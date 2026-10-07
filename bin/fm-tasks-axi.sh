@@ -45,7 +45,15 @@
 #     cannot be read (bin/fm-tasks-axi-lib.sh owns that diagnostic);
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
-#     this command exists to prevent. Lifecycle transitions refuse the same file.
+#     this command exists to prevent. Lifecycle transitions refuse the same file;
+#   - `done`/`close` (with or without the optional `task` noun) of a ship or scout row
+#     without proof that its deliverable exists: a written non-empty report for a
+#     scout, a GitHub pull request the forge reports merged for a ship, or
+#     --drop-file carrying the captain's own words (1..8192 bytes, retained at
+#     data/<id>/captain-drop.md; the row then records the fixed note "dropped").
+#     A live task record completes only through bin/fm-teardown.sh, which owns the
+#     landing proof; a local-only merge records itself there too. Other row kinds
+#     close as before, and a help token never reaches this guard.
 # Otherwise the exit status is tasks-axi's own.
 set -u
 
@@ -122,6 +130,64 @@ done
 
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/fm-bootstrap.sh for the install command"
 
+# The completion guard reads the actual argument tokens: a value (a note that happens to
+# read "--help") is never a flag, and the optional `task` noun is normalized away.
+guard_completion() {
+  local tokens=("$@") i=0 command='' id='' expect='' token pr='' report='' drop='' help=0 note=0
+  [ "${tokens[0]:-}" != task ] || i=1
+  command=${tokens[i]:-}
+  case "$command" in done|close) ;; *) return 0 ;; esac
+  for token in "${tokens[@]:$((i + 1))}"; do
+    if [ -n "$expect" ]; then
+      case "$expect" in
+        --pr) pr=$token ;; --report) report=$token ;; --drop-file) drop=$token ;; --note) note=1 ;;
+        --keep) ;;
+      esac
+      expect=''
+      continue
+    fi
+    case "$token" in
+      -h|--help) help=1 ;;
+      --pr|--report|--drop-file|--note|--keep) expect=$token ;;
+      --pr=*) pr=${token#*=} ;; --report=*) report=${token#*=} ;;
+      --drop-file=*) drop=${token#*=} ;; --note=*) note=1 ;;
+      -*) ;;
+      *) [ -n "$id" ] || id=$token ;;
+    esac
+  done
+  [ "$help" = 0 ] || return 0
+  case "$id" in ''|*[!A-Za-z0-9._-]*) return 0 ;; esac
+  fm_backlog_row_probe "$DATA" "$id" || {
+    [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && return 0
+    fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
+  }
+  case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) return 0 ;; esac
+  [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
+    || fail "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
+  if [ -n "$drop" ]; then
+    [ -z "$pr$report" ] && [ "$note" = 0 ] \
+      || fail "a captain's drop is its own completion; do not combine --drop-file with --pr, --report, or --note"
+    fm_backlog_drop_record "$DATA" "$id" "$drop" \
+      || fail "--drop-file must be a regular file holding the captain's own words (1..8192 bytes)"
+    GUARD_ARGS=(--note dropped)
+    GUARD_STRIP_DROP=1
+  elif [ -n "$report" ]; then
+    [ "$FM_BACKLOG_ROW_KIND" = scout ] \
+      || fail "a report is not a ship's deliverable; land its pull request or record the captain's drop"
+    case "$report" in /*) ;; *) report="$FM_BACKLOG_AXI_ROOT/$report" ;; esac
+    [ -f "$report" ] && [ ! -L "$report" ] && [ -s "$report" ] \
+      || fail "the report has not been written: $report"
+  elif [ -n "$pr" ]; then
+    [ "$FM_BACKLOG_ROW_KIND" = ship ] || fail "a scout's deliverable is its written report"
+    [[ "$pr" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
+      || fail "only a GitHub pull request can be proved merged here; complete other deliveries with bin/fm-teardown.sh or record the captain's drop"
+    gh-axi api "/repos/${BASH_REMATCH[1]}/pulls/${BASH_REMATCH[2]}" --jq '"merged=" + ((.merged_at != null)|tostring)' --full 2>/dev/null \
+      | grep -Eq '^  body: "?merged=true"?$' || fail "the pull request has not merged: $pr"
+  else
+    fail "completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words"
+  fi
+}
+
 FM_BACKLOG_TRANSITION_ERROR=
 if ! fm_backlog_tasks_axi_addressing "$DATA"; then
   fail "${FM_BACKLOG_TRANSITION_ERROR:-data directory cannot be resolved: $DATA}"
@@ -134,6 +200,21 @@ if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
   export TASKS_AXI_FILE="$FM_BACKLOG_AXI_FILE"
 else
   unset TASKS_AXI_FILE
+fi
+
+GUARD_ARGS=()
+GUARD_STRIP_DROP=0
+guard_completion ${ARGS[@]+"${ARGS[@]}"}
+if [ "$GUARD_STRIP_DROP" = 1 ]; then
+  # The drop words stay in the retained file; tasks-axi receives only the fixed note.
+  kept=()
+  skip=0
+  for arg in "${ARGS[@]}"; do
+    if [ "$skip" = 1 ]; then skip=0; continue; fi
+    case "$arg" in --drop-file) skip=1; continue ;; --drop-file=*) continue ;; esac
+    kept+=("$arg")
+  done
+  ARGS=("${kept[@]}" "${GUARD_ARGS[@]}")
 fi
 
 cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI_ROOT"

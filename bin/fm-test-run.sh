@@ -312,7 +312,7 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -399,7 +399,7 @@ family_for_basename() {
       ;;
     fm-check-unregister.test.sh|fm-pr-check-security.test.sh|fm-pr-merge.test.sh|\
     fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
-    fm-review-diff.test.sh|fm-teardown.test.sh|fm-x-mode.test.sh)
+    fm-review-diff.test.sh|fm-teardown.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -772,6 +772,7 @@ tests/fm-no-mistakes-required.test.sh 247
 tests/fm-omp-harness.test.sh 47734
 tests/fm-omp-primary-live-e2e.test.sh 46
 tests/fm-on.test.sh 11001
+tests/fm-open-loops.test.sh 12000
 tests/fm-opencode-primary-live-e2e.test.sh 48
 tests/fm-operational-input.test.sh 221
 tests/fm-peek-remote.test.sh 964
@@ -868,6 +869,7 @@ tests/fm-wake-drain-unread-status.test.sh 16169
 tests/fm-wake-queue.test.sh 85252
 tests/fm-watch-arm.test.sh 68479
 tests/fm-watch-checkpoint.test.sh 6076
+tests/fm-watch-open-loops.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 58946
 tests/fm-watch-triage.test.sh 697969
 tests/fm-watcher-lock.test.sh 108940
@@ -1454,6 +1456,10 @@ families_for_changed_path() {
       if [ "$path" = bin/fm-utc-lib.sh ]; then
         printf '%s\n' "__script__:fm-afk-launch.test.sh"
       fi
+      ;;
+    bin/fm-open-loops.sh|bin/fm_open_loops.py)
+      printf '%s\n' "__script__:fm-open-loops.test.sh"
+      printf '%s\n' "__script__:fm-watch-open-loops.test.sh"
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)

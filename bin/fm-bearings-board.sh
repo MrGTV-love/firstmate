@@ -335,6 +335,25 @@ effective_payload() {  # <data.json> <dest.json>
         }]
         else . end
     ]' "$data" > "$dest" || return 1
+  # The deterministic ledger is injected here, not left to a board composer's memory.
+  # Every overdue obligation stays visible; it is read from the effective state root.
+  local ledger="${FM_STATE_OVERRIDE:-$FM_HOME/state}/open-loops.json" staged
+  if [ -f "$ledger" ] && [ ! -L "$ledger" ]; then
+    staged=$(mktemp "${TMPDIR:-/tmp}/fm-bearings-open-loops.XXXXXX") || return 1
+    if ! jq --slurpfile ledger "$ledger" '
+      if $ledger[0].schema != "fm-open-loops.v1" then error("unsupported open-loop ledger") else . end
+      | .charted += [$ledger[0].rows[] | select(.overdue)
+        | {id:("loop-" + .id),repo:$ledger[0].home,title:(.category + ": " + .subject),
+           reason:(.owner + " - " + .next_action + " - age "
+             + (if .age_seconds == null then "unknown" else (.age_seconds|tostring) + "s" end)
+             + " - observed " + ($ledger[0].generated_epoch|tostring)),
+           dispatchable:false,kind:"warning"}]
+    ' "$dest" > "$staged"; then
+      rm -f -- "$staged"
+      return 1
+    fi
+    mv -f -- "$staged" "$dest" || return 1
+  fi
 }
 
 # The OWNER column bin/fm-procevent.sh already publishes: live, none,

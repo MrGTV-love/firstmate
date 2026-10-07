@@ -112,6 +112,25 @@ fm_backlog_control_bytes_valid() {  # <allow-newline: 0|1> <od-bytes>
   '
 }
 
+# A captain's drop is a completion deliverable, like a scout report: the exact
+# words are retained at data/<id>/captain-drop.md and the row records only the
+# fixed note "dropped". The words must exist before any state is discarded.
+fm_backlog_drop_words_file_valid() {  # <path>
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  perl -0777 -e 'my $s = <>; exit(defined($s) && length($s) <= 8192 && $s =~ /\S/ && index($s, "\0") == -1 ? 0 : 1)' < "$1"
+}
+
+fm_backlog_drop_record() {  # <data> <id> <words-file>
+  local dir="$1/$2" target="$1/$2/captain-drop.md" tmp
+  case "$2" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  fm_backlog_drop_words_file_valid "$3" || return 1
+  [ ! -L "$dir" ] && [ ! -L "$target" ] && { [ ! -e "$target" ] || [ -f "$target" ]; } || return 1
+  (umask 077; mkdir -p "$dir") || return 1
+  tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
+  cp -- "$3" "$tmp" && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
+    || { rm -f -- "$tmp"; return 1; }
+}
+
 fm_backlog_directory_present() {
   local path=$1 label=$2 check=$1
   while [ "$check" != / ] && [ "${check%/}" != "$check" ]; do
@@ -435,6 +454,7 @@ fm_backlog_row_probe() {  # <data-dir> <id>
   FM_BACKLOG_ROW_RESULT=error
   FM_BACKLOG_ROW_STATE=
   FM_BACKLOG_ROW_HOLD_KIND=
+  FM_BACKLOG_ROW_KIND=
   FM_BACKLOG_ROW_ERROR=
   fm_backlog_source_present "$data" "$authorized_data"
   source_status=$?
@@ -464,6 +484,7 @@ fm_backlog_row_probe() {  # <data-dir> <id>
   held=$(printf '%s\n' "$out" | sed -n 's/^  held: *//p' | head -1)
   blocked=$(printf '%s\n' "$out" | sed -n 's/^  blocked: *//p' | head -1)
   hold_kind=$(printf '%s\n' "$out" | sed -n 's/^  hold_kind: *//p' | head -1)
+  FM_BACKLOG_ROW_KIND=$(printf '%s\n' "$out" | sed -n 's/^  kind: *//p' | head -1 | tr -d '"')
   if [ -z "$state" ]; then
     FM_BACKLOG_ROW_ERROR="tasks-axi show $id returned no state"
     return 1
@@ -988,7 +1009,7 @@ fm_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
     0) ;;
     2)
       case "${args[0]}" in
-        --note) [ "${args[1]}" = "local%20main" ] ;;
+        --note) [ "${args[1]}" = "local%20main" ] || [ "${args[1]}" = dropped ] ;;
         --pr)
           arg_value=${args[1]}
           [ "${#arg_value}" -le 2048 ] \
@@ -1151,7 +1172,7 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
   mode=$FM_BACKLOG_CLOSE_VALIDATED_MODE
   [ "$mode" = close ] || mode_flags=(--retain)
   args=("${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
-  if [ "${args[0]-}" = --note ]; then
+  if [ "${args[0]-}" = --note ] && [ "${args[1]}" = "local%20main" ]; then
     args[1]="local main"
   fi
   meta="$state/$id.meta"

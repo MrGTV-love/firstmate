@@ -1077,6 +1077,26 @@ test_default_is_bounded_and_local_only() {
   pass "default output is bounded, local-only, and marks omitted surfaces"
 }
 
+test_open_work_ledger_is_dated_evidence_from_the_effective_state_root() {
+  local home fakebin json
+  home=$(make_home open-loops-ledger); write_fixture "$home"
+  fakebin=$(make_fakebin "$home"); : > "$home/net.log"
+  mkdir -p "$home/special-state"
+  jq -n '{schema:"fm-open-loops.v1",generated_epoch:1783792800,home:"lane",complete:false,rows:[
+    {id:"late",category:"red_check",subject:"failing PR",owner:"firstmate",next_action:"diagnose: code or test",age_seconds:3600,overdue:true,limit_seconds:0},
+    {id:"fine",category:"open_pr",subject:"fresh PR",owner:"firstmate",next_action:"route review",age_seconds:5,overdue:false,limit_seconds:3600}]}' \
+    > "$home/special-state/open-loops.json"
+  json=$(FM_STATE_OVERRIDE="$home/special-state" run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    .open_loops.generated_epoch == 1783792800 and .open_loops.complete == false
+    and (.open_loops.rows | map(.id) == ["late"])' >/dev/null \
+    || fail "ledger rows were not projected from the effective state root with their observation time: $json"
+  printf '{"schema":"other.v9","rows":[]}\n' > "$home/special-state/open-loops.json"
+  FM_STATE_OVERRIDE="$home/special-state" run "$home" "$fakebin" --json >/dev/null 2>&1 \
+    && fail "an unsupported ledger schema was projected as if it were valid"
+  pass "the open-work ledger is projected as dated evidence from the effective state root"
+}
+
 test_toon_json_parity() {
   local home fakebin toon json keys k
   home=$(make_home parity); write_fixture "$home"
@@ -3374,6 +3394,7 @@ test_nonprogressing_child_states_are_explicit
 test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
+test_open_work_ledger_is_dated_evidence_from_the_effective_state_root
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_accepts_only_kind_owned_delivery_artifacts

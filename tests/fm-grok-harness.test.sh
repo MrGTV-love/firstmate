@@ -83,7 +83,7 @@ EOF
 
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     GROK_HOME="$grok_home" PATH="$fakebin:$PATH" \
-    "$TEARDOWN" "$id" --force >/dev/null 2>&1 \
+    "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>&1 \
     || fail "grok teardown failed"
 
   assert_absent "$wt/.fm-grok-turnend" "grok pointer survived teardown"

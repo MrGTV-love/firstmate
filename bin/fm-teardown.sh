@@ -30,14 +30,13 @@
 # lift the deferral (it authorizes discarding unlanded WORK, never the
 # captain's question), and bin/fm-captain-hold.sh answer stays the only act
 # that closes the call.
-# REFUSES if the worktree holds work that has not LANDED, because cleanup
-# hard-resets/removes the worktree and kills its processes. Work has landed when it is
-# reachable from any remote-tracking branch (a fork counts as a remote, so
-# upstream-contribution PRs pushed to a fork satisfy this in any mode), OR - for a
-# normal ship task whose commits are not so reachable - when its PR is merged and
+# REFUSES if a ship's deliverable has not LANDED, because cleanup
+# hard-resets/removes the worktree and kills its processes.
+# A pushed branch is recoverable work, not a delivered result.
+# A ship has landed only when its PR is merged and
 # GitHub reports a PR head that contains the current local work, or its content is
-# already present in the up-to-date default branch. This recognizes the common
-# squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
+# already present in the up-to-date default branch.
+# This recognizes the common squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
 # on a remote yet the change is fully in main.
 # Squash merges collapse the branch's commits, so per-commit patch ids against main
 # no longer match, and a pipeline rebase can leave the local worktree diverged from
@@ -162,10 +161,13 @@
 # leased home releases its durable treehouse lease so the pool slot is freed,
 # never left leased forever. If the treehouse return fails, teardown leaves the
 # leased home and state in place instead of hiding a still-held lease.
-# Usage: fm-teardown.sh <task-id> [--force] [--legacy-record]
+# Usage: fm-teardown.sh <task-id> [--force [--drop-file <path>]] [--legacy-record]
 #   --force skips ordinary-task dirty and landed-work checks, skips scout report
 #   checks, and discards secondmate child work for kind=secondmate. Only use it
-#   when the captain has explicitly said to discard the work.
+#   when the captain has explicitly said to discard the work. Ordinary work
+#   additionally requires --drop-file holding the captain's own words (1..8192
+#   bytes): they are retained at data/<id>/captain-drop.md before anything is
+#   discarded, and the backlog row records the fixed note "dropped".
 #   --legacy-record accepts a task record that predates the spawn_gen field:
 #   teardown then proceeds only when the recorded endpoint is confirmed dead or
 #   agent-less (bin/fm-backend.sh's recovery-grade classifier), and without
@@ -384,10 +386,16 @@ fi
 ID=$1
 FORCE=
 LEGACY_RECORD_GIVEN=0
+DROP_FILE=
 shift
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --force) FORCE=--force ;;
+    --drop-file)
+      shift
+      DROP_FILE=${1:-}
+      [ -n "$DROP_FILE" ] || { echo "error: --drop-file requires a path" >&2; exit 2; }
+      ;;
     --legacy-record) LEGACY_RECORD_GIVEN=1 ;;
     *)
       echo "error: invalid teardown request" >&2
@@ -522,6 +530,15 @@ fm_backlog_record_present "$META" "task record" "$STATE" || {
 }
 TEARDOWN_META_KIND=$(fm_meta_get "$META" kind)
 [ -n "$TEARDOWN_META_KIND" ] || TEARDOWN_META_KIND=ship
+if [ "$FORCE" = --force ] && { [ "$TEARDOWN_META_KIND" != secondmate ] || [ -n "$DROP_FILE" ]; }; then
+  if ! fm_backlog_drop_words_file_valid "$DROP_FILE"; then
+    echo "REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes)." >&2
+    exit 1
+  fi
+elif [ -n "$DROP_FILE" ]; then
+  echo "error: --drop-file is only valid with --force" >&2
+  exit 2
+fi
 # Retiring a persistent secondmate is main's alone in both postures; the kind
 # is read under the metadata lock (role partition: bin/fm-lease-lib.sh).
 [ "$TEARDOWN_META_KIND" != secondmate ] || fm_lease_forbid_branch "secondmate retirement (fm-teardown)"
@@ -1610,6 +1627,20 @@ work_is_landed() {
   content_in_default
 }
 
+# A drop is recorded only when the deliverable did not land. A scout that wrote its report, or a
+# ship whose PR merged or whose content reached the default branch, keeps its own completion note.
+TEARDOWN_DROPPING=0
+teardown_is_dropping() {
+  local report="$DATA/$ID/report.md"
+  [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ] || return 1
+  if [ "$KIND" = scout ]; then
+    [ -f "$report" ] && [ ! -L "$report" ] && [ -s "$report" ] && return 1
+    return 0
+  fi
+  [ ! -d "$WT" ] || ! work_is_landed "$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)" || return 1
+  return 0
+}
+
 # The completion links this teardown already holds locally. A scout's
 # deliverable is its report, a local-only ship lands on local main, and every
 # other ship carries the PR recorded on its own record.
@@ -1617,6 +1648,10 @@ BACKLOG_DONE_ARGS=()
 backlog_done_args() {
   local data_relative
   BACKLOG_DONE_ARGS=()
+  if [ "$TEARDOWN_DROPPING" = 1 ]; then
+    BACKLOG_DONE_ARGS=(--note dropped)
+    return 0
+  fi
   case "$KIND" in
     scout)
       data_relative=$(fm_backlog_data_relative "$DATA") || return 1
@@ -1924,16 +1959,16 @@ validate_worktree_teardown_safety() {
     echo "uncommitted changes present" >&2
     echo "Commit them (or get the captain's explicit OK to discard, then --force)." >&2
     return 1
-  elif [ -n "$unpushed" ]; then
+  else
     branch=${TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY:-}
     if [ -z "$branch" ]; then
       branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
       TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=$branch
     fi
     if ! work_is_landed "$branch"; then
-      echo "REFUSED: worktree $WT has work not on any remote and not landed." >&2
-      printf 'unpushed commits:\n%s\n' "$unpushed" >&2
-      echo "Push the branch, land its PR, or get the captain's explicit OK to discard, then --force." >&2
+      echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
+      [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
+      echo "Land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
       return 1
     fi
   fi
@@ -3583,7 +3618,7 @@ fi
 
 if [ "$KIND" = scout ] && [ "$FORCE" != "--force" ]; then
   REPORT="$DATA/$ID/report.md"
-  if [ ! -f "$REPORT" ]; then
+  if [ ! -f "$REPORT" ] || [ -L "$REPORT" ] || [ ! -s "$REPORT" ]; then
     echo "REFUSED: scout task $ID has no report at $REPORT." >&2
     echo "The report is the work product. Have the crewmate write it, or use --force after explicit discard approval." >&2
     exit 1
@@ -3670,6 +3705,14 @@ teardown_release_herdr_locks
 # Prepare the non-authoritative close record and retire any previous marker
 # outside presentation custody. The EXIT trap retires this stage on refusal;
 # the legacy stamp and authoritative publication wait for exact reacquisition.
+if teardown_is_dropping; then
+  TEARDOWN_DROPPING=1
+  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
+    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
+    exit 1
+  }
+fi
+
 BACKLOG_CLOSED=0
 BACKLOG_TRANSITION=$TEARDOWN_BACKLOG_TRANSITION
 BACKLOG_TRANSITION_FLAGS=()

@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
-| Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -90,6 +90,7 @@ Each effective `FM_HOME` contains private operational directories.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
+- The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -566,6 +567,56 @@ See [`trace-context.md`](trace-context.md) for carrier semantics, supported rout
 ## Fleet activity ledger (config/fleet-ledger)
 
 See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, and limits.
+
+## Open-work ledger (config/open-loops.json)
+
+`bin/fm-open-loops.sh` reconciles what this home owes against its live records, so assigned work cannot be lost without a row saying so.
+`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog.
+Every row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
+An unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
+
+| Category | A row exists when | Default limit |
+| --- | --- | --- |
+| `missing_worker` | an In flight item or task record has no live worker | 600 s |
+| `ready_not_started` | a Queued item has no hold, no open blocker, and a due date | 1800 s |
+| `unanswered_question` | a `needs-decision` or `blocked` status key is still open, aged from its stamped opening | 1800 s |
+| `failed_task` | a task record's current state is `failed` | 1800 s |
+| `stalled_worker` | a live worker reads `working` but has no commit, status line, or pipeline progress; the row carries the pane's last usage, authentication, or network error | 3600 s |
+| `unlanded_commit` | a ship task's copy holds commits that are neither on the default branch nor in an open PR | 86400 s |
+| `open_pr` | an open PR of this home's projects waits on checks, a reviewer, or firstmate's review routing | 3600 s |
+| `red_check` | the latest run of a check on an open PR failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
+| `completion_unproved` | a ship or scout row is Done with no merged PR, local-merge note, written report, or retained captain drop | 0 s |
+| `coverage` | one source could not be read, so the ledger is partly blind | 0 s |
+
+A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
+The ledger covers this home only; each secondmate home runs its own watcher and reports through its own parent channel.
+
+The watcher runs the reconciler as a detached helper every `FM_OPEN_LOOPS_INTERVAL` seconds (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
+The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
+When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
+A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
+Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
+Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops`, dated by the ledger's observation time.
+No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
+
+Create the optional local `config/open-loops.json` to override the limits:
+
+```json
+{
+  "age_limits_seconds": { "stalled_worker": 3600, "unlanded_commit": 86400 },
+  "command_timeout_seconds": 60
+}
+```
+
+Age limits are non-negative integer seconds for the categories above.
+`command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
+A malformed configuration is reported as an error rather than ignored.
+
+A work item reaches Done only with its deliverable, or with the captain's own words.
+`bin/fm-tasks-axi.sh done|close` of a ship or scout row requires a written non-empty report (scout), a GitHub PR the forge reports merged (ship), or `--drop-file` holding the captain's words.
+A live task record completes only through `bin/fm-teardown.sh`, whose landed-work test treats a pushed branch as recoverable work, not a delivered result.
+`bin/fm-teardown.sh --force` on ordinary work additionally requires `--drop-file`; the words (1..8192 bytes) are retained at `data/<id>/captain-drop.md` before anything is discarded, and the row records the fixed note `dropped`.
+A dropped row is completed but is never presented as recently landed.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 
@@ -2734,6 +2785,9 @@ FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppres
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
 FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
+FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
+FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
+FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding the complete best-effort home-summary refresh, including lock acquisition, validation, atomic publication, and worker-side failure logging; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2

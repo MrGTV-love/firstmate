@@ -239,6 +239,85 @@ test_wrapper_single_home() {
   pass "fm-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog"
 }
 
+# Completion needs proof of the deliverable, however the command is spelled.
+completion_refused() {  # <case-dir> <label> <wrapper args...>
+  local dir=$1 label=$2 out rc=0
+  shift 2
+  out=$(wrapper_from_code "$dir" "$@" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "$label: expected a refusal (exit 2), got $rc: $out"
+  printf '%s' "$out"
+}
+
+row_state() {  # <case-dir> <id>
+  grep -E "^- \[[x ]\] $2 " "$1/home/data/backlog.md" | sed -E 's/^- \[(.)\].*/\1/'
+}
+
+test_completion_needs_proof_of_the_deliverable() {
+  local dir fakebin out
+  dir=$(make_split completion)
+  fakebin=$(fm_fakebin "$dir")
+  wrapper_from_code "$dir" add ship-a "ship a" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" add scout-a "scout a" --kind scout --repo p >/dev/null
+  wrapper_from_code "$dir" add note-a "a plain note" --kind docs --repo p >/dev/null
+  # Every spelling of a completion without proof is refused and leaves the row open.
+  completion_refused "$dir" "bare done" "done" ship-a >/dev/null
+  completion_refused "$dir" "close alias" "close" ship-a >/dev/null
+  completion_refused "$dir" "task noun" "task" "done" ship-a >/dev/null
+  completion_refused "$dir" "task noun and close" "task" "close" ship-a >/dev/null
+  out=$(completion_refused "$dir" "help text inside a note" "done" ship-a --note=$'a note\n--help')
+  assert_contains "$out" "completion needs proof" "a note naming --help skipped the guard"
+  completion_refused "$dir" "a note alone is no proof" "done" ship-a --note "local main" >/dev/null
+  [ "$(row_state "$dir" ship-a)" = " " ] || fail "a refused completion closed the row"
+  # A scout's deliverable is a written non-empty regular file; a ship's is a merged pull request.
+  mkdir -p "$dir/home/data/scout-a/report.md"
+  completion_refused "$dir" "directory as report" "done" scout-a --report data/scout-a/report.md >/dev/null
+  rmdir "$dir/home/data/scout-a/report.md"
+  : > "$dir/home/data/scout-a/report.md"
+  completion_refused "$dir" "empty report" "done" scout-a --report data/scout-a/report.md >/dev/null
+  printf '# findings\n' > "$dir/home/data/scout-a/report.md"
+  completion_refused "$dir" "report for a ship" "done" ship-a --report data/scout-a/report.md >/dev/null
+  wrapper_from_code "$dir" "done" scout-a --report data/scout-a/report.md >/dev/null || fail "a written report was refused"
+  [ "$(row_state "$dir" scout-a)" = x ] || fail "the reported scout did not close"
+  completion_refused "$dir" "non-GitHub pull request" "done" ship-a --pr https://forge.example.com/o/r/pulls/3 >/dev/null
+  cat > "$fakebin/gh-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'api_response:\n  body: merged=%s\n' "${FAKE_MERGED:-false}"
+SH
+  chmod +x "$fakebin/gh-axi"
+  (cd "$dir/code" && PATH="$fakebin:$PATH" FAKE_MERGED=false FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" \
+    "$WRAPPER" "done" ship-a --pr https://github.com/o/r/pull/9 >/dev/null 2>&1) && fail "an unmerged pull request closed the row"
+  (cd "$dir/code" && PATH="$fakebin:$PATH" FAKE_MERGED=true FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" \
+    "$WRAPPER" "done" ship-a --pr https://github.com/o/r/pull/9 >/dev/null) || fail "a merged pull request was refused"
+  [ "$(row_state "$dir" ship-a)" = x ] || fail "the merged ship did not close"
+  # Other row kinds, help text, and unknown ids keep tasks-axi's own behavior.
+  wrapper_from_code "$dir" "done" note-a >/dev/null || fail "a non-delivery row was refused"
+  wrapper_from_code "$dir" "done" --help >/dev/null || fail "done --help was refused"
+  pass "fm-tasks-axi.sh closes a ship or scout only with its proved deliverable"
+}
+
+test_completion_by_the_captains_own_words() {
+  local dir words
+  dir=$(make_split drop)
+  words="$dir/words.txt"
+  wrapper_from_code "$dir" add ship-d "ship d" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" add ship-e "ship e" --kind ship --repo p >/dev/null
+  : > "$words"
+  completion_refused "$dir" "empty words" "done" ship-d --drop-file "$words" >/dev/null
+  ln -s "$words" "$dir/words-link.txt"
+  printf 'Drop it; the premise is gone.\n' > "$words"
+  completion_refused "$dir" "symbolic link words" "done" ship-d --drop-file "$dir/words-link.txt" >/dev/null
+  completion_refused "$dir" "words with a pull request" "done" ship-d --drop-file "$words" --pr https://github.com/o/r/pull/9 >/dev/null
+  wrapper_from_code "$dir" "done" ship-d --drop-file "$words" >/dev/null || fail "the captain's words were refused"
+  [ "$(row_state "$dir" ship-d)" = x ] || fail "the dropped row did not close"
+  cmp -s "$words" "$dir/home/data/ship-d/captain-drop.md" || fail "the exact words were not retained"
+  assert_grep "dropped" "$dir/home/data/backlog.md" "the row does not record the fixed drop note"
+  # A live task record completes only through teardown.
+  printf 'kind=ship\n' > "$dir/home/state/ship-e.meta"
+  out=$(completion_refused "$dir" "live task record" "done" ship-e --drop-file "$words")
+  assert_contains "$out" "fm-teardown.sh ship-e" "a live task did not point at teardown"
+  pass "fm-tasks-axi.sh records a captain's drop with the exact words and refuses a live task"
+}
+
 test_guard_reports_regular_code_root_backlog
 test_guard_reports_foreign_link_and_archive
 test_guard_silent_for_single_home
@@ -249,6 +328,8 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_refusals
   test_wrapper_refuses_add_start
   test_wrapper_single_home
+  test_completion_needs_proof_of_the_deliverable
+  test_completion_by_the_captains_own_words
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi

@@ -696,6 +696,18 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (if $include_prs == 1 then empty else {surface:"live PR discovery + checks", reveal:"--include-prs"} end) ]) }
 ') || { echo "fm-bearings-snapshot: projection failed" >&2; exit 1; }
 
+# This is dated heartbeat evidence, not a fresh scan. Preserve the observation time so a
+# reader cannot mistake an old ledger for current proof.
+OPEN_LOOPS_LEDGER=$(printf '%s' "$SNAP" | jq -r '.roots.state + "/open-loops.json"')
+if [ -f "$OPEN_LOOPS_LEDGER" ] && [ ! -L "$OPEN_LOOPS_LEDGER" ]; then
+  MODEL=$(printf '%s' "$MODEL" | jq --slurpfile ledger "$OPEN_LOOPS_LEDGER" '
+    if $ledger[0].schema != "fm-open-loops.v1" then error("unsupported open-loop ledger") else . end
+    | .open_loops = {generated_epoch:$ledger[0].generated_epoch,complete:$ledger[0].complete,
+        rows:[$ledger[0].rows[] | select(.overdue)
+          | {id,category,subject,owner,next_action,age_seconds}]}
+  ') || { echo "fm-bearings-snapshot: unreadable open-loop ledger" >&2; exit 1; }
+fi
+
 if [ "$FORMAT" = json ]; then
   printf '%s\n' "$MODEL"
   exit 0

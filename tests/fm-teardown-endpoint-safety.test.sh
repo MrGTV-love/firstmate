@@ -57,7 +57,7 @@ run_case() {  # <case> <id>
   local dir=$1 id=$2
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
   FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
-    "$TEARDOWN" "$id" --force
+    "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)"
 }
 
 assert_refused_without_mutation() {  # <case> <id> <description>
@@ -398,7 +398,7 @@ SH
   set +e
   env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
-    PATH="$dir/fakebin:$PATH" "$TEARDOWN" invalid --force \
+    PATH="$dir/fakebin:$PATH" "$TEARDOWN" invalid --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/invalid.out" 2> "$dir/invalid.err"
   rc=$?
   set -e
@@ -434,7 +434,7 @@ SH
     "kind=scout" "mode=no-mistakes"
   env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
-    PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$target_id" --force \
+    PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$target_id" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/valid.out" 2> "$dir/valid.err" \
     || fail "isolated valid endpoint teardown failed: $(cat "$dir/valid.err")"
   isolated_tmux_window_exists "$dir" "$socket" "$session" "$target" \
@@ -1150,7 +1150,7 @@ test_forced_teardown_continues_past_a_close_it_could_not_make() {
 
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
-    PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" --force \
+    PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/forced.out" 2> "$dir/forced.err" \
     || fail "--force did not get past a close that failed: $(cat "$dir/forced.err")"
   assert_grep "teardown $id complete" "$dir/forced.out" "the forced cleanup did not finish"
@@ -1268,7 +1268,7 @@ test_forced_secondmate_child_close_failure_still_refuses() {
   set +e
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
-    PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$parent" --force \
+    PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$parent" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/child.out" 2> "$dir/child.err"
   rc=$?
   set -e
@@ -1308,7 +1308,7 @@ test_orca_close_failure_refuses_even_under_force() {
   set +e
   env -u TMUX -u TMUX_PANE \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
-    PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" --force \
+    PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/orca-forced.out" 2> "$dir/orca-forced.err"
   rc=$?
   set -e
