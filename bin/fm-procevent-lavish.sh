@@ -12,6 +12,7 @@
 #   fm-procevent-lavish.sh source-id <artifact.html>
 #   fm-procevent-lavish.sh retire <artifact.html>
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
+#   fm-procevent-lavish.sh check <artifact.html>
 #
 # classify   Print the lifecycle state a handler should act on: feedback, ended,
 #            waiting, disconnected, missing, or unknown.
@@ -40,6 +41,21 @@
 #            argument; later retries poll without that reply. That post is best
 #            effort: a crash while consuming drops that one round's reply
 #            instead of posting it twice. See the note at the consume site.
+# check      Compile, without running, every inline event handler and inline
+#            classic script in the board and exit 1 naming each one that does not
+#            parse. `arm` runs it first and refuses such a board. The defect it
+#            guards is a form whose inline onsubmit holds text pasted into a
+#            quoted JavaScript string (an apostrophe in a decision title ends
+#            the string): the handler fails to parse, the browser submits the
+#            form natively, the artifact frame lands on Lavish's 409 "no longer
+#            current" page, and no reload can repair it because the file itself
+#            is broken. Build handlers with addEventListener or read their text
+#            from data attributes, and run `check` before opening a board.
+#            It also warns, without failing, when a board has inline onsubmit
+#            handlers and lacks the guard in
+#            .agents/skills/bearings/assets/lavish-form-guard.html, which turns a
+#            form that fails to cancel its own submit into a visible error and an
+#            error prompt for the agent instead of a silent loss.
 # terminal   Exit 0 when the captured result means this Lavish source will never
 #            produce another result, so the runner may retire it; any other exit
 #            keeps it armed. This is the generic adapter contract bin/fm-procevent.sh
@@ -197,6 +213,154 @@ cmd_source_id() {
   fi
 }
 
+# Compile, never run, every inline event handler and inline classic script the
+# board carries. A handler that fails to parse is not a no-op in a browser: the
+# form it sits on submits natively, which navigates the sandboxed artifact frame
+# to a URL with no load token, and Lavish answers that with a 409 "no longer
+# current" page. Reloading cannot repair it, and the answer never reaches the
+# poll. The syntax error is a property of the file, so it is caught here rather
+# than discovered by the captain. Handler bodies are compiled as the function
+# body a browser wraps them in; a type=module, JSON, or other non-classic script
+# is skipped because this check cannot parse it faithfully.
+#
+# 0 = nothing broken (including a board with nothing to compile), 1 = at least
+# one parse failure, printed one per line, anything else = the check could not
+# complete, which is never proof the board is sound.
+board_extract_scripts() {  # <artifact> <out-json-file>
+  perl -MJSON::PP -MEncode=decode,FB_DEFAULT -e '
+    use strict; use warnings;
+    my ($path, $out) = @ARGV;
+    open my $in, "<:raw", $path or exit 2;
+    local $/;
+    # Scan bytes, not characters: character offsets into a large non-ASCII page
+    # cost a pass over the text each, so only the extracted pieces are decoded.
+    my $html = <$in>;
+    close $in;
+    my $text = sub { decode("UTF-8", $_[0], FB_DEFAULT) };
+    my @items;
+    # Offsets arrive in ascending order within one text, so count only the
+    # newlines since the previous offset instead of rescanning from the start.
+    my $line_counter = sub {
+      my ($text, $at, $line) = (shift, 0, 1);
+      return sub {
+        my ($pos) = @_;
+        if ($pos < $at) { ($at, $line) = (0, 1); }
+        $line += substr($text, $at, $pos - $at) =~ tr/\n//;
+        $at = $pos;
+        return $line;
+      };
+    };
+    my $html_line = $line_counter->($html);
+    sub unescape {
+      my ($v) = @_;
+      $v =~ s/&#[xX]([0-9a-fA-F]+);/chr(hex($1))/ge;
+      $v =~ s/&#([0-9]+);/chr($1)/ge;
+      $v =~ s/&quot;/"/g;
+      $v =~ s/&apos;/\x27/g;
+      $v =~ s/&lt;/</g;
+      $v =~ s/&gt;/>/g;
+      $v =~ s/&amp;/&/g;
+      return $v;
+    }
+    # Inline scripts first, then blank them (keeping their newlines) so script
+    # text can never be mistaken for markup by the tag scan below.
+    push @items, { kind => "guard" } if $html =~ /<script\b[^>]*\bdata-fm-lavish-form-guard\b/;
+    my $markup = $html;
+    while ($html =~ m{<script\b([^>]*)>(.*?)</script\s*>}gis) {
+      my ($attrs, $body, $start) = ($1, $2, $-[0]);
+      next if $attrs =~ /\bsrc\s*=/i;
+      my $type = $attrs =~ /\btype\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s>]+))/i
+        ? lc($1 // $2 // $3 // "") : "";
+      next unless $type eq "" || $type =~ m{\A(?:text|application)/(?:x-)?(?:javascript|ecmascript)\z};
+      next unless $body =~ /\S/;
+      push @items, { kind => "script", where => "inline script", line => $html_line->($start + length($attrs) + 8), body => $text->($body) };
+    }
+    $markup =~ s{(<script\b[^>]*>)(.*?)(</script\s*>)}{ my ($open, $body, $close) = ($1, $2, $3); $open . ($body =~ s/[^\n]//gr) . $close }gise;
+    $markup =~ s{<!--(.*?)-->}{ my $comment = $1; $comment =~ s/[^\n]//gr }gse;
+    my $markup_line = $line_counter->($markup);
+    # Linear scan: find each start tag, then read its attributes with \G so no
+    # pattern can backtrack across the page.
+    pos($markup) = 0;
+    while ($markup =~ m{<([A-Za-z][\w:-]*)(?=[\s/>])}g) {
+      my ($tag, $start) = (lc $1, $-[0]);
+      my (%attr, @order);
+      while ($markup =~ m{\G\s*([^\s"\x27<>/=]+)(?:\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s"\x27=<>`]+)))?}gc) {
+        my $name = lc $1;
+        $attr{$name} //= unescape($text->($2 // $3 // $4 // ""));
+        push @order, $name;
+      }
+      $markup =~ m{\G\s*/?>}gc;
+      my $who = defined $attr{"data-lavish-question"} ? " question " . $attr{"data-lavish-question"}
+        : defined $attr{id} ? " #" . $attr{id} : "";
+      for my $name (@order) {
+        next unless $name =~ /\Aon[a-z]+\z/;
+        my $body = $attr{$name};
+        next unless defined $body && $body =~ /\S/;
+        push @items, { kind => "handler", where => "<$tag>$who $name", line => $markup_line->($start), body => $body };
+      }
+    }
+    open my $fh, ">:raw", $out or exit 2;
+    print {$fh} encode_json(\@items);
+    close $fh or exit 2;
+  ' "$1" "$2"
+}
+
+cmd_check() {
+  local artifact=${1-} items verdict rc=0
+  [ -n "$artifact" ] || usage
+  [ -f "$artifact" ] && [ ! -L "$artifact" ] && [ -r "$artifact" ] \
+    || die "artifact is not a readable file: $artifact"
+  items=$(mktemp "${TMPDIR:-/tmp}/fm-lavish-check.XXXXXX") || die "cannot stage the board check"
+  board_extract_scripts "$artifact" "$items" || { rm -f -- "$items"; die "cannot read the board's scripts: $artifact"; }
+  if [ "$(cat -- "$items")" = '[]' ]; then
+    rm -f -- "$items"
+    printf 'check: ok handlers=0 scripts=0\n'
+    return 0
+  fi
+  if ! command -v node >/dev/null 2>&1; then
+    rm -f -- "$items"
+    die "node is required to verify the board's page scripts and was not found on PATH: $artifact"
+  fi
+  verdict=$(node -e '
+    const vm = require("node:vm");
+    let raw = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (d) => { raw += d; });
+    process.stdin.on("end", () => {
+      const items = JSON.parse(raw);
+      let bad = 0, handlers = 0, scripts = 0, submits = 0, guard = 0;
+      for (const item of items) {
+        if (item.kind === "guard") { guard = 1; continue; }
+        if (item.kind === "handler") handlers++; else scripts++;
+        if (item.kind === "handler" && / onsubmit$/.test(item.where)) submits++;
+        const source = item.kind === "handler" ? "(function(event){" + item.body + "\n})" : item.body;
+        try { new vm.Script(source, { filename: "board" }); }
+        catch (error) {
+          bad++;
+          console.log(["FAIL", item.where, "line " + item.line, String(error.message).replace(/\s+/g, " ")].join("\t"));
+        }
+      }
+      console.log(["SUMMARY", handlers, scripts, bad, submits, guard].join("\t"));
+      process.exit(bad ? 1 : 0);
+    });
+  ' < "$items") || rc=$?
+  rm -f -- "$items"
+  case "$rc" in 0|1) ;; *) die "the board script check did not complete: $artifact" ;; esac
+  if [ "$rc" -eq 1 ]; then
+    printf 'error: this board has page scripts that do not parse, so an answer entered on it would be lost: %s\n' "$artifact" >&2
+    printf '%s\n' "$verdict" | awk -F'\t' '$1 == "FAIL" { printf "  %s (%s): %s\n", $2, $3, $4 }' >&2
+    printf 'fix: never paste text into an inline handler string; build the handler with addEventListener or read the text from a data attribute\n' >&2
+    return 1
+  fi
+  printf '%s\n' "$verdict" | awk -F'\t' '$1 == "SUMMARY" { printf "check: ok handlers=%s scripts=%s\n", $2, $3 }'
+  # Parsing cleanly does not make a form safe: a handler that never cancels its
+  # own submit still navigates the frame. The guard asset turns that into a
+  # visible failure instead of a lost answer.
+  printf '%s\n' "$verdict" | awk -F'\t' '$1 == "SUMMARY" && $5 > 0 && $6 == 0 { exit 1 }' || \
+    printf 'warning: this board has inline form handlers but no data-fm-lavish-form-guard script; a form that fails to cancel its own submit would lose the answer silently. Add .agents/skills/bearings/assets/lavish-form-guard.html: %s\n' "$artifact" >&2
+  return 0
+}
+
 cmd_arm() {
   local artifact='' task='' reply_file='' id real owner listening
   local -a listener=()
@@ -225,6 +389,9 @@ cmd_arm() {
   command -v lavish-axi >/dev/null 2>&1 || die "lavish-axi is not installed"
   poll_retry_delay >/dev/null
   id=$(cmd_source_id "$artifact") || exit 1
+  # A board whose page scripts do not parse loses every answer entered on it, so
+  # it is refused before anything is registered or listening.
+  cmd_check "$artifact" >/dev/null || exit 1
   real=$(perl -MCwd=realpath -e '$p = realpath($ARGV[0]); defined($p) or exit 1; print "$p\n"' "$artifact" 2>/dev/null) \
     || die "cannot resolve the artifact path: $artifact"
   listener=("$SCRIPT_DIR/fm-procevent-lavish.sh" poll "$real")
@@ -813,6 +980,7 @@ case "${1-}" in
   arm)       shift; cmd_arm "$@" ;;
   retire)    shift; cmd_retire "$@" ;;
   poll)      shift; cmd_poll "$@" ;;
+  check)     shift; cmd_check "$@" ;;
   source-id) shift; cmd_source_id "$@" ;;
   classify)  shift; cmd_classify "$@" ;;
   terminal)  shift; cmd_terminal "$@" ;;

@@ -1,0 +1,36 @@
+<!--
+Drop-in guard for any Lavish board that carries a form. Paste this script into the board once.
+Without it, a form whose handler is missing or broken submits natively: the sandboxed artifact frame
+navigates to a URL with no Lavish load token, Lavish answers 409 "no longer current", a reload does
+not repair it, and the answer is gone with nothing said.
+With it, the native submit is cancelled, the form shows a visible error, and an error prompt is queued
+for the agent. A form whose handler ran and cancelled its own submit is left alone.
+bin/fm-procevent-lavish.sh check warns when a board has inline form handlers and no element carrying
+the data-fm-lavish-form-guard attribute below.
+-->
+<script data-fm-lavish-form-guard>
+(function () {
+  document.addEventListener("submit", function (event) {
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    var form = event.target;
+    var question = (form && form.getAttribute && form.getAttribute("data-lavish-question")) || "";
+    var notice = document.createElement("div");
+    notice.setAttribute("role", "alert");
+    notice.style.cssText = "margin:8px 0;padding:8px 12px;border:2px solid #b00020;background:#fff0f0;color:#600010;font:14px/1.4 sans-serif";
+    notice.textContent = "This answer was NOT recorded: the form's page script is broken. Tell the agent" +
+      (question ? " (form " + question + ")." : ".");
+    (form && form.appendChild ? form : document.body).appendChild(notice);
+    try {
+      if (window.lavish && window.lavish.queuePrompt) {
+        window.lavish.queuePrompt("Form " + question + " failed: its page script is broken and no answer was queued", {
+          tag: "form-error",
+          text: "Form failed: " + question,
+          element: form,
+          data: { question: question, error: "handler-broken" }
+        });
+      }
+    } catch (ignored) { /* the visible notice above already stands */ }
+  }, false);
+})();
+</script>
