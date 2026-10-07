@@ -466,23 +466,11 @@ QUOTA_MS=$(( Q1 - Q0 ))
 [ "$QUOTA_MS" -ge 0 ] || QUOTA_MS=0
 [ "$quota_rc" -eq 0 ] || emit_error "quota-axi --json failed"
 fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an invalid snapshot"
-OMP_POOLS='{}'
-omp_models=$(jq -r '[(.rules[]?.use // []), (.default // [])] | .[] |
-  (if type == "array" then .[] else . end) |
-  select(.harness == "omp" and (.model // "" | startswith("openai-codex/"))) | .model' "$RULES" | sort -u)
-if [ -n "$omp_models" ]; then
-  omp_usage=$(fm_dispatch_omp_usage "$CONFIG") || omp_usage='{}'
-  while IFS= read -r omp_model; do
-    omp_capacity=$(fm_omp_codex_capacity "$omp_model" "$omp_usage")
-    OMP_POOLS=$(jq -cn --argjson pools "$OMP_POOLS" --arg m "$omp_model" --argjson capacity "$omp_capacity" '$pools + {($m): $capacity}')
-  done <<<"$omp_models"
-fi
 CLAUDE_QUOTA_UNBOUND=false
 if fm_dispatch_claude_quota_unbound "$CONFIG"; then CLAUDE_QUOTA_UNBOUND=true; fi
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
 RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
-  --argjson omp_pools "$OMP_POOLS" \
   --argjson claude_quota_unbound "$CLAUDE_QUOTA_UNBOUND" \
   --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
@@ -528,12 +516,11 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     else "\($s) at \($row.scope)" end;
   def assess($c; $p; $lane):
     if pooled_codex($c) then
-      ($omp_pools[($c.model // "")] // {status: "unknown", accounts: []}) as $pool |
-      {profile: $c, provider: "codex", capacity: $pool, eligible: ($pool.status != "exhausted"),
-       exhausted: ($pool.status == "exhausted" and $c.floor == null), unranked: true,
-       reason: ("OMP pooled Codex capacity " + $pool.status + "; no pool spendPriority")}
-      + (if $c.floor != null then {unknown: true, reason: "OMP pool profile floor is unverifiable"}
-         elif $pool.status != "usable" then {unknown: true} else {} end)
+      {profile: $c, provider: "codex",
+       capacity: {status: "unknown", accounts: [], reason: "destination OMP authentication scope is not established"},
+       eligible: true, exhausted: false, unranked: true, unknown: true,
+       reason: (if $c.floor != null then "OMP pool profile floor is unverifiable"
+                else "OMP pooled Codex capacity unknown; no pool spendPriority" end)}
     elif $c.harness == "claude" and $claude_quota_unbound then
       {profile: $c, provider: $p, capacity: {status: "unknown"}, eligible: true,
        exhausted: false, unranked: true, unknown: true,

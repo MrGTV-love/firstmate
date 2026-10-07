@@ -1457,7 +1457,10 @@ JSON
   assert_equals '' "$err" "optional OMP model $optional_omp_case does not produce a jq error"
   assert_contains "$out" "  status: $optional_omp_status" "optional OMP model preserves the $optional_omp_case outcome"
   optional_omp_candidate=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
-  assert_contains "$optional_omp_candidate" 'pool={"status":"unknown","accounts":[]}' "optional OMP model keeps unknown pool evidence in $optional_omp_case"
+  optional_omp_pool=${optional_omp_candidate#*  pool=}
+  optional_omp_pool=${optional_omp_pool%%  spendPriority=*}
+  jq -e '.status == "unknown" and .accounts == []' <<<"$optional_omp_pool" >/dev/null ||
+    fail "optional OMP model keeps unknown pool evidence in $optional_omp_case"
   assert_contains "$optional_omp_candidate" 'eligible, unranked:' "optional OMP model stays eligible and unranked in $optional_omp_case"
   assert_contains "$optional_omp_candidate" 'spendPriority=unknown  runway=unknown' "optional OMP model discloses both economics in $optional_omp_case"
   assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor' "optional OMP model retains measured sibling evidence in $optional_omp_case"
@@ -1713,7 +1716,11 @@ for pooled_choice in direct runner-up; do
     assert_equals '' "$err" "omitted OMP model floor has no jq error for $pooled_choice $pooled_use"
     assert_contains "$out" '  status: escalate' "omitted OMP model floor gates $pooled_choice $pooled_use"
     assert_contains "$out" 'rule rule_1 floor codex/all_models is unverifiable' "native account evidence cannot establish the pooled floor"
-    assert_contains "$out" 'candidate: omp:-  provider=codex  pool={"status":"unknown","accounts":[]}' "omitted selector keeps pool capacity unknown"
+    omitted_omp_candidate=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
+    omitted_omp_pool=${omitted_omp_candidate#*  pool=}
+    omitted_omp_pool=${omitted_omp_pool%%  spendPriority=*}
+    jq -e '.status == "unknown" and .accounts == []' <<<"$omitted_omp_pool" >/dev/null ||
+      fail "omitted selector keeps pool capacity unknown"
     assert_not_contains "$out" 'candidate: cursor:cursor-grok-4.6-high' "unverifiable pooled floor does not evaluate the rankable default"
     assert_not_contains "$out" 'candidate: omp:openrouter/deepseek/deepseek-v4-flash' "unverifiable pooled floor does not activate the declared stand-in"
     assert_not_contains "$out" '  profile:' "unverifiable pooled floor authorizes no served route"
