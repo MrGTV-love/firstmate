@@ -886,12 +886,16 @@ test_send_text_submit_detects_swallowed_enter() {
   cmux_panes_response "$dir" 5 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_panes_response "$dir" 7 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_panes_response "$dir" 9 "bbbbbbbb-1111-1111-1111-111111111111"
+  cmux_panes_response "$dir" 11 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 6 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
-  cmux_read_screen_response "$dir" 10 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
+  cmux_read_screen_response "$dir" 8 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
+  cmux_read_screen_response "$dir" 12 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
   fb=$(make_cmux_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; fm_backend_cmux_send_text_submit "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = pending ] || fail "send_text_submit should report pending once retries are exhausted with no visible change, got '$out'"
+  [ "$(grep -c $'\x1fsend-key\x1f' "$dir/log")" -eq 2 ] \
+    || fail "swallowed Enter fixture must exercise both configured Enter attempts"
   pass "fm_backend_cmux_send_text_submit: reports 'pending' when the composer never clears after retried Enters (swallowed)"
 }
 
@@ -913,13 +917,11 @@ test_send_text_submit_popup_autocomplete_requires_second_enter() {
   cmux_panes_response "$dir" 3 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_panes_response "$dir" 5 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 6 $'  ╭──────────────────────────────────────╮\n  │ ❯ /compact compaction instructions   │\n  ╰──────────────── Composer ────────────╯\n\n  Enter:send'
-  # 7: list-panes (target_ready via send_key Enter #2)
-  # 8: send-key enter (#2) - actually submits
-  # 9: list-panes (target_ready via composer_state capture)
-  # 10: composer now reads empty
   cmux_panes_response "$dir" 7 "bbbbbbbb-1111-1111-1111-111111111111"
+  cmux_read_screen_response "$dir" 8 $'  ╭──────────────────────────────────────╮\n  │ ❯ /compact compaction instructions   │\n  ╰──────────────── Composer ────────────╯\n\n  Enter:send'
   cmux_panes_response "$dir" 9 "bbbbbbbb-1111-1111-1111-111111111111"
-  cmux_read_screen_response "$dir" 10 $'  ╭────────────────────────╮\n  │ ❯                      │\n  ╰──────── Composer ──────╯'
+  cmux_panes_response "$dir" 11 "bbbbbbbb-1111-1111-1111-111111111111"
+  cmux_read_screen_response "$dir" 12 $'  ╭────────────────────────╮\n  │ ❯                      │\n  ╰──────── Composer ──────╯'
   fb=$(make_cmux_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; fm_backend_cmux_send_text_submit "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "/compact" 3 0.01 0.01' "$ROOT" )

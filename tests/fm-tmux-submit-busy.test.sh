@@ -8,7 +8,7 @@ set -u
 . "$ROOT/bin/fm-tmux-lib.sh"
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-tmux-submit-busy.XXXXXX")
-trap 'rm -rf "$TMP_ROOT"' EXIT
+trap 'rm -rf "$TMP_ROOT"; fm_test_cleanup' EXIT
 
 # Override fm_pane_is_busy for testing: FM_FAKE_PANE_BUSY=1 means busy.
 fm_pane_is_busy() {
@@ -36,6 +36,10 @@ case "${1:-}" in
       printf '%s\n' "$count" > "$FM_FAKE_CAPTURE_COUNT"
       if [ "${FM_FAKE_FAIL_FIRST_CAPTURE:-0}" = 1 ] && [ "$count" -eq 1 ]; then
         exit 1
+      fi
+      if [ "${FM_FAKE_REFRESH_UNKNOWN:-0}" = 1 ] && [ "$count" -ge 3 ]; then
+        printf 'Pi is processing\n✻ Working…\n'
+        exit 0
       fi
     fi
     cat "$COMPOSER" 2>/dev/null; exit 0 ;;
@@ -222,6 +226,34 @@ test_failed_baseline_capture_keeps_busy_unknown_unconfirmed() {
     || fail "failed-baseline regression did not render the post-Enter busy footer"
   pass "fm_tmux_submit_core: failed baseline capture disables busy unknown conversion"
 }
+
+test_refreshed_unknown_requires_idle_baseline() {
+  local dir fakebin composer sent out baseline expected
+  for baseline in idle busy failed; do
+    dir="$TMP_ROOT/refreshed-unknown-$baseline"
+    fakebin=$(make_submit_mock "$dir")
+    composer="$dir/composer"; sent="$dir/sent"
+    printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
+    [ "$baseline" != busy ] || printf '✻ Working…\n' >> "$composer"
+    touch "$dir/.swallow"; : > "$sent"
+    expected=unknown
+    [ "$baseline" != idle ] || expected=empty
+    out=$(
+      fm_pane_is_busy() { [ "$(fm_pane_busy_state "$1")" = busy ]; }
+      PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
+        FM_FAKE_CAPTURE_COUNT="$dir/captures" FM_FAKE_REFRESH_UNKNOWN=1 \
+        FM_FAKE_FAIL_FIRST_CAPTURE="$([ "$baseline" = failed ] && printf 1 || printf 0)" \
+        FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
+        fm_tmux_submit_core win fix 3 0 0
+    )
+    [ "$out" = "$expected" ] || fail "$baseline baseline refreshed unknown must return $expected, got '$out'"
+    [ "$(grep -c '^Enter$' "$sent")" -eq 1 ] \
+      || fail "refreshed unknown must be dispatched without another Enter"
+    [ "$(cat "$dir/captures")" -ge 3 ] || fail "pending composer must be refreshed before unknown dispatch"
+  done
+  pass "tmux refreshed unknown uses idle-baseline-gated turn-start proof without another Enter"
+}
+test_refreshed_unknown_requires_idle_baseline
 
 test_busy_pane_ambiguous_pending_retries_without_conversion() {
   local dir fakebin composer sent vfile

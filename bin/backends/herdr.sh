@@ -3555,7 +3555,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       case "$verdict" in
         busy)
           case "${identity%%$'\t'*}" in
-            claude|codex)
+            claude|codex|pi)
               printf 'empty'; return 0 ;;
           esac
           ;;

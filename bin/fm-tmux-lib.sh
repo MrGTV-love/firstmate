@@ -238,10 +238,10 @@ fm_pane_is_busy() {  # <target> [harness]
 # transition evidence could mark an undelivered message delivered.
 fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle]
   local target=$1 retries=$2 sleep_s=$3 baseline_idle=${4:-} i=0 j state busy_state harness
+  tmux send-keys -t "$target" Enter 2>/dev/null || true
+  sleep "$sleep_s"
+  state=$(fm_tmux_composer_state "$target")
   while :; do
-    tmux send-keys -t "$target" Enter 2>/dev/null || true
-    sleep "$sleep_s"
-    state=$(fm_tmux_composer_state "$target")
     case "$state" in
       pending|pending-unproven) ;;
       unknown)
@@ -266,8 +266,12 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     sleep "$sleep_s"
     state=$(fm_tmux_composer_state "$target")
     case "$state" in
-      pending|pending-unproven) ;;
-      *) printf '%s' "$state"; return 0 ;;
+      pending|pending-unproven)
+        tmux send-keys -t "$target" Enter 2>/dev/null || true
+        sleep "$sleep_s"
+        state=$(fm_tmux_composer_state "$target")
+        ;;
+      *) continue ;;
     esac
   done
   if [ "$state" != pending ]; then

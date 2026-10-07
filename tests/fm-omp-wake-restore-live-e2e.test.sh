@@ -164,13 +164,12 @@ is_busy() { [ "$(live_busy_class "$TARGET")" = busy ]; }
 queue_drained() { [ "$(queue_rows)" -eq 0 ]; }
 composer_is() { [ "$(composer)" = "$1" ]; }
 
-# start_omp <label> [ENV=value...]
+# start_omp <label>
 start_omp() {
   local label=$1
-  shift
   rm -f "$PROJECT/state/.wake-queue" "$PROJECT/state/.watch-cycle-exits.log" "$PROJECT/state/wakelab.status" "$PARENT/state/wakemate.meta"
   printf 'wakemate\n' > "$PROJECT/.fm-secondmate-home"
-  printf '#!/usr/bin/env bash\nexec env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 %s %q "$@"\n' "$*" "$REAL_OMP" > "$FAKEBIN/omp"
+  printf '#!/usr/bin/env bash\nexec env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 %q "$@"\n' "$REAL_OMP" > "$FAKEBIN/omp"
   chmod +x "$FAKEBIN/omp"
   FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_SKIP_SECONDMATE_SYNC=1 FM_SKIP_SECONDMATE_INHERIT=1 \
     FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$PROJECT" FM_STATE_OVERRIDE="$PARENT/state" \
@@ -261,7 +260,12 @@ pass "live omp markers: $SUBJECT kept both loaded markers on the session pid $lo
 lab pane close "$PANE" >/dev/null 2>&1 || true
 reap_lab
 rm -rf "$PROJECT/state/.watch.lock" "$PROJECT/state/.lock" "$PROJECT/state/.omp-turnend-extension-loaded" "$PROJECT/state/.omp-watch-extension-loaded"
-start_omp wake-parent FM_OMP_WAKE_RESTORE_CHECK_MS=3600000
+node --input-type=module - "$PROJECT/.omp/extensions/fm-primary-omp-watch.ts" <<'EOF' || fail "could not delay restored-wake recovery in the disposable lab extension"
+import { readFileSync, writeFileSync } from "node:fs";
+const file = process.argv[2];
+writeFileSync(file, readFileSync(file, "utf8").replace(/const restoreCheckMs = \d+;/, "const restoreCheckMs = 3600000;"));
+EOF
+start_omp wake-parent
 
 busy_turn
 queue_wake

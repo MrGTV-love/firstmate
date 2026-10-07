@@ -1221,7 +1221,8 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
   The composer then read `pending`, the lane read idle, and a bare Enter submitted the wake, which the lane then handled.
   omp joins restored messages and any operator draft with a blank line (`<wake>` blank line `<draft>`).
   The extension now finds its own wake in the composer after `agent_end`, removes only that text, and sends it again; the operator's draft stayed exactly as typed in the guard run.
-  With the extension recovery switched off (`FM_OMP_WAKE_RESTORE_CHECK_MS=3600000`), `fm_task_inbox_submit_held_wake` submitted the wake with one bare Enter and typed nothing, and it refused a composer that also held operator words.
+  With extension recovery delayed only in the disposable lab checkout's copied extension for Session B (a test-local one-hour timer; production uses a fixed two-second interval), `fm_task_inbox_submit_held_wake` submitted the wake with one bare Enter and typed nothing, and it refused a composer that also held operator words.
+  Parent recovery requires complete-or-refused composer extraction: unproven edge, status, or braille boundaries cannot authorize Enter on a truncated wake prefix. The stalled-loop drain-steer fallback requires an affirmatively empty composer; unknown and unproven pending composers retain the parent alarm.
 - **A working lane's box composer is readable.**
   While a turn runs, the box top border carries a braille spinner frame and the elapsed time (`╭── ⠦ 13s > ◔ GPT-6-Astra …`) instead of the idle `π >` identity.
   The shared classifier used to read that border as `unknown`, so a doorbell typed into a working lane could not be seen as unsubmitted and the adapter's submit never retried a dropped Enter.

@@ -635,7 +635,7 @@ Their pre-Enter typed-payload proof has not been live-verified; composer classif
 
 On an idle or done native baseline, submit confirmation proceeds in this order:
 
-1. Wait for `working` or `blocked` across a bounded polling window. Native transition alone confirms only positively identified Claude or Codex; omp and missing or other identities still require composer clearance, because resumed work on another turn cannot prove this Enter delivered retained text.
+1. Wait for `working` or `blocked` across a bounded polling window. Native transition alone confirms only positively identified Claude, Codex, or Pi; omp and missing or other identities still require composer clearance, because resumed work on another turn cannot prove this Enter delivered retained text.
 2. If native status stays idle, or identity is ineligible for native-transition-only proof, use the shared composer verdict as the next positive signal.
    A cleared composer is delivery; pending and unproven pending text receive a fresh composer read before another Enter is allowed.
 3. After the retry budget, `fm_composer_queued_enter_verdict` accepts retained proven pending text only for positively identified OpenCode with native `working`, whose Enter queue semantics are verified.
