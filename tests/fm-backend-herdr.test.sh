@@ -6418,3 +6418,54 @@ test_submit_idle_pi_delayed_native_transition_confirms() {
   pass "identified idle Pi confirms delayed native transitions after initial and refreshed composer reads"
 }
 test_submit_idle_pi_delayed_native_transition_confirms
+
+test_submit_idle_agy_native_transitions_confirm() {
+  local dir log resp fb out phase status screen reads transition_call
+  screen=$'─────────────────────────────────────────────────────\n> \n─────────────────────────────────────────────────────\nesc to cancel    gemini-3.8-flash'
+  for phase in immediate initial refresh; do
+    for status in working blocked idle; do
+      dir="$TMP_ROOT/native-agy-$phase-$status"; mkdir -p "$dir/responses"
+      log="$dir/log"; resp="$dir/responses"; : > "$log"
+      printf '{"result":{"agent":{"agent":"agy","agent_status":"idle"}}}\n' > "$resp/1.out"
+      printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+      case "$phase" in
+        immediate)
+          transition_call=5
+          reads=0
+          printf '%s\n' "$screen" > "$resp/6.out"
+          printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/7.out"
+          ;;
+        initial)
+          printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+          printf '%s\n' "$screen" > "$resp/6.out"
+          transition_call=7
+          reads=1
+          ;;
+        refresh)
+          printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+          printf '%s\n' '❯ hello captain' > "$resp/6.out"
+          printf '%s\n' "$screen" > "$resp/7.out"
+          transition_call=8
+          reads=2
+          ;;
+      esac
+      printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/$transition_call.out"
+      fb=$(make_herdr_fakebin "$dir")
+      out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+        bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+      if [ "$status" = idle ]; then
+        [ "$out" = unknown ] || fail "agy without a native transition after $phase must remain unknown, got '$out'"
+      else
+        [ "$out" = empty ] || fail "agy transition to $status after $phase must confirm delivery, got '$out'"
+        [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq "$reads" ] \
+          || fail "agy $phase transition must require exactly $reads composer reads"
+      fi
+      [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
+        || fail "agy $phase transition must type the payload only once"
+      [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+        || fail "agy $phase transition must not provoke another Enter"
+    done
+  done
+  pass "agy confirms immediate and delayed native transitions without treating unknown composer alone as delivery"
+}
+test_submit_idle_agy_native_transitions_confirm
