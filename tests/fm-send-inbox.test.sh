@@ -239,9 +239,9 @@ test_pending_composer_skips_ring_advisorily() {
 test_unstyled_nested_draft_skips_ring_advisorily() {
   local dir err rc rec
   command -v jq >/dev/null 2>&1 || { printf 'skip: cmux inbox draft regression requires jq\n'; return; }
-  dir=$(setup_cmux_case unstyled-nested-draft)
+  dir=$(setup_cmux_case "unstyled-nested-draft${1:+-native}")
   err="$dir/send.err"
-  printf '────────\n❯ preface\n ❯ nested draft\n────────\n' > "$dir/composer"
+  printf '%s\n' "${1:-$'────────\n❯ preface\n ❯ nested draft\n────────'}" > "$dir/composer"
   cp "$dir/composer" "$dir/composer-before"
   run_send "$dir" "$err" -- t1 "preserve the unfinished nested draft"
   rc=$?
@@ -515,6 +515,7 @@ test_multiline_steer_is_legal
 test_resend_enqueues_new_sequence
 test_pending_composer_skips_ring_advisorily
 test_unstyled_nested_draft_skips_ring_advisorily
+test_unstyled_nested_draft_skips_ring_advisorily $'────────\n╭── π > model > path ─╮\n╰─  ─╯\n────────'
 test_unknown_idle_composer_still_rings_advisorily
 test_failed_ring_is_still_sent
 test_harness_invocations_stay_typed

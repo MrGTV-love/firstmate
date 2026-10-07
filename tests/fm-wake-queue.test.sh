@@ -925,7 +925,7 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
 
 test_secondmate_unknown_draft_keeps_the_parent_alert() {
   local dir state sub fakebin stall_count
-  dir=$(make_case secondmate-unknown-draft-no-ring)
+  dir=$(make_case "secondmate-unknown-draft-no-ring${1:+-native}")
   state="$dir/state"
   sub="$dir/secondmate"
   fakebin="$dir/fakebin"
@@ -935,7 +935,7 @@ test_secondmate_unknown_draft_keeps_the_parent_alert() {
     "$sub" > "$state/mate.meta"
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
   cp "$sub/state/.wake-queue" "$dir/foreign-before"
-  printf '────────\n❯ preface\n ❯ nested draft\n────────\n' > "$dir/composer"
+  printf '%s\n' "${1:-$'────────\n❯ preface\n ❯ nested draft\n────────'}" > "$dir/composer"
   cp "$dir/composer" "$dir/composer-before"
   install_secondmate_alive_tmux "$fakebin"
   install_secondmate_stall_date "$fakebin"
@@ -3444,6 +3444,7 @@ test_secondmate_active_turn_defers_stall_until_the_turn_ends
 test_secondmate_long_lived_mate_mid_turn_is_not_a_stall
 test_secondmate_proven_idle_ring_lets_the_child_drain
 test_secondmate_unknown_draft_keeps_the_parent_alert
+test_secondmate_unknown_draft_keeps_the_parent_alert $'────────\n╭── π > model > path ─╮\n╰─  ─╯\n────────'
 test_secondmate_busy_and_unknown_panes_are_not_rung
 test_secondmate_genuine_stall_after_idle_ring_still_alarms
 test_secondmate_stall_marker_rejects_symlink

@@ -114,6 +114,8 @@ init_changed_fixture_repo() {
     fm-composer-native-band.test.sh \
     fm-composer-native-continuation.test.sh \
     fm-composer-native-idle-hint.test.sh \
+    fm-task-inbox.test.sh \
+    fm-wake-queue.test.sh \
     fm-afk-pi-herdr-return-e2e.test.sh \
     fm-backend.test.sh \
     fm-pr-merge.test.sh \
@@ -456,7 +458,7 @@ test_changed_dependency_selection_and_unmapped_failure() {
     "composer library keeps pure contract coverage"
   assert_contains "$listed" "tests/fm-omp-composer-box-live-e2e.test.sh" \
     "composer library keeps live coverage"
-  for script in fm-composer-native-band.test.sh fm-composer-native-continuation.test.sh fm-composer-native-idle-hint.test.sh; do
+  for script in fm-composer-native-band.test.sh fm-composer-native-continuation.test.sh fm-composer-native-idle-hint.test.sh fm-task-inbox.test.sh fm-wake-queue.test.sh; do
     assert_contains "$listed" "tests/$script" \
       "composer library selects $script"
   done

@@ -54,6 +54,7 @@ The clear is refused before anything is sent when the recorded backend cannot de
 The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, cursor-owned ambiguity across later frames, complete literal blank and braille continuation extraction, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
 Cursorless classification and extraction rank every candidate before refusing a selected ambiguous native band, so an older ambiguous band cannot veto a newer independent composer.
 For an unstyled prompt-bearing rule pair, only literal-owned rows inside that selected pair can make its pending verdict `unknown-draft`; historical literal frames outside the pair do not affect it.
+A native box or band nested inside the selected Pi pair retains draft risk when Pi identity is unavailable or denied; a later independent composer does not inherit that risk.
 `unknown-draft` retains conservative uncertainty while identifying draft risk in literal continuations or selected ambiguous input. Ordinary inbox doorbells, watcher re-rings, and secondmate child-drain rings defer without typing for this verdict. Ordinary `unknown` idle screens and `pending-unproven` remain advisory on the inbox plane; exact pending text still defers unless it is solely the inbox's own stuck doorbell.
 
 **Teardown and discard are not verbs and will not become verbs.**
@@ -126,6 +127,7 @@ Drafts, busy state, task instructions, profile axes, charters, child records, an
 
 `bin/fm-launch-proof-lib.sh` owns launch attribution, and every control-plane path to a live Herdr agent uses one shared positive task-attribution guard before lifecycle input or a task checkpoint, note, or record mutation.
 A recorded endpoint or matching cwd alone never proves live task ownership.
+The stopped-agent exception requires process-backed absence even when Herdr has not registered an agent; a live process still requires launch attribution, and unreadable process evidence refuses recovery.
 Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.

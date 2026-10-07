@@ -1621,6 +1621,8 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-composer-native-band.test.sh"
       printf '%s\n' "__script__:fm-composer-native-continuation.test.sh"
       printf '%s\n' "__script__:fm-composer-native-idle-hint.test.sh"
+      printf '%s\n' "__script__:fm-task-inbox.test.sh"
+      printf '%s\n' "__script__:fm-wake-queue.test.sh"
       ;;
     bin/fm-spawn.sh|bin/fm-send.sh|bin/fm-harness.sh|\
     bin/fm-peek.sh|bin/fm-composer*)

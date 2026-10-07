@@ -1175,6 +1175,12 @@ test_pi_nested_omp_box_preserves_enclosing_draft() {
               pending "$caps" "$screen" "$row" $'pi\tidle'
             assert_screen "nested Pi draft requests identity, styled=$styled cursor=$cursor row=$row" \
               need-identity "$caps" "$screen" "$row"
+            assert_screen "nested Pi draft without probe, styled=$styled cursor=$cursor row=$row" \
+              unknown-draft "$caps" "$screen" "$row" probe-absent
+            assert_screen "nested Pi draft with foreign identity, styled=$styled cursor=$cursor row=$row" \
+              unknown-draft "$caps" "$screen" "$row" $'zsh\t'
+            assert_screen "nested Pi draft without capability, styled=$styled cursor=$cursor row=$row" \
+              unknown-draft "$(printf 'styled=%s\ncursor=%s\nidentity=0' "$styled" "$cursor")" "$screen" "$row"
             row=$((row + 1))
           done
           out=$(fm_composer_extract_selected_content "$caps" "$screen")
@@ -1185,7 +1191,7 @@ test_pi_nested_omp_box_preserves_enclosing_draft() {
             || fail "nested Pi extraction under LC_ALL=C must preserve '$expected', got '$out'"
         done
         caps=$(printf 'styled=%s\ncursor=0\nidentity=0' "$styled")
-        assert_screen "nested omp-looking box without Pi identity capability" unknown "$caps" "$screen"
+        assert_screen "nested omp-looking box without Pi identity capability" unknown-draft "$caps" "$screen"
       done
       assert_screen "real omp below a Pi draft still wins" empty "$CAPS_STYLED_NOID" \
         "$screen"$'\n╭── π > model > path ─╮\n╰─  ─╯'
@@ -1195,6 +1201,10 @@ test_pi_nested_omp_box_preserves_enclosing_draft() {
       # and a later empty pair can neither restore emptiness nor veto it.
       assert_screen "later Pi pair cannot restore an earlier nested omp proof" pending "$CAPS_TMUX" \
         "$screen"$'\n\n────────' "$row" $'pi\tidle'
+      assert_screen "earlier cursor retains nested native risk with denied identity" unknown-draft "$CAPS_TMUX" \
+        "$screen"$'\n\n────────' "$row" probe-absent
+      assert_screen "later empty pair does not inherit native risk" unknown "$CAPS_STYLED_NOID" \
+        "$screen"$'\n\n────────'
       assert_screen "later empty Pi pair remains the cursorless composer" empty "$CAPS_STYLED" \
         "$screen"$'\n\n────────' '' $'pi\tidle'
       out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$screen"$'\n\n────────')
@@ -1822,7 +1832,8 @@ test_pi_and_standalone_multirow_omp_ownership() {
   for caps in "$CAPS_STYLED" $'styled=0\ncursor=0\nidentity=1'; do
     assert_screen "enclosing Pi owns multirow literal with idle identity" pending "$caps" "$screen" '' $'pi\tidle'
     assert_screen "enclosing Pi multirow literal requests identity" need-identity "$caps" "$screen"
-    assert_screen "non-Pi identity cannot claim enclosing multirow literal" unknown "$caps" "$screen" '' $'zsh\t'
+    assert_screen "non-Pi identity cannot claim enclosing multirow literal" unknown-draft "$caps" "$screen" '' $'zsh\t'
+    assert_screen "absent probe cannot claim enclosing multirow literal" unknown-draft "$caps" "$screen" '' probe-absent
     out=$(fm_composer_extract_selected_content "$caps" "$screen")
     [ "$out" = "$expected" ] || fail "enclosing Pi extraction lost literal body bytes or preface: '$out'"
     out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen")
@@ -1831,8 +1842,17 @@ test_pi_and_standalone_multirow_omp_ownership() {
   for cursor in 1 2 3 4 5 6; do
     assert_screen "enclosing Pi multirow literal cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor" $'pi\tidle'
     assert_screen "enclosing Pi multirow row $cursor requests identity" need-identity "$CAPS_TMUX" "$screen" "$cursor"
+    for caps in "$CAPS_TMUX" $'styled=0\ncursor=1\nidentity=1'; do
+      assert_screen "multirow denied probe cursor row $cursor" unknown-draft "$caps" "$screen" "$cursor" probe-absent
+      assert_screen "multirow foreign identity cursor row $cursor" unknown-draft "$caps" "$screen" "$cursor" $'claude\tidle'
+    done
+    for caps in $'styled=0\ncursor=1\nidentity=0' $'styled=1\ncursor=1\nidentity=0'; do
+      assert_screen "multirow missing capability cursor row $cursor" unknown-draft "$caps" "$screen" "$cursor"
+    done
   done
-  assert_screen "enclosing Pi literal without identity capability stays unproven" unknown "$CAPS_STYLED_NOID" "$screen"
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    assert_screen "enclosing Pi literal without identity capability stays unproven" unknown-draft "$caps" "$screen"
+  done
 
   screen=$'❯ old draft\n\n'"$frame"
   assert_screen "blank-separated multirow omp stays ambiguous" unknown-draft "$CAPS_STYLED_NOID" "$screen"

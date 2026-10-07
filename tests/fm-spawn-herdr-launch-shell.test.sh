@@ -97,6 +97,7 @@ PY
     chmod +x "$FAKEBIN/$harness"
   done
   chmod +x "$FAKEBIN/herdr" "$FAKEBIN/ps"
+  export FM_HERDR_PS_BIN="$FAKEBIN/ps"
 }
 
 run_spawn() {

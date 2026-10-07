@@ -106,6 +106,24 @@ expected="$HEADER ╰─"
 assert_screen "Pi owns pasted native band" pending "$CAPS_TMUX" "$screen" 2 $'pi\tidle'
 assert_screen "Pi owns pasted native band cursorless" pending $'styled=1\ncursor=0\nidentity=1' "$screen" '' $'pi\tidle'
 assert_content "Pi owns pasted native band" "$expected" "$CAPS_PLAIN" "$screen"
+for continuation in '' $'\n   continued draft'; do
+  screen=$'────────\n'"$BAND$continuation"$'\n\n────────'
+  for styled in 0 1; do
+    for cursor in 0 1; do
+      caps=$(printf 'styled=%s\ncursor=%s\nidentity=1' "$styled" "$cursor")
+      for row in 1 2 3; do
+        assert_screen "nested band Pi identity styled=$styled cursor=$cursor row=$row" pending "$caps" "$screen" "$row" $'pi\tidle'
+        assert_screen "nested band lazy identity styled=$styled cursor=$cursor row=$row" need-identity "$caps" "$screen" "$row"
+        assert_screen "nested band absent probe styled=$styled cursor=$cursor row=$row" unknown-draft "$caps" "$screen" "$row" probe-absent
+        assert_screen "nested band foreign identity styled=$styled cursor=$cursor row=$row" unknown-draft "$caps" "$screen" "$row" $'claude\tidle'
+        assert_screen "nested band no capability styled=$styled cursor=$cursor row=$row" unknown-draft \
+          "$(printf 'styled=%s\ncursor=%s\nidentity=0' "$styled" "$cursor")" "$screen" "$row"
+      done
+    done
+  done
+  assert_screen "later independent pair clears band risk" unknown "$CAPS_PLAIN" "$screen"$'\n\n────────'
+  assert_screen "earlier cursor retains band risk" unknown-draft "$CAPS_TMUX" "$screen"$'\n\n────────' 2 probe-absent
+done
 pass "bare and Pi enclosing drafts retain ownership of pasted native bands"
 
 for blocker in '' 'π · model' '│ │' '⠂⠁'; do

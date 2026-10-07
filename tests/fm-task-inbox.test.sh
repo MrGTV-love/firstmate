@@ -642,7 +642,7 @@ test_watcher_rerings_idle_pane_quietly() {
 
 test_watcher_defers_ring_for_unknown_draft() {
   local dir state out log keys pid rec rung rings epoch
-  dir=$(setup_watch_case unknown-draft)
+  dir=$(setup_watch_case "unknown-draft${1:+-native}")
   state="$dir/state"; out="$dir/watch.out"; log="$dir/send.log"; keys="$dir/keys.log"
   : > "$log"; : > "$keys"
   fm_write_meta "$state/t1.meta" "window=sess:fm-t1" "kind=ship" "harness=claude"
@@ -651,7 +651,7 @@ test_watcher_defers_ring_for_unknown_draft() {
   "$ROOT/bin/fm-busy-event.sh" apply "$state" t1 idle --current-gen \
     --source claude-hook --event stop >/dev/null \
     || fail "could not mark the draft-risk task exactly idle"
-  printf '────────\n❯ preface\n ❯ nested draft\n────────\n' > "$dir/draft.capture"
+  printf '%s\n' "${1:-$'────────\n❯ preface\n ❯ nested draft\n────────'}" > "$dir/draft.capture"
   cp "$dir/draft.capture" "$dir/draft-before"
   rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue after your draft")
   age_path "$rec"
@@ -861,6 +861,7 @@ test_fire_and_forget_records_never_enter_the_ladder
 test_ring_ladder_policy
 test_watcher_rerings_idle_pane_quietly
 test_watcher_defers_ring_for_unknown_draft
+test_watcher_defers_ring_for_unknown_draft $'────────\n╭── π > model > path ─╮\n│ typed draft │\n╰─  ─╯\n────────'
 test_watcher_waits_on_busy_pane
 test_watcher_quiet_on_healthy_inbox
 test_watcher_ack_silences_unwritable_ladder

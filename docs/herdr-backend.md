@@ -743,7 +743,7 @@ No Herdr-specific copy of that protocol exists.
 Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids, but terminates the original harness processes.
 When a viewer attaches, Herdr's default `session.resume_agents_on_restore=true` can launch new processes from recorded native session references.
 Those bare resume commands do not reproduce Firstmate's launch configuration, model and effort flags, permission posture, or extensions.
-A restored same-labeled tab with a missing pane or no registered agent is a husk; a live native-resumed agent is not.
+A restored same-labeled tab with a missing pane or a positively shell-only unregistered pane is a husk; a live native-resumed agent is not, even if `agent get` returns `agent_not_found`.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
 This prevents closing the workspace's last tab before a replacement exists.
@@ -765,15 +765,15 @@ Herdr keeps a Pi registration after the Pi process has exited to a plain shell, 
 In that case `agent get` still reports `agent=pi` with its last status.
 That nested shell is the crew shape `treehouse get` leaves behind (measured on Herdr 0.9.0 - [verification](verification/runtime-backends.md) "Stale agent registration"; upstream issue #4115).
 
-So before a registered agent counts as live, the pane classifier reads `pane process-info` and the real process table.
+The pane classifier reads `pane process-info` and the real process table whether registration is present or absent.
 It uses the shared harness-process classifier in `bin/fm-agent-process-lib.sh`, the same rule the tmux adapter proves liveness with:
 
-| What the process view shows | Verdict |
-| --- | --- |
-| A harness in the foreground process group, or still a descendant of the pane shell | The registration stays live. |
-| A foreground that is nothing but shells, with no harness descendant | A `stale-agent` pane: agent-free, with that explicit reason. |
-| A foreground holding anything else | The registration stays live, but only after the same bounded settle window the idle-shell proof uses. |
-| An unreadable process view | The pane is `unknown`, trusting neither the registration nor its absence. |
+| What the process view shows | Registered agent | `agent_not_found` |
+| --- | --- | --- |
+| A harness in the foreground process group, or still a descendant of the pane shell | `live` | `live` |
+| A foreground that is nothing but shells, with no harness descendant | `stale-agent`: agent-free, with that explicit reason | `no-agent`: a proven agent-free shell |
+| A foreground holding anything else after the bounded settle window | `live`: registration retains authority | `unknown`: registration absence does not identify the process |
+| An unreadable, malformed, or mismatched process view | `unknown` | `unknown` |
 
 The settle window exists because an idle shell transiently hosts prompt helpers such as starship in its foreground group.
 The first agent or shell sample in that window decides.
@@ -797,7 +797,7 @@ The generic Herdr agent-liveness probe reuses that pane classifier, then applies
 | --- | --- |
 | A structurally gone pane, or a pane read from a session positively reported as having no running server | `missing` |
 | A restored agent-less shell, or a stale registration over a shell-only pane | `dead` |
-| A registered agent with a live process | `alive` |
+| A verified live harness, registered or not, or a registered agent backed by a non-shell process | `alive` |
 | Every other unexpected read | `unreadable` |
 
 Neither the stopped-server exception nor the stale-registration verdict widens husk detection or any close authority.
@@ -805,7 +805,7 @@ Those paths still refuse an unreadable pane.
 A `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell.
 
 Native registration still identifies Pi by name where tmux would see a generic interpreter.
-The process-level proof only decides whether that registration is backed by a running process.
+The process-level proof decides liveness independently of registration absence; absence alone never licenses closing, relaunching, or recovery.
 `tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#agent-lifecycle-control) owns the versioned evidence.
 

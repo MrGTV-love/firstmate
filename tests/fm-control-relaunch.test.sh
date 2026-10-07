@@ -84,8 +84,12 @@ if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
   esac
   exit 0
 fi
+live_pane=false
+for marker in "$D"/herdr-live-*; do
+  [ ! -f "$marker" ] || live_pane=true
+done
 if [ -f "$D/herdr-agent-registration" ] \
-  || { [ -f "$D/recovery-case-id" ] && [ ! -f "$D/herdr-agent-live" ]; }; then
+  || { [ ! -f "$D/herdr-agent-live" ] && [ "$live_pane" = false ]; }; then
   case "$*" in
     '-axo pid=,ppid=,comm=') printf '4242 1 bash\n'; exit 0 ;;
     '-p 4242 -o args=') printf 'bash\n'; exit 0 ;;
@@ -2429,7 +2433,9 @@ case "${1:-} ${2:-}" in
       kill -TERM "$(cat "$D/recovery-inspection-interrupt")"
       exit 1
     fi
-    if [ -f "$D/recovery-case-id" ] && [ -f "$D/herdr-agent-live" ] && [ ! -f "$D/recovery-registration-missing" ]; then
+    if [ -f "$D/recovery-registration-missing" ]; then
+      printf '{"error":{"code":"agent_not_found"}}\n'
+    elif [ -f "$D/recovery-case-id" ] && [ -f "$D/herdr-agent-live" ]; then
       ref=$(cat "$D/recovery-session-ref")
       agent=omp
       [ ! -f "$D/recovery-registration-ref" ] || ref=$(cat "$D/recovery-registration-ref")
@@ -2475,7 +2481,8 @@ case "${1:-} ${2:-}" in
     fi
     # A retained registration with a shell-only pane models an exited agent
     # whose Herdr status authority still belongs to its previous session.
-    if [ -f "$D/herdr-agent-registration" ]; then
+    if [ -f "$D/herdr-agent-registration" ] \
+      || { [ ! -f "$D/herdr-live-${4:-}" ] && { [ -f "$D/herdr-cwd-${4:-}" ] || [ ! -f "$D/herdr-agent-live" ]; }; }; then
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[]}}}\n' \
         "${4:-}"
     else
@@ -3885,8 +3892,8 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
   local CONTROL="$ROOT/bin/fm-control.sh" preserved=() case_index=0
   for kind in ship scout secondmate; do
   for proof in env-v1 legacy; do
-    for action in exit busy-exit relaunch interrupt; do
-      for scenario in different-cwd same-cwd-personal historical-startup in-process-personal mismatched unreadable; do
+    for action in exit busy-exit relaunch interrupt spawn; do
+      for scenario in different-cwd same-cwd-personal historical-startup in-process-personal mismatched unreadable missing-registration; do
         case_index=$((case_index + 1))
         recovery_case_or_skip "ownership-$kind-$proof-$action-$scenario" "owner-$case_index" \
           || fail "live lifecycle ownership regression requires jq"
@@ -3894,6 +3901,7 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
         prepare_herdr_recovery "$dir" "$id" "$kind"
         [ "$proof" != legacy ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
         case "$scenario" in
+          missing-registration) : > "$dir/fake/recovery-registration-missing" ;;
           different-cwd|same-cwd-personal)
             printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref"
             printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-registration-ref"
@@ -3928,12 +3936,17 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
         work_before=$(git -C "$dir/wt" status --porcelain)
         rc=0
         case "$action" in
+          spawn) out=$(run_spawn "$dir" "$id" --relaunch --harness omp) || rc=$? ;;
           relaunch) out=$(run_control "$dir" "$id" relaunch --note "preserve the live task") || rc=$? ;;
           busy-exit) out=$(run_control "$dir" "$id" exit) || rc=$? ;;
           *) out=$(run_control "$dir" "$id" "$action") || rc=$? ;;
         esac
         expect_code 1 "$rc" "$proof/$action/$scenario must refuse personal lifecycle input"$'\n'"$out"
-        assert_contains "$out" "cannot positively attribute its live Herdr agent" "refusal must name missing live task ownership"
+        if [ "$action" = spawn ]; then
+          assert_contains "$out" "positively agent-free endpoint" "direct spawn must refuse its live endpoint"
+        else
+          assert_contains "$out" "cannot positively attribute its live Herdr agent" "refusal must name missing live task ownership"
+        fi
         assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "personal pane must receive no lifecycle input"
         assert_present "$dir/fake/herdr-agent-live" "personal agent must remain live"
         [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] \
@@ -3947,6 +3960,7 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
         assert_absent "$dir/fake/exit-pending" "ownership refusal must not stage an exit"
         assert_absent "$dir/fake/launched-command" "ownership refusal must not stage a replacement"
         assert_absent "$dir/home/state/.control-$id.lock" "ownership refusal must release the control lock"
+        assert_absent "$dir/home/state/.meta-$id.lock" "ownership refusal must release the metadata lock"
       done
     done
   done
@@ -3954,11 +3968,46 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
   pass "all lifecycle verbs refuse unpinned native startup and personal session switches without input or task mutation"
 }
 
+test_herdr_shell_only_ordinary_lifecycle_accepts_missing_registration() {
+  local dir id action out rc before CONTROL="$ROOT/bin/fm-control.sh"
+  for action in exit relaunch; do
+    recovery_case_or_skip "ordinary-shell-$action" "ordinary-shell-$action" \
+      || fail "ordinary shell lifecycle regression requires jq"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    prepare_herdr_recovery "$dir" "$id" ship
+    : > "$dir/fake/recovery-registration-missing"
+    rm "$dir/fake/herdr-agent-live"
+    before=$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/recorded-session.jsonl")
+    rc=0
+    if [ "$action" = relaunch ]; then
+      out=$(run_control "$dir" "$id" relaunch --note "continue from the idle shell") || rc=$?
+    else
+      out=$(run_control "$dir" "$id" exit) || rc=$?
+    fi
+    expect_code 0 "$rc" "ordinary $action must accept a positively shell-only pane"$'\n'"$out"
+    assert_contains "$(cat "$dir/fake/herdr-log")" "pane process-info" "shell admission must consult process evidence"
+    [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/recorded-session.jsonl")" ] \
+      || fail "ordinary shell $action changed preserved work"
+    if [ "$action" = relaunch ]; then
+      [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "ordinary shell relaunch did not complete"
+      assert_present "$dir/fake/launched-command" "ordinary shell relaunch must launch its replacement"
+      assert_present "$dir/fake/herdr-agent-live" "ordinary shell relaunch must leave its replacement live"
+    else
+      assert_contains "$out" already-stopped "ordinary shell exit must report already stopped"
+      assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "ordinary shell exit must send no input"
+      assert_absent "$dir/fake/launched-command" "ordinary shell exit must not launch"
+      assert_absent "$dir/home/state/$id.control-relaunch" "ordinary shell exit must not checkpoint"
+    fi
+    assert_absent "$dir/home/state/.control-$id.lock" "ordinary shell action must release its control lock"
+  done
+  pass "ordinary lifecycle accepts genuine unregistered shell panes with process-table proof"
+}
+
 test_live_herdr_lifecycle_accepts_managed_launches() {
   local dir id proof launch action out rc gen busy before head_before log meta_before brief_before status_before
   local CONTROL="$ROOT/bin/fm-control.sh"
   for proof in env-v1 legacy; do
-    for launch in managed; do
+    for launch in managed missing-registration; do
       for action in interrupt exit busy-exit relaunch; do
         recovery_case_or_skip "owned-$proof-$launch-$action" "owned-$proof-$launch-$action" \
           || fail "positive lifecycle ownership regression requires jq"
@@ -3970,6 +4019,10 @@ test_live_herdr_lifecycle_accepts_managed_launches() {
           printf node > "$dir/fake/recovery-harness"
           printf '["node","/installed/agent.js"]' > "$dir/fake/recovery-process-argv"
           printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd"
+        fi
+        if [ "$launch" = missing-registration ]; then
+          : > "$dir/fake/recovery-registration-missing"
+          printf old > "$dir/fake/recovery-spawn-gen"
         fi
         busy=idle
         [ "$action" != busy-exit ] || busy=busy
@@ -4055,7 +4108,7 @@ test_reboot_recovery_inspects_without_native_attribution() {
   local preserved=()
   for proof in env-v1 legacy; do
     for mode in direct sweep; do
-      for scenario in different-cwd different-resume in-process-personal header-only historical-startup managed managed-claude unknown-harness mismatched unreadable; do
+      for scenario in different-cwd different-resume in-process-personal header-only historical-startup managed managed-claude unknown-harness mismatched unreadable missing-registration; do
         recovery_case_or_skip "native-$proof-$mode-$scenario" "native-$proof-$mode-$scenario" \
           || fail "native identity regression requires jq"
         dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
@@ -4066,6 +4119,7 @@ test_reboot_recovery_inspects_without_native_attribution() {
         printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
         printf 'working: preserve recorded task\n' > "$dir/home/state/$id.status"
         case "$scenario" in
+          missing-registration) : > "$dir/fake/recovery-registration-missing" ;;
           different-cwd) printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd" ;;
           different-resume) printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref" ;;
           in-process-personal)
@@ -4133,6 +4187,12 @@ test_reboot_recovery_inspects_without_native_attribution() {
           expect_code "$expected" "$rc" "$proof/$mode/$scenario inspection must not recover"$'\n'"$out"
           if [ "$mode" = direct ] && [ "$expected" = 0 ]; then
             assert_contains "$out" recovery-skipped "direct inspection must report its skip"
+            if [ "$scenario" = missing-registration ]; then
+              assert_contains "$out" "launch=unmanaged" "missing registration must reach live ownership inspection"
+            fi
+          fi
+          if [ "$scenario" = missing-registration ] && [ "$mode" = sweep ]; then
+            assert_contains "$out" "live launch is unmanaged" "sweep must inspect the unregistered live launch"
           fi
           [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] || fail "$proof/$mode/$scenario changed records, draft or work"
           assert_present "$dir/fake/herdr-agent-live" "inspected pane must remain alive"
@@ -4604,4 +4664,5 @@ test_recovery_fixture_claims_only_owned_temp_directories
 test_reboot_recovery_inspects_without_native_attribution
 test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation
 test_live_herdr_lifecycle_accepts_managed_launches
+test_herdr_shell_only_ordinary_lifecycle_accepts_missing_registration
 test_managed_herdr_relaunch_refuses_unproven_replacement_env

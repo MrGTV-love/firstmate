@@ -881,6 +881,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_PI_PAIR_FOUND=0
   FM_COMPOSER_SCAN_PI_PAIR_VALID=0
   FM_COMPOSER_SCAN_PI_PAIR_AMBIG=0
+  FM_COMPOSER_SCAN_PI_NATIVE_DRAFT_RISK=0
   FM_COMPOSER_SCAN_PI_CURSOR_AMBIG=0
   FM_COMPOSER_SCAN_PI_OPEN=-1
   FM_COMPOSER_SCAN_PI_CLOSE=-1
@@ -900,7 +901,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   FM_COMPOSER_SCAN_BOX_OMP=0
-  local box_omp=0
+  local box_omp=0 pi_native_draft_risk=0
   local band_top=-1 band_floor=-1 band_indent='' band_continuation=0 band_gap=0
   local bare_line bare_indent literal_line literal_indent literal_row literal_rows
   FM_COMPOSER_SCAN_BARE_LITERAL_ROWS='|'
@@ -1176,6 +1177,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         FM_COMPOSER_SCAN_PI_OPEN=$pi_open
         FM_COMPOSER_SCAN_PI_CLOSE=$row
         FM_COMPOSER_SCAN_PI_PAIR_AMBIG=$pi_ambiguous
+        FM_COMPOSER_SCAN_PI_NATIVE_DRAFT_RISK=$pi_native_draft_risk
         if [ "$pi_lines" -le "$pi_max" ]; then
           FM_COMPOSER_SCAN_PI_PAIR_VALID=1
         else
@@ -1204,6 +1206,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       pi_open_titled=0
       pi_ambiguous=0
       pi_lines=0
+      pi_native_draft_risk=0
       pi_glyph_row=-1
       pi_glyph=''
     elif _fm_composer_titled_rule_row "$trimmed"; then
@@ -1222,6 +1225,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       pi_open_indent=$indent
       pi_open_titled=1
       pi_lines=0
+      pi_native_draft_risk=0
       pi_glyph_row=-1
       pi_glyph=''
     else
@@ -1307,6 +1311,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       # omp's box shape: the status-bearing top border proves the container and
       # the closing `╰─ … ─╯` row IS the editor's last row (never a bare rule),
       # so the box is complete with zero side-bordered rows above it.
+      if [ "$pi_open" -ge 0 ] && [ "$top" -gt "$pi_open" ]; then
+        pi_native_draft_risk=1
+      fi
       if [ -z "$cy" ] || { [ "$top" -lt "$cy" ] && [ "$cy" -le "$row" ]; }; then
         FM_COMPOSER_SCAN_OMPBOX_TOP=$top
         FM_COMPOSER_SCAN_OMPBOX_BOTTOM=$row
@@ -1357,6 +1364,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
               geometry_ambiguous=1
             fi
           fi
+        fi
+        if [ "$box_omp" != 0 ] && [ "$pi_open" -ge 0 ] && [ "$top" -gt "$pi_open" ]; then
+          pi_native_draft_risk=1
         fi
         if [ -n "$cy" ]; then
           if [ "$top" -lt "$cy" ] && [ "$cy" -le "$row" ]; then
@@ -2623,9 +2633,10 @@ _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <i
 # cannot disprove that, so a blocked pi defers rather than claiming empty.
 _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   local screen=$1 styled=$2 has_identity=$3 identity=$4 agent agent_status state denied=unknown
-  if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
-     && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
-     && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+  if [ "$FM_COMPOSER_SCAN_PI_NATIVE_DRAFT_RISK" = 1 ] \
+     || { [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+          && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+          && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; }; then
     denied=unknown-draft
   fi
   if [ "$has_identity" != 1 ]; then
