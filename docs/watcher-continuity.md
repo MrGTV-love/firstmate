@@ -388,9 +388,9 @@ The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYC
 ### Grace, beacon, and stop signals
 
 The default 300-second grace is unchanged.
-Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, and while actively waiting for a deadline-bounded custom or PR check.
+Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
-The main shell enforces the check deadline even if the check's timeout controller stops responding.
+The main shell enforces each capture deadline even if its timeout controller stops responding.
 Home-summary publication runs separately so its inventory-sized work does not delay the main poll.
 The [process-event operating contract](configuration.md#process-to-event-sources-stateprocevent) owns background source reconciliation and queued-result delivery.
 The [pending-reply library](../bin/fm-pending-reply-lib.sh) owns retained-reply scanning and escalation-close retries.
@@ -401,6 +401,7 @@ An arm whose own script path sits under a disposable no-mistakes validation chec
 Once per poll the watcher checks that its home, its state directory, and its own code root still exist, and exits with a logged reason when one is gone, scoped to itself alone, so a torn-down temporary home or a discarded checkout never leaves an orphan watcher behind.
 The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked poll, so both run its EXIT cleanup.
 `watcher_stop_signals` in `bin/fm-watch.sh` owns the signal-handling rationale.
+Reboot-recovery inspection uses the same registered capture ownership as checks and an owner-aware bounded child. PID-only stop or eviction runs that capture's cleanup; an outer checkpoint deadline also stops inspection descendants when the watcher owner disappears. Cleanup allows the bounded child's one-second TERM grace before retiring its controller, so TERM-resistant inspection descendants receive KILL rather than becoming orphaned. Recovery output and exit status remain available for the existing durable wake and completion cooldown.
 The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `FM_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
 A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lock wait: on timeout the recovery transition fails without releasing the singleton, leaving dead-pid stale evidence for the next arm to republish and clear.
@@ -470,6 +471,8 @@ Process-event fixtures pass both the home and its matching explicit state direct
 - Bounded and successor-linked lifecycle rows.
 - A SIGSTOP counterfactual that distinguishes a live PID from a stale beacon before classifying termination.
 - A single slow, deadline-bounded check keeps the strict watcher predicate healthy beyond grace, while stopping that same main poll makes its beacon stale even with its check child still alive.
+
+`tests/fm-supervision-events.test.sh` covers recovery output/status transport and cooldown, plus real recovery command and descendant termination on PID-only owner TERM, owner death without cleanup, the inspection deadline, and an outer checkpoint deadline. Its TERM-resistant fixtures assert process survival before shutdown and disappearance afterward.
 
 ### Claude auto-arm and turn-end guard
 

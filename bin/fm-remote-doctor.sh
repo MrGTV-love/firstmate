@@ -657,7 +657,23 @@ check_launch_agent_loaded() { # <resolved-login-shell>
     "close the login-session gap first; a launch agent can only be bootstrapped into an existing GUI session"
 }
 
+check_herdr_owner_reader() {
+  if [ "$PLATFORM" != darwin ]; then
+    record herdr-owner-reader "skip: Aqua server ownership applies only on darwin"
+  elif fm_remote_herdr_owner_reader_available; then
+    record herdr-owner-reader "ok: python3 resolves on the runtime PATH"
+  else
+    record herdr-owner-reader "human: python3 prerequisite does not resolve on the runtime PATH" \
+      "install Python 3 on that account and expose python3 on the remote runtime and launch agent PATH; server reload cannot repair a missing ownership reader"
+  fi
+}
+
 check_herdr_server() {
+  if [ "$PLATFORM" = darwin ] && ! check_is_ok herdr-owner-reader; then
+    record herdr-server "human: server ownership cannot be proven without the python3 prerequisite" \
+      "close the herdr-owner-reader prerequisite gap first; the current server will not be reloaded or taken over"
+    return 0
+  fi
   if ! herdr_cli_available; then
     record herdr-server "human: herdr server status cannot be read without both herdr and jq on the runtime PATH" \
       "install the missing tool reported above, then rerun this command"
@@ -727,6 +743,7 @@ run_checks() { # <resolved-login-shell>
   check_gui_session
   check_remote_job_worker
   check_launch_agent "$shell"
+  check_herdr_owner_reader
   check_herdr_server
   check_entrypoint_link
 }
@@ -846,6 +863,7 @@ apply_fixes() { # <resolved-login-shell>
         fix_remote_job_worker || true
         ;;
       launchagent|launchagent-scope)
+        [ "$PLATFORM" != darwin ] || check_is_ok herdr-owner-reader || continue
         [ "$launch_agent_written" -eq 0 ] || continue
         launch_agent_written=1
         write_launch_agent "$shell" || continue
@@ -856,11 +874,13 @@ apply_fixes() { # <resolved-login-shell>
         reload_launch_agent launchagent-loaded || true
         ;;
       launchagent-loaded)
+        check_is_ok herdr-owner-reader || continue
         [ "$launch_agent_reloaded" -eq 0 ] || continue
         launch_agent_reloaded=1
         reload_launch_agent launchagent-loaded || true
         ;;
       herdr-server)
+        [ "$PLATFORM" != darwin ] || check_is_ok herdr-owner-reader || continue
         # On darwin the launch agent owns the server, so restart it through
         # launchd rather than starting a stray one outside the Aqua session. A
         # reload earlier in this same pass has already done that.

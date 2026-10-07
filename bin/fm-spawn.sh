@@ -312,8 +312,8 @@
 #   Spawn refuses an unsafe pre-existing task temp root or launch namespace, and
 #   task teardown removes only the current home's launch namespace.
 # Herdr launches record launch_proof=env-v1 and stamp FM_SPAWN_GEN with
-# spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns the
-# recovery proof; Herdr's bare native resume cannot reproduce that boundary.
+# spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns live
+# lifecycle attribution; Herdr's bare native resume remains unmanaged.
 # Launch environment (config/launch-env-allowlist):
 #   Absent leaves ambient inheritance subject to harness-specific shedding.
 #   A present readable regular file opts every launch (ship, scout, secondmate,

@@ -50,6 +50,10 @@
 #     Aqua: a server that cannot prove its birth is treated like a foreign one,
 #     because leaving it in place silently reproduces the keychain failure.
 
+fm_remote_herdr_owner_reader_available() {
+  command -v python3 >/dev/null 2>&1
+}
+
 fm_remote_herdr_socket_owner() { # <socket-path>
   local socket=$1 real pid='' line candidates='' candidate cmd
   [ -n "$socket" ] || return 1
@@ -80,7 +84,7 @@ EOF2
 fm_remote_herdr_process_env() { # <pid>
   local pid=$1
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  command -v python3 >/dev/null 2>&1 || return 1
+  fm_remote_herdr_owner_reader_available || return 1
   python3 - "$pid" 2>/dev/null <<'PY'
 import ctypes
 import re

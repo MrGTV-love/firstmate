@@ -99,61 +99,53 @@ A relaunch does take one session reference when the endpoint's own runtime recor
 
 Switching harness is therefore one ordinary relaunch rather than a separate mechanism.
 
-### Recovering a bare native restore
+### Inspecting a bare native restore
 
 Herdr can resume a live omp harness after reboot without the Firstmate launch command.
-For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and repairs only positively unmanaged recorded `omp` agents.
-Use an explicit `FM_HOME` with `recover` to repair every eligible positively unmanaged live omp agent.
-`recover --one` bounds an automatic supervision tick to one repair attempt.
-The recovery script's [header and help](../bin/fm-reboot-recover.sh) own bounded-scan scheduling and its durable cursor.
-Deferred startup recovery runs the sweep after the existing bootstrap sweeps, which keep their recovery responsibilities.
-The watcher repeats the bounded scan to catch panes restored only after a viewer attaches, waits at least 60 seconds after each attempt finishes, and emits each sweep's diagnostics and repair results as an independently keyed `check` wake.
+That native restore is unmanaged: neither its resume path nor the original launch message proves which conversation the live process currently owns.
+`bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and reports unmanaged live launches without lifecycle input or task-record mutation.
+Use an explicit `FM_HOME` with `recover` to inspect every eligible recorded live agent.
+`recover --one` bounds an automatic supervision tick to one selected local Herdr record.
+The script's [header and help](../bin/fm-reboot-recover.sh) own bounded-scan scheduling and its durable cursor, which advances before inspection even when that inspection is interrupted or refuses.
+Deferred startup inspection follows the existing bootstrap sweeps, which keep their recovery responsibilities.
+The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and emits each sweep's diagnostics as an independently keyed `check` wake.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
-Unreadable endpoint inspection is reported as a task-specific recovery failure without lifecycle action, not silently treated as a missing or stopped agent.
-Ship and scout recovery skips lifecycle action when the shared backlog eligibility check refuses: automatic backlog rows must be readable, unheld, unblocked, and queued or In flight; validated away work requires a queued row.
-Existing manual and no-backlog exemptions remain unchanged.
-Recovery also refuses while the task has a pending authoritative backlog close.
+Unreadable endpoint inspection is reported as a task-specific failure without lifecycle action, not silently treated as a missing or stopped agent.
 The sweep never discovers other homes' panes or recursively enters a secondmate home.
 
-Each repair is the ordinary `bin/fm-control.sh <id> relaunch --recover-launch` transaction, not a second exit or spawn mechanism.
+`bin/fm-control.sh <id> relaunch --recover-launch` is also inspection-only.
 The option is exclusive of profile overrides, notes, and debug options.
-Under the task's control lock it rechecks launch proof and requires a proven empty composer **before any interrupt**, checkpoint, or progress note.
-Retained busy metadata does not authorize Escape into a draft: omp clears idle Bash/Python execution-mode drafts on that key.
-Pending or unproven input refuses without changing the draft or task records.
-An empty composer proceeds with **all three recorded profile axes** pinned and the ordinary checkpoint-and-relaunch transaction.
-For a local secondmate, recovery also holds the existing liveness lock through stop, replacement proof, and any rollback, so liveness recovery cannot concurrently replace its endpoint; contention refuses without touching the agent.
-Unlike an ordinary secondmate relaunch, it does not adopt a newly configured secondmate profile.
-It reuses the exact pane and local copy, preserves all unlanded work and secondmate child records, and never rewrites a standing charter.
-A ship or scout replacement receives a progress note directing it to reconcile completed work and outstanding decisions before continuing.
-For a local secondmate, the note remains parent-side audit evidence; its unchanged charter and home records supply startup reconciliation.
-An already managed agent is left alone, including on repeated sweeps.
+Under the task's control lock it inspects the live launch and reports unmanaged proof without interrupting, exiting, checkpointing, noting, or replacing the agent.
+It leaves managed and stopped agents untouched.
+Unknown versioned proof refuses; legacy-unproven proof skips.
+Drafts, busy state, task instructions, profile axes, charters, child records, and unlanded work remain unchanged.
 
 ### Live Herdr task attribution
 
 `bin/fm-launch-proof-lib.sh` owns launch attribution, and every control-plane path to a live Herdr agent uses one shared positive task-attribution guard before lifecycle input or a task checkpoint, note, or record mutation.
 A recorded endpoint or matching cwd alone never proves live task ownership.
-Managed incarnations and positively attributable recorded bare native restores authorize ordinary interrupt, exit, busy-exit, and relaunch; recovery repairs only the latter and leaves managed launches untouched.
+Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.
 An enabled `config/launch-env-allowlist` still selects the existing cleared-environment POSIX-sh boundary.
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
-The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
-Readable kernel environment with a nonempty matching recorded incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field; argv and text embedded in other environment values never supply incarnation evidence.
-A readable environment with a missing or mismatched incarnation proves unmanaged only for a recorded `harness=omp` with positively attributed native startup provenance.
-The foreground process must have executable basename `omp`, exactly `omp --resume=<file>` argv, and an actual cwd equal to the recorded worktree.
-The resumed native JSONL file must begin with its session header, optionally preceded by one validated native title slot, and have that same cwd in the header and an initial user message decoding through the operational-input protocol as `launch-brief`.
-For a ship or scout, that initial body must begin with the complete current worker role contract followed by a paragraph boundary; the inbox must retain the exact task ID and resolve to this home's state directory, while equivalent directory spellings remain attributable.
-For a local secondmate, that initial body must equal the recorded home's standing charter when it is a regular file, or otherwise the recorded task brief, matching the ordinary launch source.
-Neither a generic launch phrase, an inbox path mentioned in unrelated prose, nor a current Herdr session registration supplies this recorded-task provenance.
+The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
+The kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
+That matching live pin proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field.
+Argv and text embedded in other environment values never supply incarnation evidence.
+An omp process without that matching pin is unmanaged, including Herdr-native `omp --resume`.
+Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for the pin.
+An in-process switch of a native-restored omp to a personal conversation remains unmanaged even when its PID, argv, environment, and original session file are unchanged.
 Every other recorded harness remains unknown with missing or mismatched pins.
-Foreign processes, personal native sessions, missing actual cwd, unreadable or malformed session files, and ambiguous foreground identity also remain unknown; no control-plane path takes lifecycle action on unknown proof.
-Older records with no launch-proof field require either that matching recorded incarnation or the same exact bare native startup provenance.
-Split `--resume <ref>` arguments, extra arguments, non-omp harnesses, and interpreter entry points do not prove native restoration; no installed-CLI symlink reconstruction is used.
-An unproven legacy launch remains unchanged by recovery, and a present but unsupported launch-proof field never falls back to legacy attribution.
-After a recovery replacement, matching managed-launch proof is required before transaction completion.
+Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
+Neither unmanaged nor unknown proof authorizes lifecycle action.
+Every Herdr replacement must have matching managed-launch proof before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 
-This recovery does not change Herdr's session-wide auto-resume setting.
+The live spawn pin is an incarnation binding, not proof of the current omp conversation.
+**Accepted residual risk:** `/resume` inside an FM-spawned worker retains its live pin and remains undetected pending `fm-omp-current-session-proof`.
+No extension-recorded current-session proof is implemented by this control plane.
+This inspection does not change Herdr's session-wide auto-resume setting.
 The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
 
 ### Recovering an exited instruction owner
@@ -280,6 +272,6 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 ## Verification
 
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
-- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, positive live Herdr ownership and personal-pane refusals across every lifecycle verb, attributable native restore and bounded copied-home recovery, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr no-server reclaim, refusal of other configured backends, and conservative process-read refusals.
-- `tests/fm-launch-proof.test.sh` - versioned and legacy managed incarnation proof across supported harnesses, exact native startup attribution, and conservative foreground, process-environment, and conversation-provenance refusals.
+- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, positive live Herdr ownership and no-pin refusals across every lifecycle verb, unmanaged native restore inspection and bounded copied-home diagnostics, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr no-server reclaim, refusal of other configured backends, and conservative process-read refusals.
+- `tests/fm-launch-proof.test.sh` - versioned and legacy managed incarnation proof across supported harnesses, native restore and same-PID personal-session switches remaining unmanaged, and conservative foreground and process-environment refusals.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.

@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-# Recover this home's recorded Herdr agents after native bare restoration.
+# Inspect this home's recorded Herdr agents after native bare restoration.
 # Usage: FM_HOME=<home> fm-reboot-recover.sh [recover] [--one]
-# Default recover repairs each positively unmanaged live recorded omp ship,
-# scout, or local secondmate through fm-control relaunch --recover-launch, in
-# its recorded pane and local copy. No namespace discovery, child-home traversal, config change,
-# endpoint removal, branch operation, or worktree allocation occurs.
+# Native restores without a matching live Firstmate spawn pin are unmanaged.
+# The sweep reports them without lifecycle input or task-record mutation.
+# No namespace discovery, child-home traversal, config change, endpoint removal,
+# branch operation, or worktree allocation occurs.
 # Remote secondmates and other backends keep their existing recovery owners.
 # Missing/stopped agents remain with their existing liveness recovery paths.
-# Herdr's session-wide auto-resume setting is deliberately not changed: it
-# applies to unrelated panes too. Exact recorded launch recovery supplies the
-# settings its native resume drops. Unknown versioned launch proof is reported;
-# legacy-unproven records are silently skipped. Neither authorizes lifecycle action.
-# Failed recovery is surfaced; an unbounded sweep continues inspecting records.
-# --one stops after one repair attempt. Bounded recover scans rotate after the
-# last selected local Herdr record, including interrupted inspections and refusals.
+# Herdr's session-wide auto-resume setting is deliberately not changed.
+# Unknown versioned launch proof is reported; legacy-unproven records skip.
+# Failed inspection is surfaced; an unbounded sweep continues inspecting records.
+# --one stops after one selected local Herdr record, including inspection refusals.
 # STATE/.reboot-recovery-cursor holds that id. It advances atomically before
 # backend inspection, so the next tick follows it even if inspection is interrupted.
 # Unbounded recover does not read or change that scheduling cursor.
@@ -67,7 +64,8 @@ if [ "$ONE" = 1 ]; then
     done
   fi
 fi
-for ((offset=0; offset<count; offset++)); do
+selected=0
+for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
   index=$(( (start + offset) % count ))
   meta=${records[index]}
   [ -f "$meta" ] && [ ! -L "$meta" ] || continue
@@ -75,6 +73,7 @@ for ((offset=0; offset<count; offset++)); do
   [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
   id=${meta##*/}; id=${id%.meta}
   case "$(fm_meta_get "$meta" kind)" in ship|scout|secondmate|'') ;; *) continue ;; esac
+  selected=1
   if [ "$ONE" = 1 ]; then
     tmp=$(umask 077; mktemp "$STATE/.reboot-recovery-cursor.XXXXXX") || exit 1
     if ! printf '%s\n' "$id" > "$tmp" || ! mv -f -- "$tmp" "$cursor"; then
@@ -107,17 +106,10 @@ for ((offset=0; offset<count; offset++)); do
       result=1
       continue
       ;;
-    unmanaged) ;;
-    *) result=1; continue ;;
+    unmanaged)
+      echo "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken"
+      ;;
+    *) result=1 ;;
   esac
-  # fm-control rechecks proof under its per-task lock and pins every recorded
-  # profile axis itself, including secondmates whose current config changed.
-  if out=$("$SCRIPT_DIR/fm-control.sh" "$id" relaunch --recover-launch 2>&1); then
-    printf 'REBOOT_RECOVERY: %s: %s\n' "$id" "$out"
-  else
-    printf 'REBOOT_RECOVERY: %s: failed: %s\n' "$id" "$out"
-    result=1
-  fi
-  [ "$ONE" != 1 ] || break
 done
 exit "$result"

@@ -1,35 +1,4 @@
 #!/usr/bin/env bash
-# tests/fm-omp-composer-box-live-e2e.test.sh - the live omp box-composer guard
-# (live-harness-optin family; task fm-omp-composer-unknown-blocks-control).
-#
-# omp draws its composer in the shape `composer.shape` selects. Firstmate pins
-# `borderless` for every worker it launches (.omp/fm-session-overlay.yml), but a
-# running omp live-reloads the overlay files it was started with: when the
-# tracked overlay stopped carrying the pin, every already-running worker fell
-# back to the captain's own `box` shape, which carries its status line in the
-# top border and folds the editor's last row into the bottom border. The
-# classifier read that screen as `unknown`, so fm-control exit and relaunch
-# refused every idle worker ("composer state is 'unknown', not proven empty").
-# That shape is vendor-rendered, so per .agents/skills/firstmate-coding-guidelines
-# the portable fixtures in tests/fm-composer-lib.test.sh are not enough on
-# their own: this guard launches the INSTALLED omp idle in an isolated Herdr lab
-# with the box shape pinned, and requires, through the production Herdr adapter
-# and the public fm-control lifecycle commands:
-#   - the idle pane really is the box shape (status in the top border);
-#   - an empty composer reads `empty`, and a typed draft reads `pending` and
-#     makes fm-control exit refuse by name without typing anything;
-#   - fm-control exit then stops the idle worker and preserves its endpoint.
-# It fails naming omp and `omp --version`.
-#
-# Reading an idle screen and exiting submit no prompt, so no model tokens are
-# spent and the gate is default-on wherever omp, herdr, and jq are installed
-# (fm_live_gate): FM_OMP_COMPOSER_BOX_LIVE=1 forces it (an absent tool then
-# fails instead of skipping) and =0 disables it. The relaunch proof starts a
-# real worker on the brief, which does spend tokens, so it stays opt-in behind
-# FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1.
-# Refresh docs/verification/runtime-backends.md ("omp box composer") from this
-# guard's output after any omp upgrade.
-# Every Herdr call, including adapter calls, is routed through bin/fm-herdr-lab.sh.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -41,17 +10,13 @@ LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-LIVE_CONTROLS=FM_OMP_COMPOSER_BOX_LIVE
-if [ "${FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH:-0}" = 1 ]; then
-  LIVE_CONTROLS="$LIVE_CONTROLS,FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH"
-fi
-fm_live_gate default-on "$LIVE_CONTROLS" herdr jq omp
-
+fm_live_gate default-on FM_OMP_COMPOSER_BOX_LIVE herdr jq omp python3
 [ -x "$LAB_HELPER" ] || fail "FM_OMP_COMPOSER_BOX_LIVE=1 but the Herdr lab helper is not executable at $LAB_HELPER"
 
 # shellcheck source=tests/herdr-test-safety.sh
 . "$ROOT/tests/herdr-test-safety.sh"
 herdr_forget_inherited_pane
+unset FM_SPAWN_GEN
 
 ORIGINAL_PATH=$PATH
 SESSION=$("$LAB_HELPER" name omp-composer-box-live)
@@ -59,20 +24,18 @@ TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-omp-composer-box-live
 FAKEBIN="$TMP_ROOT/fakebin"
 mkdir -p "$FAKEBIN"
 TASK_ID="ompbox$$"
-LAUNCH_DIR=
+OWNED_SESSION=0
 
 cleanup() {
   local rc=$?
   trap - EXIT
-  if ! PATH="$ORIGINAL_PATH" "$LAB_HELPER" teardown "$SESSION"; then
-    rc=1
+  if [ "$OWNED_SESSION" = 1 ] && ! PATH="$ORIGINAL_PATH" "$LAB_HELPER" teardown "$SESSION"; then
+    printf "guarded teardown failed for session '%s'; retained private tree for manual cleanup: %s\n" \
+      "$SESSION" "$TMP_ROOT" >&2
+    exit 1
   fi
-  # fm-spawn write-protects the task's git hook directory in the control home.
-  chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
-  if [ -n "$LAUNCH_DIR" ]; then
-    rm -rf "$LAUNCH_DIR"
-  fi
-  rm -rf "/tmp/fm-$TASK_ID" "$TMP_ROOT"
+  chmod -R u+w "$TMP_ROOT" 2>/dev/null || rc=1
+  rm -rf "$TMP_ROOT" || rc=1
   exit "$rc"
 }
 trap cleanup EXIT
@@ -93,19 +56,21 @@ exec env PATH="$ORIGINAL_PATH" "$LAB_HELPER" run "$SESSION" "\${args[@]}"
 EOF
 chmod +x "$FAKEBIN/herdr"
 
+"$LAB_HELPER" prepare "$SESSION" || fail "could not reserve the isolated Herdr lab"
+OWNED_SESSION=1
 "$LAB_HELPER" provision "$SESSION" || fail "could not provision the isolated Herdr lab"
 export PATH="$FAKEBIN:$ORIGINAL_PATH"
 
 # shellcheck source=/dev/null
-. "$ROOT/bin/backends/herdr.sh"
+. "$ROOT/bin/fm-backend.sh"
+fm_backend_source herdr
+. "$ROOT/bin/fm-launch-proof-lib.sh"
 
 lab() { env PATH="$ORIGINAL_PATH" "$LAB_HELPER" run "$SESSION" "$@"; }
 VERSION=$(PATH="$ORIGINAL_PATH" omp --version 2>/dev/null | head -1 || printf 'version-unknown')
 HERDR_VER=$(PATH="$ORIGINAL_PATH" herdr --version 2>/dev/null | head -1 || printf 'herdr-unknown')
 SUBJECT="omp ($VERSION) on $HERDR_VER"
 
-# The session overlay with its composer pin swapped for the box shape: the same
-# posture every worker launches with, minus the one setting under test.
 BOX_OVERLAY="$TMP_ROOT/box-overlay.yml"
 sed 's/^  shape: borderless$/  shape: box/' "$ROOT/.omp/fm-session-overlay.yml" > "$BOX_OVERLAY"
 
@@ -113,25 +78,22 @@ CONTROL_HOME="$TMP_ROOT/control-home"
 PROJECT="$TMP_ROOT/proj"
 WORKTREE="$TMP_ROOT/wt"
 mkdir -p "$CONTROL_HOME/state" "$CONTROL_HOME/data/$TASK_ID"
-CONTROL_HOME_ROOT=$(cd "$CONTROL_HOME" 2>/dev/null && pwd -P) || CONTROL_HOME_ROOT=$CONTROL_HOME
-if command -v shasum >/dev/null 2>&1; then
-  CONTROL_HOME_HASH=$(printf '%s' "$CONTROL_HOME_ROOT" | shasum -a 256 | awk '{print $1}')
-elif command -v sha256sum >/dev/null 2>&1; then
-  CONTROL_HOME_HASH=$(printf '%s' "$CONTROL_HOME_ROOT" | sha256sum | awk '{print $1}')
-else
-  fail "test needs shasum or sha256sum"
-fi
-LAUNCH_DIR="/tmp/fm-$TASK_ID+$CONTROL_HOME_HASH"
 fm_git_worktree "$PROJECT" "$WORKTREE" "$TASK_ID" \
   || fail "could not create the task worktree"
 cat > "$CONTROL_HOME/data/$TASK_ID/brief.md" <<'EOF'
 # Task
 ## Captain's intent
-Verify that an idle box-shaped omp worker can be safely relaunched.
+Verify that native box-shaped omp remains untouched by Firstmate lifecycle commands.
 
 ## Firstmate spec
 Do not edit any file.
 EOF
+printf 'preserve dirty native work\n' > "$WORKTREE/unlanded.txt"
+export FM_HOME="$CONTROL_HOME" FM_STATE_OVERRIDE="$CONTROL_HOME/state"
+export FM_DATA_OVERRIDE="$CONTROL_HOME/data" FM_CONFIG_OVERRIDE="$CONTROL_HOME/config"
+export FM_PROJECTS_OVERRIDE="$CONTROL_HOME/projects" FM_ROOT_OVERRIDE="$ROOT" HERDR_SESSION="$SESSION"
+mkdir -p "$FM_CONFIG_OVERRIDE" "$FM_PROJECTS_OVERRIDE"
+printf 'manual\n' > "$FM_CONFIG_OVERRIDE/backlog-backend"
 
 ws=$(lab workspace create --cwd "$WORKTREE" --label "fm-$TASK_ID" --no-focus) \
   || fail "could not create the isolated workspace"
@@ -164,9 +126,6 @@ control() {  # <fm-control arguments...>
     "$ROOT/bin/fm-control.sh" "$@" 2>&1
 }
 
-# Wait for both the box shape and Herdr's live-agent registration: omp can draw
-# its composer before the detector registers it. A splash, different shape, or
-# unregistered launch must never satisfy the guard's lifecycle precondition.
 i=0
 screen=
 while [ "$i" -lt 60 ]; do
@@ -194,6 +153,72 @@ state=$(fm_backend_herdr_composer_state "$TARGET")
   || fail "$SUBJECT: the initial empty box composer has no live agent"
 pass "live omp box composer: $SUBJECT idle empty composer reads empty through the production Herdr adapter"
 
+META="$CONTROL_HOME/state/$TASK_ID.meta"
+native_pid() {
+  lab pane process-info --pane "$PANE" | jq -er --arg config "$BOX_OVERLAY" '
+    [.result.process_info.foreground_processes[]
+      | select(any(.argv[]?; . == $config))]
+    | select(length == 1) | .[0].pid'
+}
+PID=$(native_pid) || fail "$SUBJECT: the native omp PID could not be identified"
+environment=$(fm_remote_herdr_process_env "$PID") || fail "$SUBJECT: native live environment could not be read"
+printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' \
+  || fail "$SUBJECT: native live environment was not positively readable"
+if printf '%s\n' "$environment" | grep -q '^FM_SPAWN_GEN='; then
+  fail "$SUBJECT: native omp unexpectedly inherited a Firstmate spawn pin"
+fi
+[ "$(fm_launch_proof_herdr "$META")" = unmanaged ] \
+  || fail "$SUBJECT: direct omp launch did not remain unmanaged"
+BEFORE=$(git -C "$WORKTREE" rev-parse HEAD)
+BRANCH=$(git -C "$WORKTREE" symbolic-ref HEAD)
+PRESERVED=("$META" "$CONTROL_HOME/data/$TASK_ID/brief.md" "$WORKTREE/unlanded.txt")
+SNAPSHOT=$(cksum "${PRESERVED[@]}")
+STATE_FILES=$(find "$FM_STATE_OVERRIDE" -type f -print | LC_ALL=C sort)
+
+assert_native_refusals() {
+  local action out state_before content_before
+  state_before=$(fm_backend_herdr_composer_state "$TARGET")
+  content_before=$(fm_backend_herdr_composer_content "$TARGET" "$(fm_backend_herdr_composer_identity "$TARGET")")
+  lab pane read "$PANE" --source visible > "$TMP_ROOT/before.screen" \
+    || fail "$SUBJECT: could not snapshot the native screen"
+  for action in interrupt exit relaunch; do
+    if [ "$action" = relaunch ]; then
+      if out=$(control "$TASK_ID" relaunch --note 'Must not reach native instructions.'); then
+        fail "$SUBJECT: ordinary relaunch accepted the unmanaged native worker: $out"
+      fi
+    elif out=$(control "$TASK_ID" "$action"); then
+      fail "$SUBJECT: $action accepted the unmanaged native worker: $out"
+    fi
+    case "$out" in
+      *'cannot positively attribute its live Herdr agent'*'refusing'*) ;;
+      *) fail "$SUBJECT: $action did not name the native ownership refusal: $out" ;;
+    esac
+    [ "$(native_pid)" = "$PID" ] || fail "$SUBJECT: $action replaced the native PID"
+    [ "$(fm_launch_proof_herdr "$META")" = unmanaged ] \
+      || fail "$SUBJECT: $action changed native ownership"
+    [ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] \
+      || fail "$SUBJECT: $action stopped the native worker"
+    [ "$(fm_backend_herdr_composer_state "$TARGET")" = "$state_before" ] \
+      || fail "$SUBJECT: $action changed native composer state"
+    [ "$(fm_backend_herdr_composer_content "$TARGET" "$(fm_backend_herdr_composer_identity "$TARGET")")" = "$content_before" ] \
+      || fail "$SUBJECT: $action changed native composer content"
+    lab pane read "$PANE" --source visible > "$TMP_ROOT/after.screen" \
+      || fail "$SUBJECT: could not reread the native screen"
+    cmp -s "$TMP_ROOT/before.screen" "$TMP_ROOT/after.screen" \
+      || fail "$SUBJECT: $action changed the visible native screen"
+    [ "$(cksum "${PRESERVED[@]}")" = "$SNAPSHOT" ] \
+      || fail "$SUBJECT: $action changed metadata, instructions or dirty work"
+    [ "$(git -C "$WORKTREE" rev-parse HEAD)" = "$BEFORE" ] \
+      && [ "$(git -C "$WORKTREE" symbolic-ref HEAD)" = "$BRANCH" ] \
+      || fail "$SUBJECT: $action changed HEAD or branch"
+    [ "$(find "$FM_STATE_OVERRIDE" -type f -print | LC_ALL=C sort)" = "$STATE_FILES" ] \
+      || fail "$SUBJECT: $action created lifecycle state"
+    lab pane get "$PANE" >/dev/null || fail "$SUBJECT: $action removed the native endpoint"
+  done
+}
+
+assert_native_refusals
+
 fm_backend_herdr_send_literal "$TARGET" 'unsent draft text' \
   || fail "$SUBJECT: could not type a draft into the box composer"
 i=0
@@ -210,23 +235,9 @@ esac
 state=$(fm_backend_herdr_composer_state "$TARGET")
 [ "$state" = pending ] \
   || fail "$SUBJECT: a box composer holding a typed draft read '$state', not pending"
-if out=$(control "$TASK_ID" exit); then
-  fail "$SUBJECT: fm-control exit typed over a pending draft in the box composer: $out"
-fi
-case "$out" in
-  *'composer visibly holds pending text'*) ;;
-  *) fail "$SUBJECT: fm-control exit did not name the pending draft in the box composer: $out" ;;
-esac
-[ ! -e "$CONTROL_HOME/state/$TASK_ID.control-exit" ] \
-  || fail "$SUBJECT: a refused exit left a deliberate-exit marker"
-screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
-case "$screen" in
-  *'unsent draft text/quit'*|*'unsent draft text /quit'*) fail "$SUBJECT: the exit command was concatenated onto the draft" ;;
-esac
-pass "live omp box composer: $SUBJECT reads a typed draft pending and fm-control exit refuses it by name without typing"
 
-# Clear the draft (Ctrl+U clears the composer line) and prove it reads empty
-# again before the real exit.
+assert_native_refusals
+pass "live omp box composer: $SUBJECT reads a draft pending and refuses native interrupt, exit and relaunch without altering its PID, screen or draft"
 lab pane send-keys "$PANE" ctrl+u >/dev/null || fail "$SUBJECT: could not clear the draft"
 i=0
 state=
@@ -240,46 +251,5 @@ done
 [ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] \
   || fail "$SUBJECT: the cleared empty box composer has no live agent"
 
-out=$(control "$TASK_ID" exit) \
-  || fail "$SUBJECT: fm-control exit refused an idle box composer: $out"
-case "$out" in
-  *"stopped $TASK_ID"*) ;;
-  *) fail "$SUBJECT: exit did not report a verified stop: $out" ;;
-esac
-[ "$(fm_backend_herdr_agent_state "$TARGET")" = dead ] \
-  || fail "$SUBJECT: exit returned but the agent is still running"
-lab pane get "$PANE" >/dev/null || fail "exit removed the endpoint it must preserve"
-pass "live omp box composer: $SUBJECT fm-control exit stops the idle box-shaped worker and preserves its endpoint"
-
-if [ "${FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH:-0}" = 1 ]; then
-  # A second box-shaped launch, then the relaunch through fm-spawn's own launch.
-  lab pane run "$PANE" "env OMP_SKIP_SETUP=1 FM_OMP_HARNESS=omp omp --config '$BOX_OVERLAY' --auto-approve --cwd '$WORKTREE'" >/dev/null \
-    || fail "could not relaunch $SUBJECT in the box shape"
-  i=0
-  while [ "$i" -lt 60 ]; do
-    state=$(fm_backend_herdr_composer_state "$TARGET")
-    agent=$(fm_backend_herdr_agent_state "$TARGET")
-    screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
-    if [ "$state" = empty ] && [ "$agent" = alive ] \
-      && printf '%s\n' "$screen" | grep -Eq '^╭── (π|󰵗) [>·] ' \
-      && printf '%s\n' "$screen" | grep -Eq '^╰─ .* ─╯$'; then
-      break
-    fi
-    i=$((i + 1))
-    sleep 1
-  done
-  [ "$i" -lt 60 ] \
-    || fail "$SUBJECT: the second launch never proved a live agent with an empty box composer (agent='$agent', composer='$state')"
-  out=$(control "$TASK_ID" relaunch --note "Live guard relaunch.") \
-    || fail "$SUBJECT: fm-control relaunch refused an idle box composer: $out"
-  case "$out" in
-    *"relaunched $TASK_ID harness=omp"*"endpoint=$TARGET "*) ;;
-    *) fail "$SUBJECT: relaunch did not report a replacement in the same endpoint: $out" ;;
-  esac
-  [ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] \
-    || fail "$SUBJECT: relaunch returned but no agent is running in the preserved endpoint"
-  lab pane get "$PANE" >/dev/null || fail "relaunch removed the endpoint it must preserve"
-  pass "live omp box composer: $SUBJECT fm-control relaunch replaces the box-shaped worker with a live agent in the same endpoint"
-else
-  printf 'skip: live omp box composer relaunch: opt-in; set FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 to run\n'
-fi
+assert_native_refusals
+pass "live omp box composer: $SUBJECT preserves the live unmanaged empty box-shaped worker, endpoint, metadata, instructions and dirty work after lifecycle refusals"

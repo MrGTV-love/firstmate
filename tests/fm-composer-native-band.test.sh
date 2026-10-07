@@ -223,6 +223,72 @@ test_stale_ambiguous_band_does_not_veto_newer_composer() {
   pass "newer bare, compact omp, left-bar and Pi composers outrank stale band ambiguity without weakening cursor refusal"
 }
 
+test_literal_band_rows_never_dispatch() {
+  local screen continuation expected caps cursor
+  screen=$'❯ preface\n π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n ╰─\n ┃\n ╭── π > pasted header ─╮'
+  assert_refused "reported nested left-bar and compact header with unproven band" "$screen"
+  for cursor in 2 3; do
+    assert_screen "unproven band cannot dispatch nested left-bar cursor $cursor" \
+      unknown "$CAPS_TMUX" "$screen" "$cursor"
+  done
+  for continuation in $'┃\n     ╭── π > pasted header ─╮' \
+      $'────────\n     ❯\n     ────────' \
+      $'──────── pasted title ─\n     ❯\n     ────────' \
+      $'┃ ❯\n     ┃' $'│ ❯ │\n     │ │' \
+      $'║ ❯ ║\n     ║ ║' $'| ❯ |\n     | |' \
+      $'╭── π > pasted header ─╮\n     ╰─  ─╯'; do
+    screen=$'❯ preface\n   '"$HEADER"$'\n  ╰─\n     '"$continuation"
+    expected=$(printf '%s\n' "preface $HEADER ╰─ $continuation" | LC_ALL=C awk '{$1=$1; printf "%s%s", sep, $0; sep=" "}')
+    assert_screen "owned band nested '$continuation'" pending "$CAPS_STYLED" "$screen"
+    for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+      assert_content "owned band nested '$continuation'" "$expected" "$caps" "$screen"
+    done
+    for cursor in 0 3 4; do
+      assert_screen "owned band nested '$continuation' cursor $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
+    done
+    screen=$'────────\n'"$screen"$'\n────────'
+    assert_screen "Pi enclosing nested '$continuation'" pending \
+      $'styled=1\ncursor=0\nidentity=1' "$screen" '' $'pi\tidle'
+    assert_content "Pi enclosing nested '$continuation'" "$expected" "$CAPS_PLAIN" "$screen"
+  done
+  pass "literal-owned band rows cannot dispatch nested rules, glyph proofs, left-bars or compact headers"
+}
+
+test_compact_omp_uses_folded_floor_semantics() {
+  local screen floor caps
+  for floor in '╰──────╯' '╰─draft─╯'; do
+    screen=$'╭── π > model > path ─╮\n│ │\n'"$floor"
+    case "$floor" in
+      '╰──────╯') assert_refused "compact rule-only floor" "$screen" ;;
+      *)
+        for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+          assert_screen "compact folded floor without padding" pending "$caps" "$screen"
+          assert_content "compact folded floor without padding" draft "$caps" "$screen"
+        done
+        ;;
+    esac
+  done
+  screen=$'╭── π > model > path ─╮\n │ draft │\n╰─  ─╯'
+  assert_refused "compact misaligned body" "$screen"
+  assert_screen "compact misaligned body cursor" unknown "$CAPS_TMUX" "$screen" 1
+  screen=$'╭── π > model > path ─╮\n╰─ ⇧\033[2m⇥ to change thinking effort\033[0m ─╯'
+  assert_screen "compact partial styled hint remnant" unknown "$CAPS_STYLED" "$screen"
+  assert_content "compact partial styled hint remnant" '⇧' "$CAPS_STYLED" "$screen"
+  assert_screen "compact hint remnant plain capture" unknown "$CAPS_PLAIN" "$screen"
+  screen=$'╭── π > model > path ─╮\n╰─ ⇧⇥\033[2m to change thinking effort\033[0m ─╯'
+  assert_screen "compact exact styled effort-key remnant" empty "$CAPS_STYLED" "$screen"
+  assert_content "compact exact styled effort-key remnant" '' "$CAPS_STYLED" "$screen"
+  screen=$'╭── π > model > path ─╮\n╰─ \033[2m⇧⇥ to change thinking effort\033[0m ─╯'
+  assert_screen "compact fully dim hint" empty "$CAPS_STYLED" "$screen"
+  assert_content "compact fully dim hint" '' "$CAPS_STYLED" "$screen"
+  screen=$'╭── π > model > path ─╮\n╰─ ⇧⇥ to change thinking effort ─╯'
+  assert_screen "compact bright typed hint" pending "$CAPS_STYLED" "$screen"
+  assert_content "compact bright typed hint" '⇧⇥ to change thinking effort' "$CAPS_STYLED" "$screen"
+  pass "compact omp retains conservative floor admission, styled hint remnants and misaligned-body refusal"
+}
+
+test_literal_band_rows_never_dispatch
+test_compact_omp_uses_folded_floor_semantics
 test_cursor_ambiguity_survives_later_band_continuations
 test_owned_band_blank_and_braille_continuations
 test_stale_ambiguous_band_does_not_veto_newer_composer

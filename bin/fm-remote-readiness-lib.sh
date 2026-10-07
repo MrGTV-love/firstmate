@@ -4,10 +4,11 @@
 # Source this file and call:
 #   fm_remote_readiness_ensure <bin-dir> <secondmate-id>
 #
-# It runs bin/fm-remote-doctor.sh on that route's configured host, and when the
-# read-only run reports any gap it runs the doctor again with --fix and then a
-# third read-only time. That last read-only run is the verdict, so a repair is
-# never trusted on its own word. bin/fm-remote-doctor.sh remains the single
+# It runs bin/fm-remote-doctor.sh on that route's configured host. A missing
+# ownership-reader prerequisite returns its human gap without repair. Other
+# gaps run the doctor again with --fix and then a third read-only time. That
+# final read-only run is the verdict, so repair is never trusted on its own word.
+# bin/fm-remote-doctor.sh remains the single
 # owner of every check, every repair, and every message; nothing here restates
 # them.
 #
@@ -29,6 +30,7 @@ fm_remote_readiness_ensure() { # <bin-dir> <secondmate-id>
   FM_REMOTE_READINESS_OUT=$out
   [ "$rc" -ne 0 ] || return 0
   [ "$rc" -ne 255 ] || return 255
+  case "$out" in *'check herdr-owner-reader=human:'*) return 1 ;; esac
 
   out=$("$bin_dir/fm-on.sh" "$id" fm-remote-doctor.sh --fix < /dev/null 2>&1)
   rc=$?

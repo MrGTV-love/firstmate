@@ -748,15 +748,15 @@ A restored same-labeled tab with a missing pane or no registered agent is a husk
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
 This prevents closing the workspace's last tab before a replacement exists.
 
-### Managed recovery after native restoration
+### Ownership after native restoration
 
 Firstmate leaves Herdr's global auto-resume configuration unchanged.
 Disabling `session.resume_agents_on_restore` would also disable restoration of unrelated agents in the same Herdr installation, outside the current home's recorded fleet.
 The supported 0.9.x interface has no verified per-pane switch or custom resume-argv registration; Herdr documents custom resume commands as a 0.10.0 addition ([upstream support contract](https://raw.githubusercontent.com/herdrdev/herdr/v0.9.3/docs/next/website/src/content/docs/add-herdr-support.mdx)).
 Changing a user's global configuration is therefore not the scoped repair.
 
-Use the [agent-control recovery contract](agent-control.md#recovering-a-bare-native-restore) for startup and watcher recovery of this home's recorded fleet, including launch proof, legacy attribution, preserved work, and refusal boundaries.
-The [runtime verification record](verification/runtime-backends.md) records the real bare-resumed omp proof and captured bordered composers.
+The [agent-control recovery contract](agent-control.md#recovering-a-bare-native-restore) requires a Firstmate spawn pin read from the identified live PID and matching the recorded launch generation before any lifecycle action. A bare native-restored omp process is unmanaged: startup and watcher scans report it without interrupting, exiting, checkpointing, relaunching, or dispatching recovery.
+The [runtime verification record](verification/runtime-backends.md) records captured bordered composers and historical recovery evidence; native-restored lifecycle acceptance described there predates this safety boundary.
 
 ### Stale agent registrations
 

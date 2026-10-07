@@ -196,42 +196,67 @@ SH
   done
   for RECOVERY_SERVER_STATE in running unknown stopped; do
     for RECOVERY_MODE in unbounded one; do
-      RECOVERY_INSPECTION_LOG="$RECOVERY_INSPECTION/$RECOVERY_SERVER_STATE-$RECOVERY_MODE.log"
-      RECOVERY_CONTROL_LOG="$RECOVERY_INSPECTION/$RECOVERY_SERVER_STATE-$RECOVERY_MODE.control"
-      RECOVERY_ARGS=(recover)
-      [ "$RECOVERY_MODE" != one ] || RECOVERY_ARGS+=(--one)
-      RECOVERY_SCAN_RC=0
-      RECOVERY_SCAN_OUT=$(PATH="$RECOVERY_INSPECTION/fakebin:$PATH" \
-        FM_HOME="$RECOVERY_INSPECTION_HOME" FM_STATE_OVERRIDE="$RECOVERY_INSPECTION_HOME/state" \
-        FM_RECOVERY_SERVER_STATE="$RECOVERY_SERVER_STATE" \
-        FM_RECOVERY_INSPECTION_LOG="$RECOVERY_INSPECTION_LOG" FM_RECOVERY_CONTROL_LOG="$RECOVERY_CONTROL_LOG" \
-        bash "$RECOVERY_INSPECTION/bin/fm-reboot-recover.sh" "${RECOVERY_ARGS[@]}" 2>&1) || RECOVERY_SCAN_RC=$?
-      if [ "$RECOVERY_SERVER_STATE" = stopped ]; then
-        expect_code 0 "$RECOVERY_SCAN_RC" "$RECOVERY_MODE recovery must leave positively stopped endpoints to liveness recovery"
-        [ -z "$RECOVERY_SCAN_OUT" ] || fail "stopped endpoint recovery unexpectedly reported: $RECOVERY_SCAN_OUT"
-      else
-        expect_code 1 "$RECOVERY_SCAN_RC" "$RECOVERY_SERVER_STATE/$RECOVERY_MODE unreadable inspection must fail"
-        for RECOVERY_ID in unreadable-versioned unreadable-legacy; do
-          assert_contains "$RECOVERY_SCAN_OUT" \
-            "REBOOT_RECOVERY: $RECOVERY_ID: agent state is unreadable; no lifecycle action taken" \
-            "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must report the unreadable task $RECOVERY_ID"
-        done
-      fi
-      assert_absent "$RECOVERY_CONTROL_LOG" "$RECOVERY_SERVER_STATE/$RECOVERY_MODE inspection must not call control"
-      assert_contains "$(cat "$RECOVERY_INSPECTION_LOG")" \
-        "status --json --session $RECOVERY_INSPECTION_SESSION" \
-        "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must consult the recorded server's state"
-      awk '!(($1 == "pane" && $2 == "get") || ($1 == "status" && $2 == "--json")) { bad = 1 }
-        END { exit bad }' "$RECOVERY_INSPECTION_LOG" \
-        || fail "$RECOVERY_SERVER_STATE/$RECOVERY_MODE inspection sent a non-read-only backend call"
+      rm -f "$RECOVERY_INSPECTION_HOME/state/.reboot-recovery-cursor"
+      RECOVERY_ATTEMPTS=(1)
+      [ "$RECOVERY_MODE" != one ] || RECOVERY_ATTEMPTS=(1 2 3)
+      for RECOVERY_ATTEMPT in "${RECOVERY_ATTEMPTS[@]}"; do
+        RECOVERY_EXPECTED_IDS=(unreadable-legacy unreadable-versioned)
+        if [ "$RECOVERY_MODE" = one ]; then
+          case "$RECOVERY_ATTEMPT" in
+            1|3) RECOVERY_EXPECTED_IDS=(unreadable-legacy) ;;
+            2) RECOVERY_EXPECTED_IDS=(unreadable-versioned) ;;
+          esac
+        fi
+        RECOVERY_INSPECTION_LOG="$RECOVERY_INSPECTION/$RECOVERY_SERVER_STATE-$RECOVERY_MODE-$RECOVERY_ATTEMPT.log"
+        RECOVERY_CONTROL_LOG="$RECOVERY_INSPECTION/$RECOVERY_SERVER_STATE-$RECOVERY_MODE-$RECOVERY_ATTEMPT.control"
+        RECOVERY_ARGS=(recover)
+        [ "$RECOVERY_MODE" != one ] || RECOVERY_ARGS+=(--one)
+        RECOVERY_SCAN_RC=0
+        RECOVERY_SCAN_OUT=$(PATH="$RECOVERY_INSPECTION/fakebin:$PATH" \
+          FM_HOME="$RECOVERY_INSPECTION_HOME" FM_STATE_OVERRIDE="$RECOVERY_INSPECTION_HOME/state" \
+          FM_RECOVERY_SERVER_STATE="$RECOVERY_SERVER_STATE" \
+          FM_RECOVERY_INSPECTION_LOG="$RECOVERY_INSPECTION_LOG" FM_RECOVERY_CONTROL_LOG="$RECOVERY_CONTROL_LOG" \
+          bash "$RECOVERY_INSPECTION/bin/fm-reboot-recover.sh" "${RECOVERY_ARGS[@]}" 2>&1) || RECOVERY_SCAN_RC=$?
+        if [ "$RECOVERY_SERVER_STATE" = stopped ]; then
+          expect_code 0 "$RECOVERY_SCAN_RC" "$RECOVERY_MODE recovery must leave positively stopped endpoints to liveness recovery"
+          [ -z "$RECOVERY_SCAN_OUT" ] || fail "stopped endpoint recovery unexpectedly reported: $RECOVERY_SCAN_OUT"
+        else
+          expect_code 1 "$RECOVERY_SCAN_RC" "$RECOVERY_SERVER_STATE/$RECOVERY_MODE unreadable inspection must fail"
+          for RECOVERY_ID in "${RECOVERY_EXPECTED_IDS[@]}"; do
+            assert_contains "$RECOVERY_SCAN_OUT" \
+              "REBOOT_RECOVERY: $RECOVERY_ID: agent state is unreadable; no lifecycle action taken" \
+              "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must report the selected unreadable task $RECOVERY_ID"
+          done
+          [ "$(printf '%s\n' "$RECOVERY_SCAN_OUT" | wc -l | tr -d '[:space:]')" = "${#RECOVERY_EXPECTED_IDS[@]}" ] \
+            || fail "$RECOVERY_SERVER_STATE/$RECOVERY_MODE reported an unselected record: $RECOVERY_SCAN_OUT"
+        fi
+        if [ "$RECOVERY_MODE" = one ]; then
+          [ "$(cat "$RECOVERY_INSPECTION_HOME/state/.reboot-recovery-cursor")" = "${RECOVERY_EXPECTED_IDS[0]}" ] \
+            || fail "$RECOVERY_SERVER_STATE bounded inspection did not advance its cursor before completion"
+        else
+          assert_absent "$RECOVERY_INSPECTION_HOME/state/.reboot-recovery-cursor" \
+            "full recovery sweep must not alter bounded inspection scheduling"
+        fi
+        assert_absent "$RECOVERY_CONTROL_LOG" "$RECOVERY_SERVER_STATE/$RECOVERY_MODE inspection must not call control"
+        assert_contains "$(cat "$RECOVERY_INSPECTION_LOG")" \
+          "status --json --session $RECOVERY_INSPECTION_SESSION" \
+          "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must consult the recorded server's state"
+        awk -v expected="${#RECOVERY_EXPECTED_IDS[@]}" '
+          $1 == "pane" && $2 == "get" { panes++; next }
+          $1 == "status" && $2 == "--json" { servers++; next }
+          { bad = 1 }
+          END { exit bad || panes != expected || servers != expected }
+        ' "$RECOVERY_INSPECTION_LOG" \
+          || fail "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must inspect exactly the selected records using read-only calls"
+      done
     done
   done
 ) || fail "unreadable recovery inspection assertions failed"
-pass "reboot recovery: bounded and unbounded unreadable inspections report every task without lifecycle input"
+pass "reboot recovery: full sweeps report every unreadable task; bounded inspections rotate one task without lifecycle input"
 
 (
   # shellcheck disable=SC2329 # Runtime override called by the isolated watcher.
-  fm_run_timed() {
+  fm_exec_timed() {
     case "$*" in
       *"fm-reboot-recover.sh recover --one") ;;
       *) fail "unexpected timed recovery boundary: $*" ;;
@@ -267,7 +292,7 @@ pass "reboot recovery: bounded and unbounded unreadable inspections report every
       || fail "$RECOVERY_CASE recovery did not restart its cooldown at completion"
     FM_RECOVERY_CALLS="$RECOVERY_CALLS" bash -c '
       . "$1/bin/fm-watch.sh"
-      fm_run_timed() { printf "%s\n" successor-attempt >> "$FM_RECOVERY_CALLS"; return 124; }
+      fm_exec_timed() { printf "%s\n" successor-attempt >> "$FM_RECOVERY_CALLS"; return 124; }
       wake() { return 0; }
       reboot_recovery_tick
     ' _ "$ROOT" || fail "$RECOVERY_CASE successor could not observe the recovery cooldown"
@@ -316,5 +341,135 @@ pass "reboot recovery: bounded and unbounded unreadable inspections report every
     || fail "independent recovery attempts reused their durable wake key"
 ) || fail "recovery wake transport assertions failed"
 pass "reboot recovery: independent outcomes survive queue deduplication and every completed attempt cools down its successor"
+
+(
+  command -v perl >/dev/null 2>&1 || fail "recovery ownership assertions require Perl"
+  RECOVERY_FIXTURE="$TMP/recovery-ownership"
+  mkdir -p "$RECOVERY_FIXTURE/bin" "$RECOVERY_FIXTURE/home/config"
+  cat > "$RECOVERY_FIXTURE/bin/fm-reboot-recover.sh" <<'EOF'
+#!/usr/bin/env bash
+set -u
+trap '' HUP INT TERM
+printf '%s\n' "${BASHPID:-$$}" > "$RECOVERY_PARENT_PID"
+printf '%s\n' 'inspection started' >&2
+bash -c '
+  trap "" HUP INT TERM
+  printf "%s\n" "$$" > "$RECOVERY_CHILD_PID"
+  while :; do sleep 1; done
+' &
+wait
+EOF
+  cat > "$RECOVERY_FIXTURE/bin/fm-watch.sh" <<'EOF'
+#!/usr/bin/env bash
+set -u
+. "$RECOVERY_ROOT/bin/fm-watch.sh"
+SCRIPT_DIR="$RECOVERY_FIXTURE/bin"
+WATCHER_PID=${BASHPID:-$$}
+printf '%s\n' "$WATCHER_PID" > "$RECOVERY_OWNER_PID"
+trap 'fm_active_check_stop; fm_check_output_cleanup' EXIT
+watcher_stop_signals
+fm_session_end_bounds() {
+  FM_SESSION_END_TIMEOUT=$RECOVERY_BOUND
+  FM_SESSION_END_LAUNCH_WAIT=1
+}
+wake() { printf '%s\n' "$1"; }
+reboot_recovery_tick
+EOF
+  cp "$ROOT/bin/fm-watch-checkpoint.sh" "$RECOVERY_FIXTURE/bin/fm-watch-checkpoint.sh"
+  chmod +x "$RECOVERY_FIXTURE/bin/"*.sh
+  RECOVERY_PATH=$(fm_test_base_path_sans "$PATH" timeout gtimeout)
+  RECOVERY_RUNNER_PID=
+  RECOVERY_OWNER=
+  RECOVERY_PARENT=
+  RECOVERY_CHILD=
+  trap '
+    [ -z "$RECOVERY_PARENT" ] || kill -KILL -- "-$RECOVERY_PARENT" 2>/dev/null || true
+    for recovery_pid in "$RECOVERY_CHILD" "$RECOVERY_PARENT" "$RECOVERY_OWNER" "$RECOVERY_RUNNER_PID"; do
+      [ -z "$recovery_pid" ] || kill -KILL "$recovery_pid" 2>/dev/null || true
+    done
+    [ -z "$RECOVERY_RUNNER_PID" ] || wait "$RECOVERY_RUNNER_PID" 2>/dev/null || true
+  ' EXIT
+  recovery_test_alive() {
+    local state
+    kill -0 "$1" 2>/dev/null || return 1
+    state=$(ps -p "$1" -o stat= 2>/dev/null || true)
+    case "$state" in ''|*Z*) return 1 ;; esac
+  }
+  recovery_test_gone() {
+    local pid=$1 i=0
+    while recovery_test_alive "$pid" && [ "$i" -lt 100 ]; do
+      command sleep 0.1
+      i=$((i + 1))
+    done
+    ! recovery_test_alive "$pid"
+  }
+  for RECOVERY_CASE in term owner-kill deadline checkpoint; do
+    RECOVERY_STATE="$RECOVERY_FIXTURE/$RECOVERY_CASE-state"
+    mkdir -p "$RECOVERY_STATE"
+    fm_write_meta "$RECOVERY_STATE/recovery.meta" "backend=herdr" "kind=ship"
+    RECOVERY_OWNER_PID="$RECOVERY_STATE/owner.pid"
+    RECOVERY_PARENT_PID="$RECOVERY_STATE/parent.pid"
+    RECOVERY_CHILD_PID="$RECOVERY_STATE/child.pid"
+    RECOVERY_BOUND=60
+    [ "$RECOVERY_CASE" != deadline ] || RECOVERY_BOUND=1
+    export RECOVERY_ROOT="$ROOT" RECOVERY_FIXTURE RECOVERY_BOUND
+    export RECOVERY_OWNER_PID RECOVERY_PARENT_PID RECOVERY_CHILD_PID
+    if [ "$RECOVERY_CASE" = checkpoint ]; then
+      PATH="$RECOVERY_PATH" FM_HOME="$RECOVERY_FIXTURE/home" FM_CONFIG_OVERRIDE="$RECOVERY_FIXTURE/home/config" \
+        FM_STATE_OVERRIDE="$RECOVERY_STATE" "$RECOVERY_FIXTURE/bin/fm-watch-checkpoint.sh" --seconds 2 \
+        > "$RECOVERY_STATE/output" 2> "$RECOVERY_STATE/error" &
+    else
+      PATH="$RECOVERY_PATH" FM_HOME="$RECOVERY_FIXTURE/home" FM_STATE_OVERRIDE="$RECOVERY_STATE" \
+        "$RECOVERY_FIXTURE/bin/fm-watch.sh" > "$RECOVERY_STATE/output" 2> "$RECOVERY_STATE/error" &
+    fi
+    RECOVERY_RUNNER_PID=$!
+    RECOVERY_OWNER=
+    RECOVERY_PARENT=
+    RECOVERY_CHILD=
+    RECOVERY_POLLS=0
+    while { [ ! -s "$RECOVERY_OWNER_PID" ] || [ ! -s "$RECOVERY_PARENT_PID" ] || [ ! -s "$RECOVERY_CHILD_PID" ]; } \
+      && recovery_test_alive "$RECOVERY_RUNNER_PID" && [ "$RECOVERY_POLLS" -lt 50 ]; do
+      command sleep 0.02
+      RECOVERY_POLLS=$((RECOVERY_POLLS + 1))
+    done
+    [ ! -s "$RECOVERY_OWNER_PID" ] || RECOVERY_OWNER=$(cat "$RECOVERY_OWNER_PID")
+    [ ! -s "$RECOVERY_PARENT_PID" ] || RECOVERY_PARENT=$(cat "$RECOVERY_PARENT_PID")
+    [ ! -s "$RECOVERY_CHILD_PID" ] || RECOVERY_CHILD=$(cat "$RECOVERY_CHILD_PID")
+    [ -n "$RECOVERY_OWNER" ] && [ -n "$RECOVERY_PARENT" ] && [ -n "$RECOVERY_CHILD" ] \
+      || fail "$RECOVERY_CASE recovery subprocess tree did not start"
+    recovery_test_alive "$RECOVERY_PARENT" && recovery_test_alive "$RECOVERY_CHILD" \
+      || fail "$RECOVERY_CASE recovery subprocess tree was not live before shutdown"
+    case "$RECOVERY_CASE" in
+      term) kill -TERM "$RECOVERY_OWNER" || fail "could not TERM recovery owner" ;;
+      owner-kill) kill -KILL "$RECOVERY_OWNER" || fail "could not KILL recovery owner" ;;
+    esac
+    recovery_test_gone "$RECOVERY_OWNER" || fail "$RECOVERY_CASE recovery owner survived its shutdown"
+    recovery_test_gone "$RECOVERY_PARENT" || fail "$RECOVERY_CASE TERM-resistant recovery command survived its owner"
+    recovery_test_gone "$RECOVERY_CHILD" || fail "$RECOVERY_CASE TERM-resistant recovery descendant survived its owner"
+    recovery_test_gone "$RECOVERY_RUNNER_PID" || fail "$RECOVERY_CASE recovery runner survived its deadline"
+    RECOVERY_STATUS=0
+    wait "$RECOVERY_RUNNER_PID" 2>/dev/null || RECOVERY_STATUS=$?
+    RECOVERY_RUNNER_PID=
+    case "$RECOVERY_CASE" in
+      term) [ "$RECOVERY_STATUS" -ne 0 ] || fail "TERMed recovery owner reported success" ;;
+      owner-kill) [ "$RECOVERY_STATUS" -eq 137 ] || fail "KILLed recovery owner status was $RECOVERY_STATUS" ;;
+      deadline)
+        [ "$RECOVERY_STATUS" -eq 0 ] || fail "bounded recovery failure did not surface normally"
+        assert_contains "$(cat "$RECOVERY_STATE/output")" \
+          "check: Herdr reboot launch recovery: inspection started (failed)" \
+          "bounded recovery lost stderr or timeout failure status"
+        ;;
+      checkpoint)
+        [ "$RECOVERY_STATUS" -eq 124 ] || fail "outer checkpoint deadline status was $RECOVERY_STATUS"
+        assert_contains "$(cat "$RECOVERY_STATE/output")" \
+          "checkpoint: no actionable wake within 2s" "outer recovery checkpoint lost quiet deadline output"
+        ;;
+    esac
+    RECOVERY_OWNER=
+    RECOVERY_PARENT=
+    RECOVERY_CHILD=
+  done
+) || fail "recovery owned-subtree assertions failed"
+pass "reboot recovery: owner TERM, owner death, inspection deadline, and outer checkpoint retire TERM-resistant descendants"
 
 echo "# fm-supervision-events.test.sh: all assertions passed"

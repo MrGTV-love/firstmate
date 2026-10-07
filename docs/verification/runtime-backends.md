@@ -1098,16 +1098,14 @@ Typed text appears in the folded row (`╰─ hello world typed text ─╯`), w
 The current classification and plain-hint safety boundary is owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety); exact container predicates are owned by `bin/fm-composer-lib.sh`.
 `test_matrix_omp_box_composer` and `test_omp_box_requires_omp_identity_and_complete_shape` in `tests/fm-composer-lib.test.sh` carry the captured idle screen and the captured typed, wrapped, and hint rows.
 
-The live guard that refreshes this entry launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands.
-Its default-on checks spend no tokens wherever omp, herdr, and jq are installed; the relaunch proof submits a real worker brief and remains opt-in:
+The live guard launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands. It now verifies that direct native launches remain unmanaged and that interrupt, exit, and ordinary relaunch preserve their live PID, screen, draft, endpoint, instructions, and dirty work.
+The default-on checks spend no tokens wherever omp, herdr, jq, and python3 are installed:
 
 ```sh
-FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 tests/fm-omp-composer-box-live-e2e.test.sh
+FM_OMP_COMPOSER_BOX_LIVE=1 tests/fm-omp-composer-box-live-e2e.test.sh
 ```
 
-Setting `FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1` forces the shared capability gate even when `FM_LIVE=0` or `FM_OMP_COMPOSER_BOX_LIVE=0`; a missing required tool fails rather than skips.
-Setting the relaunch flag to `0` skips only the token-spending relaunch portion and leaves token-free checks governed by their existing live controls.
-The relaunch proof first requires a live agent with a proven empty box composer, failing if that readiness wait expires, then checks replacement-agent liveness and endpoint preservation; it does not require a model-generated acknowledgement.
+The shared capability gate owns explicit enable/disable and missing-tool behavior. The historical lifecycle-success output below predates the current ownership boundary; the model-consuming relaunch option has been removed.
 
 Observed output:
 
@@ -2279,6 +2277,8 @@ The read that supplies the reference is `bin/backends/herdr.sh`'s `fm_backend_he
 
 ### Native omp default-band composer
 
+The lifecycle result below is historical: the current ownership boundary refuses lifecycle actions on bare native-restored omp processes without a Firstmate spawn pin read from the live PID and matching the recorded launch generation.
+
 Measured 2026-10-06 on macOS aarch64 with omp 18.6.3 in a fresh guarded, named non-default Herdr lab.
 The shared classifier recognized the native status-band header and adjacent `╰─` input row without a Firstmate composer overlay.
 Actual empty captures classified `empty` and extracted no draft; unsubmitted `!git diff` classified `pending`, extracted completely, and ordinary exit refused without changing the screen or recorded task identity.
@@ -2289,6 +2289,8 @@ No model input was submitted, and guarded lab teardown succeeded.
 The saved actual renderer captures and focused portable checks are refreshed with `bash tests/fm-composer-native-band.test.sh` and `LC_ALL=C bash tests/fm-composer-native-band.test.sh`; these checks do not themselves launch the live lab.
 
 ### Bare native omp restoration and managed recovery
+
+The native-restored recovery results below predate the current safety decision. Bare native-restored omp processes are now always unmanaged and receive no lifecycle action; these measurements remain renderer and historical transport evidence, not current recovery authorization.
 
 Measured 2026-10-04 on macOS aarch64 (Darwin 25.5.0), Herdr 0.9.1 protocol 22, and omp 18.6.1.
 The earlier composer captures in `tests/fixtures/omp-bordered-{empty,pending}.ansi` are real omp 18.6.0 frames from the same guarded named-lab procedure.

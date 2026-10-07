@@ -10,11 +10,11 @@
 #                                         [--reconcile-only]
 #                                         (--note <text> | --note-file <path>)
 #        fm-control.sh <task-id> relaunch --recover-launch
-# --recover-launch is Herdr-only: under the control lock, repair a positively
-# unmanaged live agent using the exact recorded harness, model and effort.
-# A managed, stopped, or legacy-unproven agent is left untouched.
-# Unknown proof on an env-v1 launch refuses rather than restarting blindly.
-# This mode supplies the reboot progress note and cannot change a profile.
+# --recover-launch is Herdr-only inspection under the control lock.
+# Managed and stopped agents are left untouched. Unmanaged live agents are
+# reported without lifecycle input; native restoration does not prove ownership.
+# Unknown proof on a versioned launch refuses; legacy-unproven launches skip.
+# This mode cannot change a profile or create a relaunch transaction.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -226,7 +226,6 @@ die() {  # <message>
 
 CONTROL_LOCK=
 CONTROL_LOCK_HELD=0
-SECONDMATE_LIVENESS_LOCK_HELD=0
 CONTROL_META_LOCK=
 CONTROL_META_LOCK_HELD=0
 CONTROL_META_TMP=
@@ -243,10 +242,6 @@ control_cleanup() {
   if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
     CONTROL_META_LOCK_HELD=0
     fm_lock_release "$CONTROL_META_LOCK" || true
-  fi
-  if [ "$SECONDMATE_LIVENESS_LOCK_HELD" = 1 ]; then
-    SECONDMATE_LIVENESS_LOCK_HELD=0
-    fm_secondmate_liveness_unlock "$ID"
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -341,7 +336,7 @@ if [ "$VERB" != relaunch ]; then
 fi
 if [ "$RECOVER_LAUNCH" = 1 ]; then
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
-    || die "--recover-launch uses the recorded profile and recovery note; it cannot be combined with replacement options or --reconcile-only"
+    || die "--recover-launch only inspects the recorded launch; it cannot be combined with replacement options or --reconcile-only"
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
@@ -438,14 +433,6 @@ if [ -n "$(fm_meta_get "$META" remote_host)" ]; then
   die "task $ID is a remotely placed secondmate on $(fm_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane"
 fi
 
-if [ "$RECOVER_LAUNCH" = 1 ] && [ "$(fm_meta_get "$META" kind)" = secondmate ]; then
-  # shellcheck source=bin/fm-secondmate-liveness-lib.sh
-  . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
-  fm_secondmate_liveness_lock "$ID" \
-    || die "another secondmate liveness check is already running for task $ID"
-  SECONDMATE_LIVENESS_LOCK_HELD=1
-fi
-
 fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
 BACKEND=$FM_BACKEND_VALIDATED_BACKEND
 T=$FM_BACKEND_VALIDATED_TARGET
@@ -478,10 +465,8 @@ busy_verdict() {
   fm_busy_classify_meta "$META" "$ID" "$STATE"
 }
 
-LIVE_TASK_LAUNCH_PROOF=
 require_live_task_attribution() {
   local state=${1:-} absence
-  LIVE_TASK_LAUNCH_PROOF=not-required
   [ "$BACKEND" = herdr ] || return 0
   [ -n "$state" ] || state=$(agent_state)
   if [ "$state" = missing ]; then
@@ -493,15 +478,11 @@ require_live_task_attribution() {
     alive) ;;
     *) return 1 ;;
   esac
-  LIVE_TASK_LAUNCH_PROOF=$(fm_launch_proof_herdr "$META")
-  case "$LIVE_TASK_LAUNCH_PROOF" in
-    managed|unmanaged) return 0 ;;
-    *) return 1 ;;
-  esac
+  [ "$(fm_launch_proof_herdr "$META")" = managed ]
 }
 
 # wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
-# Recovery's alive postcondition also requires the managed launch incarnation.
+# Herdr's alive postcondition also requires the managed launch incarnation.
 wait_agent_state() {  # <timeout> <wanted>...
   local timeout=$1 state want elapsed=0
   shift
@@ -509,7 +490,7 @@ wait_agent_state() {  # <timeout> <wanted>...
     state=$(agent_state)
     for want in "$@"; do
       if [ "$state" = "$want" ]; then
-        if [ "$want" = alive ] && [ "$RECOVER_LAUNCH" = 1 ] \
+        if [ "$want" = alive ] && [ "$BACKEND" = herdr ] \
           && [ "$(fm_launch_proof_herdr "$META")" != managed ]; then
           continue
         fi
@@ -1131,7 +1112,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line backlog_gate_status recovery_actor composer_state
+  local exit_result state note_line
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1143,63 +1124,22 @@ do_relaunch() {
       alive) ;;
       *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
     esac
-    if ! require_live_task_attribution "$state"; then
-      if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
-        echo "recovery-skipped $ID launch=legacy-unproven"
-        return 0
-      fi
-      die "launch recovery for $ID cannot prove its live launch settings"
-    fi
-    state=$LIVE_TASK_LAUNCH_PROOF
+    state=$(fm_launch_proof_herdr "$META")
     case "$state" in
       managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
-      unmanaged) ;;
+      unmanaged)
+        echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
+        return 0
+        ;;
+      unknown)
+        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+          echo "recovery-skipped $ID launch=legacy-unproven"
+          return 0
+        fi
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken"
+        ;;
       *) die "invalid launch proof for $ID: $state" ;;
     esac
-    if [ -e "$STATE/$ID.backlog-close" ] || [ -L "$STATE/$ID.backlog-close" ]; then
-      die "task $ID has a pending authoritative backlog close at $STATE/$ID.backlog-close; refusing launch recovery before stopping its agent"
-    fi
-    case "$KIND" in
-      ship|scout)
-        # shellcheck source=bin/fm-tasks-axi-lib.sh
-        . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
-        # shellcheck source=bin/fm-backlog-transition-lib.sh
-        . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
-        if fm_backlog_transition_applies "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$KIND"; then
-          if fm_backlog_row_probe "$DATA" "$ID"; then
-            :
-          elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-            die "task $ID has no backlog item in this home; refusing launch recovery before stopping its agent"
-          else
-            die "task $ID's backlog item could not be read before launch recovery ($FM_BACKLOG_ROW_ERROR)"
-          fi
-          recovery_actor=$(fm_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
-          if [ "$recovery_actor" = branch ] && fm_lease_away_relocated; then
-            [ "$FM_BACKLOG_ROW_STATE" = "queued no no" ] \
-              || die "launch recovery refused - the supervision branch under the away-posture record may dispatch only queued unblocked work; task $ID's backlog state is $FM_BACKLOG_ROW_STATE"
-          elif ! fm_backlog_row_dispatchable "$FM_BACKLOG_ROW_STATE"; then
-            die "task $ID's backlog item is not dispatchable in state $FM_BACKLOG_ROW_STATE; refusing launch recovery before stopping its agent"
-          fi
-        else
-          backlog_gate_status=$?
-          [ "$backlog_gate_status" -eq 1 ] \
-            || die "task $ID cannot be recovered because its backlog is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)"
-        fi
-        ;;
-    esac
-    composer_state=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) \
-      || composer_state=unknown
-    case "$composer_state" in
-      empty) ;;
-      *) die "task $ID's recovery composer state is '$composer_state', not proven empty; refusing launch recovery before interrupting its agent" ;;
-    esac
-    NEW_HARNESS=$RECORDED_HARNESS; HARNESS_SET=1
-    NEW_MODEL=$(fm_meta_get "$META" model); MODEL_SET=1
-    NEW_EFFORT=$(fm_meta_get "$META" effort); EFFORT_SET=1
-    [ -n "$NEW_MODEL" ] || NEW_MODEL=default
-    [ -n "$NEW_EFFORT" ] || NEW_EFFORT=default
-    NOTE="Herdr restored the previous agent without Firstmate's launch settings. This relaunch restores the recorded profile in the same local copy and pane, preserving all work. Read the latest task status and instruction inbox before continuing. Respect completed outcomes and outstanding decisions or external waits; do not repeat finished work."
-    NOTE_SET=1
   fi
   resolve_relaunch_profile
   if [ "$CLAUDE_DEBUG" = 1 ] && [ "$TARGET_HARNESS" != claude ]; then
@@ -1258,10 +1198,8 @@ do_relaunch() {
   # Admission refusals above name the task's own state; only then does an
   # unattributable live Herdr agent stop an ordinary relaunch, still before any
   # checkpoint or lifecycle input.
-  if [ "$RECOVER_LAUNCH" != 1 ]; then
-    require_live_task_attribution \
-      || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
-  fi
+  require_live_task_attribution \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   safe_checkpoint
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
@@ -1311,6 +1249,10 @@ do_relaunch() {
        && [ -n "$FM_BACKEND_VALIDATED_TARGET" ]; then
       T=$FM_BACKEND_VALIDATED_TARGET
       BACKEND=$FM_BACKEND_VALIDATED_BACKEND
+      if [ "$BACKEND" = herdr ] && ! declare -F fm_launch_proof_herdr >/dev/null 2>&1; then
+        . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
+        fm_backend_source herdr || die "could not load Herdr lifecycle control"
+      fi
     else
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi
@@ -1321,6 +1263,9 @@ do_relaunch() {
   fi
 
   state=$(wait_agent_state "$LAUNCH_WAIT" alive) || {
+    if [ "$BACKEND" = herdr ] && [ "$state" = alive ]; then
+      die "the replacement agent for $ID is running but its managed launch incarnation could not be proven within ${LAUNCH_WAIT}s"
+    fi
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1

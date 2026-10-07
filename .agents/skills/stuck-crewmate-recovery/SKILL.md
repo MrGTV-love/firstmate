@@ -23,8 +23,8 @@ A relaunch admission refusal is not a failed launch; reconcile it through the [i
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 
-For a live Herdr agent restored after reboot without Firstmate's launch settings, use the [recorded-launch recovery contract](../../../docs/agent-control.md#recovering-a-bare-native-restore) rather than treating its live pane as a dead endpoint.
-An unknown composer, unreadable proof, or pending draft is a refusal requiring investigation, never permission to clear input or kill the pane.
+For a live Herdr agent restored after reboot without a Firstmate launch pin read from the live PID and matching the recorded launch generation, the [recorded-launch recovery contract](../../../docs/agent-control.md#recovering-a-bare-native-restore) classifies it as unmanaged: leave it untouched and report the alert, rather than treating its live pane as a dead endpoint.
+An unmanaged agent, unknown composer, unreadable proof, or pending draft is a refusal requiring investigation, never permission to clear input or kill the pane.
 
 ## Session-start reconciliation for a dead ordinary direct report
 

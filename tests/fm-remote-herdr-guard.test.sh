@@ -291,11 +291,18 @@ load_job gui dev.firstmate.herdr.fm-remote "$LAUNCHD_PID"
 rm "$TOOLS/python3"
 guard
 ln -sf "$(command -v python3)" "$TOOLS/python3"
-expect_code 0 "$GUARD_RC" "the guard failed to take over when Python was unavailable"
-assert_stop_before_start
-assert_contains "$GUARD_OUT" "pid $LAUNCHD_PID born outside the Aqua login session (unknown)" \
-  "a missing environment reader granted Aqua ownership"
-pass "a missing kernel environment reader never grants Aqua ownership"
+expect_code 1 "$GUARD_RC" "the guard did not refuse a missing Python prerequisite"
+[ ! -s "$CASE_LOG" ] || fail "a missing Python prerequisite caused server mutation"
+assert_contains "$GUARD_OUT" "python3 prerequisite" "the missing ownership reader was not diagnosed"
+pass "a missing kernel environment reader refuses server takeover"
+
+new_case stopped
+rm "$TOOLS/python3"
+guard
+ln -sf "$PYTHON" "$TOOLS/python3"
+expect_code 1 "$GUARD_RC" "the guard started a server without the Python prerequisite"
+assert_not_started "missing Python allowed a new server"
+[ ! -s "$CASE_LOG" ] || fail "missing Python reached the server CLI"
 
 # --- a foreign owner is stopped, then the guard becomes the server -----------
 

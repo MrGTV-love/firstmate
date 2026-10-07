@@ -417,6 +417,8 @@ For spawn-capable adapters, the runtime session-provider backend controls where 
 
 Treehouse remains the worktree provider for tmux, herdr, zellij, and cmux, since herdr, zellij, and cmux are session providers only; Orca provides both the task worktree and terminal endpoint.
 
+On macOS, the remote Herdr backend requires `python3` on both the remote runtime PATH and the Aqua launch agent PATH to read process environments and prove server ownership. Missing Python is a human prerequisite gap: doctor/readiness will not reload the server to repair it, and the launch guard refuses server start or takeover until it is available. Ownership remains unproven rather than being accepted from an unreadable environment.
+
 ### Backend selection order
 
 New spawns choose the backend in this order:

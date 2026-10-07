@@ -302,7 +302,7 @@ doctor() {
   DOCTOR_OUT=$(
     HOME="$CASE_HOME" \
     FM_HOME="$CASE_PROJECT_HOME" \
-    PATH="$CASE_HOME/.local/bin:$CASE_BIN:$BASE_PATH" \
+    PATH="$CASE_HOME/.local/bin:$CASE_BIN:${CASE_BASE_PATH:-$BASE_PATH}" \
     FM_FAKE_STATE="$CASE_STATE" \
     FM_FAKE_LAUNCHCTL_LOG="$CASE_LAUNCHCTL_LOG" \
     FM_FAKE_FORBIDDEN_LOG="$CASE_FORBIDDEN_LOG" \
@@ -617,6 +617,50 @@ doctor --fix
 expect_code 0 "$DOCTOR_RC" "the Aqua-owner fixture could not be initialized"
 assert_contains "$DOCTOR_OUT" "check herdr-server=ok: session fm-remote is running in the Aqua login session (pid $AQUA_HOLDER_PID, launchd)" \
   "a launchd-born owner was not reported with its pid and birth"
+
+NO_PYTHON_TOOLS="$TMP_ROOT/no-python-tools"
+mkdir -p "$NO_PYTHON_TOOLS"
+for tool in bash sh id cat sed awk grep tr dirname basename readlink ps head tail sort cut wc date find mkdir chmod mv rm ln env git jq; do
+  real=$(command -v "$tool") || fail "test host lacks $tool"
+  ln -sf "$real" "$NO_PYTHON_TOOLS/$tool"
+done
+CASE_BASE_PATH=$NO_PYTHON_TOOLS
+: > "$CASE_LAUNCHCTL_LOG"
+doctor
+expect_code 1 "$DOCTOR_RC" "a missing Python prerequisite was reported ready"
+assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite' "the prerequisite was not named"
+assert_not_contains "$DOCTOR_OUT" 'check herdr-server=fixable:' "missing Python was misdiagnosed as server repair"
+doctor --fix
+expect_code 1 "$DOCTOR_RC" "--fix accepted missing Python"
+assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "missing Python caused server repair"
+assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" bootout "missing Python unloaded the launch agent"
+assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" bootstrap "missing Python reloaded the launch agent"
+assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" kickstart "missing Python restarted the launch agent"
+unset CASE_BASE_PATH
+doctor
+expect_code 0 "$DOCTOR_RC" "restoring Python did not restore Aqua ownership proof"
+pass "missing Python is a prerequisite rather than a server repair"
+
+READINESS_BIN="$TMP_ROOT/readiness-bin"
+mkdir -p "$READINESS_BIN"
+cat > "$READINESS_BIN/fm-on.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_TEST_READINESS_LOG"
+printf '%s\n' 'check herdr-owner-reader=human: python3 prerequisite does not resolve on the runtime PATH'
+exit 1
+SH
+chmod +x "$READINESS_BIN/fm-on.sh"
+export FM_TEST_READINESS_LOG="$TMP_ROOT/readiness-calls"
+. "$ROOT/bin/fm-remote-readiness-lib.sh"
+set +e
+fm_remote_readiness_ensure "$READINESS_BIN" fixture
+READINESS_RC=$?
+set -e
+expect_code 1 "$READINESS_RC" "readiness accepted the missing prerequisite"
+assert_contains "$FM_REMOTE_READINESS_OUT" 'check herdr-owner-reader=human:' "readiness lost the prerequisite diagnosis"
+[ "$(wc -l < "$FM_TEST_READINESS_LOG" | tr -d ' ')" = 1 ] || fail "readiness retried a missing Python prerequisite"
+assert_not_contains "$(cat "$FM_TEST_READINESS_LOG")" --fix "readiness attempted disruptive prerequisite repair"
+pass "readiness does not enter a missing-Python repair loop"
 
 printf '%s\n' "$BACKGROUND_HOLDER_PID" > "$CASE_STATE/socket-owner"
 printf 'background job\n' > "$CASE_STATE/user-loaded-$LABEL"
