@@ -291,7 +291,8 @@ If a durable row arrived after the announcement, the arm opens a fresh pending d
 ### Generation reuse
 
 An ordinary watcher close attempts to publish downtime, and every durable queue append publishes it.
-A handling successor closing to resurface recovery preserves the existing marker instead.
+A watcher closing after it successfully resurfaced recovery preserves the existing marker instead, whether it discovered recovery at startup or during a poll.
+An acknowledgement completed after output but before EXIT cleanup remains retired; cleanup does not mint a replacement episode for that already-delivered recovery.
 If EXIT cleanup cannot acquire the downtime-marker lock within its bound, it retains the stale singleton for the next arm to publish the missing downtime before clearing that lock (see [Grace, beacon, and stop signals](#grace-beacon-and-stop-signals)).
 A downtime republication of a pending episode reuses its generation.
 A watcher close leaves an announced downtime episode announced, while a successful durable append opens a fresh pending generation so a live watcher can recover the new work.
@@ -569,6 +570,8 @@ It checks that a newly appended keyed decision is classified without rereading e
 Completed-cycle waits observe the test-owned terminal poll-wait boundary in the fixture's explicit state directory, not intermediate progress-beacon writes.
 Process-event fixtures pass both the home and its matching explicit state directory to every watcher launch, including output-failure launches, so the same completed-cycle boundary covers replay, handling acknowledgement, and the absence of duplicate wakes.
 `tests/fm-wake-queue.test.sh` proves TERM likewise stops a watcher blocked in the drain-ring idle check's pane capture.
+The proactive-delivery and redrain fixtures use actionable terminal feedback and require exactly one captured generation plus terminal retirement before watcher launch, so handling sequence 1 exhausts all seeded process-event work.
+A deterministic late-publication fixture acknowledges poll-discovered recovery after its reason is printed but before delivery cleanup, then proves that cleanup preserves the retired generation and the next watcher stays quiet.
 
 `tests/fm-watcher-lock.test.sh` covers:
 

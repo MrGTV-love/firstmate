@@ -859,6 +859,8 @@ tests/fm-pr-state-live-e2e.test.sh 47
 tests/fm-pr-state.test.sh 531
 tests/fm-proc-budget.test.sh 8000
 tests/fm-procevent-quota.test.sh 2459
+tests/fm-procevent-runner-backlog.test.sh 37059
+tests/fm-procevent-runner-custody.test.sh 26175
 tests/fm-procevent-when.test.sh 25674
 tests/fm-procevent.test.sh 370820
 tests/fm-project-capacity.test.sh 56263
