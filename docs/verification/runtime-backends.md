@@ -1153,6 +1153,12 @@ An executable guard-preparation smoke used real Git fixtures and trust registrat
 It verified isolated trust, unchanged symlinked operator files, file-backed and simulated default/custom Keychain authentication, explicit and empty OAuth overrides, legacy configuration, and secure-storage overrides.
 This smoke stopped after the initial launch; it did not rerun real Herdr, Claude, doorbell, or lifecycle behavior.
 
+The saved live historical-example capture with Claude's slash menu above the titled opener reproduced `unknown` classification and refused `/exit` extraction.
+After excluding glyph carry from a candidate implicitly reopened by a recorded closing separator, replaying that capture produced `pending` and extracted exactly `/exit` across cursor and cursorless profiles in UTF-8 and `LC_ALL=C`.
+`test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer` covers the outside-menu boundary with empty and nonempty live composers; the existing selected-envelope ambiguity and draft-preservation cases remain in the focused composer regression file.
+This replay exercises the production classifier and extractor on actual terminal output; it is not a new live-worker lifecycle run.
+The focused `tests/fm-composer-lib.test.sh` run passed, including the new boundary regression and all existing draft-preservation and selected-ambiguity checks.
+
 The live guard that refreshes this entry launches the installed claude idle with a session name in a guarded Herdr lab and drives the public lifecycle commands.
 Its default-on checks spend no tokens wherever claude, herdr, jq, git, and node are installed.
 The guard copies onboarding and settings into a private worktree-contained `CLAUDE_CONFIG_DIR` shared by trust registration and every launch, including lifecycle relaunch.

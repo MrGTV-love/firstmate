@@ -959,7 +959,8 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       pi_glyph=''
     elif _fm_composer_titled_rule_row "$trimmed"; then
       pi_ambiguous=0
-      if [ "$pi_glyph_row" -ge 0 ]; then
+      # Carry draft ambiguity, not glyphs after a recorded pair's closer.
+      if [ "$pi_glyph_row" -ge 0 ] && [ "$pi_open" -ne "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
         pi_ambiguous=1
       fi
       # A titled rule only OPENS a pair; it never closes one, so a titled

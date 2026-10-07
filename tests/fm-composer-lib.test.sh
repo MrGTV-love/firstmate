@@ -350,6 +350,32 @@ test_rule_pair_ambiguity_is_candidate_scoped() {
   pass "historical ambiguity does not poison live rule pairs and selected ambiguity still refuses"
 }
 
+test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer() {
+  local history outside prefix draft screen cursor verdict caps
+  for history in $' ──────── Old example ─\n ❯ old example\n────────────────' ''; do
+    for outside in \
+      $'  ❯ /exit                       Exit the CLI\n    /context                    Visualize current context usage as a colored grid' \
+      $'────────────────\n❯ old example\n────────────────\n\n❯ outside example'; do
+      prefix=$outside
+      [ -z "$history" ] || prefix="$history"$'\n\n'"$outside"
+      cursor=$(printf '%s\n' "$prefix" | wc -l)
+      cursor=$((cursor + 1))
+      for draft in '/exit' ''; do
+        verdict=empty
+        [ -z "$draft" ] || verdict=pending
+        screen="$prefix"$'\n──────── Live session ─\n❯'"$NBSP $draft"$'\n────────────────\n  ⏵⏵ bypass permissions on'
+        assert_screen "outside glyph before titled $verdict on cursor" "$verdict" "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+        assert_selected_content "outside glyph before titled $verdict tmux extraction" "$draft" "$CAPS_TMUX" "$screen"
+        for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+          assert_screen "outside glyph before titled $verdict cursorless" "$verdict" "$caps" "$screen" '' probe-absent
+          assert_selected_content "outside glyph before titled $verdict extraction" "$draft" "$caps" "$screen"
+        done
+      done
+    done
+  done
+  pass "glyphs outside a closed pair do not poison a live titled composer or its extracted draft"
+}
+
 test_multiline_rule_pair_retains_all_interior_rows() {
   local top bottom screen earlier later
   bottom='────────────────'
@@ -1516,6 +1542,7 @@ test_matrix_claude_arrow_statusline_footer
 test_matrix_claude_titled_top_border
 test_rule_pair_equal_indentation
 test_rule_pair_ambiguity_is_candidate_scoped
+test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer
 test_multiline_rule_pair_retains_all_interior_rows
 test_rule_pair_continuations_never_prove_empty
 test_rule_pair_pasted_containers_remain_literal
