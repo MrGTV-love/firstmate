@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fm-dispatch-capacity.sh - inspect the capacity of a concrete worker route.
 # Usage: fm-dispatch-capacity.sh --harness <name> --model <id> [--cwd <path>] [--json]
-# Reports usable, exhausted, or unknown; OMP Codex requires a resolvable --cwd.
+# Reports usable, exhausted, or unknown.
 # This reads quota only. Saved resets are reported, never spent or counted as
 # current headroom. Account identities and credentials are not printed.
 set -eu

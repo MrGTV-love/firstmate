@@ -1381,22 +1381,22 @@ This section is the single owner of the canonical schema and its per-field seman
 
 ### Pooled OMP capacity and declared stand-ins
 
-`bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> --cwd <destination-path> [--json]` reports pool status and classifies accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials; the displayed account count is not necessarily the pool size.
-OMP's own `usage --provider openai-codex --json`, measured in an established destination working directory with the destination worker's effective authentication-directory, profile, and `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` selectors, is authoritative for that surface, not quota-axi's single-account Codex row.
-All shared OMP usage and model-catalog queries require a nonempty, resolvable destination directory; absent or invalid `--cwd` leaves OMP capacity unknown without probing the caller's directory or its `.env`, and classification consumes only explicitly supplied usage JSON.
+Fresh-spawn routing reports pool status and classifies accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials; the displayed account count is not necessarily the pool size.
+OMP's own `usage --provider openai-codex --json`, measured through the owned initialized worker pane in its destination working directory under the same authentication boundary as launch, is authoritative for that surface, not quota-axi's single-account Codex row.
+Shared OMP usage and model-catalog queries require that initialized endpoint and a nonempty, resolvable destination directory; standalone capacity inspection and typed intake have no owned worker endpoint, so their OMP capacity remains unknown without probing a reconstructed environment or the caller's directory, and classification consumes only explicitly supplied usage JSON.
 A fresh usable entitled sibling keeps the model available; an unmeasured or unknown-entitlement sibling prevents a whole-pool exhaustion verdict unless it is known to be ineligible.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 Chat and Spark consume independent windows and meter verdicts; negative shared meter flags alone cannot prove exhaustion without a current model-scoped limit, and paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify regardless of model-ID casing.
 A snapshot fetched before a window's elapsed reset cannot establish current capacity; another still-current exhausted bound can establish exhaustion, but dropping obsolete windows never proves replenishment.
 When response headers update a native report, chat limit statuses supersede retained chat meter verdicts, but conflicting warning and exhausted or non-warning zero bounds remain unknown because report-wide timestamps do not establish their order.
 For merged reports, report-wide `fetchedAt` cannot make elapsed chat or Spark windows current or establish current Spark capacity.
-The pool has no synthesized `spendPriority` or completion runway: manual intake and typed resolution can dispatch a sole eligible native-usable OMP route when every alternative is proven exhausted or blocked and no explicit floor remains unverifiable, disclosing both economics as `unknown`; unknown or unmeasured pools do not qualify, and percentages cannot economically rank competing unranked routes.
+The pool has no synthesized `spendPriority` or completion runway; unknown or unmeasured pools do not qualify for sole-usable selection, and percentages cannot economically rank competing unranked routes.
 Typed candidate output renders `spendPriority=unknown` and `runway=unknown` for every pooled OMP Codex route, including candidates without a quota scope.
 An OMP Codex profile that omits its model retains unknown, unranked capacity without preventing evaluation of other profiles; typed intake also recognizes an explicit `provider: "codex"` as a pooled OMP route without a model.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a pinned account's capacity, an alternate store selected through `CLAUDE_CONFIG_DIR`, or a route using retained API credentials, `CLAUDE_CODE_OAUTH_TOKEN`, or supported cloud-auth overrides.
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
-For new tmux panes, credential binding resolves the launch backend and applies the launch allowlist to the effective destination environment, including configured caller imports and removals when creating a session, with explicit forwarded stores and account-pin credential shedding taking precedence; caller-only API credentials not imported by tmux, filtered credentials, and empty credentials do not hide subscription exhaustion, and `--allow-api-key` grants permission without establishing headroom.
+For fresh tmux workers, bounded probes run through the already-owned initialized pane after worktree entry, using the same pane-expanded launch allowlist and explicit forwarded stores and account-pin credential shedding as launch; shell initialization and directory-entry exports therefore participate in the evidence, and `--allow-api-key` grants permission without establishing headroom.
 Native Claude default-store quota is bound only when the destination's absolute `HOME` is established as matching the measuring process's `HOME`; a different, absent, removed, empty, or relative destination `HOME` keeps capacity unknown.
 An adopted pane retains its existing shell environment, which current tmux session/global settings cannot establish, so its native Claude and OMP quota remain unknown.
 An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established also keeps native Claude and OMP quota unknown.
@@ -1522,8 +1522,8 @@ Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFI
 bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name> --cwd <project-path>
 ```
 
-The project name is a task label, not a filesystem scope; supply the intended destination directory when asking intake to establish OMP usage or fallback catalog support.
-Without a resolvable destination directory, OMP pool capacity remains unknown and catalog support remains unestablished; typed intake does not approve an OMP primary or stand-in from the caller's project settings, and fresh spawn performs selection in the acquired worker worktree.
+The project name is a task label, not a filesystem scope; `--cwd` names the intended destination directory but does not establish an initialized worker's authentication environment.
+Typed intake therefore retains unknown native Claude and OMP capacity and cannot activate their stand-ins from reconstructed credentials; fresh spawn performs authoritative selection through the acquired worker pane.
 
 **When firstmate invokes the resolver**
 

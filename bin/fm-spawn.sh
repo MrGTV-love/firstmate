@@ -2105,11 +2105,16 @@ pi_supports_tui_mode() {
 # through with a notice, a bare fuzzy pattern is omp's own matcher's job, and an
 # unreadable listing establishes nothing (harness-adapters model-and-effort.md).
 omp_model_validate() { # <omp-bin> <model> <config-dir> <cwd> [tmux-session]
-  local bin=$1 model=$2 config=$3 cwd=$4 session=${5:-} provider listing providers
+  local bin=$1 model=$2 config=$3 cwd=$4 session=${5:-} provider listing providers rc=0
   [ -n "$model" ] && [ "$model" != default ] || return 0
   case "$model" in */*) ;; *) return 0 ;; esac
   command -v jq >/dev/null 2>&1 || return 0
-  listing=$(fm_dispatch_omp_query "$config" "$session" "$cwd" "$bin" models --json) || return 0
+  listing=$(fm_dispatch_omp_query "$config" "$session" "$cwd" "$bin" models --json) || rc=$?
+  if [ "$rc" -eq 126 ]; then
+    echo "error: destination authentication query did not complete; refusing to launch into an unsettled endpoint" >&2
+    return 126
+  fi
+  [ "$rc" -eq 0 ] || return 0
   providers=$(printf '%s' "$listing" | jq -r '.models[]?.provider // empty' 2>/dev/null | sort -u) || return 0
   [ -n "$providers" ] || return 0
   provider=${model%%/*}
@@ -2534,12 +2539,122 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   fi
 fi
 
+spawn_launch_env_wrap() {
+  local command=$1 prefix='/usr/bin/env -i' name arg
+  if [ "$LAUNCH_ENV_ENABLED" != 1 ]; then
+    printf '%s\n' "$command"
+    return
+  fi
+  for name in $FM_LAUNCH_ENV_FLOOR $LAUNCH_ENV_NAMES; do
+    # shellcheck disable=SC2016
+    printf -v arg '${%s+"%s=$%s"}' "$name" "$name" "$name"
+    prefix="$prefix $arg"
+  done
+  prefix="$prefix COMPACT_ADVISER_DISABLE=${COMPACT_ADVISER_SWITCH:-1}"
+  if [ -n "${SPAWN_TRACEPARENT:-}" ]; then
+    # shellcheck disable=SC2016
+    prefix="$prefix "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
+  fi
+  printf '%s /bin/sh -c %s\n' "$prefix" "$(shell_quote "$command")"
+}
+
+spawn_claude_boundary_wrap() {
+  local command=$1 account=${2:-} root=${3:-}
+  if [ "$ALLOW_API_KEY" -eq 0 ] || [ -n "$account" ]; then
+    command="/bin/sh -c $(shell_quote "$command")"
+  fi
+  if [ -n "$account" ]; then
+    if [ -n "$root" ]; then
+      command="$(fm_worker_account_claude_shed) CLAUDE_CONFIG_DIR=$(shell_quote "$root") $command"
+    else
+      command="$(fm_worker_account_claude_shed) -u CLAUDE_CONFIG_DIR $command"
+    fi
+  elif [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
+    command="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $command"
+  fi
+  if [ "$ALLOW_API_KEY" -eq 0 ] && [ -z "$account" ]; then
+    command="env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN $command"
+  fi
+  printf '%s\n' "$command"
+}
+
+fm_dispatch_endpoint_query() {
+  local harness=$1 config=$2 session=$3 cwd=$4 executable=$5
+  shift 5
+  [ "$BACKEND" = tmux ] && [ "$RELAUNCH" -eq 0 ] &&
+    [ "${SPAWN_DISPATCH_ENDPOINT_READY:-0}" = 1 ] &&
+    [ -n "${WT_TARGET:-}" ] && [ "$config" = "$CONFIG" ] || return 125
+  [ -z "$session" ] || [ "$session" = "$SES" ] || return 125
+  [ -n "$cwd" ] && [ "$(real_path_or_raw "$cwd")" = "$(real_path_or_raw "$WT")" ] || return 125
+  local command arg query_dir status rc=126 i runner
+  case "$harness" in
+    omp)
+      case "$executable" in
+        omp) executable=${OMP_BIN:-}; [ -n "$executable" ] || executable=$(resolve_pi_executable omp) || return 127 ;;
+      esac
+      [ -n "$executable" ] || return 127
+      command="env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 $(shell_quote "$executable")"
+      for arg in "$@"; do command="$command $(shell_quote "$arg")"; done
+      ;;
+    claude)
+      case "${HOME:-}" in /*) ;; *) return 125 ;; esac
+      # shellcheck disable=SC2016
+      command='[ "${HOME-}" = '"$(shell_quote "$HOME")"' ] && [ -z "${CLAUDE_CONFIG_DIR-}" ] || exit 125; '
+      for arg in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+        case "$arg" in
+          CLAUDE_CODE_USE_*)
+            # shellcheck disable=SC2016
+            command="$command"'case "${'"$arg"'-}" in 1|[tT][rR][uU][eE]|[yY][eE][sS]|[oO][nN]) exit 125 ;; esac; '
+            ;;
+          ANTHROPIC_FEDERATION_RULE_ID)
+            # shellcheck disable=SC2016
+            command="$command"'[ -z "${ANTHROPIC_FEDERATION_RULE_ID-}" ] || [ -z "${ANTHROPIC_ORGANIZATION_ID-}" ] || exit 125; '
+            ;;
+          *)
+            # shellcheck disable=SC2016
+            command="$command"'[ -z "${'"$arg"'-}" ] || exit 125; '
+            ;;
+        esac
+      done
+      command=$(spawn_claude_boundary_wrap "$command" "${WORKER_ACCOUNT:-}" "${WORKER_ACCOUNT_ROOT:-}")
+      ;;
+    *) return 125 ;;
+  esac
+  # shellcheck disable=SC2016
+  command='[ "$(pwd -P)" = '"$(shell_quote "$(real_path_or_raw "$WT")")"' ] || exit 125; '"$command"
+  runner=$(resolve_pi_executable bash) || return 125
+  command="$(shell_quote "$runner") -c $(shell_quote '. "$1"; shift; fm_run_timed 20 /bin/sh -c "$1"') _ $(shell_quote "$SCRIPT_DIR/fm-timeout-lib.sh") $(shell_quote "$command")"
+  command=$(spawn_launch_env_wrap "$command")
+  query_dir=$(mktemp -d "$STATE/.dispatch-query.XXXXXX") || return 125
+  if ! printf '%s\n' "( $command ) >$(shell_quote "$query_dir/stdout") 2>/dev/null; printf '%s\\n' \"\$?\" >$(shell_quote "$query_dir/status.tmp"); mv -- $(shell_quote "$query_dir/status.tmp") $(shell_quote "$query_dir/status")" > "$query_dir/script"; then
+    rm -rf "$query_dir"
+    return 125
+  fi
+  if spawn_send_text_line "$WT_TARGET" ". $(shell_quote "$query_dir/script")"; then
+    for ((i=0; i<250; i++)); do
+      if [ -f "$query_dir/status" ]; then
+        IFS= read -r status < "$query_dir/status" || status=
+        case "$status" in ''|*[!0-9]*) rc=125 ;; *) [ "$status" -le 255 ] && rc=$status ;; esac
+        [ "$rc" -ne 126 ] || rc=1
+        [ "$rc" -ne 0 ] || cat "$query_dir/stdout"
+        break
+      fi
+      sleep 0.1
+    done
+  fi
+  rm -rf "$query_dir"
+  return "$rc"
+}
+
 spawn_profile_preflight() {
   local dispatch_cwd=${1:-}
   if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
     if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
       dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
-      dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$dispatch_tmux_session" "$dispatch_cwd") || exit 1
+      dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$dispatch_tmux_session" "$dispatch_cwd") || {
+        [ "$?" -ne 126 ] || echo "error: destination authentication query did not complete; refusing to launch into an unsettled endpoint" >&2
+        exit 1
+      }
       DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       if [ "$DISPATCH_SWITCHED" = true ]; then
         HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
@@ -4650,6 +4765,7 @@ fi
 # tab's original project directory.
 spawn_enter_recorded_worktree
 spawn_assert_agent_worktree
+SPAWN_DISPATCH_ENDPOINT_READY=1
 
 if [ "$SPAWN_PREFLIGHT_DEFERRED" = 1 ]; then
   spawn_profile_preflight "$WT"
@@ -5488,40 +5604,12 @@ claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo 
   LAUNCH="env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI $LAUNCH"
   ;;
 esac
-if [ "$HARNESS" = claude ] && { [ "$ALLOW_API_KEY" -eq 0 ] || [ -n "$WORKER_ACCOUNT" ]; }; then
-  LAUNCH="/bin/sh -c $(shell_quote "$LAUNCH")"
-fi
-# Crewmate panes are created by a long-lived tmux/herdr daemon that does not
-# inherit firstmate's current environment, so a bare `claude` in the pane falls
-# back to the default ~/.claude store even when firstmate itself runs under a
-# different CLAUDE_CONFIG_DIR (for example a work-vs-personal subscription split).
-# Forward firstmate's own resolved store onto the claude launch so the crewmate
-# uses the same credential/config firstmate is authenticated with. Only when set;
-# an unset value is the single-store default and needs no prefix.
-# A home's worker account pin replaces that forwarding: the launch names the
-# pinned root (or unsets the variable for the ordinary Claude account) and
-# sheds the environment credentials Claude ranks above the root's login.
-if [ -n "$WORKER_ACCOUNT" ]; then
+if [ "$HARNESS" = claude ]; then
+  LAUNCH=$(spawn_claude_boundary_wrap "$LAUNCH" "$WORKER_ACCOUNT" "$WORKER_ACCOUNT_ROOT")
+elif [ -n "$WORKER_ACCOUNT" ]; then
   case "$HARNESS" in
-  claude)
-    if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
-      LAUNCH="$(fm_worker_account_claude_shed) CLAUDE_CONFIG_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
-    else
-      LAUNCH="$(fm_worker_account_claude_shed) -u CLAUDE_CONFIG_DIR $LAUNCH"
-    fi
-    ;;
-  pi | pi-signed)
-    LAUNCH="PI_CODING_AGENT_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
-    ;;
+  pi | pi-signed) LAUNCH="PI_CODING_AGENT_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH" ;;
   esac
-elif [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
-  LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
-fi
-# A pre-existing pane may have captured credentials absent from the spawning
-# process and tmux server. Shed both variables for a non-opt-in Claude worker;
-# a worker-account pin already applies the same shed to its launch command.
-if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ] && [ -z "$WORKER_ACCOUNT" ]; then
-  LAUNCH="env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN $LAUNCH"
 fi
 # The pane's environment comes from the tmux/herdr daemon, not this process, so
 # a TeamClaude launch hands its wrapper the configuration its --check above
@@ -5675,23 +5763,7 @@ if [ -n "$SPAWN_TRACEPARENT" ]; then
   fi
 fi
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  LAUNCH_ENV_PREFIX='/usr/bin/env -i'
-  # The resolved literal below wins over any retained ambient switch.
-  for env_name in $FM_LAUNCH_ENV_FLOOR $LAUNCH_ENV_NAMES; do
-    # Only validated names enter shell syntax. Values expand once, quoted, in
-    # the pane shell and never become source text or spawn-process snapshots.
-    # shellcheck disable=SC2016
-    printf -v env_arg '${%s+"%s=$%s"}' "$env_name" "$env_name" "$env_name"
-    LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX $env_arg"
-  done
-  # Establish the policy before the wrapper shell starts, even if a pane export
-  # was lost.
-  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
-  if [ -n "$SPAWN_TRACEPARENT" ]; then
-    # shellcheck disable=SC2016
-    LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
-  fi
-  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
+  LAUNCH=$(spawn_launch_env_wrap "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")
 fi
 LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
 # Implement the launch-delivery contract in this script's header. The full

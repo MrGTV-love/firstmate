@@ -52,7 +52,7 @@ Below-floor is rare: bootstrap enforces `FM_QUOTA_AXI_MIN` and normally reports 
 `--json` is a defensive belt, not a habit; never reach for it because it feels more complete.
 Read `quota-axi auth --json` only when a candidate's credential surface is in question.
 
-For an OMP `openai-codex/` candidate, inspect native capacity through [`fm-dispatch-capacity.sh`](../../../bin/fm-dispatch-capacity.sh) under the [pooled-capacity contract](../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins) before declaring exhaustion or applying the selected rule's stand-ins.
+For an OMP `openai-codex/` candidate, follow the [pooled-capacity contract](../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins); standalone capacity inspection cannot establish initialized worker authentication or authorize the selected rule's stand-ins.
 Quota-axi's single Codex account cannot veto a usable OMP sibling.
 Disclose pool economics as unknown and apply the [selection procedure below](#rank-by-spendpriority), not the exhausted sibling's economics.
 Provider-level quota notifications from `fm-procevent-quota.sh` are not proof that an OMP account pool is exhausted; reconcile the concrete OMP route before parking it.
@@ -124,9 +124,7 @@ Rank only from comparable known scalars.
 Never treat absent, `unknown`, or unmeasurable `spendPriority` as zero or as healthy; `0` means exact utilization, a different claim from unknown.
 An unknown `spendPriority` keeps the candidate eligible with disclosed uncertainty.
 Prefer known viable evidence when otherwise comparable.
-When exactly one candidate remains eligible with native-usable OMP capacity and every alternative is proven exhausted or blocked, dispatch it with `spendPriority` and completion runway disclosed as `unknown`, provided no explicit floor remains unverifiable.
-This narrow exception does not apply to unknown or unmeasured pools and does not bypass catalog support, authentication, reasoning-class fit, or an explicit captain floor.
-In every other case, after the permitted TOON-to-JSON fallback, escalate to Firstmate instead of routing if no candidate can be ranked or runway uncertainty prevents proving the feasibility floor for any candidate that could be selected.
+After the permitted TOON-to-JSON fallback, escalate to Firstmate instead of routing if no candidate can be ranked or runway uncertainty prevents proving the feasibility floor for any candidate that could be selected.
 Never resolve that terminal uncertainty by treating unknown as healthy or by choosing arbitrarily.
 Show the scalar or the literal `unknown` in the rationale; do not hide it in a score.
 

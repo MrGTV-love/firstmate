@@ -89,9 +89,11 @@ make_seeded_secondmate_home() {
 }
 
 run_spawn() {
-  local home=$1 wt=$2 fakebin=$3 launchlog=$4
+  local home=$1 wt=$2 fakebin=$3 launchlog=$4 pane_init
   shift 4
   : > "$launchlog"
+  pane_init=${FM_TEST_PANE_INIT:-$home/pane-init.sh}
+  [ -f "$pane_init" ] || pane_init=
   # CLAUDE_CONFIG_DIR is forwarded onto claude launches by fm-spawn, so pin it
   # explicitly (empty by default) instead of leaking the invoking shell's value,
   # which would make launch assertions depend on the developer's environment.
@@ -102,6 +104,7 @@ run_spawn() {
     XDG_CONFIG_HOME="${FM_TEST_XDG_CONFIG_HOME:-}" \
     TEAMCLAUDE_CONFIG="${FM_TEST_TEAMCLAUDE_CONFIG:-}" \
     FM_FAKE_TEAMCLAUDE_STATUS="${FM_TEST_TEAMCLAUDE_STATUS:-0}" \
+    FM_FAKE_PANE_INIT="$pane_init" \
     FM_FAKE_LAUNCH_LOG="$launchlog" FM_FAKE_PANE_LOG="${FM_TEST_PANE_LOG:-}" \
     FM_FAKE_PI_VERSION="${FM_TEST_PI_VERSION:-0.84.0}" \
     FM_FAKE_CURSOR_MODELS="${FM_TEST_CURSOR_MODELS:-}" \
@@ -166,7 +169,7 @@ SH
 
 enable_exhausted_claude_dispatch() {
   local home=$1 fakebin=$2
-  export FM_FAKE_TMUX_GLOBAL_ENV_HOME="$home/user-home"
+  printf 'export HOME=%q\nexport PATH=%q\n' "$home/user-home" "$fakebin:$PATH" > "$home/pane-init.sh"
   printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' \
     > "$home/config/crew-dispatch.json"
   cat > "$fakebin/quota-axi" <<'SH'
@@ -189,7 +192,7 @@ SH
 
 test_claude_dispatch_binds_only_forwarded_api_credentials() {
   local rec id credential policy out status expected_harness expected_model expected_effort launch
-  local -a args pane_env
+  local -a args
   for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
     for policy in ambient retained filtered flag-only caller-only destination-only; do
       id="profile-auth-$credential-$policy"
@@ -205,6 +208,10 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
           ;;
         filtered) printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
         flag-only) args+=(--allow-api-key) ;;
+      esac
+      case "$policy" in
+        flag-only|caller-only) ;;
+        *) printf 'export %s=%q\n' "$credential" synthetic-launch-credential >> "$HOME_DIR/pane-init.sh" ;;
       esac
       out=$(
         unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
@@ -228,11 +235,7 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
       grep -Fxq 'dispatch_rule=rule_1' "$HOME_DIR/state/$id.meta" || fail "$credential $policy lost dispatch identity"
       launch=$(cat "$LAUNCH_LOG")
       [ -n "$launch" ] || fail "$credential $policy sent no launch"
-      pane_env=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
-        -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
-        -u CLAUDE_CONFIG_DIR HOME="$HOME_DIR/user-home")
-      case "$policy" in flag-only|caller-only) ;; *) pane_env+=("$credential=synthetic-launch-credential") ;; esac
-      fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "${pane_env[@]}" \
+      fm_test_consume_pane_launch "$FAKEBIN_DIR" "$launch" \
         > "$CASE_DIR/worker.out" 2>&1 || fail "$credential $policy staged launch could not be consumed"
       case "$policy" in
         ambient|retained|destination-only)
@@ -1303,6 +1306,7 @@ test_claude_forwards_firstmate_config_dir_when_set() {
   read_case_record "$rec"
   printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist"
   enable_exhausted_claude_dispatch "$HOME_DIR" "$FAKEBIN_DIR"
+  printf 'export CLAUDE_CONFIG_DIR=%q\n' "$CASE_DIR/destination-claude" >> "$HOME_DIR/pane-init.sh"
 
   # A creatable path: this spawn now pre-registers workspace trust in that store
   # (bin/fm-claude-trust.sh), so an unwritable directory is a genuine blocker.
@@ -1312,7 +1316,7 @@ test_claude_forwards_firstmate_config_dir_when_set() {
   expect_code 0 "$status" "claude spawn with CLAUDE_CONFIG_DIR set should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
   launch=$(cat "$LAUNCH_LOG")
-  fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "CLAUDE_CONFIG_DIR=$CASE_DIR/destination-claude" \
+  fm_test_consume_pane_launch "$FAKEBIN_DIR" "$launch" \
     > "$CASE_DIR/worker.out" 2>&1 || fail "filtered root launch could not be consumed"
   grep -Fxq "CLAUDE_CONFIG_DIR=$CASE_DIR/claude-work" "$FAKEBIN_DIR/worker.env" \
     || fail "claude launch did not forward firstmate's CLAUDE_CONFIG_DIR to the crewmate pane"
@@ -1330,6 +1334,7 @@ test_claude_dispatch_destination_root() {
       retained) printf '%s\n' PATH CLAUDE_CONFIG_DIR > "$HOME_DIR/config/launch-env-allowlist" ;;
       filtered) printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
     esac
+    printf 'export CLAUDE_CONFIG_DIR=%q\n' "$CASE_DIR/destination-root" >> "$HOME_DIR/pane-init.sh"
     out=$(FM_FAKE_TMUX_ENV_CLAUDE_CONFIG_DIR="$CASE_DIR/destination-root" \
       run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
     status=$?
@@ -1342,7 +1347,7 @@ test_claude_dispatch_destination_root() {
       assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
     fi
     launch=$(cat "$LAUNCH_LOG")
-    fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "CLAUDE_CONFIG_DIR=$CASE_DIR/destination-root" \
+    fm_test_consume_pane_launch "$FAKEBIN_DIR" "$launch" \
       > "$CASE_DIR/worker.out" 2>&1 || fail "$policy destination root launch could not be consumed"
     grep -Fxq "CLAUDE_CONFIG_DIR=$expected" "$FAKEBIN_DIR/worker.env" || fail "$policy destination root disagrees with selected capacity"
   done

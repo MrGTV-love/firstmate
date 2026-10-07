@@ -635,6 +635,91 @@ test_prospective_tmux_credentials() {
   pass "prospective tmux imports both credentials with glob patterns and honors removal, emptiness, filtering, pins, and opt-in"
 }
 
+test_fresh_claude_dispatch_consumes_initialized_auth_boundary() {
+  local variant rec id out status percent expected_harness expected_config expected_home launch
+  for variant in caller-config pane-config filtered-config home-mismatch default-available default-exhausted; do
+    id="fresh-auth-$variant"
+    rec=$(make_case "$id" claude "$id")
+    read_case "$rec"
+    printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' \
+      > "$HOME_DIR/config/crew-dispatch.json"
+    percent=0
+    [ "$variant" != default-available ] || percent=50
+    printf '%s\n' "$percent" > "$FAKEBIN_DIR/remaining"
+    cat > "$FAKEBIN_DIR/quota-axi" <<'SH'
+#!/usr/bin/env bash
+percent=$(cat "${0%/*}/remaining")
+printf '%s\n' "$HOME" > "${0%/*}/quota-home"
+printf '{"schemaVersion":6,"providers":[{"provider":"claude","accountKey":"default","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":%s,"runway":{"status":"%s"}}]}}]}\n' \
+  "$percent" "$([ "$percent" = 0 ] && printf exhausted_now || printf available)"
+SH
+    cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "HOME=$HOME" "CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-}" "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" \
+  > "${0%/*}/worker.env"
+SH
+    cat > "$FAKEBIN_DIR/omp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  models) printf '%s\n' '{"models":[{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"}]}' ;;
+  *) exec "${0%/*}/claude" "$@" ;;
+esac
+SH
+    chmod +x "$FAKEBIN_DIR/quota-axi" "$FAKEBIN_DIR/claude" "$FAKEBIN_DIR/omp"
+    expected_home="$HOME_DIR/user-home"
+    expected_config=
+    expected_harness=claude
+    case "$variant" in
+      caller-config) expected_config="$CASE_DIR/caller-config" ;;
+      pane-config) expected_config="$CASE_DIR/pane-config" ;;
+      filtered-config)
+        printf '%s\n' HOME PATH > "$HOME_DIR/config/launch-env-allowlist"
+        expected_harness=omp
+        ;;
+      home-mismatch) expected_home="$CASE_DIR/other-home" ;;
+      default-exhausted) expected_harness=omp ;;
+    esac
+    mkdir -p "$expected_home"
+    printf 'export HOME=%q\nexport PATH=%q\n' "$expected_home" "$FAKEBIN_DIR:$PATH" > "$CASE_DIR/pane-init.sh"
+    case "$variant" in
+      pane-config|filtered-config)
+        printf 'export CLAUDE_CONFIG_DIR=%q\n' "$CASE_DIR/pane-config" >> "$CASE_DIR/pane-init.sh"
+        ;;
+    esac
+    out=$(
+      unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
+      FM_FAKE_PANE_INIT="$CASE_DIR/pane-init.sh" \
+        FM_FAKE_QUERY_LOG="$CASE_DIR/query.log" \
+        FM_FAKE_TMUX_GLOBAL_ENV_HOME="$HOME_DIR/user-home" \
+        FM_FAKE_TMUX_ENV_HOME="$HOME_DIR/user-home" \
+        FM_TEST_CLAUDE_CONFIG_DIR="$([ "$variant" != caller-config ] || printf '%s' "$expected_config")" \
+        run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off --harness claude --dispatch-rule rule_1
+    )
+    status=$?
+    [ "$status" -eq 0 ] || fail "$variant fresh Claude dispatch should succeed"$'\n'"$out"
+    assert_contains "$out" "spawned $id harness=$expected_harness" "$variant selected capacity from a different authentication boundary"
+    if [ "$expected_harness" = omp ]; then
+      assert_contains "$out" "fallback launched omp" "$variant did not serve the exhausted default fallback"
+    else
+      assert_not_contains "$out" "fallback launched" "$variant must not activate an unsupported fallback"
+    fi
+    assert_grep "harness=$expected_harness" "$HOME_DIR/state/$id.meta" "$variant recorded the wrong served harness"
+    [ -s "$CASE_DIR/query.log" ] || fail "$variant did not consume an actual initialized-pane endpoint query"
+    launch=$(cat "$LAUNCH_LOG")
+    [ -n "$launch" ] || fail "$variant did not send an actual worker launch"
+    fm_test_consume_pane_launch "$FAKEBIN_DIR" "$launch" \
+      > "$CASE_DIR/worker.out" 2>&1 || fail "$variant initialized-pane launch could not be consumed"
+    grep -Fxq "HOME=$expected_home" "$FAKEBIN_DIR/worker.env" || fail "$variant worker HOME disagreed with its actual probe"
+    grep -Fxq "CLAUDE_CONFIG_DIR=$expected_config" "$FAKEBIN_DIR/worker.env" || fail "$variant worker config root disagreed with its actual probe"
+    grep -Fxq 'ANTHROPIC_API_KEY=' "$FAKEBIN_DIR/worker.env" || fail "$variant leaked billing credentials"
+    grep -Fxq 'ANTHROPIC_AUTH_TOKEN=' "$FAKEBIN_DIR/worker.env" || fail "$variant leaked billing tokens"
+    if [ -f "$FAKEBIN_DIR/quota-home" ]; then
+      assert_equals "$HOME_DIR/user-home" "$(cat "$FAKEBIN_DIR/quota-home")" "$variant queried quota outside the caller identity"
+    fi
+  done
+  pass "fresh Claude dispatch consumes initialized pane authentication, filters inherited alternate roots, and binds native quota only to matching default HOME"
+}
+
 
 test_refuse_api_key_no_allowlist
 test_refuse_auth_token_no_allowlist
@@ -658,3 +743,4 @@ test_existing_tmux_ignores_caller_credentials
 test_existing_tmux_without_firstmate_checks_global_credentials
 test_fresh_tmux_auth_token_exceptions
 test_prospective_tmux_credentials
+test_fresh_claude_dispatch_consumes_initialized_auth_boundary

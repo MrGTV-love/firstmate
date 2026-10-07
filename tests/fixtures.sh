@@ -111,6 +111,29 @@ fm_test_fake_tmux_spawn() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
+pane_state="${0%/*}/pane-state"
+pane_initialize() {
+  mkdir -p "$pane_state"
+  /usr/bin/env -i HOME="${HOME:-}" PATH="$PATH" /bin/bash -c '
+    [ -z "$1" ] || . "$1" || exit
+    cd -- "$2" || exit
+    export -p > "$3/env.sh"
+    pwd -P > "$3/cwd"
+  ' _ "${FM_FAKE_PANE_INIT:-}" "${1:-${FM_FAKE_PANE_PATH:-$PWD}}" "$pane_state"
+}
+pane_consume() {
+  [ -f "$pane_state/env.sh" ] || pane_initialize || return
+  /usr/bin/env -i /bin/bash -c '
+    . "$1/env.sh" || exit
+    IFS= read -r pane_cwd < "$1/cwd"
+    cd -- "$pane_cwd" || exit
+    eval "$2"
+    pane_status=$?
+    export -p > "$1/env.sh"
+    pwd -P > "$1/cwd"
+    exit "$pane_status"
+  ' _ "$pane_state" "$1"
+}
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
@@ -122,13 +145,37 @@ case "${1:-}" in
     fi
     exit 0
     ;;
-  has-session|new-session|new-window|kill-window|set-window-option) exit 0 ;;
+  new-session|new-window)
+    initial_path="${FM_FAKE_PANE_PATH:-}"
+    if [ -z "$initial_path" ]; then
+      prev=
+      for a in "$@"; do
+        [ "$prev" != -c ] || initial_path=$a
+        prev=$a
+      done
+    fi
+    pane_initialize "${initial_path:-$PWD}"
+    exit $?
+    ;;
+  has-session|kill-window|set-window-option) exit 0 ;;
   show-environment)
-    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
+    [ "${FM_FAKE_TMUX_UNREADABLE:-0}" != 1 ] || exit 1
     knob=FM_FAKE_TMUX_ENV_
     for a in "$@"; do
       [ "$a" = -g ] && knob=FM_FAKE_TMUX_GLOBAL_ENV_
     done
+    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then
+      [ "$2" != -g ] || printf 'HOME=%s\nPATH=%s\n' "$HOME" "$PATH"
+      while IFS='=' read -r env_name value; do
+        case "$env_name" in
+          "$knob"*)
+            name=${env_name#"$knob"}
+            if [ "$value" = - ]; then printf -- '-%s\n' "$name"; else printf '%s=%s\n' "$name" "$value"; fi
+            ;;
+        esac
+      done < <(/usr/bin/env)
+      exit 0
+    fi
     name=${!#}
     knob=$knob$name
     if [ -z "${!knob+x}" ]; then
@@ -143,6 +190,28 @@ case "${1:-}" in
     exit 0
     ;;
   send-keys)
+    payload= literal= skip_next=
+    for a in "${@:2}"; do
+      if [ -n "$skip_next" ]; then skip_next=; continue; fi
+      case "$a" in
+        -t) skip_next=1 ;;
+        -l) literal=1 ;;
+        Enter|C-m) ;;
+        *) payload=$a ;;
+      esac
+    done
+    if [ -z "$literal" ]; then
+      case "$payload" in
+        *'.dispatch-query.'*'/script'*)
+          [ -z "${FM_FAKE_QUERY_LOG:-}" ] || printf '%s\n' "$payload" >> "$FM_FAKE_QUERY_LOG"
+          [ "${FM_FAKE_QUERY_DROP:-0}" != 1 ] || exit 0
+          pane_consume "$payload" || exit $?
+          ;;
+        export\ *|unset\ *|cd\ *)
+          pane_consume "$payload" || exit $?
+          ;;
+      esac
+    fi
     if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ] || { [ -n "${FM_FAKE_LAUNCH_STATUS_PATH:-}" ] && [ -n "${FM_FAKE_LAUNCH_STATUS_EVENT:-}" ]; }; then
       prev=
       for a in "$@"; do
@@ -204,6 +273,16 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+}
+
+fm_test_consume_pane_launch() {
+  local fakebin=$1 launch=$2
+  env -i /bin/bash -c '
+    . "$1/pane-state/env.sh" || exit
+    IFS= read -r pane_cwd < "$1/pane-state/cwd"
+    cd -- "$pane_cwd" || exit
+    eval "$2"
+  ' _ "$fakebin" "$launch"
 }
 
 # fm_test_fake_tmux_send <fakebin>

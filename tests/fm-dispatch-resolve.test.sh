@@ -362,9 +362,9 @@ assert_contains "$out" 'dispatch-resolve:' "TOON block header"
 assert_contains "$out" '  status: clear' "clear status"
 assert_contains "$out" '  rule: rule_4 (A simple bug fix with a stated root cause.)   confidence: 0.9' "rule and confidence line"
 assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "argmax picks the highest spendPriority"
-assert_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=all_models  remaining=79%  spendPriority=-0.4627  runway=projected_exhaustion  -> eligible' "every candidate is accounted for"
+assert_contains "$out" 'candidate: claude:sonnet  provider=claude  pool={"status":"unknown"}  -> eligible, unranked:' "Claude quota remains unbound without an initialized endpoint"
 assert_contains "$out" 'candidate: kimi:kimi-code/k3  provider=kimi  -> eligible, unranked: provider kimi unmeasured (unknown): disclosed uncertainty' "unmeasured provider stays listed as eligible and unranked"
-assert_contains "$out" '  note: 1 eligible candidate(s) unranked (kimi)' "clear results flag eligible unranked candidates once"
+assert_contains "$out" '  note: 2 eligible candidate(s) unranked (claude, kimi)' "clear results disclose every unbound candidate"
 assert_not_contains "$out" '--effort' "cursor profile without effort emits no --effort"
 argv=$(cat "$LOG/argv")
 assert_not_contains "$argv" "$KEY" "the key never appears on curl argv"
@@ -861,7 +861,7 @@ TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 0 "$code" "ambiguous exits 0"
 assert_contains "$out" '  status: ambiguous' "below the floor is ambiguous"
 assert_contains "$out" '  reason: confidence 0.41 below floor 0.6' "ambiguous names the floor"
-assert_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=all_models  remaining=79%  spendPriority=-0.4627  runway=projected_exhaustion  -> eligible' "ambiguous preserves matched candidate evidence"
+assert_contains "$out" 'candidate: claude:sonnet  provider=claude  pool={"status":"unknown"}  -> eligible, unranked:' "ambiguous preserves unbound Claude evidence"
 assert_contains "$out" 'candidate: kimi:kimi-code/k3  provider=kimi  -> eligible, unranked: provider kimi unmeasured (unknown): disclosed uncertainty' "ambiguous preserves eligible unranked candidate evidence"
 assert_not_contains "$out" '  profile:' "ambiguous emits no profile line"
 pass "ambiguous: confidence below the fixed floor hands the decision back"
@@ -1015,26 +1015,32 @@ TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 0 "$code" "escalate exits 0"
 assert_contains "$out" '  status: escalate' "approval-gated rule escalates"
 assert_contains "$out" "  reason: rule requires the captain's explicit approval before dispatch" "escalate names the approval gate"
-assert_contains "$out" 'candidate: claude:fable  provider=claude  scope=model:fable  remaining=15%  spendPriority=-0.79  runway=projected_exhaustion  bounds=all_models:79%/projected_exhaustion,model:fable:15%/projected_exhaustion  -> eligible' "approval escalation preserves matched candidate evidence"
+assert_contains "$out" 'candidate: claude:fable  provider=claude  pool={"status":"unknown"}  -> eligible, unranked:' "approval escalation preserves unbound candidate evidence"
 assert_not_contains "$out" '  profile:' "escalate emits no profile line"
 pass "escalate: a rule declared approval: captain never yields a profile"
 
-# --- rule floor fails: fall through to default -------------------------------
+# --- rule floors cannot borrow projected Claude quota ---------------------------
 reset_log
 write_response "$RESPONSE" rule_1 0.97
+for remaining in 0 15 100; do
+  jq --argjson remaining "$remaining" '
+    (.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
+      (.effectivePercentRemaining=$remaining)
+  ' "$QUOTA" > "$TMP_ROOT/unbound-rule-floor.json"
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/unbound-rule-floor.json" run code out err "$BRIEF"
+  assert_contains "$out" '  status: escalate' "unbound Claude floor stays unverifiable at $remaining%"
+  assert_contains "$out" '  reason: rule rule_1 floor claude/model:fable is unverifiable' "the unbound rule floor names its provider and scope"
+  assert_not_contains "$out" '  profile:' "unbound rule floor authorizes neither primary nor default routing"
+  assert_not_contains "$out" 'candidate: cursor:' "unbound floor does not evaluate weaker default candidates"
+done
+# Keep known rule-floor shortfall coverage on an independently measured provider.
+jq '.rules[0].floor={provider:"codex",scope:"all_models",min_percent:50}
+  | .rules[0].use={harness:"codex",model:"gpt-5.6-sol"}' "$BASE_RULES" > "$RULES"
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
-assert_contains "$out" '  status: clear' "rule floor fall-through still resolves"
-assert_contains "$out" '  note: rule rule_1 floor model:fable below 20%: fall through to default' "rule floor fall-through is explained"
-assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-high'" "fall-through resolves among the default profiles"
-assert_not_contains "$out" 'candidate: claude:fable' "the floored rule's own profile is not a candidate"
-
-MISSING_RULE_FLOOR="$TMP_ROOT/missing-rule-floor.json"
-jq '(.providers[] | select(.provider == "claude") | .quotaSemantics.effectiveAvailability) |= map(select(.scope != "model:fable"))' "$QUOTA" > "$MISSING_RULE_FLOOR"
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$MISSING_RULE_FLOOR" run code out err "$BRIEF"
-assert_contains "$out" '  status: escalate' "an unverifiable rule floor escalates"
-assert_contains "$out" '  reason: rule rule_1 floor claude/model:fable is unverifiable' "the unverifiable rule floor names its provider and scope"
-assert_not_contains "$out" '  profile:' "an unverifiable rule floor never authorizes default routing"
-pass "rule floor: known shortfall falls through while unavailable evidence escalates"
+assert_contains "$out" '  note: rule rule_1 floor all_models below 50%: fall through to default' "a measured shortfall still permits the declared default"
+assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-high'" "measured floor shortfall resolves the default"
+cp "$BASE_RULES" "$RULES"
+pass "rule floors preserve measured shortfall behavior without trusting unbound Claude quota"
 
 # --- declared provider and profile floor --------------------------------------
 reset_log
@@ -1069,13 +1075,14 @@ cp "$BASE_RULES" "$RULES"
 pass "declared provider and profile floor evidence are applied in code"
 
 # --- malformed ranking evidence is never ordered -------------------------------
+jq '.rules[3].use += [{harness:"codex",model:"gpt-5.6-sol"}]' "$BASE_RULES" > "$RULES"
 reset_log
 NONNUMERIC="$TMP_ROOT/nonnumeric-spend-priority.json"
 jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics.effectiveAvailability[] | select(.scope == "all_models") | .selection.spendPriority) = "high"' "$QUOTA" > "$NONNUMERIC"
 write_response "$RESPONSE" rule_4 0.9
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$NONNUMERIC" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=-  runway=through_reset  -> eligible, unranked: spendPriority missing or non-numeric at all_models: not rankable: disclosed uncertainty' "a nonnumeric spendPriority remains eligible but unranked"
-assert_contains "$out" "  profile: --harness 'claude' --model 'sonnet' --effort 'high'" "numeric evidence wins without mixed-type ordering"
+assert_contains "$out" "  profile: --harness 'codex' --model 'gpt-5.6-sol'" "numeric evidence wins without ordering unbound Claude quota"
 pass "nonnumeric spendPriority evidence is never ranked"
 
 # --- partial providers retain their known row evidence --------------------------
@@ -1093,8 +1100,8 @@ jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics) |= (.status
 ])' "$QUOTA" > "$PARTIAL_UNKNOWN"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$PARTIAL_UNKNOWN" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=model:cursor-grok-4.6-medium  remaining=-%  spendPriority=-  runway=-  bounds=all_models:91%/through_reset,model:cursor-grok-4.6-medium:-%/unknown  -> eligible, unranked: quota row model:cursor-grok-4.6-medium unknown: not rankable: disclosed uncertainty' "an unknown exact-model row preserves partial known evidence without ranking"
-assert_contains "$out" '  note: 2 eligible candidate(s) unranked (cursor, kimi)' "clear result lists every provider with unranked uncertainty"
-assert_contains "$out" "  profile: --harness 'claude' --model 'sonnet' --effort 'high'" "another measured candidate can clear"
+assert_contains "$out" '  note: 3 eligible candidate(s) unranked (claude, cursor, kimi)' "clear result lists every unranked provider"
+assert_contains "$out" "  profile: --harness 'codex' --model 'gpt-5.6-sol'" "another measured candidate can clear"
 
 PARTIAL_EXHAUSTED="$TMP_ROOT/partial-exhausted.json"
 jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics) |= (.status = "partial" | .effectiveAvailability += [
@@ -1102,7 +1109,7 @@ jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics) |= (.status
 ] | .effectiveAvailability[] |= if .scope == "all_models" then .effectivePercentRemaining = 0 | .runway.status = "exhausted_now" else . end)' "$QUOTA" > "$PARTIAL_EXHAUSTED"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$PARTIAL_EXHAUSTED" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  bounds=all_models:0%/exhausted_now,model:cursor-grok-4.6-medium:-%/unknown  -> not eligible: runway exhausted_now at all_models' "known exhaustion vetoes a candidate despite unknown exact-model evidence"
-assert_contains "$out" '  note: 1 eligible candidate(s) unranked (kimi)' "an exhausted candidate is excluded from the unranked uncertainty note"
+assert_contains "$out" '  note: 2 eligible candidate(s) unranked (claude, kimi)' "an exhausted candidate is excluded from the unranked uncertainty note"
 
 UNKNOWN_EXHAUSTED="$TMP_ROOT/unknown-exhausted.json"
 jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics) = {
@@ -1119,28 +1126,30 @@ jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics.effectiveAva
 ]' "$QUOTA" > "$NO_APPLICABLE"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$NO_APPLICABLE" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  -> eligible, unranked: no applicable quota row for provider cursor: disclosed uncertainty' "a candidate without an applicable row remains eligible but unranked"
-assert_contains "$out" '  note: 2 eligible candidate(s) unranked (cursor, kimi)' "no-applicable-row uncertainty appears in the clear-result note"
+assert_contains "$out" '  note: 3 eligible candidate(s) unranked (claude, cursor, kimi)' "no-applicable-row uncertainty appears beside unbound Claude"
 pass "partial and missing quota evidence remain eligible but unranked"
 
 # --- provider-wide rows remain bounds beside exact model rows ------------------
 reset_log
 BOUNDED="$TMP_ROOT/bounded.json"
-jq '(.providers[] | select(.provider == "claude") | .quotaSemantics.effectiveAvailability) += [
-  {"scope":"model:sonnet","status":"known","effectivePercentRemaining":99,"runway":{"status":"through_reset"},"selection":{"spendPriority":0.9}}
+jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics.effectiveAvailability) += [
+  {"scope":"model:cursor-grok-4.6-medium","status":"known","effectivePercentRemaining":99,"runway":{"status":"through_reset"},"selection":{"spendPriority":0.9}}
 ]' "$QUOTA" > "$BOUNDED"
 write_response "$RESPONSE" rule_4 0.9
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$BOUNDED" run code out err "$BRIEF"
-assert_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=all_models  remaining=79%  spendPriority=-0.4627' "the limiting provider-wide row drives ranking"
-assert_contains "$out" 'bounds=all_models:79%/projected_exhaustion,model:sonnet:99%/through_reset' "all applicable quota bounds are disclosed"
+assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597' "the limiting provider-wide row drives ranking"
+assert_contains "$out" 'bounds=all_models:91%/through_reset,model:cursor-grok-4.6-medium:99%/through_reset' "all applicable quota bounds are disclosed"
 
 EXHAUSTED_WIDE="$TMP_ROOT/exhausted-wide.json"
-jq '(.providers[] | select(.provider == "claude") | .quotaSemantics.effectiveAvailability[] | select(.scope == "all_models")) |= (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$BOUNDED" > "$EXHAUSTED_WIDE"
+jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics.effectiveAvailability[] | select(.scope == "all_models")) |= (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$BOUNDED" > "$EXHAUSTED_WIDE"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$EXHAUSTED_WIDE" run code out err "$BRIEF"
-assert_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=all_models  remaining=0%' "the exhausted account-wide bound is the candidate evidence"
-assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "a healthy exact row cannot bypass an exhausted account-wide bound"
-pass "provider-wide and exact quota rows combine into one limiting candidate"
+assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=0%' "the exhausted provider-wide bound is the candidate evidence"
+assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "a healthy exact row cannot bypass an exhausted provider-wide bound"
+cp "$BASE_RULES" "$RULES"
+jq '(.providers[] | select(.provider == "claude") | .quotaSemantics.effectiveAvailability[] | select(.scope == "all_models")) |= (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$QUOTA" > "$EXHAUSTED_WIDE"
+pass "provider-wide and exact quota rows combine without binding projected Claude authentication"
 
-# --- alternate credentials bind only when forwarded to the Claude launch -------
+# --- projected Claude credentials never bind the typed resolver ----------------
 for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   export "$credential=synthetic-alternate-auth"
   printf '%s=synthetic-alternate-auth\n' "$credential" > "$FM_AUTH_DESTINATION"
@@ -1152,27 +1161,17 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
     esac
     reset_log
     TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$EXHAUSTED_WIDE" run code out err "$BRIEF"
-    expect_code 0 "$code" "$credential $policy resolves with exhausted native default"
-    assert_contains "$out" '  status: clear' "$credential $policy keeps the measured alternative available"
-    assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "$credential $policy selects the measured alternative"
-    if [ "$policy" = stripped ]; then
-      assert_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=all_models  remaining=0%' "$credential stripped preserves native default exhaustion evidence"
-      assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "$credential stripped does not hide native default exhaustion"
-      assert_contains "$out" '  note: 1 eligible candidate(s) unranked (kimi)' "$credential stripped excludes exhausted Claude from uncertainty"
-    else
-      claude_candidate=$(printf '%s\n' "$out" | grep 'candidate: claude:sonnet ')
-      assert_contains "$claude_candidate" '"status":"unknown"' "$credential $policy leaves Claude capacity unknown"
-      assert_contains "$claude_candidate" 'eligible, unranked:' "$credential $policy keeps alternate authentication eligible without default-account quota ranking"
-      assert_contains "$out" '  note: 2 eligible candidate(s) unranked (claude, kimi)' "$credential $policy discloses alternate auth as uncertainty"
-    fi
-    pass "$credential $policy resolves against the effective Claude launch credentials"
+    expect_code 0 "$code" "$credential $policy resolves normally"
+    assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "measured alternative remains available"
+    assert_contains "$out" 'candidate: claude:sonnet  provider=claude  pool={"status":"unknown"}  -> eligible, unranked:' "$credential $policy cannot establish initialized Claude auth"
+    assert_contains "$out" '  note: 2 eligible candidate(s) unranked (claude, kimi)' "$credential $policy discloses unbound auth"
+    assert_not_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=' "projected credentials never authorize native Claude quota"
   done
   unset "$credential"
   rm "$FM_AUTH_DESTINATION"
 done
 rm "$HOME_DIR/config/launch-env-allowlist"
-ANTHROPIC_API_KEY=caller-only TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$EXHAUSTED_WIDE" run code out err "$BRIEF"
-assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "caller-only API auth does not conceal destination native exhaustion"
+pass "typed resolver keeps Claude unbound even when projection filters remove alternate credentials"
 
 # --- default choice ------------------------------------------------------------
 reset_log
@@ -1187,10 +1186,13 @@ pass "default: no rule matched resolves among the default profiles"
 reset_log
 TIE="$TMP_ROOT/tie.json"
 write_quota "$TIE" 0.5 0.5
+jq '.default=[{harness:"cursor",model:"cursor-grok-4.6-high"},{harness:"codex",model:"gpt-5.6-sol"}]' "$BASE_RULES" > "$RULES"
+jq '(.providers[] | select(.provider=="codex").quotaSemantics.effectiveAvailability[].selection.spendPriority)=0.5' "$TIE" > "$TMP_ROOT/measured-tie.json"
 write_response "$RESPONSE" default 0.88
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TIE" run code out err "$BRIEF"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/measured-tie.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "tie escalates"
 assert_contains "$out" '  reason: genuine spendPriority tie' "tie is named"
+cp "$BASE_RULES" "$RULES"
 pass "tie: equal spendPriority never breaks by array order"
 
 # --- nothing rankable escalates -------------------------------------------------
@@ -1599,117 +1601,46 @@ jq -n --argjson now "$(date +%s)" '{reports:[
    limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}
 ]}' > "$OMP_USAGE_FIXTURE"
 write_response "$RESPONSE" rule_4 0.9
-reset_log
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-assert_contains "$out" '  status: clear' "the pooled sibling clears single-account exhaustion"
-assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a healthy pool retains Luna"
-assert_contains "$out" "--dispatch-rule 'rule_4'" "the launch carries the selected fallback policy"
-assert_contains "$out" 'spendPriority=unknown  runway=unknown' "a sole native-usable route discloses unknown economics"
-cp "$RULES" "$TMP_ROOT/usable-primary-rules.json"
-jq '.rules[3].use = [
-  {harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},
-  {harness:"cursor",model:"cursor-grok-4.6-medium"},
-  {harness:"claude",model:"sonnet",floor:{scope:"all_models",min_percent:95}}
-] | .default = .rules[3].use' "$BASE_RULES" > "$RULES"
-jq '(.providers[] | select(.provider=="cursor").quotaSemantics.effectiveAvailability[]) |=
-  (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/sole-pool-quota.json"
-for usable_choice in rule_4 default; do
-  write_response "$RESPONSE" "$usable_choice" 0.9
-  jq --arg choice "$usable_choice" '.answers.rule.probabilities =
-    {rule_1:0.01,rule_2:0.01,rule_3:0.01,rule_4:0.01,default:0.01} |
-    .answers.rule.probabilities[$choice] = 0.96' "$RESPONSE" > "$TMP_ROOT/usable-response.json"
-  cp "$TMP_ROOT/usable-response.json" "$RESPONSE"
-  reset_log
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/sole-pool-quota.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  expect_code 0 "$code" "sole usable pool resolves for $usable_choice"
-  assert_contains "$out" '  status: clear' "$usable_choice admits a usable pool beside exhausted and blocked alternatives"
-  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$usable_choice retains the native-usable route"
-  usable_candidate=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
-  assert_contains "$usable_candidate" '"status":"usable"' "$usable_choice retains native capacity evidence"
-  assert_contains "$usable_candidate" 'spendPriority=unknown  runway=unknown' "$usable_choice discloses both unknown economics"
+for serving in false true; do
+  jq --argjson serving "$serving" '
+    .reports[].metadata.meterStates.chat={allowed:$serving,limitReached:($serving|not)}
+  ' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/projected-pool.json"
+  for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+    printf '%s=%s\n' "$selector" "$TMP_ROOT/projected-auth" > "$FM_AUTH_DESTINATION"
+    printf '%s=%s\n' "$selector" "$TMP_ROOT/global-auth" > "$FM_AUTH_DESTINATION.global"
+    for policy in retained filtered removed empty; do
+      case "$policy" in
+        retained) printf '%s\n' "$selector" > "$HOME_DIR/config/launch-env-allowlist" ;;
+        filtered) printf '# filtered\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+        removed) printf -- '-%s\n' "$selector" > "$FM_AUTH_DESTINATION" ;;
+        empty) printf '%s=\n' "$selector" > "$FM_AUTH_DESTINATION" ;;
+      esac
+      reset_log
+      TYPESAFE_API_KEY=$KEY OMP_USAGE_FIXTURE="$TMP_ROOT/projected-pool.json" \
+        QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+      expect_code 0 "$code" "unowned $selector $policy serving=$serving resolves normally"
+      assert_contains "$out" '  status: escalate' "projected OMP auth never establishes usable or exhausted capacity"
+      assert_contains "$out" 'pool={"status":"unknown","accounts":[],' "unowned pool remains unknown"
+      assert_contains "$out" 'eligible, unranked:' "unowned pool remains eligible but unranked"
+      assert_contains "$out" 'spendPriority=unknown  runway=unknown' "unowned pool economics stay unknown"
+      assert_not_contains "$out" '  profile:' "projection cannot authorize primary or permitted stand-in"
+      assert_absent "$LOG/usage-cwd" "typed resolver never invokes usage without an owned endpoint"
+      assert_absent "$LOG/catalog-cwd" "typed resolver never invokes models without an owned endpoint"
+    done
+    rm -f "$FM_AUTH_DESTINATION" "$FM_AUTH_DESTINATION.global" "$HOME_DIR/config/launch-env-allowlist"
+  done
 done
-cp "$TMP_ROOT/usable-primary-rules.json" "$RULES"
-write_response "$RESPONSE" rule_4 0.9
-saved_home=$HOME
-for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
-  case "$selector" in
-    OMP_PROFILE|PI_PROFILE) caller=caller; destination=destination ;;
-    PI_CONFIG_DIR) caller=.caller-omp; destination=.destination-omp ;;
-    *) caller="$TMP_ROOT/caller-auth"; destination="$TMP_ROOT/destination-auth" ;;
-  esac
-  export "$selector=$caller"
-  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION"
-  printf '%s=%s\n' "$selector" "$caller" > "$FM_AUTH_DESTINATION.global"
-  reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$selector destination headroom retains Luna despite caller exhaustion"
-  reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "$selector destination exhaustion cannot borrow caller headroom"
-  printf '%s\n' PATH > "$HOME_DIR/config/launch-env-allowlist"
-  if [ "$selector" = HOME ]; then expected="$selector=$destination"; else expected="-$selector"; fi
-  reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$expected" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$selector follows the launch allowlist with HOME retained"
-  rm "$HOME_DIR/config/launch-env-allowlist"
-  printf -- '-%s\n' "$selector" > "$FM_AUTH_DESTINATION"
-  reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="-$selector" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "removed $selector suppresses caller and global auth"
-  rm "$FM_AUTH_DESTINATION"
-  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION.global"
-  reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "absent session $selector inherits destination global auth"
-  rm "$FM_AUTH_DESTINATION.global"
-  unset "$selector"
-  export HOME=$saved_home
-done
-printf '%s\n' 'OMP_PROFILE=' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
-reset_log
-TYPESAFE_API_KEY=$KEY OMP_PROFILE=caller PI_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile= \
-  run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "explicit empty canonical profile suppresses legacy profile"
-printf '%s\n' '-OMP_PROFILE' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
-reset_log
-TYPESAFE_API_KEY=$KEY OMP_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile=legacy \
-  run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "removed canonical profile permits destination legacy profile"
-rm "$FM_AUTH_DESTINATION"
-for scope_failure in unreadable backend relative usage empty invalid; do
-  reset_log
-  case "$scope_failure" in
-    unreadable) TYPESAFE_API_KEY=$KEY FM_AUTH_UNREADABLE=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
-    backend) TYPESAFE_API_KEY=$KEY FM_BACKEND=herdr run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
-    relative) printf '%s\n' 'PI_CODING_AGENT_DIR=relative-root' > "$FM_AUTH_DESTINATION"
-      TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"; rm "$FM_AUTH_DESTINATION" ;;
-    usage) TYPESAFE_API_KEY=$KEY OMP_USAGE_FAIL=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
-    empty) TYPESAFE_API_KEY=$KEY OMP_USAGE_EMPTY=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
-    invalid) TYPESAFE_API_KEY=$KEY OMP_USAGE_INVALID=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
-  esac
-  assert_contains "$out" '  status: escalate' "$scope_failure OMP evidence is unknown"
-  assert_not_contains "$out" '  profile:' "$scope_failure cannot authorize primary or paid stand-in"
-done
-pass "OMP resolver acquisition follows destination auth selectors, precedence, allowlist and uncertainty"
-jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/all-empty.json"
-mv "$TMP_ROOT/all-empty.json" "$OMP_USAGE_FIXTURE"
-reset_log
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
-assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
 for unknown_scope in absent label empty; do
   reset_log
   case "$unknown_scope" in
-    absent) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" ;;
-    label) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --project "$CATALOG_PROJECT" ;;
-    empty) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd '' ;;
+    absent) TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" ;;
+    label) TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --project "$CATALOG_PROJECT" ;;
+    empty) TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd '' ;;
   esac
-  assert_contains "$out" '  status: escalate' "$unknown_scope destination scope retains escalation despite exhausted pool"
-  assert_not_contains "$out" '  profile:' "$unknown_scope destination scope cannot approve a catalog stand-in"
-  assert_absent "$LOG/catalog-cwd" "$unknown_scope destination scope does not query a caller catalog"
-  assert_absent "$LOG/usage-cwd" "$unknown_scope destination scope does not query caller usage"
-  assert_contains "$out" '"status":"unknown"' "$unknown_scope destination scope leaves pool capacity unknown"
-  assert_contains "$out" 'destination OMP authentication scope is not established' "$unknown_scope destination scope is disclosed"
+  assert_contains "$out" '  status: escalate' "$unknown_scope destination scope stays unranked"
+  assert_not_contains "$out" '  profile:' "$unknown_scope destination scope never authorizes fallback"
+  assert_absent "$LOG/catalog-cwd" "unowned destination scope never queries catalog"
+  assert_absent "$LOG/usage-cwd" "unowned destination scope never queries usage"
 done
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$TMP_ROOT/missing destination"
@@ -1728,42 +1659,15 @@ for destination_enabled in false true; do
   printf '{"disabledProviders":%s}\n' "$caller_disabled" > "$CATALOG_CALLER/.omp/config.yml"
   reset_log
   cd "$CATALOG_CALLER" || exit 1
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT/."
+  TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$CATALOG_PROJECT/."
   cd "$saved_cwd" || exit 1
-  if [ "$destination_enabled" = false ]; then
-    assert_contains "$out" '  status: escalate' "disabled destination route retains escalation despite enabled caller"
-    assert_not_contains "$out" '  profile:' "disabled destination route authorizes no profile"
-  else
-    assert_contains "$out" '  status: clear' "enabled destination route clears despite disabled caller"
-    assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "enabled destination selects its supported declared stand-in"
-  fi
-  assert_equals "$CATALOG_PROJECT" "$(cat "$LOG/catalog-cwd")" "catalog process cwd uses the normalized destination with spaces"
-  assert_equals "$CATALOG_PROJECT" "$(cat "$LOG/usage-cwd")" "usage process cwd uses the normalized destination with spaces"
+  assert_contains "$out" '  status: escalate' "project catalog enabled=$destination_enabled is not initialized endpoint evidence"
+  assert_not_contains "$out" '  profile:' "neither caller nor destination config establishes fallback support"
+  assert_absent "$LOG/catalog-cwd" "unowned project config never invokes models"
+  assert_absent "$LOG/usage-cwd" "unowned project config never invokes usage"
 done
 rm "$CATALOG_PROJECT/.omp/config.yml" "$CATALOG_CALLER/.omp/config.yml"
-: > "$FAKEBIN/catalog-key"
-cp "$RULES" "$TMP_ROOT/catalog-rules.json"
-jq '.rules[3].fallback += [{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}]' \
-  "$RULES" > "$TMP_ROOT/catalog-ordered.json"
-cp "$TMP_ROOT/catalog-ordered.json" "$RULES"
-for policy in inherited retained filtered removed empty; do
-  printf 'OPENROUTER_API_KEY=destination\n' > "$FM_AUTH_DESTINATION.global"
-  case "$policy" in
-    inherited) ;;
-    retained) printf 'OPENROUTER_API_KEY\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
-    filtered) : > "$HOME_DIR/config/launch-env-allowlist" ;;
-    removed) printf -- '-OPENROUTER_API_KEY\n' > "$FM_AUTH_DESTINATION" ;;
-    empty) printf 'OPENROUTER_API_KEY=\n' > "$FM_AUTH_DESTINATION" ;;
-  esac
-  reset_log
-  OPENROUTER_API_KEY=caller TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  case "$policy" in inherited|retained) expected=openrouter/z-ai/glm-5.3-flash ;; *) expected=openrouter/deepseek/deepseek-v4-flash ;; esac
-  assert_contains "$out" "--model '$expected'" "$policy resolver support must use destination-only provider credentials"
-  rm -f "$FM_AUTH_DESTINATION" "$FM_AUTH_DESTINATION.global" "$HOME_DIR/config/launch-env-allowlist"
-done
-cp "$TMP_ROOT/catalog-rules.json" "$RULES"
-rm "$FAKEBIN/catalog-key"
-pass "OMP resolver fallback catalog is destination-scoped including provider credentials"
+pass "typed OMP probes stay unknown and never query projected auth or catalogs"
 cp "$RULES" "$TMP_ROOT/exhausted-primary-rules.json"
 jq '.rules[3].use = [
   {harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},
@@ -1778,21 +1682,21 @@ for summary_choice in rule_4 default; do
   cp "$TMP_ROOT/summary-response.json" "$RESPONSE"
   reset_log
   TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  expect_code 0 "$code" "exhausted pool summary resolves for $summary_choice"
-  assert_contains "$out" '  status: clear' "measured capacity clears $summary_choice with an exhausted pool"
+  expect_code 0 "$code" "unowned pool summary resolves for $summary_choice"
+  assert_contains "$out" '  status: clear' "measured sibling clears $summary_choice beside an unowned pool"
   assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "$summary_choice chooses the measured Cursor candidate"
   summary_pool=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
-  assert_contains "$summary_pool" '"status":"exhausted"' "$summary_choice retains exhausted pooled evidence"
-  assert_contains "$summary_pool" 'not eligible' "$summary_choice excludes the exhausted pool from eligibility"
-  assert_contains "$summary_pool" 'spendPriority=unknown  runway=unknown' "$summary_choice discloses both economics for an exhausted pool"
+  assert_contains "$summary_pool" '"status":"unknown"' "$summary_choice keeps unowned pool unknown"
+  assert_contains "$summary_pool" 'eligible, unranked:' "$summary_choice discloses unowned pool uncertainty"
+  assert_contains "$summary_pool" 'spendPriority=unknown  runway=unknown' "$summary_choice discloses both unknown economics"
   summary_note=$(printf '%s\n' "$out" | grep '^  note: .*unranked')
-  assert_contains "$summary_note" 'kimi' "$summary_choice summarizes eligible unranked uncertainty"
-  assert_not_contains "$summary_note" 'codex' "$summary_choice does not summarize the ineligible pool as eligible unranked"
+  assert_contains "$summary_note" 'kimi' "$summary_choice summarizes unmeasured provider uncertainty"
+  assert_contains "$summary_note" 'codex' "$summary_choice summarizes unowned pool uncertainty"
   assert_not_contains "$summary_note" 'cursor' "$summary_choice does not summarize measured capacity as unranked"
 done
 cp "$TMP_ROOT/exhausted-primary-rules.json" "$RULES"
 write_response "$RESPONSE" rule_4 0.9
-pass "rules and defaults summarize only eligible unranked candidates beside exhausted OMP pools"
+pass "rules and defaults summarize eligible unranked OMP pools beside measured siblings"
 for gate in profile rule; do
   jq --arg gate "$gate" '
     if $gate == "profile" then .rules[3].use.floor={scope:"all_models",min_percent:20}
@@ -1856,7 +1760,7 @@ TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code o
 assert_contains "$out" '  status: escalate' "unknown pooled capacity does not authorize paid fallback"
 assert_not_contains "$out" '  profile:' "an uncertain pool does not silently use the stand-in"
 cp "$BASE_RULES" "$RULES"
-pass "typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty"
+pass "typed OMP dispatch never establishes capacity or activates fallback without owned endpoint evidence"
 
 # Native Claude quota cannot authorize a stand-in for another authentication scope.
 jq '.rules[3].use={harness:"claude",model:"sonnet",effort:"high"} |
@@ -1864,14 +1768,17 @@ jq '.rules[3].use={harness:"claude",model:"sonnet",effort:"high"} |
 jq '(.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
   (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/claude-native-empty.json"
 write_response "$RESPONSE" rule_4 0.9
-for exhaustion in runway percent; do
+for exhaustion in runway percent healthy; do
   jq --arg exhaustion "$exhaustion" '
     (.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
-      (.effectivePercentRemaining=0 | .runway.status=(if $exhaustion=="runway" then "exhausted_now" else "unknown" end))
+      (.effectivePercentRemaining=(if $exhaustion=="healthy" then 100 else 0 end) |
+       .runway.status=(if $exhaustion=="runway" then "exhausted_now" elif $exhaustion=="healthy" then "through_reset" else "unknown" end))
   ' "$QUOTA" > "$TMP_ROOT/direct-claude-empty.json"
   TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-  assert_contains "$out" '  status: clear' "native Claude $exhaustion exhaustion activates a permitted stand-in"
-  assert_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "native Claude uses its declared stand-in"
+  assert_contains "$out" '  status: escalate' "unbound Claude $exhaustion quota cannot authorize dispatch"
+  assert_contains "$out" 'pool={"status":"unknown"}  -> eligible, unranked:' "projected native quota stays unbound"
+  assert_not_contains "$out" '  profile:' "unbound native Claude never activates its permitted stand-in"
+  assert_absent "$LOG/catalog-cwd" "unbound Claude exhaustion never queries fallback catalog"
   for floor_state in below unknown ok; do
     case "$floor_state" in
       below) floor_scope=all_models; floor_min=20 ;;
@@ -1884,12 +1791,9 @@ for exhaustion in runway percent; do
     ' "$RULES" > "$TMP_ROOT/claude-profile-floor.json"
     cp "$TMP_ROOT/claude-profile-floor.json" "$RULES"
     TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
-    if [ "$floor_state" = ok ]; then
-      assert_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "a verified passing floor permits $exhaustion fallback"
-    else
-      assert_contains "$out" '  status: escalate' "a $floor_state profile floor gates $exhaustion fallback"
-      assert_not_contains "$out" '  profile:' "a $floor_state floor cannot be bypassed by exhaustion"
-    fi
+    assert_contains "$out" '  status: escalate' "an unbound $floor_state profile floor cannot authorize $exhaustion routing"
+    assert_contains "$out" 'pool={"status":"unknown"}  -> eligible, unranked:' "profile floors never borrow unbound default quota"
+    assert_not_contains "$out" '  profile:' "neither failing nor passing projected floor establishes authentication"
     cp "$TMP_ROOT/no-claude-profile-floor.json" "$RULES"
   done
 done

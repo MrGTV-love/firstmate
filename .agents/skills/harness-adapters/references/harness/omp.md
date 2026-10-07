@@ -37,8 +37,8 @@ The optional claude-bridge extension runs a nested executable literally named `c
 ## Launch posture
 
 [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns session posture, worker-only memory scope, and the invariant that the captain's own configuration is never written.
-The [worker overlay](../../../../../.omp/fm-worker-overlay.yml) owns worker-only memory and retry settings and their safety rationale.
-The [pooled capacity and declared stand-ins contract](../../../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins) owns native credential rotation, destination-owned in-worker fallback, capacity inspection, and restart-only recovery limits.
+The [worker overlay](../../../.omp/fm-worker-overlay.yml) owns worker-only memory and retry settings and their safety rationale.
+The [pooled capacity and declared stand-ins contract](../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins) owns native credential rotation, destination-owned in-worker fallback, capacity inspection, and restart-only recovery limits.
 
 ## Extension loading
 

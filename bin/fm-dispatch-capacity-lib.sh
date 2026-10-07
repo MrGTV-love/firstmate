@@ -19,82 +19,12 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-quota-axi-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-quota-axi-lib.sh"
-# shellcheck source=bin/fm-config-inherit-lib.sh
-. "$FM_DISPATCH_CAPACITY_DIR/fm-config-inherit-lib.sh"
-# shellcheck source=bin/fm-worker-account-lib.sh
-. "$FM_DISPATCH_CAPACITY_DIR/fm-worker-account-lib.sh"
-# shellcheck source=bin/fm-backend.sh
-. "$FM_DISPATCH_CAPACITY_DIR/fm-backend.sh"
-
-fm_dispatch_omp_query_scoped() {
-  local config=$1 session=$2 backend=$3 cwd=$4 executable=$5
-  shift 5
-  [ -n "$cwd" ] || return 125
-  cwd=$(cd "$cwd" 2>/dev/null && pwd -P) || return 125
-  local destination_env name names='' present entry value
-  local assignments=() discovered=()
-  case "$session" in *:*) return 125 ;; esac
-  [ "$backend" = tmux ] || return 125
-  destination_env=$(fm_worker_account_tmux_env '' "$session" names) || return 125
-  present=$(fm_config_source_present "$config/launch-env-allowlist") || return 125
-  if [ "$present" = 1 ]; then
-    names=$(fm_config_launch_env_names "$config") || return 125
-  fi
-  while IFS= read -r entry; do
-    name=${entry%%=*}
-    name=${name#-}
-    case "$name" in ''|[0-9]*|*[!a-zA-Z0-9_]*) continue ;; esac
-    case " ${discovered[*]-} " in *" $name "*) continue ;; esac
-    discovered+=("$name")
-    if [ "$present" = 1 ]; then
-      case " $FM_LAUNCH_ENV_FLOOR " in
-        *" $name "*) ;;
-        *) case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) continue ;; esac ;;
-      esac
-    fi
-    entry=$(fm_worker_account_tmux_env "$name" "$session" assignment) || return 125
-    [ -n "$entry" ] || continue
-    value=${entry#*=}
-    case "$name" in
-      HOME|PI_CODING_AGENT_DIR|XDG_DATA_HOME|XDG_STATE_HOME|XDG_CACHE_HOME)
-        case "$value" in ''|/*) ;; *) return 125 ;; esac
-        ;;
-    esac
-    assignments+=("$entry")
-  done <<<"$destination_env"
-  cd "$cwd" || return 125
-  /usr/bin/env -i "${assignments[@]+"${assignments[@]}"}" OMP_SKIP_SETUP=1 "$executable" "$@"
-}
 
 fm_dispatch_omp_query() {
-  local config=$1 session=$2 cwd=$3 executable=$4 backend=${BACKEND:-} shell_bin dir
+  local config=$1 session=$2 cwd=$3 executable=$4
   shift 4
-  [ -n "$cwd" ] || return 125
-  cwd=$(cd "$cwd" 2>/dev/null && pwd -P) || return 125
-  executable=$(type -P -- "$executable" 2>/dev/null) || return 127
-  [ -x "$executable" ] || return 127
-  case "$executable" in
-    /*) ;;
-    *)
-      dir=$(cd "$(dirname "$executable")" 2>/dev/null && pwd -P) || return 127
-      executable="$dir/$(basename "$executable")"
-      ;;
-  esac
-  shell_bin=$(type -P -- bash 2>/dev/null) || return 127
-  [ -x "$shell_bin" ] || return 127
-  case "$shell_bin" in
-    /*) ;;
-    *)
-      dir=$(cd "$(dirname "$shell_bin")" 2>/dev/null && pwd -P) || return 127
-      shell_bin="$dir/$(basename "$shell_bin")"
-      ;;
-  esac
-  if [ -z "$backend" ]; then
-    backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 125
-  fi
-  # shellcheck disable=SC2016 # Expand positional arguments in the child shell.
-  fm_run_timed 20 "$shell_bin" -c '. "$1"; shift; fm_dispatch_omp_query_scoped "$@"' _ \
-    "$FM_DISPATCH_CAPACITY_DIR/fm-dispatch-capacity-lib.sh" "$config" "$session" "$backend" "$cwd" "$executable" "$@" \
+  declare -F fm_dispatch_endpoint_query >/dev/null || return 125
+  fm_dispatch_endpoint_query omp "$config" "$session" "$cwd" "$executable" "$@" \
     2>/dev/null </dev/null
 }
 
@@ -102,6 +32,7 @@ fm_dispatch_omp_usage() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
   local session=${2:-} cwd=${3:-} usage rc=0
   usage=$(fm_dispatch_omp_query "$config" "$session" "$cwd" omp usage --provider openai-codex --json) || rc=$?
+  [ "$rc" -ne 126 ] || return 126
   if [ "$rc" -eq 125 ]; then
     printf '%s\n' '{"reason":"destination OMP authentication scope is not established"}'
     return
@@ -206,55 +137,30 @@ fm_omp_codex_capacity() {
 
 fm_dispatch_claude_quota_unbound() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
-  local name names present value session=${2:-} backend=${BACKEND:-}
-  case "$session" in *:*) return 0 ;; esac
-  if [ -z "$backend" ]; then
-    backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 0
-  fi
-  if [ -n "${CLAUDE_CONFIG_DIR:-}" ] ||
-    [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
+  local session=${2:-} cwd=${3:-} rc=0
+  if [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
     { [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; }; then
     return 0
   fi
-  present=$(fm_config_source_present "$config/launch-env-allowlist") || return 0
-  if [ "$present" = 1 ]; then
-    names=$(fm_config_launch_env_names "$config") || return 0
-  fi
-  [ "$backend" = tmux ] || return 0
-  fm_worker_account_tmux_env '' "$session" readable || return 0
-  value=$(fm_worker_account_tmux_env HOME "$session" assignment) || return 0
-  case "${HOME:-}" in /*) ;; *) return 0 ;; esac
-  [ "$value" = "HOME=$HOME" ] || return 0
-  value=$(fm_worker_account_tmux_filtered_env CLAUDE_CONFIG_DIR "$session" "$present" "${names:-}")
-  [ -z "$value" ] || return 0
-  for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
-    value=$(fm_worker_account_tmux_filtered_env "$name" "$session" "$present" "${names:-}")
-    case "$name" in
-      CLAUDE_CODE_USE_*)
-        case "$value" in 1|[tT][rR][uU][eE]|[yY][eE][sS]|[oO][nN]) return 0 ;; esac
-        ;;
-      ANTHROPIC_FEDERATION_RULE_ID)
-        if [ -n "$value" ]; then
-          value=$(fm_worker_account_tmux_filtered_env ANTHROPIC_ORGANIZATION_ID "$session" "$present" "${names:-}")
-          [ -z "$value" ] || return 0
-        fi
-        ;;
-      *) [ -z "$value" ] || return 0 ;;
-    esac
-  done
+  declare -F fm_dispatch_endpoint_query >/dev/null || return 0
+  fm_dispatch_endpoint_query claude "$config" "$session" "$cwd" '' >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 126 ] || return 126
+  [ "$rc" -eq 0 ] || return 0
   return 1
 }
 
 fm_dispatch_capacity() {
-  local harness=$1 model=$2 quota config session=${4:-} cwd=${5:-}
+  local harness=$1 model=$2 quota config session=${4:-} cwd=${5:-} rc=0
   case "$harness:$model" in
     omp:openai-codex/*)
-      quota=$(fm_dispatch_omp_usage "${3:-}" "$session" "$cwd")
+      quota=$(fm_dispatch_omp_usage "${3:-}" "$session" "$cwd") || return $?
       fm_omp_codex_capacity "$model" "$quota"
       return ;;
     claude:*)
       config=${3:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-$(cd "$FM_DISPATCH_CAPACITY_DIR/.." && pwd)}/config}}
-      if fm_dispatch_claude_quota_unbound "$config" "$session"; then
+      fm_dispatch_claude_quota_unbound "$config" "$session" "$cwd" || rc=$?
+      [ "$rc" -ne 126 ] || return 126
+      if [ "$rc" -eq 0 ]; then
         printf '%s\n' '{"status":"unknown","reason":"selected Claude authentication has no established native default-account quota mapping"}'
         return
       fi
@@ -309,12 +215,14 @@ fm_dispatch_fallbacks() {
 }
 
 fm_dispatch_fallback_supported() {
-  local config=$1 profile=$2 session=${3:-} cwd=${4:-} harness model catalog launcher
+  local config=$1 profile=$2 session=${3:-} cwd=${4:-} harness model catalog launcher rc=0
   harness=$(jq -r .harness <<<"$profile")
   model=$(jq -r .model <<<"$profile")
   case "$harness" in
     omp)
-      catalog=$(fm_dispatch_omp_query "$config" "$session" "$cwd" omp models --json) || return 1
+      catalog=$(fm_dispatch_omp_query "$config" "$session" "$cwd" omp models --json) || rc=$?
+      [ "$rc" -ne 126 ] || return 126
+      [ "$rc" -eq 0 ] || return 1
       jq -e --arg m "$model" 'any(.models[]?; .selector == $m)' <<<"$catalog" >/dev/null
       ;;
     claude)
@@ -333,9 +241,9 @@ fm_dispatch_fallback_supported() {
 }
 
 fm_dispatch_select() {
-  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} session=${6:-} cwd=${7:-} candidate state
+  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} session=${6:-} cwd=${7:-} candidate state rc=0
   if [ -z "$evidence" ]; then
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config" "$session" "$cwd")
+    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config" "$session" "$cwd") || return $?
   fi
   state=$(jq -r .status <<<"$evidence")
   if [ "$state" != exhausted ]; then
@@ -345,8 +253,11 @@ fm_dispatch_select() {
   fi
   while IFS= read -r candidate; do
     [ "$candidate" != "$profile" ] || continue
-    fm_dispatch_fallback_supported "$config" "$candidate" "$session" "$cwd" || continue
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config" "$session" "$cwd")
+    rc=0
+    fm_dispatch_fallback_supported "$config" "$candidate" "$session" "$cwd" || rc=$?
+    [ "$rc" -ne 126 ] || return 126
+    [ "$rc" -eq 0 ] || continue
+    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config" "$session" "$cwd") || return $?
     [ "$(jq -r .status <<<"$evidence")" != exhausted ] || continue
     jq -cn --argjson profile "$candidate" --argjson capacity "$evidence" --arg rule "$rule" \
       '{profile: $profile, capacity: $capacity, rule: $rule, switched: true}'

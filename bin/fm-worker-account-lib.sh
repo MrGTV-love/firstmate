@@ -321,7 +321,7 @@ fm_worker_account_claude_shed() {
 }
 
 fm_worker_account_tmux_env() {
-  local name=$1 session=${2:-} mode=${3:-scope} entry='' scope=''
+  local name=$1 session=${2:-} entry='' scope=''
   local updates='' pattern exported_names=''
   if [ -z "$session" ]; then
     if [ -n "${TMUX:-}" ]; then
@@ -334,20 +334,6 @@ fm_worker_account_tmux_env() {
   if [ -z "$session" ]; then
     updates=$(tmux show-options -gv update-environment 2>/dev/null) || return 1
     exported_names=$(compgen -e)
-  fi
-  if [ "$mode" = readable ]; then
-    tmux show-environment -g >/dev/null 2>&1 || return 1
-    [ -z "$session" ] || tmux show-environment -t "$session" >/dev/null 2>&1 || return 1
-    return 0
-  fi
-  if [ "$mode" = names ]; then
-    tmux show-environment -g || return 1
-    if [ -n "$session" ]; then
-      tmux show-environment -t "$session" || return 1
-    else
-      printf '%s\n' "$exported_names"
-    fi
-    return 0
   fi
   if [ -z "$session" ]; then
     while IFS= read -r pattern; do
@@ -374,25 +360,9 @@ fm_worker_account_tmux_env() {
     fi
   fi
   [ -n "$scope" ] || return 0
-  if [ "$mode" = assignment ]; then
-    case "$entry" in "$name"=*) printf '%s\n' "$entry" ;; esac
-    return 0
-  fi
   case "$entry" in
     "$name"=?*)
-      if [ "$mode" = value ]; then
-        printf '%s\n' "${entry#*=}"
-      else
-        printf '%s\n' "$scope"
-      fi
+      printf '%s\n' "$scope"
       ;;
   esac
-}
-
-fm_worker_account_tmux_filtered_env() {
-  local name=$1 session=${2:-} filtered=${3:-0} names=${4:-}
-  if [ "$filtered" = 1 ]; then
-    case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) return 0 ;; esac
-  fi
-  fm_worker_account_tmux_env "$name" "$session" value
 }
