@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bin/fm-composer-lib.sh - the ONE fleet-wide owner of composer classification:
 # every shape a verified harness draws, every glyph, every container proof, and
-# the empty|pending|pending-unproven|unknown verdict, shared by every
+# the empty|pending|pending-unproven|unknown|unknown-draft verdict, shared by every
 # session-provider adapter (tmux via bin/fm-tmux-lib.sh, and
 # bin/backends/{herdr,orca,cmux,zellij}.sh) and by fm-spawn.sh's kimi
 # launch-readiness check.
@@ -784,7 +784,7 @@ fm_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
 #   [identity]   "<agent>\t<status>" from the backend's native identity probe,
 #                or `probe-absent` when the probe found no live identity; only
 #                meaningful when caps carry identity=1.
-# Prints exactly one verdict: empty | pending | pending-unproven | unknown,
+# Prints exactly one verdict: empty | pending | pending-unproven | unknown | unknown-draft,
 # or the internal sentinel `need-identity` when caps declare identity=1, no
 # identity result was supplied, and the verdict depends on it. Adapters answer
 # `need-identity` by running their identity probe once and re-calling with
@@ -881,6 +881,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_PI_PAIR_FOUND=0
   FM_COMPOSER_SCAN_PI_PAIR_VALID=0
   FM_COMPOSER_SCAN_PI_PAIR_AMBIG=0
+  FM_COMPOSER_SCAN_PI_CURSOR_AMBIG=0
   FM_COMPOSER_SCAN_PI_OPEN=-1
   FM_COMPOSER_SCAN_PI_CLOSE=-1
   FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=-1
@@ -998,6 +999,17 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
                   FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=$FM_COMPOSER_SCAN_BARE_ROW
                   FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$row
                 fi
+              fi
+              ;;
+            "$bare_indent "*)
+              if fm_composer_leading_agent_glyph_var glyph "$trimmed" \
+                 && [ "$trimmed" != "$glyph" ] \
+                 && _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))" 1 \
+                 && { [ -z "$cy" ] || [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -lt 0 ] \
+                      || [ "$cy" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+                      || [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; }; then
+                FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=$FM_COMPOSER_SCAN_BARE_ROW
+                FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$row
               fi
               ;;
           esac
@@ -1135,6 +1147,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     if _fm_composer_pi_separator_row "$trimmed"; then
       if [ "$indent" != "$pi_open_indent" ] && [ "$pi_glyph_row" -ge 0 ]; then
         pi_ambiguous=1
+        if [ -n "$cy" ] && [ "$cy" -ge "$pi_glyph_row" ] && [ "$cy" -le "$row" ]; then
+          FM_COMPOSER_SCAN_PI_CURSOR_AMBIG=1
+        fi
       fi
       if [ "$pi_glyph_row" -ge 0 ] \
          && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
@@ -1142,6 +1157,10 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
          && [ "$pi_open" -eq "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
         pi_ambiguous=1
         FM_COMPOSER_SCAN_PI_PAIR_AMBIG=1
+        if [ -n "$cy" ] && [ "$cy" -ge "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" ] \
+           && [ "$cy" -le "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+          FM_COMPOSER_SCAN_PI_CURSOR_AMBIG=1
+        fi
       fi
       FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
       # A pair opened by a TITLED rule (claude draws its session title in the
@@ -1192,6 +1211,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       # Carry draft ambiguity, not glyphs after a recorded pair's closer.
       if [ "$pi_glyph_row" -ge 0 ] && [ "$pi_open" -ne "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
         pi_ambiguous=1
+        if [ -n "$cy" ] && [ "$cy" -ge "$pi_glyph_row" ] && [ "$cy" -le "$row" ]; then
+          FM_COMPOSER_SCAN_PI_CURSOR_AMBIG=1
+        fi
       fi
       # A titled rule only OPENS a pair; it never closes one, so a titled
       # transcript row can never end a composer region.
@@ -1840,7 +1862,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
 # prove it real and unknown otherwise (the same styled=0 degradation as the
 # glyph row itself).
 _fm_composer_classify_bare_wrap() {  # <screen> <styled> <first-row> <last-row>
-  local screen=$1 styled=$2 g=$3 cy=$4 row raw content glyph='' text_seen=0
+  local screen=$1 styled=$2 g=$3 cy=$4 row raw content glyph='' text_seen=0 literal_seen=0
   row=$g
   while [ "$row" -le "$cy" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
@@ -1852,14 +1874,19 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <first-row> <last-row>
       fi
     fi
     fm_composer_normalize_trim_var content
-    [ -z "$content" ] || text_seen=1
+    if [ -n "$content" ]; then
+      text_seen=1
+      if [ "$row" -gt "$g" ] && _fm_composer_row_is_bare_literal "$row"; then literal_seen=1; fi
+    fi
     row=$((row + 1))
   done
   if [ "$text_seen" = 0 ]; then
     printf 'empty'
     return 0
   fi
-  if [ "$styled" = 1 ]; then printf 'pending'; else printf 'unknown'; fi
+  if [ "$styled" = 1 ]; then printf 'pending'
+  elif [ "$literal_seen" = 1 ]; then printf 'unknown-draft'
+  else printf 'unknown'; fi
 }
 
 # _fm_composer_classify_leftbar: opencode's left-bar composer. Blank rows and
@@ -2082,7 +2109,7 @@ _fm_composer_select_cursorless() {
      && [ "$FM_COMPOSER_SCAN_PI_CLOSE" -gt "$generic" ] \
      && { [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
           || [ "$generic" -lt "$FM_COMPOSER_SCAN_PI_OPEN" ]; }; then
-    [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 0 ] || return 1
+    [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 0 ] || return 2
     generic=$FM_COMPOSER_SCAN_PI_CLOSE
     FM_COMPOSER_SELECTED_KIND=pi
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
@@ -2092,6 +2119,9 @@ _fm_composer_select_cursorless() {
      && [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ] \
      && [ "$FM_COMPOSER_SELECTED_AMBIG" = 1 ]; then
     FM_COMPOSER_SELECTED_KIND=
+    if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+       && [ "$FM_COMPOSER_SELECTED_FIRST" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ] \
+       && [ "$FM_COMPOSER_SELECTED_LAST" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ]; then return 2; fi
     return 1
   fi
   if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
@@ -2106,7 +2136,7 @@ _fm_composer_select_cursorless() {
       FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
     else
       FM_COMPOSER_SELECTED_KIND=
-      return 1
+      return 2
     fi
   fi
   if [ "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -gt "$generic" ]; then
@@ -2307,8 +2337,21 @@ EOF
   _fm_composer_scan_screen "$plain" "$cy"
   if [ -n "$cy" ]; then
     # Cursor mode (tmux): the shape CONTAINING the cursor is the composer.
+    if [ "$FM_COMPOSER_SCAN_PI_CURSOR_AMBIG" = 1 ]; then
+      printf 'unknown-draft'
+      return 0
+    fi
     if [ "$FM_COMPOSER_SCAN_UNSAFE" = 1 ]; then
-      printf 'unknown'; return 0
+      if { [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+           && [ "$cy" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+           && [ "$cy" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; } \
+         || { [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+              && [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 1 ] \
+              && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+              && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; }; then
+        printf 'unknown-draft'
+      else printf 'unknown'; fi
+      return 0
     fi
     if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
        && [ "$cy" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
@@ -2318,7 +2361,7 @@ EOF
          && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
         _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
       else
-        printf 'unknown'
+        printf 'unknown-draft'
       fi
       return 0
     fi
@@ -2326,7 +2369,7 @@ EOF
        && [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 1 ] \
        && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
        && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-      printf 'unknown'; return 0
+      printf 'unknown-draft'; return 0
     fi
     if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
        && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
@@ -2413,8 +2456,10 @@ EOF
   fi
   # Cursorless envelope precedence and ambiguity refusal have one owner:
   # _fm_composer_select_cursorless, shared with content extraction.
-  if ! _fm_composer_select_cursorless "$plain"; then
-    printf 'unknown'
+  local selection_status=0
+  _fm_composer_select_cursorless "$plain" || selection_status=$?
+  if [ "$selection_status" -ne 0 ]; then
+    if [ "$selection_status" = 2 ]; then printf 'unknown-draft'; else printf 'unknown'; fi
     return 0
   fi
   case "$FM_COMPOSER_SELECTED_KIND" in
@@ -2534,7 +2579,7 @@ _fm_composer_pair_glyph_verdict() {  # <screen> <styled> <has-identity> <identit
     row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
     while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
       if _fm_composer_row_is_bare_literal "$row"; then
-        state=unknown
+        state=unknown-draft
         break
       fi
       row=$((row + 1))
@@ -2577,9 +2622,14 @@ _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <i
 # keys would answer the prompt instead of composing (issue #2797). Structure
 # cannot disprove that, so a blocked pi defers rather than claiming empty.
 _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
-  local screen=$1 styled=$2 has_identity=$3 identity=$4 agent agent_status state
+  local screen=$1 styled=$2 has_identity=$3 identity=$4 agent agent_status state denied=unknown
+  if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+     && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+     && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+    denied=unknown-draft
+  fi
   if [ "$has_identity" != 1 ]; then
-    printf 'unknown'
+    printf '%s' "$denied"
     return 0
   fi
   if [ -z "$identity" ]; then
@@ -2587,13 +2637,13 @@ _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
     return 0
   fi
   if [ "$identity" = probe-absent ]; then
-    printf 'unknown'
+    printf '%s' "$denied"
     return 0
   fi
   agent=${identity%%$'\t'*}
   agent_status=${identity#*$'\t'}
   if [ "$agent" != pi ] || [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" != 1 ]; then
-    printf 'unknown'
+    printf '%s' "$denied"
     return 0
   fi
   state=$(_fm_composer_classify_pi_rows "$screen" "$styled")

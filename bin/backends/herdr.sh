@@ -72,7 +72,7 @@ FM_BACKEND_HERDR_ROOT="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ]
 FM_ROOT="${FM_ROOT_OVERRIDE:-${FM_ROOT:-$FM_BACKEND_HERDR_ROOT}}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 
-# Shared composer-content classifier (empty|pending|unknown, and the fleet-wide
+# Shared composer-content classifier (empty|pending|pending-unproven|unknown-draft|unknown, and the fleet-wide
 # dead-shell-vs-agent-composer rule). Owned by bin/fm-composer-lib.sh, reused by
 # every backend so the decision cannot drift.
 # shellcheck source=bin/fm-composer-lib.sh
@@ -3212,7 +3212,7 @@ fm_backend_herdr_composer_ghost_policy_matters() {  # <caps> <capture>
 # The ghost-colour policy (fm_backend_herdr_composer_ghost_luma) follows the
 # same lazy rule: a styled capture whose composer rows the two ceilings strip
 # differently depends on identity from the start, and no other capture does.
-fm_backend_herdr_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
+fm_backend_herdr_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown-draft|unknown
   fm_backend_herdr_composer_state_as "$1" ''
 }
 
@@ -3353,7 +3353,7 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 # footer may supply the same generating signal because live Claude never leaves
 # idle. The policy is fm_composer_queued_enter_verdict; this adapter only
 # supplies the busy primitive.
-# Echoes empty|pending|unknown|send-failed, a subset of the proof-carrying
+# Echoes empty|pending|pending-unproven|unknown-draft|unknown|send-failed, a subset of the proof-carrying
 # submit vocabulary. Empty means confirmed submitted for every backend; how
 # each backend confirms it is an internal decision.
 #
@@ -3603,7 +3603,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       case "$verdict" in
         busy) printf 'empty'; return 0 ;;
         empty) printf 'empty'; return 0 ;;
-        unknown) printf 'unknown'; return 0 ;;
+        unknown|unknown-draft) printf '%s' "$verdict"; return 0 ;;
       esac
     fi
     i=$((i + 1))

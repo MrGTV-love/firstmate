@@ -809,12 +809,14 @@ install_secondmate_alive_tmux() {  # <fakebin>
 set -u
 case "${1:-}" in
   list-windows) printf '%s\n' 'fm-mate' ;;
-  capture-pane) exit 0 ;;
+  capture-pane)
+    [ -z "${FM_FAKE_TMUX_CAPTURE:-}" ] || cat "$FM_FAKE_TMUX_CAPTURE"
+    exit 0 ;;
   display-message)
     case "$*" in
       *pane_current_command*) printf 'claude\n' ;;
       *pane_tty*) exit 1 ;;
-      *cursor_y*) printf '0\n' ;;
+      *cursor_y*) printf '%s\n' "${FM_FAKE_TMUX_CURSOR_Y:-0}" ;;
       *) printf '0\n' ;;
     esac
     ;;
@@ -868,6 +870,11 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
   install_secondmate_alive_tmux "$fakebin"
   install_secondmate_stall_date "$fakebin"
+  printf 'unrecognized idle prompt\n' > "$dir/composer"
+  [ "$(PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$dir/composer" \
+    bash -c '. "$1"; fm_backend_composer_state tmux firstmate:fm-mate fm-mate' \
+      _ "$ROOT/bin/fm-backend.sh")" = unknown ] \
+    || fail "the idle child-drain fixture must reach the real classifier's ordinary unknown verdict"
   "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
     || fail "could not arm the mate's busy contract"
   "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
@@ -877,6 +884,7 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
+    FM_FAKE_TMUX_CAPTURE="$dir/composer" \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
@@ -886,6 +894,7 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   printf '1002\n' > "$dir/now"
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
+    FM_FAKE_TMUX_CAPTURE="$dir/composer" \
     FM_FAKE_CHILD_WAKE_QUEUE="$sub/state/.wake-queue" \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
@@ -911,7 +920,60 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
     || fail "the child-first ring wrote the wrong drain instruction: $steer"
   grep -F '[ENTER]' "$dir/sent" >/dev/null \
     || fail "the child-first ring did not submit the doorbell: $(cat "$dir/sent" 2>/dev/null)"
-  pass "a proven-idle leftover row is rung so the child home can drain without a parent alarm"
+  pass "a proven-idle mate with an ordinary unknown composer is rung so its child home drains without a parent alarm"
+}
+
+test_secondmate_unknown_draft_keeps_the_parent_alert() {
+  local dir state sub fakebin stall_count
+  dir=$(make_case secondmate-unknown-draft-no-ring)
+  state="$dir/state"
+  sub="$dir/secondmate"
+  fakebin="$dir/fakebin"
+  mkdir -p "$sub/state"
+  printf 'mate\n' > "$sub/.fm-secondmate-home"
+  printf 'window=firstmate:fm-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+    "$sub" > "$state/mate.meta"
+  printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
+  cp "$sub/state/.wake-queue" "$dir/foreign-before"
+  printf '────────\n❯ preface\n ❯ nested draft\n────────\n' > "$dir/composer"
+  cp "$dir/composer" "$dir/composer-before"
+  install_secondmate_alive_tmux "$fakebin"
+  install_secondmate_stall_date "$fakebin"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
+    || fail "could not arm the draft-risk mate's busy contract"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
+    --source claude-hook --event stop >/dev/null \
+    || fail "could not mark the draft-risk mate exactly idle"
+
+  printf '1000\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
+    FM_FAKE_TMUX_CAPTURE="$dir/composer" FM_FAKE_TMUX_CURSOR_Y=2 \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+  [ ! -s "$state/.wake-queue" ] || fail "the first draft-risk queue observation alerted early"
+  [ ! -s "$dir/sent" ] || fail "the draft-risk mate was rung before the stall interval"
+
+  printf '1002\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
+    FM_FAKE_TMUX_CAPTURE="$dir/composer" FM_FAKE_TMUX_CURSOR_Y=2 \
+    FM_FAKE_CHILD_WAKE_QUEUE="$sub/state/.wake-queue" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" "risk" alert
+  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-risk.out" >/dev/null \
+    || fail "an exactly idle live mate with draft risk lost the parent alert: $(cat "$dir/watch-risk.out")"
+  stall_count=$(grep -c 'secondmate-wake-loop-mate-' "$state/.wake-queue" || true)
+  [ "$stall_count" -eq 1 ] || fail "draft risk did not retain exactly one durable parent notification"
+  [ ! -s "$dir/sent" ] || fail "a draft-risk child composer received text or Enter: $(cat "$dir/sent")"
+  [ ! -e "$state/mate.inbox" ] || fail "a draft-risk child received a drain steer"
+  [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "draft risk was recorded as a successful child ring"
+  cmp -s "$dir/foreign-before" "$sub/state/.wake-queue" \
+    || fail "the draft-risk child's pending wake row changed"
+  cmp -s "$dir/composer-before" "$dir/composer" || fail "the nested child draft changed"
+  pass "an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input"
 }
 
 # Busy and unknown panes are never typed into. Busy still defers inside the
@@ -3381,6 +3443,7 @@ test_secondmate_reprovisioned_queue_starts_a_fresh_interval
 test_secondmate_active_turn_defers_stall_until_the_turn_ends
 test_secondmate_long_lived_mate_mid_turn_is_not_a_stall
 test_secondmate_proven_idle_ring_lets_the_child_drain
+test_secondmate_unknown_draft_keeps_the_parent_alert
 test_secondmate_busy_and_unknown_panes_are_not_rung
 test_secondmate_genuine_stall_after_idle_ring_still_alarms
 test_secondmate_stall_marker_rejects_symlink

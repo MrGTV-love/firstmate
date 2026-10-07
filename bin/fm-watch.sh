@@ -121,9 +121,9 @@
 #                          BUSY_TURN_MAX_SECS); declared external-wait pause
 #                          rows do not feed this escalation; a mate whose
 #                          semantic busy class is exactly idle, whose agent is
-#                          alive, and whose composer is not pending is rung
-#                          once so its own home can drain, and the parent
-#                          notification is withheld until that same row stays
+#                          alive, and whose composer has no pending text or
+#                          identified draft risk is rung once so its home drains;
+#                          the parent notification waits until that row stays
 #                          frozen for another stall interval; unknown or
 #                          ring-unsafe panes keep the parent alarm; empty
 #                          inbox and a fresh child beacon are not idle proof;
@@ -939,9 +939,9 @@ secondmate_busy_class() {  # <window>
 }
 
 # 0 iff a child ring is authorized: exact idle, a live agent, and a composer
-# that is not proven pending. Busy, unknown, dead, missing, and pending
-# composer all refuse, so a Kimi or Claude pane without an exact idle
-# verdict is never typed into.
+# without pending text or identified draft risk. Busy, unknown, dead, missing,
+# pending and unknown-draft composer all refuse, so a Kimi or Claude pane
+# without an exact idle verdict is never typed into.
 secondmate_idle_ring_safe() {  # <window>
   local w=$1 backend agent_state cstate
   [ -n "$w" ] || return 1
@@ -950,7 +950,7 @@ secondmate_idle_ring_safe() {  # <window>
   agent_state=$(fm_backend_agent_state "$backend" "$w" 2>/dev/null || true)
   [ "$agent_state" = alive ] || return 1
   cstate=$(fm_backend_composer_state "$backend" "$w" "$(window_label "$w")" 2>/dev/null) || cstate=unknown
-  [ "$cstate" != pending ] || return 1
+  case "$cstate" in pending|unknown-draft) return 1 ;; esac
   return 0
 }
 
@@ -986,7 +986,7 @@ secondmate_ring_to_drain() {  # <task> <window>
 # turn defers its escalation, but only while this same interval is under
 # BUSY_TURN_MAX_SECS, so a turn that never ends cannot hide a frozen queue.
 # A mate whose busy class is exactly idle, whose agent is alive, and whose
-# composer is not pending is rung once so its own home can drain, and the
+# composer has no pending text or identified draft risk is rung once to drain, and the
 # parent notification is withheld until that same row stays frozen for another
 # stall interval. Unknown, busy-over-bound, and ring-unsafe panes keep the
 # parent alarm. Empty inbox and a fresh child beacon are not idle proof.

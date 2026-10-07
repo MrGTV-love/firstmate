@@ -1609,6 +1609,7 @@ families_for_changed_path() {
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-supervision-events.test.sh"
       printf '%s\n' "__script__:fm-omp-reboot-live-e2e.test.sh"
+      printf '%s\n' "__script__:fm-omp-composer-box-live-e2e.test.sh"
       ;;
     bin/fm-composer-lib.sh)
       # The shared shape catalogue is vendor-rendered signal; a change to it
@@ -1617,6 +1618,9 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
       printf '%s\n' live-harness-optin
+      printf '%s\n' "__script__:fm-composer-native-band.test.sh"
+      printf '%s\n' "__script__:fm-composer-native-continuation.test.sh"
+      printf '%s\n' "__script__:fm-composer-native-idle-hint.test.sh"
       ;;
     bin/fm-spawn.sh|bin/fm-send.sh|bin/fm-harness.sh|\
     bin/fm-peek.sh|bin/fm-composer*)

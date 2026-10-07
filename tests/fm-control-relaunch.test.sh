@@ -3572,19 +3572,6 @@ teamclaude_launch_line() {
   grep -F 'Firstmate operational input waiting: read' "$1" | tail -1
 }
 
-# Execute the pane command rather than pinning launcher quoting.
-# bin/fm-spawn.sh owns the launch-shell and environment boundaries.
-assert_teamclaude_launch() { # <fakebin> <launch-command> <label>
-  local fakebin=$1 launch=$2 label=$3 out
-  out="$(dirname "$fakebin")/claude-env.$RANDOM"
-  fm_test_teamclaude_launch_env "$fakebin" "$launch" "$out" \
-    || fail "$label: the recorded launch command failed: $launch"
-  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$out" \
-    || fail "$label: claude did not receive HTTPS_PROXY from teamclaude: $(cat "$out")"
-  grep -Fqx "NODE_EXTRA_CA_CERTS=$FM_TEST_TEAMCLAUDE_CA" "$out" \
-    || fail "$label: claude did not receive the TeamClaude CA from teamclaude: $(cat "$out")"
-}
-
 # arm_session_end <case-dir> <id>: record that the task's Claude session ended.
 arm_session_end() {
   local state="$1/home/state" gen
@@ -3619,7 +3606,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   printf 'zsh' > "$dir/fake/command"
   out=$(run_spawn "$dir" tc1 --relaunch --harness claude); rc=$?
   expect_code 0 "$rc" "a TeamClaude fm-spawn --relaunch should succeed"$'\n'"$out"
-  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux fm-spawn --relaunch"
 
   dir=$(new_case tc-tmux-control tc2)
@@ -3627,7 +3614,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   enable_teamclaude "$dir"
   out=$(run_control "$dir" tc2 relaunch --note "resume under TeamClaude"); rc=$?
   expect_code 0 "$rc" "a TeamClaude fm-control relaunch should succeed"$'\n'"$out"
-  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux fm-control relaunch"
 
   dir=$(new_case tc-tmux-session-end tc3)
@@ -3639,7 +3626,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   expect_code 0 "$rc" "the session-end scan should succeed"$'\n'"$out"
   assert_contains "$out" "tc3 auto-relaunched after session-end" \
     "the session-end scan should relaunch the ended worker"
-  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux session-end auto-relaunch"
   pass "config/claude-launcher=teamclaude: tmux fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude"
 }
@@ -3654,7 +3641,7 @@ test_teamclaude_reaches_herdr_relaunch_paths() {
   enable_teamclaude "$dir"
   out=$(run_spawn "$dir" tc4 --relaunch --harness claude); rc=$?
   expect_code 0 "$rc" "a TeamClaude herdr fm-spawn --relaunch should succeed"$'\n'"$out"
-  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr fm-spawn --relaunch"
 
   herdr_case_or_skip tc-herdr-control tc5 || return 0
@@ -3663,7 +3650,7 @@ test_teamclaude_reaches_herdr_relaunch_paths() {
   rm -f "$dir/fake/herdr-stopped"
   out=$(run_control "$dir" tc5 relaunch --note "resume under TeamClaude"); rc=$?
   expect_code 0 "$rc" "a TeamClaude herdr fm-control relaunch should succeed"$'\n'"$out"
-  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr fm-control relaunch"
 
   herdr_case_or_skip tc-herdr-session-end tc6 || return 0
@@ -3675,7 +3662,7 @@ test_teamclaude_reaches_herdr_relaunch_paths() {
   expect_code 0 "$rc" "the herdr session-end scan should succeed"$'\n'"$out"
   assert_contains "$out" "tc6 auto-relaunched after session-end" \
     "the session-end scan should relaunch the ended herdr worker"
-  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr session-end auto-relaunch"
   pass "config/claude-launcher=teamclaude: herdr fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude"
 }
@@ -3715,7 +3702,7 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
   enable_teamclaude "$dir"
   out=$(run_control "$dir" tc7 relaunch); rc=$?
   expect_code 0 "$rc" "a TeamClaude tmux secondmate relaunch should succeed"$'\n'"$out"
-  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux secondmate respawn"
 
   herdr_case_or_skip tc-herdr-secondmate tc8 || {
@@ -3730,7 +3717,7 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
   rm -f "$dir/fake/herdr-stopped"
   out=$(run_control "$dir" tc8 relaunch); rc=$?
   expect_code 0 "$rc" "a TeamClaude herdr secondmate relaunch should succeed"$'\n'"$out"
-  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr secondmate respawn"
   pass "config/claude-launcher=teamclaude: a Claude second mate respawns through TeamClaude on tmux and herdr"
 }
@@ -3783,7 +3770,7 @@ test_teamclaude_reaches_fresh_herdr_spawns() {
   out=$(run_spawn "$dir" tc9 "$dir/proj" claude --backend herdr --mode no-mistakes --yolo off); rc=$?
   expect_code 0 "$rc" "a TeamClaude fresh herdr spawn should succeed"$'\n'"$out"
   assert_contains "$(cat "$dir/fake/herdr-log")" "tab create" "the fresh spawn should open its own herdr tab"
-  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "fresh herdr ship spawn"
 
   dir=$(new_case tc-herdr-fresh-secondmate tc10)
@@ -3794,7 +3781,7 @@ test_teamclaude_reaches_fresh_herdr_spawns() {
   enable_teamclaude "$dir"
   out=$(run_spawn "$dir" tc10 "$dir/tc10-home" --secondmate --backend herdr); rc=$?
   expect_code 0 "$rc" "a TeamClaude fresh herdr secondmate spawn should succeed"$'\n'"$out"
-  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "fresh herdr secondmate launch"
   pass "config/claude-launcher=teamclaude: fresh herdr ship and second mate launches reach claude through TeamClaude"
 }

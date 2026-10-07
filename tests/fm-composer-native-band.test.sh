@@ -34,9 +34,9 @@ assert_content() {
 }
 
 assert_refused() {
-  local label=$1 screen=$2 caps out status
+  local label=$1 screen=$2 want=${3:-unknown} caps out status
   for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
-    assert_screen "$label" unknown "$caps" "$screen"
+    assert_screen "$label" "$want" "$caps" "$screen"
     status=0
     out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
     [ "$status" -ne 0 ] && [ -z "$out" ] || fail "$label: extraction must refuse, got $status '$out'"
@@ -110,19 +110,19 @@ pass "bare and Pi enclosing drafts retain ownership of pasted native bands"
 
 for blocker in '' 'π · model' '│ │' '⠂⠁'; do
   screen=$'❯ preface\n  '"$blocker"$'\n'"$frame"
-  assert_refused "bare ambiguous '$blocker' before pasted band" "$screen"
+  assert_refused "bare ambiguous '$blocker' before pasted band" "$screen" unknown-draft
   for cursor in 0 2 3; do
-    assert_screen "bare ambiguous '$blocker' band cursor $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor"
+    assert_screen "bare ambiguous '$blocker' band cursor $cursor" unknown-draft "$CAPS_TMUX" "$screen" "$cursor"
   done
 done
 for suffix in $'\n\n   second line' $'\n  second line'; do
   screen="$BAND$suffix"
-  assert_refused "unproven native band continuation" "$screen"
-  assert_screen "unproven native band floor cursor" unknown "$CAPS_TMUX" "$screen" 1
+  assert_refused "unproven native band continuation" "$screen" unknown-draft
+  assert_screen "unproven native band floor cursor" unknown-draft "$CAPS_TMUX" "$screen" 1
 done
 assert_refused "band header alone" " $HEADER"
 assert_refused "band missing usage meter" $' π > model > 📁 /work > ⑂ main\n╰─'
-assert_refused "band misaligned floor" $'  '"$HEADER"$'\n╰─'
+assert_refused "band misaligned floor" $'  '"$HEADER"$'\n╰─' unknown-draft
 assert_refused "band stale above shell" "$BAND"$'\n$ command'
 assert_refused "band stale above stray border" "$BAND"$'\n│ │'
 assert_screen "band header cannot claim cursor" unknown "$CAPS_TMUX" "$BAND" 0
@@ -134,14 +134,14 @@ test_cursor_ambiguity_survives_later_band_continuations() {
   local prefix screen suffix cursor
   prefix=$'❯ preface\n\n ╭── π > model > path ─╮\n │ │\n ╰─ ─╯'
   screen="$prefix"$'\n π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n ╰─\n\n second line'
-  assert_screen "reported compact floor ambiguity with later band" unknown "$CAPS_TMUX" "$screen" 4
+  assert_screen "reported compact floor ambiguity with later band" unknown-draft "$CAPS_TMUX" "$screen" 4
   for suffix in $'\n\n   second line' $'\n second line' $'\n  second line'; do
     screen="$prefix"$'\n '"$HEADER"$'\n╰─'"$suffix"
     for cursor in 0 2 3 4; do
       assert_screen "cursor-owned compact ambiguity survives later band '$suffix', cursor $cursor" \
-        unknown "$CAPS_TMUX" "$screen" "$cursor"
+        unknown-draft "$CAPS_TMUX" "$screen" "$cursor"
     done
-    assert_refused "cursorless compact ambiguity and later band '$suffix'" "$screen"
+    assert_refused "cursorless compact ambiguity and later band '$suffix'" "$screen" unknown-draft
   done
   pass "later band gaps and short gutters cannot replace cursor-owned compact ambiguity"
 }
@@ -157,7 +157,7 @@ test_owned_band_blank_and_braille_continuations() {
       case "$continuation" in *'⠂⠁'*) expected="$expected ⠂⠁" ;; esac
       expected="$expected keep tail"
       assert_screen "owned band gutter '$continuation', root '$prefix'" pending "$CAPS_STYLED" "$screen"
-      assert_screen "plain owned band gutter '$continuation', root '$prefix'" unknown "$CAPS_PLAIN" "$screen"
+      assert_screen "plain owned band gutter '$continuation', root '$prefix'" unknown-draft "$CAPS_PLAIN" "$screen"
       for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
         assert_content "owned band gutter '$continuation', root '$prefix'" "$expected" "$caps" "$screen"
       done
@@ -168,7 +168,7 @@ test_owned_band_blank_and_braille_continuations() {
     done
   done
   screen=$'❯ preface\n π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n ╰─\n ⠂⠁\n keep tail'
-  assert_refused "reported band and braille capture with unproven gutter" "$screen"
+  assert_refused "reported band and braille capture with unproven gutter" "$screen" unknown-draft
   for continuation in '   ' '   ⠂⠁'; do
     screen="$BAND"$'\n'"$continuation"$'\n   keep tail'
     expected='keep tail'
@@ -187,7 +187,7 @@ test_owned_band_blank_and_braille_continuations() {
 test_stale_ambiguous_band_does_not_veto_newer_composer() {
   local stale shape draft candidate screen caps candidate_caps want cursor
   stale=$'π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n╰─'
-  assert_refused "reported ambiguous band without a newer composer" "$stale"
+  assert_refused "reported ambiguous band without a newer composer" "$stale" unknown-draft
   for shape in bare ompbox leftbar pi; do
     for draft in '' 'newer draft'; do
       case "$shape" in
@@ -216,7 +216,7 @@ test_stale_ambiguous_band_does_not_veto_newer_composer() {
       [ -z "$draft" ] || want=pending
       assert_screen "newer $shape cursor ignores stale ambiguous band" "$want" \
         "$CAPS_TMUX" "$screen" "$cursor" $'pi\tidle'
-      assert_screen "cursor in old ambiguous band still refuses below newer $shape" unknown \
+      assert_screen "cursor in old ambiguous band still refuses below newer $shape" unknown-draft \
         "$CAPS_TMUX" "$screen" 1 $'pi\tidle'
     done
   done
@@ -226,10 +226,10 @@ test_stale_ambiguous_band_does_not_veto_newer_composer() {
 test_literal_band_rows_never_dispatch() {
   local screen continuation expected caps cursor
   screen=$'❯ preface\n π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n ╰─\n ┃\n ╭── π > pasted header ─╮'
-  assert_refused "reported nested left-bar and compact header with unproven band" "$screen"
+  assert_refused "reported nested left-bar and compact header with unproven band" "$screen" unknown-draft
   for cursor in 2 3; do
     assert_screen "unproven band cannot dispatch nested left-bar cursor $cursor" \
-      unknown "$CAPS_TMUX" "$screen" "$cursor"
+      unknown-draft "$CAPS_TMUX" "$screen" "$cursor"
   done
   for continuation in $'┃\n     ╭── π > pasted header ─╮' \
       $'────────\n     ❯\n     ────────' \
@@ -314,7 +314,7 @@ test_literal_ownership_is_scoped_to_selected_pair() {
         for cursor in 0 1; do
           for identity in '' $'claude\tidle' $'pi\tidle'; do
             want=pending
-            if [ "$styled" = 0 ] && [ "${identity%%$'\t'*}" != pi ]; then want=unknown; fi
+            if [ "$styled" = 0 ] && [ "${identity%%$'\t'*}" != pi ]; then want=unknown-draft; fi
             caps=$(printf 'styled=%s\ncursor=%s\nidentity=%s' "$styled" "$cursor" "${identity:+1}")
             assert_screen "literal rows inside selected pair retain conservative verdict" "$want" \
               "$caps" "$screen" 2 "$identity"

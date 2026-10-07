@@ -38,7 +38,7 @@ test_owned_frame_status_substrings_remain_input() {
       screen="$screen"$'\n π · model · 15.4%/272K'
       for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
         want=pending
-        [ "$caps" != "$CAPS_PLAIN" ] || want=unknown
+        [ "$caps" != "$CAPS_PLAIN" ] || want=unknown-draft
         assert_screen "owned frame status substring, enclosure=$enclosed" "$want" "$caps" "$screen"
         out=$(fm_composer_extract_selected_content "$caps" "$screen") \
           || fail "owned frame status substring extraction refused"
@@ -80,7 +80,7 @@ test_native_prompt_continuations_own_literal_frames() {
       expected="preface $continuation $frame_expected"
       for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
         if [ "$caps" = "$CAPS_PLAIN" ]; then
-          assert_screen "plain native '$continuation' with literal frame" unknown "$caps" "$screen"
+          assert_screen "plain native '$continuation' with literal frame" unknown-draft "$caps" "$screen"
         else
           assert_screen "native '$continuation' with literal frame cursorless" pending "$caps" "$screen"
         fi
@@ -98,7 +98,7 @@ test_native_prompt_continuations_own_literal_frames() {
       for cursor in 0 1; do
         assert_screen "empty native root with '$continuation' literal frame cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
       done
-      assert_screen "plain empty native root with '$continuation' literal frame" unknown \
+      assert_screen "plain empty native root with '$continuation' literal frame" unknown-draft \
         $'styled=0\ncursor=1\nidentity=0\nrows=20' "$screen" 0
     done
   done
@@ -108,14 +108,14 @@ test_native_prompt_continuations_own_literal_frames() {
   assert_screen "indented empty native root retains its owned draft" pending "$CAPS_TMUX" "$screen" 0
   for continuation in '❯ nested draft' '› nested draft' '⟩ nested draft' '→ nested draft'; do
     screen=$'❯ \n '"$continuation"$'\n╭── π > model > path ─╮\n│ │\n╰─  ─╯'
-    assert_screen "insufficient native gutter before '$continuation' does not claim the cursor" unknown "$CAPS_TMUX" "$screen" 0
+    assert_screen "insufficient native gutter before '$continuation' does not claim the cursor" unknown-draft "$CAPS_TMUX" "$screen" 0
     assert_screen "insufficient native gutter before '$continuation' leaves standalone frame empty" empty "$CAPS_TMUX" "$screen" 4
   done
 
   screen=$'  ❯ preface\n      > quote\n    # heading\n    $ command\n    % command\n    ❯ nested draft\n    › nested draft\n    ⟩ nested draft\n    → nested draft\n    ╭── π > model > path ─╮\n    │ │\n    ╰─  ─╯'
   expected='preface > quote # heading $ command % command ❯ nested draft › nested draft ⟩ nested draft → nested draft ╭── π > model > path ─╮ │ │ ╰─ ─╯'
   assert_screen "indented native gutter with consecutive prompt literals" pending "$CAPS_STYLED_NOID" "$screen"
-  assert_screen "plain indented native gutter with consecutive prompt literals" unknown "$CAPS_PLAIN" "$screen"
+  assert_screen "plain indented native gutter with consecutive prompt literals" unknown-draft "$CAPS_PLAIN" "$screen"
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
     out=$(fm_composer_extract_selected_content "$caps" "$screen")
     [ "$out" = "$expected" ] || fail "consecutive native literal extraction: expected '$expected', got '$out'"
@@ -126,16 +126,17 @@ test_native_prompt_continuations_own_literal_frames() {
     assert_screen "indented consecutive native literal cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
   done
 
-  local glyph prefix shell_row status
+  local glyph prefix shell_row status want
   for glyph in '>' '#' '$' '%'; do
     for prefix in $'❯ preface\n ' $'  ❯ preface\n   ' $'❯ preface\n\n  ' $'❯ preface\n > independent shell\n  '; do
       screen="${prefix}${glyph} command"
       case "$prefix" in
-        *$'\n\n'*|*'independent shell'*) shell_row=2 ;;
-        *) shell_row=1 ;;
+        *$'\n\n'*) shell_row=2; want=unknown-draft ;;
+        *'independent shell'*) shell_row=2; want=unknown ;;
+        *) shell_row=1; want=unknown ;;
       esac
       for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-        assert_screen "'$glyph' shell after insufficient gutter or uncertain continuity" unknown "$caps" "$screen"
+        assert_screen "'$glyph' shell after insufficient gutter or uncertain continuity" "$want" "$caps" "$screen"
         status=0
         out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
         [ "$status" -ne 0 ] && [ -z "$out" ] || fail "genuine '$glyph' shell must refuse extraction, got status $status and '$out'"
@@ -143,12 +144,12 @@ test_native_prompt_continuations_own_literal_frames() {
         out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") || status=$?
         [ "$status" -ne 0 ] && [ -z "$out" ] || fail "genuine '$glyph' shell under LC_ALL=C must refuse extraction, got status $status and '$out'"
       done
-      assert_screen "genuine '$glyph' shell cursor is not native input" unknown "$CAPS_TMUX" "$screen" "$shell_row"
+      assert_screen "genuine '$glyph' shell cursor is not native input" "$want" "$CAPS_TMUX" "$screen" "$shell_row"
       screen="$screen"$'\n  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'
       case "$prefix" in
         *$'\n\n'*)
-          assert_screen "blank-separated native '$glyph' cannot prove an independent frame" unknown "$CAPS_STYLED_NOID" "$screen"
-          assert_screen "blank-separated native '$glyph' frame floor stays ambiguous" unknown "$CAPS_TMUX" "$screen" "$((shell_row + 3))"
+          assert_screen "blank-separated native '$glyph' cannot prove an independent frame" unknown-draft "$CAPS_STYLED_NOID" "$screen"
+          assert_screen "blank-separated native '$glyph' frame floor stays ambiguous" unknown-draft "$CAPS_TMUX" "$screen" "$((shell_row + 3))"
           for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
             status=0
             out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
@@ -199,7 +200,7 @@ test_separator_enclosed_native_prompt_continuations() {
       fi
       screen="$screen"$'\n────────'
       assert_screen "separator native '$continuation' complete styled draft" pending "$CAPS_STYLED_NOID" "$screen"
-      assert_screen "separator native '$continuation' plain draft stays unproven" unknown "$CAPS_PLAIN" "$screen"
+      assert_screen "separator native '$continuation' plain draft stays unproven" unknown-draft "$CAPS_PLAIN" "$screen"
       assert_screen "separator native '$continuation' lazily requests identity" need-identity "$CAPS_STYLED" "$screen"
       for identity in probe-absent $'zsh\t' $'claude\tidle' $'pi\tidle' $'pi\tworking'; do
         assert_screen "separator native '$continuation' identity '$identity' keeps complete draft" pending \
@@ -207,7 +208,7 @@ test_separator_enclosed_native_prompt_continuations() {
       done
       assert_screen "plain separator native '$continuation' Pi owns literal content" pending \
         $'styled=0\ncursor=0\nidentity=1\nrows=20' "$screen" '' $'pi\tidle'
-      assert_screen "plain separator native '$continuation' non-Pi stays unproven" unknown \
+      assert_screen "plain separator native '$continuation' non-Pi stays unproven" unknown-draft \
         $'styled=0\ncursor=0\nidentity=1\nrows=20' "$screen" '' $'zsh\t'
       for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
         out=$(fm_composer_extract_selected_content "$caps" "$screen") \
@@ -227,7 +228,7 @@ test_separator_enclosed_native_prompt_continuations() {
       assert_screen "separator native '$continuation' empty root non-Pi identity" pending "$CAPS_TMUX" "$screen" 1 $'zsh\t'
       assert_screen "separator native '$continuation' empty root Pi identity" pending "$CAPS_TMUX" "$screen" 1 $'pi\tidle'
       assert_screen "separator native '$continuation' final content row Pi identity" pending "$CAPS_TMUX" "$screen" "$last" $'pi\tidle'
-      assert_screen "plain separator native '$continuation' empty root stays unproven" unknown \
+      assert_screen "plain separator native '$continuation' empty root stays unproven" unknown-draft \
         $'styled=0\ncursor=1\nidentity=0\nrows=20' "$screen" 1
     done
     screen=$'────────\n'"${bright}❯ ${reset}"$'\n  '"${bright}${continuation}${reset}"$'\n  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯\n────────'
@@ -262,7 +263,7 @@ test_blank_boundary_prompt_transitions() {
           screen="$screen$frame"$'\n'"  $glyph "
         fi
         for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-          assert_screen "blank-boundary '$glyph' $transition frame remains ambiguous" unknown "$caps" "$screen"
+          assert_screen "blank-boundary '$glyph' $transition frame remains ambiguous" unknown-draft "$caps" "$screen"
           status=0
           out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
           [ "$status" -ne 0 ] && [ -z "$out" ] || fail "blank-boundary '$glyph' $transition frame must refuse extraction, got $status '$out'"
@@ -271,7 +272,7 @@ test_blank_boundary_prompt_transitions() {
           [ "$status" -ne 0 ] && [ -z "$out" ] || fail "blank-boundary '$glyph' $transition frame under LC_ALL=C must refuse extraction"
         done
         for cursor in 0 2 "$((last - 1))" "$last"; do
-          assert_screen "blank-boundary '$glyph' $transition frame cursor row $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+          assert_screen "blank-boundary '$glyph' $transition frame cursor row $cursor" unknown-draft "$CAPS_TMUX" "$screen" "$cursor" probe-absent
         done
       done
     done
@@ -280,3 +281,27 @@ test_blank_boundary_prompt_transitions() {
 }
 
 test_blank_boundary_prompt_transitions
+
+test_reported_one_space_nested_draft() {
+  local screen=$'❯ preface\n ❯ nested draft' caps cursor identity
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    assert_screen "reported one-space nested draft preserves risk" unknown-draft "$caps" "$screen"
+  done
+  for caps in "$CAPS_TMUX" $'styled=0\ncursor=1\nidentity=1\nrows=20'; do
+    for cursor in 0 1; do
+      assert_screen "reported one-space nested draft cursor $cursor" unknown-draft "$caps" "$screen" "$cursor"
+    done
+  done
+  screen=$'────────\n❯ preface\n ❯ nested draft\n────────'
+  assert_screen "enclosed one-space draft lazily probes identity" need-identity "$CAPS_STYLED" "$screen"
+  assert_screen "enclosed one-space draft without identity" unknown-draft "$CAPS_STYLED_NOID" "$screen"
+  for identity in probe-absent $'claude\tidle' $'zsh\t'; do
+    assert_screen "enclosed one-space draft denied identity '$identity'" unknown-draft "$CAPS_STYLED" "$screen" '' "$identity"
+  done
+  assert_screen "enclosed one-space draft proven Pi" pending "$CAPS_STYLED" "$screen" '' $'pi\tidle'
+  screen="$screen"$'\n❯ '
+  assert_screen "independent newer empty prompt ignores enclosed ambiguity" empty "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "plain independent newer empty prompt ignores enclosed ambiguity" empty "$CAPS_PLAIN" "$screen"
+}
+
+test_reported_one_space_nested_draft

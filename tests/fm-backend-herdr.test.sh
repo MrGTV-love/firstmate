@@ -4718,6 +4718,39 @@ test_send_text_submit_never_idle_native_state_keeps_pending_without_a_transition
   pass "fm_backend_herdr_send_text_submit: an already-busy footer baseline is never accepted as proof that this Enter landed"
 }
 
+test_send_text_submit_nonidle_unknown_draft_stops_after_one_enter() {
+  local status dir log resp fb out enter_count idx
+  for status in working blocked; do
+    dir="$TMP_ROOT/submit-nonidle-unknown-draft-$status"
+    mkdir -p "$dir/responses"
+    log="$dir/log"
+    resp="$dir/responses"
+    : > "$log"
+    for idx in 1 7; do
+      printf '❯ preface\n ❯ nested draft\nthinking... esc to interrupt\n' > "$resp/$idx.out"
+    done
+    printf '{"result":{"agent":{"agent":"codex","agent_status":"%s"}}}\n' "$status" > "$resp/2.out"
+    printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/4.out"
+    printf 'thinking... esc to interrupt\n' > "$resp/5.out"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+      bash -c '. "$0/bin/backends/herdr.sh"
+        before=$(fm_backend_herdr_composer_state default:w1:p2)
+        after=$(fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0.01 0.01)
+        printf "%s %s" "$before" "$after"' "$ROOT" )
+    [ "$out" = "unknown-draft unknown-draft" ] \
+      || fail "$status native baseline must preserve the captured ambiguous draft token, got '$out'"
+    enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+    [ "$enter_count" -eq 1 ] \
+      || fail "$status native baseline must stop after one Enter for unknown-draft, sent $enter_count Enter(s)"
+    [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f''w1:p2'$'\x1f''hello captain' "$log")" -eq 1 ] \
+      || fail "$status draft-risk submit must type the payload exactly once"
+    [ "$(grep -c $'\x1f''agent'$'\x1f''get' "$log")" -eq 2 ] \
+      || fail "$status unknown-draft must return without borrowing preexisting native busy as queued-delivery proof"
+  done
+  pass "fm_backend_herdr_send_text_submit: a non-idle native baseline retains unknown-draft after one Enter without retries or busy conversion"
+}
+
 # Regression for the submit-confirmation side of the 2026-07-07 incident:
 # even if a Codex idle composer displays suggestion text, an idle-baseline
 # submit must confirm from native agent-state rather than composer scraping.
@@ -6177,6 +6210,7 @@ test_composer_state_cursor_midturn_row_reads_pending
 test_rendered_busy_state_reads_the_cursor_busy_token
 test_send_text_submit_confirms_never_idle_native_state_via_footer_transition
 test_send_text_submit_never_idle_native_state_keeps_pending_without_a_transition
+test_send_text_submit_nonidle_unknown_draft_stops_after_one_enter
 test_send_text_submit_confirms_despite_codex_idle_tip_composer
 test_composer_state_codex_dynamic_idle_tip_reads_empty_when_faint
 test_composer_state_guard_still_refuses_real_pending_text_after_submit_confirmation_change

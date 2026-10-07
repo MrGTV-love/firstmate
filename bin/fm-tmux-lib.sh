@@ -137,12 +137,12 @@ EOF
 
 # fm_tmux_composer_state: the tmux composer verdict - a thin adapter over the
 # shared screen classifier. The verdict contract (empty | pending |
-# pending-unproven | unknown, positive proof required for empty, unrecognized
+# pending-unproven | unknown-draft | unknown, positive proof required for empty, unrecognized
 # future verdicts failing safe) is owned by bin/fm-composer-lib.sh. Identity
 # is fetched lazily, only when the classifier reports the verdict depends on
 # it (a pi separator pair under the cursor), so the common read never pays
 # for the process probe.
-fm_tmux_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
+fm_tmux_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown-draft|unknown
   local target=$1 cy pane verdict identity
   cy=$(fm_tmux_composer_cursor_row "$target") || { printf 'unknown'; return 0; }
   case "$cy" in ''|*[!0-9]*) printf 'unknown'; return 0 ;; esac
@@ -252,7 +252,7 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     state=$(fm_tmux_composer_state "$target")
     case "$state" in
       pending|pending-unproven) ;;
-      unknown)
+      unknown|unknown-draft)
         if [ "$baseline_idle" = 1 ]; then
           j=0
           while [ "$j" -lt "$retries" ]; do
@@ -264,7 +264,7 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
             [ "$j" -ge "$retries" ] || sleep "$sleep_s"
           done
         fi
-        printf 'unknown'
+        printf '%s' "$state"
         return 0
         ;;
       *) printf '%s' "$state"; return 0 ;;

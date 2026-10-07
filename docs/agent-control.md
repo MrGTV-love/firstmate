@@ -50,10 +50,11 @@ An interrupt is not complete until the composer is empty.
 muse is the one verified adapter that restores the cancelled prompt back into its composer as real text, so its interrupt key is followed by a Ctrl+U clear; without it the next submitted line - including this plane's own exit command - would concatenate onto the restored prompt and submit both as one line.
 The clear is refused before anything is sent when the recorded backend cannot deliver it.
 
-`exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
+`exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `unknown-draft`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
 The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, cursor-owned ambiguity across later frames, complete literal blank and braille continuation extraction, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
 Cursorless classification and extraction rank every candidate before refusing a selected ambiguous native band, so an older ambiguous band cannot veto a newer independent composer.
-For an unstyled prompt-bearing rule pair, only literal-owned rows inside that selected pair can make its pending verdict unknown; historical literal frames outside the pair do not affect it.
+For an unstyled prompt-bearing rule pair, only literal-owned rows inside that selected pair can make its pending verdict `unknown-draft`; historical literal frames outside the pair do not affect it.
+`unknown-draft` retains conservative uncertainty while identifying draft risk in literal continuations or selected ambiguous input. Ordinary inbox doorbells, watcher re-rings, and secondmate child-drain rings defer without typing for this verdict. Ordinary `unknown` idle screens and `pending-unproven` remain advisory on the inbox plane; exact pending text still defers unless it is solely the inbox's own stuck doorbell.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.

@@ -529,7 +529,7 @@ fm_backend_zellij_composer_capture() {  # <target> [expected-label]
 # a message the crew never received. A dead pane still fails safe here: the
 # unconditional-exit-0 CLI quirk (file header) yields an empty dump, which
 # classifies unknown - never a confirmation.
-fm_backend_zellij_composer_state() {  # <target> [expected-label] -> empty|pending|pending-unproven|unknown
+fm_backend_zellij_composer_state() {  # <target> [expected-label] -> empty|pending|pending-unproven|unknown-draft|unknown
   local target=$1 expected_label=${2:-} cap caps verdict
   if cap=$(fm_backend_zellij_composer_capture "$target" "$expected_label"); then
     caps=$(printf 'styled=1\ncursor=0\nidentity=0\nrows=%s' "$FM_COMPOSER_CAPTURE_LINES")
@@ -571,7 +571,7 @@ fm_backend_zellij_composer_observed_append() {  # <target> <before> <text> [expe
 # fm_backend_zellij_send_text_submit: type <text> into <target> once (raw,
 # unsubmitted, via send_literal), then drive the shared verify-and-retry-Enter
 # loop (bin/fm-composer-lib.sh: fm_composer_submit_retry_core) against the
-# real composer verdict above. Echoes empty|pending|unknown|send-failed, a
+# real composer verdict above. Echoes empty|pending|pending-unproven|unknown-draft|unknown|send-failed, a
 # subset of the proof-carrying submit vocabulary. Only a positively classified
 # empty composer confirms delivery - a pane that merely CHANGED does not, so
 # the old heuristic's false "delivery confirmed" cannot recur.

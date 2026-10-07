@@ -108,6 +108,12 @@ init_changed_fixture_repo() {
     fm-backend-herdr-smoke.test.sh \
     fm-secondmate-safety.test.sh \
     fm-session-start.test.sh \
+    fm-supervision-events.test.sh \
+    fm-omp-reboot-live-e2e.test.sh \
+    fm-omp-composer-box-live-e2e.test.sh \
+    fm-composer-native-band.test.sh \
+    fm-composer-native-continuation.test.sh \
+    fm-composer-native-idle-hint.test.sh \
     fm-afk-pi-herdr-return-e2e.test.sh \
     fm-backend.test.sh \
     fm-pr-merge.test.sh \
@@ -129,6 +135,9 @@ init_changed_fixture_repo() {
   : >"$repo/bin/fm-supervisor-target-lib.sh"
   : >"$repo/bin/fm-control-lib.sh"
   : >"$repo/bin/fm-timeout-lib.sh"
+  : >"$repo/bin/fm-launch-proof-lib.sh"
+  : >"$repo/bin/fm-reboot-recover.sh"
+  : >"$repo/bin/fm-composer-lib.sh"
   : >"$repo/bin/fm-procevent-quota.sh"
   : >"$repo/bin/fm-quota-axi-lib.sh"
   : >"$repo/bin/fm-quota-choose.sh"
@@ -306,7 +315,7 @@ test_shell_line_ending_policy_selects_runner_contract() {
 }
 
 test_changed_dependency_selection_and_unmapped_failure() {
-  local tmp repo listed rc
+  local tmp repo listed rc source script
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-changed.XXXXXX")
   repo="$tmp/repo"
   init_changed_fixture_repo "$repo"
@@ -420,6 +429,41 @@ test_changed_dependency_selection_and_unmapped_failure() {
     "control library selects chooser coverage"
   git -C "$repo" add bin/fm-control-lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm control-lib-change
+  for source in fm-launch-proof-lib.sh fm-reboot-recover.sh; do
+    printf '\n' >>"$repo/bin/$source"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
+    assert_contains "$listed" "tests/fm-backend.test.sh" \
+      "$source keeps backend coverage"
+    assert_contains "$listed" "tests/fm-session-start.test.sh" \
+      "$source keeps session coverage"
+    assert_contains "$listed" "tests/fm-supervision-events.test.sh" \
+      "$source selects supervision event coverage"
+    assert_contains "$listed" "tests/fm-omp-reboot-live-e2e.test.sh" \
+      "$source selects live reboot coverage"
+    assert_contains "$listed" "tests/fm-omp-composer-box-live-e2e.test.sh" \
+      "$source selects live composer recovery coverage"
+    assert_not_contains "$listed" "tests/fm-pr-merge.test.sh" \
+      "$source selection stays focused"
+    git -C "$repo" add "bin/$source"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm "$source-change"
+  done
+
+  printf '\n' >>"$repo/bin/fm-composer-lib.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
+  assert_contains "$listed" "tests/fm-backend.test.sh" \
+    "composer library keeps backend coverage"
+  assert_contains "$listed" "tests/fm-ask-user-authority.test.sh" \
+    "composer library keeps pure contract coverage"
+  assert_contains "$listed" "tests/fm-omp-composer-box-live-e2e.test.sh" \
+    "composer library keeps live coverage"
+  for script in fm-composer-native-band.test.sh fm-composer-native-continuation.test.sh fm-composer-native-idle-hint.test.sh; do
+    assert_contains "$listed" "tests/$script" \
+      "composer library selects $script"
+  done
+  assert_not_contains "$listed" "tests/fm-pr-merge.test.sh" \
+    "composer library selection stays focused"
+  git -C "$repo" add bin/fm-composer-lib.sh
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm composer-lib-change
 
   printf '\n' >>"$repo/bin/fm-timeout-lib.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
