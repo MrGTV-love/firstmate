@@ -5032,7 +5032,18 @@ HTML
 cat > "$BOARD_DIR/commented.html" <<'HTML'
 <!doctype html><h1>board</h1>
 <!-- <form onsubmit="const x = ;"> a commented-out form is not a live handler -->
+<!-- <script>const broken = ;</script> -->
+<!-- <script data-fm-lavish-form-guard>const guard = true;</script> -->
+<script>const example = "<!-- <script data-fm-lavish-form-guard> -->";</script>
 <form onsubmit="event.preventDefault()"><button>ok</button></form>
+HTML
+cat > "$BOARD_DIR/script-comments.html" <<'HTML'
+<!doctype html><h1>board</h1>
+<script>
+const open = "<!--";
+const broken = ;
+const close = "-->";
+</script>
 HTML
 
 if ! command -v node >/dev/null 2>&1; then
@@ -5060,8 +5071,13 @@ else
   [ "$rc" -eq 0 ] || fail "JSON, module, or external scripts were compiled as classic scripts: $out"
 
   out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/commented.html" 2>&1) && rc=0 || rc=$?
-  [ "$rc" -eq 0 ] || fail "a commented-out handler was treated as live: $out"
-  assert_contains "$out" "handlers=1" "only the live handler is counted"
+  [ "$rc" -eq 0 ] || fail "commented-out markup was treated as live: $out"
+  assert_contains "$out" "handlers=1 scripts=1" "only the live handler and script are counted"
+  assert_contains "$out" "warning:" "a commented-out guard does not silence the missing-guard warning"
+
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/script-comments.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 1 ] || fail "HTML comment markers inside live JavaScript hid a syntax error: $out"
+  assert_contains "$out" "inline script (line 2)" "live script bodies retain HTML-like comment text"
 
   # The drop-in guard satisfies the warning without any other change.
   { cat "$BOARD_DIR/fixed.html"; cat "$ROOT/.agents/skills/bearings/assets/lavish-form-guard.html"; } > "$BOARD_DIR/guarded.html"
@@ -5075,11 +5091,15 @@ else
   fm_test_track_procevent_home "$HBOARD"
   BOARD_BIN=$(fm_fakebin "$TMP_ROOT/lavish-board-stub")
   BOARD_POLLS="$TMP_ROOT/board-polls"; : > "$BOARD_POLLS"; export BOARD_POLLS
+  BOARD_RELEASE="$TMP_ROOT/board-release"; export BOARD_RELEASE
   cat > "$BOARD_BIN/lavish-axi" <<'SH'
 #!/usr/bin/env bash
-# Records that a listener actually started, then waits a bounded time.
 printf 'poll\n' >> "$BOARD_POLLS"
-sleep 20
+while [ ! -e "$BOARD_RELEASE" ]; do
+  [ "$SECONDS" -lt 20 ] || exit 75
+  sleep 0.05
+done
+printf 'session:\n  status: feedback\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","board answer","","message",""\n'
 SH
   chmod +x "$BOARD_BIN/lavish-axi"
   lavish_session "$BOARD_DIR/broken.html"
@@ -5099,6 +5119,49 @@ SH
   assert_contains "$out" "armed: $guarded_id" "arm still arms a sound board with handlers"
   PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" retire "$BOARD_DIR/guarded.html" >/dev/null 2>&1 || true
   pass "arm refuses a board whose form handler does not parse and still arms a sound one"
+
+  lavish_session "$BOARD_DIR/commented.html"
+  commented_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$BOARD_DIR/commented.html")
+  out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/commented.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "arm refused a sound board containing inactive scripts: $out"
+  assert_contains "$out" "armed: $commented_id" "arm ignores a commented-out broken script"
+  assert_contains "$out" "warning:" "arm warns when the guard is only commented out"
+  PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" retire "$BOARD_DIR/commented.html" >/dev/null 2>&1 || true
+
+  ln -s "$BOARD_DIR/guarded.html" "$BOARD_DIR/guarded-alias.html"
+  for board_owner in firstmate task; do
+    board_owner_args=()
+    if [ "$board_owner" = task ]; then
+      new_task_endpoint "$HBOARD" board-worker
+      board_owner_args=(--for board-worker)
+    fi
+    board_poll_count=$(wc -l < "$BOARD_POLLS" | tr -d ' ')
+    out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/guarded-alias.html" ${board_owner_args[@]+"${board_owner_args[@]}"} 2>&1) && rc=0 || rc=$?
+    [ "$rc" -eq 0 ] || fail "$board_owner arm refused a sound board through a symlink: $out"
+    assert_contains "$out" "armed: $guarded_id" "symlink arming retains the canonical source identity"
+    assert_contains "$out" "artifact: $BOARD_DIR/guarded.html" "symlink arming reports the checked physical file"
+    wait_for_lines "$BOARD_POLLS" "$((board_poll_count + 1))" || fail "symlink arming did not start a listener"
+    out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/guarded-alias.html" ${board_owner_args[@]+"${board_owner_args[@]}"} 2>&1) && rc=0 || rc=$?
+    if [ "$board_owner" = firstmate ]; then
+      [ "$rc" -eq 0 ] || fail "firstmate re-arm refused the symlink: $out"
+      assert_contains "$out" "still-listening: $guarded_id" "symlink re-arm retains the existing listener"
+      [ "$(wc -l < "$BOARD_POLLS" | tr -d ' ')" -eq "$((board_poll_count + 1))" ] || fail "symlink re-arm started a second listener"
+    else
+      [ "$rc" -ne 0 ] || fail "task symlink re-arm discarded a listener with no captured round"
+      assert_contains "$out" "no captured round" "task symlink re-arm reaches the ownership boundary"
+      [ "$(wc -l < "$BOARD_POLLS" | tr -d ' ')" -eq "$((board_poll_count + 1))" ] || fail "refused task re-arm started another listener"
+      touch "$BOARD_RELEASE"
+      wait_capture "$HBOARD" "$guarded_id" || fail "the symlink-armed task never captured its round"
+      rm -f "$BOARD_RELEASE"
+      out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/guarded-alias.html" --for board-worker 2>&1) && rc=0 || rc=$?
+      [ "$rc" -eq 0 ] || fail "task re-arm refused the symlink after capturing a round: $out"
+      assert_contains "$out" "armed: $guarded_id" "task symlink re-arm starts the next round"
+      [ -f "$HBOARD/state/procevent-inbox/$guarded_id.1.handled" ] || fail "task symlink re-arm did not acknowledge its captured round"
+      wait_for_lines "$BOARD_POLLS" "$((board_poll_count + 2))" || fail "task symlink re-arm did not start its next listener"
+    fi
+    PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" retire "$BOARD_DIR/guarded-alias.html" >/dev/null 2>&1 || fail "could not retire the symlink-armed board"
+  done
+  pass "sound boards arm and re-arm through symlinks for both owners"
 
   # The guard's behavior, run for real against a stand-in document: a native
   # submit nobody cancelled is cancelled, shown, and reported to the agent; a

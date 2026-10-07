@@ -264,19 +264,21 @@ board_extract_scripts() {  # <artifact> <out-json-file>
     }
     # Inline scripts first, then blank them (keeping their newlines) so script
     # text can never be mistaken for markup by the tag scan below.
-    push @items, { kind => "guard" } if $html =~ /<script\b[^>]*\bdata-fm-lavish-form-guard\b/;
     my $markup = $html;
-    while ($html =~ m{<script\b([^>]*)>(.*?)</script\s*>}gis) {
-      my ($attrs, $body, $start) = ($1, $2, $-[0]);
-      next if $attrs =~ /\bsrc\s*=/i;
-      my $type = $attrs =~ /\btype\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s>]+))/i
-        ? lc($1 // $2 // $3 // "") : "";
-      next unless $type eq "" || $type =~ m{\A(?:text|application)/(?:x-)?(?:javascript|ecmascript)\z};
-      next unless $body =~ /\S/;
-      push @items, { kind => "script", where => "inline script", line => $html_line->($start + length($attrs) + 8), body => $text->($body) };
-    }
-    $markup =~ s{(<script\b[^>]*>)(.*?)(</script\s*>)}{ my ($open, $body, $close) = ($1, $2, $3); $open . ($body =~ s/[^\n]//gr) . $close }gise;
-    $markup =~ s{<!--(.*?)-->}{ my $comment = $1; $comment =~ s/[^\n]//gr }gse;
+    $markup =~ s{<!--.*?(?:-->|\z)|(<script\b([^>]*)>)(.*?)(</script\s*>)}{
+      my ($open, $attrs, $body, $close, $start) = ($1, $2, $3, $4, $-[0]);
+      if (defined $open) {
+        push @items, { kind => "guard" } if $attrs =~ /\bdata-fm-lavish-form-guard\b/i;
+        my $type = $attrs =~ /\btype\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s>]+))/i
+          ? lc($1 // $2 // $3 // "") : "";
+        if ($attrs !~ /\bsrc\s*=/i && ($type eq "" || $type =~ m{\A(?:text|application)/(?:x-)?(?:javascript|ecmascript)\z}) && $body =~ /\S/) {
+          push @items, { kind => "script", where => "inline script", line => $html_line->($start + length($attrs) + 8), body => $text->($body) };
+        }
+        $open . ($body =~ s/[^\n]//gr) . $close;
+      } else {
+        $& =~ s/[^\n]//gr;
+      }
+    }gise;
     my $markup_line = $line_counter->($markup);
     # Linear scan: find each start tag, then read its attributes with \G so no
     # pattern can backtrack across the page.
@@ -391,9 +393,9 @@ cmd_arm() {
   id=$(cmd_source_id "$artifact") || exit 1
   # A board whose page scripts do not parse loses every answer entered on it, so
   # it is refused before anything is registered or listening.
-  cmd_check "$artifact" >/dev/null || exit 1
   real=$(perl -MCwd=realpath -e '$p = realpath($ARGV[0]); defined($p) or exit 1; print "$p\n"' "$artifact" 2>/dev/null) \
     || die "cannot resolve the artifact path: $artifact"
+  cmd_check "$real" >/dev/null || exit 1
   listener=("$SCRIPT_DIR/fm-procevent-lavish.sh" poll "$real")
   [ -z "$reply_file" ] || listener+=(--agent-reply-file "$reply_file")
   if [ -n "$task" ]; then
