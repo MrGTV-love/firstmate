@@ -801,8 +801,6 @@ TARGET_HARNESS=$HARNESS
 TARGET_MODEL=
 TARGET_EFFORT=
 TARGET_DISPATCH_RULE=
-TARGET_DISPATCH_SWITCHED=false
-TARGET_DISPATCH_FALLBACK='[]'
 
 journal_write() {  # <phase> [extra-line]...
   local phase=$1
@@ -843,13 +841,6 @@ relaunch_refresh_published_profile() {
   effort=$(fm_meta_get "$META" effort)
   model=${model:-default}
   effort=${effort:-default}
-  if [ -n "$TARGET_DISPATCH_RULE" ] && [ "$TARGET_DISPATCH_FALLBACK" != '[]' ] \
-     && { [ "$TARGET_HARNESS" != "$harness" ] || [ "$TARGET_MODEL" != "$model" ] || [ "$TARGET_EFFORT" != "$effort" ]; } \
-     && jq -e --arg h "$harness" --arg m "$model" --arg e "$effort" \
-       'any(.[]; .harness == $h and (.model // "default") == $m and (.effort // "default") == $e)' \
-       <<<"$TARGET_DISPATCH_FALLBACK" >/dev/null; then
-    TARGET_DISPATCH_SWITCHED=true
-  fi
   TARGET_HARNESS=$harness
   TARGET_MODEL=$model
   TARGET_EFFORT=$effort
@@ -1018,7 +1009,6 @@ resolve_relaunch_profile() {
         "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
       TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
       dispatch_fallback=$(jq -c .fallback <<<"$dispatch_set")
-      TARGET_DISPATCH_FALLBACK=$dispatch_fallback
     else
       TARGET_DISPATCH_RULE=
     fi
@@ -1028,7 +1018,6 @@ resolve_relaunch_profile() {
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
         "$dispatch_profile" "$dispatch_fallback" "" "$T" "$WT") || return 1
-      TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       TARGET_DISPATCH_CAPACITY=$(jq -r .capacity.status <<<"$dispatch_result")
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
@@ -1321,9 +1310,6 @@ do_relaunch() {
 
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
-  if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
-    printf 'model-matrix fallback relaunched %s %s effort=%s for %s\n' "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" "${TARGET_DISPATCH_RULE:-matching profiles}"
-  fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }
 

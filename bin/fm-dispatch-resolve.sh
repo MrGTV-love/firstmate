@@ -724,6 +724,9 @@ TEXT=$(jq -r '
       + (if .provider then "  provider=\(.provider | flat)" else "" end)
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
       + (if .capacity then "  pool=" + (.capacity | tojson | flat) else "" end)
+      + (if .capacity and .profile.harness == "omp" and
+            (.provider == "codex" or ((.profile.model // "") | startswith("openai-codex/")))
+         then "  spendPriority=unknown  runway=unknown" else "" end)
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
       + "  -> " + (if .unranked and .eligible then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
       + (if .warning then " [warning: \(.warning | flat)]" else "" end)),

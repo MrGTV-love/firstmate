@@ -666,7 +666,6 @@ SH
   assert_equals default "$(meta_field "$dir" "$id" effort)" "ordinary relaunch corrupted the durable effort"
   assert_equals complete "$(journal_field "$dir" "$id" phase)" "ordinary relaunch did not complete its transaction"
   assert_equals "$dir/wt" "$(meta_field "$dir" "$id" worktree)" "ordinary relaunch changed the worktree"
-  assert_not_contains "$out" 'model-matrix fallback' "ordinary relaunch must not invent matrix routing"
   pass "an ordinary non-OMP relaunch without crew-dispatch.json succeeds without required jq and preserves its durable profile"
 }
 

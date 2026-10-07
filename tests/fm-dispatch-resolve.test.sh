@@ -1459,7 +1459,10 @@ JSON
   expect_code 0 "$code" "optional OMP model $optional_omp_case resolves normally"
   assert_equals '' "$err" "optional OMP model $optional_omp_case does not produce a jq error"
   assert_contains "$out" "  status: $optional_omp_status" "optional OMP model preserves the $optional_omp_case outcome"
-  assert_contains "$out" 'candidate: omp:-  provider=codex  pool={"status":"unknown","accounts":[]}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority' "optional OMP model stays unknown and unranked in $optional_omp_case"
+  optional_omp_candidate=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
+  assert_contains "$optional_omp_candidate" 'pool={"status":"unknown","accounts":[]}' "optional OMP model keeps unknown pool evidence in $optional_omp_case"
+  assert_contains "$optional_omp_candidate" 'eligible, unranked:' "optional OMP model stays eligible and unranked in $optional_omp_case"
+  assert_contains "$optional_omp_candidate" 'spendPriority=unknown  runway=unknown' "optional OMP model discloses both economics in $optional_omp_case"
   assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor' "optional OMP model retains measured sibling evidence in $optional_omp_case"
   if [ "$optional_omp_status" = clear ]; then
     optional_omp_profile=$(printf '%s\n' "$out" | grep '^  profile: ')
@@ -1601,6 +1604,32 @@ TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code o
 assert_contains "$out" '  status: clear' "the pooled sibling clears single-account exhaustion"
 assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a healthy pool retains Luna"
 assert_contains "$out" "--dispatch-rule 'rule_4'" "the launch carries the selected fallback policy"
+assert_contains "$out" 'spendPriority=unknown  runway=unknown' "a sole native-usable route discloses unknown economics"
+cp "$RULES" "$TMP_ROOT/usable-primary-rules.json"
+jq '.rules[3].use = [
+  {harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},
+  {harness:"cursor",model:"cursor-grok-4.6-medium"},
+  {harness:"claude",model:"sonnet",floor:{scope:"all_models",min_percent:95}}
+] | .default = .rules[3].use' "$BASE_RULES" > "$RULES"
+jq '(.providers[] | select(.provider=="cursor").quotaSemantics.effectiveAvailability[]) |=
+  (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/sole-pool-quota.json"
+for usable_choice in rule_4 default; do
+  write_response "$RESPONSE" "$usable_choice" 0.9
+  jq --arg choice "$usable_choice" '.answers.rule.probabilities =
+    {rule_1:0.01,rule_2:0.01,rule_3:0.01,rule_4:0.01,default:0.01} |
+    .answers.rule.probabilities[$choice] = 0.96' "$RESPONSE" > "$TMP_ROOT/usable-response.json"
+  cp "$TMP_ROOT/usable-response.json" "$RESPONSE"
+  reset_log
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/sole-pool-quota.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+  expect_code 0 "$code" "sole usable pool resolves for $usable_choice"
+  assert_contains "$out" '  status: clear' "$usable_choice admits a usable pool beside exhausted and blocked alternatives"
+  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$usable_choice retains the native-usable route"
+  usable_candidate=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
+  assert_contains "$usable_candidate" '"status":"usable"' "$usable_choice retains native capacity evidence"
+  assert_contains "$usable_candidate" 'spendPriority=unknown  runway=unknown' "$usable_choice discloses both unknown economics"
+done
+cp "$TMP_ROOT/usable-primary-rules.json" "$RULES"
+write_response "$RESPONSE" rule_4 0.9
 saved_home=$HOME
 for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
   case "$selector" in
@@ -1755,6 +1784,7 @@ for summary_choice in rule_4 default; do
   summary_pool=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
   assert_contains "$summary_pool" '"status":"exhausted"' "$summary_choice retains exhausted pooled evidence"
   assert_contains "$summary_pool" 'not eligible' "$summary_choice excludes the exhausted pool from eligibility"
+  assert_contains "$summary_pool" 'spendPriority=unknown  runway=unknown' "$summary_choice discloses both economics for an exhausted pool"
   summary_note=$(printf '%s\n' "$out" | grep '^  note: .*unranked')
   assert_contains "$summary_note" 'kimi' "$summary_choice summarizes eligible unranked uncertainty"
   assert_not_contains "$summary_note" 'codex' "$summary_choice does not summarize the ineligible pool as eligible unranked"
