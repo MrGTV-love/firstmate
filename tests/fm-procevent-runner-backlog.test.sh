@@ -51,7 +51,10 @@ n=$(cat "$artifact.count" 2>/dev/null || printf 0)
 n=$((n + 1))
 printf '%s\n' "$n" > "$artifact.count"
 printf 'ready\n' > "$artifact.poll$n"
-while [ ! -f "$artifact.answer$n" ]; do sleep 0.05; done
+while [ ! -f "$artifact.answer$n" ]; do
+  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 1
+  sleep 0.05
+done
 cat "$artifact.answer$n"
 rm -f -- "$artifact.answer$n"
 SH
