@@ -961,7 +961,8 @@ function reset(home, target, ordinary = false) {
   if (target === 'fm-procevent-posttool-check.sh') {
     const inbox = statePath(home, 'procevent-inbox');
     fs.mkdirSync(inbox);
-    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.result'), '{"answer":"continue"}\n');
+    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.result'),
+      'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,config consumer answer\n');
     fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.adapter'), 'lavish\n');
   }
 }
@@ -1081,13 +1082,45 @@ if (mode === 'contexts') {
                 assert.equal(result.stderr, '', label);
                 const output = JSON.parse(result.stdout);
                 assert.equal(output.hookSpecificOutput.hookEventName, 'PostToolUse', label);
-                assert.equal(output.hookSpecificOutput.additionalContext,
-                  'A captured Lavish result is waiting: lavish-config-consumer 1. Run bin/fm-wake-drain.sh now. '
-                  + 'If the drain has no row for this result, read it directly with bin/fm-procevent-lavish.sh read '
-                  + `'${statePath(home, 'procevent-inbox/lavish-config-consumer.1.result')}'. `
-                  + 'Handle the result, then acknowledge it with bin/fm-procevent.sh handled lavish-config-consumer 1 before continuing.',
-                  label);
                 assert.deepEqual(snapshot(home), before, `${label}: notification changed pending state`);
+                const commands = [...output.hookSpecificOutput.additionalContext.matchAll(/`([^`]+)`/g)]
+                  .map(match => match[1]);
+                assert.equal(commands.length, 3, `${label}: missing executable recovery commands`);
+                const otherBefore = snapshot(task);
+                const runCommand = command => {
+                  const recovery = spawnSync('/bin/bash', ['-c', command], {
+                    cwd: task,
+                    env: {
+                      PATH: process.env.PATH, HOME: path.join(home, 'pane-home'),
+                      XDG_CONFIG_HOME: path.join(home, 'pane-home', '.config'),
+                      XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
+                      FM_HOME: task, FM_STATE_OVERRIDE: statePath(task, ''), FM_ROOT_OVERRIDE: task,
+                      FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
+                      FM_PROCEVENT_CLAIM_ROOT: path.join(home, 'pane-home', 'claims'),
+                    },
+                    encoding: 'utf8', timeout: 15000,
+                  });
+                  assert.ifError(recovery.error);
+                  assert.equal(recovery.signal, null, `${label}: recovery command did not settle`);
+                  assert.equal(recovery.status, 0, `${label}: ${recovery.stderr}`);
+                  return recovery;
+                };
+                runCommand(commands[0]);
+                assert.equal(fs.readFileSync(statePath(home, '.wake-queue'), 'utf8'), '',
+                  `${label}: drain did not inspect the unpublished capture's home`);
+                assert.ok(runCommand(commands[1]).stdout.includes('config consumer answer'),
+                  `${label}: direct recovery did not read the captured answer`);
+                const inbox = statePath(home, 'procevent-inbox');
+                const handled = path.join(inbox, 'lavish-config-consumer.1.handled');
+                assert.ok(!fs.existsSync(handled), `${label}: drain or read acknowledged before handling`);
+                runCommand(commands[2]);
+                assert.ok(fs.lstatSync(handled).isFile(), `${label}: acknowledgement missed the captured round`);
+                assert.deepEqual(fs.readdirSync(inbox).filter(name => name.endsWith('.handled')),
+                  ['lavish-config-consumer.1.handled'], `${label}: acknowledgement changed another round`);
+                assert.deepEqual(snapshot(task), otherBefore, `${label}: recovery changed another home's state`);
+                const acknowledged = snapshot(home);
+                silent(invoke(registration, home, context, payloadFor(registration, tool)), `${label}/handled`);
+                assert.deepEqual(snapshot(home), acknowledged, `${label}: handled notification changed state`);
                 break;
               }
               default: assert.fail(`unhandled hook: ${registration.target}`);
