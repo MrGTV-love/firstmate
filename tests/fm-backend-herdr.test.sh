@@ -6469,3 +6469,27 @@ test_submit_idle_agy_native_transitions_confirm() {
   pass "agy confirms immediate and delayed native transitions without treating unknown composer alone as delivery"
 }
 test_submit_idle_agy_native_transitions_confirm
+
+test_submit_idle_devin_native_transition_confirms_unknown_composer() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/native-devin-unknown"; mkdir -p "$dir/responses"
+  log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '{"result":{"agent":{"agent":"devin","agent_status":"idle"}}}\n' > "$resp/1.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+  printf '%s\n' '❭ Ask Devin to build features, fix bugs, or work on your code' \
+    '─────────────────────────────────────────────────────' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "/no-mistakes" 3 0 0' "$ROOT")
+  [ "$out" = empty ] || fail "Devin idle-to-working transition with an unknown composer must confirm delivery, got '$out'"
+  [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq 1 ] \
+    || fail "Devin delayed native transition must confirm after the initial unknown composer read"
+  [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
+    || fail "Devin delayed native transition must type the command only once"
+  [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+    || fail "Devin delayed native transition must not provoke another Enter"
+  pass "Devin idle-to-working transition confirms delivery despite an unknown composer"
+}
+test_submit_idle_devin_native_transition_confirms_unknown_composer
