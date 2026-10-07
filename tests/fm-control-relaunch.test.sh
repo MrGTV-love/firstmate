@@ -2607,9 +2607,9 @@ test_herdr_relaunch_resumes_only_the_registered_pi_session() {
     }
     dir=$HERDR_CASE_DIR
     rm -f "$dir/fake/herdr-stopped"
-    sed 's/^harness=claude$/harness=pi/' "$dir/home/state/resume-$registered.meta" \
-      > "$dir/home/state/resume-$registered.meta.tmp" || fail 'could not prepare Pi relaunch metadata'
-    mv "$dir/home/state/resume-$registered.meta.tmp" "$dir/home/state/resume-$registered.meta" \
+    sed 's/^harness=claude$/harness=pi/' "$dir/home/state/resume-$registered.meta" > "$dir/pi.meta" \
+      || fail 'could not prepare Pi relaunch metadata'
+    mv "$dir/pi.meta" "$dir/home/state/resume-$registered.meta" \
       || fail 'could not publish Pi relaunch metadata'
     # Keep the pane's status authority registered to an existing Pi session,
     # while process-info proves that its previous agent has exited.
