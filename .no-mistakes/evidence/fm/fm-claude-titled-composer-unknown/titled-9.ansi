@@ -1,0 +1,10 @@
+CLAUDE_CONFIG_DIR='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.live-validati
+on/claude' CLAUDE_CODE_SAFE_MODE=1 DISABLE_AUTOUPDATER=1 claude --safe-mode -n 'Firstmate operational input waiting rea
+d Users probe' --dangerously-skip-permissions
+charlesabrooker@Mac-Studio wt % CLAUDE_CONFIG_DIR='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3AD
+SC1G73B49JB6J416H/.live-validation/claude' CLAUDE_CODE_SAFE_MODE=1 DISABLE_AUTOUPDATER=1 claude --safe-mode -n 'Firstma
+te operational input waiting read Users probe' --dangerously-skip-permissions
+
+[0m[2mResume this session with:[0m
+[0m[2mclaude --resume "Firstmate operational input waiting read Users probe"[0m
+charlesabrooker@Mac-Studio wt % 

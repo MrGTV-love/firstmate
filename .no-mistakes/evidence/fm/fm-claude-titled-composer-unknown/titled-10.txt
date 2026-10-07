@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Sonnet 5.5 · Claude API
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.live-validation/tmp/fm-claude-titled-live.ZtVsHG/wt
+
+⚠ Safe mode: all customizations are disabled (CLAUDE.md, skills, plugins, hooks, MCP, agents, and more)
+  Unset CLAUDE_CODE_SAFE_MODE to re-enable
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ : Firstmate operational input waiting: read
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.live-validation/tmp/fm-claud
+  e-titled-live.ZtVsHG/control-home/state/operational-inbox/1791341349-5929c4c98df4f85f.msg' and handle its contents
+  as Firstmate operational input.
+
+  Read 1 file
+
+⏺ Check the steering inbox.
+
+⏺ Running 1 shell command…
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+· Caramelizing… (3s · ↓ 159 tokens)
+                                                                                                   ◐ medium · /effort
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents
