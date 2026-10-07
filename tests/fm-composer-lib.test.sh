@@ -1606,6 +1606,8 @@ test_selected_content_is_composer_scoped_and_wrap_normalized() {
 }
 
 test_shared_extraction_preserves_transcript_and_long_claude_editor() {
+  # Read dynamically by the sourced composer library.
+  # shellcheck disable=SC2034
   local caps screen out expected n FM_COMPOSER_PI_MAX_LINES=8
   for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
     screen=$'❯ hi\nHello!\n────────────────\n❯\n────────────────'
@@ -1808,17 +1810,25 @@ test_cursorless_submit_refreshes_pending_before_retry() (
   dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-composer-retry.XXXXXX")
   trap 'rm -rf "$dir"' EXIT
   for backend in cmux orca zellij; do
+    # shellcheck source=/dev/null
     . "$ROOT/bin/backends/$backend.sh"
     eval "fm_backend_${backend}_send_literal() { printf 'literal\n' >> \"\$dir/literals\"; }"
     eval "fm_backend_${backend}_send_key() { printf '%s\n' \"\$2\" >> \"\$dir/enters\"; }"
     eval "fm_backend_${backend}_composer_state() { retry_test_state; }"
+    # Called indirectly by the dynamically sourced backends.
+    # shellcheck disable=SC2329
     fm_backend_cmux_parse_target() { return 0; }
+    # shellcheck disable=SC2329
     fm_backend_orca_tool_check() { return 0; }
+    # shellcheck disable=SC2329
     fm_backend_zellij_composer_content() { printf ''; }
+    # shellcheck disable=SC2329
     fm_backend_zellij_composer_observed_append() { return 0; }
     for initial in pending pending-unproven; do
       for final in empty unknown pending; do
         : > "$dir/enters"; : > "$dir/literals"; printf '0' > "$dir/reads"
+        # Called by the eval-defined composer-state function.
+        # shellcheck disable=SC2329
         retry_test_state() {
           local n
           n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"

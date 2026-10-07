@@ -239,6 +239,7 @@ test_refreshed_unknown_requires_idle_baseline() {
     expected=unknown
     [ "$baseline" != idle ] || expected=empty
     out=$(
+      # shellcheck disable=SC2329
       fm_pane_is_busy() { [ "$(fm_pane_busy_state "$1")" = busy ]; }
       PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
         FM_FAKE_CAPTURE_COUNT="$dir/captures" FM_FAKE_REFRESH_UNKNOWN=1 \
@@ -406,7 +407,9 @@ test_pending_frame_clears_before_retry() (
   for initial in pending pending-unproven; do
     for final in empty unknown; do
       : > "$dir/enters"; printf '0' > "$dir/reads"
+      # shellcheck disable=SC2329
       tmux() { printf 'Enter\n' >> "$dir/enters"; }
+      # shellcheck disable=SC2329
       fm_tmux_composer_state() {
         local n
         n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
