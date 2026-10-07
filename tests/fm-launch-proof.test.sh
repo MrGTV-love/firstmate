@@ -18,7 +18,7 @@ mkdir -p "$FM_HOME/state"
 . "$ROOT/bin/fm-operational-input.sh"
 start_probe() {
   rm -f "$TMP/ready"
-  FM_SPAWN_GEN=$1 python3 -c 'import pathlib,sys,time; pathlib.Path(sys.argv[1]).touch(); time.sleep(120)' "$TMP/ready" &
+  FM_SPAWN_GEN=$1 FM_PROOF_NOTE=${3:-} python3 -c 'import pathlib,sys,time; pathlib.Path(sys.argv[1]).touch(); time.sleep(120)' "$TMP/ready" "${2:-}" &
   PID=$!
   for _ in $(seq 1 200); do
     [ ! -f "$TMP/ready" ] || return 0
@@ -29,6 +29,15 @@ start_probe() {
 test_launch_proof_recorded_native_identity() {
 start_probe ''
 [ "$(fm_launch_proof_pid "$PID" expected)" = unmanaged ] || fail 'readable bare process must be unmanaged'
+kill "$PID"; wait "$PID" 2>/dev/null || true
+start_probe '' 'FM_SPAWN_GEN=expected'
+[ "$(fm_launch_proof_pid "$PID" expected)" = unmanaged ] || fail 'argv text must not impersonate a launch environment pin'
+kill "$PID"; wait "$PID" 2>/dev/null || true
+start_probe '' '' 'ordinary value FM_SPAWN_GEN=expected'
+[ "$(fm_launch_proof_pid "$PID" expected)" = unmanaged ] || fail 'text inside another environment value must not impersonate a launch pin'
+kill "$PID"; wait "$PID" 2>/dev/null || true
+start_probe '' '' $'ordinary value\nFM_SPAWN_GEN=expected'
+[ "$(fm_launch_proof_pid "$PID" expected)" = unknown ] || fail 'an ambiguous multiline environment must not authenticate a launch pin'
 kill "$PID"; wait "$PID" 2>/dev/null || true
 start_probe expected
 [ "$(fm_launch_proof_pid "$PID" expected)" = managed ] || fail 'live matching incarnation must be managed'
@@ -41,6 +50,8 @@ pass 'live process environment distinguishes managed, missing, mismatched, and g
 META="$FM_HOME/state/t.meta"
 WORKTREE="$TMP/worktree"
 mkdir -p "$WORKTREE" "$FM_HOME/data/t"
+mkdir -p "$TMP/foreign-state" "$FM_HOME/state/path-component"
+ln -s "$FM_HOME/state" "$TMP/state-alias"
 proof_meta() {
   printf 'window=lab:w1:p1\nharness=%s\nworktree=%s\n' "$1" "$WORKTREE" > "$META"
   [ -z "${2:-}" ] || printf 'launch_proof=%s\nspawn_gen=%s\n' "$2" "${3:-}" >> "$META"
@@ -262,6 +273,37 @@ for version in legacy env-v1; do
   jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"foreign-task",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
   jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
   assert_proof unknown "$version another task's real generated launch role must remain unknown"
+  for worker_kind in ship scout; do
+    printf 'kind=%s\n' "$worker_kind" >> "$META"
+    for role_state in "$TMP/state-alias" "$FM_HOME/state/." "$FM_HOME/state/path-component/.." "$FM_HOME/state/" \
+      "$(CDPATH='' cd -P -- "$FM_HOME/state" && pwd -P)"; do
+      OTHER_BRIEF="$(fm_brief_worker_role "$role_state" t)"$'\n\nTask assigned by Firstmate.'
+      fm_operational_input_encode launch-brief "$OTHER_BRIEF" OTHER_MESSAGE
+      jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"alias",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
+      jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
+      assert_proof unmanaged "$version $worker_kind equivalent inbox directory spelling must preserve task ownership"
+      [ "$(fm_launch_proof_herdr "$TMP/state-alias/t.meta")" = unmanaged ] \
+        || fail "$version $worker_kind equivalent metadata directory spelling must preserve task ownership"
+    done
+    for role_state in "$TMP/foreign-state" "$TMP/missing-state"; do
+      OTHER_BRIEF="$(fm_brief_worker_role "$role_state" t)"$'\n\nTask assigned by Firstmate.'
+      fm_operational_input_encode launch-brief "$OTHER_BRIEF" OTHER_MESSAGE
+      jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"foreign-home",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
+      jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
+      assert_proof unknown "$version $worker_kind matching task ID in another or unavailable inbox directory must remain unknown"
+    done
+    OTHER_BRIEF="$(fm_brief_worker_role "$TMP/state-alias" another-task)"$'\n\nTask assigned by Firstmate.'
+    fm_operational_input_encode launch-brief "$OTHER_BRIEF" OTHER_MESSAGE
+    jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"foreign-task-alias",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
+    jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
+    assert_proof unknown "$version $worker_kind resolved directory identity must not relax the exact task ID"
+    OTHER_BRIEF="$(fm_brief_worker_role "$TMP/state-alias" t)"$'\n\nTask assigned by Firstmate.'
+    OTHER_BRIEF=${OTHER_BRIEF/You are a crewmate/You are a supervisor}
+    fm_operational_input_encode launch-brief "$OTHER_BRIEF" OTHER_MESSAGE
+    jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"altered-role",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
+    jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
+    assert_proof unknown "$version $worker_kind equivalent inbox spelling must not relax the remaining role contract"
+  done
   mkdir -p "$WORKTREE/data"
   printf '# Standing charter\nServe this recorded secondmate home.\n' > "$WORKTREE/data/charter.md"
   printf 'kind=secondmate\nhome=%s\n' "$WORKTREE" >> "$META"
@@ -280,6 +322,20 @@ for version in legacy env-v1; do
   jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"fallback",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
   jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
   assert_proof unmanaged "$version recorded secondmate launch fallback must remain recoverable"
+  ln -s "$WORKTREE/data/missing-charter.md" "$WORKTREE/data/charter.md"
+  assert_proof unmanaged "$version dangling charter symlink must use the same fallback as spawn"
+  rm "$WORKTREE/data/charter.md"
+  mkdir "$WORKTREE/data/charter.md"
+  assert_proof unmanaged "$version charter directory must use the same fallback as spawn"
+  rmdir "$WORKTREE/data/charter.md"
+  printf '# Symlinked charter\nServe this secondmate home.\n' > "$WORKTREE/data/real-charter.md"
+  ln -s "$WORKTREE/data/real-charter.md" "$WORKTREE/data/charter.md"
+  assert_proof unknown "$version a regular-file charter symlink must supersede the fallback brief"
+  fm_operational_input_encode launch-brief "$(cat "$WORKTREE/data/charter.md")" OTHER_MESSAGE
+  jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"symlinked-charter",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
+  jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
+  assert_proof unmanaged "$version exact regular-file charter symlink must preserve native recovery"
+  rm "$WORKTREE/data/charter.md"
   cp "$WORKTREE/saved.jsonl" "$WORKTREE/recorded.jsonl"
 done
 pass 'versioned and legacy provenance reject generic, foreign, malformed and personal sessions while preserving exact secondmate startup'

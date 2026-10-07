@@ -184,5 +184,45 @@ test_owned_band_blank_and_braille_continuations() {
   pass "owned band blank and braille gutters retain every content row while unproven gutters refuse extraction"
 }
 
+test_stale_ambiguous_band_does_not_veto_newer_composer() {
+  local stale shape draft candidate screen caps candidate_caps want cursor
+  stale=$'π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n╰─'
+  assert_refused "reported ambiguous band without a newer composer" "$stale"
+  for shape in bare ompbox leftbar pi; do
+    for draft in '' 'newer draft'; do
+      case "$shape" in
+        bare) candidate="❯ $draft"; cursor=3 ;;
+        ompbox) candidate=$'╭── 󰵗 > model > path ─╮\n╰─ '"$draft"' ─╯'; cursor=4 ;;
+        leftbar) candidate=$'┃\n┃  '"$draft"$'\n┃'; cursor=4 ;;
+        pi) candidate=$'────────\n'"$draft"$'\n────────'; cursor=4 ;;
+      esac
+      screen="$stale"$'\n\n'"$candidate"
+      for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+        candidate_caps=$caps
+        [ "$shape" != pi ] || candidate_caps="$caps"$'\nidentity=1'
+        want=empty
+        if [ -n "$draft" ]; then
+          want=pending
+          if [ "$caps" = "$CAPS_PLAIN" ] && { [ "$shape" = bare ] || [ "$shape" = leftbar ]; }; then
+            want=unknown
+          fi
+        fi
+        assert_screen "stale ambiguous band below newer $shape '$draft'" "$want" \
+          "$candidate_caps" "$screen" '' $'pi\tidle'
+        assert_content "stale ambiguous band extracts only newer $shape '$draft'" "$draft" \
+          "$candidate_caps" "$screen"
+      done
+      want=empty
+      [ -z "$draft" ] || want=pending
+      assert_screen "newer $shape cursor ignores stale ambiguous band" "$want" \
+        "$CAPS_TMUX" "$screen" "$cursor" $'pi\tidle'
+      assert_screen "cursor in old ambiguous band still refuses below newer $shape" unknown \
+        "$CAPS_TMUX" "$screen" 1 $'pi\tidle'
+    done
+  done
+  pass "newer bare, compact omp, left-bar and Pi composers outrank stale band ambiguity without weakening cursor refusal"
+}
+
 test_cursor_ambiguity_survives_later_band_continuations
 test_owned_band_blank_and_braille_continuations
+test_stale_ambiguous_band_does_not_veto_newer_composer

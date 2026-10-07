@@ -51,7 +51,8 @@ muse is the one verified adapter that restores the cancelled prompt back into it
 The clear is refused before anything is sent when the recorded backend cannot deliver it.
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
-The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, cursor-owned ambiguity across later frames, literal blank and braille continuation extraction, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
+The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, cursor-owned ambiguity across later frames, complete literal blank and braille continuation extraction, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
+Cursorless classification and extraction rank every candidate before refusing a selected ambiguous native band, so an older ambiguous band cannot veto a newer independent composer.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
@@ -137,12 +138,12 @@ The staged launch runs in a subshell of the destination pane shell, preserving i
 An enabled `config/launch-env-allowlist` still selects the existing cleared-environment POSIX-sh boundary.
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
-Readable kernel environment with a nonempty matching recorded incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field.
+Readable kernel environment with a nonempty matching recorded incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field; argv and text embedded in other environment values never supply incarnation evidence.
 A readable environment with a missing or mismatched incarnation proves unmanaged only for a recorded `harness=omp` with positively attributed native startup provenance.
 The foreground process must have executable basename `omp`, exactly `omp --resume=<file>` argv, and an actual cwd equal to the recorded worktree.
 The resumed native JSONL file must begin with its session header, optionally preceded by one validated native title slot, and have that same cwd in the header and an initial user message decoding through the operational-input protocol as `launch-brief`.
-For a ship or scout, that initial body must begin with the complete current worker role contract generated for this home's exact task-owned steering inbox, followed by a paragraph boundary.
-For a local secondmate, that initial body must equal the recorded home's standing charter, or the recorded task brief only when that home has no charter, matching the ordinary launch source.
+For a ship or scout, that initial body must begin with the complete current worker role contract followed by a paragraph boundary; the inbox must retain the exact task ID and resolve to this home's state directory, while equivalent directory spellings remain attributable.
+For a local secondmate, that initial body must equal the recorded home's standing charter when it is a regular file, or otherwise the recorded task brief, matching the ordinary launch source.
 Neither a generic launch phrase, an inbox path mentioned in unrelated prose, nor a current Herdr session registration supplies this recorded-task provenance.
 Every other recorded harness remains unknown with missing or mismatched pins.
 Foreign processes, personal native sessions, missing actual cwd, unreadable or malformed session files, and ambiguous foreground identity also remain unknown; no control-plane path takes lifecycle action on unknown proof.

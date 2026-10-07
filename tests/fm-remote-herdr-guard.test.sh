@@ -14,8 +14,9 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (the guard parses herdr's JSON, and jq is the holder process)"; exit 0; }
+command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (the guard parses herdr's JSON)"; exit 0; }
 command -v mkfifo >/dev/null 2>&1 || { echo "skip: mkfifo not found (holder processes block on a fifo)"; exit 0; }
+command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found (kernel process environments require Python)"; exit 0; }
 
 TMP_ROOT=$(fm_test_tmproot fm-remote-herdr-guard)
 mkdir -p "$TMP_ROOT"
@@ -26,13 +27,14 @@ trap 'if [ "${#HOLDER_PIDS[@]}" -gt 0 ]; then kill "${HOLDER_PIDS[@]}" 2>/dev/nu
 
 GUARD="$ROOT/bin/fm-remote-herdr-guard.sh"
 JQ=$(command -v jq)
+PYTHON=$(command -v python3)
 SESSION=fm-remote
 
 # The guard must see only the fixture and the system tools it really needs,
 # so a case can also present a host with NO lsof.
 TOOLS="$TMP_ROOT/tools"
 mkdir -p "$TOOLS"
-for tool in ps awk sed grep tr dirname basename sleep cat cp rm env bash sh id head; do
+for tool in ps awk sed grep tr dirname basename sleep cat cp rm env bash sh id head python3; do
   real=$(command -v "$tool") || fail "test host lacks $tool"
   ln -sf "$real" "$TOOLS/$tool"
 done
@@ -98,7 +100,7 @@ SH
 chmod +x "$FAKE/lsof" "$FAKE/launchctl" "$FAKE/herdr"
 cp "$FAKE/lsof" "$TMP_ROOT/lsof.fake"
 
-# hold <marker-env...> -> HOLDER_PID: a real non-platform process (jq blocked
+# hold <marker-env...> -> HOLDER_PID: a real non-platform process (Python blocked
 # on a fifo this test keeps open) whose environment is exactly the markers.
 hold() {
   local fifo="$TMP_ROOT/holder-$HOLDER_FD.fifo"
@@ -107,7 +109,7 @@ hold() {
   # Open read-write so this never blocks on the reader; the holder sees EOF
   # only when the descriptor closes at exit.
   eval "exec ${HOLDER_FD}<>\"\$fifo\""
-  env -i "$@" "$JQ" . "$fifo" &
+  env -i "$@" "$PYTHON" -c 'import sys; open(sys.argv[1], "rb").read()' "$fifo" &
   HOLDER_PID=$!
   HOLDER_PIDS+=("$HOLDER_PID")
   HOLDER_FD=$((HOLDER_FD + 1))
@@ -121,8 +123,9 @@ hold_under() {
   rm -f "$fifo" "$pidfile"
   mkfifo "$fifo"
   eval "exec ${HOLDER_FD}<>\"\$fifo\""
-  ( export FM_HOLDER_JQ="$JQ" FM_HOLDER_FIFO="$fifo" FM_HOLDER_PIDFILE="$pidfile"
-    exec -a "$argv0" bash -c 'env -i FM_HOLDER=1 "$FM_HOLDER_JQ" . "$FM_HOLDER_FIFO" & printf "%s\n" "$!" > "$FM_HOLDER_PIDFILE"; wait' "$@" ) &
+  ( export FM_HOLDER_PYTHON="$PYTHON" FM_HOLDER_FIFO="$fifo" FM_HOLDER_PIDFILE="$pidfile"
+    export FM_HOLDER_CODE='import sys; open(sys.argv[1], "rb").read()'
+    exec -a "$argv0" bash -c 'env -i FM_HOLDER=1 "$FM_HOLDER_PYTHON" -c "$FM_HOLDER_CODE" "$FM_HOLDER_FIFO" & printf "%s\n" "$!" > "$FM_HOLDER_PIDFILE"; wait' "$@" ) &
   HOLDER_PIDS+=("$!")
   HOLDER_FD=$((HOLDER_FD + 1))
   local i=0
@@ -160,7 +163,6 @@ guard() { # [extra env assignments...]
     env -i PATH="$CASE_PATH" HOME="$TMP_ROOT" \
       FM_FAKE_STATE="$CASE_STATE" FM_FAKE_HERDR_LOG="$CASE_LOG" FM_FAKE_HERDR_RUNNING="$CASE_RUNNING" \
       FM_FAKE_SOCKET_OWNER="$CASE_OWNER" FM_FAKE_HERDR_SOCKET="$CASE_SOCKET" \
-      FM_HOLDER_JQ="$JQ" \
       FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS=8 \
       "$@" "$GUARD" "$FAKE/herdr" "$SESSION" 2>&1
   )
@@ -184,7 +186,7 @@ assert_stop_before_start() {
   [ "$stop_line" -lt "$start_line" ] || fail "the guard started its server before stopping the foreign one"
 }
 
-# Prove the holder construction on this host: the environment of a jq holder
+# Prove the holder construction on this host: the environment of a Python holder
 # must be readable, or every marker case would be vacuous.
 hold FM_PROBE_MARKER=1
 PROBE_PID=$HOLDER_PID
@@ -194,9 +196,30 @@ sleep 0.2
 probe_env=$(fm_remote_herdr_process_env "$PROBE_PID")
 case "$probe_env" in
   *FM_PROBE_MARKER=1*) ;;
-  *) fail "this host does not expose a holder's environment (macOS hides platform-binary environments; jq at $JQ must be a non-platform binary): $probe_env" ;;
+  *) fail "this host does not expose a holder's environment (Python at $PYTHON must be a non-platform binary): $probe_env" ;;
 esac
 pass "holder processes expose their environment to the owner library"
+
+hold FM_PROBE_TEXT='literal FM_REMOTE_JOB_ACTIVE=1 SSH_CONNECTION=spoof XPC_SERVICE_NAME=dev.firstmate.herdr.fm-remote'
+VALUE_PID=$HOLDER_PID
+hold FM_PROBE_TEXT=$'literal\nFM_REMOTE_JOB_ACTIVE=1'
+NEWLINE_PID=$HOLDER_PID
+hold FM_PROBE_TEXT=$'literal\rXPC_SERVICE_NAME=dev.firstmate.herdr.fm-remote'
+CR_PID=$HOLDER_PID
+sleep 0.2
+value_env=$(fm_remote_herdr_process_env "$VALUE_PID") || fail "an ordinary space-bearing value was unreadable"
+printf '%s\n' "$value_env" | grep -Fx 'FM_PROBE_TEXT=literal FM_REMOTE_JOB_ACTIVE=1 SSH_CONNECTION=spoof XPC_SERVICE_NAME=dev.firstmate.herdr.fm-remote' >/dev/null \
+  || fail "environment values were split into false marker entries: $value_env"
+if printf '%s\n' "$value_env" | grep -E '^(FM_REMOTE_JOB_ACTIVE|SSH_CONNECTION|XPC_SERVICE_NAME)=' >/dev/null; then
+  fail "text inside an environment value escaped its entry boundary"
+fi
+for ambiguous in "$NEWLINE_PID" "$CR_PID"; do
+  if ambiguous_env=$(fm_remote_herdr_process_env "$ambiguous"); then
+    fail "a line-breaking environment was accepted as ownership evidence"
+  fi
+  [ -z "$ambiguous_env" ] || fail "an ambiguous environment leaked partial ownership evidence"
+done
+pass "kernel environment entries retain spaces and reject line-breaking evidence"
 
 # --- no server: the guard becomes the server ---------------------------------
 
@@ -248,6 +271,31 @@ assert_not_contains "$(herdr_calls)" 'server stop' "the guard stopped a gui-doma
 assert_contains "$GUARD_OUT" "pid $WORKER_PID born in the Aqua login session (worker)" \
   "the guard did not name the worker owner"
 pass "launchd and worker markers require gui-domain launchctl proof"
+
+for injected in "$VALUE_PID" "$NEWLINE_PID" "$CR_PID"; do
+  new_case running
+  printf '%s\n' "$injected" > "$CASE_OWNER"
+  load_job gui dev.firstmate.herdr.fm-remote "$injected"
+  load_job gui dev.firstmate.remote-job
+  guard
+  expect_code 0 "$GUARD_RC" "the guard failed to take over a value-contaminated owner"
+  assert_stop_before_start
+  assert_contains "$GUARD_OUT" "pid $injected born outside the Aqua login session (unknown)" \
+    "an embedded value marker was trusted as an Aqua birth"
+done
+pass "embedded worker and launchd values never prove an Aqua birth"
+
+new_case running
+printf '%s\n' "$LAUNCHD_PID" > "$CASE_OWNER"
+load_job gui dev.firstmate.herdr.fm-remote "$LAUNCHD_PID"
+rm "$TOOLS/python3"
+guard
+ln -sf "$(command -v python3)" "$TOOLS/python3"
+expect_code 0 "$GUARD_RC" "the guard failed to take over when Python was unavailable"
+assert_stop_before_start
+assert_contains "$GUARD_OUT" "pid $LAUNCHD_PID born outside the Aqua login session (unknown)" \
+  "a missing environment reader granted Aqua ownership"
+pass "a missing kernel environment reader never grants Aqua ownership"
 
 # --- a foreign owner is stopped, then the guard becomes the server -----------
 

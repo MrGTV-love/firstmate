@@ -60,6 +60,8 @@ trap relaunch_cleanup EXIT
 # harness's exit command stops the agent, and a launch-brief literal starts the
 # harness named in `becomes`.
 make_process_table_stub() { # <case-dir>
+  local real_python
+  real_python=$(command -v python3)
   cat > "$1/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
@@ -82,37 +84,6 @@ if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
   esac
   exit 0
 fi
-if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = '-Eww -o command= -p' ]; then
-  pid=$5
-  if [ -f "$D/herdr-pids/$pid" ]; then D=$(cat "$D/herdr-pids/$pid"); fi
-  expected=2000000000
-  [ ! -f "$D/recovery-pid" ] || expected=$(cat "$D/recovery-pid")
-  if [ -f "$D/recovery-case-id" ] && [ "$pid" = "$expected" ]; then
-    printf 'PATH=/test'
-    if [ -f "$D/launched-command" ]; then
-      if [ -f "$D/recovery-proof-once" ]; then
-        [ ! -f "$D/recovery-proof-observed" ] || exit 1
-        : > "$D/recovery-proof-observed"
-      fi
-      if [ -f "$D/recovery-proof-hold" ]; then
-        : > "$D/recovery-proof-ready"
-        while [ ! -e "$D/recovery-proof-release" ]; do /bin/sleep 0.01; done
-      fi
-      [ ! -f "$D/recovery-proof-unmanaged" ] || { printf '\n'; exit 0; }
-      id=$(cat "$D/recovery-case-id")
-      gen=$(grep '^spawn_gen=' "$FM_HOME/state/$id.meta" | cut -d= -f2-)
-      printf ' FM_SPAWN_GEN=%s' "$gen"
-    elif [ -f "$D/recovery-spawn-gen" ]; then
-      printf ' FM_SPAWN_GEN=%s' "$(cat "$D/recovery-spawn-gen")"
-    fi
-    printf '\n'
-    exit 0
-  fi
-  if [ -f "$D/herdr-managed-env-$pid" ]; then
-    cat "$D/herdr-managed-env-$pid"
-    exit 0
-  fi
-fi
 if [ -f "$D/herdr-agent-registration" ] \
   || { [ -f "$D/recovery-case-id" ] && [ ! -f "$D/herdr-agent-live" ]; }; then
   case "$*" in
@@ -123,6 +94,42 @@ fi
 exec /bin/ps "$@"
 SH
   chmod +x "$1/fakebin/ps"
+  cat > "$1/fakebin/python3" <<'SH'
+#!/usr/bin/env bash
+D=$FM_FAKE_DIR
+if [ "$#" = 2 ] && [ "$1" = - ]; then
+  pid=$2
+  if [ -f "$D/herdr-pids/$pid" ]; then D=$(cat "$D/herdr-pids/$pid"); fi
+  expected=2000000000
+  [ ! -f "$D/recovery-pid" ] || expected=$(cat "$D/recovery-pid")
+  if [ -f "$D/recovery-case-id" ] && [ "$pid" = "$expected" ]; then
+    printf 'PATH=/test\n'
+    if [ -f "$D/launched-command" ]; then
+      if [ -f "$D/recovery-proof-once" ]; then
+        [ ! -f "$D/recovery-proof-observed" ] || exit 1
+        : > "$D/recovery-proof-observed"
+      fi
+      if [ -f "$D/recovery-proof-hold" ]; then
+        : > "$D/recovery-proof-ready"
+        while [ ! -e "$D/recovery-proof-release" ]; do /bin/sleep 0.01; done
+      fi
+      [ ! -f "$D/recovery-proof-unmanaged" ] || exit 0
+      id=$(cat "$D/recovery-case-id")
+      gen=$(grep '^spawn_gen=' "$FM_HOME/state/$id.meta" | cut -d= -f2-)
+      printf 'FM_SPAWN_GEN=%s\n' "$gen"
+    elif [ -f "$D/recovery-spawn-gen" ]; then
+      printf 'FM_SPAWN_GEN=%s\n' "$(cat "$D/recovery-spawn-gen")"
+    fi
+    exit 0
+  fi
+  if [ -f "$D/herdr-managed-env-$pid" ]; then
+    cat "$D/herdr-managed-env-$pid"
+    exit 0
+  fi
+fi
+SH
+  printf '\nexec %q "$@"\n' "$real_python" >> "$1/fakebin/python3"
+  chmod +x "$1/fakebin/python3"
 }
 
 make_tmux_stub() {  # <dir>
@@ -2509,7 +2516,7 @@ case "${1:-} ${2:-}" in
           pid=$((2100000000 + ${pane#%}))
           pin_pattern='export FM_SPAWN_GEN=[^[:alnum:]]*([[:alnum:].]+)'
           [[ "$payload" =~ $pin_pattern ]] || exit 1
-          printf 'PATH=/test FM_SPAWN_GEN=%s\n' "${BASH_REMATCH[1]}" > "$D/herdr-managed-env-$pid"
+          printf 'PATH=/test\nFM_SPAWN_GEN=%s\n' "${BASH_REMATCH[1]}" > "$D/herdr-managed-env-$pid"
         fi
         printf '%s\n' "$payload" > "$D/launched-command"
         : > "$D/herdr-live-${3:-}"

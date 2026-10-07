@@ -40,6 +40,7 @@ fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
 # restore to this task's delivered launch input. Read only the named file.
 fm_launch_proof_native_startup() { # <meta> <session-file> <worktree>
   local meta=$1 ref=$2 worktree=$3 message kind body expected source state id data
+  local role_head role_tail inbox inbox_state recorded_state
   [ -f "$ref" ] && [ -r "$ref" ] || return 1
   message=$(jq -ern --arg cwd "$worktree" '
     def native_title_slot:
@@ -68,7 +69,7 @@ fm_launch_proof_native_startup() { # <meta> <session-file> <worktree>
   case "$(fm_meta_get "$meta" kind)" in
     secondmate)
       source="$worktree/data/charter.md"
-      if [ ! -e "$source" ] && [ ! -L "$source" ]; then
+      if [ ! -f "$source" ]; then
         data=${FM_DATA_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$_FM_LAUNCH_PROOF_DIR/..}}/data}
         source="$data/$id/brief.md"
       fi
@@ -77,8 +78,19 @@ fm_launch_proof_native_startup() { # <meta> <session-file> <worktree>
       ;;
     ship|scout|'')
       expected=$(fm_brief_worker_role "$state" "$id") || return 1
-      case "$body" in "$expected"$'\n\n'?*) return 0 ;; esac
-      return 1
+      role_head=${expected%%"$state/$id.inbox"*}
+      role_tail=${expected#*"$state/$id.inbox"}
+      case "$body" in "$role_head"*) ;; *) return 1 ;; esac
+      inbox=${body#"$role_head"}
+      inbox=${inbox%%"$role_tail"*}
+      [ "${inbox##*/}" = "$id.inbox" ] || return 1
+      case "$inbox" in /*) ;; *) return 1 ;; esac
+      inbox_state=${inbox%/*}
+      expected=$(fm_brief_worker_role "$inbox_state" "$id") || return 1
+      case "$body" in "$expected"$'\n\n'?*) ;; *) return 1 ;; esac
+      inbox_state=$(CDPATH='' cd -P -- "$inbox_state" 2>/dev/null && pwd -P) || return 1
+      recorded_state=$(CDPATH='' cd -P -- "$state" 2>/dev/null && pwd -P) || return 1
+      [ "$inbox_state" = "$recorded_state" ]
       ;;
     *) return 1 ;;
   esac

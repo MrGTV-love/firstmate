@@ -1945,11 +1945,6 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
     [ "$FM_COMPOSER_SCAN_BOX_OMP" = 0 ] || FM_COMPOSER_SELECTED_LAST=$FM_COMPOSER_SCAN_BOX_BOTTOM
     FM_COMPOSER_SELECTED_AMBIG=$FM_COMPOSER_SCAN_BOX_AMBIG
-    # Unlike closed boxes, ambiguous native bands have no fallback envelope.
-    if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ] && [ "$FM_COMPOSER_SELECTED_AMBIG" = 1 ]; then
-      FM_COMPOSER_SELECTED_KIND=
-      return 1
-    fi
   fi
   if [ "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM" -gt "$generic" ]; then
     generic=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
@@ -1993,6 +1988,12 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_KIND=pi
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
     FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
+  fi
+  if [ "$FM_COMPOSER_SELECTED_KIND" = box ] \
+     && [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ] \
+     && [ "$FM_COMPOSER_SELECTED_AMBIG" = 1 ]; then
+    FM_COMPOSER_SELECTED_KIND=
+    return 1
   fi
   if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
      && [ "$FM_COMPOSER_SELECTED_FIRST" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ] \
