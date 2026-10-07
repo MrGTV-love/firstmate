@@ -198,7 +198,7 @@ Without that exact value, or with `FM_COMPACT_ADVISER_HOOKS=1`, the mod is a com
 
 ### Toggling Calm on Claude Code
 
-With the flag on, the mod registers `/calm`.
+With the mod [activated](#enabling-function-hooks), it registers `/calm`.
 It toggles the same per-home preference Pi's `/calm` uses, so one choice applies on both harnesses.
 The toggle answers with a transient "Calm on" or "Calm off" notice under the prompt rather than a transcript row.
 A preference that cannot be written leaves the current choice unchanged, and the notice says so.
@@ -225,7 +225,7 @@ The Pi extension keeps its standard ANSI blue and yellow.
 
 ### Supervision notes on Claude Code
 
-With the flag on, the mod shows the supervision notes Pi shows, whether Calm is on or off, because on Pi they are supervision UI rather than Calm UI.
+With the mod [activated](#enabling-function-hooks), it shows the supervision notes Pi shows, whether Calm is on or off, because on Pi they are supervision UI rather than Calm UI.
 Each note is appended to the transcript as its own system-notice row, which Claude Code draws in gray behind a `⏺` bullet and the mod's name (`firstmate-calm:`), and never sends to the model:
 
 | Line | When |

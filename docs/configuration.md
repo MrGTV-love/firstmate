@@ -1026,7 +1026,8 @@ Keep the policy off for material that must not leave the machine.
 3. Running agents keep the environment they launched with.
    Relaunch a local agent with `bin/fm-control.sh <id> relaunch`, or a remote secondmate with `bin/fm-remote-secondmate-relaunch.sh <id> <harness> <model> <effort>` naming its current runtime, for it to run with the new policy.
 4. Verify a newly launched worker process with `ps eww -p <pid> | tr ' ' '\n' | grep -E '^(COMPACT_ADVISER_DISABLE|CLAUDE_CODE_ENABLE_FUNCTION_HOOKS)='`.
-   An automatic Claude worker shows `COMPACT_ADVISER_DISABLE=0` and `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`; an automatic omp worker shows `COMPACT_ADVISER_DISABLE=0`.
+   For a generated launch, an automatic Claude worker shows `COMPACT_ADVISER_DISABLE=0` and `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`; an automatic omp worker shows `COMPACT_ADVISER_DISABLE=0`.
+   A leading raw-command assignment retains its explicit function-hooks value instead.
    The environment proves only that the adviser may act; a plugin judgement on a completed turn above the token minimum proves that it runs.
 
 #### Comparing enabled and disabled workers

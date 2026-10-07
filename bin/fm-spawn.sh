@@ -329,10 +329,8 @@
 #   See docs/configuration.md for provider/Git setup, raw-command shell
 #   compatibility, and supported limits.
 # Compact adviser (config/compact-adviser):
-#   Optional JSON object whose only keys are claude and omp, each mapped to
-#   "off" or "auto"; other keys refuse before launch, and every absent entry
-#   and other harness stays off. omp requires a compatible installed
-#   settled-turn integration before opting in. See docs/configuration.md.
+#   docs/configuration.md owns the policy format, defaults, supported harnesses,
+#   and installed-plugin prerequisites.
 #   The resolved switch reaches the pane export, compound launch, and env -i
 #   floor, replacing any inherited COMPACT_ADVISER_DISABLE. A truthy invoking
 #   FM_COMPACT_ADVISER_DISABLE is the operator's emergency override; Firstmate
