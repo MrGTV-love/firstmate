@@ -160,9 +160,9 @@ case "$1" in
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
   usage)
+    record_project "${0%/*}/usage.cwd"
     if [ -d "${0%/*}/scope-fixtures" ]; then
       record_scope "${0%/*}/usage.env"
-      record_project "${0%/*}/usage.cwd"
       case "${PI_CODING_AGENT_DIR-}|${OMP_PROFILE-${PI_PROFILE-}}" in
         *exhausted-dir*|*'|exhausted') cat "${0%/*}/scope-fixtures/exhausted.json" ;;
         *) cat "${0%/*}/scope-fixtures/healthy.json" ;;
@@ -536,18 +536,34 @@ test_spawn_catalog_matches_destination_provider_auth() {
   pass "OMP fallback discovery and post-selection validation share destination provider auth and arbitrary model interpolation scope"
 }
 
-test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
+test_spawn_exhausted_strongest_route_without_stand_in() {
   local rec id=omp-strongest-q3 out status
   rec=$(make_spawn_case strongest omp "$id")
   read_case_record "$rec"
-  printf 'unlanded work\n' > "$WT_DIR/unfinished.txt"
   jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}],resetCredits:{availableCount:1}}]}' > "$CASE_DIR/usage.json"
   out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
   status=$?
   expect_code 1 "$status" "Sol without an available same-class stand-in must refuse: $out"
+  assert_grep "process=$(cd "$WT_DIR" && pwd -P)" "$FAKEBIN_DIR/usage.cwd" "strongest-route refusal must reach native usage in the destination worktree"
+  assert_contains "$out" 'has exhausted capacity and no supported permitted fallback' "strongest-route refusal must result from exhausted capacity without an authorized stand-in"
   assert_absent "$HOME_DIR/state/$id.meta" "refused launch must publish no replacement"
-  assert_equals 'unlanded work' "$(cat "$WT_DIR/unfinished.txt")" "quota exhaustion must preserve work"
-  pass "strongest-model exhaustion neither spends saved resets nor weakens or discards the task"
+  assert_equals '' "$(cat "$LAUNCH_LOG")" "exhausted strongest route must launch no worker"
+  pass "strongest-model exhaustion with a saved reset refuses undeclared stand-ins"
+}
+
+test_spawn_dirty_worktree_preserves_unlanded_work() {
+  local rec id=omp-dirty-q4 out status
+  rec=$(make_spawn_case dirty omp "$id")
+  read_case_record "$rec"
+  printf 'unlanded work\n' > "$WT_DIR/unfinished.txt"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
+  status=$?
+  expect_code 1 "$status" "dirty worktree must refuse fresh launch: $out"
+  assert_contains "$out" 'refusing to discard uncommitted work while refreshing its base' "dirty-worktree refusal must identify preservation rather than quota"
+  assert_absent "$HOME_DIR/state/$id.meta" "dirty-worktree refusal must publish no replacement"
+  assert_equals '' "$(cat "$LAUNCH_LOG")" "dirty worktree must launch no worker"
+  assert_equals 'unlanded work' "$(cat "$WT_DIR/unfinished.txt")" "fresh launch refusal must preserve unlanded work"
+  pass "fresh OMP launch refuses a dirty worktree without discarding unlanded work"
 }
 
 test_spawn_model_validation_scoped_to_listed_providers() {
@@ -1707,7 +1723,8 @@ test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
-test_spawn_exhausted_strongest_route_preserves_unlanded_work
+test_spawn_exhausted_strongest_route_without_stand_in
+test_spawn_dirty_worktree_preserves_unlanded_work
 test_spawn_catalog_matches_destination_provider_auth
 test_spawn_capacity_matches_destination_auth_and_allowlist
 test_spawn_without_fallback_uses_destination_project_capacity
