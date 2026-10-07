@@ -127,7 +127,20 @@ case "$1" in
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
   usage)
-    if [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
+    if [ -d "${0%/*}/scope-fixtures" ]; then
+      printf '%s\n' "HOME=${HOME-}" "PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR-}" \
+        "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" > "${0%/*}/usage.env"
+      case "${PI_CODING_AGENT_DIR-}|${OMP_PROFILE-${PI_PROFILE-}}" in
+        *exhausted-dir*|*'|exhausted') cat "${0%/*}/scope-fixtures/exhausted.json" ;;
+        *) cat "${0%/*}/scope-fixtures/healthy.json" ;;
+      esac
+    elif [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
+    ;;
+  *)
+    if [ -d "${0%/*}/scope-fixtures" ]; then
+      printf '%s\n' "HOME=${HOME-}" "PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR-}" \
+        "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" > "${0%/*}/worker.env"
+    fi
     ;;
 esac
 exit 0
@@ -223,6 +236,71 @@ JSON
   assert_grep 'model=openrouter/z-ai/glm-5.3-flash' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
   assert_contains "$out" 'fallback launched' "the changed serving route must be reported"
   pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
+}
+
+test_spawn_capacity_matches_destination_auth_and_allowlist() {
+  local rec id scenario out status destination_root caller_root caller_profile destination_profile expected_model expected_root expected_profile launch
+  local -a pane_env
+  for scenario in destination-healthy destination-exhausted filtered empty-profile; do
+    id="omp-scope-$scenario"
+    rec=$(make_spawn_case "$scenario" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config" "$FAKEBIN_DIR/scope-fixtures" "$CASE_DIR/destination-home"
+    cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}
+JSON
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' \
+      > "$FAKEBIN_DIR/scope-fixtures/exhausted.json"
+    jq '.reports[].metadata.meterStates.chat = {allowed:true,limitReached:false}' \
+      "$FAKEBIN_DIR/scope-fixtures/exhausted.json" > "$FAKEBIN_DIR/scope-fixtures/healthy.json"
+    destination_root="$CASE_DIR/healthy-dir"
+    caller_root="$CASE_DIR/exhausted-dir"
+    caller_profile=exhausted
+    destination_profile=healthy
+    expected_model=openai-codex/gpt-6-luna
+    case "$scenario" in
+      destination-exhausted|filtered)
+        destination_root="$CASE_DIR/exhausted-dir"
+        caller_root="$CASE_DIR/healthy-dir"
+        caller_profile=healthy
+        destination_profile=exhausted
+        ;;
+      empty-profile)
+        destination_root=
+        destination_profile=
+        ;;
+    esac
+    expected_root=$destination_root
+    expected_profile=$destination_profile
+    if [ "$scenario" = filtered ]; then
+      printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist"
+      expected_root=
+      expected_profile=unset
+    else
+      printf '%s\n' PATH PI_CODING_AGENT_DIR OMP_PROFILE PI_PROFILE > "$HOME_DIR/config/launch-env-allowlist"
+    fi
+    [ "$scenario" != destination-exhausted ] || expected_model=openrouter/z-ai/glm-5.3-flash
+    out=$(PI_CODING_AGENT_DIR="$caller_root" OMP_PROFILE="$caller_profile" PI_PROFILE=caller-profile \
+      FM_FAKE_TMUX_ENV_HOME="$CASE_DIR/destination-home" \
+      FM_FAKE_TMUX_ENV_PI_CODING_AGENT_DIR="$destination_root" \
+      FM_FAKE_TMUX_ENV_OMP_PROFILE="$destination_profile" FM_FAKE_TMUX_ENV_PI_PROFILE=exhausted \
+      run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    expect_code 0 "$status" "$scenario launch must resolve destination capacity: $out"
+    assert_grep "model=$expected_model" "$HOME_DIR/state/$id.meta" "$scenario must route using effective destination authentication"
+    assert_grep "HOME=$CASE_DIR/destination-home" "$FAKEBIN_DIR/usage.env" "$scenario usage must use the destination HOME"
+    assert_grep "PI_CODING_AGENT_DIR=$expected_root" "$FAKEBIN_DIR/usage.env" "$scenario usage must respect the destination root and allowlist"
+    assert_grep "OMP_PROFILE=$expected_profile" "$FAKEBIN_DIR/usage.env" "$scenario usage must preserve profile presence and allowlist filtering"
+    launch=$(cat "$LAUNCH_LOG")
+    pane_env=(-u PI_CONFIG_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME
+      HOME="$CASE_DIR/destination-home" PI_CODING_AGENT_DIR="$destination_root"
+      OMP_PROFILE="$destination_profile" PI_PROFILE=exhausted)
+    fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "${pane_env[@]}" \
+      > "$CASE_DIR/worker.out" 2>&1 || fail "$scenario generated OMP command could not be consumed"
+    cmp -s "$FAKEBIN_DIR/usage.env" "$FAKEBIN_DIR/worker.env" || fail "$scenario usage scope differs from the generated worker's effective authentication"
+  done
+  pass "OMP fresh capacity follows destination authentication, profile precedence, and the launch allowlist rather than caller credentials"
 }
 
 test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
@@ -1328,6 +1406,7 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
 test_spawn_exhausted_strongest_route_preserves_unlanded_work
+test_spawn_capacity_matches_destination_auth_and_allowlist
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated

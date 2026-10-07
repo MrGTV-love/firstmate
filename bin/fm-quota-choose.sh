@@ -324,7 +324,7 @@ OMP_USAGE=
 for c in "${CANDIDATES[@]}"; do
   case "$c" in
     omp:openai-codex/*)
-      OMP_USAGE=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || OMP_USAGE='{}'
+      OMP_USAGE=$(fm_dispatch_omp_usage) || OMP_USAGE='{}'
       [ -n "$OMP_USAGE" ] || OMP_USAGE='{}'
       break ;;
   esac

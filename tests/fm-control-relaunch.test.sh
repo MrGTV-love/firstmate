@@ -152,10 +152,6 @@ case "${1:-}" in
       case "$payload" in
         /exit|/quit)
           printf 'zsh' > "$D/command"
-          if [ -f "$D/../usage-after-stop.json" ]; then
-            cp "$FM_HOME/state/"*.control-relaunch "$D/../preflight-journal"
-            cp "$D/../usage-after-stop.json" "$D/../usage.json"
-          fi
           [ -z "${FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
           ;;
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
@@ -4569,7 +4565,7 @@ test_quota_scan_stops_after_failed_published_or_confirmed_replacement() {
     assert_contains "$out" "$first_id auto-relaunch failed after quota exhaustion" "the failed first replacement must retain its failure report"
     assert_not_contains "$out" "$second_id" "the first replacement failure must not be replaced by a second lane's report"
     assert_equals omp "$(cat "$dir/fake/command")" "the failed first transaction must leave its replacement alive"
-    assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$first_id" model)" "the first transaction must publish its permitted replacement"
+    assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$first_id" model)" "unknown adopted authentication must retain the first transaction's route"
     assert_equals "$(meta_field "$dir" "$first_id" control_relaunch_tx)" "$(journal_field "$dir" "$first_id" relaunch_tx)" "the first failed transaction must own its published record"
     if [ "$failure" = transport ]; then
       assert_equals none-new-record-kept "$(journal_field "$dir" "$first_id" rollback)" "transport failure must retain the published live replacement"
@@ -4635,7 +4631,7 @@ test_live_quota_retries_after_initial_pre_stop_failure() {
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "live retry must complete"
       assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "live retry must keep quota origin"
       assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "live retry must keep quota sequence"
-      assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "live retry must serve declared fallback"
+      assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$id" model)" "live retry must retain the route when adopted authentication is unknown"
       assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "live retry must preserve work"
       [ "$(cat "$dir/home/state/$id.busy-gen")" != "$gen" ] || fail "live retry revived the original generation"
     done
@@ -4643,38 +4639,35 @@ test_live_quota_retries_after_initial_pre_stop_failure() {
   pass "initial live checkpoint/noted quota rollback remains retryable by scan and direct control"
 }
 
-test_relaunch_reports_the_profile_spawn_actually_served() {
+test_relaunch_records_the_operator_selected_served_profile() {
   local dir id outcome out rc real_mv
   real_mv=$(command -v mv)
   for outcome in complete transport complete-journal; do
     id="rl-served-$outcome"
     dir=$(new_case served-profile "$id")
     add_quota_recovery_task "$dir" "$id"
-    cp "$dir/usage.json" "$dir/usage-after-stop.json"
-    jq '.reports[].metadata.meterStates.chat = {allowed:true,limitReached:false}' \
-      "$dir/usage-after-stop.json" > "$dir/usage.json"
     make_mv_failure_stub "$dir"
     case "$outcome" in
-      complete) out=$(FM_REAL_MV="$real_mv" run_control "$dir" "$id" relaunch --note "serve the current permitted profile"); rc=$? ;;
+      complete) out=$(FM_REAL_MV="$real_mv" run_control "$dir" "$id" relaunch \
+        --model openrouter/z-ai/glm-5.3-flash --effort high --note "serve the operator-selected declared stand-in"); rc=$? ;;
       transport) out=$(FM_REAL_MV="$real_mv" FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
-        run_control "$dir" "$id" relaunch --note "retain published fallback"); rc=$? ;;
+        run_control "$dir" "$id" relaunch --model openrouter/z-ai/glm-5.3-flash \
+        --effort high --note "retain the published operator-selected profile"); rc=$? ;;
       complete-journal) out=$(FM_REAL_MV="$real_mv" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL=1 \
-        run_control "$dir" "$id" relaunch --note "retain confirmed fallback"); rc=$? ;;
+        run_control "$dir" "$id" relaunch --model openrouter/z-ai/glm-5.3-flash \
+        --effort high --note "retain the confirmed operator-selected profile"); rc=$? ;;
     esac
-    assert_grep 'to_model=openai-codex/gpt-6-luna' "$dir/preflight-journal" "preflight must still select Codex before the stop"
-    assert_grep 'phase=stopping' "$dir/preflight-journal" "usage change must happen between control preflight and spawn"
     assert_equals omp "$(meta_field "$dir" "$id" harness)" "spawn must publish served harness"
-    assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "spawn must publish actual fallback model"
-    assert_equals high "$(meta_field "$dir" "$id" effort)" "spawn must publish actual fallback effort"
+    assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "spawn must publish the operator-selected model"
+    assert_equals high "$(meta_field "$dir" "$id" effort)" "spawn must publish the operator-selected effort"
     assert_equals omp "$(journal_field "$dir" "$id" to_harness)" "journal must name served harness"
     assert_equals openrouter/z-ai/glm-5.3-flash "$(journal_field "$dir" "$id" to_model)" "journal must name served model"
     assert_equals high "$(journal_field "$dir" "$id" to_effort)" "journal must name served effort"
     assert_equals "$(meta_field "$dir" "$id" control_relaunch_tx)" "$(journal_field "$dir" "$id" relaunch_tx)" "published metadata must bind journal transaction"
     if [ "$outcome" = complete ]; then
-      expect_code 0 "$rc" "served fallback must complete: $out"
-      assert_contains "$out" 'model=openrouter/z-ai/glm-5.3-flash effort=high' "success must report actual served profile"
-      assert_equals complete "$(journal_field "$dir" "$id" phase)" "served fallback must complete journal"
-      assert_contains "$out" 'fallback relaunched omp openrouter/z-ai/glm-5.3-flash effort=high' "control must report actual served fallback effort"
+      expect_code 0 "$rc" "operator-selected profile must complete: $out"
+      assert_contains "$out" 'model=openrouter/z-ai/glm-5.3-flash effort=high' "success must report the actual served profile"
+      assert_equals complete "$(journal_field "$dir" "$id" phase)" "operator-selected profile must complete the journal"
     else
       expect_code 1 "$rc" "published failure must remain a failure: $out"
       assert_equals failed:launching "$(journal_field "$dir" "$id" phase)" "published failure must retain durable phase"
@@ -4685,40 +4678,36 @@ test_relaunch_reports_the_profile_spawn_actually_served() {
       fi
     fi
   done
-  pass "control reports actual spawn fallback after preflight Codex availability changes, including published failure journals"
+  pass "control records the actual operator-selected serving profile in successful and failed-publication transactions"
 }
 
-test_relaunch_fallback_preserves_launch_delivery_declarations() {
+test_operator_selected_stand_in_preserves_launch_delivery_declarations() {
   local dir id event declaration expected out rc
   for event in done failed paused; do
     id="rl-fallback-$event"
     dir=$(new_case fallback-declaration "$id")
     add_quota_recovery_task "$dir" "$id"
-    cp "$dir/usage.json" "$dir/usage-after-stop.json"
-    jq '.reports[].metadata.meterStates.chat = {allowed:true,limitReached:false}' \
-      "$dir/usage-after-stop.json" > "$dir/usage.json"
     declaration="$event [at=2026-10-06T00:00:00Z]: replacement declared $event during launch delivery"
     expected="$dir/expected.status"
     printf '%s\n' "$declaration" > "$expected"
 
     out=$(FM_FAKE_LAUNCH_STATUS_PATH="$dir/home/state/$id.status" \
       FM_FAKE_LAUNCH_STATUS_EVENT="$declaration" \
-      run_control "$dir" "$id" relaunch --note "serve the current permitted profile")
+      run_control "$dir" "$id" relaunch --model openrouter/z-ai/glm-5.3-flash \
+        --effort high --note "serve the operator-selected declared stand-in")
     rc=$?
-    expect_code 0 "$rc" "$event declaration must not fail fallback relaunch: $out"
-    assert_grep 'to_model=openai-codex/gpt-6-luna' "$dir/preflight-journal" "preflight must select Codex before launch capacity changes"
-    assert_contains "$out" 'fallback relaunched omp openrouter/z-ai/glm-5.3-flash effort=high for rule_1' "control must disclose the served fallback after $event"
+    expect_code 0 "$rc" "$event declaration must not fail operator-selected relaunch: $out"
     assert_equals omp "$(meta_field "$dir" "$id" harness)" "relaunch must publish the served harness"
     assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "relaunch must publish the served model"
     assert_equals high "$(meta_field "$dir" "$id" effort)" "relaunch must publish the served effort"
-    assert_equals complete "$(journal_field "$dir" "$id" phase)" "fallback relaunch must complete its transaction"
-    assert_equals openrouter/z-ai/glm-5.3-flash "$(journal_field "$dir" "$id" to_model)" "journal must record the served fallback"
+    assert_equals complete "$(journal_field "$dir" "$id" phase)" "operator-selected relaunch must complete its transaction"
+    assert_equals openrouter/z-ai/glm-5.3-flash "$(journal_field "$dir" "$id" to_model)" "journal must record the served stand-in"
     [ -s "$dir/fake/launch" ] || fail "$event declaration must come from an actual launch"
-    cmp -s "$expected" "$dir/home/state/$id.status" || fail "spawn or control fallback announcement changed the $event declaration"
+    cmp -s "$expected" "$dir/home/state/$id.status" || fail "spawn or control relaunch changed the $event declaration"
     assert_equals "$declaration" "$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_current_line "$2" ship' \
       bash "$ROOT" "$dir/home/state/$id.status")" "the $event declaration must remain authoritative"
   done
-  pass "real control fallback relaunches preserve done, failed, and paused declarations published before spawn and control announcements"
+  pass "real control relaunches onto operator-selected declared stand-ins preserve done, failed, and paused launch-delivery declarations"
 }
 
 test_quota_recovery_retries_real_stop_then_failed_launch() {
@@ -4882,7 +4871,7 @@ test_quota_published_failure_retries_only_its_dead_transaction() {
   out=$(run_session_end_scan "$dir"); rc=$?
   expect_code 0 "$rc" "the matching dead published quota replacement must recover: $out"
   assert_contains "$out" 'auto-relaunched after quota exhaustion' "a matching dead publication must retry"
-  assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "retry must resolve the current published fallback"
+  assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$id" model)" "retry must retain the current route when adopted authentication is unknown"
   assert_equals published-concurrent "$(meta_field "$dir" "$id" x_request)" "retry must preserve published concurrent metadata"
   assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "published retry must retain the quota origin"
   assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "published retry must retain the quota sequence"
@@ -4923,8 +4912,8 @@ test_quota_live_published_replacement_handles_its_new_event() {
   assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "the completed journal must bind the new generation rather than the failed origin"
   assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "the completed journal must bind the fresh event sequence"
   assert_equals omp "$(cat "$dir/fake/command")" "the new quota recovery must leave a live replacement"
-  assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "new recovery must retain the permitted published model"
-  assert_equals high "$(meta_field "$dir" "$id" effort)" "new recovery must retain the published effort"
+  assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$id" model)" "new recovery must retain the published model when adopted authentication is unknown"
+  assert_equals default "$(meta_field "$dir" "$id" effort)" "new recovery must retain the published effort"
   assert_equals new-live-quota "$(meta_field "$dir" "$id" x_request)" "new recovery must preserve concurrent replacement metadata"
   assert_equals "$dir/wt" "$(meta_field "$dir" "$id" worktree)" "new recovery must retain the recorded worktree"
   assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "new recovery must preserve unfinished work"
@@ -5045,23 +5034,16 @@ SH
     rc=$?
     expect_code 0 "$rc" "supervised quota recovery must reconcile the route: $out"
     assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "automatic replacement must preserve uncommitted work"
-    if [ "$model" = openai-codex/gpt-6-luna ]; then
-      assert_contains "$out" 'auto-relaunched after quota exhaustion' "a live OMP session must recover despite recent session-end relaunch history, a failed same-identity quota attempt, and the daily cap"
-      assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
-      assert_equals high "$(meta_field "$dir" "$id" effort)" "an omitted primary effort must permit the explicitly configured fallback effort"
-      assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
-      assert_contains "$out" 'harness=omp model=openrouter/z-ai/glm-5.3-flash effort=high' "the supervisor wake must disclose the served route"
-      cmp -s "$expected" "$dir/home/state/$id.status" || fail "automatic routing disclosure changed the replacement's done declaration"
-      assert_equals "$declaration" "$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_current_line "$2" ship' \
-        bash "$ROOT" "$dir/home/state/$id.status")" "the replacement's done declaration must remain authoritative"
-    else
-      assert_contains "$out" 'auto-relaunch failed' "strongest-model exhaustion must be surfaced without a weak stand-in"
-      assert_equals omp "$(cat "$dir/fake/command")" "an unavailable strongest route must refuse before stopping the old agent"
-      assert_equals openai-codex/gpt-6.1-sol "$(meta_field "$dir" "$id" model)" "the strongest model identity must remain unchanged"
-      assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent when the strongest replacement is unavailable"
-    fi
+    assert_contains "$out" 'auto-relaunched after quota exhaustion' "a live OMP session must recover despite recent session-end relaunch history, a failed same-identity quota attempt, and the daily cap"
+    assert_equals "$model" "$(meta_field "$dir" "$id" model)" "unknown adopted authentication must not authorize switching the selected route"
+    assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
+    assert_contains "$out" "harness=omp model=$model" "the supervisor wake must disclose the retained route"
+    assert_absent "$dir/fake/created-windows" "in-place recovery must retain the adopted endpoint"
+    cmp -s "$expected" "$dir/home/state/$id.status" || fail "automatic routing disclosure changed the replacement's done declaration"
+    assert_equals "$declaration" "$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_current_line "$2" ship' \
+      bash "$ROOT" "$dir/home/state/$id.status")" "the replacement's done declaration must remain authoritative"
   done
-  pass "supervised OMP quota recovery ignores attempt caps and failed handling while using only the declared route and preserving work"
+  pass "supervised OMP quota recovery ignores attempt caps and failed handling while retaining routes with unknown adopted authentication and preserving work"
 }
 
 test_retiring_omp_removes_only_its_generated_configuration() {
@@ -5127,8 +5109,8 @@ test_quota_confirmed_replacement_is_not_retried
 test_quota_retry_preserves_identity_after_pre_stop_failure
 test_live_quota_retries_after_initial_pre_stop_failure
 test_explicit_exit_cancels_partial_quota_recovery
-test_relaunch_reports_the_profile_spawn_actually_served
-test_relaunch_fallback_preserves_launch_delivery_declarations
+test_relaunch_records_the_operator_selected_served_profile
+test_operator_selected_stand_in_preserves_launch_delivery_declarations
 test_ordinary_partial_failure_keeps_its_attempt_caps
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint

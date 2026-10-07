@@ -166,7 +166,7 @@ fm_session_end_quota_journal_identity() {
   phase=$(fm_meta_get "$journal" phase)
   rollback=$(fm_meta_get "$journal" rollback)
   case "$phase:$rollback" in
-    failed:checkpoint:instructions-restored|failed:noted:instructions-restored|failed:stopping:prior-record-kept-agent-dead|failed:exited:prior-record-kept|failed:launching:prior-record-kept)
+    failed:checkpoint:instructions-restored|failed:noted:instructions-restored|failed:stopping:prior-record-kept-agent-dead|failed:stopping:instructions-restored-agent-alive|failed:stopping:instructions-restored-agent-state-*|failed:exited:prior-record-kept|failed:launching:prior-record-kept)
       backend=$(fm_meta_get "$meta" backend)
       [ "$(fm_meta_get "$journal" backend)" = "${backend:-tmux}" ] || return 1
       [ "$(fm_meta_get "$journal" endpoint)" = "$(fm_meta_get "$meta" window)" ] || return 1

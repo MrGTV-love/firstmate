@@ -704,6 +704,7 @@ add_partial_quota_lane() {
     from_harness=omp from_model=default from_effort=default \
     "quota_gen=$gen" "quota_seq=$seq" "from_busy_gen=$gen" from_relaunch_tx=- \
     relaunch_tx=fixture-tx > "$dir/state/$id.control-relaunch"
+  [ "${3:-retired}" != retained ] || return 0
   "$ROOT/bin/fm-busy-event.sh" retire "$dir/state" "$id" --current-gen >/dev/null \
     || fail "quota retirement fixture failed"
 }
@@ -742,6 +743,103 @@ test_partial_quota_retries_are_uncapped_and_deduplicated() {
   [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
     || fail "the successfully handled journal identity duplicated after its ledger expired"
   pass "journal-backed quota failures stay uncapped, advance to later lanes, and deduplicate their stable identity"
+}
+
+test_delayed_quota_stop_recovery_requires_current_death() {
+  local dir rollback guard command read_fail gen seq current_gen missing mode before_record
+  for rollback in instructions-restored-agent-alive instructions-restored-agent-state-unknown \
+    instructions-restored-agent-state-ambiguous instructions-restored-agent-state-unreadable \
+    instructions-restored-agent-state-unverified instructions-restored-agent-state-missing \
+    prior-record-kept-agent-dead; do
+    for mode in retired retained; do
+    for guard in none origin-exit current-exit superseded; do
+      if [ "$guard" != none ]; then
+        [ "$rollback" = instructions-restored-agent-alive ] || continue
+        [ "$mode:$guard" != retained:current-exit ] || continue
+      fi
+      dir="$TMP_ROOT/delayed-quota-$rollback-$guard-$mode"
+      add_partial_quota_lane "$dir" lane "$mode"
+      current_gen=$(fm_meta_get "$dir/state/lane.meta" busy_gen)
+      gen=$current_gen
+      if [ "$mode" = retired ]; then
+        gen=fixture-quota-origin
+        printf 'quota_gen=%s\n' "$gen" >> "$dir/state/lane.control-relaunch"
+      fi
+      before_record=$(cat "$dir/state/lane.busy-state" 2>/dev/null || true)
+      seq=$(fm_meta_get "$dir/state/lane.control-relaunch" quota_seq)
+      printf 'phase=failed:stopping\nrollback=%s\n' "$rollback" >> "$dir/state/lane.control-relaunch"
+      command=python read_fail=0 missing=0
+      case "$rollback" in
+        instructions-restored-agent-alive) command=omp ;;
+        instructions-restored-agent-state-unreadable) read_fail=1 ;;
+        instructions-restored-agent-state-missing) missing=1 ;;
+      esac
+      FM_SESSION_END_CONTROL_RC=1 FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_TMUX_READ_FAIL="$read_fail" FM_FAKE_WINDOW_GONE="$missing" scan_lane "$dir" \
+        || fail "$rollback live or uncertain scan failed"
+      if [ "$mode" = retained ] && [ "$command" = omp ]; then
+        [ "$FM_SESSION_END_ACTION" = failed ] && [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+          || fail "retained current quota did not record its failed live stop attempt"
+      else
+        [ ! -s "$dir/control.log" ] || fail "$rollback retried before current endpoint death"
+      fi
+      case "$guard" in
+        origin-exit) printf 'gen=%s\n' "$gen" > "$dir/state/lane.control-exit" ;;
+        current-exit) printf 'gen=%s\n' "$current_gen" > "$dir/state/lane.control-exit" ;;
+        superseded) printf 'control_relaunch_tx=unrelated\n' >> "$dir/state/lane.meta" ;;
+      esac
+      FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" \
+        || fail "$rollback delayed-death scan failed"
+      if [ "$guard" != none ]; then
+        [ ! -s "$dir/control.log" ] || fail "$rollback bypassed $guard after delayed death"
+        continue
+      fi
+      [ "$FM_SESSION_END_ACTION" = relaunch ] && [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+        || fail "$rollback did not recover exactly once after delayed death"
+      grep -Fx "FM_CONTROL_QUOTA_GEN=$gen" "$dir/control-env.log" >/dev/null \
+        && grep -Fx "FM_CONTROL_QUOTA_SEQ=$seq" "$dir/control-env.log" >/dev/null \
+        || fail "$rollback changed the quota origin during delayed recovery"
+      if [ "$mode" = retired ]; then
+        [ ! -e "$dir/state/lane.busy-gen" ] && [ ! -e "$dir/state/lane.busy-state" ] \
+          || fail "$rollback resurrected the retired incarnation"
+      else
+        [ "$(cat "$dir/state/lane.busy-gen")" = "$current_gen" ] \
+          && [ "$(cat "$dir/state/lane.busy-state")" = "$before_record" ] \
+          || fail "$rollback changed the retained quota incarnation"
+      fi
+    done
+    done
+  done
+  pass "delayed quota stop failures recover only after current death and preserve identity and cancellation"
+}
+
+test_live_published_quota_uses_new_event_identity() {
+  local dir rollback gen seq record
+  for rollback in none-new-record-kept instructions-restored; do
+    dir="$TMP_ROOT/live-published-quota-$rollback"
+    add_partial_quota_lane "$dir" lane
+    "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state busy --source fm-spawn --event launch-brief >/dev/null
+    gen=$(cat "$dir/state/lane.busy-gen")
+    printf 'busy_gen=%s\ncontrol_relaunch_tx=fixture-tx\n' "$gen" >> "$dir/state/lane.meta"
+    printf 'rollback=%s\n' "$rollback" >> "$dir/state/lane.control-relaunch"
+    if [ "$rollback" = instructions-restored ]; then
+      printf 'phase=failed:checkpoint\nfrom_busy_gen=%s\nfrom_relaunch_tx=fixture-tx\n' "$gen" >> "$dir/state/lane.control-relaunch"
+    fi
+    FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "live published launch scan failed"
+    [ ! -s "$dir/control.log" ] || fail "live published worker was retried from its old journal"
+    "$ROOT/bin/fm-busy-event.sh" apply "$dir/state" lane idle --gen "$gen" --source omp-ext --event quota-exhausted >/dev/null
+    record=$(cat "$dir/state/lane.busy-state")
+    seq=${record#*seq=}
+    seq=${seq%% *}
+    FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" \
+      || fail "live published quota scan failed"
+    [ "$FM_SESSION_END_ACTION" = relaunch ] || fail "old journal masked the live replacement's new quota"
+    grep -Fx "FM_CONTROL_QUOTA_GEN=$gen" "$dir/control-env.log" >/dev/null \
+      && grep -Fx "FM_CONTROL_QUOTA_SEQ=$seq" "$dir/control-env.log" >/dev/null \
+      || fail "live replacement recovery used the old journal identity"
+    [ "$(cat "$dir/state/.session-end-handled-lane")" = "$(printf '%s\t%s\trelaunched' "$gen" "$seq")" ] \
+      || fail "live replacement did not handle its new quota identity"
+  done
+  pass "live published replacements fall through old journals to their own new quota event"
 }
 
 test_partial_quota_journal_guards_fail_closed() {
@@ -808,8 +906,8 @@ test_partial_quota_journal_guards_fail_closed() {
       complete) printf 'phase=complete\n' >> "$journal" ;;
       confirmed) printf 'rollback=none-new-agent-confirmed\n' >> "$journal" ;;
       pre-stop) printf 'phase=failed:noted\nrollback=instructions-restored\n' >> "$journal"; command=omp ;;
-      stop-alive) printf 'phase=failed:stopping\nrollback=instructions-restored-agent-alive\n' >> "$journal" ;;
-      stop-unknown) printf 'phase=failed:stopping\nrollback=instructions-restored-agent-state-unknown\n' >> "$journal" ;;
+      stop-alive) printf 'phase=failed:stopping\nrollback=instructions-restored-agent-alive\n' >> "$journal"; command=omp ;;
+      stop-unknown) printf 'phase=failed:stopping\nrollback=instructions-restored-agent-state-unknown\n' >> "$journal"; command=python ;;
       manual) printf 'quota_gen=\nquota_seq=\n' >> "$journal" ;;
       incomplete) printf 'relaunch_tx=\nfrom_busy_gen=\n' >> "$journal" ;;
       task) printf 'task=other\n' >> "$journal" ;;
@@ -933,6 +1031,8 @@ test_failed_quota_recovery_does_not_starve_later_tasks
 test_failed_recovery_shares_the_scan_time_bound
 test_deadline_consuming_quota_failure_advances_next_scan
 test_partial_quota_retries_are_uncapped_and_deduplicated
+test_delayed_quota_stop_recovery_requires_current_death
+test_live_published_quota_uses_new_event_identity
 test_partial_quota_journal_guards_fail_closed
 test_deliberate_exit_and_waits_are_skipped
 test_stale_exit_in_scrollback_still_relaunches

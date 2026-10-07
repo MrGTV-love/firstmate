@@ -24,10 +24,46 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=bin/fm-backend.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-backend.sh"
 
+fm_dispatch_omp_usage() {
+  local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
+  local session=${2:-} backend=${BACKEND:-} name names= present entry value usage
+  local unknown='{"reason":"destination OMP authentication scope is not established"}'
+  local selectors='HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME'
+  local assignments=() unset_args=()
+  case "$session" in *:*) printf '%s\n' "$unknown"; return ;; esac
+  if [ -z "$backend" ]; then
+    backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || { printf '%s\n' "$unknown"; return; }
+  fi
+  [ "$backend" = tmux ] || { printf '%s\n' "$unknown"; return; }
+  fm_worker_account_tmux_env '' "$session" readable || { printf '%s\n' "$unknown"; return; }
+  present=$(fm_config_source_present "$config/launch-env-allowlist") || { printf '%s\n' "$unknown"; return; }
+  if [ "$present" = 1 ]; then
+    names=$(fm_config_launch_env_names "$config") || { printf '%s\n' "$unknown"; return; }
+  fi
+  for name in $selectors; do
+    unset_args+=(-u "$name")
+    if [ "$name" != HOME ] && [ "$present" = 1 ]; then
+      case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) continue ;; esac
+    fi
+    entry=$(fm_worker_account_tmux_env "$name" "$session" assignment) || { printf '%s\n' "$unknown"; return; }
+    [ -n "$entry" ] || continue
+    value=${entry#*=}
+    case "$name" in
+      HOME|PI_CODING_AGENT_DIR|XDG_DATA_HOME|XDG_STATE_HOME|XDG_CACHE_HOME)
+        case "$value" in ''|/*) ;; *) printf '%s\n' "$unknown"; return ;; esac
+        ;;
+    esac
+    assignments+=("$entry")
+  done
+  usage=$(fm_run_timed 20 env "${unset_args[@]}" "${assignments[@]+"${assignments[@]}"}" omp usage --provider openai-codex --json 2>/dev/null </dev/null) || usage='{}'
+  [ -n "$usage" ] || usage='{}'
+  printf '%s\n' "$usage"
+}
+
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
   if [ -z "$usage" ]; then
-    usage=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || usage='{}'
+    usage=$(fm_dispatch_omp_usage)
   fi
   now=$(date +%s)
   printf '%s\n' "$usage" | jq -sc --arg model "${model#*/}" --argjson now "$now" '
@@ -71,26 +107,29 @@ fm_omp_codex_capacity() {
       end;
     def account:
       entitlement as $entitlement |
-      .fetchedAt as $fetched |
-      (.limits // [] | map(select(scoped))) as $scoped |
+      ((.metadata.headersUpdatedAt | type) == "number") as $merged |
+      (if $merged and $tier == "spark" then null else .fetchedAt end) as $fetched |
+      (if $merged and $tier == "spark" then [] else (.limits // [] | map(select(scoped))) end) as $scoped |
       ($scoped | map(select((.window.resetsAt | type) == "number" and
         ($fetched | type) == "number" and $fetched < .window.resetsAt and
         .window.resetsAt <= ($now * 1000)))) as $expired |
       ($scoped - $expired) as $limits |
-      (if ($expired | length) > 0 then {}
+      (if $merged or ($expired | length) > 0 then {}
        elif $tier == "chat" then (.metadata.meterStates.chat // .metadata // {})
        else (.metadata.meterStates.spark // {}) end) as $meter |
       (if $entitlement == "ineligible" then "ineligible"
        elif $entitlement == "unknown" or
             ($fetched | type) != "number" or $fetched < (($now - 300) * 1000)
        then "unknown"
+       elif $merged and any($limits[]; .status == "warning" and
+            (.amount | percent) != null and (.amount | percent) <= 0) then "usable"
        elif $meter.allowed == false or $meter.limitReached == true or
             any($limits[]; .status == "exhausted") then "exhausted"
        elif ($expired | length) > 0 then
          (if any($limits[]; (.amount | percent) != null and (.amount | percent) <= 0 and .status != "warning")
           then "exhausted" else "unknown" end)
        elif $meter.allowed == true and $meter.limitReached == false then "usable"
-       elif .metadata.source == "ratelimit-headers" and ($limits | length) > 0 and
+       elif ($limits | length) > 0 and
             all($limits[]; (.amount | percent) != null and
               ((.amount | percent) > 0 or .status == "warning")) then "usable"
        elif ($limits | length) > 0 and all($limits[]; (.amount | percent) != null) then
@@ -101,7 +140,9 @@ fm_omp_codex_capacity() {
        savedResets: (.resetCredits.availableCount // 0)};
     (if length == 1 and (.[0] | type) == "object" then .[0] else {} end) |
     if (.reports | type) != "array" then
-      {status: "unknown", accounts: [], reason: "omp usage failed or returned an invalid report"}
+      {status: "unknown", accounts: [], reason:
+        (if .reason == "destination OMP authentication scope is not established" then .reason
+         else "omp usage failed or returned an invalid report" end)}
     else
       [.reports[] | select(.provider == "openai-codex") | account] as $accounts |
       [(.accountsWithoutUsage // [])[] | select(.provider == "openai-codex")] as $missing |
@@ -155,7 +196,10 @@ fm_dispatch_claude_quota_unbound() {
 fm_dispatch_capacity() {
   local harness=$1 model=$2 quota config session=${4:-}
   case "$harness:$model" in
-    omp:openai-codex/*) fm_omp_codex_capacity "$model"; return ;;
+    omp:openai-codex/*)
+      quota=$(fm_dispatch_omp_usage "${3:-}" "$session")
+      fm_omp_codex_capacity "$model" "$quota"
+      return ;;
     claude:*)
       config=${3:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-$(cd "$FM_DISPATCH_CAPACITY_DIR/.." && pwd)}/config}}
       if fm_dispatch_claude_quota_unbound "$config" "$session"; then

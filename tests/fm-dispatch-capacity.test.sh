@@ -15,7 +15,16 @@ export FM_BACKEND=tmux
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
-  usage) cat "$OMP_USAGE_FIXTURE" ;;
+  usage)
+    if [ -n "${OMP_AUTH_SELECTOR:-}" ]; then
+      value=${!OMP_AUTH_SELECTOR:-}
+      [ "$OMP_AUTH_SELECTOR" != OMP_PROFILE ] || value=${OMP_PROFILE-${PI_PROFILE:-}}
+      if [ "$value" = "$OMP_AUTH_EXHAUSTED_VALUE" ]; then
+        cat "$OMP_AUTH_EXHAUSTED_FIXTURE"
+        exit
+      fi
+    fi
+    cat "$OMP_USAGE_FIXTURE" ;;
   models) printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}' ;;
   *) exit 2 ;;
 esac
@@ -189,6 +198,33 @@ for tier in chat spark; do
 done
 pass "reset-crossed snapshots invalidate meter verdicts without inferring replenished quota"
 
+for source in ratelimit-headers usage-endpoint; do
+  for current in warning positive exhausted; do
+    jq -n --argjson at "$(date +%s)" --arg source "$source" --arg current "$current" '
+      {reports:[{provider:"openai-codex",fetchedAt:($at*1000),
+        metadata:{planType:"pro",source:$source,headersUpdatedAt:($at*1000),
+          meterStates:{chat:{allowed:false,limitReached:true},spark:{allowed:false,limitReached:true}}},
+        limits:[
+          {id:"openai-codex:primary",status:(if $current=="warning" then "warning" elif $current=="positive" then "ok" else "exhausted" end),
+            window:{resetsAt:(($at+1000)*1000)},
+            amount:{unit:"percent",remaining:(if $current=="positive" then 80 else 0 end)}},
+          {id:"openai-codex:spark:primary",scope:{tier:"spark"},status:"exhausted",
+            window:{resetsAt:(($at-1)*1000)},amount:{unit:"percent",remaining:0}}]}]}' > "$OMP_USAGE_FIXTURE"
+    if [ "$current" = exhausted ]; then expected=exhausted; else expected=usable; fi
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+    assert_equals "$expected" "$(jq -r .status <<<"$out")" "merged $source chat $current supersedes retained meter verdicts"
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-5.3-codex-spark --json)
+    assert_equals unknown "$(jq -r .status <<<"$out")" "chat ingestion cannot re-date retained Spark exhaustion"
+    assert_equals null "$(jq -r '.accounts[0].remaining' <<<"$out")" "retained Spark limits have no current measurement provenance"
+  done
+done
+jq '.reports[0].limits[0].status="warning" |
+  .reports[0].limits += [{id:"openai-codex:secondary",status:"exhausted",amount:{unit:"percent",remaining:0}}]' \
+  "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/partial-headers.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/partial-headers.json")")
+assert_equals usable "$(jq -r .status <<<"$out")" "a current successful zero-percent header supersedes an untouched exhausted chat window"
+pass "merged native reports preserve current chat serving evidence without refreshing Spark provenance"
+
 primary='{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}'
 allowed='[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]'
 jq -n --argjson use "$primary" --argjson fallback "$allowed" '{rules:[{when:"easy work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
@@ -229,6 +265,52 @@ if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna h
   fail "Claude fallback without a supported TeamClaude requirement must refuse"
 fi
 pass "matrix fallback retains per-rule permission and strongest-model boundaries"
+
+write_pool 0
+export OMP_AUTH_EXHAUSTED_FIXTURE="$TMP_ROOT/auth-exhausted.json"
+cp "$OMP_USAGE_FIXTURE" "$OMP_AUTH_EXHAUSTED_FIXTURE"
+write_pool 98
+for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+  export OMP_AUTH_SELECTOR="$selector" OMP_AUTH_EXHAUSTED_VALUE="$TMP_ROOT/exhausted-scope"
+  case "$selector" in OMP_PROFILE|PI_PROFILE) export OMP_AUTH_EXHAUSTED_VALUE=exhausted-profile ;; esac
+  out=$(env "$selector=$OMP_AUTH_EXHAUSTED_VALUE" "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  assert_equals usable "$(jq -r .status <<<"$out")" "caller-only $selector must not select the worker's authentication"
+  printf '%s=%s\n' "$selector" "$OMP_AUTH_EXHAUSTED_VALUE" > "$TMP_ROOT/tmux-global-env"
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed")
+  assert_equals true "$(jq -r .switched <<<"$out")" "destination $selector exhaustion must authorize declared fallback"
+  printf -- '-%s\n' "$selector" > "$TMP_ROOT/tmux-session-env"
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed")
+  assert_equals false "$(jq -r .switched <<<"$out")" "session removal must override global $selector"
+  printf '%s=%s\n' "$selector" "$OMP_AUTH_EXHAUSTED_VALUE" > "$TMP_ROOT/tmux-session-env"
+  printf '# filtered selectors\n' > "$TMP_ROOT/config/launch-env-allowlist"
+  out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+  if [ "$selector" = HOME ]; then expected=exhausted; else expected=usable; fi
+  assert_equals "$expected" "$(jq -r .status <<<"$out")" "$selector must follow launch filtering and the HOME floor"
+  printf '%s\n' "$selector" > "$TMP_ROOT/config/launch-env-allowlist"
+  out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+  assert_equals exhausted "$(jq -r .status <<<"$out")" "retained destination $selector must measure its own pool"
+  rm "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/config/launch-env-allowlist"
+done
+export OMP_AUTH_SELECTOR=OMP_PROFILE OMP_AUTH_EXHAUSTED_VALUE=exhausted-profile
+printf 'PI_PROFILE=exhausted-profile\n' > "$TMP_ROOT/tmux-global-env"
+printf 'OMP_PROFILE=\n' > "$TMP_ROOT/tmux-session-env"
+out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+assert_equals usable "$(jq -r .status <<<"$out")" "explicit empty OMP_PROFILE must override the legacy PI_PROFILE"
+printf -- '-OMP_PROFILE\n' > "$TMP_ROOT/tmux-session-env"
+out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+assert_equals exhausted "$(jq -r .status <<<"$out")" "removed OMP_PROFILE must allow destination PI_PROFILE selection"
+rm "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env"
+unset OMP_AUTH_SELECTOR OMP_AUTH_EXHAUSTED_VALUE OMP_AUTH_EXHAUSTED_FIXTURE
+for scope in adopted unreadable daemon; do
+  case "$scope" in
+    adopted) out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" recorded:fm-existing.0) ;;
+    unreadable) out=$(FM_FAKE_TMUX_UNREADABLE=1 fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config") ;;
+    daemon) out=$(BACKEND=herdr fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config") ;;
+  esac
+  assert_equals unknown "$(jq -r .status <<<"$out")" "$scope authentication must not borrow caller capacity"
+  assert_contains "$(jq -r .reason <<<"$out")" 'authentication scope' "unknown capacity must disclose its binding limitation"
+done
+pass "OMP pooled measurements bind destination selectors, profile emptiness, and launch filtering"
 
 for container in scalar array; do
   for use in '{"harness":"claude"}' '{"harness":"claude","model":"","effort":""}' '{"harness":"claude","model":"default","effort":"default"}'; do

@@ -9,6 +9,7 @@
 # at all.
 set -u
 unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+unset PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -36,9 +37,16 @@ cat > "$FAKEBIN/tmux" <<'SH'
 case "$1" in
   has-session) exit 0 ;;
   show-environment)
+    [ "${FM_AUTH_UNREADABLE:-0}" = 0 ] || exit 1
     if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
-    [ -f "$FM_AUTH_DESTINATION" ] || exit 1
-    cat "$FM_AUTH_DESTINATION" ;;
+    name=${!#}
+    file=$FM_AUTH_DESTINATION
+    [ "$2" != -g ] || file=$FM_AUTH_DESTINATION.global
+    [ -f "$file" ] || exit 1
+    while IFS= read -r entry; do
+      case "$entry" in "$name"=*|-"$name") printf '%s\n' "$entry"; exit 0 ;; esac
+    done < "$file"
+    exit 1 ;;
   *) exit 1 ;;
 esac
 SH
@@ -185,7 +193,24 @@ chmod +x "$FAKEBIN/quota-axi"
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
-  usage) cat "${OMP_USAGE_FIXTURE:?}" ;;
+  usage)
+    [ "${OMP_USAGE_FAIL:-0}" = 0 ] || exit 7
+    [ "${OMP_USAGE_EMPTY:-0}" = 0 ] || exit 0
+    if [ "${OMP_USAGE_INVALID:-0}" != 0 ]; then printf 'not-json\n'; exit 0; fi
+    if [ -n "${OMP_AUTH_SELECTOR:-}" ]; then
+      if [ "$OMP_AUTH_SELECTOR" = profile ]; then
+        observed="profile=${OMP_PROFILE-${PI_PROFILE-}}"
+      elif [ "${!OMP_AUTH_SELECTOR+x}" = x ]; then
+        observed="$OMP_AUTH_SELECTOR=${!OMP_AUTH_SELECTOR}"
+      else
+        observed="-$OMP_AUTH_SELECTOR"
+      fi
+      if [ "$observed" != "$OMP_AUTH_EXPECTED" ]; then
+        jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE"
+        exit 0
+      fi
+    fi
+    cat "${OMP_USAGE_FIXTURE:?}" ;;
   models) printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}' ;;
   *) exit 2 ;;
 esac
@@ -1529,6 +1554,67 @@ TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code o
 assert_contains "$out" '  status: clear' "the pooled sibling clears single-account exhaustion"
 assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a healthy pool retains Luna"
 assert_contains "$out" "--dispatch-rule 'rule_4'" "the launch carries the selected fallback policy"
+saved_home=$HOME
+for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+  case "$selector" in
+    OMP_PROFILE|PI_PROFILE) caller=caller; destination=destination ;;
+    PI_CONFIG_DIR) caller=.caller-omp; destination=.destination-omp ;;
+    *) caller="$TMP_ROOT/caller-auth"; destination="$TMP_ROOT/destination-auth" ;;
+  esac
+  export "$selector=$caller"
+  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION"
+  printf '%s=%s\n' "$selector" "$caller" > "$FM_AUTH_DESTINATION.global"
+  reset_log
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF"
+  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$selector destination headroom retains Luna despite caller exhaustion"
+  reset_log
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" run code out err "$BRIEF"
+  assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "$selector destination exhaustion cannot borrow caller headroom"
+  printf '%s\n' PATH > "$HOME_DIR/config/launch-env-allowlist"
+  if [ "$selector" = HOME ]; then expected="$selector=$destination"; else expected="-$selector"; fi
+  reset_log
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$expected" run code out err "$BRIEF"
+  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$selector follows the launch allowlist with HOME retained"
+  rm "$HOME_DIR/config/launch-env-allowlist"
+  printf -- '-%s\n' "$selector" > "$FM_AUTH_DESTINATION"
+  reset_log
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="-$selector" run code out err "$BRIEF"
+  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "removed $selector suppresses caller and global auth"
+  rm "$FM_AUTH_DESTINATION"
+  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION.global"
+  reset_log
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF"
+  assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "absent session $selector inherits destination global auth"
+  rm "$FM_AUTH_DESTINATION.global"
+  unset "$selector"
+  export HOME=$saved_home
+done
+printf '%s\n' 'OMP_PROFILE=' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
+reset_log
+TYPESAFE_API_KEY=$KEY OMP_PROFILE=caller PI_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile= \
+  run code out err "$BRIEF"
+assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "explicit empty canonical profile suppresses legacy profile"
+printf '%s\n' '-OMP_PROFILE' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
+reset_log
+TYPESAFE_API_KEY=$KEY OMP_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile=legacy \
+  run code out err "$BRIEF"
+assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "removed canonical profile permits destination legacy profile"
+rm "$FM_AUTH_DESTINATION"
+for scope_failure in unreadable backend relative usage empty invalid; do
+  reset_log
+  case "$scope_failure" in
+    unreadable) TYPESAFE_API_KEY=$KEY FM_AUTH_UNREADABLE=1 run code out err "$BRIEF" ;;
+    backend) TYPESAFE_API_KEY=$KEY FM_BACKEND=herdr run code out err "$BRIEF" ;;
+    relative) printf '%s\n' 'PI_CODING_AGENT_DIR=relative-root' > "$FM_AUTH_DESTINATION"
+      TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"; rm "$FM_AUTH_DESTINATION" ;;
+    usage) TYPESAFE_API_KEY=$KEY OMP_USAGE_FAIL=1 run code out err "$BRIEF" ;;
+    empty) TYPESAFE_API_KEY=$KEY OMP_USAGE_EMPTY=1 run code out err "$BRIEF" ;;
+    invalid) TYPESAFE_API_KEY=$KEY OMP_USAGE_INVALID=1 run code out err "$BRIEF" ;;
+  esac
+  assert_contains "$out" '  status: escalate' "$scope_failure OMP evidence is unknown"
+  assert_not_contains "$out" '  profile:' "$scope_failure cannot authorize primary or paid stand-in"
+done
+pass "OMP resolver acquisition follows destination auth selectors, precedence, allowlist and uncertainty"
 jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/all-empty.json"
 mv "$TMP_ROOT/all-empty.json" "$OMP_USAGE_FIXTURE"
 reset_log

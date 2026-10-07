@@ -471,7 +471,7 @@ omp_models=$(jq -r '[(.rules[]?.use // []), (.default // [])] | .[] |
   (if type == "array" then .[] else . end) |
   select(.harness == "omp" and (.model // "" | startswith("openai-codex/"))) | .model' "$RULES" | sort -u)
 if [ -n "$omp_models" ]; then
-  omp_usage=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || omp_usage='{}'
+  omp_usage=$(fm_dispatch_omp_usage "$CONFIG") || omp_usage='{}'
   while IFS= read -r omp_model; do
     omp_capacity=$(fm_omp_codex_capacity "$omp_model" "$omp_usage")
     OMP_POOLS=$(jq -cn --argjson pools "$OMP_POOLS" --arg m "$omp_model" --argjson capacity "$omp_capacity" '$pools + {($m): $capacity}')

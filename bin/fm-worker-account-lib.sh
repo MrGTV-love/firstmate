@@ -343,6 +343,10 @@ fm_worker_account_tmux_env() {
     scope=global
   fi
   [ -n "$scope" ] || return 0
+  if [ "$mode" = assignment ]; then
+    case "$entry" in "$name"=*) printf '%s\n' "$entry" ;; esac
+    return 0
+  fi
   case "$entry" in
     "$name"=?*)
       if [ "$mode" = value ]; then

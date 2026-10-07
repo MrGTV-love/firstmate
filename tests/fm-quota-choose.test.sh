@@ -3,6 +3,7 @@
 # Drives the public argv interface with a mocked quota-axi JSON source.
 set -u
 unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+unset PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -68,9 +69,16 @@ cat > "$FAKEBIN/tmux" <<'SH'
 case "$1" in
   has-session) exit 0 ;;
   show-environment)
+    [ "${FM_AUTH_UNREADABLE:-0}" = 0 ] || exit 1
     if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
-    [ -f "$FM_AUTH_DESTINATION" ] || exit 1
-    cat "$FM_AUTH_DESTINATION" ;;
+    name=${!#}
+    file=$FM_AUTH_DESTINATION
+    [ "$2" != -g ] || file=$FM_AUTH_DESTINATION.global
+    [ -f "$file" ] || exit 1
+    while IFS= read -r entry; do
+      case "$entry" in "$name"=*|-"$name") printf '%s\n' "$entry"; exit 0 ;; esac
+    done < "$file"
+    exit 1 ;;
   *) exit 1 ;;
 esac
 SH
@@ -78,7 +86,21 @@ chmod +x "$FAKEBIN/tmux"
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 [ "$1" = usage ] || exit 2
-jq -n --argjson now "$(date +%s)" --argjson remaining "${OMP_POOL_REMAINING:-20}" '
+[ "${OMP_USAGE_FAIL:-0}" = 0 ] || exit 7
+[ "${OMP_USAGE_EMPTY:-0}" = 0 ] || exit 0
+if [ "${OMP_USAGE_INVALID:-0}" != 0 ]; then printf 'not-json\n'; exit 0; fi
+remaining=${OMP_POOL_REMAINING:-20}
+if [ -n "${OMP_AUTH_SELECTOR:-}" ]; then
+  if [ "$OMP_AUTH_SELECTOR" = profile ]; then
+    observed="profile=${OMP_PROFILE-${PI_PROFILE-}}"
+  elif [ "${!OMP_AUTH_SELECTOR+x}" = x ]; then
+    observed="$OMP_AUTH_SELECTOR=${!OMP_AUTH_SELECTOR}"
+  else
+    observed="-$OMP_AUTH_SELECTOR"
+  fi
+  [ "$observed" = "$OMP_AUTH_EXPECTED" ] || remaining=0
+fi
+jq -n --argjson now "$(date +%s)" --argjson remaining "$remaining" '
   {reports:[{provider:"openai-codex",fetchedAt:($now*1000),
     limits:[{scope:{shared:true},amount:{unit:"percent",remaining:$remaining}}]}]}'
 SH
@@ -255,6 +277,67 @@ jq '(.providers[] | select(.provider == "codex").quotaSemantics.effectiveAvailab
 out=$(call_choose --snapshot "$LAB/single-exhausted.json" --candidate omp:openai-codex/gpt-6.1-sol)
 [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "a healthy OMP sibling must survive single-account exhaustion: '$out'"
 ok "OMP Codex uses its pooled accounts rather than the single-account snapshot"
+saved_home=$HOME
+for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+  case "$selector" in
+    OMP_PROFILE|PI_PROFILE) caller=caller; destination=destination ;;
+    PI_CONFIG_DIR) caller=.caller-omp; destination=.destination-omp ;;
+    *) caller="$LAB/caller-auth"; destination="$LAB/destination-auth" ;;
+  esac
+  export "$selector=$caller"
+  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION"
+  printf '%s=%s\n' "$selector" "$caller" > "$FM_AUTH_DESTINATION.global"
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" call_choose --snapshot "$LAB/single-exhausted.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna)
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector did not use destination headroom: $out"
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" call_choose --snapshot "$LAB/captured.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol --candidate claude:default)
+  [ "$out" = "claude default" ] || fail "$selector borrowed caller headroom for exhausted destination: $out"
+  printf '%s\n' PATH > "$LAB/home/config/launch-env-allowlist"
+  if [ "$selector" = HOME ]; then expected="$selector=$destination"; else expected="-$selector"; fi
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$expected" call_choose --snapshot "$LAB/single-exhausted.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol)
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector did not follow allowlist with HOME retained: $out"
+  rm "$LAB/home/config/launch-env-allowlist"
+  printf -- '-%s\n' "$selector" > "$FM_AUTH_DESTINATION"
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="-$selector" call_choose --snapshot "$LAB/single-exhausted.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol)
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "removed $selector leaked caller/global auth: $out"
+  rm "$FM_AUTH_DESTINATION"
+  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION.global"
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" call_choose --snapshot "$LAB/single-exhausted.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol)
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "global $selector did not supply absent session entry: $out"
+  rm "$FM_AUTH_DESTINATION.global"
+  unset "$selector"
+  export HOME=$saved_home
+done
+printf '%s\n' 'OMP_PROFILE=' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
+out=$(OMP_PROFILE=caller PI_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile= \
+  call_choose --snapshot "$LAB/single-exhausted.json" --candidate omp:openai-codex/gpt-6.1-sol)
+[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "empty OMP_PROFILE inherited legacy/caller profile: $out"
+printf '%s\n' '-OMP_PROFILE' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
+out=$(OMP_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile=legacy \
+  call_choose --snapshot "$LAB/single-exhausted.json" --candidate omp:openai-codex/gpt-6.1-sol)
+[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "removed OMP_PROFILE failed to select destination legacy profile: $out"
+rm "$FM_AUTH_DESTINATION"
+for scope_failure in unreadable backend relative usage empty invalid; do
+  case "$scope_failure" in
+    unreadable) out=$(FM_AUTH_UNREADABLE=1 call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/gpt-6.1-sol 2>/dev/null); rc=$? ;;
+    backend) out=$(FM_BACKEND=herdr call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/gpt-6.1-sol 2>/dev/null); rc=$? ;;
+    relative) printf '%s\n' 'PI_CODING_AGENT_DIR=relative-root' > "$FM_AUTH_DESTINATION"
+      out=$(call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/gpt-6.1-sol 2>/dev/null)
+      rc=$?; rm "$FM_AUTH_DESTINATION" ;;
+    usage) out=$(OMP_USAGE_FAIL=1 call_choose --snapshot "$LAB/captured.json" \
+      --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna 2>/dev/null); rc=$? ;;
+    empty) out=$(OMP_USAGE_EMPTY=1 call_choose --snapshot "$LAB/captured.json" \
+      --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna 2>/dev/null); rc=$? ;;
+    invalid) out=$(OMP_USAGE_INVALID=1 call_choose --snapshot "$LAB/captured.json" \
+      --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna 2>/dev/null); rc=$? ;;
+  esac
+  [ "$rc:$out" = 1:none ] || fail "$scope_failure OMP scope unexpectedly dispatched: $rc:$out"
+done
+ok "OMP chooser acquisition follows destination selectors, precedence, allowlist and uncertainty"
 
 if err=$(call_choose --snapshot "$LAB/captured.json" --candidate omp:ollama/qwen3:8b --candidate claude:claude-3-5-sonnet 2>&1); then
   fail "unmapped omp prefix unexpectedly selected a later candidate"
