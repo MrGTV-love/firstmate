@@ -2096,6 +2096,10 @@ fm_composer_submit_retry_core() {  # <send-key-fn> <state-fn> <target> <retries>
   done
 }
 
+# Busy work alone cannot prove that Enter accepted retained text.
+# Only OpenCode's verified mid-turn queue semantics permit this conversion;
+# adapters must supply positive harness identity and a generating busy signal.
+# Unproven composer content never receives a queued-delivery acknowledgement.
 fm_composer_queued_enter_verdict() {
   local state=$1 busy=${2:-} harness=${3:-}
   [ "$state" = pending ] || { printf '%s' "$state"; return 0; }

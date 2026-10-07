@@ -86,7 +86,7 @@ The supervisor guard selects only the detected primary harness's signature rathe
 `bin/fm-tmux-lib.sh` owns exact type-and-submit mechanics.
 It types a message once and retries Enter only until the composer clears.
 Before any retry after pending or unproven pending, it refreshes the composer verdict; a fresh empty or unreadable composer receives no further Enter.
-Only a proven empty composer is a positive delivery acknowledgement.
+The submit primitive returns `empty` only after composer-clearance proof or one of the delivery-proof exceptions below.
 Text left in established structure remains `pending`, text in ambiguous structure remains unproven, and unreadable or unsafe state remains unknown.
 An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
