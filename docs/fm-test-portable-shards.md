@@ -64,6 +64,7 @@ Three supplemental hints come from completed successful shards of the partial [r
 All three shard summaries report `failed=0`, and each measured row reports `exit=0` and `gate_skip=false`.
 The new `tests/fm-omp-wake-restore-live-e2e.test.sh` hint is its successful 51 ms record from portable serial shard 3 of [run 37663635202](https://github.com/MrGTV-love/firstmate/actions/runs/37663635202) on 2026-10-07.
 That shard completed with zero failures; the live test took its opt-in capability skip, so this hint models ordinary portable CI gate evaluation, not live wake-recovery runtime.
+Thirteen further hints come from the complete green [run 37404365422](https://github.com/MrGTV-love/firstmate/actions/runs/37404365422), whose nine serial shard summaries all report `failed=0`: every then-unhinted serial script that run measured with `exit=0` and `gate_skip=false`, added when the lane gained `tests/fm-cpu-pass.test.sh` and `tests/fm-load-report.test.sh`.
 An unfinished or failed invocation is not a healthy duration sample.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.

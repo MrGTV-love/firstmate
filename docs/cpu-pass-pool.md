@@ -1,0 +1,63 @@
+# CPU pass pool
+
+The CPU pass pool is one host-wide budget for CPU-heavy test bursts.
+A test script, a parallel test worker, or a load test takes a pass before it runs and returns it when it ends.
+When every pass is held, the next burst waits for one instead of adding to the run queue.
+
+The pool bounds bursts, not agents.
+Interactive agents, lanes, and sessions never ask for a pass and are never queued or capped.
+Only the work that swings host load - suites sized to every core in every copy, parallel test workers, deliberate load generation - takes turns.
+
+This page owns the cross-repository protocol.
+`bin/fm-cpu-pass.sh` is its reference implementation, and its engine header (`bin/fm-cpu-pass.py`, also `bin/fm-cpu-pass.sh --help`) owns the command's waiting, notice, signal, and exit-status behavior.
+
+## Why file locks
+
+The pool uses Python's standard-library `fcntl.flock` over one lock file per pass, not GNU parallel's `sem`.
+A kernel file lock is released when its holder exits for any reason, including `SIGKILL`, so a crashed or killed test can never leak a pass and the pool has no stale state to repair; `sem` keeps its own bookkeeping that must notice dead holders.
+`python3` is already a runtime dependency of Firstmate's runner and of the Python projects that will join the pool, so the pool adds no new install, while `sem` would add Perl-based GNU parallel and its citation prompt to every host and CI image.
+Any language with `flock` can join the protocol below without calling a Firstmate script.
+
+## Protocol
+
+Every participant on a host follows these rules, so one pool is shared by every Firstmate home, worktree, and repository of the same user.
+
+1. **Directory:** `FM_CPU_POOL_DIR` when set, else `$HOME/.cache/fm-cpu-pool`, created with mode `0700` and owned by the user.
+2. **Size:** `FM_CPU_POOL_SIZE` when set to a positive integer, else the host's logical CPU count (`os.cpu_count()`, which is `hw.ncpu` on macOS).
+   Load average does not shrink the pool: it includes interactive sessions that never take passes, so a load-based gate would hold tests back indefinitely on a host whose baseline load comes from idle sessions.
+3. **Passes:** pass `i` is an exclusive, non-blocking `flock` on `slot-<i>.lock` for `i` in `0..size-1`.
+   A holder may write one line into each slot it holds, `pid=<pid> passes=<k> since=<epoch> label=<text>`, for status display.
+4. **Turnstile:** a request first takes an exclusive `flock` on `turnstile.lock`, then collects slots until it holds all it asked for, keeping the slots it already holds, then releases the turnstile.
+   Only the turnstile holder collects, so two multi-pass requests cannot deadlock and a large request is not starved by small ones.
+   Both locks are polled with backoff; a request queues and never fails for lack of a pass.
+5. **Count:** a request asks for as many passes as the CPU-bound workers it will run (one for one test script, `W` for `pytest -n W`), clamped to the pool size.
+6. **Nested work:** a holder exports `FM_CPU_PASS_HELD=<k>` to the work it runs.
+   A participant that finds `FM_CPU_PASS_HELD` set runs without taking a pass, because it is already inside one; taking another could deadlock a full pool.
+7. **Opt-out:** `FM_CPU_POOL=off` runs work directly with no pass.
+8. **Degrade, never block:** a participant that cannot use the pool (no `flock`, no pool directory, a foreign-owned directory) runs its work without a pass and says so once.
+   The pool governs throughput; it is not a safety boundary, and a broken pool must not stop every test on the host.
+9. **Waiting stays outside work bounds:** take passes before starting any per-test or per-worker timeout, so time spent queued never counts toward that timeout.
+   A caller's own overall budget, such as a harness command limit, still includes the wait.
+
+## Calling it
+
+From a shell, with Firstmate's `bin/` reachable:
+
+```sh
+bin/fm-cpu-pass.sh run --passes 4 --label "my-suite" -- pytest -n 4
+bin/fm-cpu-pass.sh status
+bin/fm-cpu-pass.sh size
+```
+
+A repository that cannot assume a Firstmate checkout implements the protocol directly with its language's `flock`, as rules 1-9 describe.
+Firstmate's own `bin/fm-test-run.sh` takes one pass per executed test script, outside its per-script bound, and runs directly when it is already inside a pass or the pool is off; its header owns that wiring.
+
+## Judging the pool
+
+`bin/fm-load-report.sh` records host load and reads pipeline agent durations so a change to the pool can be judged on data; its engine header owns the sample format and verdict rules.
+
+1. When the change lands, note the time with `date +%s` and start one recorder per host: `nohup bin/fm-load-report.sh watch --interval 60 >/dev/null 2>&1 &`.
+2. After 24 to 48 hours of normal fleet work, run `bin/fm-load-report.sh report --since <that epoch>`.
+3. Read its two verdicts: `load_within_2x_cpus` (1-minute load p95 at or under twice the CPU count) and `converged_within_2_fix_rounds` (the latest ten pipeline runs that reached review needed at most two review-fix rounds and none hit a timeout).
+   Its list of timeout-class run errors should be empty.
+4. Stop the recorder when the window closes.

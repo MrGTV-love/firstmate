@@ -120,6 +120,14 @@
 # configuration, including one that sources no test helper of its own;
 # tests/git-config-helpers.sh owns that contract and its limits.
 #
+# Every executed script first takes one pass from the host-wide CPU pass pool
+# (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
+# per-script bound, so test bursts from every worktree on the host take turns.
+# A runner already inside a pass (FM_CPU_PASS_HELD set), opted out with
+# FM_CPU_POOL=off, without python3, or copied without the pool tool beside it
+# runs its scripts directly. --jobs above the pool size still starts that many
+# workers, but only pool-size scripts run at once.
+#
 # Family labels, the changed-file map, and production portable-shard composition
 # live in this script only (one owner). The proven-isolated candidate set remains
 # owned by bin/fm-test-isolation-proof.sh; portable parallel shards are a
@@ -717,6 +725,7 @@ tests/fm-calm-claude-mod-live-e2e.test.sh 46
 tests/fm-calm-claude-mod-plugin.test.sh 172
 tests/fm-calm-claude-mod.test.sh 1252
 tests/fm-calm-pi-extension.test.sh 45128
+tests/fm-calm-pi-queue-retention-live-e2e.test.sh 1226
 tests/fm-check-unregister.test.sh 464
 tests/fm-ci-workflow.test.sh 2073
 tests/fm-classify-corr-token.test.sh 49294
@@ -736,15 +745,19 @@ tests/fm-cursor-harness.test.sh 30212
 tests/fm-cursor-primary-live-e2e.test.sh 72
 tests/fm-cursor-primary.test.sh 52269
 tests/fm-daemon.test.sh 27262
+tests/fm-devin-harness.test.sh 3651
 tests/fm-dispatch-resolve.test.sh 4397
 tests/fm-documentation-audiences.test.sh 847
 tests/fm-dod-lib.test.sh 4000
 tests/fm-extension-binding.test.sh 9053
+tests/fm-fleet-ledger.test.sh 20284
 tests/fm-fleet-snapshot-view.test.sh 17465
 tests/fm-fleet-sync.test.sh 35983
 tests/fm-forge-detect.test.sh 160
+tests/fm-fork-free-helpers.test.sh 795
 tests/fm-gate-refuse.test.sh 5328
 tests/fm-gemini-harness.test.sh 938
+tests/fm-git-strip-ai-trailers.test.sh 2500
 tests/fm-gitignore-config.test.sh 58
 tests/fm-gotmp.test.sh 1320
 tests/fm-grok-continuity-live-e2e.test.sh 45
@@ -759,7 +772,9 @@ tests/fm-herdr-session-cleanup.test.sh 6828
 tests/fm-herdr-submit-confirm-live-e2e.test.sh 46
 tests/fm-herdr-version-floor-live-e2e.test.sh 72
 tests/fm-home-summary-refresh.test.sh 37264
+tests/fm-host-mirror.test.sh 10591
 tests/fm-inactive-reconcile.test.sh 53178
+tests/fm-inbox.test.sh 5227
 tests/fm-kimi-harness.test.sh 19151
 tests/fm-lint-workflows.test.sh 785
 tests/fm-live-gate.test.sh 1755
@@ -804,6 +819,7 @@ tests/fm-remote-job.test.sh 59354
 tests/fm-remote-reply.test.sh 118669
 tests/fm-remote-secondmate-lifecycle-e2e.test.sh 241208
 tests/fm-remote-secondmate-parent-binding.test.sh 32176
+tests/fm-remote-secondmate-relaunch.test.sh 817
 tests/fm-remote-secondmate-trace-context.test.sh 59689
 tests/fm-remote-transport-lanes.test.sh 62635
 tests/fm-rovo-harness.test.sh 14322
@@ -831,7 +847,10 @@ tests/fm-sessionstart-hook-live-e2e.test.sh 97
 tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh 46
 tests/fm-sessionstart-nudge.test.sh 66247
 tests/fm-shared-captain-inheritance.test.sh 5687
+tests/fm-spawn-compact-adviser-disable-remote.test.sh 49944
+tests/fm-spawn-compact-adviser-disable.test.sh 24211
 tests/fm-spawn-dispatch-profile.test.sh 138433
+tests/fm-spawn-orca-worktree.test.sh 2433
 tests/fm-spawn-pool-base-freshen.test.sh 62249
 tests/fm-spawn-worktree-settle.test.sh 8482
 tests/fm-startup-memory-budget.test.sh 7392
@@ -872,6 +891,8 @@ tests/fm-watch-checkpoint.test.sh 6076
 tests/fm-watch-recovery-loop.test.sh 58946
 tests/fm-watch-triage.test.sh 697969
 tests/fm-watcher-lock.test.sh 108940
+tests/fm-worker-account-live-e2e.test.sh 2462
+tests/fm-worker-account.test.sh 37607
 EOF
 }
 
@@ -2372,9 +2393,20 @@ fi
 
 if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
   [ -r "$ROOT/bin/fm-timeout-lib.sh" ] || die "per-script timeout helper not found: bin/fm-timeout-lib.sh"
-  # shellcheck source=bin/fm-timeout-lib.sh
-  . "$ROOT/bin/fm-timeout-lib.sh"
 fi
+
+# CPU pass pool wiring; the header owns when scripts run without a pass.
+# fd 8 keeps the pool's wait notices on this runner's stderr.
+CPU_PASS_ACTIVE=1
+CPU_PASS_LOG_FD=8
+if [ -n "${FM_CPU_PASS_HELD+x}" ] || [ "${FM_CPU_POOL:-}" = off ] \
+  || [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
+  CPU_PASS_ACTIVE=0
+elif ! command -v python3 >/dev/null 2>&1; then
+  CPU_PASS_ACTIVE=0
+  log "running without CPU passes: python3 not found"
+fi
+exec 8>&2
 
 RUN_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run.XXXXXX")
 RECORDS="$RUN_TMP/records.tsv"
@@ -2475,6 +2507,9 @@ record_script_result() {
 # positive, a script that outruns it is terminated and reported as exit 124: a
 # hung script must become a bounded failure rather than an unbounded suite,
 # because an unbounded suite is what silently outruns its caller's budget.
+# When the CPU pass pool is active (see the header) the script's pass is taken
+# outside the per-script bound, so waiting for a pass never counts toward it;
+# the recorded duration and --max-wall-ms still include the wait.
 run_script_bounded() {  # <script> <out> <stream> <id>
   local script=$1 out=$2 stream=$3 id=$4
   # Declaring the variables local first keeps the helper's export scoped to this
@@ -2484,26 +2519,32 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc
+  local -a cmd
   : "$id"
+  if [ "$stream" -eq 1 ]; then
+    # Expansion is intentionally deferred to the child bash passed to -c.
+    # shellcheck disable=SC2016
+    cmd=(bash -c 'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out")
+  else
+    cmd=(bash "$script")
+  fi
+  if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
+    # The bound runs inside the pass holder so the pass wait stays outside it.
+    # shellcheck disable=SC2016
+    cmd=(bash -c '. "$1" || exit 125; shift; fm_run_timed "$@"' _ \
+      "$ROOT/bin/fm-timeout-lib.sh" "$PER_SCRIPT_TIMEOUT_SECS" "${cmd[@]}")
+  fi
+  if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
+    cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
+      --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
+  fi
   set +e
   if [ "$stream" -eq 1 ]; then
-    if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
-      # Expansion is intentionally deferred to the child bash passed to -c.
-      # shellcheck disable=SC2016
-      fm_run_timed "$PER_SCRIPT_TIMEOUT_SECS" bash -c \
-        'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out"
-      rc=$?
-    else
-      bash "$script" 2>&1 | tee "$out"
-      rc=${PIPESTATUS[0]}
-    fi
-  elif [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
-    fm_run_timed "$PER_SCRIPT_TIMEOUT_SECS" bash "$script" >"$out" 2>&1
-    rc=$?
+    "${cmd[@]}"
   else
-    bash "$script" >"$out" 2>&1
-    rc=$?
+    "${cmd[@]}" >"$out" 2>&1
   fi
+  rc=$?
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ] && [ "$rc" -eq 124 ]; then
     printf 'not ok - %s exceeded the per-script bound of %ss and was terminated\n' \
       "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"
