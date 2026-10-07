@@ -67,7 +67,7 @@
 #            registered until its owner concludes it with `handled`.
 # reconcile  Idempotent liveness entry the watcher calls on its ordinary cycle:
 #            republish every durably captured result with no handled
-#            acknowledgement yet - regardless of any earlier publication - and
+#            acknowledgement yet unless its wake is still queued, and
 #            start a runner for any registered source that has no live owner and
 #            no open task-owned round. This is liveness repair only - it never
 #            discovers results by
@@ -806,9 +806,9 @@ cmd_register_extension() {
 
 # Publish every durably captured result with no handled acknowledgement yet.
 # Capture already happened, so this only turns durable state into durable
-# events - and it republishes on every call regardless of any earlier
-# publication, so a result stays eligible for re-announcement across restarts
-# and drains until `fm_procevent_mark_handled` records it.
+# events, coalescing a result's wake while it remains queued.
+# After a drain acknowledges that wake, an unhandled result is eligible for
+# re-announcement until `fm_procevent_mark_handled` records it.
 publish_result() {  # <result-file>
   local result=$1 id seq adapter line status=1 owner_task='' message='' record=''
   local ring_backend ring_target ring_meta inbox_dir handled_dir pre_existing existing new_record
@@ -891,9 +891,15 @@ EOF
       esac
     fi
     unset FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
-    if fm_wake_append check "procevent:$id:$seq" "check: $line"; then
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    if awk -F '\t' -v key="procevent:$id:$seq" \
+      'NF >= 5 && $3 == "check" && $4 == key { found=1; exit } END { exit !found }' \
+      "$FM_WAKE_QUEUE" 2>/dev/null; then
+      status=0
+    elif fm_wake_append_locked check "procevent:$id:$seq" "check: $line"; then
       status=0
     fi
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   fi
   fm_procevent_source_lock_release "$id"
   return "$status"
