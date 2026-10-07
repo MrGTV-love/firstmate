@@ -18,31 +18,42 @@ mkdir -p "$LAVISH_AXI_STATE_DIR"
 NATIVE_BIN=$(fm_fakebin "$TMP_ROOT/native")
 export PATH="$NATIVE_BIN:$PATH"
 OWNED_PID=''
-OWNED_IDENTITY=''
+OWNED_MEMBERS=()
+OWNED_IDENTITIES=()
 own_group() {
-  local pid=$1 identity
+  local pid=$1 member identity
   [ -z "$OWNED_PID" ] || fail "previous owned generation was not released"
-  identity=$(fm_test_pid_identity "$pid") || fail "could not identify owned runner $pid"
-  [ -n "$identity" ] || fail "owned runner $pid has no identity"
-  assert_equals "$pid" "$(ps -o pgid= -p "$pid" | tr -d '[:space:]')" \
-    "owned runner leads its current process group"
-  OWNED_PID=$pid
-  OWNED_IDENTITY=$identity
+  for member in "$@"; do
+    identity=$(fm_test_pid_identity "$member") || fail "could not identify owned member $member"
+    [ -n "$identity" ] || fail "owned member $member has no identity"
+    assert_equals "$pid" "$(ps -o pgid= -p "$member" | tr -d '[:space:]')" \
+      "owned member belongs to its current runner group"
+    OWNED_PID=$pid
+    OWNED_MEMBERS+=("$member")
+    OWNED_IDENTITIES+=("$identity")
+  done
 }
 forget_group() {
   assert_equals "$OWNED_PID" "$1" "released group is the current owned generation"
   OWNED_PID=''
-  OWNED_IDENTITY=''
+  OWNED_MEMBERS=()
+  OWNED_IDENTITIES=()
+}
+signal_owned_group() {
+  local i identity pgid
+  [ -n "$OWNED_PID" ] || return 1
+  for ((i = 0; i < ${#OWNED_MEMBERS[@]}; i++)); do
+    identity=$(fm_test_pid_identity "${OWNED_MEMBERS[$i]}" 2>/dev/null) || identity=''
+    pgid=$(ps -o pgid= -p "${OWNED_MEMBERS[$i]}" 2>/dev/null | tr -d '[:space:]')
+    if [ "$identity" = "${OWNED_IDENTITIES[$i]}" ] && [ "$pgid" = "$OWNED_PID" ]; then
+      kill -KILL -"$OWNED_PID" 2>/dev/null
+      return
+    fi
+  done
+  return 1
 }
 cleanup() {
-  local identity pgid
-  if [ -n "$OWNED_PID" ] && [ -n "$OWNED_IDENTITY" ]; then
-    identity=$(fm_test_pid_identity "$OWNED_PID" 2>/dev/null) || identity=''
-    pgid=$(ps -o pgid= -p "$OWNED_PID" 2>/dev/null | tr -d '[:space:]')
-    if [ "$identity" = "$OWNED_IDENTITY" ] && [ "$pgid" = "$OWNED_PID" ]; then
-      kill -KILL -"$OWNED_PID" 2>/dev/null || true
-    fi
-  fi
+  signal_owned_group || true
   fm_test_cleanup
 }
 trap cleanup EXIT
@@ -100,8 +111,8 @@ wait_for() {  # <condition command...>
 }
 nonempty() { [ -s "$1" ]; }
 group_gone() { ! kill -0 -"$1" 2>/dev/null; }
-two_native_polls() {
-  [ -f "$ARTIFACT.native-pids" ] && [ "$(wc -l < "$ARTIFACT.native-pids" | tr -d ' ')" -ge 2 ]
+two_pids() {
+  [ -f "$1" ] && [ "$(wc -l < "$1" | tr -d ' ')" -ge 2 ]
 }
 claim_gone() { [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$1.claim" ]; }
 pe() { FM_HOME="$HOME_FIXTURE" "$ROOT/bin/fm-procevent.sh" "$@"; }
@@ -133,11 +144,7 @@ new_board() {
     IFS= read -r _
     IFS= read -r RUNNER_PID
   } < "$FM_PROCEVENT_CLAIM_ROOT/$SOURCE_ID.claim"
-  own_group "$RUNNER_PID"
-  assert_equals "$RUNNER_PID" "$(ps -o pgid= -p "$NATIVE_PID" | tr -d '[:space:]')" \
-    "$name native poll belongs to its owned runner group"
-  assert_equals "$RUNNER_PID" "$(ps -o pgid= -p "$DESCENDANT_PID" | tr -d '[:space:]')" \
-    "$name descendant belongs to its owned runner group"
+  own_group "$RUNNER_PID" "$NATIVE_PID" "$DESCENDANT_PID"
 }
 
 answer_and_capture() {  # <token>
@@ -198,7 +205,11 @@ for resist in 0 1; do
     IFS= read -r replacement_runner
   } < "$FM_PROCEVENT_CLAIM_ROOT/$SOURCE_ID.claim"
   RUNNER_PID=$replacement_runner
-  own_group "$RUNNER_PID"
+  wait_for two_pids "$ARTIFACT.native-pids" || fail "replacement native listener did not publish its pid"
+  wait_for two_pids "$ARTIFACT.descendant-pids" || fail "replacement descendant did not block"
+  while IFS= read -r member_pid; do NATIVE_PID=$member_pid; done < "$ARTIFACT.native-pids"
+  while IFS= read -r member_pid; do DESCENDANT_PID=$member_pid; done < "$ARTIFACT.descendant-pids"
+  own_group "$RUNNER_PID" "$NATIVE_PID" "$DESCENDANT_PID"
   answer_and_capture "term-only-answer-$resist"
   pass "TERM-only runner shutdown preserves custody and replacement answer (resistant=$resist)"
 done
@@ -217,7 +228,7 @@ assert_contains "$out" "already owned:" "public start also refuses the crashed l
 kill -0 "$NATIVE_PID" 2>/dev/null || fail "crashed-leader refusal signalled the native listener"
 kill -0 "$DESCENDANT_PID" 2>/dev/null || fail "crashed-leader refusal signalled the descendant"
 assert_absent "$ARTIFACT.signals" "crashed-leader refusal never sends TERM"
-kill -KILL -"$crashed_runner" 2>/dev/null || true
+signal_owned_group || fail "fixture-only crash cleanup could not verify a surviving owned member"
 wait_for group_gone "$crashed_runner" || fail "fixture-only crash cleanup left a group alive"
 forget_group "$crashed_runner"
 pe retire "$SOURCE_ID" >/dev/null || fail "empty crashed group could not be retired"
@@ -232,7 +243,7 @@ new_board killed-child
 listening_runner=$RUNNER_PID
 kill -TERM "$NATIVE_PID" || fail "could not signal the native poll child alone"
 kill -TERM "$DESCENDANT_PID" || fail "could not close the killed poll child's inherited stdout"
-wait_for two_native_polls || fail "an outputless killed native poll did not relisten"
+wait_for two_pids "$ARTIFACT.native-pids" || fail "an outputless killed native poll did not relisten"
 {
   IFS= read -r _
   IFS= read -r relistening_runner
