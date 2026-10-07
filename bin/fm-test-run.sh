@@ -767,6 +767,7 @@ tests/fm-nm-test-contract.test.sh 128
 tests/fm-no-mistakes-required.test.sh 247
 tests/fm-omp-harness.test.sh 47734
 tests/fm-omp-primary-live-e2e.test.sh 46
+tests/fm-omp-wake-restore-live-e2e.test.sh 51
 tests/fm-on.test.sh 11001
 tests/fm-opencode-primary-live-e2e.test.sh 48
 tests/fm-operational-input.test.sh 221
