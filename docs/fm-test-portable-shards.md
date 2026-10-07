@@ -61,6 +61,9 @@ The serial hints were refreshed from successful per-script records in the `fm-te
 Together these cover all 176 serial scripts at refresh time; retain the slower successful sample where both exist.
 The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
 An unfinished or failed invocation is not a healthy duration sample.
+On 2026-10-07, 32 previously missing hints were added from successful completed per-script records in the portable-serial timing artifacts of [run 37619080376](https://github.com/MrGTV-love/firstmate/actions/runs/37619080376).
+That run was not green: its successful records supplement the retained baseline, while failed and unfinished invocations supply no hints.
+Capability skips measure only the portable gate path, not the opt-in live scenario.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.
 Balance is still worth keeping current, because enough unmeasured scripts let one shard carry more than twice another shard's real work and reach the job cap while another runner sits idle.
@@ -69,8 +72,8 @@ That is not hypothetical: by 2026-09-01 the lane had grown from 116 to 139 scrip
 Refresh the hints whenever the serial lane gains scripts, rather than waiting for that bound to trip.
 
 `bin/fm-test-run.sh` owns the per-shard packing, so its `--check-coverage` output is the current account of lane size and coverage rather than a copied inventory.
-Nine serial runners pack the refreshed measurements into a longest modeled script sum of 697969 ms (11m38s), with other shards near 10m36s.
-The longest script, `tests/fm-watch-triage.test.sh`, legitimately occupies one whole shard and is the indivisible floor for this layout.
+The nine serial runners pack the current hints into derived lane memberships; refresh those hints rather than treating an older modeled shard sum as a current measurement.
+The longest individual script remains an indivisible lower bound on this packing.
 This is a packing estimate, not measured new-workflow execution or an end-to-end latency guarantee.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.
