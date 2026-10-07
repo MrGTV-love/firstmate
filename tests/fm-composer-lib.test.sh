@@ -1403,7 +1403,7 @@ test_claude_selected_slash_menu_extracts_only_the_composer() {
     [ "$out" = /exit ] || fail "selected /exit popup under LC_ALL=C must extract exactly /exit, got '$out'"
   done
   assert_screen "selected /exit popup on styled backends" pending "$CAPS_STYLED_NOID" "$screen"
-  assert_screen "selected /exit popup on plain backends retains degradation" unknown "$CAPS_PLAIN" "$screen"
+  assert_screen "selected /exit popup on plain backends" pending "$CAPS_PLAIN" "$screen"
   # A selected completion is not the typed command: preserve a nonempty prefix,
   # also when both the composer and popup are indented by the pane renderer.
   prefix=$'  ────────────────────────\n  ❯ /ex\n  ────────────────────────\n    ❯ /exit                       Exit the CLI\n      /extra                      Another matching command'
@@ -1414,7 +1414,7 @@ test_claude_selected_slash_menu_extracts_only_the_composer() {
     [ "$out" = /ex ] || fail "selected completion under LC_ALL=C must preserve /ex, got '$out'"
   done
   assert_screen "nonempty slash prefix on styled backends" pending "$CAPS_STYLED_NOID" "$prefix"
-  assert_screen "nonempty slash prefix on plain backends" unknown "$CAPS_PLAIN" "$prefix"
+  assert_screen "nonempty slash prefix on plain backends" pending "$CAPS_PLAIN" "$prefix"
   pass "Claude selected slash-menu rows do not replace the actual command or prefix"
 }
 
