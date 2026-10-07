@@ -2512,6 +2512,7 @@ This section is the single owner of the runner's operating contract.
 - The self-announcing adapter exception and its fail-safe ordering are defined below.
 - The watcher delivers a queued result on its ordinary cycle by reporting it as an actionable `check` wake, so a default or fallback publication reaches firstmate through the same rewake path every other wake uses and never waits for a manual drain.
 - A queued `check` delivery is reported at most once per captured source and sequence while any records for that key remain queued.
+- Publication coalesces an already-queued `check` for the same captured source and sequence under the queue lock, so reconciliation during handling cannot strand a duplicate beyond the presented acknowledgement snapshot.
 - A durable handled acknowledgement stops future source re-announcement, while a record already queued remains under the durable queue's authority until the ordinary drain's sequence-bound post-handling acknowledgement consumes it.
 - By default, a runner releases its claim after one poll; adapter-owned continuation and registration-adoption rules are defined in the `bin/fm-procevent.sh` header.
   [Remote secondmates](remote-secondmates.md#how-remote-lines-are-mirrored) owns the reply listener's behavior; ordinary Lavish review continuation is defined above.
@@ -2522,7 +2523,7 @@ Discovery is never a timer.
 Each registered source has its own child process blocking on that source.
 Once per cycle, unless that watcher process's previous run is still going, the watcher starts a background `reconcile` that:
 
-- Republishes every captured result without a durable handled acknowledgement, regardless of earlier publication.
+- Republishes every captured result without a durable handled acknowledgement unless its wake is still queued; a drained but unhandled result remains eligible for replay.
 - Restarts a source whose owner is gone.
 - Stops this home's runner if its registration disappeared unexpectedly.
 
