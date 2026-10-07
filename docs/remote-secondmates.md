@@ -413,7 +413,7 @@ bin/fm-spawn.sh <id> --secondmate
 
 The primary then takes these steps:
 
-1. It resolves the verified secondmate harness and optional model and effort.
+1. It resolves the verified secondmate harness and optional model and effort, subject to the initiating home's [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy).
 2. It runs the same readiness gate the seed runs.
 3. It transfers the inherited-material allowlist.
 4. It asks the remote host to launch on Herdr in `fm-remote`.
@@ -431,13 +431,18 @@ All remote secondmates on one host share `fm-remote` and retain separate `2ndmat
 
 ### Liveness recovery
 
-Startup liveness recovery relaunches a dead or missing remote second mate through this same command.
+Startup liveness recovery relaunches an eligible dead or missing remote secondmate through this same command, subject to the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy).
 So recovery passes the same readiness gate rather than a weaker one.
+
+The startup probe admits the currently configured replacement harness under the initiating home's policy before running readiness repair, including `doctor --fix`, which can stop a foreign Herdr server and close its panes.
+When that policy denies the replacement or is malformed, startup still classifies the recorded endpoint read-only and preserves a live endpoint.
+A confirmed dead or missing endpoint reaches the shared relaunch boundary, which rechecks admission and retains the policy refusal diagnostic and generation-scoped receipt without repair or a recovery attempt.
+Probe admission never converges policy into a child home; an absent policy or an admitted `omp` replacement keeps the existing readiness behavior.
 
 The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/fm-secondmate-liveness-lib.sh`:
 
 - The remote endpoint is probed read-only once per cadence.
-- Only a positive `dead` or `missing` reply relaunches through that command.
+- Only a positive `dead` or `missing` reply permits a relaunch through that command, subject to the same launch checks.
 - An unreachable transport or inconclusive state is left untouched rather than replaced locally.
 
 ### Inventory reconcile for markerless routes

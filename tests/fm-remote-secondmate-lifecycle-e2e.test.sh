@@ -926,6 +926,29 @@ publish_healthy_watcher_identity "$PARENT/state" "$PARENT" "$ROOT/bin/fm-watch.s
   || fail "remote endpoint delivery observation did not execute on its own host"
 pass "remote spawn launches on the remote-local backend and records a host-qualified route"
 
+cp "$REMOTE_HOME/state/parent-route/ios.meta" "$TMP_ROOT/remote-before-policy.meta"
+cp "$PARENT/state/ios.meta" "$TMP_ROOT/parent-before-policy.meta"
+cp "$HERDR_STATE" "$TMP_ROOT/herdr-before-policy.state"
+jq '.typed = {} | .working = {}' "$HERDR_STATE" > "$TMP_ROOT/herdr-dead-policy.state"
+mv "$TMP_ROOT/herdr-dead-policy.state" "$HERDR_STATE"
+cp "$HERDR_STATE" "$TMP_ROOT/herdr-dead-before-policy.state"
+printf 'omp-or-tc\n' > "$REMOTE_HOME/config/session-launch-policy"
+cp "$HERDR_LOG" "$TMP_ROOT/herdr-before-policy.log"
+policy_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh launch ios codex explicit-model high herdr 2>&1)
+policy_rc=$?
+[ "$policy_rc" -ne 0 ] || fail "host-local launch accepted a forbidden recovery"
+assert_contains "$policy_out" "session-launch-policy" "host-local refusal did not identify policy"
+cmp -s "$TMP_ROOT/herdr-before-policy.log" "$HERDR_LOG" || fail "host-local policy refusal touched the backend"
+cmp -s "$TMP_ROOT/herdr-dead-before-policy.state" "$HERDR_STATE" || fail "host-local policy refusal removed the dead endpoint"
+cmp -s "$TMP_ROOT/remote-before-policy.meta" "$REMOTE_HOME/state/parent-route/ios.meta" || fail "host-local refusal rewrote endpoint metadata"
+cmp -s "$TMP_ROOT/parent-before-policy.meta" "$PARENT/state/ios.meta" || fail "host-local refusal changed the parent's route"
+rm "$REMOTE_HOME/config/session-launch-policy"
+mv "$TMP_ROOT/herdr-before-policy.state" "$HERDR_STATE"
+out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh launch ios codex - - herdr)
+assert_contains "$out" "schema=fm-remote-secondmate-control.v1" "ordinary host-local launch stopped reusing its alive endpoint"
+cmp -s "$TMP_ROOT/remote-before-policy.meta" "$REMOTE_HOME/state/parent-route/ios.meta" || fail "ordinary alive reuse changed endpoint metadata"
+pass "host-local launch refuses policy before dead-endpoint removal and keeps ordinary alive reuse"
+
 remote_route_meta="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-before-default-session.meta"
 legacy_pane=$(sed -n 's/^herdr_pane_id=//p' "$remote_route_meta")

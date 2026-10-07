@@ -309,6 +309,7 @@ fm_supervision_engine_turn() {
         --model "$model" --output-format json)
       root_phys=$(cd "$FM_ROOT" 2>/dev/null && pwd -P) || root_phys=$FM_ROOT
       home_phys=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || home_phys=$FM_HOME
+      # shellcheck disable=SC2153 # STATE is supplied by the sourcing host.
       state_phys=$(cd "$STATE" 2>/dev/null && pwd -P) || state_phys=$STATE
       # Claude path-checks direct file reads against its working directories,
       # so a home or state directory outside the code root is added.

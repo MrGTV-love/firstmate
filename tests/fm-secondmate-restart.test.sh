@@ -35,6 +35,7 @@ fm_git_identity fmtest fmtest@example.com
 TMP_ROOT=$(fm_test_tmproot fm-secondmate-restart)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
+trap 'chmod -R u+w "$TMP_ROOT"; rm -rf -- "$TMP_ROOT"' EXIT
 
 # A session-provider stub that models the two things this pass depends on: the
 # harness exit command stops the agent, a launch brief starts the replacement,
@@ -73,6 +74,9 @@ case "${1:-}" in
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
         /exit|/quit)
+          if [ ! -e "$D/remote-relaunch-end" ]; then
+            : > "$D/local-relaunch-before-remote-end"
+          fi
           : > "$D/local-relaunch-seen"
           printf 'zsh' > "$D/command.$target"
           ;;
@@ -243,6 +247,7 @@ arm_answer() {
 run_restart() {  # <case-dir> <args...>
   local dir=$1; shift
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_CONFIG_OVERRIDE="$dir/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
     FM_SECONDMATE_PERSIST_WAIT="${FM_TEST_PERSIST_WAIT:-30}" \
     FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
@@ -507,6 +512,16 @@ case "${rargs[1]:-}" in
         fi
         : > "$FM_FAKE_DIR/remote-relaunch-end"
         ;;
+      coordinated-relaunch)
+        : > "$FM_FAKE_DIR/remote-relaunch-start"
+        # Wait for independent local progress, including progress before SSH started.
+        # A serial consumer reaches the bound and cannot publish the overlap marker.
+        for ((i = 0; i < 100; i++)); do
+          [ ! -e "$FM_FAKE_DIR/local-relaunch-before-remote-end" ] || break
+          /bin/sleep 0.1
+        done
+        : > "$FM_FAKE_DIR/remote-relaunch-end"
+        ;;
     esac
     printf 'relaunched %s harness=%s from=claude model=%s effort=%s backend=herdr endpoint=fm-remote:2ndmate-%s worktree=/srv/fm\n' \
       "${rargs[2]}" "${rargs[3]}" "${rargs[4]}" "${rargs[5]}" "${rargs[2]}"
@@ -552,6 +567,27 @@ test_remote_mate_restarts_over_the_transport_hop() {
      -lt "$(grep -n '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
     || fail "the remote mate was restarted before it was asked to persist"$'\n'"$(cat "$dir/ssh.log")"
   pass "T6 a remote mate restarts through the host-local control plane over the fm-on hop"
+}
+
+test_remote_fleet_restart_obeys_initiating_policy() {
+  local dir out rc
+  dir=$(new_case remote-policy)
+  setup_remote_case "$dir" sm2 ok
+  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+  printf 'codex explicit-model high\n' > "$dir/home/config/secondmate-harness"
+  printf 'omp-or-tc\n' > "$dir/home/config/session-launch-policy"
+  cp "$dir/home/state/sm2.meta" "$dir/meta-before"
+
+  out=$(run_restart "$dir" sm2); rc=$?
+  unset FM_FAKE_ANSWER_STATUS
+
+  expect_code 3 "$rc" "fleet restart misreported a refused remote profile"$'\n'"$out"
+  assert_contains "$out" "summary: 0 of 1 restarted, 0 nudged, 1 unreached" "fleet restart claimed a refused replacement succeeded"
+  assert_contains "$out" "config/session-launch-policy" "fleet restart lost the initiating policy reason"
+  assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
+    "fleet restart transported a forbidden replacement"
+  cmp -s "$dir/meta-before" "$dir/home/state/sm2.meta" || fail "fleet refusal changed route metadata"
+  pass "remote fleet restart retains its route without transporting a forbidden replacement"
 }
 
 test_remote_role_restart_resolves_the_pair_selected_after_persist() {
@@ -738,7 +774,7 @@ test_post_stop_failure_is_reported_unreached() {
 test_relaunches_do_not_block_persist_polling() {
   local dir out rc
   dir=$(new_case relaunch-polling)
-  setup_remote_case "$dir" sm1 slow-relaunch
+  setup_remote_case "$dir" sm1 coordinated-relaunch
   add_local_mate "$dir" sm2
   printf -- '- sm2 - local domain (home: %s; scope: things; projects: p; added 2026-09-03)\n' \
     "$dir/sm2-home" >> "$dir/home/data/secondmates.md"
@@ -749,7 +785,7 @@ test_relaunches_do_not_block_persist_polling() {
   unset FM_FAKE_ANSWER_STATUS
 
   expect_code 0 "$rc" "both confirmed mates should restart independently"$'\n'"$out"
-  assert_present "$dir/fake/local-relaunch-during-remote" \
+  assert_present "$dir/fake/local-relaunch-before-remote-end" \
     "the slow first relaunch blocked lifecycle progress for the second mate"
   assert_contains "$out" "summary: 2 of 2 restarted, 0 nudged, 0 unreached" \
     "parallel relaunches were not both accounted for"
@@ -946,6 +982,7 @@ test_refused_restart_falls_back_without_claiming_a_reload
 test_local_restart_uses_the_home_pin_and_reports_what_ran
 test_native_ultra_restart_keeps_local_and_remote_profiles
 test_remote_mate_restarts_over_the_transport_hop
+test_remote_fleet_restart_obeys_initiating_policy
 test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown
 test_concurrent_reply_cannot_release_persist_gate

@@ -320,6 +320,7 @@ The file may be empty, or hold one line `<engine> [<model>]`:
 - `<engine> [<model>]` names a verified engine, currently only `claude`, and optionally the engine's own model name or alias; `default <model>` selects the primary harness's engine with that model.
 
 Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file.
+Engine sessions follow the [session launch policy's scope](#session-launch-policy-configsession-launch-policy); engine selection follows the rules above.
 
 ### Failures and when changes apply
 
@@ -776,9 +777,50 @@ Remote secondmate routes accept verified harness adapters only and reject raw la
 When `config/crew-dispatch.json` exists, crewmate and scout spawns require an explicit resolved harness instead of automatically falling back to `config/crew-harness`.
 
 The inherited-local-material contract is owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); its harness-relevant consequence is that a secondmate's own crewmates use the primary's dispatch profiles and static harness value.
-Those inherited values are defaults and rules only; `fm-spawn` still permits a consciously chosen explicit runtime outside the config.
+Those inherited values are defaults and rules only; explicit runtimes remain subject to the [session launch policy](#session-launch-policy-configsession-launch-policy) when enabled.
 
 `config/secondmate-harness` is not inherited because secondmates do not launch secondmates.
+
+### Session launch policy (config/session-launch-policy)
+
+The optional local, gitignored `config/session-launch-policy` contains exactly `omp-or-tc`, with an optional single trailing newline.
+The shared template leaves this restriction off by default: absence preserves existing launch behavior, including standalone Codex launches.
+Enabling it in each captain home is the operator's responsibility.
+An unreadable or malformed present file refuses new worker and secondmate sessions instead of disabling the restriction.
+The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
+Local admission and live inheritance also require the child's policy parser/configuration dependency and spawn, control, automatic-recovery, and remote-replacement owners to match the authoritative launching code's bytes.
+The remote inheritance receiver verifies destination-home owners against its separate authoritative code root before reporting a policy put as pushed or unchanged; equal policy bytes do not bypass verification.
+This conservative tooling-capability check does not invoke child scripts or rewrite the child checkout: missing, outdated, unreadable, or locally changed policy owners refuse, even when inheritance is skipped and the child already has a valid policy.
+An enabled child policy retained by a guarded removal also requires verified tooling and admission of the resolved replacement runtime at fresh/direct launch and manual/automatic recovery, even when the primary policy is absent.
+An unsupported policy reports an error rather than usable convergence.
+Its copied configuration may remain in place, while unrelated inheritance remains best-effort and successful policy removal clears the restriction without requiring compatible owners.
+Dirty edits outside those owners, wrong-branch homes, and preserved divergence remain supported when their policy tooling matches; restore the named owner from the primary while preserving unrelated work before retrying a refusal.
+Local recovery converges this setting, verifies the tooling, and checks the resolved replacement against the effective child policy before stopping the old endpoint or consuming a recovery attempt.
+Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
+
+For worker and secondmate launches, this opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
+Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.
+A TeamClaude proxy wrapper that starts `claude` directly does not satisfy the literal `tc run` requirement and must not be treated as an allowed fallback.
+Opaque raw shell launch commands are refused, even when their first word is `omp`, because their eventual session executable cannot be established from that word.
+The `openai-codex` provider inside omp remains allowed; the restriction excludes the standalone Codex CLI, not its models or provider.
+
+Fresh ship, scout, batch, and secondmate spawns check the selected runtime against the initiating home's policy before launch resources or remote inheritance change.
+Manual recovery checks the resolved replacement before checkpointing or stopping the old agent.
+Automatic ship and scout session-end recovery admits the recorded runtime before consuming an attempt or marking the generation handled, and retains the control-plane recheck before replacement.
+Policy repair is reconsidered immediately on the next eligible tick, permitting recovery of the same generation without a refusal-induced cooldown.
+Remote secondmate replacement checks the initiating home's policy before transport and the destination home's policy before stopping the old agent.
+Automatic secondmate recovery and host-local remote launch check the selected replacement before removing an existing endpoint; a refused automatic recovery records no attempt.
+Automatic session-end and secondmate recovery notify once per task or secondmate generation and refusal fingerprint, derived from the raw policy-source contents and admission diagnostic.
+Acknowledging the queued notification does not make an unchanged refusal recur, and toggling the policy away and back does not re-notify an already-seen fingerprint within that generation.
+This notification deduplication does not skip policy admission checks: repairs remain immediately eligible for reconsideration, while recovery-attempt and handled-generation accounting remain untouched by a refusal.
+Automatic refusal receipts publish the complete generation and notified-fingerprint set atomically under the notification queue lock, using only transient staging and no additional durable marker files.
+A disallowed recorded ship or scout runtime is refused rather than silently reusing it or translating its model onto omp.
+Select an explicit allowed dispatch profile and use the replacement flags documented by [`fm-control.sh --help`](../bin/fm-control.sh); the refusal also prints that supported recovery path.
+Already-running agents, unpublished work, durable task records, and validation custody are not migrated or discarded by enabling this setting.
+
+[`bin/fm-session-launch-policy-lib.sh`](../bin/fm-session-launch-policy-lib.sh) owns the shared launch check, exercised through executable entrypoints in [`tests/fm-session-launch-policy.test.sh`](../tests/fm-session-launch-policy.test.sh).
+This setting governs Firstmate-owned worker and secondmate launches only, not supervision-host engine sessions, separately configured validation tools, or the operator's own primary session.
+The Pi supervision branch is an in-process part of the exempt operator primary session, not a Firstmate-invoked worker, and is also exempt.
 
 ### Installed hooks and launch details
 
@@ -845,7 +887,7 @@ Firstmate requires any nonempty override to be an absolute path.
 The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
-A raw launch command whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
+A raw launch command admitted by the [session launch policy](#session-launch-policy-configsession-launch-policy) whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
 That raw command then runs under `/bin/sh`, not the pane's own shell, so it must be POSIX sh compatible.
 The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.
 `tests/fm-teamclaude-launch-live-e2e.test.sh` checks the launcher against the installed TeamClaude CLI and running proxy.
@@ -1689,7 +1731,7 @@ It uses the same live secondmate discovery and propagation helper as bootstrap; 
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
 - The locked bootstrap inheritance pass uses the same placement-specific behavior; see `secondmate-provisioning` for the single contract owner.
 - That live discovery starts from `state/*.meta` records with `kind=secondmate`; `data/secondmates.md` only backfills `home=` for older or incomplete meta records.
-- Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures.
+- Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures unless the [session launch policy](#session-launch-policy-configsession-launch-policy) cannot be verified.
 
 ## Watched tool updates (config/watched-tools.json)
 

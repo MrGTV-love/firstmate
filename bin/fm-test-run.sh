@@ -381,6 +381,7 @@ family_for_basename() {
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
     fm-tmux-agent-liveness.test.sh|\
     fm-control.test.sh|fm-control-relaunch.test.sh|\
+    fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
     fm-send-inbox.test.sh|fm-spawn-batch.test.sh|\
     fm-spawn-dispatch-profile.test.sh|fm-claude-trust.test.sh|\
@@ -817,6 +818,9 @@ tests/fm-send-remote-delivery.test.sh 27717
 tests/fm-send-resolve-key.test.sh 28685
 tests/fm-send-secondmate-marker-herdr-e2e.test.sh 52
 tests/fm-send-secondmate-marker.test.sh 5309
+tests/fm-session-launch-policy-inherit.test.sh 16144
+tests/fm-session-launch-policy-receipt.test.sh 2166
+tests/fm-session-launch-policy.test.sh 229671
 tests/fm-session-lock-ancestry.test.sh 2857
 tests/fm-session-start.test.sh 179350
 tests/fm-sessionstart-hook-live-e2e.test.sh 97

@@ -206,6 +206,8 @@
 #   a failed or inconclusive probe omits it so older Pi versions remain launchable.
 #   A missing selected executable refuses before endpoint creation, and pi-signed
 #   never falls back to pi.
+#   config/session-launch-policy can restrict even explicit launches; its schema
+#   and tc-run prerequisite are owned by docs/configuration.md "Session launch policy".
 #   Devin is worker-only: --permission-mode dangerous and
 #   --respect-workspace-trust false allow unattended tools in a fresh worktree.
 #   --config points at a private per-task snapshot of the user config with
@@ -586,8 +588,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-# shellcheck source=bin/fm-config-inherit-lib.sh
-. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 # shellcheck source=bin/fm-api-key-guard-lib.sh
 . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 fm_api_key_guard_launch_env_config "$CONFIG" || exit 1
@@ -712,9 +714,7 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
-# Skip the watcher guard when re-exec'd for one pair of a batch (FM_SPAWN_NO_GUARD is
-# set by the batch loop below), so the guard runs once for the batch, not once per pair.
-[ -n "${FM_SPAWN_NO_GUARD:-}" ] || "$FM_ROOT/bin/fm-guard.sh" || true
+# The watcher guard runs after the read-only session launch policy preflight.
 KIND=ship
 KIND_SET=0
 HARNESS_ARG=
@@ -976,6 +976,56 @@ else
     }
   fi
 fi
+
+# Refuse restricted launches before guards, locks, remote inheritance, endpoint
+# creation, or worktree allocation. Recheck the authoritative resolved launch
+# below, after locked adoption of a relaunch record.
+SESSION_LAUNCH_POLICY=$(fm_session_launch_policy_enabled "$CONFIG") || exit 1
+if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
+  policy_harness=$HARNESS_ARG
+  policy_kind=$KIND
+  if [ "$RELAUNCH" = 1 ]; then
+    fm_task_id_creation_valid "${POS[0]}" || {
+      echo "error: invalid task id" >&2
+      exit 2
+    }
+    policy_meta="$STATE/${POS[0]}.meta"
+    fm_backlog_record_present "$policy_meta" "task record" "$STATE" || {
+      echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+      exit 1
+    }
+    policy_kind=$(fm_meta_get "$policy_meta" kind)
+    [ -n "$policy_harness" ] || policy_harness=$(fm_meta_get "$policy_meta" harness)
+  elif [ -z "$policy_harness" ]; then
+    if [ "$KIND" = secondmate ]; then
+      case "${POS[1]:-}" in
+      '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
+        policy_harness=${POS[1]:-} ;;
+      *' '*)
+        if [ "${#POS[@]}" -gt 2 ] || [ -d "${POS[1]}" ]; then
+          policy_harness=${POS[2]:-}
+        else
+          policy_harness=${POS[1]}
+        fi ;;
+      *) policy_harness=${POS[2]:-} ;;
+      esac
+    elif [ "${POS[0]}" = "${POS[0]%%=*}" ]; then
+      policy_harness=${POS[2]:-}
+    fi
+  fi
+  if [ -z "$policy_harness" ] && [ "$RELAUNCH" = 0 ]; then
+    if [ "$policy_kind" = secondmate ]; then
+      policy_harness=$("$FM_ROOT/bin/fm-harness.sh" secondmate)
+    else
+      policy_harness=$("$FM_ROOT/bin/fm-harness.sh" crew)
+    fi
+  fi
+  policy_raw=0
+  case "$policy_harness" in *[[:space:]]*) policy_raw=1 ;; esac
+  fm_session_launch_policy_check "$CONFIG" "$policy_harness" "$policy_raw" || exit 1
+fi
+# Skip the watcher guard when re-exec'd for one pair of a batch.
+[ -n "${FM_SPAWN_NO_GUARD:-}" ] || "$FM_ROOT/bin/fm-guard.sh" || true
 
 spawn_remote_secondmate() {
   local id=$1 remote host root home harness positional model effort backend out rc meta tmp
@@ -2417,6 +2467,7 @@ if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; t
   fi
 fi
 
+fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 # config/secondmate-harness may carry optional model/effort tokens alongside the
 # harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
 # --secondmate spawn and no explicit per-spawn harness/raw launch was supplied, so
@@ -3159,14 +3210,8 @@ if [ "$KIND" = secondmate ]; then
     SECONDMATE_PROJECTS=$SECONDMATE_REGISTRY_MATCH_PROJECTS
   fi
   WT="$PROJ_ABS"
-  # Local-HEAD sync: before launch, fast-forward this secondmate's worktree to the
-  # PRIMARY checkout's current default-branch commit, so a freshly spawned or
-  # recovery-respawned secondmate always runs the primary's version (AGENTS.md
-  # spawn section). Purely local - no fetch: the home is a worktree of this same
-# repo and already holds the commit. The same guarded path can reconcile a clean
-# divergence already present at the target; a dirty, uniquely diverged, or
-# wrong-branch home is left untouched and launches as-is. The agent re-reads
-  # AGENTS.md fresh on launch, so no nudge is needed here.
+  # Guarded tracked sync is owned by .agents/skills/secondmate-provisioning/SKILL.md.
+  # Preserving a skipped checkout does not waive the admission checks below.
   # On a remote host this spawn is the host-local leg of a launch whose parent has
   # already synced the home to ITS primary commit, and $FM_ROOT here is only that
   # host's own Firstmate copy; syncing again would target the wrong checkout, so
@@ -3206,6 +3251,7 @@ if [ "$KIND" = secondmate ]; then
       propagate_secondmate_inheritance "$FM_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
       echo "warning: secondmate $ID inheritance failed for $PROJ_ABS" >&2
   fi
+  fm_session_launch_policy_admit_child "$CONFIG" "$PROJ_ABS" "$HARNESS" "$RAW_LAUNCH" || exit 1
   if [ -f "$PROJ_ABS/data/charter.md" ]; then
     BRIEF="$PROJ_ABS/data/charter.md"
   else

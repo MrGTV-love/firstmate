@@ -34,8 +34,8 @@
 # per-task spawn lock.
 #
 # Modes:
-#   full - session-start sweep: remote routes run the full readiness repair
-#          sequence before probing, and an alive remote route is revalidated
+#   full - session-start sweep: admitted remote routes run the full readiness
+#          repair sequence before probing, and an alive remote route is revalidated
 #          (route readable, backend herdr) so the sweep reports drift.
 #   poll - watcher tick: remote routes take one read-only state probe per
 #          check; repair still happens, but inside fm-spawn's launch gate only
@@ -58,6 +58,10 @@ FM_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$FM_SM_LIVE_LIB_DIR/fm-remote-readiness-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$FM_SM_LIVE_LIB_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$FM_SM_LIVE_LIB_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-secondmate-registry-lib.sh
+. "$FM_SM_LIVE_LIB_DIR/fm-secondmate-registry-lib.sh"
 
 # Per-task probe+kill+relaunch serialization. A busy lock means another
 # supervisor (the other sweep, or a racing tick) is mid-episode on this mate;
@@ -83,6 +87,13 @@ fm_secondmate_liveness_unlock() {  # <id>
 
 fm_sm_live_first_line() {
   printf '%s\n' "$1" | sed -n '1s/[[:space:]]\{1,\}/ /g;1p'
+}
+
+fm_sm_live_replacement_admit() {
+  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} harness
+  harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_SM_LIVE_LIB_DIR/fm-harness.sh" secondmate) || return 1
+  fm_session_launch_policy_check "$config" "$harness" || return 1
+  printf '%s\n' "$harness"
 }
 
 # One line per relaunch attempt and one per outcome, keyed by epoch, plus a
@@ -139,7 +150,7 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
   harness=$(fm_meta_get "$meta" harness)
   remote_host=$(fm_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
-    if [ "$mode" = full ]; then
+    if [ "$mode" = full ] && fm_sm_live_replacement_admit >/dev/null 2>&1; then
       remote_rc=0
       fm_remote_readiness_ensure "$FM_SM_LIVE_LIB_DIR" "$id" || remote_rc=$?
       if [ "$remote_rc" -eq 255 ]; then
@@ -255,9 +266,9 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 
 # fm_secondmate_liveness_relaunch <meta> <id> [timeout-secs]
 #
-# Acts on a `relaunchable` probe verdict for <id>: kills a confirmed-dead local
-# endpoint first (FM_SM_LIVE_KILL), records the attempt and its outcome in the
-# per-mate ledger, then runs the guarded secondmate spawn. A positive timeout
+# Acts on a `relaunchable` probe verdict for <id>, subject to the launch policy
+# owned by docs/configuration.md: records the attempt before killing a confirmed-dead
+# local endpoint (FM_SM_LIVE_KILL), then runs the guarded secondmate spawn and records its outcome. A positive timeout
 # wraps the spawn in fm_run_timed so a watcher poll stays bounded; 124/137 mean
 # the bound fired. Returns the spawn exit status; combined spawn output is in
 # FM_SM_LIVE_OUT and the status in FM_SM_LIVE_RC. When the ledger cannot be
@@ -266,7 +277,42 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 # Caller holds the liveness lock and owns reporting.
 fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-}
-  FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0
+  FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
+  local policy_error config home generation reason harness
+  home=$(fm_meta_get "$meta" home)
+  [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
+  [ -n "$home" ] || home=$(secondmate_registry_field "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" home || true)
+  if ! policy_error=$(
+    {
+      config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+      harness=$(fm_sm_live_replacement_admit) || exit 1
+      if [ -z "$(fm_meta_get "$meta" remote_host)" ]; then
+        fm_session_launch_policy_converge_child "$config" "$home" "$id" "$harness"
+      fi
+    } 2>&1
+  ); then
+    FM_SM_LIVE_STATUS=skipped
+    FM_SM_LIVE_OUT=$policy_error
+    FM_SM_LIVE_REASON=$(fm_sm_live_first_line "$policy_error")
+    FM_SM_LIVE_RC=1
+    config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+    generation=$(fm_meta_get "$meta" spawn_gen)
+    [ -n "$generation" ] || generation=$(fm_meta_get "$meta" busy_gen)
+    if [ -z "$generation" ]; then
+      if [ "$(uname)" = Darwin ]; then
+        generation=$(/usr/bin/stat -f '%d.%i' "$meta") || return 1
+      else
+        generation=$(stat -c '%d.%i' "$meta") || return 1
+      fi
+      generation="legacy-$generation"
+    fi
+    reason="check: secondmate $id auto-relaunch refused: $FM_SM_LIVE_REASON"
+    fm_session_launch_policy_refusal_notify "$STATE" "$id" "$generation" "$reason" "$policy_error" \
+      "$config/session-launch-policy" "$config/secondmate-harness" "$home/config/session-launch-policy" || return 1
+    FM_SM_LIVE_POLICY_REFUSED=1
+    FM_SM_LIVE_WAKE=$FM_SESSION_LAUNCH_REFUSAL_WAKE
+    return 1
+  fi
   if ! fm_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
     FM_SM_LIVE_STATUS=skipped
     FM_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unreadable; endpoint left $FM_SM_LIVE_STATE"
