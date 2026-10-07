@@ -860,11 +860,11 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_PI_OPEN=-1
   FM_COMPOSER_SCAN_PI_CLOSE=-1
   FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=-1
-  # The glyph PROOF of each envelope: the first row strictly inside it whose
-  # content leads with an agent prompt glyph once its side borders are
-  # stripped, and that glyph. This is what tells a composer container from a
-  # decorative banner; it is recorded here, on the one pass that already walks
-  # and trims every row, so the footer zone never re-reads the screen.
+  # The glyph PROOF of each envelope distinguishes a composer container from
+  # a decorative banner. Box and left-bar proofs remove container sides;
+  # rule-pair proofs inspect trimmed interior rows without stripping literal
+  # side characters. Record the first proving row and glyph on this scan so
+  # the footer zone never re-reads the screen.
   FM_COMPOSER_SCAN_BOX_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_BOX_GLYPH=
   FM_COMPOSER_SCAN_PI_GLYPH_ROW=-1
@@ -894,9 +894,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       '┗'*'┛') kind=bottom; family=heavy ;;
       '+'*'+') kind=ascii; family=ascii ;;
     esac
-    # This row's glyph proof, computed once for every envelope that contains
-    # it: the same side-border strip _fm_composer_row_content performs, then
-    # the agent-glyph test. A border row never carries a proof.
+    # Box and left-bar glyph proof after removing container sides. Rule pairs
+    # use their own unstripped interior-row proof below, so pasted side borders
+    # cannot manufacture a prompt glyph. A box border row carries no proof.
     row_glyph=''
     row_glyph_row=-1
     if [ -z "$kind" ]; then
@@ -1477,8 +1477,8 @@ _fm_composer_row_is_pi_status() {  # <trimmed-row>
 
 # _fm_composer_row_is_braille_furniture: 0 when the row is non-blank and its
 # non-whitespace content is entirely braille cells (fm_composer_strip_braille
-# above) - an animation row that never counts as typed content and bounds a
-# bare composer's wrap region. A blank row is not furniture (the blank-row
+# above). Treat it as animation furniture at bare-wrap and footer boundaries,
+# not inside a proven rule pair. A blank row is not furniture (the blank-row
 # rules own it), and a row mixing braille with anything else is not either.
 _fm_composer_row_is_braille_furniture() {  # <row>
   local row=$1 rest
@@ -1741,11 +1741,10 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_OMPBOX_TOP + 1))
     FM_COMPOSER_SELECTED_LAST=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
   fi
-  # A bare candidate standing in a proven envelope's footer zone is that
-  # harness's own furniture, never a composer. The envelope it sits under is
-  # what the screen actually shows, so when that envelope's proving glyph row
-  # is itself borderless, the bare candidate moves UP to it; otherwise the
-  # envelope (box, left bar) stays selected on its own.
+  # A bare candidate in a proven envelope's footer zone is harness furniture,
+  # not a composer. Move its ranking anchor to the borderless proving row, or
+  # remove it when the envelope has container sides. The rule-pair selection
+  # below retains the entire enclosing interior, not just that anchor row.
   bare=$FM_COMPOSER_SCAN_BARE_ROW
   if [ "$footer" = 1 ]; then
     trimmed=$(_fm_composer_screen_row "$FM_COMPOSER_FOOTER_GLYPH" "$plain")
@@ -2022,9 +2021,8 @@ EOF
     printf 'unknown'
     return 0
   fi
-  # No cursor: the bottom-most shape wins, with the pi-separator staleness
-  # rules layered on (a live pi composer pair below the generic candidate
-  # proves that candidate stale).
+  # Cursorless envelope precedence and ambiguity refusal have one owner:
+  # _fm_composer_select_cursorless, shared with content extraction.
   if ! _fm_composer_select_cursorless "$plain"; then
     printf 'unknown'
     return 0

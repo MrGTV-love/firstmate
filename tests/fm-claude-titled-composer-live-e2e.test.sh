@@ -5,9 +5,9 @@
 #
 # Claude Code draws its session title (`--name`, `/rename`, a hook-supplied
 # title, or the title it generates from the first prompt) INSIDE the prompt
-# box's top rule: `──── <title> ─`. That row is no longer a solid rule, so the
-# cursorless profiles read the composer as `unknown`, every steer's doorbell
-# was skipped, and fm-control exit and relaunch refused an idle worker
+# box's top rule: `──── <title> ─`. Before titled-rule support, cursorless
+# profiles read that composer as `unknown`, skipped every steer's doorbell,
+# and made fm-control exit and relaunch refuse an idle worker
 # ("composer state is 'unknown', not proven empty"). That shape is
 # vendor-rendered, so per .agents/skills/firstmate-coding-guidelines the
 # portable fixtures in tests/fm-composer-lib.test.sh are not enough on their
@@ -28,6 +28,14 @@
 # which submits a prompt and so spends tokens, and
 # FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 adds the fm-control relaunch proof,
 # which starts a real worker on the brief and so spends tokens too.
+# Relaunch requires subscription authentication: unset ANTHROPIC_API_KEY and
+# ANTHROPIC_AUTH_TOKEN before enabling it. The guard refuses a nonempty value
+# in either variable before lab setup and does not authorize API billing.
+# Trust registration and every launch share a disposable worktree-contained
+# CLAUDE_CONFIG_DIR and CLAUDE_SECURESTORAGE_CONFIG_DIR. Existing configuration
+# and authentication are copied into that private store; the operator's files
+# and Keychain entry are read only, never modified or restored. Configuration
+# copies and lab state are removed after teardown.
 # Refresh docs/verification/runtime-backends.md ("claude titled top border")
 # from this guard's output after any claude upgrade.
 # Every Herdr call, including adapter calls, is routed through bin/fm-herdr-lab.sh.

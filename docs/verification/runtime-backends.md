@@ -1160,11 +1160,7 @@ This replay exercises the production classifier and extractor on actual terminal
 The focused `tests/fm-composer-lib.test.sh` run passed, including the new boundary regression and all existing draft-preservation and selected-ambiguity checks.
 
 The live guard that refreshes this entry launches the installed claude idle with a session name in a guarded Herdr lab and drives the public lifecycle commands.
-Its default-on checks spend no tokens wherever claude, herdr, jq, git, and node are installed.
-The guard copies onboarding and settings into a private worktree-contained `CLAUDE_CONFIG_DIR` shared by trust registration and every launch, including lifecycle relaunch.
-It reads the selected account's existing OAuth access token from the environment, settings, matching Keychain entry, or credentials file and retains it only in disposable settings; it does not restore the operator store or refresh the login.
-The configuration copies and lab-helper state are removed after lab teardown.
-The doorbell proof and the relaunch proof each submit a real prompt and remain opt-in:
+For prerequisites, token-spending opt-ins, subscription-only relaunch, and configuration isolation, see the [guard's header](../../tests/fm-claude-titled-composer-live-e2e.test.sh).
 
 ```sh
 FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND=1 FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 tests/fm-claude-titled-composer-live-e2e.test.sh
@@ -1548,7 +1544,7 @@ The pre-Enter payload proof then judged the typed command unsent, pressed Ctrl+U
 The fix captures the FULL VISIBLE VIEWPORT for every herdr adapter composer read (`pane read --source visible [--format ansi]`, `fm_backend_herdr_composer_state` and `fm_backend_herdr_composer_content`): the composer is by definition inside the viewport, and the viewport is the one bound that always contains it.
 The shared inbox pending-line confirmation read (`bin/fm-task-inbox-lib.sh`) stays a bounded tail on every backend, herdr included; its payloads are task lines, not slash commands, so the popup shape does not arise there.
 The popup rows sit below the composer's closing rule, which bounds the extracted input; the selector also distinguishes an indented selected slash-menu glyph from the nonempty command inside the proven composer.
-When the selected menu row repeats `❯`, only an immediately adjacent, more-indented slash choice with a padded description matching the nonempty command or prefix inside the proven rule pair is demoted. The actual `/exit` or `/ex` input reads `pending` on both styled and plain captures; absent styling does not degrade a prompt-proven rule pair to `unknown`. Unbounded lower drafts and dead shells retain their refusal behavior. `tests/fm-composer-lib.test.sh` exercises these classification and extraction contracts in both locales.
+Current rule-pair safety limits are owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety), and exact slash-menu demotion predicates by [`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh); `test_claude_selected_slash_menu_extracts_only_the_composer` in [`tests/fm-composer-lib.test.sh`](../../tests/fm-composer-lib.test.sh) covers classification and extraction in both locales.
 Verified live in the lab: with the popup up the state read answers `pending` (previously `empty`) and the payload proof returns `/exit` (previously empty), the submit presses Enter, and the Claude process exits, leaving the shell prompt.
 Growing the window only adds rows above the composer, so the bottom-most-shape selection, the footer zone, and every previously passing verdict are unchanged.
 
