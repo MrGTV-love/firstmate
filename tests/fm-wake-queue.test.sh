@@ -993,7 +993,10 @@ case "${1:-}" in
         -l) shift; [ "$#" -gt 0 ] && printf 'TYPED:%s\n' "$1" >> "${FM_FAKE_TMUX_SENT:-/dev/null}" ;;
         Enter)
           printf '[ENTER]\n' >> "${FM_FAKE_TMUX_SENT:-/dev/null}"
-          if [ "${FM_FAKE_AFTER_ENTER_CAPTURE_FAIL:-0}" = 1 ]; then
+          if [ -n "${FM_FAKE_EDIT_AFTER_WAKE_ENTER:-}" ] \
+            && [ "$(wc -l < "${FM_FAKE_TMUX_SENT:?}" | tr -d '[:space:]')" = "$FM_FAKE_EDIT_AFTER_WAKE_ENTER" ]; then
+            cat "${FM_FAKE_EDITED_COMPOSER:?}" > "${FM_FAKE_TMUX_SCREEN:?}"
+          elif [ "${FM_FAKE_AFTER_ENTER_CAPTURE_FAIL:-0}" = 1 ]; then
             : > "${FM_FAKE_TMUX_SCREEN:?}.unavailable"
           elif [ "${FM_FAKE_AFTER_ENTER_EXTRACT_FAIL:-0}" = 1 ]; then
             printf '$ no readable composer\n' > "${FM_FAKE_TMUX_SCREEN:?}"
@@ -1276,6 +1279,46 @@ test_secondmate_restored_wake_unavailable_after_enter_keeps_parent_alarm() {
     [ ! -e "$state/mate.inbox" ] || fail "an unconfirmed $shape $failure fell through to another drain steer"
   done
   pass "box and bare capture and extraction failures after Enter keep the parent alarm without retrying or typing a second steer"
+}
+
+test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm() {
+  local dir state sub fakebin wake shape confirmation content edited expected
+  wake=$(secondmate_wake_text)
+  for shape in box bare; do
+    for confirmation in 1 2; do
+      for content in edited mixed; do
+        setup_secondmate_composer_case "secondmate-wake-edit-$shape-$confirmation-$content" "$wake" "$shape"
+        if [ "$content" = edited ]; then
+          edited=${wake/lane.status/operator-edited.status}
+        else
+          edited="$wake operator draft"
+        fi
+        render_secondmate_composer "$shape" "$edited" > "$dir/edited-screen"
+        stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
+        FM_FAKE_EDIT_AFTER_WAKE_ENTER="$confirmation" FM_FAKE_EDITED_COMPOSER="$dir/edited-screen" \
+          FM_FAKE_LOSE_FIRST_WAKE_ENTER=1 stall_composer_leg stall 1002 alert
+        expected='[ENTER]'
+        [ "$confirmation" -eq 1 ] || expected=$(printf '[ENTER]\n[ENTER]')
+        [ "$(cat "$dir/sent")" = "$expected" ] \
+          || fail "$shape $content at confirmation $confirmation caused an extra Enter or typed text"
+        expected=0.5
+        [ "$confirmation" -eq 1 ] || expected=$(printf '0.5\n0.5')
+        [ "$(cat "$dir/submit-sleeps")" = "$expected" ] \
+          || fail "$shape $content at confirmation $confirmation changed the fixed confirmation waits"
+        cmp -s "$dir/screen" "$dir/edited-screen" \
+          || fail "$shape $content at confirmation $confirmation changed the operator's composer"
+        grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+          || fail "$shape $content at confirmation $confirmation hid the parent alarm"
+        [ ! -e "$state/.secondmate-wake-ring-mate" ] \
+          || fail "$shape $content at confirmation $confirmation was marked recovered"
+        [ -s "$sub/state/.wake-queue" ] \
+          || fail "$shape $content at confirmation $confirmation drained the child's queue"
+        [ ! -e "$state/mate.inbox" ] \
+          || fail "$shape $content at confirmation $confirmation typed a drain steer"
+      done
+    done
+  done
+  pass "operator edits after either swallowed Enter remain unconfirmed without submitting edited or mixed box and bare composers"
 }
 
 test_secondmate_restored_wake_lost_enter_retries_while_idle() {
@@ -3712,6 +3755,7 @@ test_secondmate_restored_wake_requires_semantic_idle
 test_secondmate_restored_wake_rechecks_semantic_idle_before_retry
 test_secondmate_restored_wake_lost_enter_retries_while_idle
 test_secondmate_restored_wake_unavailable_after_enter_keeps_parent_alarm
+test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm
 test_secondmate_stall_marker_rejects_symlink
 test_acknowledged_stall_publication_survives_pre_marker_crash
 test_empty_prefix_mate_preserves_other_mate_receipt

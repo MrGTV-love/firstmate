@@ -335,12 +335,13 @@ fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
 
 fm_task_inbox_composer_holds_wake() {
   local cap held
-  [ -n "${3:-}" ] || return 1
+  [ -n "${3:-}" ] || return 2
   [ -d "$3" ] && [ -r "$3" ] || return 2
   fm_backend_source "$1" || return 2
   cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 2
   held=$(fm_composer_extract_selected_content styled=0 "$cap") || return 2
-  [ -n "$held" ] && fm_operational_watcher_wakes_only "$held" "$3"
+  [ -n "$held" ] || return 4
+  fm_operational_watcher_wakes_only "$held" "$3"
 }
 
 fm_task_inbox_submit_held_wake() {
@@ -358,7 +359,7 @@ fm_task_inbox_submit_held_wake() {
   fi
   case "$match_status" in
     0) ;;
-    1) return 0 ;;
+    4) return 0 ;;
     *) return 3 ;;
   esac
   idle_class=$("$idle_callback" "$target" 2>/dev/null) || return 3
@@ -370,7 +371,7 @@ fm_task_inbox_submit_held_wake() {
   else
     match_status=$?
   fi
-  [ "$match_status" -eq 1 ] && return 0
+  [ "$match_status" -eq 4 ] && return 0
   return 3
 }
 
