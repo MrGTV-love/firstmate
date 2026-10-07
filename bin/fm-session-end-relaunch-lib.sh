@@ -404,7 +404,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
 # supervisor-visible line, or empty. Returns non-zero only when a required
 # write failed.
 fm_session_end_relaunch_scan() {  # <state-dir> [<watcher-grace-secs>]
-  local state=$1 meta id reason first= deadline last_attempt attempts epoch kind ledger
+  local state=$1 meta id reason first='' deadline last_attempt attempts epoch kind ledger
   FM_SESSION_END_WAKE=
   [ -d "$state" ] || return 0
   fm_session_end_bounds "${2:-}" || return 0

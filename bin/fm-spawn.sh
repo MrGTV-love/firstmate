@@ -2549,7 +2549,10 @@ spawn_profile_preflight() {
       fi
     fi
   fi
-  COMPACT_ADVISER_MODE=$(jq -r --arg harness "$HARNESS" '.[$harness] // "off"' <<<"$COMPACT_ADVISER_CONFIG")
+  COMPACT_ADVISER_MODE=off
+  if [ "$COMPACT_ADVISER_PRESENT" = 1 ]; then
+    COMPACT_ADVISER_MODE=$(jq -r --arg harness "$HARNESS" '.[$harness] // "off"' <<<"$COMPACT_ADVISER_CONFIG")
+  fi
   COMPACT_ADVISER_SWITCH=1
   # A reused pane shell may still hold the flag an earlier automatic launch
   # marked as adviser-only; drop it before this launch resolves its own policy.
@@ -2701,69 +2704,8 @@ spawn_profile_preflight() {
   # (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
   # ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
   # refuse when a pin is active: the key cannot reach the worker.
-  if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
-    if [ -z "$WORKER_ACCOUNT" ]; then
-      # No pin shed: determine whether each variable would reach the worker.
-      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-        route_text=' through config/launch-env-allowlist'
-      else
-        route_text=' through ambient environment inheritance'
-      fi
-      caller_env_reaches=1
-      if [ "$BACKEND" = tmux ] && tmux show-environment -g >/dev/null 2>&1; then
-        caller_env_reaches=0
-      fi
-      for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-        would_reach=1
-        if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-          case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-          *$'\n'"$check_var"$'\n'*) ;;
-          *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
-          esac
-        fi
-        if [ "$caller_env_reaches" -eq 1 ] && [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-          echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
-          exit 1
-        fi
-      done
-    fi
-    if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ] && tmux show-environment -g >/dev/null 2>&1; then
-      tmux_session=
-      if [ "$RELAUNCH" -eq 1 ]; then
-        tmux_session=${RELAUNCH_TARGET%%:*}
-      elif [ -n "${TMUX:-}" ]; then
-        tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
-      elif tmux has-session -t firstmate 2>/dev/null; then
-        tmux_session=firstmate
-      fi
-      for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-        if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-          case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-          *$'\n'"$check_var"$'\n'*) ;;
-          *) continue ;;  # Allowlist filters it out at launch time
-          esac
-        fi
-        tmux_env_scope=$(fm_worker_account_tmux_env "$check_var" "$tmux_session") || {
-          echo "error: cannot establish the destination tmux environment for the claude API key guard" >&2
-          exit 1
-        }
-        case "$tmux_env_scope" in
-        client)
-          echo "error: $check_var is set and would reach the claude worker through tmux update-environment; unset it or pass --allow-api-key to deliberately bill the API" >&2
-          exit 1
-          ;;
-        session)
-          echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-          exit 1
-          ;;
-        global)
-          echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-          exit 1
-          ;;
-        esac
-      done
-    fi
-  fi
+  fm_api_key_guard "$HARNESS" "$ALLOW_API_KEY" "$WORKER_ACCOUNT" \
+    "$LAUNCH_ENV_ENABLED" "$LAUNCH_ENV_NAMES" "$BACKEND" "$dispatch_tmux_session" || exit 1
   case "$LAUNCH" in
   *__MUSEBIN__*)
     MUSE_BIN=$(resolve_muse_binary) || exit 1

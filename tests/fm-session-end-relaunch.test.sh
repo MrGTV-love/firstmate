@@ -155,6 +155,8 @@ test_relaunch_hands_control_the_watcher_home() {
     export -n FM_HOME
     unset FM_STATE_OVERRIDE FM_WAKE_QUEUE
     FM_HOME="$dir"
+    # This fixture PATH is intentionally confined to the watcher subshell.
+    # shellcheck disable=SC2030
     export PATH="$fakebin:$PATH" FM_TEST_SEAM=1 FM_SESSION_END_CONTROL="$recorder" \
       FM_SESSION_END_CONTROL_LOG="$dir/control.log" \
       FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" \
@@ -811,6 +813,8 @@ test_replacement_bound_requires_current_transaction_and_live_endpoint() {
     printf 'task=%s\nworktree=%s\nkind=%s\nrelaunch_tx=%s\nrollback=%s\n' \
       "$task" "$wt" "$kind" "$tx" "$rollback" > "$journal"
     rc=0
+    # Use the parent PATH; the earlier watcher fixture's subshell PATH must not escape.
+    # shellcheck disable=SC2031
     PATH="$fakebin:$PATH" FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_TMUX_READ_FAIL="$read_fail" \
       fm_session_end_replacement_bound "$state" lane "$prior_tx" "$dir/wt-lane" ship || rc=$?
     if [ "$expected" = 1 ]; then
@@ -827,6 +831,7 @@ test_successful_replacement_stops_on_report_write_failure() {
   add_lane "$dir" lane-a
   add_lane "$dir" lane-b
   (
+    # shellcheck disable=SC2329 # Override the helper invoked by the sourced relaunch library.
     fm_session_end_queue_wake() { return 1; }
     local rc=0
     scan_lane "$dir" || rc=$?

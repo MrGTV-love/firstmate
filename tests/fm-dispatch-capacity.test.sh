@@ -495,11 +495,15 @@ for pattern in PI_CODING_AGENT_DIR 'PI_CODING_*' 'PI_?ODING_AGENT_DIR' 'PI_[A-Z]
         global_store="$TMP_ROOT/exhausted-scope"; caller_store=; expected=usable; switched=false ;;
     esac
     printf 'PI_CODING_AGENT_DIR=%s\n' "$global_store" > "$TMP_ROOT/tmux-global-env"
+    # Each command substitution deliberately exports its own isolated caller environment.
+    # shellcheck disable=SC2030
     out=$(unset PI_CODING_AGENT_DIR
       [ "$direction" = removed ] || export PI_CODING_AGENT_DIR="$caller_store"
       FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$pattern" \
         "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
     assert_equals "$expected" "$(jq -r .status <<<"$out")" "prospective $pattern $direction must measure the effective store rather than the global store"
+    # This separate command substitution deliberately recreates the caller environment.
+    # shellcheck disable=SC2031
     out=$(unset PI_CODING_AGENT_DIR
       [ "$direction" = removed ] || export PI_CODING_AGENT_DIR="$caller_store"
       FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$pattern" \
@@ -622,7 +626,8 @@ pass "OMP fallback approval uses explicit destination project configuration"
 (
   ln -s "$(type -P bash)" "$FAKEBIN/bash"
   cd "$(dirname "$FAKEBIN")" || exit 1
-  export PATH="$(basename "$FAKEBIN"):$PATH" OPENROUTER_API_KEY=caller
+  PATH="$(basename "$FAKEBIN"):$PATH"
+  export PATH OPENROUTER_API_KEY=caller
   destination=$(cd "$TMP_ROOT/destination enabled" && pwd -P)
   printf 'OPENROUTER_API_KEY=destination\n' > "$TMP_ROOT/tmux-global-env"
   printf 'OPENROUTER_API_KEY\n' > "$TMP_ROOT/config/launch-env-allowlist"
@@ -741,6 +746,8 @@ for container in scalar array; do
     done
   done
 done
+# $fallback is a jq variable, not a shell expansion.
+# shellcheck disable=SC2016
 for mutation in '.rules[0].use.model="opus"' '.rules[0].use.harness="omp"' '.rules[0].use.effort="high"' '.rules[0].fallback=$fallback'; do
   jq -n --argjson fallback "$allowed" \
     "{rules:[{use:{harness:\"claude\",model:\"sonnet\"}}]} | $mutation" > "$TMP_ROOT/config/crew-dispatch.json"
@@ -911,7 +918,7 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   rm "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/config/launch-env-allowlist"
 done
 for credential in $FM_WORKER_ACCOUNT_CLAUDE_SHED CLAUDE_CONFIG_DIR; do
-  value=destination-auth
+  value='destination-auth'
   case "$credential" in CLAUDE_CODE_USE_*) value=1 ;; esac
   printf '%s=%s\n' "$credential" "$value" > "$TMP_ROOT/tmux-session-env"
   if [ "$credential" = ANTHROPIC_FEDERATION_RULE_ID ]; then

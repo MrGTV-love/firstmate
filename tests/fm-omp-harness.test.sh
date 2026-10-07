@@ -335,7 +335,7 @@ JSON
     if [ "$scenario" = filtered ]; then
       printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist"
       expected_root=
-      expected_profile=unset
+      expected_profile='unset'
     else
       printf '%s\n' PATH PI_CODING_AGENT_DIR OMP_PROFILE PI_PROFILE > "$HOME_DIR/config/launch-env-allowlist"
     fi
@@ -407,10 +407,10 @@ test_spawn_catalog_matches_destination_provider_auth() {
         ;;
       filtered)
         printf '%s\n' PATH PI_CODING_AGENT_DIR OPENROUTER_API_KEY > "$HOME_DIR/config/launch-env-allowlist"
-        expected_custom=unset
+        expected_custom='unset'
         expected_model=openrouter/deepseek/deepseek-v4-flash
         ;;
-      removed) expected_custom=unset; destination_custom=-; expected_model=openrouter/deepseek/deepseek-v4-flash ;;
+      removed) expected_custom='unset'; destination_custom=-; expected_model=openrouter/deepseek/deepseek-v4-flash ;;
       empty) expected_custom=; destination_custom=; expected_model=openrouter/deepseek/deepseek-v4-flash ;;
       explicit-destination) model=openrouter/destination-model; expected_model=$model ;;
       explicit-caller) model=openrouter/caller-model; expected_model=$model ;;

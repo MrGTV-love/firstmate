@@ -250,7 +250,7 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
 
 test_fallback_spawn_preserves_launch_delivery_declarations() {
   local rec id event declaration expected out status
-  for event in done failed paused; do
+  for event in 'done' failed paused; do
     id="profile-fallback-$event"
     rec=$(make_spawn_case "$id" claude "$id")
     read_case_record "$rec"
@@ -333,11 +333,11 @@ SH
       effort) args+=(--effort high); expected_rule=; expected_effort=high ;;
       nondefault-model-override)
         args+=(--model opus)
-        expected_rule= expected_model=opus expected_effort=default
+        expected_rule='' expected_model=opus expected_effort=default
         ;;
       nondefault-effort-override)
         args+=(--effort low)
-        expected_rule= expected_model=default expected_effort=low
+        expected_rule='' expected_model=default expected_effort=low
         ;;
       ambiguous-harness) args+=(--harness claude) ;;
       ambiguous-model) args+=(--model default) ;;

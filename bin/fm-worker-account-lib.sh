@@ -321,8 +321,8 @@ fm_worker_account_claude_shed() {
 }
 
 fm_worker_account_tmux_env() {
-  local name=$1 session=${2:-} mode=${3:-scope} entry= scope=
-  local updates= pattern exported_names=
+  local name=$1 session=${2:-} mode=${3:-scope} entry='' scope=''
+  local updates='' pattern exported_names=''
   if [ -z "$session" ]; then
     if [ -n "${TMUX:-}" ]; then
       session=$(tmux display-message -p '#S' 2>/dev/null) || return 1
@@ -351,6 +351,7 @@ fm_worker_account_tmux_env() {
   fi
   if [ -z "$session" ]; then
     while IFS= read -r pattern; do
+      # shellcheck disable=SC2254 # tmux update-environment entries are glob patterns.
       case "$name" in
         $pattern)
           case $'\n'"$exported_names"$'\n' in

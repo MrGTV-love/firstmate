@@ -29,7 +29,7 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 fm_dispatch_omp_query_scoped() {
   local config=$1 session=$2 backend=$3 cwd=$4 executable=$5
   shift 5
-  local destination_env name names= present entry value
+  local destination_env name names='' present entry value
   local assignments=() discovered=()
   case "$session" in *:*) return 125 ;; esac
   [ "$backend" = tmux ] || return 125
@@ -93,6 +93,7 @@ fm_dispatch_omp_query() {
   if [ -z "$backend" ]; then
     backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 125
   fi
+  # shellcheck disable=SC2016 # Expand positional arguments in the child shell.
   fm_run_timed 20 "$shell_bin" -c '. "$1"; shift; fm_dispatch_omp_query_scoped "$@"' _ \
     "$FM_DISPATCH_CAPACITY_DIR/fm-dispatch-capacity-lib.sh" "$config" "$session" "$backend" "$cwd" "$executable" "$@" \
     2>/dev/null </dev/null
