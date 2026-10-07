@@ -21,11 +21,16 @@ set -u
 . "$ROOT/bin/fm-pr-lib.sh"
 
 command -v perl >/dev/null 2>&1 || { echo "skip: perl not found"; exit 0; }
+command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
+unset FM_MODEL_CATALOG_DIR
 
-TMP=$(fm_test_tmproot fm-remote-secondmate-relaunch)
+TMP=$(TMPDIR="$ROOT" fm_test_tmproot fm-remote-secondmate-relaunch)
 HOME_DIR="$TMP/home"
 FAKEBIN=$(fm_fakebin "$TMP/fake")
 mkdir -p "$HOME_DIR/data" "$HOME_DIR/state" "$HOME_DIR/config"
+DEST_HOME="$TMP/destination"
+mkdir -p "$DEST_HOME/config" "$DEST_HOME/state" "$DEST_HOME/data" "$TMP/tmp" "$TMP/user-home"
+export TMPDIR="$TMP/tmp"
 
 printf -- '- ios - iOS delivery (host: remote-mac; root: /srv/fm; home: /srv/fm-home; scope: iOS; projects: alpha; added 2026-08-01)\n' \
   > "$HOME_DIR/data/secondmates.md"
@@ -61,17 +66,50 @@ entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = fm-remote-entrypoint.sh ] || exit 92
-argv_b64=$4
-command_fields=$(perl -MMIME::Base64=decode_base64 -e '
-  my $data=decode_base64($ARGV[0]);
-  my @args=split(/\0/, $data);
-  print join("\t", map { defined $_ ? $_ : "" } @args[0..5]);
-' "$argv_b64")
-IFS=$'\t' read -r cmd action id harness model effort <<EOF
-$command_fields
-EOF
+args=()
+while IFS= read -r -d '' arg; do args+=("$arg"); done < <(
+  perl -MMIME::Base64=decode_base64 -e 'print decode_base64($ARGV[0])' "$4"
+)
+cmd=${args[0]}
+action=${args[1]}
+printf '%s %s\n' "$cmd" "$action" >> "$FM_FAKE_SSH_LOG"
+if [ "$cmd" = fm-remote-inherit.sh ]; then
+  if [ "$action" = check ] && [ "${FM_FAKE_RELAUNCH_MODE:-}" = mutate-source ] \
+    && [ ! -e "$FM_FAKE_SOURCE_HOME/mutated" ]; then
+    cp "$FM_FAKE_LATER/model-index.json" "$FM_FAKE_SOURCE_HOME/config/model-index.json"
+    cp "$FM_FAKE_LATER/crew-dispatch.json" "$FM_FAKE_SOURCE_HOME/config/crew-dispatch.json"
+    printf 'mutated\n' > "$FM_FAKE_SOURCE_HOME/mutated"
+  fi
+  FM_HOME="$FM_FAKE_DEST_HOME" FM_STATE_OVERRIDE="$FM_FAKE_DEST_HOME/state" \
+    exec "$FM_FAKE_ROOT/bin/fm-remote-inherit.sh" "${args[@]:1}"
+fi
+id=${args[2]}
+harness=${args[3]}
+model=${args[4]}
+effort=${args[5]}
 [ "$cmd" = fm-remote-secondmate-control.sh ] || exit 93
 [ "$action" = relaunch ] || exit 94
+if [ "${FM_FAKE_RELAUNCH_MODE:-}" = native ] \
+  || [ "${FM_FAKE_RELAUNCH_MODE:-}" = mutate-source ]; then
+  env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+    -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+    FM_ROOT_OVERRIDE="$FM_FAKE_SOURCE_HOME/../control-root" \
+    FM_HOME="$FM_FAKE_SOURCE_HOME/../control-root" \
+    FM_CONFIG_OVERRIDE="$FM_FAKE_DEST_HOME/config" \
+    FM_STATE_OVERRIDE="$FM_FAKE_DEST_HOME/state/parent-route" \
+    FM_DATA_OVERRIDE="$FM_FAKE_DEST_HOME/data/.parent-route" \
+    FM_SKIP_SECONDMATE_SYNC=1 FM_SKIP_SECONDMATE_INHERIT=1 \
+    FM_SPAWN_NO_GUARD=1 FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=1 FM_CONTROL_LAUNCH_WAIT=1 \
+    "$FM_FAKE_ROOT/bin/fm-control.sh" "$id" relaunch \
+    --harness "$harness" --model "$model" --effort "$effort" || exit $?
+  while IFS='=' read -r key value; do
+    case "$key" in
+      harness) harness=$value ;;
+      model) model=$value ;;
+      effort) effort=$value ;;
+    esac
+  done < "$FM_FAKE_DEST_HOME/state/parent-route/$id.meta"
+fi
 case "$FM_FAKE_RELAUNCH_MODE" in
   refuse)
     printf 'error: unverified remote secondmate harness: %s\n' "$harness" >&2
@@ -96,7 +134,12 @@ SH
 chmod +x "$FAKEBIN/fake-ssh"
 
 run_relaunch() {  # <args...>
-  env FM_HOME="$HOME_DIR" FM_SSH_BIN="$FAKEBIN/fake-ssh" \
+  env -u FM_MODEL_CATALOG_DIR -u FM_CONFIG_OVERRIDE -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE \
+    PATH="$FAKEBIN:$PATH" HOME="$TMP/user-home" \
+    FM_HOME="$HOME_DIR" FM_SSH_BIN="$FAKEBIN/fake-ssh" \
+    FM_FAKE_ROOT="$ROOT" FM_FAKE_SOURCE_HOME="$HOME_DIR" \
+    FM_FAKE_DEST_HOME="$DEST_HOME" FM_FAKE_SSH_LOG="$TMP/ssh.log" \
+    FM_FAKE_LATER="$TMP/later" \
     FM_FAKE_RELAUNCH_MODE="${FM_FAKE_RELAUNCH_MODE:-}" \
     "$ROOT/bin/fm-remote-secondmate-relaunch.sh" "$@" 2>&1
 }
@@ -188,5 +231,226 @@ expect_code 0 "$RC" "a confirmed remote relaunch should succeed with an armed PR
 fm_pr_poll_artifacts_valid "$HOME_DIR/state" ios "$ROOT/bin/fm-pr-poll.sh" \
   || fail "a remote relaunch broke PR poll authentication by writing harness/model/effort after pr="
 pass "a remote relaunch keeps an already-armed PR poll authenticating"
+
+mkdir -p "$TMP/native" "$TMP/old" "$TMP/new" "$TMP/later" "$TMP/control-root/state" \
+  "$DEST_HOME/state/parent-route" "$DEST_HOME/data/.parent-route" "$DEST_HOME/worker-account" "$DEST_HOME/bin"
+ln -s "$ROOT/bin" "$TMP/control-root/bin"
+printf '%s\n' '{"version":1,"roles":{"restart":{"pi":{"model":"openai/old","stand_in":"openai/old-standby"}}},"retired":[]}' \
+  > "$TMP/old/model-index.json"
+printf '%s\n' '{"version":1,"roles":{"restart":{"pi":{"model":"openai/new","stand_in":"openai/new-standby"}}},"retired":[]}' \
+  > "$TMP/new/model-index.json"
+printf '%s\n' '{"version":1,"roles":{"later":{"pi":{"model":"openai/later"}}},"retired":[]}' \
+  > "$TMP/later/model-index.json"
+printf '%s\n' '{"default":{"harness":"pi","role":"restart"}}' > "$TMP/old/crew-dispatch.json"
+cp "$TMP/old/crew-dispatch.json" "$TMP/new/crew-dispatch.json"
+printf '%s\n' '{"default":{"harness":"pi","role":"later"}}' > "$TMP/later/crew-dispatch.json"
+printf '%s\n' "$DEST_HOME/worker-account" openai > "$DEST_HOME/config/pi-account"
+cp "$DEST_HOME/config/pi-account" "$TMP/pi-account-before"
+printf 'tmux\n' > "$DEST_HOME/config/backend"
+printf 'ios\n' > "$DEST_HOME/.fm-secondmate-home"
+printf 'fixture instructions\n' > "$DEST_HOME/AGENTS.md"
+printf 'fixture charter\n' > "$DEST_HOME/data/charter.md"
+git -C "$DEST_HOME" init -q -b main
+git -C "$DEST_HOME" add AGENTS.md
+git -C "$DEST_HOME" -c user.name=Test -c user.email=test@example.invalid commit -qm fixture
+cat > "$FAKEBIN/pi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = auth ] && [ "${2:-}" = check ]; then
+  printf '{"status":"ready"}\n'
+  exit
+fi
+if [ "${1:-}" = --list-models ]; then
+  printf '%s\n' "${PI_CODING_AGENT_DIR:-unset}" >> "$FM_FAKE_SOURCE_HOME/native-catalog.log"
+  printf 'provider model context output reasoning images\n'
+  cat "${PI_CODING_AGENT_DIR:?}/listed"
+  exit
+fi
+printf 'Options: --tui-mode\n'
+SH
+cat > "$FAKEBIN/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+D="$FM_FAKE_SOURCE_HOME/../native"
+printf '%s\n' "$*" >> "$D/runtime.log"
+case "${1:-}" in
+  list-windows) printf 'fm-ios\n' ;;
+  display-message)
+    case "$*" in
+      *pane_current_command*) cat "$D/command" ;;
+      *pane_current_path*) printf '%s\n' "$FM_FAKE_DEST_HOME" ;;
+      *cursor_y*) printf '1\n' ;;
+      *pane_tty*) exit 0 ;;
+      *) printf '%%1\n' ;;
+    esac
+    ;;
+  capture-pane) printf '╭────╮\n│    │\n╰────╯\n' ;;
+  show-environment) exit 1 ;;
+  send-keys)
+    shift
+    literal=0
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        -t) shift 2 ;;
+        -l) literal=1; shift ;;
+        *) break ;;
+      esac
+    done
+    [ "$literal" = 1 ] || exit 0
+    payload=${1:-}
+    case "$payload" in
+      ". '"*"'")
+        staged=${payload#". '"}
+        staged=${staged%"'"}
+        [ ! -f "$staged" ] || payload=$(cat "$staged")
+        ;;
+    esac
+    printf '%s\n' "$payload" >> "$D/literal"
+    case "$payload" in
+      /exit|/quit) printf zsh > "$D/command" ;;
+      *'encode launch-brief'*|*'Firstmate operational input waiting: read'*)
+        printf '%s\n' "$payload" > "$D/launch"
+        printf pi > "$D/command"
+        ;;
+    esac
+    ;;
+esac
+SH
+chmod +x "$FAKEBIN/pi" "$FAKEBIN/tmux"
+
+reset_native() {
+  reset_meta
+  cp "$TMP/new/model-index.json" "$HOME_DIR/config/model-index.json"
+  cp "$TMP/new/crew-dispatch.json" "$HOME_DIR/config/crew-dispatch.json"
+  cp "$TMP/old/model-index.json" "$DEST_HOME/config/model-index.json"
+  cp "$TMP/old/crew-dispatch.json" "$DEST_HOME/config/crew-dispatch.json"
+  fm_write_meta "$DEST_HOME/state/parent-route/ios.meta" \
+    "window=fmses:fm-ios" "endpoint_task_id=ios" \
+    "worktree=$DEST_HOME" "project=$DEST_HOME" "home=$DEST_HOME" \
+    "harness=pi" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "model=openai/old" "effort=medium" "tasktmp=$TMP/tasktmp" "projects="
+  printf pi > "$TMP/native/command"
+  : > "$TMP/native/literal"
+  : > "$TMP/native/runtime.log"
+  : > "$TMP/ssh.log"
+  : > "$HOME_DIR/native-catalog.log"
+  rm -f "$TMP/native/launch" "$HOME_DIR/mutated"
+  rm -f "$DEST_HOME/state/parent-route/ios.control-relaunch"*
+  printf 'openai old 128K 32K yes no\n' > "$DEST_HOME/worker-account/listed"
+  cp "$HOME_DIR/state/ios.meta" "$TMP/parent-before"
+  cp "$DEST_HOME/state/parent-route/ios.meta" "$TMP/destination-before"
+  FM_FAKE_RELAUNCH_MODE=native
+}
+
+assert_native_untouched() {
+  cmp -s "$TMP/parent-before" "$HOME_DIR/state/ios.meta" \
+    || fail "refusal changed the parent route"
+  cmp -s "$TMP/destination-before" "$DEST_HOME/state/parent-route/ios.meta" \
+    || fail "refusal changed the running mate's metadata"
+  [ "$(cat "$TMP/native/command")" = pi ] || fail "refusal stopped the running mate"
+  [ ! -s "$TMP/native/literal" ] || fail "refusal sent lifecycle input to the running mate"
+  [ ! -e "$DEST_HOME/state/parent-route/ios.control-relaunch" ] \
+    || fail "refusal reached checkpoint publication"
+  cmp -s "$TMP/pi-account-before" "$DEST_HOME/config/pi-account" \
+    || fail "inheritance rewrote the destination account"
+}
+
+for REQUEST in role:restart stand-in:restart openai/new; do
+  reset_native
+  OUT=$(run_relaunch ios pi "$REQUEST" medium); RC=$?
+  [ "$RC" -ne 0 ] || fail "catalog missing the new indexed selector accepted $REQUEST: $OUT"
+  SELECTED=openai/new
+  [ "$REQUEST" != stand-in:restart ] || SELECTED=openai/new-standby
+  assert_contains "$OUT" "id '$SELECTED' absent or retired in pi catalog" \
+    "the real destination pre-stop gate must reject the newly inherited entry"
+  assert_grep "$DEST_HOME/worker-account" "$HOME_DIR/native-catalog.log" \
+    "the real catalog lookup did not use the destination worker account"
+  assert_native_untouched
+  for MEMBER in model-index.json crew-dispatch.json; do
+    cmp -s "$TMP/new/$MEMBER" "$DEST_HOME/config/$MEMBER" \
+      || fail "the pre-stop gate did not see the selected parent pair"
+  done
+done
+pass "new roles, stand-ins, and indexed literals refuse through the real destination catalog before stopping"
+
+for REQUEST in role:restart stand-in:restart openai/new; do
+  reset_native
+  printf 'openai new 128K 32K yes no\nopenai new-standby 128K 32K yes no\n' \
+    > "$DEST_HOME/worker-account/listed"
+  OUT=$(run_relaunch ios pi "$REQUEST" medium); RC=$?
+  expect_code 0 "$RC" "a destination supporting the selected parent entry must relaunch: $OUT"
+  SELECTED=openai/new
+  [ "$REQUEST" != stand-in:restart ] || SELECTED=openai/new-standby
+  assert_grep "model=$SELECTED" "$HOME_DIR/state/ios.meta" \
+    "the parent did not record the selected entry"
+  assert_grep "model=$SELECTED" "$DEST_HOME/state/parent-route/ios.meta" \
+    "the real spawn did not record the selected entry"
+  assert_contains "$(cat "$TMP/native/launch")" "$SELECTED" \
+    "the replacement launch did not consume the selected entry"
+  assert_not_contains "$(cat "$TMP/native/launch")" 'role:restart' \
+    "an unresolved role reached the worker"
+  assert_grep 'phase=complete' "$DEST_HOME/state/parent-route/ios.control-relaunch" \
+    "real control did not finish its relaunch transaction"
+  while IFS= read -r ACCOUNT; do
+    [ "$ACCOUNT" = "$DEST_HOME/worker-account" ] \
+      || fail "restart queried a catalog outside the destination account"
+  done < "$HOME_DIR/native-catalog.log"
+  for MEMBER in model-index.json crew-dispatch.json; do
+    cmp -s "$TMP/new/$MEMBER" "$DEST_HOME/config/$MEMBER" \
+      || fail "the supported restart did not deliver the selected pair"
+  done
+  cmp -s "$TMP/pi-account-before" "$DEST_HOME/config/pi-account" \
+    || fail "the supported restart changed the destination account"
+done
+pass "supported destination catalogs relaunch roles, stand-ins, and indexed literals through real control and spawn"
+
+for MEMBER in model-index.json crew-dispatch.json; do
+  reset_native
+  mv "$DEST_HOME/config/$MEMBER" "$DEST_HOME/retained-$MEMBER"
+  ln -s "$DEST_HOME/retained-$MEMBER" "$DEST_HOME/config/$MEMBER"
+  OUT=$(run_relaunch ios pi role:restart medium); RC=$?
+  [ "$RC" -ne 0 ] || fail "unsafe destination pair member was accepted: $OUT"
+  assert_contains "$OUT" 'remote inheritance refused' \
+    "the wrapper must report pair propagation refusal"
+  assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$TMP/ssh.log" \
+    "a pair preflight refusal reached remote relaunch"
+  assert_native_untouched
+  [ -L "$DEST_HOME/config/$MEMBER" ] || fail "pair preflight replaced the guarded member"
+  for RETAINED in model-index.json crew-dispatch.json; do
+    cmp -s "$TMP/old/$RETAINED" "$DEST_HOME/config/$RETAINED" \
+      || fail "pair preflight changed the retained destination pair"
+  done
+  [ "$(FM_HOME="$DEST_HOME" "$ROOT/bin/fm-model-index.sh" profiles \
+    "$DEST_HOME/config/crew-dispatch.json" | jq -r '.default.model')" = openai/old ] \
+    || fail "pair preflight left a retained pair that no longer resolves"
+  rm "$DEST_HOME/config/$MEMBER"
+  mv "$DEST_HOME/retained-$MEMBER" "$DEST_HOME/config/$MEMBER"
+done
+pass "destination pair preflight refusal preserves both retained members, the working mate, and the parent route"
+
+reset_native
+printf 'openai new 128K 32K yes no\nopenai new-standby 128K 32K yes no\n' \
+  > "$DEST_HOME/worker-account/listed"
+FM_FAKE_RELAUNCH_MODE=mutate-source
+OUT=$(run_relaunch ios pi role:restart medium); RC=$?
+expect_code 0 "$RC" "source mutation after staging must not change the restart selection: $OUT"
+[ -s "$HOME_DIR/mutated" ] || fail "the after-stage mutation hook did not execute"
+for MEMBER in model-index.json crew-dispatch.json; do
+  cmp -s "$TMP/later/$MEMBER" "$HOME_DIR/config/$MEMBER" \
+    || fail "the source mutation fixture did not change $MEMBER"
+  cmp -s "$TMP/new/$MEMBER" "$DEST_HOME/config/$MEMBER" \
+    || fail "the sender delivered the later source instead of its frozen pair"
+done
+[ "$(FM_HOME="$DEST_HOME" "$ROOT/bin/fm-model-index.sh" profiles \
+  "$DEST_HOME/config/crew-dispatch.json" | jq -r '.default.model')" = openai/new ] \
+  || fail "the delivered frozen pair does not resolve the staged model"
+assert_grep 'model=openai/new' "$HOME_DIR/state/ios.meta" \
+  "the parent recorded a model from the mutated source"
+assert_grep 'model=openai/new' "$DEST_HOME/state/parent-route/ios.meta" \
+  "the replacement spawn used a model from the mutated source"
+assert_contains "$(cat "$TMP/native/launch")" 'openai/new' \
+  "the replacement launch did not consume the frozen selection"
+assert_not_contains "$(cat "$TMP/native/launch")" 'openai/later' \
+  "the replacement launch consumed the later selection"
+pass "after-stage source mutation leaves resolution, inheritance, destination validation, and spawn on the frozen pair"
 
 echo "ALL TESTS PASSED"

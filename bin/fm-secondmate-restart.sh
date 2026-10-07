@@ -282,12 +282,13 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
       ''|low|medium|high|xhigh|max|ultra) ;;
       *) EFFORT[i]="" ;;
     esac
-    if [ -n "${MODEL[i]}" ] && ! MODEL[i]=$("$SCRIPT_DIR/fm-model-index.sh" model "${HARNESS[i]}" "${MODEL[i]}" 2>/dev/null); then
+    resolved_model=${MODEL[i]}
+    if [ -n "${MODEL[i]}" ] && ! resolved_model=$("$SCRIPT_DIR/fm-model-index.sh" model "${HARNESS[i]}" "${MODEL[i]}" 2>/dev/null); then
       REASON[i]="its configured model does not resolve through the model index (a retired id or an unconfigured role)"
       i=$((i + 1))
       continue
     fi
-    if [ "${EFFORT[i]}" = ultra ] && ! "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "${HARNESS[i]}" "${MODEL[i]}" "${EFFORT[i]}"; then
+    if [ "${EFFORT[i]}" = ultra ] && ! "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "${HARNESS[i]}" "$resolved_model" "${EFFORT[i]}"; then
       REASON[i]="the configured Ultra profile does not select native Codex through Pi"
       i=$((i + 1))
       continue
