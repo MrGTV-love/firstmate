@@ -1,0 +1,31 @@
+{
+  "name": "manual",
+  "backend": "manual",
+  "lab": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P/.fm-lab-retest-lgnoekwz",
+  "protected_files_unchanged": true,
+  "completed": true,
+  "dimensions": "140x45 /private/tmp/fml.gIlfJs/tmux-501/fm-lab",
+  "wait_stderr": "",
+  "result_subtype": "success",
+  "response_marker": true,
+  "project_source_unchanged": true,
+  "lab_files": [
+    ".fm-lab-home",
+    "config/backlog-backend",
+    "config/supervision-host",
+    "data/backlog.md",
+    "data/learnings.md",
+    "data/memory-archive.md",
+    "data/one-task/nm-review-findings.txt",
+    "data/one-task/report.md",
+    "data/projects.md",
+    "projects/sweep-demo/AGENTS.md",
+    "projects/sweep-demo/CLAUDE.md",
+    "projects/sweep-demo/export.sh",
+    "state/.fm-lab-tmux-dir"
+  ],
+  "private_server_stop_status": 0,
+  "socket_teardown_status": 0,
+  "socket_teardown_stderr": "",
+  "lab_removed": true
+}

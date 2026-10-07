@@ -1,0 +1,12 @@
+# Backlog
+
+## In flight
+
+## Queued
+
+- guard-shell-raw-command-lint - Add a rule to the repository's existing shell-lint owner that rejects the forbidden raw command and whose error message names the sole approved wrapper as the fix.
+  Class: shell script uses the forbidden raw command instead of the sole wrapper. Instances: lint-a (learnings 2026-10-01), lint-b (data/lint-b/report.md, 2026-10-06). Ladder rung 3 (lint); rungs 1 and 2 cannot apply to shell text, and the wrapper owner already exists. It would have rejected the lint-a script. No existing lint rule covers this, so nothing missed it. Dispatch follows normal intake and the project's delivery mode (direct-PR).
+- guard-editorial-tradeoff-reviewer-guidance - Add reviewer guidance to the existing owned contributor docs, placed through the firstmate-coding-guidelines knowledge-placement tree: a subjective editorial tradeoff must not be stated as an established causal fact.
+  Class: stakeholder explanation presents editorial judgment as proven cause. Instances: docs-a (learnings 2026-10-05), docs-b (data/docs-b/report.md, 2026-10-06). Ladder rung 5 (docs) because no deterministic guard can validate editorial judgment; guidance is not a guarantee of rejection. It addresses the docs-a explanation. No existing guard missed. Dispatch follows normal intake and the project's delivery mode (direct-PR).
+
+## Done

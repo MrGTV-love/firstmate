@@ -1,0 +1,83 @@
+[
+  {
+    "primary": "manual",
+    "output_excludes_nonqualifying_classes": {
+      "solo": true,
+      "one-task": true,
+      "disk full": true,
+      "storage exhaustion": true,
+      "date format": true
+    },
+    "queued_items": [
+      "- [ ] existing-owner-guard - Make archive deletion share owner validation (repo: sweep-demo) (kind: ship)",
+      "- [ ] export-single-owner-guard - Route all exports through the validated export owner (repo: sweep-demo) (kind: ship)",
+      "- [ ] operating-mode-enum-guard - Constrain API operating mode to a closed enum/schema (repo: sweep-demo) (kind: ship)",
+      "- [ ] repair-rollback-cache-test - Repair skipped rollback behavioral test so stale cache after rollback fails (repo: sweep-demo) (kind: ship)"
+    ],
+    "manual_mutation_paths": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P/.fm-lab-retest-lgnoekwz/data/backlog.md"
+    ],
+    "actual_tasks_axi_add_commands": [],
+    "protected_files_unchanged": true,
+    "tracked_project_files_unchanged": true,
+    "private_tmux_dimensions": "140x45 /private/tmp/fml.gIlfJs/tmux-501/fm-lab",
+    "lab_removed": true,
+    "private_socket_cache_removed": true
+  },
+  {
+    "primary": "tasks-axi",
+    "output_excludes_nonqualifying_classes": {
+      "solo": true,
+      "one-task": true,
+      "disk full": true,
+      "storage exhaustion": true,
+      "date format": true
+    },
+    "queued_items": [
+      "- [ ] existing-owner-guard - Make archive deletion share owner validation (repo: sweep-demo) (kind: ship)",
+      "- [ ] export-owner-guard - Route all exports through the single validated export owner (repo: sweep-demo) (kind: ship) (since 2026-10-06)",
+      "- [ ] mode-enum-guard - Constrain API operating mode to a closed enum (repo: sweep-demo) (kind: ship) (since 2026-10-06)",
+      "- [ ] rollback-cache-test-repair - Repair skipped rollback stale-cache behavioral test (repo: sweep-demo) (kind: ship) (since 2026-10-06)"
+    ],
+    "manual_mutation_paths": [],
+    "actual_tasks_axi_add_commands": [
+      "FM_HOME=$PWD/.fm-lab-retest-0tw3dnee bin/fm-tasks-axi.sh add --help 2>&1 | head -40",
+      "export FM_HOME=$PWD/.fm-lab-retest-0tw3dnee\nbin/fm-tasks-axi.sh add export-owner-guard \"Route all exports through the single validated export owner\" --kind ship --repo sweep-demo --queue --body \"Class: duplicated export implementation skips lock validation. Instances: alpha 2026-10-01, beta 2026-10-02. Rung: architecture (one shared export entry point; remove the independent implementations). Would have rejected: alpha (backup export in projects/sweep-demo/export.sh). No existing guard.\"\nbin/fm-tasks-axi.sh add mode-enum-guard \"Constrain API operating mode to a closed enum\" --kind ship --repo sweep-demo --queue --body \"Class: shared API owner accepts unconstrained mode string. Instances: gamma 2026-10-03, zeta 2026-10-04. Rung: types (closed enum/schema of the three fixed modes). Would have rejected: gamma misspelled mode. Single-owner architecture already correct.\"\nbin/fm-tasks-axi.sh add rollback-cache-test-repair \"Repair skipped rollback stale-cache behavioral test\" --kind ship --repo sweep-demo --queue --body \"Class: stale cache survives rollback. Instances: theta 2026-10-01, iota 2026-10-02. Rung: behavioral test; repair the existing rollback test whose opt-in condition skips this transition, so it runs and fails on the recorded case. Would have rejected: theta. Existing guard missed it; do not add a second.\"\ncat .fm-lab-retest-0tw3dnee/data/backlog.md"
+    ],
+    "protected_files_unchanged": true,
+    "tracked_project_files_unchanged": true,
+    "private_tmux_dimensions": "140x45 /private/tmp/fml.QkiQzy/tmux-501/fm-lab",
+    "lab_removed": true,
+    "private_socket_cache_removed": true,
+    "tasks_axi_mutating_add_lines": [
+      "bin/fm-tasks-axi.sh add export-owner-guard \"Route all exports through the single validated export owner\" --kind ship --repo sweep-demo --queue --body \"Class: duplicated export implementation skips lock validation. Instances: alpha 2026-10-01, beta 2026-10-02. Rung: architecture (one shared export entry point; remove the independent implementations). Would have rejected: alpha (backup export in projects/sweep-demo/export.sh). No existing guard.\"",
+      "bin/fm-tasks-axi.sh add mode-enum-guard \"Constrain API operating mode to a closed enum\" --kind ship --repo sweep-demo --queue --body \"Class: shared API owner accepts unconstrained mode string. Instances: gamma 2026-10-03, zeta 2026-10-04. Rung: types (closed enum/schema of the three fixed modes). Would have rejected: gamma misspelled mode. Single-owner architecture already correct.\"",
+      "bin/fm-tasks-axi.sh add rollback-cache-test-repair \"Repair skipped rollback stale-cache behavioral test\" --kind ship --repo sweep-demo --queue --body \"Class: stale cache survives rollback. Instances: theta 2026-10-01, iota 2026-10-02. Rung: behavioral test; repair the existing rollback test whose opt-in condition skips this transition, so it runs and fails on the recorded case. Would have rejected: theta. Existing guard missed it; do not add a second.\""
+    ]
+  },
+  {
+    "primary": "second-instance",
+    "queued_items": [
+      "- guard-raw-command-lint [sweep-demo] - Add a shell-lint rule rejecting the raw command in favor of the sole approved wrapper",
+      "- guard-editorial-causal-claims-docs [sweep-demo] - Place reviewer guidance on stating subjective editorial tradeoffs as proven cause"
+    ],
+    "actual_mutation_actions": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01LD9HL31hEoBYnmszBwrAco",
+        "name": "Bash",
+        "input": {
+          "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P/.fm-lab-retest-05eamcsg && cat > data/backlog.md <<'EOF'\n# Backlog\n\n## In flight\n\n## Queued\n\n- guard-raw-command-lint [sweep-demo] - Add a shell-lint rule rejecting the raw command in favor of the sole approved wrapper\n  Mistake class: shell scripts invoke the forbidden raw command instead of the approved wrapper. Evidence (2): lint-a (2026-10-01, data/learnings.md), lint-b (2026-10-06, data/lint-b/report.md).\n  Ladder rung: lint. Architecture already exists (the wrapper) and types cannot constrain shell command text. Existing guard that missed: the shell-lint owner has no rule for this invocation, so repair it there.\n  Recorded instance rejected: lint-a and lint-b scripts. The error message must name the wrapper as the fix. The lint-b reproduction becomes the fixture for the rule.\n  Proposed only; dispatch follows normal intake and the project's direct-PR delivery mode. Do not edit the project's AGENTS.md or CLAUDE.md.\n\n- guard-editorial-causal-claims-docs [sweep-demo] - Place reviewer guidance on stating subjective editorial tradeoffs as proven cause\n  Mistake class: stakeholder explanations present a subjective editorial judgment as an established causal fact. Evidence (2): docs-a (2026-10-05, data/learnings.md), docs-b (2026-10-06, data/docs-b/report.md).\n  Ladder rung: docs. No architecture, type, lint, or behavioral check can decide an editorial judgment; no mechanical guard exists to have missed it.\n  Place the rule in the existing contributor docs that own reviewer guidance, chosen through the firstmate-coding-guidelines knowledge-placement tree. Wording should require separating observed fact from judgment. Would have flagged docs-a and docs-b.\n  Proposed only; dispatch follows normal intake and the project's direct-PR delivery mode. Do not edit the project's AGENTS.md or CLAUDE.md.\n\n## Done\nEOF\ncat data/backlog.md | head -8"
+        },
+        "caller": {
+          "type": "direct"
+        }
+      }
+    ],
+    "protected_files_unchanged": true,
+    "tracked_project_files_unchanged": true,
+    "private_tmux_dimensions": "140x45 /private/tmp/fml.smKEcL/tmux-501/fm-lab",
+    "lab_removed": true,
+    "private_socket_cache_removed": true
+  }
+]

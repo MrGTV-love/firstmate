@@ -1,0 +1,56 @@
+[
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; ls; ls -R .fm-lab-sweep-xg3svmt5 | head -100; grep -ril \"trigger\" --include=*.md . 2>/dev/null | grep -i skill | head -20"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; ls skills; grep -rli \"trigger index\" skills AGENTS.md docs | head"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; grep -n -i -B2 -A15 \"trigger index\" AGENTS.md | head -60; find skills | head -50"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; grep -rl \"repeat-mistake\" . --exclude-dir=.git --exclude-dir=.fm-lab-sweep-xg3svmt5 | head; ls -a ~/.claude/skills 2>/dev/null | head"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; grep -n -i \"repeat-mistake\" .agents/skills/agent-skill-trigger-index/SKILL.md; cat .agents/skills/diagnostic-reasoning/SKILL.md; ls .agents/skills/diagnostic-reasoning"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; L=.fm-lab-sweep-xg3svmt5; cat $L/config/*; for f in learnings memory-archive backlog done-archive projects; do echo \"=== $f\"; cat $L/data/$f.md; done; echo ===; cat $L/data/one-task/*; ls -la $L/state $L/data; cat $L/projects/sweep-demo/*; sed -n '/required-tools-and-manual-mode/,+40p' docs/configuration.md | head -80"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; L=.fm-lab-sweep-xg3svmt5; cat $L/data/one-task/*; ls -la $L/state; cat $L/projects/sweep-demo/*; grep -n -A40 \"required-tools-and-manual-mode\\|## Required tools\" docs/configuration.md | head -90; sed -n 1,60p bin/fm-tasks-axi.sh"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; export FM_HOME=$PWD/.fm-lab-sweep-xg3svmt5; bin/fm-tasks-axi.sh add --help 2>&1 | head -40"
+    }
+  },
+  {
+    "tool": "Bash",
+    "input": {
+      "command": "cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3B3TFV91CVVRFACHNT5P; export FM_HOME=$PWD/.fm-lab-sweep-xg3svmt5; T=bin/fm-tasks-axi.sh\n$T add export-owner-guard \"Route backup and batch export through the single lock-checked export owner\" --kind ship --repo sweep-demo --queue --body \"Recurring class: independent export implementations omit the lock check. Evidence: alpha (2026-10-01, backup export), beta (2026-10-02, batch export). Rung: architecture - one export entry point. Instance rejected: alpha. No existing guard missed. Sweep-filed; do not dispatch without normal intake; direct-PR delivery.\" 2>&1\n$T add mode-enum-guard \"Constrain API operating mode to a closed schema enum of the three supported modes\" --kind ship --repo sweep-demo --queue --body \"Recurring class: API accepts misspelled operating mode via unconstrained string. Evidence: gamma (2026-10-03), zeta (2026-10-04). Rung: types - closed schema enum (architecture cannot help: one shared owner already exists). Instance rejected: gamma. No existing guard missed. Sweep-filed; direct-PR delivery.\" 2>&1\n$T add rollback-cache-guard-repair \"Repair the rollback behavioral test so it runs unconditionally for the stale-cache transition\" --kind ship --repo sweep-demo --queue --body \"Recurring class: stale cache survives rollback. Evidence: theta (2026-10-01), iota (2026-10-02). Rung: behavioral test - repair the existing guard, which was disabled by an opt-in condition / skipped and missed both instances. Instance rejected: theta. Sweep-filed; direct-PR delivery.\" 2>&1\ncat $FM_HOME/data/backlog.md"
+    }
+  }
+]
