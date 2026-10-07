@@ -1186,9 +1186,9 @@ Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json`
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
 Typed intake freezes the index alongside its rules snapshot, applies the never-send filter before any live catalog request, and checks only the chosen profile's id, under that harness's `config/claude-account` or `config/pi-account` pin when one is set.
 For a manually selected profile, pass `--model role:<role>` or `--model stand-in:<role>` to `fm-spawn.sh`, or use the concrete id returned by `fm-model-index.sh model <harness> role:<role>`.
-Spawn resolves role references, including a model token in `config/secondmate-harness`, before its existing model validation and records and launches only the resulting concrete id.
+Spawn freezes the routing pair before resolving role references, including a model token in `config/secondmate-harness`, and reuses that generation for membership, catalog checks, and secondmate inheritance; metadata and launch flags contain only the resulting concrete id.
 `fm-control.sh relaunch` and the remote secondmate spawn and restart paths resolve the same way before anything stops, so a role pin launches and a since-retired id refuses on the pre-stop side.
-A relaunch also runs the selected-entry catalog check, under the replacement's worker account, before it stops the running agent.
+A relaunch runs the selected-entry catalog check under the replacement's worker account before it stops the running agent, and carries the same frozen routing pair into replacement spawn.
 Spawn checks only the selected index entry, after worker-account selection, using a declared worker account pin or an authoritative catalog export.
 Only an exact primary or stand-in entry for the selected harness delegates spawn's native model validation to this check; unrelated index entries do not disable the existing validation of literal selectors.
 Spawn, intake, and relaunch checks report unavailable catalog evidence when the destination worker's account and environment cannot be established, including unpinned launches, ordinary Claude's destination-dependent home, and wrapped or raw launch commands; the supervisor's live catalog does not stand in for the worker's.

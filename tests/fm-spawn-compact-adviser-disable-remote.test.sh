@@ -80,6 +80,16 @@ shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = fm-remote-entrypoint.sh ] || exit 92
 cd "$FM_FAKE_REMOTE_CWD" || exit 93
+decoded=$(printf '%s' "$4" | base64 --decode 2>/dev/null | tr '\0' '\n')
+if [ -n "${FM_TEST_PAIR_BOUNDARY:-}" ] && [ ! -e "$FM_TEST_PAIR_MARKER" ]; then
+  case "$FM_TEST_PAIR_BOUNDARY:$decoded" in
+    readiness:fm-remote-doctor.sh*|sync:fm-remote-secondmate-control.sh$'\n'sync*)
+      cp "$FM_TEST_PAIR_LATER/model-index.json" "$FM_HOME/config/model-index.json"
+      cp "$FM_TEST_PAIR_LATER/crew-dispatch.json" "$FM_HOME/config/crew-dispatch.json"
+      touch "$FM_TEST_PAIR_MARKER"
+      ;;
+  esac
+fi
 # The readiness gate is answered here rather than by the real doctor, which
 # would inspect the RUNNER's own account; tests/fm-remote-doctor.test.sh owns
 # the doctor's behavior against controlled account fixtures.
@@ -228,5 +238,53 @@ for setting in absent enabled; do
   done
 done
 pass "remote Claude auto and function hooks survive both environment postures and lost pane exports"
+
+
+cat > "$PROBEBIN/codex" <<'SH'
+#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --model) printf '%s\n' "$2"; exit 0 ;;
+    *) shift ;;
+  esac
+done
+exit 1
+SH
+
+for BOUNDARY in readiness sync; do
+  for SELECTOR in role:strong stand-in:strong current-sol configured; do
+    ORIGINAL="$TMP_ROOT/pair-$BOUNDARY-${SELECTOR//:/-}"
+    LATER="$ORIGINAL/later"
+    mkdir -p "$LATER"
+    printf '%s\n' '{"version":1,"roles":{"strong":{"codex":{"model":"current-sol","stand_in":"standby-sol"}}},"retired":[]}' > "$ORIGINAL/model-index.json"
+    printf '%s\n' '{"default":{"harness":"codex","role":"strong"}}' > "$ORIGINAL/crew-dispatch.json"
+    printf '%s\n' '{"version":1,"roles":{"strong":{"codex":{"model":"later-sol","stand_in":"later-standby"}}},"retired":["current-sol","standby-sol"]}' > "$LATER/model-index.json"
+    cp "$ORIGINAL/crew-dispatch.json" "$LATER/crew-dispatch.json"
+    cp "$ORIGINAL/model-index.json" "$PARENT/config/model-index.json"
+    cp "$ORIGINAL/crew-dispatch.json" "$PARENT/config/crew-dispatch.json"
+    printf 'codex\n' > "$PARENT/config/secondmate-harness"
+    REQUEST=(--model "$SELECTOR")
+    if [ "$SELECTOR" = configured ]; then
+      printf 'codex role:strong\n' > "$PARENT/config/secondmate-harness"
+      REQUEST=()
+    fi
+    reset_remote_herdr_fixture "$HERDR_STATE"
+    : > "$HERDR_LOG"
+    OUT=$(FM_TEST_PAIR_BOUNDARY="$BOUNDARY" FM_TEST_PAIR_MARKER="$ORIGINAL/mutated" \
+      FM_TEST_PAIR_LATER="$LATER" remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate ${REQUEST[@]+"${REQUEST[@]}"} 2>&1) \
+      || fail "$BOUNDARY/$SELECTOR frozen remote launch failed: $OUT"
+    assert_present "$ORIGINAL/mutated" "$BOUNDARY mutation boundary was not reached"
+    SELECTED=current-sol
+    [ "$SELECTOR" != stand-in:strong ] || SELECTED=standby-sol
+    assert_grep "model=$SELECTED" "$PARENT/state/ios.meta" "remote metadata changed selection after mutation"
+    SEEN=$(replay_remote_launch bare) || fail "the frozen remote launch command failed to run"
+    assert_equals "$SELECTED" "$SEEN" "the remote worker received a different model generation"
+    for MEMBER in model-index.json crew-dispatch.json; do
+      cmp -s "$ORIGINAL/$MEMBER" "$REMOTE_HOME/config/$MEMBER" \
+        || fail "$BOUNDARY/$SELECTOR inherited a different $MEMBER generation"
+    done
+  done
+done
+pass "remote readiness and sync mutations preserve roles, stand-ins, indexed literals, and configured models with their inherited pair"
 
 echo "ALL TESTS PASSED"

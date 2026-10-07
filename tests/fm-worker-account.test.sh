@@ -48,6 +48,12 @@ SH
   cat > "$fakebin/pi" <<SH
 #!/usr/bin/env bash
 root=\${PI_CODING_AGENT_DIR:-\$HOME/.pi/agent}
+if { [ "\${1:-}" = auth ] && [ -f '$dir/mutate-auth' ]; } ||
+  { [ "\${1:-}" = --list-models ] && [ -f '$dir/mutate-check' ]; }; then
+  cp '$dir/later-index.json' '$dir/home/config/model-index.json'
+  cp '$dir/later-dispatch.json' '$dir/home/config/crew-dispatch.json'
+  touch '$dir/mutated'
+fi
 case "\${1:-}" in
   --help) printf '%s\n' 'Pi 0.86.1' 'Options: --help --tui-mode <mode>'; exit 0 ;;
   auth)
@@ -600,6 +606,85 @@ SH
   pass "an unrelated or other-harness index entry leaves Cursor and omp non-entry native guards active"
 }
 
+test_configured_secondmate_inherits_frozen_routing_pair() {
+  local boundary out rc id sm root member
+  for boundary in auth check; do
+    id="acct-configured-freeze-$boundary"
+    new_case "$id" pi
+    root="$CASE/pinned"
+    mkdir -p "$root"
+    printf 'openai\n' > "$root/signed-in"
+    printf 'openai current 128K 32K yes no\n' > "$root/listed"
+    printf '%s\nopenai\n' "$root" > "$HOME_DIR/config/pi-account"
+    printf 'pi role:chosen\n' > "$HOME_DIR/config/secondmate-harness"
+    printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/current"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+    printf '%s\n' '{"default":{"harness":"pi","role":"chosen"}}' > "$HOME_DIR/config/crew-dispatch.json"
+    for member in model-index.json crew-dispatch.json; do
+      cp "$HOME_DIR/config/$member" "$CASE/original-$member"
+    done
+    printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later"}}},"retired":["openai/current"]}' > "$CASE/later-index.json"
+    printf '%s\n' '{"default":{"harness":"pi","model":"openai/later"}}' > "$CASE/later-dispatch.json"
+    touch "$CASE/mutate-$boundary"
+    sm="$CASE/secondmate-home"
+    mkdir -p "$sm/bin" "$sm/data"
+    git init -q -b main "$sm"
+    printf '%s\n' 'config/' 'state/' 'data/' > "$sm/.gitignore"
+    printf '# Firstmate\n' > "$sm/AGENTS.md"
+    printf '%s\n' "$id" > "$sm/.fm-secondmate-home"
+    printf 'charter for %s\n' "$id" > "$sm/data/charter.md"
+    out=$(FM_FAKE_LAUNCH_LOG="$CASE/launch.log" \
+      fm_test_run_spawn "$HOME_DIR" "$WT" "$FAKEBIN" "$id" "$sm" --secondmate); rc=$?
+    expect_code 0 "$rc" "$boundary configured secondmate frozen launch failed: $out"
+    assert_not_contains "$out" "catalog unavailable" "configured selection must have readable pinned catalog evidence"
+    assert_present "$CASE/mutated" "configured model did not exercise mutation"
+    assert_grep 'model=openai/current' "$HOME_DIR/state/$id.meta" "configured model lost its frozen selection"
+    assert_contains "$(cat "$CASE/launch.log")" "--model 'openai/current'" "configured launch used later routing"
+    for member in model-index.json crew-dispatch.json; do
+      cmp -s "$CASE/original-$member" "$sm/config/$member" \
+        || fail "local secondmate inherited later $member at $boundary"
+    done
+  done
+  pass "configured local secondmates inherit the exact pair selected before auth and catalog mutation"
+}
+
+test_configured_secondmate_inherits_frozen_routing_pair
+test_spawn_routing_pair_survives_account_boundaries() {
+  local boundary selector id root model out rc
+  for boundary in auth check; do
+    for selector in role:chosen stand-in:chosen openai/current; do
+      id="acct-freeze-$boundary-${selector//[:\/]/-}"
+      new_case "$id" pi
+      root="$CASE/pinned"
+      mkdir -p "$root"
+      printf 'openai\n' > "$root/signed-in"
+      printf 'openai current 128K 32K yes no\nopenai standby 128K 32K yes no\n' > "$root/listed"
+      printf '%s\nopenai\n' "$root" > "$HOME_DIR/config/pi-account"
+      printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/current","stand_in":"openai/standby"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+      printf '%s\n' '{"default":{"harness":"pi","role":"chosen"}}' > "$HOME_DIR/config/crew-dispatch.json"
+      printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later"}}},"retired":["openai/current","openai/standby"]}' > "$CASE/later-index.json"
+      printf '%s\n' '{"default":{"harness":"pi","model":"openai/later"}}' > "$CASE/later-dispatch.json"
+      touch "$CASE/mutate-$boundary"
+      out=$(spawn_ship "$id" --harness pi --model "$selector"); rc=$?
+      expect_code 0 "$rc" "$boundary/$selector must retain its initial entry: $out"
+      assert_not_contains "$out" "catalog unavailable" "selected entry must have readable pinned catalog evidence"
+      assert_present "$CASE/mutated" "the account mutation boundary was not exercised"
+      model=openai/current
+      [ "$selector" != stand-in:chosen ] || model=openai/standby
+      assert_grep "model=$model" "$HOME_DIR/state/$id.meta" "spawn changed its frozen selection"
+      assert_contains "$(cat "$CASE/launch.log")" "--model '$model'" "spawn launched a later model generation"
+      assert_grep "$root" "$CASE/pi-catalogs" "frozen selection bypassed the pinned native catalog"
+      printf 'openai unrelated 128K 32K yes no\n' > "$root/listed"
+      printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/current","stand_in":"openai/standby"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+      out=$(spawn_ship "$id-refuse" --harness pi --model "$selector"); rc=$?
+      [ "$rc" -ne 0 ] || fail "mutation bypassed initial-entry catalog refusal: $out"
+      assert_absent "$HOME_DIR/state/$id-refuse.meta" "unsupported frozen entry published metadata"
+      assert_contains "$out" "absent or retired in pi catalog" "initial-entry refusal lost native catalog evidence"
+    done
+  done
+  pass "local auth and catalog mutations preserve initial roles, stand-ins, and indexed literals without bypassing account checks"
+}
+
+test_spawn_routing_pair_survives_account_boundaries
 test_nonentry_literals_keep_the_native_catalog_guards
 test_indexed_native_catalog_guards_use_the_shared_boundary
 test_ordinary_claude_catalog_context_is_unavailable

@@ -1008,6 +1008,18 @@ spawn_remote_secondmate() {
     fm_lock_release "$SPAWN_TASK_LOCK" || true
     return 3
   fi
+  SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || {
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    return 1
+  }
+  if ! FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
+    fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" 1 ||
+    ! fm_config_inherit_pair_valid "$SPAWN_ROUTING_PAIR"; then
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    return 1
+  fi
   host=$(secondmate_registry_field "$DATA/secondmates.md" "$id" host)
   root=$(secondmate_registry_field "$DATA/secondmates.md" "$id" root)
   home=$(secondmate_registry_field "$DATA/secondmates.md" "$id" home)
@@ -1068,7 +1080,7 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
-  if [ "$model" != - ] && ! model=$("$SCRIPT_DIR/fm-model-index.sh" model "$harness" "$model"); then
+  if [ "$model" != - ] && ! model=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$harness" "$model"); then
     fm_lock_release "$registry_lock" || true
     fm_lock_release "$SPAWN_TASK_LOCK" || true
     return 1
@@ -1142,7 +1154,7 @@ spawn_remote_secondmate() {
     echo "error: remote secondmate $id inheritance generation could not be published" >&2
     return 1
   fi
-  if "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$id" "$remote_generation" >/dev/null; then
+  if FM_CONFIG_INHERIT_PAIR_DIR="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$id" "$remote_generation" >/dev/null; then
     :
   else
     rc=$?
@@ -1307,6 +1319,7 @@ GIT_HOOKS_DIR=
 SPAWN_LAUNCH_SENT=0
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_TREEHOUSE_ABORT_TARGET=
+SPAWN_ROUTING_PAIR=
 
 spawn_fresh_commit_rollback() {
   if fm_backlog_atomic_transition rollback "$STATE/$ID.meta" \
@@ -1493,6 +1506,7 @@ spawn_abort_cleanup() {
     CONFIG_INHERIT_LOCK_HELD=0
     fm_lock_release "$CONFIG_INHERIT_LOCK" || true
   fi
+  [ -z "$SPAWN_ROUTING_PAIR" ] || rm -rf -- "$SPAWN_ROUTING_PAIR"
   # The per-id spawn lock is retaken so a concurrent spawn of the same id, which
   # reinstalls this strip dir, is never undone. A launched agent whose endpoint
   # was not closed may still be committing, so it keeps its strip.
@@ -2422,20 +2436,26 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
+if { [ -n "$MODEL" ] && [ "$MODEL" != default ]; } ||
+  { [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; }; then
+  SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
+  FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
+    fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" || exit 1
+fi
 # Resolve a role exactly once, after every model source and before any
 # model-aware launch validation. Resolution is offline; with an index, a retired
 # literal refuses here and the selected entry's catalog check runs below under
 # the worker account that will actually launch it.
 MODEL_INDEXED=0
-[ ! -e "$CONFIG/model-index.json" ] && [ ! -L "$CONFIG/model-index.json" ] || MODEL_INDEXED=1
+[ ! -e "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] && [ ! -L "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] || MODEL_INDEXED=1
 case "$MODEL" in role:*|stand-in:*)
   [ "$RAW_LAUNCH" = 0 ] || { echo "error: model roles require a canonical harness launch" >&2; exit 1; }
   MODEL_INDEXED=1
   ;;
 esac
 if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
-  MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
-  MODEL_INDEXED=$("$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
+  MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+  MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
   if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
 else
   MODEL_INDEXED=0
@@ -2579,7 +2599,7 @@ if [ "$MODEL_INDEXED" = 1 ]; then
   if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
     MODEL_CATALOG_CONTEXT=unavailable
   fi
-  fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
+  FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
 fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
@@ -3181,7 +3201,7 @@ if [ "$KIND" = secondmate ]; then
     CONFIG_INHERIT_LOCK_HELD=1
     # Inheritance propagation: push the primary-authoritative live-safe local inheritance
     # surface into this secondmate home (fm-config-inherit-lib.sh).
-    FM_CONFIG_INHERIT_LIVE=1 \
+    FM_CONFIG_INHERIT_PAIR_DIR="${SPAWN_ROUTING_PAIR:-${FM_CONFIG_INHERIT_PAIR_DIR:-}}" FM_CONFIG_INHERIT_LIVE=1 \
       propagate_secondmate_inheritance "$FM_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
       echo "warning: secondmate $ID inheritance failed for $PROJ_ABS" >&2
   fi

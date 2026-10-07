@@ -999,6 +999,66 @@ test_model_index_resolves_and_refuses_before_stop() {
   pass "fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop"
 }
 
+test_model_index_generation_survives_account_checks_and_replacement() {
+  local dir out rc id request verdict selected
+  for request in role:chosen stand-in:chosen openai/selected; do
+    for verdict in absent available; do
+      id="rl-generation-${request//[:\/]/-}-$verdict"
+      dir=$(new_case model-generation "$id")
+      add_ship_task "$dir" "$id" pi
+      printf pi > "$dir/fake/command"
+      printf pi > "$dir/fake/becomes"
+      mkdir -p "$dir/home/config" "$dir/account"
+      printf '%s\nopenai\n' "$dir/account" > "$dir/home/config/pi-account"
+      printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/selected","stand_in":"openai/standby"}}},"retired":[]}' \
+        > "$dir/home/config/model-index.json"
+      selected=openai/selected
+      [ "$request" != stand-in:chosen ] || selected=openai/standby
+      if [ "$verdict" = available ]; then
+        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":["selected","standby"]}' > "$dir/later.json"
+        printf 'openai selected 272K 32K yes no\nopenai standby 272K 32K yes no\n' > "$dir/account/listed"
+      else
+        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":[]}' > "$dir/later.json"
+        printf 'openai later 272K 32K yes no\n' > "$dir/account/listed"
+      fi
+      cat > "$dir/fakebin/pi" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  auth)
+    cp '$dir/later.json' '$dir/home/config/model-index.json'
+    printf '%s\n' "\$PI_CODING_AGENT_DIR" >> '$dir/auth-roots'
+    printf '{"status":"ready"}\n'
+    ;;
+  --list-models)
+    printf '%s\n' "\$PI_CODING_AGENT_DIR" >> '$dir/catalog-roots'
+    printf 'provider model context\n'
+    cat "\$PI_CODING_AGENT_DIR/listed"
+    ;;
+  *) printf 'Options: --tui-mode\n' ;;
+esac
+SH
+      chmod +x "$dir/fakebin/pi"
+      cp "$dir/home/state/$id.meta" "$dir/meta-before"
+      out=$(run_control "$dir" "$id" relaunch --model "$request" --note "preserve selected routing generation"); rc=$?
+      cmp -s "$dir/later.json" "$dir/home/config/model-index.json" || fail "account check did not mutate the source generation"
+      [ "$(cat "$dir/catalog-roots" | sort -u)" = "$dir/account" ] || fail "generation check changed the worker account"
+      if [ "$verdict" = absent ]; then
+        expect_code 1 "$rc" "an absent originally selected entry must refuse before stopping: $out"
+        assert_contains "$out" "id '$selected' absent or retired in pi catalog" "the frozen entry must remain catalog-gated"
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "generation refusal changed the running task record"
+        [ "$(cat "$dir/fake/command")" = pi ] || fail "generation refusal stopped the working agent"
+        [ ! -s "$dir/fake/literal" ] || fail "generation refusal sent lifecycle input"
+      else
+        expect_code 0 "$rc" "the selected available generation must survive auth mutation and replacement: $out"
+        [ "$(meta_field "$dir" "$id" model)" = "$selected" ] || fail "replacement switched model generations"
+        assert_contains "$(cat "$dir/fake/literal")" "--model '$selected'" "replacement lost the frozen model"
+        [ "$(wc -l < "$dir/catalog-roots" | tr -d ' ')" = 2 ] || fail "both pre-stop and replacement must check the selected entry"
+      fi
+    done
+  done
+  pass "relaunch freezes role, stand-in, and literal membership across authentication and replacement"
+}
+
 test_unpinned_indexed_relaunch_does_not_query_the_supervisor_account() {
   local dir out rc id=rl-context model
   dir=$(new_case model-context "$id")
@@ -3768,6 +3828,7 @@ test_prefixed_recorded_harness_requires_explicit_replacement
 test_same_harness_relaunch_keeps_the_profile_axes
 test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop
 test_model_index_resolves_and_refuses_before_stop
+test_model_index_generation_survives_account_checks_and_replacement
 test_unpinned_indexed_relaunch_does_not_query_the_supervisor_account
 test_signed_out_worker_account_pin_refuses_before_stop
 test_worker_account_pin_follows_the_relaunch
