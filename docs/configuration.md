@@ -1609,7 +1609,7 @@ The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](..
 Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.
 The policy comes from the resolved `FM_CONFIG_OVERRIDE` or `FM_HOME/config`, and each policy-check child runs without credentials; only the upstream Node process receives the resolved TypeSafe key.
 A forbidden value, invalid policy, or policy-check refusal withholds the entire request without network egress, and upstream catches the withheld-request error and allows the stop.
-Each policy check uses the shared one-second process-group deadline and a two-second synchronous-child ceiling, so stalled policy work and its descendants cannot indefinitely delay the stop.
+Each policy check uses the shared three-second process-group deadline and a five-second synchronous-child ceiling, allowing shell startup and cleanup headroom while bounding stalled policy work and its descendants.
 
 `belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
 Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.

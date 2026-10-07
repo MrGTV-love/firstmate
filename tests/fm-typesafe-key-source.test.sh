@@ -108,7 +108,9 @@ for (let attempt = 0; attempt < 2; attempt++) {
       body: JSON.stringify(body),
     });
     await response.json();
-  } catch {
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'fetch-error', attempt, name: error.name, message: error.message }));
+    // Like upstream belay, withholding fails open, but never hide its cause.
     process.exit(0);
   }
 }
@@ -119,18 +121,42 @@ REQUESTS="$TMP_ROOT/belay-requests.jsonl"
 LEAKS="$TMP_ROOT/belay-leaks"
 COMMANDS="$TMP_ROOT/belay-commands"
 TRANSPORT_MODULE="$TMP_ROOT/belay-transport.mjs"
+DIAGNOSTICS="$TMP_ROOT/belay-diagnostics.jsonl"
+trap 'status=$?; if [ "$status" -ne 0 ] && [ -f "$DIAGNOSTICS" ]; then cat "$DIAGNOSTICS" "$COMMANDS" >&2; fi; fm_test_cleanup' EXIT
 cat > "$TRANSPORT_MODULE" <<'JS'
 import { appendFileSync } from 'node:fs';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+const spawnSync = childProcess.spawnSync;
+childProcess.spawnSync = (...args) => {
+  const env = args[2]?.env ?? process.env;
+  if ('TYPESAFE_API_KEY' in env || 'TYPESAFE_API_KEY_PRIVATE' in env) {
+    appendFileSync(process.env.FM_TEST_BELAY_LEAKS, 'policy-child\n');
+  }
+  // Wrapper commands remain instrumented, but the already-observed credential-
+  // free policy child uses real utilities without per-command Bash shims.
+  args[2] = { ...args[2], env: { ...env, PATH: process.env.FM_TEST_BELAY_POLICY_PATH } };
+  const started = performance.now();
+  const result = spawnSync(...args);
+  appendFileSync(process.env.FM_TEST_BELAY_DIAGNOSTICS, JSON.stringify({
+    event: 'policy-child', elapsedMs: Math.round(performance.now() - started),
+    status: result.status, signal: result.signal, error: result.error?.code ?? null,
+  }) + '\n');
+  return result;
+};
+syncBuiltinESMExports();
 globalThis.fetch = async (url, init) => {
   appendFileSync(process.env.FM_TEST_BELAY_REQUESTS, JSON.stringify({
     url: String(url), body: JSON.parse(init.body), authorization: init.headers.Authorization,
   }) + '\n');
+  appendFileSync(process.env.FM_TEST_BELAY_DIAGNOSTICS, '{"event":"transport"}\n');
   return { ok: true, status: 200, json: async () => ({ allowed: true }) };
 };
 JS
 SHIMBIN="$TMP_ROOT/belay-shims"
 mkdir -p "$SHIMBIN"
-for command in dirname git jq grep tr mktemp rm cat; do
+# The policy child is observed at spawn; only preflight commands need shims.
+for command in dirname git; do
   real_command=$(command -v "$command") || fail "missing fixture command: $command"
   printf '#!/bin/bash\nprintf "%%s\\n" "%s" >> "$FM_TEST_BELAY_COMMANDS"\nif [ "${TYPESAFE_API_KEY+x}" = x ] || [ "${TYPESAFE_API_KEY_PRIVATE+x}" = x ]; then printf "%%s\\n" "%s" >> "$FM_TEST_BELAY_LEAKS"; fi\nexec "%s" "$@"\n' \
     "$command" "$command" "$real_command" > "$SHIMBIN/$command"
@@ -144,9 +170,12 @@ run_belay() {  # <home> [KEY=VALUE...]; stdin payload fixed
   : > "$REQUESTS"
   : > "$LEAKS"
   : > "$COMMANDS"
+  : > "$DIAGNOSTICS"
   printf 'payload' | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE FM_HOME="$home" \
     FM_CONFIG_OVERRIDE='' FM_JEV_BELAY_BLOB="$blob" FM_TEST_BELAY_SEEN="$SEEN" \
     FM_TEST_BELAY_REQUESTS="$REQUESTS" FM_TEST_BELAY_LEAKS="$LEAKS" FM_TEST_BELAY_COMMANDS="$COMMANDS" \
+    FM_TEST_BELAY_DIAGNOSTICS="$DIAGNOSTICS" \
+    FM_TEST_BELAY_POLICY_PATH="$PATH" \
     NODE_OPTIONS="--import=$TRANSPORT_MODULE" PATH="$SHIMBIN:$PATH" "$@" \
     "$ROOT/bin/fm-jev-belay-hook.sh"
 }
@@ -178,7 +207,7 @@ for keys in public private both; do
   [ "$(jq -s length "$REQUESTS")" = 2 ] || fail "allowed policy must permit every fetch attempt"
   jq -se --arg auth "Bearer $expected" 'all(.[]; .authorization == $auth)' "$REQUESTS" >/dev/null \
     || fail "$keys exported key did not reach transport"
-  for command in dirname git jq grep; do
+  for command in dirname git; do
     grep -qx "$command" "$COMMANDS" || fail "$command leakage shim was not exercised"
   done
 done
@@ -216,18 +245,17 @@ pass "config override selects the effective policy"
 
 STALLBIN="$TMP_ROOT/belay-stall"
 mkdir -p "$STALLBIN"
-cat > "$STALLBIN/jq" <<'JS'
-#!/usr/bin/env node
-const { writeFileSync } = require('node:fs');
-writeFileSync(process.env.FM_TEST_POLICY_PID, String(process.pid));
-Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 60000);
-JS
+cat > "$STALLBIN/jq" <<'SH'
+#!/bin/bash
+printf '%s' "$$" > "$FM_TEST_POLICY_PID"
+exec sleep 60
+SH
 chmod +x "$STALLBIN/jq"
 started=$SECONDS
-run_belay "$LANE" PATH="$STALLBIN:$SHIMBIN:$PATH" FM_TEST_POLICY_PID="$TMP_ROOT/policy-pid" \
+run_belay "$LANE" FM_TEST_BELAY_POLICY_PATH="$STALLBIN:$PATH" FM_TEST_POLICY_PID="$TMP_ROOT/policy-pid" \
   JEV_BELAY_TIMEOUT_MS=60000 || fail "stalled policy must fail open"
 elapsed=$((SECONDS - started))
-[ "$elapsed" -lt 5 ] || fail "synchronous policy work was not bounded"
+[ "$elapsed" -lt 10 ] || fail "synchronous policy work was not bounded"
 [ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "timed-out policy reached transport"
 [ -s "$TMP_ROOT/policy-pid" ] || fail "stalled policy fixture did not run"
 policy_pid=$(cat "$TMP_ROOT/policy-pid")

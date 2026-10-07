@@ -21,12 +21,13 @@ globalThis.fetch = async (url, options) => {
       request=$(cat <&3) || exit 1
       fm_typesafe_permitted "$request" "$2" "$scratch"
     }
-    FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed 1 check_request "$1" "$2" 3<&0
+    FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed 3 check_request "$1" "$2" 3<&0
   `, '_', library, policy, timeoutLibrary], {
     input: options.body,
     env,
     stdio: ['pipe', 'ignore', 'ignore'],
-    timeout: 2000,
+    // Leave startup and cleanup headroom around the process-group deadline.
+    timeout: 5000,
     killSignal: 'SIGKILL',
   });
   if (checked.status !== 0) throw new Error('jev-belay request withheld');
