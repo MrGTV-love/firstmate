@@ -800,8 +800,11 @@ EOF
 # interrupted (Esc, including fm-control interrupt) or dequeued (Alt+Up), which
 # leaves a delivered watcher wake unsubmitted. The watch extension must find that
 # wake, remove only its own text, and submit it again, while never touching an
-# operator's draft or a wake a run already consumed. Each scenario runs in its
-# own process because the arm fixture fires exactly one actionable close.
+# operator's draft or a wake a run already consumed. The idle-* scenarios pin
+# the other stall: a wake arriving at an idle lane whose context ends in an
+# advisor note must start its own turn instead of waiting as a follow-up.
+# Each scenario runs in its own process because the arm fixture fires exactly
+# one actionable close.
 run_watch_restore_scenario() {  # <scenario>
   local scenario=$1 repo home
   repo="$TMP_ROOT/watch-restore-$scenario/repo"; home="$TMP_ROOT/watch-restore-$scenario/home"
@@ -850,7 +853,8 @@ const pi = {
       handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
     }
     if (process.env.SCENARIO === "failed-send") throw new Error("fixture send rejected");
-    if (process.env.SCENARIO === "custom-tail") {
+    // omp's idle auto-continue refuses an explicit follow-up behind an advisor tail.
+    if (process.env.SCENARIO === "custom-tail" || process.env.SCENARIO.startsWith("idle-")) {
       if (o?.deliverAs) { queued = true; return undefined; }
       if (idle) {
         turns.push({ prompt: m, tail: transcript.at(-1) });
@@ -872,10 +876,12 @@ const composer = {
   set text(t) { editorText = t.replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, ""); },
   sets: [],
 };
-let idle = true; let queued = false;
+// Restored-wake scenarios deliver behind a running turn; idle-* scenarios
+// deliver to a lane that already went idle.
+let idle = process.env.SCENARIO.startsWith("idle-"); let queued = false;
 const ctx = {
   hasUI: true,
-  isIdle: () => idle,
+  isIdle: () => { if (process.env.SCENARIO === "idle-stale-context") throw new Error("stale context"); return idle; },
   hasPendingMessages: () => queued,
   ui: { getEditorText: () => composer.text, setEditorText: (t) => { composer.sets.push(t); composer.text = t; } },
 };
@@ -888,6 +894,12 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   writeFileSync(`${dir}/session-replacement-actionable.json`, "invalid");
   writeFileSync(`${process.env.FM_HOME}/state/.e2e-fired`, "");
 }
+// The vernant-d2-custody shape: the last turn ended, omp's advisor then posted
+// its note as the context tail, and the composer is empty or holds a draft.
+const advisorTail = { role: "custom", customType: "advisor", content: "advisor note posted after the turn" };
+if (process.env.SCENARIO.startsWith("idle-")) transcript.push(advisorTail);
+if (process.env.SCENARIO === "idle-draft") composer.text = "my unsent draft";
+const editorBefore = composer.text;
 await handlers.get("session_start")({ type: "session_start" }, ctx);
 if (!["nonpending", "failed-send"].includes(process.env.SCENARIO)) await tool.execute();
 if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
@@ -897,6 +909,7 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   if (process.env.SCENARIO !== "failed-send") {
     await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: wake }] } }, ctx);
   }
+  idle = true;
   composer.text = wake;
   await handlers.get("agent_end")({ type: "agent_end" }, ctx);
   await sleep(2500);
@@ -908,6 +921,24 @@ const expectedWakes = process.env.SCENARIO.startsWith("duplicates") ? 2 : 1;
 for (let i = 0; i < 60 && sent.length < expectedWakes; i += 1) await sleep(100);
 if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
+if (process.env.SCENARIO === "idle-stale-context") {
+  if (sent[0].o?.deliverAs !== "followUp" || !queued || turns.length !== 0) throw new Error("a stale context must keep follow-up delivery");
+  await handlers.get("session_shutdown")({}, ctx);
+  process.exit(0);
+}
+if (process.env.SCENARIO.startsWith("idle-")) {
+  if (sent[0].o?.deliverAs !== undefined || queued) throw new Error(`an idle wake was queued as a follow-up: ${JSON.stringify(sent[0].o)}`);
+  if (turns.length !== 1 || turns[0].prompt !== wake || turns[0].tail !== advisorTail) throw new Error("an idle wake behind an advisor tail did not start its own turn");
+  if (composer.sets.length !== 0 || composer.text !== editorBefore) throw new Error("idle delivery touched the composer");
+  idle = true;
+  await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+  await sleep(2500);
+  if (sent.length !== 1 || composer.text !== editorBefore) throw new Error("a consumed idle wake was sent again");
+  await handlers.get("session_shutdown")({}, ctx);
+  process.exit(0);
+}
+// The running turn behind which the wake was queued has ended.
+idle = true;
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("regular delivery must remain queued as a follow-up");
 const bare = wake.startsWith("\u2063") ? wake.slice(1) : wake;
 if (process.env.SCENARIO === "sync-consumed") {
@@ -945,7 +976,7 @@ switch (process.env.SCENARIO) {
         if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("unsubmitted duplicate did not retain its handoff record");
         await handlers.get("session_start")({}, ctx);
         for (let i = 0; i < 60 && sent.length < 4; i += 1) await sleep(100);
-        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== "followUp") throw new Error("replacement did not replay the unsubmitted duplicate");
+        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== undefined) throw new Error("idle replacement did not replay the unsubmitted duplicate as its own turn");
         await consumePrompt();
         await handlers.get("session_shutdown")({}, ctx);
         if (existsSync(handoff)) throw new Error("consumed duplicates retained a handoff record");
@@ -1044,7 +1075,7 @@ switch (process.env.SCENARIO) {
     if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("cancelled preparation retired its pending handoff");
     await handlers.get("session_start")({}, ctx);
     for (let i = 0; i < 60 && sent.length < 3; i += 1) await sleep(100);
-    if (sent.length !== 3 || sent[2].m !== wake || sent[2].o?.deliverAs !== "followUp") throw new Error("replacement lost the preparation-cancelled wake");
+    if (sent.length !== 3 || sent[2].m !== wake || sent[2].o?.deliverAs !== undefined) throw new Error("idle replacement lost the preparation-cancelled wake");
     await handlers.get("before_agent_start")({ prompt: wake }, ctx);
     if (JSON.parse(readFileSync(handoff, "utf8")).pending.length !== 1) throw new Error("replacement preparation retired its handoff");
     await handlers.get("message_start")({ message: { role: "assistant", content: wake } }, ctx);
@@ -1161,13 +1192,13 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
     [ -z "$out" ] || fail "omp watch restore scenario $scenario printed output: $out"
   done
-  pass ".omp watch extension: a wake omp restored to the composer is submitted again alone, bounded, and never over a draft or a running turn"
+  pass ".omp watch extension: an idle lane's wake starts its own turn behind an advisor tail; a wake omp restored to the composer is submitted again alone, bounded, and never over a draft or a running turn"
 }
 
 # Only the omp process that holds the session lock may record itself as the
