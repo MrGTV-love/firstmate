@@ -13,6 +13,9 @@
 # fm-config-inherit-lib.sh. Remote routes receive one durable marked reread nudge
 # through their SSH route. Unchanged config and data/captain-shared.md-only
 # updates send no reread unless a previous send failure is pending for that home.
+# The shared delivery helper reports "config-reread: sent" only after a successful
+# enqueue, not an agent acknowledgment; retiring obsolete local reread
+# instructions without delivery is silent in focused push and bootstrap.
 # Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
 # config/model-index.json is pushed only after its schema, the dispatch roles
 # it resolves, and bin/fm-model-index.sh check pass; a malformed index, an id

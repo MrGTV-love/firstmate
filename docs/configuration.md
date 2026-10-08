@@ -1755,11 +1755,10 @@ Local routes use direct guarded filesystem operations, while remote routes deleg
 **Push inherited configuration during a session**
 
 For a mid-session inherited local-material edit where tracked-file sync is not needed, run `bin/fm-config-push.sh`.
-It uses the same live secondmate discovery and propagation helper as bootstrap; its [help](../bin/fm-config-push.sh) owns reporting and exit semantics, and [`fm_config_inherit_items`](../bin/fm-config-inherit-lib.sh) declares the inherited items.
+It uses the same live secondmate discovery and propagation helper as bootstrap; its [header and help](../bin/fm-config-push.sh) own reporting and exit semantics, and [`fm_config_inherit_items`](../bin/fm-config-inherit-lib.sh) declares the inherited items.
 
 - When an allowlisted config item changes for an already-running local home, it sends the literal-content reread pointer described in [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); unchanged allowlisted config sends no pointer unless a previous delivery is pending.
-- `config-reread: sent` reports a successfully enqueued reread pointer, not successful retirement of obsolete pending instructions; retirement without delivery is silent in both focused push and bootstrap.
-- Retained reread report recovery ignores `data/captain-shared.md` rows, which never belong in a config reread, and retires reports whose only pushed config change is obsolete `keep-ai-trailers`. If an unrelated pushed config item is temporarily excluded from propagation, the whole report and any empty retry stage remain intact until all unrelated config items are eligible for reconstruction, so an invalid routing pair cannot erase or partially deliver its pending reread.
+- Retained reread recovery, including obsolete `keep-ai-trailers` sections, shared-data report rows, and temporarily excluded config items, follows the [`secondmate-provisioning` retry contract](../.agents/skills/secondmate-provisioning/SKILL.md#charter-and-seed).
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
 - The locked bootstrap inheritance pass uses the same placement-specific behavior; see `secondmate-provisioning` for the single contract owner.
 - That live discovery starts from `state/*.meta` records with `kind=secondmate`; `data/secondmates.md` only backfills `home=` for older or incomplete meta records.
