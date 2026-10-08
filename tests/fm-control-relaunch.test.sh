@@ -2383,6 +2383,19 @@ assert_tmux_missing_refuses() {  # <case-dir> <id> <what-was-staged>
   assert_absent "$dir/fake/created-windows" "a refused transaction must not create a window ($what)"
   assert_absent "$dir/fake/created-sessions" "a refused transaction must not create a session ($what)"
   [ ! -s "$dir/fake/literal" ] || fail "a refused transaction must launch nothing ($what)"
+
+  fm_tasks_axi_compatible || { echo 'skip - reconciliation-only holder proof needs compatible tasks-axi'; return; }
+  seed_backlog "$dir" "$id" in_flight
+
+  rm -f "$dir/fake/list-count"
+  out=$(run_control "$dir" "$id" relaunch --reconcile-only --note "this note must never reach a live agent"); rc=$?
+  expect_code 1 "$rc" "reconciliation-only recovery must fail closed ($what)"$'\n'"$out"
+  assert_contains "$out" "requires a proven exited owner" "reconciliation-only admission must reject inconclusive ownership ($what)"
+  [ "$(cat "$dir/home/data/$id/brief.md")" = "$brief_before" ] \
+    || fail "a refused reconciliation edited the live owner's instructions ($what)"
+  assert_absent "$dir/fake/created-windows" "a refused reconciliation must not create a window ($what)"
+  assert_absent "$dir/fake/created-sessions" "a refused reconciliation must not create a session ($what)"
+  [ ! -s "$dir/fake/literal" ] || fail "a refused reconciliation must launch nothing ($what)"
 }
 
 # prepare_herdr_reclaim <case-dir>: configure the home to replace a proven-gone
@@ -2443,7 +2456,7 @@ test_tmux_gone_endpoint_is_proven_despite_unrelated_servers() {
 # not address). Either refuses both verbs.
 test_tmux_refuses_while_the_recorded_endpoint_may_be_live() {
   local dir shape id wt
-  for shape in window-answers-first window-answers-second agent-in-worktree agent-in-subdirectory gemini-agent-in-worktree; do
+  for shape in window-answers-first window-answers-second agent-in-worktree agent-in-subdirectory gemini-agent-in-worktree gemini-spaced-script-in-worktree; do
     id="rl91${shape//-/}"
     dir=$(new_case "tmux-live-$shape" "$id")
     add_ship_task "$dir" "$id"
@@ -2455,6 +2468,7 @@ test_tmux_refuses_while_the_recorded_endpoint_may_be_live() {
       agent-in-worktree) stage_holder "$dir" /usr/local/bin/claude 'claude --resume' "$wt" ;;
       agent-in-subdirectory) stage_holder "$dir" claude claude "$wt/src/deep" ;;
       gemini-agent-in-worktree) stage_holder "$dir" MainThread 'node /home/u/.local/bin/gemini -y' "$wt" ;;
+      gemini-spaced-script-in-worktree) stage_holder "$dir" MainThread 'node /Users/person/path with spaces/bin/gemini -y' "$wt" ;;
     esac
     assert_tmux_missing_refuses "$dir" "$id" "$shape"
   done
@@ -2464,7 +2478,7 @@ test_tmux_refuses_while_the_recorded_endpoint_may_be_live() {
 # (c) Evidence that cannot be read is never evidence of absence.
 test_tmux_unreadable_evidence_refuses() {
   local dir shape id wt
-  for shape in lsof-fails lsof-partial lsof-record-without-cwd lsof-blind holder-unreadable inventory-unreadable-first inventory-unreadable-second; do
+  for shape in lsof-fails lsof-partial lsof-record-without-cwd lsof-cwd-error lsof-empty-cwd lsof-relative-cwd lsof-blind holder-unreadable holder-unattributed holder-identity-disagrees inventory-unreadable-first inventory-unreadable-second; do
     id="rl92${shape//-/}"
     dir=$(new_case "tmux-unreadable-$shape" "$id")
     add_ship_task "$dir" "$id"
@@ -2474,12 +2488,17 @@ test_tmux_unreadable_evidence_refuses() {
       lsof-fails) printf broken > "$dir/fake/lsof-mode" ;;
       lsof-partial) printf partial > "$dir/fake/lsof-mode" ;;
       lsof-record-without-cwd) stage_holder "$dir" claude claude "$wt"; printf nocwd > "$dir/fake/lsof-mode" ;;
+      lsof-cwd-error) stage_holder "$dir" claude claude 'cwd|rtd info error: Permission denied' ;;
+      lsof-empty-cwd) stage_holder "$dir" claude claude '' ;;
+      lsof-relative-cwd) stage_holder "$dir" claude claude 'relative/directory' ;;
       lsof-blind) printf empty > "$dir/fake/lsof-mode" ;;
       holder-unreadable)
         # A live holder (this very shell) whose name and command line cannot be read.
         stage_holder "$dir" '' '' "$wt"
         printf '%s' "$$" > "$dir/fake/holder-pid"
         ;;
+      holder-unattributed) stage_holder "$dir" node 'node /Users/person/project/server.js' "$wt" ;;
+      holder-identity-disagrees) stage_holder "$dir" bash 'node /Users/person/project/server.js' "$wt/src/deep" ;;
       inventory-unreadable-first) printf 1 > "$dir/fake/broken-after" ;;
       inventory-unreadable-second) printf 2 > "$dir/fake/broken-after" ;;
     esac

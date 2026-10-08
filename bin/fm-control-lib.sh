@@ -330,8 +330,9 @@ fm_control_worktree_agent_holder() {  # <worktree>
         has_cwd=0
         ;;
       n*)
-        has_cwd=1
         path=${line#n}
+        case "$path" in /*) ;; *) printf 'unknown'; return 0 ;; esac
+        has_cwd=1
         for root in "$wt" "$wt_real"; do
           case "$path/" in
             "$root"/*) holders="$holders $pid" ;;
@@ -345,17 +346,14 @@ HOLDERS
   [ "$seen" -eq 1 ] && [ "$has_cwd" -eq 1 ] || { printf 'unknown'; return 0; }
   for pid in $holders; do
     case "$pid" in ''|*[!0-9]*) printf 'unknown'; return 0 ;; esac
-    comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null)
-    args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null)
-    if [ -z "$comm" ] || [ -z "$args" ]; then
-      # A process that exited since the scan holds nothing; one that is still
-      # there but unreadable cannot be ruled out.
-      kill -0 "$pid" 2>/dev/null && { printf 'unknown'; return 0; }
-      continue
-    fi
+    comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) || { printf 'unknown'; return 0; }
+    args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || { printf 'unknown'; return 0; }
+    [ -n "$comm" ] && [ -n "$args" ] || { printf 'unknown'; return 0; }
     argv0=${args%% *}
     case "$(fm_agent_process_classify "$comm" "$argv0" "$args" "$pid")" in
       agent) printf 'held'; return 0 ;;
+      shell) ;;
+      *) printf 'unknown'; return 0 ;;
     esac
   done
   printf 'none'

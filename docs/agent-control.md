@@ -134,10 +134,10 @@ An unreachable endpoint can still hold the live agent a rebind would duplicate, 
   The addressed server must answer definitively, on two reads, that the whole server or the exact session is absent, or list the session without the recorded window.
   A window that answers on either read is never absent.
   Between the reads, one scan of the machine's process working directories must find no harness agent holding the recorded worktree or a directory under it, because a window on a socket this process does not address still leaves its agent running in that worktree.
-  Idle shells and other non-agent processes do not block the proof.
+  Positively identified idle shells do not block the proof; an unattributed worktree holder does.
   Other tmux servers owned by the same uid, and their clients, say nothing about this endpoint and no longer block it; this proof never queries or lists them.
-  Every harness counts as an agent here, including node-bundle harnesses such as Gemini, because each holder is classified from its name, its first argument and its full command line.
-  An unreadable process table, a missing `lsof`, a scan that fails part way, a process record with no working directory, a holder whose name or command line cannot be read, or a tmux answer that is not definitive refuses.
+  Every harness counts as an agent here, including node-bundle harnesses such as Gemini, because each holder is classified from its name, its first argument and its full command line. A readable identity that cannot be attributed, including an ambiguous flattened script path, is not proof of a non-agent.
+  An unreadable process table, a missing `lsof`, a scan that fails part way, a process record with no absolute working-directory path (including a CWD error returned as its NAME), a failed holder identity read, an empty or unattributed identity, or a tmux answer that is not definitive refuses.
   A renamed session or a window moved to another server still refuses while an agent holds the worktree.
 
 Every transient or self-contradicting read stays `unreadable` or `ambiguous` and still refuses, so a momentary backend failure can never be mistaken for absence.
