@@ -325,7 +325,7 @@ test_term_to_waiter_never_runs_command() {
 }
 
 test_nested_runs_directly() {
-  local pool dir holder
+  local pool dir holder rc
   dir="$TMP_ROOT/nested"
   mkdir -p "$dir"
   pool=$(new_pool nested)
@@ -342,6 +342,17 @@ test_nested_runs_directly() {
   assert_equals inner=1 "$(cat "$dir/inner.out")" \
     "a nested run inside a full pool must run directly under the outer pass, not deadlock"
 
+  rc=0
+  FM_CPU_PASS_HELD=1 FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 \
+    "$PASS_TOOL" run --passes 2 -- touch "$dir/over-request-ran" \
+    >"$dir/over-request.out" 2>&1 || rc=$?
+  assert_equals 125 "$rc" "a nested request must not exceed its inherited reservation"
+  [ ! -e "$dir/over-request-ran" ] || fail "nested over-request started work"
+  FM_CPU_PASS_HELD=2 FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 \
+    "$PASS_TOOL" run --passes 1 -- bash -c 'echo "inner=$FM_CPU_PASS_HELD"' \
+    >"$dir/subset.out" || fail "nested work within its reservation failed"
+  assert_equals inner=2 "$(cat "$dir/subset.out")" \
+    "a smaller nested request must preserve the outer reservation"
   pass "nested runs execute under the outer reservation"
 }
 
@@ -388,7 +399,7 @@ test_no_python_validates_pass_counts() {
     fi
     for nested in ordinary nested; do
       environment=(-u FM_CPU_PASS_HELD "PATH=$fakebin")
-      if [ "$nested" = nested ]; then environment+=(FM_CPU_PASS_HELD=1); fi
+      if [ "$nested" = nested ]; then environment+=(FM_CPU_PASS_HELD=2); fi
       for form in split equals; do
         for count in "${counts[@]}"; do
           if [ "$form" = split ]; then options=(--passes "$count"); else options=("--passes=$count"); fi
@@ -403,9 +414,18 @@ test_no_python_validates_pass_counts() {
         out=$("$env_tool" "${environment[@]}" "$PASS_TOOL" run "${options[@]}" --log-fd 3 -- \
           bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 5' 3>/dev/null) || rc=$?
         assert_equals 5 "$rc" "a valid no-Python request must preserve the command's exit status"
-        assert_equals held=0 "$out" "a valid no-Python request must run without a pass"
+        if [ "$nested" = nested ]; then
+          assert_equals held=2 "$out" "no-Python nested work must preserve its reservation"
+        else
+          assert_equals held=0 "$out" "ordinary no-Python work must run without a pass"
+        fi
       done
     done
+    rc=0
+    PATH="$fakebin" FM_CPU_PASS_HELD=1 "$PASS_TOOL" run --passes 2 -- \
+      bash -c 'printf ran >"$1"' _ "$marker" >/dev/null 2>&1 || rc=$?
+    assert_equals 125 "$rc" "no-Python nested work must refuse an over-request even without a size detector"
+    [ ! -e "$marker" ] || fail "no-Python nested over-request started work"
     rc=0
     PATH="$fakebin" "$PASS_TOOL" run --passes >/dev/null 2>&1 || rc=$?
     assert_equals 125 "$rc" "a missing no-Python pass count must be a usage error"
@@ -420,6 +440,47 @@ make_runner_repo() {  # <repo>
     "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   chmod +x "$repo/bin/fm-test-run.sh" "$repo/bin/fm-cpu-pass.sh"
+}
+
+test_inherited_marker_validation() {
+  local dir repo marker mode held rc out command
+  dir="$TMP_ROOT/inherited-validation"
+  repo="$dir/repo"
+  marker="$dir/ran"
+  make_runner_repo "$repo"
+  printf 'printf ran >"$MARKER"\n' >"$repo/tests/fm-brief.test.sh"
+  for mode in engine no-python runner; do
+    case "$mode" in
+      engine) command=("$PASS_TOOL" run -- bash -c 'printf ran >"$MARKER"') ;;
+      no-python) command=("$(command -v env)" "PATH=$TMP_ROOT/no-python-unknown" \
+        "$PASS_TOOL" run -- bash -c 'printf ran >"$MARKER"') ;;
+      runner) command=("$repo/bin/fm-test-run.sh" tests/fm-brief.test.sh) ;;
+    esac
+    for held in '' -1 invalid 1.5 +1 ' 1' '１'; do
+      rc=0
+      FM_CPU_PASS_HELD=$held MARKER=$marker "${command[@]}" >"$dir/out" 2>"$dir/err" || rc=$?
+      assert_equals 125 "$rc" "$mode must refuse malformed inherited count '$held'"
+      [ ! -e "$marker" ] || fail "$mode started work under a malformed marker"
+    done
+    for held in 0 00 01 2; do
+      rc=0
+      FM_CPU_PASS_HELD=$held MARKER=$marker "${command[@]}" >"$dir/out" 2>"$dir/err" || rc=$?
+      assert_equals 0 "$rc" "$mode must accept inherited count '$held': $(cat "$dir/err")"
+      [ -e "$marker" ] || fail "$mode did not run work under a valid marker"
+      rm "$marker"
+    done
+  done
+  for mode in engine no-python; do
+    case "$mode" in
+      engine) command=("$PASS_TOOL" run --passes 2) ;;
+      no-python) command=("$(command -v env)" "PATH=$TMP_ROOT/no-python-unknown" \
+        "$PASS_TOOL" run --passes 2) ;;
+    esac
+    out=$(FM_CPU_PASS_HELD=0 FM_TEST_CPU_COUNT=2 "${command[@]}" -- \
+      bash -c 'echo "held=$FM_CPU_PASS_HELD"') || fail "$mode blocked nested degraded work"
+    assert_equals held=0 "$out" "$mode must preserve the degraded marker"
+  done
+  pass "inherited markers are validated consistently while degraded work still runs"
 }
 
 test_runner_waits_for_pass_outside_script_bound() {
@@ -481,22 +542,49 @@ SH
 }
 
 test_runner_inside_pass_holder_takes_none() {
-  local dir repo pool holder rc
+  local dir repo pool rc jobs notice_count
   dir="$TMP_ROOT/runner-nested"
   repo="$dir/repo"
   mkdir -p "$dir"
   make_runner_repo "$repo"
-  cat >"$repo/tests/probe.test.sh" <<'SH'
+  cat >"$repo/tests/fm-brief.test.sh" <<'SH'
 #!/usr/bin/env bash
+if ! mkdir "$NESTED_EVIDENCE/active"; then
+  echo "not ok - nested scripts overlapped"
+  exit 1
+fi
+trap 'rmdir "$NESTED_EVIDENCE/active"' EXIT
+echo start >>"$NESTED_EVIDENCE/events"
 echo "ok - held=$FM_CPU_PASS_HELD"
+sleep 1
+echo end >>"$NESTED_EVIDENCE/events"
 SH
+  cp "$repo/tests/fm-brief.test.sh" "$repo/tests/fm-composer-lib.test.sh"
   pool=$(new_pool runner-nested)
-  rc=0
-  (cd "$repo" && FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=1 \
-    "$PASS_TOOL" run -- bin/fm-test-run.sh tests/probe.test.sh) >"$dir/out" 2>&1 || rc=$?
-  assert_equals 0 "$rc" "a runner inside a pass holder must not wait on the pass it is under: $(cat "$dir/out")"
-  assert_grep "ok - held=1" "$dir/out" "the script must inherit the outer pass marker"
-  pass "a runner inside a pass holder runs its scripts under that pass"
+  for jobs in explicit automatic; do
+    : >"$dir/events"
+    rc=0
+    (
+      cd "$repo" || exit
+      if [ "$jobs" = explicit ]; then set -- --jobs 2; else set --; fi
+      FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=1 NESTED_EVIDENCE=$dir \
+        "$PASS_TOOL" run -- bin/fm-test-run.sh "$@" \
+        tests/fm-brief.test.sh tests/fm-composer-lib.test.sh --json "$dir/timing.json"
+    ) >"$dir/out" 2>"$dir/err" || rc=$?
+    assert_equals 0 "$rc" "a nested $jobs runner must run within its one-pass reservation: $(cat "$dir/out" "$dir/err")"
+    assert_equals "$(printf 'start\nend\nstart\nend')" "$(cat "$dir/events")" \
+      "nested $jobs scripts must never overlap"
+    assert_equals 2 "$(grep -c 'ok - held=1' "$dir/out")" \
+      "both scripts must inherit the outer pass marker"
+    notice_count=$(grep -c 'reducing --jobs .* to inherited FM_CPU_PASS_HELD=1' "$dir/err")
+    assert_equals 1 "$notice_count" "a nested concurrency reduction must produce exactly one notice"
+    assert_no_grep "reducing --jobs" "$dir/out" "the reduction notice must stay outside captured script output"
+    python3 - "$dir/timing.json" <<'PY' || fail "nested timing must report the actual worker count"
+import json, sys
+assert json.load(open(sys.argv[1]))["selection"].split(";")[-1] == "jobs=1"
+PY
+  done
+  pass "nested runners take no new pass and limit scripts to the inherited reservation"
 }
 
 test_size_follows_host
@@ -511,5 +599,6 @@ test_term_to_waiter_never_runs_command
 test_nested_runs_directly
 test_unusable_pool_degrades_with_notice
 test_no_python_validates_pass_counts
+test_inherited_marker_validation
 test_runner_waits_for_pass_outside_script_bound
 test_runner_inside_pass_holder_takes_none

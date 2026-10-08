@@ -36,6 +36,9 @@ Running:
     the child runs and keeps the passes until the child exits: passes stay with
     running work and are never forwarded or doubled.
   - The child's environment gains FM_CPU_PASS_HELD=<K> (0 when degraded).
+  - Nested work takes no new passes and may request at most the inherited count.
+    FM_CPU_PASS_HELD must be a nonnegative decimal integer or run exits 125,
+    including without Python; 0 denotes degraded work and imposes no budget.
   - The child inherits the slot lock fds so passes survive a killed wrapper.
     The log fd is closed; stdout and stderr carry only COMMAND's own output.
   - A degraded run (the protocol's rule 7) writes one notice to the log fd.
@@ -290,6 +293,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         log(log_fd, "--passes must be between 1 and the pool size (%d)" % size)
         return 125
     if HELD_ENV in env:
+        inherited = env[HELD_ENV]
+        if not inherited or not inherited.isascii() or not inherited.isdecimal():
+            log(log_fd, "%s must be a nonnegative decimal integer" % HELD_ENV)
+            return 125
+        held_count = int(inherited)
+        if held_count and passes > held_count:
+            log(log_fd, "--passes must not exceed %s (%d)" % (HELD_ENV, held_count))
+            return 125
         return exec_direct(command, env, log_fd)
     label = args.label or os.path.basename(command[0])
     try:

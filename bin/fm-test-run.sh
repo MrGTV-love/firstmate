@@ -123,10 +123,13 @@
 # Every executed script first takes one pass from the host-wide CPU pass pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so test bursts from every worktree on the host take turns.
-# A runner already inside a pass (FM_CPU_PASS_HELD set), without python3,
-# or copied without the pool tool beside it runs its scripts directly.
-# --jobs above the pool size still starts that many
-# workers, but only pool-size scripts run at once.
+# A runner already inside a pass (FM_CPU_PASS_HELD set) runs directly with at
+# most that many concurrent scripts, reporting a reduced --jobs on stderr.
+# The marker must be a nonnegative decimal integer or execution exits 125;
+# 0 denotes degraded work and imposes no budget.
+# Without python3 or the pool tool beside it, scripts run directly.
+# --jobs above the pool size still starts that many workers, but only pool-size
+# scripts run at once.
 #
 # Family labels, the changed-file map, and production portable-shard composition
 # live in this script only (one owner). The proven-isolated candidate set remains
@@ -2322,9 +2325,6 @@ if { [ "$MODE" = changed ] || [ "$MODE" = scripts ]; } && [ "$JOBS_EXPLICIT" -eq
     [ "$JOBS" -eq 1 ] || AUTO_CONCURRENCY=1
   fi
 fi
-if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
-  SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
-fi
 
 # An explicit --jobs names a concurrency for exactly the selection given, so an
 # unproven script in it is a refusal rather than something to schedule around.
@@ -2347,6 +2347,36 @@ if [ "$JOBS" -gt 1 ] && [ "$AUTO_CONCURRENCY" -eq 0 ]; then
         || die "--jobs $JOBS refused: family $family is proven only up to $family_jobs_max concurrent workers"
     fi
   done
+fi
+
+CPU_PASS_ACTIVE=1
+CPU_PASS_LOG_FD=8
+exec 8>&2
+if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  inherited_passes=$FM_CPU_PASS_HELD
+  case "$inherited_passes" in
+    ''|*[!0-9]*)
+      log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
+      exit 125 ;;
+  esac
+  while [ "${inherited_passes#0}" != "$inherited_passes" ]; do
+    inherited_passes=${inherited_passes#0}
+  done
+  if [ -n "$inherited_passes" ] && [ "${#inherited_passes}" -le "${#JOBS}" ] \
+    && [ "$inherited_passes" -lt "$JOBS" ]; then
+    printf 'fm-test-run: reducing --jobs %s to inherited FM_CPU_PASS_HELD=%s\n' \
+      "$JOBS" "$inherited_passes" >&"$CPU_PASS_LOG_FD"
+    JOBS=$inherited_passes
+  fi
+  CPU_PASS_ACTIVE=0
+elif [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
+  CPU_PASS_ACTIVE=0
+elif ! command -v python3 >/dev/null 2>&1; then
+  CPU_PASS_ACTIVE=0
+  log "running without CPU passes: python3 not found"
+fi
+if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
+  SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
 fi
 
 # Split the run into proven concurrent phases and an unproven remainder.
@@ -2394,19 +2424,6 @@ fi
 if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
   [ -r "$ROOT/bin/fm-timeout-lib.sh" ] || die "per-script timeout helper not found: bin/fm-timeout-lib.sh"
 fi
-
-# CPU pass pool wiring; the header owns when scripts run without a pass.
-# fd 8 keeps the pool's wait notices on this runner's stderr.
-CPU_PASS_ACTIVE=1
-CPU_PASS_LOG_FD=8
-if [ -n "${FM_CPU_PASS_HELD+x}" ] \
-  || [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
-  CPU_PASS_ACTIVE=0
-elif ! command -v python3 >/dev/null 2>&1; then
-  CPU_PASS_ACTIVE=0
-  log "running without CPU passes: python3 not found"
-fi
-exec 8>&2
 
 RUN_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run.XXXXXX")
 RECORDS="$RUN_TMP/records.tsv"

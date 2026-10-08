@@ -37,7 +37,10 @@ Every participant on a host follows these rules, so one pool is shared by every 
    Callers read `size` and use that same positive count for their workers and reservation; a count below one or above the pool size is a usage error and never starts work.
    This validation also applies to nested and degraded execution; without Python, oversized counts are refused when the host CPU count can be read using `sysctl` or `getconf`.
 6. **Nested work:** a holder exports `FM_CPU_PASS_HELD=<k>` to the work it runs.
-   A participant that finds `FM_CPU_PASS_HELD` set runs without taking a pass, because it is already inside one; taking another could deadlock a full pool.
+   A participant that finds `FM_CPU_PASS_HELD` set runs without taking another pass, because taking another could deadlock a full pool.
+   Nested work never runs more concurrent CPU-bound workers than the inherited count; a caller needing parallel nested work reserves enough passes before starting the outer work.
+   Firstmate's runner reduces concurrency to the inherited count and reports the reduction on its notice fd; an explicit pass request above that count is a usage error.
+   The marker must be a nonnegative decimal integer in both Python and no-Python execution; a malformed marker is a usage error, while `0` denotes degraded work with no reservation or concurrency limit.
 7. **Degrade, never block:** a participant that cannot use the pool (no `flock`, no pool directory, a foreign-owned directory) runs its work without a pass and says so once.
    The pool governs throughput; it is not a safety boundary, and a broken pool must not stop every test on the host.
 8. **Waiting stays outside work bounds:** take passes before starting any per-test or per-worker timeout, so time spent queued never counts toward that timeout.
