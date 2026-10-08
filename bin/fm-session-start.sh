@@ -211,16 +211,12 @@
 #             sync, same-home backlog reconciliation, secondmate convergence and
 #             liveness, pending remote handoff retry, X-mode
 #             artifact writes) - and
-#             re-emit the rest. Wake-queue presentation is NOT skipped: queued
-#             records are this turn's work queue, they arrived after startup,
-#             and a session that owns the lock is exactly the session that must
-#             handle and acknowledge them. The one exception is an open Stop-hook
-#             auto-arm claim (fm_autoarm_claim_open in bin/fm-wake-lib.sh): that
-#             hook is then the sole deliverer of queued wakes between turns, and
-#             a drain here would move the recovery marker to handling, which makes
-#             the hook's rewake commit refuse and drop the wake. The re-emit then
-#             reports the queued count and leaves the queue and marker untouched
-#             for the handling turn the hook starts. Lock acquisition still runs, because
+#             re-emit the rest. Wake-queue records normally still need presentation:
+#             they arrived after startup and are this turn's work queue.
+#             --reemit passes that presentation to fm-wake-drain.sh --reemit;
+#             docs/watcher-continuity.md's "Who presents queued wakes between
+#             turns" section owns the delivery exclusion.
+#             Lock acquisition still runs, because
 #             ownership must be re-verified rather than assumed: fm-lock.sh
 #             already treats a lock owned through shared ancestry or a trusted
 #             same-session Claude id as its own, so the re-emit proceeds, while

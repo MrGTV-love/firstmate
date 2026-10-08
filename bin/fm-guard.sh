@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Watcher liveness and worktree-tangle guard, called by supervision scripts, by
-# fm-wake-drain.sh after it empties queued wakes, and by fm-session-start.sh in
-# read-only advisory mode whenever session-lock ownership was not verified.
+# fm-wake-drain.sh during wake presentation or delivery deferral, and by
+# fm-session-start.sh in read-only advisory mode when ownership was not verified.
+# FM_GUARD_DELIVERY_DEFERRED=1 selects the delivery-deferral diagnostics owned by
+# docs/watcher-continuity.md's "Who presents queued wakes between turns" section.
 # First, always warn if the firstmate primary checkout (FM_ROOT) is on a named
 # non-default branch, because that means firstmate-on-itself work landed in the
 # primary instead of an isolated worktree.
@@ -276,7 +278,8 @@ fi
 # Queued wakes are an independent hazard; warn whenever they are pending, even if
 # a watcher is alive. Kept after the banner so the no-watcher alarm reads first.
 # Dedup of the watcher-down banner never suppresses this warning.
-# The supervision branch is the exception: it runs guarded commands (fm-peek,
+# Delivery deferral follows the exclusion referenced in the header.
+# The supervision branch is also an exception: it runs guarded commands (fm-peek,
 # fm-crew-state) in the middle of handling the very rows that are queued, and
 # "drain them before anything else" mid-handling reads as "an earlier wake is
 # still pending", which is what made it re-run a previous acknowledgement in a

@@ -9,11 +9,13 @@
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
+# --reemit is the context-refresh presentation mode; the same document's
+# "Who presents queued wakes between turns" section owns its delivery exclusion.
 # Every scratch file this script mints (.main-eligible-rows.tmp.*,
 # .wake-rows.consume.*, .wake-queue.retire.*, .wake-queue.ack.*,
 # .wake-queue.actor-view.*) is created and removed under the queue lock, so one
 # found while taking that lock was left by a drain that died mid-write; each
-# locked drain rotates such leftovers away before doing anything else.
+# non-deferred presentation or acknowledgement rotates such leftovers away.
 # FM_STATUS_PRESENTATION_LOCK_TIMEOUT sets the positive whole-second wait for
 # presentation-path locks (default 10); queue mutation locks remain blocking.
 set -u

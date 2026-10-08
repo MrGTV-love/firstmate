@@ -30,7 +30,7 @@
 #     open claim, and a stuck, dead, identity-mismatched, or finished claim is
 #     superseded by taking the next generation instead of being unlocked or
 #     revoked. No mutex is ever held across arming or output - the owner lock
-#     survives only as the micro-mutex serializing individual ledger writes -
+#     is a micro-mutex for ledger updates and re-emit delivery decisions -
 #     and a superseded owner goes completely silent: ownership is re-verified
 #     before every arm invocation, episode-state mutation, ledger write, and
 #     continuation (fm_autoarm_claim_open/fm_autoarm_claim_next in
@@ -100,9 +100,8 @@
 # state/.claude-autoarm-failure-notified deduplicates the last-resort notice,
 # and state/.claude-autoarm-failure-alarmed bounds the attended fail-open and
 # suppresses any later automatic continuation in that unresolved episode.
-# A rewake the commit refuses (the recovery marker is not downtime, or the
-# session lock is no longer this session's) is dropped with exit 0; the ledger
-# then reads outcome=refused so the next forensic read needs no replay.
+# docs/watcher-continuity.md's "Who presents queued wakes between turns" section
+# owns rewake refusal and its best-effort ledger trace.
 #
 # In hook mode it never blocks the Stop decision itself or prints to stdout:
 # exit 0 is silent, and exit 2 carries the rewake banner on stderr.
