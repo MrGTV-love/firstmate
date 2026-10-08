@@ -120,6 +120,17 @@
 # configuration, including one that sources no test helper of its own;
 # tests/git-config-helpers.sh owns that contract and its limits.
 #
+# An unnested runner takes one pass per executed script from the host-wide pool
+# (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
+# per-script bound, so participating test bursts across worktrees take turns.
+# A runner already inside a pass (FM_CPU_PASS_HELD set) runs directly with at
+# most that many concurrent scripts, reporting a reduced --jobs on stderr.
+# The marker must be a nonnegative decimal integer or execution exits 125;
+# 0 denotes degraded work and imposes no budget.
+# Without python3 or the pool tool beside it, scripts run directly.
+# With a usable pool, --jobs above its size still starts that many workers,
+# but only pool-size scripts run at once.
+#
 # Family labels, the changed-file map, and production portable-shard composition
 # live in this script only (one owner). The proven-isolated candidate set remains
 # owned by bin/fm-test-isolation-proof.sh; portable parallel shards are a
@@ -700,7 +711,7 @@ list_portable_serial() {
 # balance rather than coverage. That doc owns the refresh procedure.
 portable_serial_weight_hints() {
   cat <<'EOF'
-tests/fm-afk-contract.test.sh 11101
+tests/fm-afk-contract.test.sh 15645
 tests/fm-afk-inject-e2e.test.sh 41958
 tests/fm-afk-pi-herdr-return-e2e.test.sh 52
 tests/fm-afk-return.test.sh 47380
@@ -710,7 +721,7 @@ tests/fm-ask-user-authority.test.sh 171
 tests/fm-backend-cmux-smoke.test.sh 34
 tests/fm-backend-cmux.test.sh 3754
 tests/fm-backend-orca.test.sh 27102
-tests/fm-backend-tmux-smoke.test.sh 291
+tests/fm-backend-tmux-smoke.test.sh 363
 tests/fm-backend-zellij-smoke.test.sh 23
 tests/fm-backend-zellij.test.sh 10453
 tests/fm-backend.test.sh 23932
@@ -727,13 +738,13 @@ tests/fm-branch-supervision.test.sh 22979
 tests/fm-busy-adapter-wiring.test.sh 31642
 tests/fm-busy-state.test.sh 3185
 tests/fm-calm-claude-mod-live-e2e.test.sh 47
-tests/fm-calm-claude-mod-plugin.test.sh 77
+tests/fm-calm-claude-mod-plugin.test.sh 172
 tests/fm-calm-claude-mod.test.sh 2527
 tests/fm-calm-pi-extension.test.sh 56463
 tests/fm-calm-pi-queue-retention-live-e2e.test.sh 1345
 tests/fm-check-unregister.test.sh 469
 tests/fm-ci-workflow.test.sh 5833
-tests/fm-classify-corr-token.test.sh 23085
+tests/fm-classify-corr-token.test.sh 49294
 tests/fm-classify-decision-key.test.sh 4362
 tests/fm-claude-stop-autoarm-live-e2e.test.sh 73
 tests/fm-claude-stop-autoarm.test.sh 61189
@@ -741,12 +752,12 @@ tests/fm-claude-trust.test.sh 12010
 tests/fm-cmux-claude-composer-live-e2e.test.sh 77
 tests/fm-codex-continuity-live-e2e.test.sh 108
 tests/fm-codex-hook-layer-live-e2e.test.sh 108
-tests/fm-composer-codex-idle-live-e2e.test.sh 77
+tests/fm-composer-codex-idle-live-e2e.test.sh 229
 tests/fm-composer-matrix-live-e2e.test.sh 51
 tests/fm-contributions.test.sh 140911
-tests/fm-control-relaunch.test.sh 114115
+tests/fm-control-relaunch.test.sh 137013
 tests/fm-control.test.sh 72794
-tests/fm-cursor-harness.test.sh 30088
+tests/fm-cursor-harness.test.sh 30212
 tests/fm-cursor-primary-live-e2e.test.sh 75
 tests/fm-cursor-primary.test.sh 69845
 tests/fm-daemon.test.sh 33606
@@ -754,30 +765,30 @@ tests/fm-devin-harness.test.sh 3725
 tests/fm-devin-signals-live-e2e.test.sh 49
 tests/fm-dispatch-resolve.test.sh 10051
 tests/fm-documentation-audiences.test.sh 1301
-tests/fm-dod-lib.test.sh 2035
+tests/fm-dod-lib.test.sh 4000
 tests/fm-extension-binding.test.sh 11105
-tests/fm-fleet-ledger.test.sh 19980
+tests/fm-fleet-ledger.test.sh 20284
 tests/fm-fleet-snapshot-view.test.sh 23334
 tests/fm-fleet-sync.test.sh 40541
 tests/fm-forge-detect.test.sh 193
-tests/fm-fork-free-helpers.test.sh 746
+tests/fm-fork-free-helpers.test.sh 795
 tests/fm-gate-refuse.test.sh 9953
 tests/fm-gemini-harness.test.sh 947
-tests/fm-git-strip-ai-trailers.test.sh 2067
+tests/fm-git-strip-ai-trailers.test.sh 2500
 tests/fm-gitignore-config.test.sh 59
 tests/fm-gotmp.test.sh 1509
 tests/fm-grok-continuity-live-e2e.test.sh 46
 tests/fm-grok-stop-live-e2e.test.sh 48
 tests/fm-guard-stale-banner.test.sh 17234
 tests/fm-harness-adapter-instructions-live-e2e.test.sh 72
-tests/fm-harness-adapter-references.test.sh 64
+tests/fm-harness-adapter-references.test.sh 83
 tests/fm-harness-liveness-drift-live-e2e.test.sh 1309
 tests/fm-harness-precedence.test.sh 4083
 tests/fm-herdr-pi-stale-registration-live-e2e.test.sh 55
 tests/fm-herdr-session-cleanup.test.sh 7425
 tests/fm-herdr-submit-confirm-live-e2e.test.sh 51
-tests/fm-herdr-version-floor-live-e2e.test.sh 50
-tests/fm-home-summary-refresh.test.sh 37057
+tests/fm-herdr-version-floor-live-e2e.test.sh 72
+tests/fm-home-summary-refresh.test.sh 37264
 tests/fm-host-mirror-live-e2e.test.sh 79
 tests/fm-host-mirror.test.sh 11587
 tests/fm-inactive-reconcile.test.sh 60823
@@ -789,10 +800,10 @@ tests/fm-lint-workflows.test.sh 872
 tests/fm-live-gate.test.sh 7452
 tests/fm-live-lab-up-mate.test.sh 17363
 tests/fm-live-lab.test.sh 79639
-tests/fm-mail-check.test.sh 7524
-tests/fm-mail.test.sh 9684
+tests/fm-mail-check.test.sh 9162
+tests/fm-mail.test.sh 9703
 tests/fm-muse-harness.test.sh 46548
-tests/fm-muse-signals-live-e2e.test.sh 52
+tests/fm-muse-signals-live-e2e.test.sh 77
 tests/fm-nm-test-contract.test.sh 853
 tests/fm-no-mistakes-required.test.sh 270
 tests/fm-omp-harness.test.sh 63796
@@ -813,15 +824,15 @@ tests/fm-pi-seeded-home-trust-live-e2e.test.sh 45
 tests/fm-pi-watch-extension.test.sh 56515
 tests/fm-pi-windows-shell-invocation.test.sh 5121
 tests/fm-pr-check-security.test.sh 300675
-tests/fm-pr-reviewers.test.sh 157
+tests/fm-pr-reviewers.test.sh 273
 tests/fm-pr-state-live-e2e.test.sh 47
-tests/fm-pr-state.test.sh 525
+tests/fm-pr-state.test.sh 531
 tests/fm-procevent-quota.test.sh 2459
 tests/fm-procevent-when.test.sh 25674
 tests/fm-procevent.test.sh 292297
-tests/fm-project-origin.test.sh 123
+tests/fm-project-origin.test.sh 136
 tests/fm-public-followup.test.sh 381564
-tests/fm-quota-array-dispatch-live-e2e.test.sh 50
+tests/fm-quota-array-dispatch-live-e2e.test.sh 71
 tests/fm-quota-choose.test.sh 2860
 tests/fm-remote-backlog-handoff.test.sh 82063
 tests/fm-remote-doctor.test.sh 14460
@@ -842,7 +853,7 @@ tests/fm-secondmate-lifecycle-e2e.test.sh 11268
 tests/fm-secondmate-liveness.test.sh 24564
 tests/fm-secondmate-reconcile.test.sh 100853
 tests/fm-secondmate-restart.test.sh 52591
-tests/fm-secondmate-safety.test.sh 69424
+tests/fm-secondmate-safety.test.sh 127260
 tests/fm-secondmate-sync.test.sh 55501
 tests/fm-send-agy-confirm.test.sh 4440
 tests/fm-send-inbox-doorbell-live-e2e.test.sh 108
@@ -851,16 +862,20 @@ tests/fm-send-remote-delivery.test.sh 31964
 tests/fm-send-resolve-key.test.sh 47317
 tests/fm-send-secondmate-marker-herdr-e2e.test.sh 80
 tests/fm-send-secondmate-marker.test.sh 7574
+tests/fm-session-launch-policy-inherit.test.sh 16144
+tests/fm-session-launch-policy-receipt.test.sh 2166
+tests/fm-session-launch-policy.test.sh 229671
 tests/fm-session-lock-ancestry.test.sh 18918
 tests/fm-session-start.test.sh 363574
-tests/fm-sessionstart-hook-live-e2e.test.sh 50
+tests/fm-sessionstart-hook-live-e2e.test.sh 97
 tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh 49
 tests/fm-sessionstart-nudge.test.sh 71802
 tests/fm-shared-captain-inheritance.test.sh 7991
-tests/fm-spawn-compact-adviser-disable-remote.test.sh 38561
-tests/fm-spawn-compact-adviser-disable.test.sh 21654
+tests/fm-skill-pick.test.sh 120549
+tests/fm-spawn-compact-adviser-disable-remote.test.sh 49944
+tests/fm-spawn-compact-adviser-disable.test.sh 24211
 tests/fm-spawn-dispatch-profile.test.sh 197548
-tests/fm-spawn-orca-worktree.test.sh 2400
+tests/fm-spawn-orca-worktree.test.sh 2433
 tests/fm-spawn-pool-base-freshen.test.sh 68652
 tests/fm-spawn-worktree-settle.test.sh 9309
 tests/fm-startup-memory-budget.test.sh 8086
@@ -870,28 +885,28 @@ tests/fm-stow-cascade.test.sh 3058
 tests/fm-supervision-events.test.sh 673
 tests/fm-supervision-host-attended-live-e2e.test.sh 49
 tests/fm-supervision-host-live-e2e.test.sh 75
-tests/fm-supervision-host.test.sh 789123
+tests/fm-supervision-host.test.sh 877426
 tests/fm-tangle-guard.test.sh 8501
 tests/fm-task-delivery.test.sh 32789
 tests/fm-task-inbox.test.sh 31965
 tests/fm-tasks-axi.test.sh 2293
 tests/fm-teardown-endpoint-safety.test.sh 40851
 tests/fm-teardown.test.sh 202132
-tests/fm-test-fixture-cleanup.test.sh 866
+tests/fm-test-fixture-cleanup.test.sh 937
 tests/fm-test-fixtures.test.sh 1802
 tests/fm-test-isolation-proof.test.sh 2866
 tests/fm-timeout-lib.test.sh 10750
 tests/fm-tmux-agent-liveness.test.sh 3770
 tests/fm-tool-update-check.test.sh 14383
-tests/fm-trace-context-lib.test.sh 221
+tests/fm-trace-context-lib.test.sh 227
 tests/fm-trace-context-spawn.test.sh 57488
 tests/fm-turnend-foreign-owner-arm-fix.test.sh 5575
 tests/fm-turnend-guard.test.sh 34727
 tests/fm-typesafe-key-source.test.sh 6000
 tests/fm-update.test.sh 11894
-tests/fm-vendor-auth-probe.test.sh 43278
-tests/fm-voice-relay.test.sh 28917
-tests/fm-wake-daemon-lifecycle-e2e.test.sh 7345
+tests/fm-vendor-auth-probe.test.sh 45255
+tests/fm-voice-relay.test.sh 32486
+tests/fm-wake-daemon-lifecycle-e2e.test.sh 7477
 tests/fm-wake-drain-open-decisions-cursor.test.sh 47677
 tests/fm-wake-drain-open-decisions.test.sh 8781
 tests/fm-wake-drain-outcome-backstop.test.sh 46316
@@ -899,15 +914,12 @@ tests/fm-wake-drain-unread-status.test.sh 24251
 tests/fm-wake-queue.test.sh 165906
 tests/fm-watch-arm.test.sh 113076
 tests/fm-watch-checkpoint.test.sh 11234
+tests/fm-watch-open-loops.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59092
 tests/fm-watch-triage.test.sh 1074843
-tests/fm-watcher-lock.test.sh 72022
+tests/fm-watcher-lock.test.sh 108940
 tests/fm-worker-account-live-e2e.test.sh 3179
-tests/fm-worker-account.test.sh 37445
-tests/fm-session-launch-policy-inherit.test.sh 16144
-tests/fm-session-launch-policy-receipt.test.sh 2166
-tests/fm-session-launch-policy.test.sh 229671
-tests/fm-watch-open-loops.test.sh 30000
+tests/fm-worker-account.test.sh 37607
 EOF
 }
 
@@ -2364,9 +2376,6 @@ if { [ "$MODE" = changed ] || [ "$MODE" = scripts ]; } && [ "$JOBS_EXPLICIT" -eq
     [ "$JOBS" -eq 1 ] || AUTO_CONCURRENCY=1
   fi
 fi
-if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
-  SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
-fi
 
 # An explicit --jobs names a concurrency for exactly the selection given, so an
 # unproven script in it is a refusal rather than something to schedule around.
@@ -2389,6 +2398,36 @@ if [ "$JOBS" -gt 1 ] && [ "$AUTO_CONCURRENCY" -eq 0 ]; then
         || die "--jobs $JOBS refused: family $family is proven only up to $family_jobs_max concurrent workers"
     fi
   done
+fi
+
+CPU_PASS_ACTIVE=1
+CPU_PASS_LOG_FD=8
+exec 8>&2
+if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  inherited_passes=$FM_CPU_PASS_HELD
+  case "$inherited_passes" in
+    ''|*[!0-9]*)
+      log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
+      exit 125 ;;
+  esac
+  while [ "${inherited_passes#0}" != "$inherited_passes" ]; do
+    inherited_passes=${inherited_passes#0}
+  done
+  if [ -n "$inherited_passes" ] && [ "${#inherited_passes}" -le "${#JOBS}" ] \
+    && [ "$inherited_passes" -lt "$JOBS" ]; then
+    printf 'fm-test-run: reducing --jobs %s to inherited FM_CPU_PASS_HELD=%s\n' \
+      "$JOBS" "$inherited_passes" >&"$CPU_PASS_LOG_FD"
+    JOBS=$inherited_passes
+  fi
+  CPU_PASS_ACTIVE=0
+elif [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
+  CPU_PASS_ACTIVE=0
+elif ! command -v python3 >/dev/null 2>&1; then
+  CPU_PASS_ACTIVE=0
+  log "running without CPU passes: python3 not found"
+fi
+if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
+  SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
 fi
 
 # Split the run into proven concurrent phases and an unproven remainder.
@@ -2435,8 +2474,6 @@ fi
 
 if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
   [ -r "$ROOT/bin/fm-timeout-lib.sh" ] || die "per-script timeout helper not found: bin/fm-timeout-lib.sh"
-  # shellcheck source=bin/fm-timeout-lib.sh
-  . "$ROOT/bin/fm-timeout-lib.sh"
 fi
 
 RUN_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run.XXXXXX")
@@ -2538,6 +2575,9 @@ record_script_result() {
 # positive, a script that outruns it is terminated and reported as exit 124: a
 # hung script must become a bounded failure rather than an unbounded suite,
 # because an unbounded suite is what silently outruns its caller's budget.
+# When the CPU pass pool is active (see the header) the script's pass is taken
+# outside the per-script bound, so waiting for a pass never counts toward it;
+# the recorded duration and --max-wall-ms still include the wait.
 run_script_bounded() {  # <script> <out> <stream> <id>
   local script=$1 out=$2 stream=$3 id=$4
   # Declaring the variables local first keeps the helper's export scoped to this
@@ -2547,26 +2587,32 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc
+  local -a cmd
   : "$id"
+  if [ "$stream" -eq 1 ]; then
+    # Expansion is intentionally deferred to the child bash passed to -c.
+    # shellcheck disable=SC2016
+    cmd=(bash -c 'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out")
+  else
+    cmd=(bash "$script")
+  fi
+  if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
+    # The bound runs inside the pass holder so the pass wait stays outside it.
+    # shellcheck disable=SC2016
+    cmd=(bash -c '. "$1" || exit 125; shift; fm_run_timed "$@"' _ \
+      "$ROOT/bin/fm-timeout-lib.sh" "$PER_SCRIPT_TIMEOUT_SECS" "${cmd[@]}")
+  fi
+  if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
+    cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
+      --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
+  fi
   set +e
   if [ "$stream" -eq 1 ]; then
-    if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
-      # Expansion is intentionally deferred to the child bash passed to -c.
-      # shellcheck disable=SC2016
-      fm_run_timed "$PER_SCRIPT_TIMEOUT_SECS" bash -c \
-        'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out"
-      rc=$?
-    else
-      bash "$script" 2>&1 | tee "$out"
-      rc=${PIPESTATUS[0]}
-    fi
-  elif [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
-    fm_run_timed "$PER_SCRIPT_TIMEOUT_SECS" bash "$script" >"$out" 2>&1
-    rc=$?
+    "${cmd[@]}"
   else
-    bash "$script" >"$out" 2>&1
-    rc=$?
+    "${cmd[@]}" >"$out" 2>&1
   fi
+  rc=$?
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ] && [ "$rc" -eq 124 ]; then
     printf 'not ok - %s exceeded the per-script bound of %ss and was terminated\n' \
       "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"

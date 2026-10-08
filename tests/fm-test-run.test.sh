@@ -12,6 +12,24 @@ set -u
 
 RUNNER="$ROOT/bin/fm-test-run.sh"
 
+POOL_TMP=$(fm_test_tmproot fm-test-run-pool)
+REAL_PYTHON=$(command -v python3)
+mkdir -p "$POOL_TMP/bin"
+printf '#!%s\n' "$REAL_PYTHON" >"$POOL_TMP/bin/python3"
+cat >>"$POOL_TMP/bin/python3" <<'PY'
+import os, runpy, sys
+if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) == "fm-cpu-pass.py":
+    os.cpu_count = lambda: 4
+    sys.argv = sys.argv[1:]
+    runpy.run_path(sys.argv[0], run_name="__main__")
+else:
+    os.execv(sys.executable, [sys.executable] + sys.argv[1:])
+PY
+chmod +x "$POOL_TMP/bin/python3"
+export PATH="$POOL_TMP/bin:$PATH"
+export FM_CPU_POOL_DIR="$POOL_TMP/pool"
+unset FM_CPU_PASS_HELD
+
 assert_present "$RUNNER" "bin/fm-test-run.sh is missing"
 [ -x "$RUNNER" ] || fail "bin/fm-test-run.sh must be executable"
 
@@ -92,6 +110,7 @@ init_changed_fixture_repo() {
   local repo=$1 script
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   chmod +x "$repo/bin/fm-test-run.sh"
   for script in \
@@ -820,6 +839,7 @@ test_family_proofs_run_in_separate_concurrent_phases() {
   repo="$tmp/repo"
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/fm-timeout-lib.sh"
   chmod +x "$repo/bin/fm-test-run.sh"
@@ -2100,6 +2120,7 @@ test_jobs_parallel_scheduler_and_failure_propagation() {
   d=tests/fm-supervision-instructions.test.sh
   mkdir -p "$repo/bin" "$repo/tests" "$evidence" "$fake_bin"
   cp "$RUNNER" "$runner"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   cat >"$fake_bin/stat" <<'SH'
 #!/usr/bin/env bash

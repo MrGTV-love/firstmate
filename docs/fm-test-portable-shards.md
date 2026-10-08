@@ -64,6 +64,9 @@ Each shard is still strictly serial in itself, and separate runners mean no two 
 
 Assignment is longest-processing-time bin packing over per-script duration hints embedded in `bin/fm-test-run.sh`.
 [Verification inputs](#verification-inputs) owns the measurement provenance and exceptions.
+Thirteen supplemental hints come from the complete green [run 37404365422](https://github.com/MrGTV-love/firstmate/actions/runs/37404365422), whose nine serial shard summaries all report `failed=0`: every then-unhinted serial script measured with `exit=0` and `gate_skip=false`.
+Fork-main supplemental maxima are retained where they exceed the shared baseline, including the host's 877426 ms in [run 37774962436](https://github.com/MrGTV-love/firstmate/actions/runs/37774962436) and skill-pick's 120549 ms in [run 37778222434](https://github.com/MrGTV-love/firstmate/actions/runs/37778222434).
+An unfinished or failed invocation is not a healthy duration sample.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.
 Shard selection checks the complete assignment generator before consuming its output; a generation failure refuses the lane instead of returning a successful partial list.

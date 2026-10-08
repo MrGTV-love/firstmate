@@ -12,19 +12,36 @@ REAL_TMUX=$(command -v tmux || true)
 # Cases that start a real tmux server on a case-local socket kill it inline, so a
 # failed or interrupted case would leave the server and its shells running. Stop
 # any that survive before the shared cleanup removes the sockets.
+# The socket is always reached by its relative name from the case directory: the
+# absolute path can exceed the Unix socket path limit on macOS under the default
+# per-user TMPDIR, where tmux refuses it and the kill would silently do nothing.
+# A server that still answers after its kill outlived the test, which is a leak,
+# so the test exits nonzero naming it.
 reap_isolated_tmux() {
-  local sock
+  local sock dir leaked=0
   [ -n "$REAL_TMUX" ] || return 0
   for sock in "$TMP_ROOT"/*/dedicated.sock; do
     [ -S "$sock" ] || continue
-    env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$sock" kill-server 2>/dev/null || true
+    dir=${sock%/*}
+    ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S dedicated.sock kill-server 2>/dev/null ) || true
+    if ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S dedicated.sock list-sessions >/dev/null 2>&1 ); then
+      echo "not ok - isolated tmux server outlived the test: $sock" >&2
+      leaked=1
+    fi
   done
+  return "$leaked"
 }
-trap 'reap_isolated_tmux; fm_test_cleanup' EXIT
-trap 'reap_isolated_tmux; fm_test_cleanup; exit 130' INT
-trap 'reap_isolated_tmux; fm_test_cleanup; exit 143' TERM
-trap 'reap_isolated_tmux; fm_test_cleanup; exit 129' HUP
-trap 'reap_isolated_tmux; fm_test_cleanup; exit 131' QUIT
+finish_test() {
+  local rc=$?
+  reap_isolated_tmux || rc=1
+  fm_test_cleanup
+  exit "$rc"
+}
+trap finish_test EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+trap 'exit 131' QUIT
 
 make_case() {  # <name>
   local dir=$1
@@ -1079,9 +1096,7 @@ test_own_and_absent_slot_claims_still_tear_down() {
 # that is NOT one of tmux's definitive missing-session/server answers, which is
 # the transient-server and tmux-absent-from-PATH shape: the read never happened,
 # so it proves nothing about whether the window survived.
-# The socket stays a RELATIVE name reached from <dir>, matching the isolated
-# case above: this fixture's absolute path is longer than a unix socket path
-# may be on macOS.
+# Keep the socket relative to <dir>; reap_isolated_tmux above owns the path-limit rationale.
 write_close_failing_tmux_shim() {  # <dir> <socket-name> <real-tmux>
   local dir=$1 socket=$2 real=$3
   cat > "$dir/fakebin/tmux" <<SH
