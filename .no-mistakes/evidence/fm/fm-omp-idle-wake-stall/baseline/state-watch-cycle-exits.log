@@ -1,0 +1,1 @@
+arm_pid=25323	watcher_pid=25937	origin=started	started_at=1791469621	ended_at=1791469634	exit_code=0	signal=none	reason=actionable-signal	beacon_age=2	lock_before=pid:25937|identity:Thu Oct  8 09:27:01 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=started:68464

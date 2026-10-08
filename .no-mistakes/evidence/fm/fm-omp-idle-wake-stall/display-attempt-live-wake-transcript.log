@@ -1,0 +1,272 @@
+omp/18.8.1; herdr 0.9.3
+Isolated session: fm-lab-idle-wake-gate-95756-1872
+PANE startup
+
+                                                                                              ████████████
+                                                                                                 ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                                 ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                                 ▒▒  ██                  █
+                                                                                                     ██       v18.8.1
+
+                                                                            Tip: Press ⌃R to search your prompt history and reuse a past message
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ π > ⬢ m1 👁 > 🌳 32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE > ⑂ detached ?1 ▶──────────7%─────────────────────────────────────────────────────────────────────────────────────────────╎──────────────┃────────────────────200K─
+╰─                                                                                                                                                                                              ⇧⇥ to change thinking effort
+
+Control terminal panes
+
+Usage: herdr pane [COMMAND]
+
+Commands:
+  list                  List panes
+  current               Show the current pane
+  get                   Show a pane
+  layout                Show pane layout information
+  process-info          Show pane process information
+  neighbor              Find a pane neighbor
+  edges                 Show pane edge information
+  focus                 Focus a neighboring pane
+  resize                Resize a pane split
+  zoom                  Toggle or set pane zoom
+  read                  Read pane terminal output
+  rename                Rename a pane
+  input                 Set pane input routing
+  split                 Split a pane
+  swap                  Swap panes
+  move                  Move a pane
+  close                 Close a pane
+  send-text             Send literal text to a pane
+  send-keys             Send key presses to a pane
+  wait-output           Wait for matching pane output
+  run                   Run a command in a pane
+  report-agent          Report pane agent lifecycle state
+  report-agent-session  Report pane agent session identity
+  release-agent         Release pane agent lifecycle authority
+  report-metadata       Report display-only pane metadata
+
+Are you an AI? Use these resources ONLY IF your task specifically asks you to:
+  Help a human understand or set up Herdr for the first time:
+    https://herdr.dev/agent-guide.md
+  Debug or investigate a problem with Herdr:
+    https://herdr.dev/llms.txt
+  Control Herdr panes, agents, or workspaces:
+    SKIP if a Herdr skill is already in your context. Otherwise run: herdr --skill
+
+
+PANE advisor-empty
+
+                                                                                              ████████████
+                                                                                                 ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                                 ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                                 ▒▒  ██                  █
+                                                                                                     ██       v18.8.1
+
+                                                                            Tip: Press ⌃R to search your prompt history and reuse a past message
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ADVISOR-SEED-empty reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ IDLE-ADVISOR-NOTE-empty
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE > ⑂ detached ?1 ▶──────────7%────────────────────────────────────────────────────────────────────────────────────────────╎──────────────┃────────────────────200K─
+╰─
+
+Published idleempty.status at 1791469254.783104
+PANE idle-empty-drained
+
+                                                                            Tip: Press ⌃R to search your prompt history and reuse a past message
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ADVISOR-SEED-empty reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ IDLE-ADVISOR-NOTE-empty
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idleempty.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ out=$(bin/fm-wake-drain.sh 2>&1); printf "%s\n" "$out"; ack=$(printf "%s\n" "$out" | /usr/bin/awk '/^WAKE_ACK_REQUIRED:/ { sub(/^.*run /, ""); print; exit }'); [ -z "$ack" ] || bash -c "$ack"                        │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791469257   2   signal   idleempty.status   signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idleempty.status                                    │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 99334.1791469257.2ZFnqB                                                                                       │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idleempty.status: done: idleempty disposable lab result                                                                                         │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                               │
+│ idleempty done: idleempty disposable lab result                                                                                                                                                                          │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                               │
+│ ⟦Wall: 2.61s | Timeout: 300s⟧                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE > ⑂ detached ?1 ▶───────────8%───────────────────────────────────────────────────────────────────────────────────────────╎──────────────┃────────────────────200K─
+╰─
+
+PASS idle-empty: no Enter or drain steer sent after status publication; real omp executed drain and acknowledgement.
+PANE advisor-draft
+
+ ADVISOR-SEED-empty reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ IDLE-ADVISOR-NOTE-empty
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idleempty.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ out=$(bin/fm-wake-drain.sh 2>&1); printf "%s\n" "$out"; ack=$(printf "%s\n" "$out" | /usr/bin/awk '/^WAKE_ACK_REQUIRED:/ { sub(/^.*run /, ""); print; exit }'); [ -z "$ack" ] || bash -c "$ack"                        │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791469257   2   signal   idleempty.status   signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idleempty.status                                    │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 99334.1791469257.2ZFnqB                                                                                       │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idleempty.status: done: idleempty disposable lab result                                                                                         │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                               │
+│ idleempty done: idleempty disposable lab result                                                                                                                                                                          │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                               │
+│ ⟦Wall: 2.61s | Timeout: 300s⟧                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ ADVISOR-SEED-draft reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ IDLE-ADVISOR-NOTE-draft
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE > ⑂ detached ?1 ▶───────────8%───────────────────────────────────────────────────────────────────────────────────────────╎──────────────┃────────────────────200K─
+╰─
+
+Published idledraft.status at 1791469274.61676
+PANE idle-draft-drained
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idleempty.status: done: idleempty disposable lab result                                                                                         │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                               │
+│ idleempty done: idleempty disposable lab result                                                                                                                                                                          │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                               │
+│ ⟦Wall: 2.61s | Timeout: 300s⟧                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ ADVISOR-SEED-draft reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ IDLE-ADVISOR-NOTE-draft
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idledraft.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ out=$(bin/fm-wake-drain.sh 2>&1); printf "%s\n" "$out"; ack=$(printf "%s\n" "$out" | /usr/bin/awk '/^WAKE_ACK_REQUIRED:/ { sub(/^.*run /, ""); print; exit }'); [ -z "$ack" ] || bash -c "$ack"                        │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791469275   4   signal   idledraft.status   signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idledraft.status                                    │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 40682.1791469275.p4kT94                                                                                       │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idledraft.status: done: idledraft disposable lab result                                                                                         │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                               │
+│ idledraft done: idledraft disposable lab result                                                                                                                                                                          │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                               │
+│ ⟦Wall: 2.86s | Timeout: 300s⟧                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE > ⑂ detached ?1 ▶───────────8%───────────────────────────────────────────────────────────────────────────────────────────╎──────────────┃────────────────────200K─
+╰─ UNSENT OPERATOR DRAFT 7e91
+
+PASS idle-draft: queue empty, draft visible in composer and absent from every model request.
+Published busyqueue.status at 1791469291.735499
+FAIL Timed out: busy wake queued in running TUI
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/drive.py", line 204, in <module>
+    wait_for('busy wake queued in running TUI', lambda: 'FIRSTMATE WATCHER WAKE:' in screen() and ('After yield' in screen() or 'Queued' in screen()), 15)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/drive.py", line 95, in wait_for
+    raise AssertionError('Timed out: ' + name)
+AssertionError: Timed out: busy wake queued in running TUI
+
+PANE failure
+
+ ADVISOR-SEED-draft reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ IDLE-ADVISOR-NOTE-draft
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idledraft.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ out=$(bin/fm-wake-drain.sh 2>&1); printf "%s\n" "$out"; ack=$(printf "%s\n" "$out" | /usr/bin/awk '/^WAKE_ACK_REQUIRED:/ { sub(/^.*run /, ""); print; exit }'); [ -z "$ack" ] || bash -c "$ack"                        │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791469275   4   signal   idledraft.status   signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idledraft.status                                    │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 40682.1791469275.p4kT94                                                                                       │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idledraft.status: done: idledraft disposable lab result                                                                                         │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                               │
+│ idledraft done: idledraft disposable lab result                                                                                                                                                                          │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                               │
+│ ⟦Wall: 2.86s | Timeout: 300s⟧                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ BUSY-SEED-queue run the bounded wait
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 24; printf "BUSY-TURN-FINISHED\n"                                                                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Working…
+ ⠙ 19s > ⬢ m1 👁 > 🌳 32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE > ⑂ detached ?1 ▶───────────8%─────────────────────────────────────────────────────────────────────────────────────────╎─────────────┃────────────────────200K─
+╰─
+
+Home-scoped watcher stop: watcher: none running
+
+Herdr teardown exit=0: 

@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Idle advisor-tail wake starts and drains with an empty composer",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Idle advisor-tail wake drains without submitting or erasing an operator draft",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Live driver failure",
+    "result": "fail",
+    "live": true,
+    "reason": "[PosixPath('/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/bin/fm-herdr-lab.sh'), 'run', 'fm-lab-idle-wake-gate-3201-28655', 'pane', 'send-keys', 'w1:p1', 'C-u']: exit 1\n\n{\"error\":{\"code\":\"invalid_key\",\"message\":\"unsupported key C-u\"},\"id\":\"cli:request\"}\n"
+  }
+]

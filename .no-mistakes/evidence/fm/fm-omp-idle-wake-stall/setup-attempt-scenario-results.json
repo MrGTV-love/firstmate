@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Live driver failure",
+    "result": "fail",
+    "live": true,
+    "reason": "Timed out: real watcher armed"
+  }
+]

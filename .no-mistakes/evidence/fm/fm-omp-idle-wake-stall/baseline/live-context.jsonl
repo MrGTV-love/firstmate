@@ -1,0 +1,8 @@
+{"time":1791469621.255,"event":"session_start","idle":true,"pending":false,"editor":""}
+{"time":1791469626.164,"event":"poll","idle":true,"pending":false,"editor":"ADVISOR-SEED-empty reply ack"}
+{"time":1791469627.437,"event":"agent_start","idle":false,"pending":false,"editor":""}
+{"time":1791469627.482,"event":"message_start","idle":false,"pending":false,"editor":"","detail":{"role":"user","content":[{"type":"text","text":"ADVISOR-SEED-empty reply ack"}],"attribution":"user","timestamp":1791469627366}}
+{"time":1791469627.496,"event":"message_start","idle":false,"pending":false,"editor":"","detail":{"role":"assistant","content":[{"type":"text","text":"ack"}],"api":"openai-completions","provider":"lab","model":"m1","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":1791469627478,"responseId":"lab"}}
+{"time":1791469627.51,"event":"agent_end","idle":false,"pending":false,"editor":""}
+{"time":1791469627.542,"event":"message_start","idle":true,"pending":false,"editor":"","detail":{"role":"custom","customType":"advisor","content":"<advisory severity=\"concern\" guidance=\"weigh, don't blindly obey\">\nIDLE-ADVISOR-NOTE-empty\n</advisory>","display":true,"attribution":"agent","details":{"notes":[{"note":"IDLE-ADVISOR-NOTE-empty","severity":"concern"}]},"timestamp":1791469627541}}
+{"time":1791469636.167,"event":"poll","idle":true,"pending":true,"editor":""}

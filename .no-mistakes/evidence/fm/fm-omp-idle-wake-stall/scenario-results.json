@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Idle advisor-tail wake starts and drains with an empty composer",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Idle advisor-tail wake drains without submitting or erasing an operator draft",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Wake arriving during a running tool waits as a follow-up and then drains",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Automatically rearmed watcher drains a subsequent idle wake without a manual ring",
+    "result": "pass",
+    "live": true
+  }
+]

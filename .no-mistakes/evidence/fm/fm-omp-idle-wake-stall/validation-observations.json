@@ -1,0 +1,53 @@
+{
+  "versions": {
+    "omp": "18.8.1",
+    "herdr": "0.9.3"
+  },
+  "baseline": {
+    "commit": "6fe80c317277e34e5d4e514d74b586a9da289579",
+    "observed_idle": true,
+    "observed_pending": true,
+    "composer": "",
+    "model_received_wake": false,
+    "queue_still_nonempty": true,
+    "observation_timeout_seconds": 35
+  },
+  "target": {
+    "commit": "dc1bffb5e5a45c426fb67302ccc52bd0b3392bd2",
+    "wake_consumption": [
+      {
+        "status": "idleempty.status",
+        "consumed_user_messages": 1,
+        "consumed_at": 1791469473.145
+      },
+      {
+        "status": "idledraft.status",
+        "consumed_user_messages": 1,
+        "consumed_at": 1791469494.482
+      },
+      {
+        "status": "busyqueue.status",
+        "consumed_user_messages": 1,
+        "consumed_at": 1791469531.258
+      },
+      {
+        "status": "successor.status",
+        "consumed_user_messages": 1,
+        "consumed_at": 1791469561
+      }
+    ],
+    "final_own_queue_empty": true,
+    "draft_visible_in_pane": true,
+    "draft_absent_from_all_model_requests": true,
+    "busy_pending_state_observed": true
+  },
+  "isolation": {
+    "real_watch_arm_and_watch_and_drain": true,
+    "scripted_local_model": "OpenAI-compatible SSE; advisor tool call and real bash drain/ack tool calls",
+    "fixture_environment_adapter": "Copied unchanged extension; arm wrapper removes extension-injected FM_*_OVERRIDE values before invoking the real arm with marked FM_HOME. No gate bypass.",
+    "unrelated_fixture": "Fresh empty open-loop ledger, one-hour refresh interval; no fleet or Vernant data.",
+    "terminal_grid": "40 rows x 220 columns",
+    "herdr_teardown_exit": 0,
+    "remaining_fixture_processes": []
+  }
+}

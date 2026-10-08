@@ -1,0 +1,40 @@
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idleempty.status: done: idleempty disposable lab result                                                                                         │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                               │
+│ idleempty done: idleempty disposable lab result                                                                                                                                                                          │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                               │
+│ ⟦Wall: 2.59s | Timeout: 300s⟧                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ ADVISOR-SEED-draft reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ IDLE-ADVISOR-NOTE-draft
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idledraft.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ out=$(bin/fm-wake-drain.sh 2>&1); printf "%s\n" "$out"; ack=$(printf "%s\n" "$out" | /usr/bin/awk '/^WAKE_ACK_REQUIRED:/ { sub(/^.*run /, ""); print; exit }'); [ -z "$ack" ] || bash -c "$ack"                        │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791469171   5   signal   idledraft.status   signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/idledraft.status                                    │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 69201.1791469171.8OnLSx                                                                                       │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idledraft.status: done: idledraft disposable lab result                                                                                         │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                               │
+│ idledraft done: idledraft disposable lab result                                                                                                                                                                          │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                               │
+│ ⟦Wall: 1.90s | Timeout: 300s⟧                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE > ⑂ detached ?1 ▶───────────8%───────────────────────────────────────────────────────────────────────────────────────────╎──────────────┃────────────────────200K─
+╰─ UNSENT OPERATOR DRAFT 7e91

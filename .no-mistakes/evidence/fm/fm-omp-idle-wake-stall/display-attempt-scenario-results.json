@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Idle advisor-tail wake starts and drains with an empty composer",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Idle advisor-tail wake drains without submitting or erasing an operator draft",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Live driver failure",
+    "result": "fail",
+    "live": true,
+    "reason": "Timed out: busy wake queued in running TUI"
+  }
+]

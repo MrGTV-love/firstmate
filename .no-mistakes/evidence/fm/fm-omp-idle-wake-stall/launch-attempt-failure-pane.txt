@@ -1,0 +1,10 @@
+bash -c 'printf "%s\n" $$ > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/.lock; exec env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE
+ -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home PI_CODING_AGENT_DI
+R=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/agent FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=3600 FM_OPEN_LOOPS_INTERVAL=3600 LAB_OBSERVATION=/Users/charlesabrooke
+r/.no-mistakes/evidence/01M4DXJQP6FBDZ6YHV46Y38ZKE/live-context.jsonl omp --model lab/m1 --no-extensions -e .gate-wake-lab/code/.omp/extensions/fm-primary-omp-watch.ts -e /Users/charlesabrooker/.no-mistakes/worktrees/32d
+18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/observe.ts --no-title --no-lsp --no-skills --no-rules --tools bash --auto-approve --thinking%
+charlesabrooker@Mac-Studio 01M4DXJQP6FBDZ6YHV46Y38ZKE % bash -c 'printf "%s\n" $$ > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home/state/.lock; exec env -u NO_MI
+STAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP
+6FBDZ6YHV46Y38ZKE/.gate-wake-lab/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/agent FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=3600 FM_OPEN_L
+OOPS_INTERVAL=3600 LAB_OBSERVATION=/Users/charlesabrooker/.no-mistakes/evidence/01M4DXJQP6FBDZ6YHV46Y38ZKE/live-context.jsonl omp --model lab/m1 --no-extensions -e .gate-wake-lab/code/.omp/extensions/fm-primary-omp-watch
+.ts -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DXJQP6FBDZ6YHV46Y38ZKE/.gate-wake-lab/observe.ts --no-title --no-lsp --no-skills --no-rules --tools bash --auto-approve --thinking
