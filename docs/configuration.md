@@ -1515,7 +1515,8 @@ A brief containing `<!--` followed by optional whitespace and the reserved `disp
 With the directive present, every such line must be exactly one of the two canonical markers above after trimming surrounding whitespace: nested, unmatched, inline, malformed suffixes (`<!-- dispatch-never-send:star -->`), unspaced (`<!--dispatch-never-send:start-->`), or differently cased (`<!-- Dispatch-Never-Send:start -->`) markers stop the entire request rather than being corrected.
 A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
-On 2026-10-07, the captain authorized worker skill selection to send the same sanitized, never-send-filtered task text used by `bin/fm-dispatch-resolve.sh` to TypeSafe and its OpenRouter fallback, ruling “I asked for A already.” This authorization does not widen any other sending boundary.
+On 2026-10-07, the captain authorized worker skill selection to send the same sanitized, never-send-filtered task text used by `bin/fm-dispatch-resolve.sh` to TypeSafe and its OpenRouter fallback, ruling “I asked for A already.”
+This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
 
 Before each request is sent, every remaining string in it is checked for literal matches through `bin/fm-typesafe-lib.sh`: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; belay checks every request string.
@@ -1607,7 +1608,9 @@ Firstmate passes its profile line unless it states a reason to override, such as
 **Key handling and fixed settings**
 
 - The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
-- The resolver sends its key to `curl` only as a header read from a file descriptor, never on argv. The skill picker pipes its keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; they never enter Node's environment or arguments. Neither tool prints, logs, or writes keys to files.
+- The resolver sends its key to `curl` only as a header read from a file descriptor, never on argv.
+  The skill picker pipes its keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; they never enter Node's environment or arguments.
+  Neither tool prints, logs, or writes keys to files.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
@@ -1703,29 +1706,40 @@ To move to a newer upstream version, review it, update the pinned commit in this
 
 ## Worker skill selection
 
-Every ship and scout launch and relaunch with brief delivery runs `bin/fm-skill-pick.sh` once its task copy exists, so the worker starts with the one project skill that fits its task.
+Every ship and scout launch and relaunch with brief delivery runs `bin/fm-skill-pick.sh` once its task copy exists, to select a project skill for the task.
 Secondmate charters are not judged.
 The picker reads the task copy's `.agents/skills` and `.claude/skills`; a firstmate task's copy holds firstmate's own skills.
-It runs the [TypeSafe skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) recipe on the vendored [hyper-jev](../.agents/skills/hyper-jev/SOURCE.md) client, and `bin/fm-skill-pick.mjs`'s header owns the recipe, roster rules, and provider order.
+It runs the [TypeSafe skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) recipe on the vendored [hyper-jev](../.agents/skills/hyper-jev/SOURCE.md) client; the [picker header](../bin/fm-skill-pick.mjs) owns recipe mechanics, large-roster chunking, and roster rules.
 
-For rosters over 255 skills, chunk-local top-three candidates enter a common Choice ranking before the detailed shortlist step; probabilities from independent chunks are never compared. This follows the cookbook's shortlist-over-chunk-winners guidance, retaining three candidates per chunk to preserve near-winners, and adds ranking requests to the ordinary two-request flow (`bin/fm-skill-pick.mjs:245-264`).
-
-**Named cookbook deviation — highest-fit delivery:** the rerank Choice is retained, but the delivered pick is the highest-fit shortlisted skill rather than the Choice winner, and its fit must be at least 0.30 (`bin/fm-skill-pick.mjs:278-288`). The captain chose this deviation because workers must read and follow the delivered skill, rather than receive the cookbook's ignorable advisory suggestion.
+**Named cookbook deviation - highest-fit delivery:** the captain chose a highest-fit pick that workers must read and follow, rather than the cookbook's ignorable advisory suggestion.
+The picker header owns the precise selection rule and thresholds.
 
 The pick is added to the launch instructions as a skill to read in full and follow.
+The launch instructions take precedence over a conflicting picked skill.
 Existing mandatory skill triggers and the worker's own skill index still apply first and unchanged.
-A skill the picker could not send, such as one that is not a Git-tracked file in the task copy or a linked skill directory containing `SKILL.md`, is listed by its local name for the worker to check; linked skill contents are never read or sent. Links without `SKILL.md` are not skills: they reserve no name and produce no manual-check instruction.
-No-fit outcomes apply only to judged skills; when every discovered skill is excluded, selection is unavailable with the exclusion reasons, not a finding that no skill fits. A genuinely empty catalog reports that there are no skills to judge. When the picker cannot run, the launch continues and the instructions say why.
+A skill the picker could not send, such as one that is not a Git-tracked file in the task copy or a linked skill directory containing `SKILL.md`, is listed by its local name for the worker to check; linked skill contents are never read or sent.
+Links without `SKILL.md` are not skills: they reserve no name and produce no manual-check instruction.
+No-fit outcomes apply only to judged skills; when every discovered skill is excluded, selection is unavailable with the exclusion reasons, not a finding that no skill fits.
+A genuinely empty catalog reports that there are no skills to judge.
+When the picker cannot run, the launch continues and the instructions say why.
 The task record carries `skill_selection=` (picked, none, unavailable, or undelivered), `skill_selection_reason=`, and `skill_selection_picked=` when a pick is delivered.
-Raw commands receive the selection when they contain `__BRIEF__` or `__BRIEFDOORBELL__`, or when their detected harness is Kimi or Rovo, which receives a brief-file pointer. Without any supported brief transport, selection is recorded as undelivered with its reason, no pick is claimed, and the command is unchanged. Failure to publish the selection overlay also records undelivered and clears the pick. If launch delivery fails, any retained record for that launch is marked undelivered with the failure reason and no claimed pick; an abort before replacement-record publication preserves the prior record.
+Raw commands receive the selection when they contain `__BRIEF__` or `__BRIEFDOORBELL__`, or when their detected harness is Kimi or Rovo, which receives a brief-file pointer.
+Without any supported brief transport, selection is recorded as undelivered with its reason, no pick is claimed, and the command is unchanged.
+Failure to publish the selection overlay also records undelivered and clears the pick.
+If launch delivery fails, any retained record for that launch is marked undelivered with the failure reason and no claimed pick; an abort before replacement-record publication preserves the prior record.
 `bin/fm-spawn.sh` stops the picker after 30 seconds.
 
-Only the brief text dispatch resolution may send is sent, after the same never-send checks; see the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key). For a promoted scout's ship relaunch, skill selection retains the original Captain's intent or provenance-marked legacy Task words and uses the recorded ship kind and current ship Firstmate spec rather than the superseded scout spec; ordinary dispatch extraction is unchanged. Legacy provenance uses the same fence and indentation exclusions as promotion. Privacy-hidden promotion instructions never revive the superseded spec.
-The `TYPESAFE_API_KEY` opt-in enables it, and TypeSafe is asked directly first.
-When the direct call is unavailable because its key is absent or fails and `OPENROUTER_API_KEY` is set in the same home `.env`, the same request and the rest of that pick go through OpenRouter. This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
+Only the brief text dispatch resolution may send is sent, after the same never-send checks; see the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key).
+For a promoted scout's ship relaunch, skill selection retains the original Captain's intent or provenance-marked legacy Task words and uses the recorded ship kind and current ship Firstmate spec rather than the superseded scout spec; ordinary dispatch extraction is unchanged.
+Legacy provenance uses the same fence and indentation exclusions as promotion.
+Privacy-hidden promotion instructions never revive the superseded spec.
+The picker uses the shared [TypeSafe key lookup](#typed-dispatch-resolution-env-typesafe_api_key), including the local primary-home fallback, and asks TypeSafe directly first when that key is available.
+When the direct call is unavailable because its key is absent or fails and `OPENROUTER_API_KEY` is set in the calling home's `.env`, the same request and the rest of that pick go through OpenRouter.
+Unlike the TypeSafe key, the OpenRouter key is read only from that home's `.env`, with no primary-home or ambient-environment fallback.
+This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
 Fallback provenance is retained for picked, no-selection, and unavailable outcomes.
 Missing optional catalog directories are skipped; failures inspecting existing catalogs are unavailable with their actionable reason, not successful no-selection results.
-Keys reach the picker on stdin, never in its environment or arguments.
+The shared [key-handling contract](#typed-dispatch-resolution-env-typesafe_api_key) owns credential transport and secrecy.
 
 [`tests/fm-skill-pick.test.sh`](../tests/fm-skill-pick.test.sh) exercises selection, both thresholds, the fallback, the never-send boundary, and chunking through the public tool.
 The cookbook's published rates are external design context, not validated performance evidence for this caller.
@@ -1742,7 +1756,8 @@ Required tools come in two parts: a universal toolchain every home needs regardl
 
 Every home requires:
 
-- Node 24+ with native TypeScript loading enabled, and git. Worker skill selection capability-checks imports of its vendored TypeScript client; unsupported TypeScript loading is a runtime prerequisite, while other import failures report a client-loading error. The picker test suite emits canonical `skip:` output only for missing Node or unsupported TypeScript loading; other client-loading errors fail the suite.
+- Node 24+ with native TypeScript loading enabled, and git.
+  Worker skill selection capability-checks imports of its vendored TypeScript client; unsupported TypeScript loading is a runtime prerequisite, while other import failures report a client-loading error.
 - gh, with GitHub authentication through `gh auth login`.
 - no-mistakes v1.46.0 or newer.
 - Compatible gh-axi.

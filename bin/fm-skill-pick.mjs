@@ -3,16 +3,20 @@
 // Usage: node bin/fm-skill-pick.mjs roster <catalog-dir>... > roster.json
 //        node bin/fm-skill-pick.mjs pick <task-file> <roster.json> <policy-path> <scratch-path> < keys
 // Recipe: https://docs.typesafe.ai/cookbooks/skill_suggestion ("rank the whole
-// roster", "rerank the top three", suggest()); question texts, thresholds,
-// shortlist and excerpt are retained; the highest-fit candidate is selected. Transport, validation,
-// retries and provider endpoints are .agents/skills/hyper-jev's starter client,
-// unchanged. keys is two lines, the TypeSafe key then the OpenRouter key;
-// either may be empty. TypeSafe is asked directly first; when that call fails and an
-// OpenRouter key exists, the same request and the rest of this run go through
-// OpenRouter. Keys arrive on stdin only and are never printed.
-// roster: one entry per skill name, the earlier catalog winning; a skill is
-// sent only when <name>/SKILL.md is a regular Git-tracked file with a
-// description, and every other one is listed in not_judged with its reason.
+// roster", "rerank the top three", suggest()); question texts, the 0.30 need
+// and fit thresholds, three-skill shortlist and 700-character excerpt are retained.
+// Above the client's 255-option Choice limit, each chunk's top three enter a
+// common ranking before detailed reranking; independent chunk probabilities
+// are never compared. Additional reduction rounds keep every Choice in bounds.
+// Named deviation: deliver the highest-fit shortlisted candidate, not the
+// rerank Choice winner, only when its fit meets the inclusive fit threshold.
+// Transport, validation, retries and endpoints are the unchanged vendored client.
+// docs/configuration.md "Worker skill selection" owns provider policy and setup.
+// keys is two lines, the TypeSafe key then the OpenRouter key; either may be empty.
+// roster: one entry per skill name, the earlier catalog winning; entries without
+// SKILL.md are not skills and reserve no name. Only regular Git-tracked SKILL.md
+// files with a readable description are judged; other discovered skills appear
+// in not_judged. Linked skill contents are never read or sent.
 // pick prints status=, reason=, picked=, path=, fit=, provider= and model=
 // lines; path is a JSON string, and status is picked, none or unavailable.
 import { execFileSync } from 'node:child_process';

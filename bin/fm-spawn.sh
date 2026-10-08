@@ -42,13 +42,10 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
-#   Every ship/scout launch and relaunch also runs bin/fm-skill-pick.sh
-#   once its task copy exists, over that copy's .agents/skills and
-#   .claude/skills, and adds the picked skill to the same overlay as one to
-#   load and follow; source intent and mandatory skill triggers remain
-#   unchanged. The picker is bounded at 30 seconds and never stops a launch:
-#   when it is unavailable the overlay says why, and the task record carries
-#   skill_selection=, skill_selection_reason=, and skill_selection_picked=.
+#   Ship/scout launches and relaunches integrate bin/fm-skill-pick.sh through
+#   that overlay. docs/configuration.md "Worker skill selection" owns selection,
+#   supported brief transports, and recorded outcomes. The picker is bounded
+#   at 30 seconds and never stops a launch.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
@@ -4629,11 +4626,8 @@ fi
 spawn_enter_recorded_worktree
 spawn_assert_agent_worktree
 
-# Every ship and scout launch picks from the skills of the project copy it
-# works in (bin/fm-skill-pick.sh), and the pick becomes part of the launch
-# instructions. The picker is bounded and only ever adds that section: when it
-# cannot run, the launch continues and both the instructions and the task
-# record say plainly why.
+# Judge only after entering the task copy so skill paths target the worker's
+# actual files. Raw commands without supported brief transport stay untouched.
 SKILL_SELECTION_BOUND=30
 SKILL_SELECTION_STATUS='' SKILL_SELECTION_REASON='' SKILL_SELECTION_PICKED=''
 if { [ "$KIND" = ship ] || [ "$KIND" = scout ]; } && [ "$RAW_LAUNCH" = 1 ] && [[ "$LAUNCH" != *'__BRIEF__'* ]] && [[ "$LAUNCH" != *'__BRIEFDOORBELL__'* ]] && [ "$HARNESS" != kimi ] && [ "$HARNESS" != rovo ]; then

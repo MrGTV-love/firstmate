@@ -2,8 +2,8 @@
 # Pick the one project skill a worker should load, for its launch instructions.
 # Usage: fm-skill-pick.sh --brief <filled-brief> --catalog <skill-dir>... [--record <file>] [--kind ship|scout]
 # bin/fm-skill-pick.mjs runs the TypeSafe skill-suggestion cookbook recipe on
-# the vendored hyper-jev client over the catalogs' skills (an earlier catalog
-# wins a duplicate name); its header owns the recipe, roster and provider order.
+# the vendored hyper-jev client; its header owns recipe and roster mechanics.
+# docs/configuration.md "Worker skill selection" owns provider policy and setup.
 # This wrapper supplies what the example cannot: the brief text dispatch
 # resolution may send (fm_typesafe_brief_task), the dispatch-never-send check
 # over every string a request can carry, and the keys from fm-typesafe-lib.sh,

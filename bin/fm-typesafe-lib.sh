@@ -13,11 +13,12 @@
 # The private key is never exported or placed on argv.
 # fm_typesafe_permitted <request-json> <never-send-path> <scratch-file> checks
 # every request string against the existing dispatch-never-send policy.
-# fm_typesafe_brief_task <brief> <never-send-path> <output-file> writes the
-# one permitted task text Jev may receive for a brief: marked never-send
-# regions removed, then the scout tag plus `## Captain's intent` and
-# `## Firstmate spec`, or the whole remaining brief when it has neither.
-# docs/configuration.md "Never-send list" owns the marker rules.
+# fm_typesafe_brief_task <brief> <never-send-path> <output-file> [ship|scout]
+# writes the permitted brief task text without relaxing existing output-file
+# permissions. The optional kind selects current ship instructions for promoted
+# briefs or the scout tag; omitting it preserves dispatch extraction.
+# docs/configuration.md "What the model receives", "Never-send list", and
+# "Worker skill selection" own the extraction and privacy contracts.
 # A refusal sets FM_TYPESAFE_WITHHELD_REASON and returns 1, without echoing text.
 
 TYPESAFE_API_KEY_PRIVATE=${TYPESAFE_API_KEY_PRIVATE:-${TYPESAFE_API_KEY:-}}
