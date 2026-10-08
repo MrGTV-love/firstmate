@@ -1025,35 +1025,35 @@ switch (process.env.SCENARIO) {
     await settle();
     if (sent.length !== 2 || !same(sent[1]) || composer.text !== draft) throw new Error("first recovery did not preserve the draft");
     await handlers.get("before_agent_start")({ prompt: wake }, ctx);
-    composer.text = `${wake}\n\n${draft}`;
-    if (process.env.SCENARIO === "preparation-handoff") {
-      const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
-      await handlers.get("agent_end")({}, ctx);
-      await handlers.get("session_shutdown")({}, ctx);
-      const stored = JSON.parse(readFileSync(handoff, "utf8"));
-      if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("cancelled preparation retired its pending handoff");
-      await handlers.get("session_start")({}, ctx);
-      for (let i = 0; i < 60 && sent.length < 3; i += 1) await sleep(100);
-      if (sent.length !== 3 || sent[2].m !== wake || sent[2].o?.deliverAs !== "followUp") throw new Error("replacement lost the preparation-cancelled wake");
-      await handlers.get("before_agent_start")({ prompt: wake }, ctx);
-      if (JSON.parse(readFileSync(handoff, "utf8")).pending.length !== 1) throw new Error("replacement preparation retired its handoff");
-      await handlers.get("message_start")({ message: { role: "assistant", content: wake } }, ctx);
-      if (!existsSync(handoff)) throw new Error("assistant message retired the wake");
-      await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
-      await handlers.get("session_shutdown")({}, ctx);
-      if (existsSync(handoff)) throw new Error("accepted replay retained its handoff");
-      if (composer.text !== `${wake}\n\n${draft}`) throw new Error("replacement changed the restored draft");
-      process.exit(0);
-    }
-    await settle();
-    if (sent.length !== 3 || !same(sent[2]) || composer.text !== draft) throw new Error("second Escape during preparation lost the wake or draft");
-    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
-    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
-    composer.text = `${wake}\n\n${draft}`;
     const sets = composer.sets.length;
-    await settle();
-    if (sent.length !== 3 || composer.sets.length !== sets || composer.text !== `${wake}\n\n${draft}`) throw new Error("accepted wake was recovered after preparation cancellation");
-    break;
+    await sleep(2500);
+    if (sent.length !== 2 || composer.sets.length !== sets || composer.text !== draft) throw new Error("cancelled preparation resubmitted the wake or changed the preserved draft");
+    if (process.env.SCENARIO === "preparation-cancelled") {
+      composer.text = "";
+      idle = false;
+      await handlers.get("before_agent_start")({ prompt: draft }, ctx);
+      await handlers.get("message_start")({ message: { role: "user", content: draft } }, ctx);
+      idle = true;
+      await settle();
+      if (sent.length !== 2 || composer.sets.length !== sets || composer.text !== "") throw new Error("later completed draft turn recovered a wake absent from the editor");
+    }
+    const preservedEditor = composer.text;
+    const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+    await handlers.get("session_shutdown")({}, ctx);
+    const stored = JSON.parse(readFileSync(handoff, "utf8"));
+    if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("cancelled preparation retired its pending handoff");
+    await handlers.get("session_start")({}, ctx);
+    for (let i = 0; i < 60 && sent.length < 3; i += 1) await sleep(100);
+    if (sent.length !== 3 || sent[2].m !== wake || sent[2].o?.deliverAs !== "followUp") throw new Error("replacement lost the preparation-cancelled wake");
+    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+    if (JSON.parse(readFileSync(handoff, "utf8")).pending.length !== 1) throw new Error("replacement preparation retired its handoff");
+    await handlers.get("message_start")({ message: { role: "assistant", content: wake } }, ctx);
+    if (!existsSync(handoff)) throw new Error("assistant message retired the wake");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    await handlers.get("session_shutdown")({}, ctx);
+    if (existsSync(handoff)) throw new Error("accepted replay retained its handoff");
+    if (composer.text !== preservedEditor) throw new Error("replacement changed the preserved editor");
+    process.exit(0);
   }
   case "consumed": {
     await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);

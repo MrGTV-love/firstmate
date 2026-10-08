@@ -87,7 +87,7 @@ The extension removes only the wake and one transport blank-line separator, pres
 Recovery is bounded to three resubmission attempts per wake; another `agent_end` is needed to schedule another check.
 A wake restored by Alt+Up while idle without `agent_end` is not resubmitted, and rare credential loss during recovery can reject resubmission after the editable copy is removed; the durable queue and shutdown handoff retain the wake, the existing parent stalled-loop alarm reports either stall for endpoint-recorded local secondmates, and consumption-confirmed removal remains follow-up `fm-omp-wake-recovery-rollback`.
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
-`tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, repeated Escape during preparation, cancelled-preparation handoff, and identical wakes across preparation plus accepted-message callbacks, streaming delivery, and session replacement.
+`tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, pending-wake retention across cancelled preparation without `agent_end`, later completed draft turns, and replacement handoff until accepted user `message_start`, plus identical wakes across preparation plus accepted-message callbacks, streaming delivery, and session replacement.
 The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
 
 ### Cursor stop hook
