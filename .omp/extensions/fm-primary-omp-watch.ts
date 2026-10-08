@@ -45,6 +45,21 @@
 // handoff carries actionable closes that were still pending delivery; its
 // durable state lives at state/extensions/omp-primary-watch/session-replacement-actionable.json.
 // Stale callbacks from a prior generation are no-ops against the active replacement.
+// A stopped generation is never a dead end: omp can stop a session generation
+// with no matching session_start reaching this extension, and a stopped
+// generation refuses every arm. If no successor has bound within
+// FM_OMP_SUCCESSOR_GRACE_MS (15s) while this process still owns the home lock,
+// the extension binds a fresh generation itself, exactly as session_start
+// would, and an arm call from the model does the same at once, because a tool
+// call proves a live session. A real successor arriving later finds that
+// generation live and arms nothing twice.
+// Single instance: the latest factory bind in this process owns the home
+// (.pi/extensions/lib/fm-watch-lifecycle.ts owns the registry). An earlier
+// instance retires its generation and its event handlers become no-ops, and
+// its arm tool and command forward to the current instance, so a session that
+// loaded this file twice still has exactly one live generation and one arm.
+// Every lifecycle transition is recorded in
+// state/extensions/omp-primary-watch/lifecycle.log (same owner).
 //
 // Delivery versus consumption (stated once here):
 // A main wake is delivered once omp accepts it (sendUserMessage returns).
@@ -71,6 +86,7 @@ import { Type } from "typebox";
 // resolves bin/fm-operational-input.sh relative to its own location, which is
 // the same repository root this file lives in.
 import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/fm-operational-input.ts";
+import { bindWatchInstance, createLifecycleLog } from "../../.pi/extensions/lib/fm-watch-lifecycle.ts";
 
 // The omp extension API surface this file uses. omp is a Pi fork and ships no
 // separately installable type package, so the contract is declared locally
@@ -147,6 +163,7 @@ const hostScript = `${fmRoot}/bin/fm-supervision-host.sh`;
 const marker = `${state}/.omp-watch-extension-loaded`;
 const handoffDir = `${state}/extensions/omp-primary-watch`;
 const actionableHandoff = `${handoffDir}/session-replacement-actionable.json`;
+const lifecycleLogPath = `${handoffDir}/lifecycle.log`;
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
@@ -160,6 +177,7 @@ const armReadyTimeoutMs = positiveInteger(
 );
 const hostReadyTimeoutMs = Math.max(armReadyTimeoutMs, 30000);
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const successorGraceMs = positiveInteger("FM_OMP_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - omp session is shutting down";
 
@@ -571,9 +589,89 @@ const cleanupOnProcessExit = () => {
 };
 process.once("exit", cleanupOnProcessExit);
 
+type OmpWatchInstanceApi = {
+  activate: () => Promise<ArmResult>;
+  retire: () => Promise<void>;
+};
+
 export default function (pi: ExtensionAPI) {
+  const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state);
+  const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
   let generation = createGeneration();
   activateGeneration(generation);
+  // The stop of the latest generation, so a self-heal never races the child
+  // retirement that stop is still waiting on.
+  let generationStopped: Promise<void> = Promise.resolve();
+  let healTimer: ReturnType<typeof setTimeout> | null = null;
+  lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
+  if (instance.previous?.api) {
+    void instance.previous.api.retire().catch(() => {
+      // The superseded instance records its own retirement; nothing to deliver.
+    });
+  }
+
+  function clearHealTimer(): void {
+    if (healTimer) clearTimeout(healTimer);
+    healTimer = null;
+  }
+
+  // Bind the generation a live session runs on: the existing one when it is
+  // still live, otherwise a fresh one. session_start, the timed self-heal, and
+  // an arm call on a stopped generation all bind through here.
+  function bindLiveGeneration(cause: string): void {
+    clearHealTimer();
+    if (generation.stopping) {
+      generation = createGeneration();
+      lifecycle("generation-create", { generation: generation.id, cause });
+    }
+    activateGeneration(generation);
+    lifecycle("generation-activate", { generation: generation.id, cause });
+  }
+
+  function scheduleSelfHeal(stopped: SessionGeneration): void {
+    clearHealTimer();
+    const shutdownAt = Date.now();
+    const timer = setTimeout(() => {
+      if (healTimer === timer) healTimer = null;
+      if (!instance.isCurrent() || generation !== stopped || !stopped.stopping) return;
+      const owned = lockOwnership() === "owned";
+      lifecycle("bound-expired", {
+        waiter: "omp-watch-extension",
+        "waited-on": "session_start",
+        bound: `${successorGraceMs}ms`,
+        actual: `${Date.now() - shutdownAt}ms`,
+        outcome: owned ? "self-heal" : "lock-not-owned",
+      });
+      if (!owned) return;
+      bindLiveGeneration("self-heal");
+      markLoaded();
+      const result = activateOwnedWatch(generation);
+      lifecycle("self-heal", { generation: generation.id, ok: result.ok });
+    }, successorGraceMs);
+    timer.unref();
+    healTimer = timer;
+  }
+
+  // The arm tool and command. A superseded instance forwards to the current
+  // one; a stopped generation is healed first, because the call itself proves
+  // the session is live.
+  async function armFromSession(): Promise<ArmResult> {
+    if (!instance.isCurrent()) {
+      const current = instance.current();
+      lifecycle("arm-forwarded", { to: current?.id });
+      if (current?.api) return await current.api.activate();
+      return { ok: false, message: shuttingDownMessage };
+    }
+    if (generation.stopping) {
+      await generationStopped;
+      if (generation.stopping) {
+        lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
+        bindLiveGeneration("arm-call");
+        markLoaded();
+      }
+    }
+    return activateOwnedWatch(generation);
+  }
 
   async function sendWake(
     owner: SessionGeneration,
@@ -1172,10 +1270,12 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on?.("before_agent_start", (_event, ctx) => {
+    if (!instance.isCurrent()) return;
     rememberContext(ctx);
     markLoaded();
   });
   pi.on?.("message_start", (event, ctx) => {
+    if (!instance.isCurrent()) return;
     rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
@@ -1184,14 +1284,19 @@ export default function (pi: ExtensionAPI) {
   // A run that ends with a wake still unconsumed either drains it into the next
   // run at once or left it in the composer; the delayed check tells the two apart.
   pi.on?.("agent_end", (_event, ctx) => {
+    if (!instance.isCurrent()) return;
     rememberContext(ctx);
     scheduleRestoredWakeCheck(generation);
   });
 
   pi.on?.("session_start", async (_event, ctx) => {
+    if (!instance.isCurrent()) {
+      lifecycle("session_start-ignored", { reason: "superseded-instance" });
+      return;
+    }
     rememberContext(ctx);
-    if (generation.stopping) generation = createGeneration();
-    activateGeneration(generation);
+    lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
+    bindLiveGeneration("session_start");
     markLoaded();
     if (lockOwnership() !== "owned") return;
     activateOwnedWatch(generation);
@@ -1200,17 +1305,29 @@ export default function (pi: ExtensionAPI) {
     // omp carries no shutdown reason (verified: `reason` is undefined), so the
     // replacement handoff is always persisted when anything is pending; a
     // terminal quit then merely replays an already-drained wake next start.
+    if (!instance.isCurrent()) {
+      lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
+      return;
+    }
+    lifecycle("session_shutdown", { generation: generation.id });
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
     if (restoreTimer) clearTimeout(restoreTimer);
     restoreTimer = null;
     latestContext = null;
-    await stopSessionGeneration(generation, true);
+    const stopped = generation;
+    generationStopped = stopSessionGeneration(stopped, true);
+    try {
+      await generationStopped;
+    } finally {
+      lifecycle("generation-stop", { generation: stopped.id });
+      scheduleSelfHeal(stopped);
+    }
   });
 
   pi.registerCommand?.("fm-watch-arm-omp", {
     description: "Arm firstmate watcher supervision through the omp extension instead of foreground bash.",
     handler: async (_args, ctx) => {
-      const result = activateOwnedWatch(generation);
+      const result = await armFromSession();
       ctx?.ui?.notify?.(result.message, result.ok ? "info" : "warning");
     },
   });
@@ -1225,11 +1342,23 @@ export default function (pi: ExtensionAPI) {
     ],
     parameters: Type.Object({}),
     execute: async () => {
-      const result = activateOwnedWatch(generation);
+      const result = await armFromSession();
       return {
         content: [{ type: "text", text: result.message }],
         details: result,
       };
+    },
+  });
+
+  instance.publish({
+    activate: armFromSession,
+    retire: async () => {
+      clearHealTimer();
+      lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
+      if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
+      if (restoreTimer) clearTimeout(restoreTimer);
+      restoreTimer = null;
+      await stopSessionGeneration(generation, true);
     },
   });
 

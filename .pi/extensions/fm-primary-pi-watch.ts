@@ -12,6 +12,15 @@
 // state/extensions/pi-primary-watch/session-replacement-actionable.json.
 // Terminal quit leaves the final generation stopped so late callbacks cannot rearm.
 // Stale callbacks from a prior generation are no-ops against the active replacement.
+// A replacement shutdown is never a dead end: if no successor has bound within
+// FM_PI_SUCCESSOR_GRACE_MS (15s) while this process still owns the home lock,
+// the extension binds a fresh generation itself, exactly as session_start
+// would, and an arm call on that stopped generation does the same at once. A
+// terminal quit never heals. Only the latest factory bind in this process owns
+// the home (.pi/extensions/lib/fm-watch-lifecycle.ts owns the registry): an
+// earlier instance ignores session events and its arm tool keeps the stale
+// refusal. Every lifecycle transition is recorded in
+// state/extensions/pi-primary-watch/lifecycle.log (same owner).
 //
 // Delivery versus consumption (stated once here):
 // A main follow-up is delivered once Pi accepts it (sendUserMessage resolves).
@@ -54,6 +63,7 @@ import {
   FIRSTMATE_CALM_PRESENTATION_EVENT,
 } from "./lib/fm-calm-visibility.ts";
 import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.ts";
+import { bindWatchInstance, createLifecycleLog } from "./lib/fm-watch-lifecycle.ts";
 
 type ArmResult = {
   ok: boolean;
@@ -151,6 +161,7 @@ const handoffDir = `${state}/extensions/pi-primary-watch`;
 const actionableHandoff = `${handoffDir}/session-replacement-actionable.json`;
 const extensionLog = `${state}/.watch-extension.log`;
 const extensionLogMaxLines = extensionLogKeepLines();
+const lifecycleLogPath = `${handoffDir}/lifecycle.log`;
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
@@ -163,6 +174,7 @@ const armReadyTimeoutMs = positiveInteger(
   process.platform === "win32" ? 35000 : 12000,
 );
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const successorGraceMs = positiveInteger("FM_PI_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - Pi session is shutting down";
 
@@ -607,8 +619,76 @@ const cleanupOnProcessExit = () => {
 process.once("exit", cleanupOnProcessExit);
 
 export default function (pi: ExtensionAPI) {
+  const instance = bindWatchInstance<true>("__firstmatePiWatchInstances", state);
+  instance.publish(true);
+  const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
   let generation = createGeneration();
   activateGeneration(generation);
+  // The stop of the latest generation and whether it was a replacement, so a
+  // self-heal never races that stop and never follows a terminal quit.
+  let generationStopped: Promise<void> = Promise.resolve();
+  let stoppedForReplacement = false;
+  let healTimer: ReturnType<typeof setTimeout> | null = null;
+  lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
+
+  function clearHealTimer(): void {
+    if (healTimer) clearTimeout(healTimer);
+    healTimer = null;
+  }
+
+  // Bind the generation a live session runs on: the existing one when it is
+  // still live, otherwise a fresh one. session_start, the timed self-heal, and
+  // an arm call after a replacement shutdown all bind through here.
+  function bindLiveGeneration(cause: string): void {
+    clearHealTimer();
+    if (generation.stopping) {
+      generation = createGeneration();
+      lifecycle("generation-create", { generation: generation.id, cause });
+    }
+    activateGeneration(generation);
+    lifecycle("generation-activate", { generation: generation.id, cause });
+  }
+
+  function scheduleSelfHeal(stopped: SessionGeneration): void {
+    clearHealTimer();
+    const shutdownAt = Date.now();
+    const timer = setTimeout(() => {
+      if (healTimer === timer) healTimer = null;
+      if (!instance.isCurrent() || generation !== stopped || !stopped.stopping) return;
+      const owned = lockOwnership() === "owned";
+      lifecycle("bound-expired", {
+        waiter: "pi-watch-extension",
+        "waited-on": "session_start",
+        bound: `${successorGraceMs}ms`,
+        actual: `${Date.now() - shutdownAt}ms`,
+        outcome: owned ? "self-heal" : "lock-not-owned",
+      });
+      if (!owned) return;
+      bindLiveGeneration("self-heal");
+      const result = activateOwnedWatch(generation);
+      lifecycle("self-heal", { generation: generation.id, ok: result.ok });
+    }, successorGraceMs);
+    timer.unref();
+    healTimer = timer;
+  }
+
+  // The arm tool and command. A superseded instance keeps the stale refusal;
+  // a generation stopped for a replacement is healed first, because the call
+  // itself proves the session is live. A terminal quit keeps the refusal.
+  async function armFromSession(): Promise<ArmResult> {
+    if (!instance.isCurrent()) {
+      lifecycle("arm-refused", { reason: "superseded-instance", current: instance.current()?.id });
+      return { ok: false, message: shuttingDownMessage };
+    }
+    if (generation.stopping && stoppedForReplacement) {
+      await generationStopped;
+      if (generation.stopping) {
+        lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
+        bindLiveGeneration("arm-call");
+      }
+    }
+    return activateOwnedWatch(generation);
+  }
 
   let calmPresentation: CalmPresentationState = {
     active: false,
@@ -1200,29 +1280,49 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on?.("before_agent_start", (event) => {
+    if (!instance.isCurrent()) return;
     consumeWake(generation, event.prompt);
   });
   pi.on?.("message_start", (event) => {
+    if (!instance.isCurrent()) return;
     if (event.message.role !== "user") return;
     consumeWake(generation, userMessageText(event.message.content));
   });
 
   pi.on?.("session_start", async () => {
-    if (generation.stopping) generation = createGeneration();
-    activateGeneration(generation);
+    if (!instance.isCurrent()) {
+      lifecycle("session_start-ignored", { reason: "superseded-instance" });
+      return;
+    }
+    lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
+    bindLiveGeneration("session_start");
     if (lockOwnership() !== "owned") return;
     activateOwnedWatch(generation);
   });
   pi.on?.("session_shutdown", async (event) => {
+    if (!instance.isCurrent()) {
+      lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
+      return;
+    }
     const replacement = event.reason === "reload" || event.reason === "new" || event.reason === "resume" || event.reason === "fork";
+    lifecycle("session_shutdown", { generation: generation.id, reason: String(event.reason ?? "") });
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
-    await stopSessionGeneration(generation, replacement);
+    clearHealTimer();
+    const stopped = generation;
+    stoppedForReplacement = replacement;
+    generationStopped = stopSessionGeneration(stopped, replacement);
+    try {
+      await generationStopped;
+    } finally {
+      lifecycle("generation-stop", { generation: stopped.id, replacement });
+      if (replacement) scheduleSelfHeal(stopped);
+    }
   });
 
   pi.registerCommand?.("fm-watch-arm-pi", {
     description: "Arm firstmate watcher supervision through the Pi extension instead of foreground bash.",
     handler: async (_args, ctx) => {
-      const result = activateOwnedWatch(generation);
+      const result = await armFromSession();
       ctx.ui.notify(result.message, result.ok ? "info" : "warning");
     },
   });
@@ -1263,7 +1363,7 @@ export default function (pi: ExtensionAPI) {
       return new Container();
     },
     execute: async () => {
-      const result = activateOwnedWatch(generation);
+      const result = await armFromSession();
       return {
         content: [{ type: "text", text: result.message }],
         details: result,

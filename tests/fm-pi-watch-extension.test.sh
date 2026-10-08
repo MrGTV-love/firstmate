@@ -37,6 +37,7 @@ install_pi_watch_extension_fixture() {
   cp "$ROOT/.pi/extensions/lib/fm-async-exec.ts" "$repo/.pi/extensions/lib/fm-async-exec.ts"
   cp "$ROOT/.pi/extensions/lib/fm-calm-visibility.ts" "$repo/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$repo/.pi/extensions/lib/fm-operational-input.ts"
+  cp "$ROOT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$repo/.pi/extensions/lib/fm-watch-lifecycle.ts"
   mkdir -p "$repo/bin"
   cp "$ROOT/bin/fm-operational-input.sh" "$repo/bin/fm-operational-input.sh"
   chmod +x "$repo/bin/fm-operational-input.sh"
@@ -72,6 +73,87 @@ export const Type = {
   },
 };
 JS
+}
+
+# A replacement shutdown that no successor session_start follows is not a dead
+# end: after the successor grace the extension binds a fresh generation and
+# arms exactly once; a real session_start inside the grace arms nothing twice;
+# and a terminal quit never heals and keeps the shutting-down refusal.
+test_pi_replacement_without_successor_heals_once() {
+  local repo home plugin out status
+  repo="$TMP_ROOT/pi-heal-root"
+  home="$TMP_ROOT/pi-heal-home"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  install_pi_watch_extension_fixture "$repo"
+  plugin="$repo/.pi/extensions/fm-primary-pi-watch.ts"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+exec sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$home/arms.log" \
+    FM_PI_SUCCESSOR_GRACE_MS=400 FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" \
+    FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=1 \
+    node --input-type=module 2>&1 <<'EOF'
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const home = process.env.FM_HOME;
+const handlers = new Map(); let tool = null;
+const pi = {
+  on(event, handler) { handlers.set(event, handler); },
+  registerCommand() {},
+  registerTool(candidate) { if (candidate.name === "fm_watch_arm_pi") tool = candidate; },
+  sendUserMessage: async () => {},
+  events: { on() {}, emit() {} },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const lifecycle = () => readFileSync(`${home}/state/extensions/pi-primary-watch/lifecycle.log`, "utf8");
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start", reason: "startup" }, {});
+for (let i = 0; i < 60 && arms() < 1; i += 1) await sleep(50);
+if (arms() !== 1) throw new Error(`startup should arm once, saw ${arms()}`);
+
+await handlers.get("session_shutdown")({ type: "session_shutdown", reason: "new" }, {});
+await sleep(150);
+if (arms() !== 1) throw new Error(`a heal fired before the successor grace: ${arms()} arms`);
+for (let i = 0; i < 60 && arms() < 2; i += 1) await sleep(50);
+if (arms() !== 2) throw new Error(`a replacement with no successor was not healed: ${arms()} arms`);
+await sleep(900);
+if (arms() !== 2) throw new Error(`the self-heal armed more than once: ${arms()} arms`);
+const healed = await tool.execute("after-heal", {}, undefined, undefined, {});
+if (!healed.details?.ok || !String(healed.details.message).includes("unchanged")) {
+  throw new Error(`the healed generation does not own its arm: ${JSON.stringify(healed.details)}`);
+}
+for (const needle of ["event=bound-expired", "waiter=pi-watch-extension", "waited-on=session_start", "bound=400ms", "outcome=self-heal", "cause=self-heal"]) {
+  if (!lifecycle().includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${lifecycle()}`);
+}
+
+await handlers.get("session_shutdown")({ type: "session_shutdown", reason: "resume" }, {});
+await handlers.get("session_start")({ type: "session_start", reason: "resume" }, {});
+for (let i = 0; i < 60 && arms() < 3; i += 1) await sleep(50);
+await sleep(900);
+if (arms() !== 3) throw new Error(`a successor session_start must arm exactly once with no heal: ${arms()} arms`);
+
+await handlers.get("session_shutdown")({ type: "session_shutdown", reason: "quit" }, {});
+await sleep(900);
+if (arms() !== 3) throw new Error(`a terminal quit was healed: ${arms()} arms`);
+const quitArm = await tool.execute("after-quit", {}, undefined, undefined, {});
+if (quitArm.details?.ok !== false || quitArm.details.message !== "watcher: not armed - Pi session is shutting down") {
+  throw new Error(`terminal quit must keep the shutting-down refusal: ${JSON.stringify(quitArm.details)}`);
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  [ "$status" -eq 0 ] || fail "Pi replacement self-heal (exit $status): $out"
+  [ -z "$out" ] || fail "Pi replacement self-heal test printed output: $out"
+  pass "Pi replacement with no successor heals once; a real successor never double-arms; quit never heals"
 }
 
 test_pi_extension_reports_external_healthy_watcher() {
@@ -3759,7 +3841,11 @@ const armed = await original.getTool().execute("initial-arm", {}, undefined, und
 if (!armed.details?.ok) throw new Error(`initial arm failed: ${JSON.stringify(armed.details)}`);
 await waitFor(() => existsSync(process.env.FM_ARM_COUNT) && readFileSync(process.env.FM_ARM_COUNT, "utf8").trim() === "1", "original arm");
 await original.handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "new" }, {});
-writeFileSync(`${process.env.FM_HOME}/state/extensions`, "block late handoff publication\n");
+// Block late handoff publication by planting a file where the handoff directory
+// belongs (the lifecycle record may already have created the parent).
+const { rmSync } = await import("node:fs");
+rmSync(`${process.env.FM_HOME}/state/extensions/pi-primary-watch`, { recursive: true, force: true });
+writeFileSync(`${process.env.FM_HOME}/state/extensions/pi-primary-watch`, "block late handoff publication\n");
 const foreignState = `${process.env.FM_HOME}/foreign-state`;
 const { mkdirSync } = await import("node:fs");
 mkdirSync(foreignState, { recursive: true });
@@ -3974,13 +4060,17 @@ mod.default(pi);
 const armed = await tool.execute("initial-arm", {}, undefined, undefined, {});
 if (!armed.details?.ok) throw new Error(`initial arm failed: ${JSON.stringify(armed.details)}`);
 await waitFor(() => deliveryStarted && existsSync(process.env.FM_CHILD_MARKER), "blocked delivery and successor child");
-writeFileSync(`${process.env.FM_HOME}/state/extensions`, "block handoff directory\n");
+// Plant a file where the handoff directory belongs (the lifecycle record may
+// already have created the parent).
+const { rmSync } = await import("node:fs");
+rmSync(`${process.env.FM_HOME}/state/extensions/pi-primary-watch`, { recursive: true, force: true });
+writeFileSync(`${process.env.FM_HOME}/state/extensions/pi-primary-watch`, "block handoff directory\n");
 await handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "new" }, {});
 if (!existsSync(process.env.FM_CHILD_MARKER)) {
   throw new Error("replacement shutdown retired the established predecessor after handoff persistence failed");
 }
 const { unlinkSync } = await import("node:fs");
-unlinkSync(`${process.env.FM_HOME}/state/extensions`);
+unlinkSync(`${process.env.FM_HOME}/state/extensions/pi-primary-watch`);
 const replacementMod = await import(`${pathToFileURL(process.env.PLUGIN).href}?replacement=persistence-failure`);
 replacementMod.default(pi);
 await handlers.get("session_start")?.({ type: "session_start", reason: "new" }, {});
@@ -5195,6 +5285,7 @@ EOF
 }
 
 test_pi_extension_reports_external_healthy_watcher
+test_pi_replacement_without_successor_heals_once
 test_pi_tool_returns_agent_tool_result
 test_pi_redundant_tool_call_is_owned_noop
 test_pi_scheduled_retry_call_is_owned_noop

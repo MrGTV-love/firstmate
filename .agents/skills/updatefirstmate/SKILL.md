@@ -66,13 +66,15 @@ This touches only the firstmate repo and its own worktrees, never anything under
    This is automatic and needs no per-mate confirmation from the captain.
    Local and remote mates go in the same list; the command owns the transport, the profile each replacement runs on, and the wait.
 
-   It asks every listed mate first to write down the open work it holds only in its conversation, and restarts one only after that mate's own answer comes back.
-   A mate that is mid-turn queues the request behind that turn.
+   It asks every listed mate first to write down the open work it holds only in its conversation, and restarts one only after that mate's own answer comes back and the turn that answered has ended.
+   A mate that is mid-turn queues the request behind that turn, so the command records the restart and returns instead of waiting on a clock.
    That is the whole point of the step, so do not work around it: it is what keeps a captain call the mate had formed but never registered from being lost with the conversation.
-   Its header owns the request, the bound, and the two knobs that change them.
+   Its header owns the request and the outcome lines, and `bin/fm-secondmate-restart-lib.sh` owns the recorded restart that supervision finishes.
 
    Read its per-mate lines and its closing `summary:` line as the outcome:
    - `restarted: <id>` - that mate is now genuinely running the current instructions and launch-time settings.
+   - `queued: <id>: <what it waits for>` - the mate has not confirmed yet; its restart is recorded, supervision finishes it once the mate confirms and its turn ends, and a later notification reports that outcome.
+     Report it as on its way, never as reloaded.
    - `nudged: <id>: <reason>` - the restart was not safe, so the mate got the older re-read message instead and is still running the conversation and launch-time settings it started with.
      Never report one of these as a clean reload.
    - `unreached: <id>: <reason>` - no safe running outcome could be confirmed, including an ambiguous relaunch result.

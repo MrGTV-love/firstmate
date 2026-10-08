@@ -87,16 +87,30 @@ status_paused_until() {  # <status-line> -> epoch on stdout
 # Any decision the fold still holds open wins over unrelated events, and the
 # fold's most recently opened record supplies it; a standing declared wait, then
 # the latest recognized event, stands when nothing is open.
+# One exception: a standing `paused` declaration for the very key a decision
+# opened is that decision's current state. A standing declared wait is always
+# newer than every open decision (a later opener ends it), and a worker that
+# re-declares its own open key as a wait is waiting on that answer, not asking
+# again. The decision stays open in the fold, so OPEN DECISIONS and the fleet
+# snapshot still surface it; only a still-open decision under ANOTHER key keeps
+# precedence over the pause. A captain-held line closes its own key in the fold,
+# so it never takes this exception.
 # Actual run/pane evidence is still reconciled by fm-crew-state.sh.
 status_current_line() {  # <status-file> <kind>
-  local open key verb note current=''
+  local open key verb note current='' wait wait_key=''
   open=$(status_open_decisions "$1" "$2")
+  wait=$(status_declared_wait_line "$1")
+  if status_is_paused "$wait"; then
+    wait_key=$(_fm_decision_key "$wait") || wait_key=''
+  fi
   while IFS=$'\t' read -r key verb note; do
-    case "$verb" in ?*) current="$verb [key=$key]: $note" ;; esac
+    case "$verb" in ?*) ;; *) continue ;; esac
+    [ -n "$wait_key" ] && [ "$key" = "$wait_key" ] && continue
+    current="$verb [key=$key]: $note"
   done <<EOF
 $open
 EOF
-  [ -n "$current" ] || current=$(status_declared_wait_line "$1")
+  [ -n "$current" ] || current=$wait
   [ -n "$current" ] || current=$(last_status_line "$1")
   printf '%s\n' "$current"
 }
