@@ -54,13 +54,15 @@
 # A gh lookup error falls back to the content check; if that is also inconclusive,
 # teardown refuses rather than risk discarding unlanded work.
 # Uncommitted changes are never landed.
-# local-only projects additionally accept work merged into the local default
-# branch (firstmate performs that merge after configured approval) as a fallback
-# for the common case where there is no remote at all.
+# local-only projects additionally accept a clean existing copy whose HEAD is
+# contained in refs/heads/<default>, regardless of remote reachability.
+# An absent recorded copy or one that is not a Git worktree completes only
+# when its recorded GitHub PR is confirmed merged by the forge, or through
+# captain-authorized forced discard below; otherwise the backlog stays open.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
-# declared scratch and the report at data/<task-id>/report.md is the work
-# product. Teardown proceeds only once the report exists and the shared
-# unresolved-decision completion gate verifies its captain-held inventory.
+# declared scratch and the regular, nonsymlink, nonempty report at
+# data/<task-id>/report.md is the work product. Non-forced teardown also requires
+# the shared unresolved-decision completion gate to verify its captain-held inventory.
 # Before destructive cleanup, teardown validates task check artifacts as
 # ordinary single-link files on the state device. It refuses and preserves
 # task state when that proof fails; otherwise it removes the task's check,
@@ -155,16 +157,18 @@
 #   --force skips ordinary-task dirty and landed-work checks, skips scout report
 #   checks, and discards secondmate child work for kind=secondmate. Only use it
 #   when the captain has explicitly said to discard the work. Ordinary work
-#   additionally requires --drop-file holding the captain's own words (1..8192
-#   bytes): they are retained at data/<id>/captain-drop.md before anything is
-#   discarded, and the backlog row records the fixed note "dropped".
+#   additionally requires --drop-file satisfying the words-file contract in
+#   bin/fm-tasks-axi.sh's header: the exact words are retained before discard.
+#   A forced ship records the fixed note "dropped" without a landing probe.
+#   A forced scout with a regular, nonsymlink, nonempty report keeps report
+#   completion instead; either retains the captain's exact words.
 #   --legacy-record accepts a task record that predates the spawn_gen field:
 #   teardown then proceeds only when the recorded endpoint is confirmed dead or
 #   agent-less (bin/fm-backend.sh's recovery-grade classifier), and without
 #   --force the worktree still passes the ordinary landed-work checks. The
 #   accepted legacy incarnation is stamped into the record before its close is
 #   recorded and named in the teardown line; the flag never relaxes the
-#   unlanded-work refusal, which --force alone can authorize. A legacy- stamp
+#   unlanded-work refusal, which requires authorized forced discard to bypass. A legacy- stamp
 #   an abandoned attempt left behind never counts as a published incarnation:
 #   the record still reads as a legacy record, so a recorded endpoint runs the
 #   endpoint gate again and the retry still needs --legacy-record. The safe
@@ -180,8 +184,8 @@
 #   endpoint validator as if it named the task's own window) is accepted as a
 #   missing-endpoint legacy record with or without --legacy-record; the shared
 #   endpoint validator is skipped so it cannot be read as the current window,
-#   kill is skipped, and a still-present worktree still faces the ordinary
-#   landed-work checks. Every other windowless record, including one with a
+#   kill is skipped, and ship completion still faces the ordinary landed-work
+#   or missing-copy admission above. Every other windowless record, including one with a
 #   spawn_gen, a non-tmux backend, or an ambiguous field, still faces the
 #   validator and refuses.
 #
@@ -1607,11 +1611,8 @@ content_in_default() {
   [ "$merged_tree" = "$default_tree" ]
 }
 
-# Has the worktree's committed work actually LANDED, though its commits are not
-# reachable from any remote-tracking branch? True when a merged PR proves the
-# current local work is contained in the PR head, OR the content is already in the
-# default branch (fallback, which also covers the no-PR and gh-error paths). False
-# only for genuinely unlanded work.
+# A pushed branch proves recoverability, not delivery: require the landing
+# proofs documented in this script's header even when every commit is pushed.
 work_is_landed() {
   local branch=$1
   if [ "$MODE" = local-only ]; then

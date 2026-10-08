@@ -571,33 +571,39 @@ See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, 
 
 ## Open-work ledger (config/open-loops.json)
 
-`bin/fm-open-loops.sh` reconciles what this home owes against its live records, so assigned work cannot be lost without a row saying so.
+`bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
 `bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
-Every row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
+Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 An unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
 
 | Category | A row exists when | Default limit |
 | --- | --- | --- |
-| `missing_worker` | an In flight item or task record has no live worker | 600 s |
-| `ready_not_started` | a Queued item has no hold, no open blocker, and a due date | 1800 s |
+| `missing_worker` | an In flight item requiring child metadata lacks a task record or endpoint, or an ordinary task has a confirmed missing or dead worker | 600 s |
+| `ready_not_started` | a Queued item has no hold kind or unresolved blocker, and its optional hold date is absent or due | 1800 s |
 | `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
-| `stalled_worker` | a live worker reads `working` but has no commit, status line, or pipeline progress; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
-| `unlanded_commit` | a ship task's copy holds commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
+| `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
+| `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR discovered from this home's project origins or recorded task PR URLs waits on checks, a reviewer, or firstmate's review routing | 3600 s |
 | `red_check` | the latest run of a check on an open PR failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
 The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.
-Status questions age from their stamped opening. Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata. Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
+Status questions age from their stamped opening.
+Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata.
+Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
-GitHub repositories are discovered from recorded local task PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits. Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
+GitHub repositories are discovered from recorded local task PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits.
+Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
 Unreadable or unknown current task state adds degraded coverage independently of liveness, and only nonfuture progress timestamps count as work evidence.
-Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`. Progress remains scoped to that resolved store and the task's project and branch.
-The ledger covers this home only; each secondmate home runs its own watcher and reports through its own parent channel.
+Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
+Progress remains scoped to that resolved store and the task's project and branch.
+The ledger covers this home's current backlog, ordinary task records, status questions, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
+The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
 
 The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
 The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
@@ -605,10 +611,12 @@ A lock in the effective state directory serializes collection through publicatio
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
 A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
 Both durable payloads are identical to their printed wake reasons, including the canonical `check:` prefix.
-Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults. Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
+Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
+Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
 Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
-The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors. Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
+The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors.
+Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
 No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
 
 Create the optional local `config/open-loops.json` to override the limits:
@@ -622,24 +630,24 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 Age limits are non-negative integer seconds for the categories above.
 `command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
-On either deadline, cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run. It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
+On either deadline, cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run.
+It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
 An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
 A malformed configuration is reported as an error rather than ignored.
 
-A recorded work item reaches Done with its deliverable or the captain's own words, subject to the live-teardown limitations below.
-`bin/fm-tasks-axi.sh done|close` of a ship or scout row requires a written non-empty report (scout), a GitHub PR the forge reports merged (ship), or `--drop-file` holding the captain's words.
-Completion accepts only an optional `task` noun, `done` or `close`, exactly one ID, and `--pr`, `--report`, `--note`, `--drop-file`, `--keep`, `--no-prune`, `--json`, or `--help`. Valued options accept split or `=` forms; `--keep` requires a non-negative count. `start` and `reopen` accept the same noun and single-ID forms with only `--json` or `--help`. Exact unconsumed `--help` prints help without mutation and may omit the ID; a help token consumed as a value is refused. Unknown or global options (including `--backend`), option-like values, and extra positionals are refused before writes; use `tasks-axi` directly for unsupported grammar.
-A retained captain-held question must be resolved through `bin/fm-captain-hold.sh answer` or `reconcile close`; delivery evidence or drop authority cannot answer it.
-A live task record completes only through `bin/fm-teardown.sh`, whose landed-work test treats a pushed branch as recoverable work, not a delivered result.
-In local-only mode, a clean existing ship copy whose `HEAD` is contained in `refs/heads/<default>` is landed regardless of remote reachability or pushed status. A genuinely merged GitHub PR whose actual head contains the current work or default-content proof remains an alternative, including fork delivery, for non-forced teardown.
-An absent recorded copy or one that is not a Git worktree completes only when its recorded GitHub PR is confirmed merged by the forge, or when `--force --drop-file` retains the captain's own words; otherwise teardown refuses and leaves the backlog open.
-The collector's slot-owner admission is outside this scope, so a reassigned slot is not detected; see the follow-up `fm-open-loops-teardown-proof`.
-The collector's nonmerge patch comparison does not establish merge-commit delivery, so merge-only content is not proved; see the follow-up `fm-open-loops-teardown-proof`.
-If a recorded Orca copy path is missing, record-only cleanup never removes a backend copy by ID.
-`bin/fm-teardown.sh --force` on ordinary work additionally requires `--drop-file`; the words (1..8192 bytes) are retained at `data/<id>/captain-drop.md` before anything is discarded.
-A forced ship with `--drop-file` always records the fixed note `dropped` without a landing probe; a scout with a regular, nonsymlink, nonempty report keeps report completion, and both retain the captain's exact words.
-Dropped work is never presented as recently landed. A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
-Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`. Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions. A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status. A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+### Completion and discard
+
+Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
+[`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
+[`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
+A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
+[`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.
+Dropped work is never presented as recently landed.
+A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
+Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`.
+Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
+A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
+A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 

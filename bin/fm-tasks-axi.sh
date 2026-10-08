@@ -6,13 +6,23 @@
 #
 # Every routine firstmate backlog read or mutation goes through this command
 # rather than a bare `tasks-axi`; `fm-tasks-axi.sh <command> --help` prints
-# tasks-axi's own help. Arguments reach tasks-axi as given, apart from one
-# rewrite that keeps file arguments meaning what the caller meant: a relative
+# tasks-axi's own help. Accepted arguments reach tasks-axi as given except for
+# captain-drop completion below and file addressing: a relative
 # value of `--to` or any `--*-file` flag (`--body-file`, `--relation-file`, ...)
 # is made absolute against the caller's working directory, because tasks-axi
 # starts from the backlog root instead. `--report` stays as given: tasks-axi
 # stores it verbatim as a link, which lifecycle transitions record relative to
 # that same root.
+#
+# Supported completion grammar: an optional `task` noun, `done` or `close`,
+# exactly one ID, and --pr, --report, --note, --drop-file, --keep, --no-prune,
+# --json, or --help. Valued options accept split or = forms; --keep requires a
+# non-negative count. `start` and `reopen` accept the same noun and single-ID
+# forms with only --json or --help. Exact unconsumed --help prints help without
+# mutation and may omit the ID; a help token consumed as a value is refused.
+# Unknown or global options (including --backend), option-like values, and
+# extra positionals are refused before writes; use tasks-axi directly for
+# unsupported grammar.
 #
 # Why it exists: a bare `tasks-axi` resolves the tracked `.tasks.toml` paths
 # against its working directory, so from the code root it forks the queue
@@ -39,18 +49,20 @@
 #   - `add` (or its `create` alias) with --start, so neither spelling places a
 #     row In flight without the dispatch artifacts bin/fm-spawn.sh creates -
 #     the task record, status file, and inbox that go with the row - which such
-#     a row would lack, counting as live work nobody is doing that nothing
-#     later would notice (`start <id>` stays a documented direct transition);
+#     a row would lack (`start <id>` stays a documented direct transition);
 #   - a data directory that cannot be resolved, or whose backend configuration
 #     cannot be read (bin/fm-tasks-axi-lib.sh owns that diagnostic);
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file;
 #   - `done`/`close` (with or without the optional `task` noun) of a ship or scout row
-#     without proof that its deliverable exists: a written non-empty report for a
-#     scout, a GitHub pull request the forge reports merged for a ship, or
-#     --drop-file carrying the captain's own words (1..8192 bytes, retained at
-#     data/<id>/captain-drop.md; the row then records the fixed note "dropped").
+#     without proof that its deliverable exists: a regular, nonsymlink,
+#     non-empty report for a scout, a GitHub pull request the forge reports
+#     merged for a ship, or --drop-file carrying the captain's own words.
+#     The drop file must be regular and nonsymlink, contain non-whitespace
+#     words without NUL bytes, and be 1..8192 bytes; the exact words are retained
+#     at data/<id>/captain-drop.md and the row records only the fixed note
+#     "dropped". Do not combine --drop-file with --pr, --report, or --note.
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.

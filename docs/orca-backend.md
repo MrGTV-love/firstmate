@@ -61,7 +61,8 @@ Cleanup keeps all shared Firstmate safety checks.
 A non-forced scout still requires its report and completed decision inventory.
 A non-forced ship with an existing copy still refuses dirty or unlanded work.
 Cleanup validates the recorded endpoint identity and removal target metadata; it does not resolve the backend worktree id to prove path equality with the inspected copy.
-When the recorded path is absent, cleanup closes the recorded terminal and retires task records without issuing an Orca worktree removal: the id may now identify a different, uninspected copy. This rule also applies to scouts, authorized forced drops, and recursive descendant cleanup.
+When the recorded path is absent, cleanup closes the recorded terminal and retires task records without issuing an Orca worktree removal: the id may now identify a different, uninspected copy.
+This rule also applies to scouts, authorized forced drops, and recursive descendant cleanup.
 After the existing-copy checks, Firstmate closes the exact terminal and releases the exact worktree with Orca's worktree command.
 It never raw-deletes an Orca worktree.
 A close the CLI never attempted, because `orca` is not on the path, stops cleanup with the metadata intact even under `--force`: removing those records would leave nothing on disk naming a terminal that may still be live.
