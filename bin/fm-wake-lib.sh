@@ -1256,9 +1256,30 @@ fm_lock_try_acquire() {
   return "$rc"
 }
 
+# fm_lock_acquire_wait <lockdir>
+#
+# Waits for the lock for as long as a live holder keeps it. It returns 1 only
+# when the lock's own directory has stayed missing for
+# FM_LOCK_PARENT_GONE_GRACE_SECONDS (default 5): nothing can create or contend
+# for a lock there, so the wait would otherwise spin at ten sleeps a second until
+# the host reboots. A deleted test fixture, a discarded scratch copy, or a
+# returned worktree slot leaves exactly that orphan behind. A directory that
+# comes back inside the grace is waited for as before.
 fm_lock_acquire_wait() {
-  local lockdir=$1
+  local lockdir=$1 parent grace gone_since=
+  parent=${lockdir%/*}
+  [ "$parent" != "$lockdir" ] || parent=.
+  [ -n "$parent" ] || parent=/
+  grace=${FM_LOCK_PARENT_GONE_GRACE_SECONDS:-5}
+  case "$grace" in ''|*[!0-9]*) grace=5 ;; esac
   while ! fm_lock_try_acquire "$lockdir"; do
+    if [ -d "$parent" ]; then
+      gone_since=
+    elif [ -z "$gone_since" ]; then
+      gone_since=$SECONDS
+    elif [ $((SECONDS - gone_since)) -ge "$grace" ]; then
+      return 1
+    fi
     sleep 0.1
   done
 }

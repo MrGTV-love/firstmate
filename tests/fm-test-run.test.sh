@@ -2039,6 +2039,60 @@ SH
   pass "--per-script-timeout-secs turns a hung script into a bounded failure"
 }
 
+# A script killed outright (the per-script bound's KILL, an outer timeout) never
+# runs its cleanup trap, so a stub it started outlives it. The runner sweeps the
+# leftovers its fixture marker proves are the dead run's after each script.
+test_runner_reaps_stubs_a_killed_script_left_behind() {
+  local tmp repo runner leak stub_pid_file stub rc
+  tmp=$(mktemp -d)
+  repo="$tmp/repo"
+  leak=tests/fm-leak-fixture.test.sh
+  mkdir -p "$repo/tests"
+  cp -R "$ROOT/bin" "$repo/bin"
+  cp "$ROOT/tests/lib.sh" "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  runner="$repo/bin/fm-test-run.sh"
+  stub_pid_file="$tmp/stub.pid"
+  cat >"$repo/$leak" <<'SH'
+#!/usr/bin/env bash
+set -u
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+root=$(fm_test_tmproot fm-leak-fixture)
+cat >"$root/stub.sh" <<'STUB'
+#!/usr/bin/env bash
+n=0
+while [ ! -e "$1" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+  sleep 0.05
+  n=$((n + 1))
+done
+STUB
+( bash "$root/stub.sh" "$root/release" >/dev/null 2>&1 & echo $! >"$FM_LEAK_PIDFILE" )
+kill -KILL "$$"
+SH
+  chmod +x "$runner" "$repo/$leak"
+
+  set +e
+  (cd "$repo" && FM_TEST_SKIP_ORPHAN_REAP=1 FM_LEAK_PIDFILE="$stub_pid_file" \
+    TMPDIR="$tmp" "$runner" "$leak" >"$tmp/out" 2>"$tmp/err")
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "a script killed outright must fail the run: $(cat "$tmp/out")"
+  [ -s "$stub_pid_file" ] || fail "the killed script never started its stub: $(cat "$tmp/out" "$tmp/err")"
+  stub=$(cat "$stub_pid_file")
+  waited=0
+  while kill -0 "$stub" 2>/dev/null && [ "$waited" -lt 100 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  if kill -0 "$stub" 2>/dev/null; then
+    kill -KILL "$stub" 2>/dev/null || true
+    fail "the runner left the killed script's stub $stub running"
+  fi
+  grep -Fq "reaped after $leak:" "$tmp/err" \
+    || fail "the runner did not say what it reaped: $(cat "$tmp/err")"
+  rm -rf "$tmp"
+  pass "the runner reaps the stub a killed script left behind"
+}
+
 # The duration regression this guard exists for: a suite whose scripts are all
 # green but whose wall clock outgrew its caller's invocation budget. The caller
 # gets killed mid-run and retries invisibly, so an over-budget run has to be a
@@ -2400,6 +2454,7 @@ test_unmapped_new_test_never_inherits_family_concurrency
 test_changed_shared_fixture_selects_its_readers
 test_concurrent_runs_are_ordered_longest_first
 test_per_script_timeout_bounds_a_hang
+test_runner_reaps_stubs_a_killed_script_left_behind
 test_changed_bound_gives_slow_watcher_suites_headroom
 test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation

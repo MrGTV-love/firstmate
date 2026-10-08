@@ -2742,6 +2742,80 @@ test_self_held_lock_reclaims_instead_of_deadlocking() {
   pass "an abandoned same-process lock hold is reclaimed; a parent's live hold is not"
 }
 
+# A waiter whose lock directory's parent vanished (a deleted test fixture, a
+# discarded scratch copy, a returned worktree slot) can never acquire: it used to
+# spin forever at ten sleeps a second, which is how fm-wake-grant.sh and watcher
+# orphans burned CPU for hours. The wait now reports failure once the parent has
+# been missing for the grace, but a parent that comes back inside the grace is
+# still waited for.
+lock_wait_pid_is_live() {  # <pid>: running, not a zombie awaiting its parent
+  local stat
+  stat=$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ') || return 1
+  [ -n "$stat" ] || return 1
+  case "$stat" in Z*) return 1 ;; esac
+}
+
+test_lock_wait_ends_when_the_lock_directory_is_gone() {
+  local dir state lock waiter_pid i rc
+  dir=$(make_case lock-wait-parent-gone)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2" || exit 10
+    : > "$3"
+    stub_ticks=0
+    while [ ! -e "$4" ] && [ "$stub_ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      stub_ticks=$((stub_ticks + 1))
+    done
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/holder.ready" "$dir/release-holder" &
+  holder_pid=$!
+  for i in $(seq 1 100); do
+    [ -e "$dir/holder.ready" ] && break
+    sleep 0.05
+  done
+  [ -e "$dir/holder.ready" ] || { kill "$holder_pid" 2>/dev/null || true; fail "lock holder did not acquire"; }
+  FM_LOCK_PARENT_GONE_GRACE_SECONDS=1 FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2"
+    printf "%s\n" "$?" > "$3"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/waiter.rc" &
+  waiter_pid=$!
+  sleep 0.5
+  lock_wait_pid_is_live "$waiter_pid" \
+    || { kill "$holder_pid" 2>/dev/null || true; fail "waiter did not block behind the live holder"; }
+  kill -KILL "$holder_pid" 2>/dev/null || true
+  wait "$holder_pid" 2>/dev/null || true
+  rm -rf "$state"
+  for i in $(seq 1 200); do
+    lock_wait_pid_is_live "$waiter_pid" || break
+    sleep 0.05
+  done
+  if lock_wait_pid_is_live "$waiter_pid"; then
+    kill -KILL "$waiter_pid" 2>/dev/null || true
+    wait "$waiter_pid" 2>/dev/null || true
+    fail "a lock waiter kept spinning after its lock directory was deleted"
+  fi
+  wait "$waiter_pid" 2>/dev/null || true
+  rc=$(cat "$dir/waiter.rc" 2>/dev/null || true)
+  [ "$rc" = 1 ] || fail "the abandoned lock wait did not report failure (rc=${rc:-none})"
+
+  # A parent that returns inside the grace is an ordinary wait, not an abandonment.
+  mkdir -p "$state"
+  rm -f "$dir/waiter.rc"
+  FM_LOCK_PARENT_GONE_GRACE_SECONDS=30 FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    rm -rf "$2"
+    ( sleep 1; mkdir -p "$2" ) &
+    fm_lock_acquire_wait "$3"
+    printf "%s\n" "$?" > "$4"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$lock" "$dir/returned.rc"
+  [ "$(cat "$dir/returned.rc" 2>/dev/null || true)" = 0 ] \
+    || fail "a lock directory that returned inside the grace was not waited for"
+  pass "a lock wait ends when its lock directory is gone and survives a brief absence"
+}
+
 test_subshell_lock_ownership_without_bashpid() {
   local dir state rc
   dir=$(make_case subshell-lock-ownership)
@@ -3697,6 +3771,7 @@ SH
 
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
+test_lock_wait_ends_when_the_lock_directory_is_gone
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
 test_live_presentation_holder_is_deadlined_without_weakening_ack

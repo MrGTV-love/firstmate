@@ -342,6 +342,27 @@ fm_test_reap_jobs() {
   done
 }
 
+# --- fixture-root process reaping ------------------------------------------
+#
+# A stub a subshell or `disown` started is outside the job table that
+# fm_test_reap_jobs walks, and removing its fixture root does not stop it: it
+# polls for the root's release file for as long as its own bound allows, at
+# ten to a hundred forks a second. bin/fm-test-reap-orphans.sh owns the rule for
+# which processes are provably this test's (their command line names a root this
+# shell stamped with its own pid, and they are its descendants or orphans). It
+# runs BEFORE the roots are removed, because the marker in each root is the proof.
+
+fm_test_reap_fixture_processes() {
+  local d
+  local -a args=()
+  [ -f "$FM_TEST_CLEANUP_REGISTRY" ] || return 0
+  while IFS= read -r d; do
+    [ -n "$d" ] && [ -d "$d" ] && args+=(--root "$d")
+  done < "$FM_TEST_CLEANUP_REGISTRY"
+  [ "${#args[@]}" -gt 0 ] || return 0
+  "$ROOT/bin/fm-test-reap-orphans.sh" --owner-pid "$$" "${args[@]}" >/dev/null 2>&1 || true
+}
+
 fm_test_cleanup() {
   local d
   # Stop watchers gracefully before forced job reaping: watcher_cleanup owns
@@ -350,6 +371,7 @@ fm_test_cleanup() {
   fm_test_reap_jobs
   fm_test_reap_processes
   fm_test_reap_procevent_homes
+  fm_test_reap_fixture_processes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
     [ -n "$d" ] && fm_test_remove_tree "$d"
   done
@@ -406,6 +428,8 @@ FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 
 fm_test_reap_orphans() {
   local marker dir mtime now owner_pid owner_identity current_identity
+  # Stop what a dead owner left running before any root (and so its proof) goes.
+  "$ROOT/bin/fm-test-reap-orphans.sh" --tmpdir "$FM_TEST_TMPDIR" >/dev/null 2>&1 || true
   now=$(date +%s)
   for marker in "$FM_TEST_TMPDIR"/fm-*/.fm-test-fixture; do
     [ -e "$marker" ] || continue

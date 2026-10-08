@@ -28,6 +28,12 @@
 # Aggregation (no suite execution):
 #   fm-test-run.sh --aggregate-json <out.json> <lane.json> [more lane.json...]
 #
+# Leftovers: after every script the runner runs bin/fm-test-reap-orphans.sh
+# from its own checkout (so a scratch copy reaps with its own copy), which stops
+# only processes that a fixture marker proves belong to an ended run. A script
+# killed by its bound or by a signal never ran its cleanup trap, and its stubs
+# would otherwise poll for hours. The sweep never changes a script's result.
+#
 # Options:
 #   --json <path>   write a deterministic timing artifact after the run. Each
 #                   script record carries its family, expected gate-skip class,
@@ -921,6 +927,7 @@ tests/fm-teardown.test.sh 202132
 tests/fm-test-fixture-cleanup.test.sh 937
 tests/fm-test-fixtures.test.sh 1802
 tests/fm-test-isolation-proof.test.sh 2866
+tests/fm-test-reap-orphans.test.sh 10537
 tests/fm-timeout-lib.test.sh 10750
 tests/fm-tmux-agent-liveness.test.sh 3770
 tests/fm-tool-update-check.test.sh 14383
@@ -2602,6 +2609,20 @@ record_script_result() {
   TOTAL=$((TOTAL + 1))
 }
 
+# A script the bound or a signal killed never ran its own cleanup trap, so the
+# stubs it started outlive it. Stop what its fixture markers prove it left behind
+# before the next script runs; bin/fm-test-reap-orphans.sh owns that proof. It
+# lives beside this runner, so a run from a scratch copy of the repo reaps with
+# that copy's own reaper. The sweep never changes the script's result.
+reap_script_leftovers() {  # <script>
+  local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line
+  [ -x "$reaper" ] || return 0
+  while IFS= read -r line; do
+    [ -z "$line" ] || log "reaped after $1: $line"
+  done < <("$reaper" 2>/dev/null || true)
+  return 0
+}
+
 # Run <script>, capturing output to <out>. <stream> 1 also echoes it live.
 # <id> only has to be unique within this run. When PER_SCRIPT_TIMEOUT_SECS is
 # positive, a script that outruns it is terminated and reported as exit 124: a
@@ -2650,6 +2671,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"
     [ "$stream" -eq 1 ] && tail -1 "$out"
   fi
+  reap_script_leftovers "$script"
   return "$rc"
 }
 
