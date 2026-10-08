@@ -194,7 +194,7 @@ fall_back_to_nudge() {  # <id> <reason>
 service_mate() {  # <array-index>
   local i=$1 id line rc
   id=${IDS[$i]}
-  line=$(fm_secondmate_restart_service "$STATE" "$id" consume); rc=$?
+  line=$(fm_secondmate_restart_service_locked "$STATE" "$id" consume); rc=$?
   case "$rc" in
     0|3)
       printf '%s\n' "$line"
@@ -203,7 +203,7 @@ service_mate() {  # <array-index>
       printf 'queued: %s: %s; supervision restarts it once it has\n' "$id" "${line#waiting: "$id": }"
       ;;
     *)
-      printf 'unreached: %s: its restart request was not recorded\n' "$id"
+      printf 'unreached: %s: its recorded restart request could not be serviced\n' "$id"
       ;;
   esac
 }
@@ -248,6 +248,7 @@ harvest_restarts() {
         out="unreached: ${IDS[$i]}: the restart worker exited before publishing an outcome"
       fi
     fi
+    fm_secondmate_liveness_unlock "${IDS[$i]}"
     printf '%s\n' "$out"
     case "$out" in
       restarted:*) restarted_count=$((restarted_count + 1)) ;;
@@ -260,6 +261,18 @@ harvest_restarts() {
     i=$((i + 1))
   done
 }
+
+RESULT_DIR=$(mktemp -d "$STATE/.secondmate-restart.XXXXXX") || {
+  echo "error: could not create restart result directory under $STATE" >&2
+  exit 1
+}
+trap 'for id in "${IDS[@]}"; do fm_secondmate_liveness_unlock "$id"; done; rm -rf -- "$RESULT_DIR"' EXIT
+restart_active_count=0
+sorted_ids=$(printf '%s\n' "${IDS[@]}" | LC_ALL=C sort)
+IDS=()
+while IFS= read -r id; do IDS+=("$id"); done <<EOF
+$sorted_ids
+EOF
 
 # --- phase A: persist ------------------------------------------------------
 # Every request goes out before any restart, so the fleet persists concurrently
@@ -321,10 +334,18 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   # A restart already recorded for this mate is still waiting on that mate's
   # own events; asking again would only queue a second persist request behind
   # the first, so the recorded request is tried instead.
-  if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ] \
-    || [ -f "$(fm_secondmate_restart_outcome_path "$STATE" "$id")" ]; then
-    PLAN[i]="recorded"
+  if [ -f "$(fm_secondmate_restart_outcome_path "$STATE" "$id")" ]; then
+    RESTART_RESULT[i]="$RESULT_DIR/$i.result"
+    RESTART_PID[i]=""
+    service_mate "$i" > "${RESTART_RESULT[i]}"
+    PLAN[i]="restarting"
+    restart_active_count=$((restart_active_count + 1))
     fm_secondmate_liveness_unlock "$id"
+    i=$((i + 1))
+    continue
+  fi
+  if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ]; then
+    PLAN[i]="recorded"
     i=$((i + 1))
     continue
   fi
@@ -353,7 +374,6 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     continue
   fi
   PLAN[i]="recorded"
-  fm_secondmate_liveness_unlock "$id"
   i=$((i + 1))
 done
 
@@ -361,17 +381,11 @@ done
 # Each recorded mate is tried once, in parallel. One whose answer and turn end
 # have already happened restarts now; any other stays queued for supervision.
 
-RESULT_DIR=$(mktemp -d "$STATE/.secondmate-restart.XXXXXX") || {
-  echo "error: could not create restart result directory under $STATE" >&2
-  exit 1
-}
-trap 'rm -rf -- "$RESULT_DIR"' EXIT
-restart_active_count=0
 i=0
 while [ "$i" -lt "${#IDS[@]}" ]; do
   if [ "${PLAN[i]}" = recorded ]; then
     launch_restart "$i"
-  else
+  elif [ "${PLAN[i]}" != restarting ]; then
     fall_back_to_nudge "${IDS[$i]}" "${REASON[i]}"
     PLAN[i]="done"
   fi

@@ -257,6 +257,14 @@ Endpoint death is the only process-level override and yields dead; child process
 `state/<id>.turn-ended` files remain wake notifications, not current state.
 
 Each record is bound to an incarnation token minted when the task's wiring is armed, so an event from a superseded incarnation is rejected rather than applied, and a record left behind by one classifies unknown.
+Canonical local secondmate spawns and relaunches install the same verified semantic sources as ordinary crew: Claude receives generation-bound lifecycle observers through its launch settings, OpenCode receives the busy plugin, and Pi, pi-signed, and omp explicitly load the parent-state extension.
+These observers do not replace or duplicate the secondmate home's primary guard, guardrail, or watcher wake handling.
+For Claude, the verified project settings are snapshotted into the launch settings and project-settings loading is excluded, so the original primary Stop guard runs exactly once inside an acceptance wrapper.
+Its output and exit status are preserved; parent idle is published only after exit 0, never when that guard rejects Stop.
+An unknown primary guard configuration or an existing local-settings surface leaves Claude parent evidence unarmed and unknown rather than installing a parallel Stop observer.
+Cursor uses the existing parent-owned pull binding, excluding conversations predating that incarnation rather than seeding a writer record.
+Raw and unverified secondmate launches are not armed; unavailable evidence stays unknown.
+[`tests/fm-secondmate-busy-evidence.test.sh`](../tests/fm-secondmate-busy-evidence.test.sh) exercises production spawn, generated event consumers, queued restart release, replacement rearming, and stale-generation rejection.
 [The omp adapter reference](../.agents/skills/harness-adapters/references/harness/omp.md#extension-loading) owns secondmate versus crewmate/scout extension loading.
 Three rendered-text checks deliberately remain outside this contract because they answer delivery questions: submit acknowledgement and the away-mode supervisor-pane busy guard consume the shared delivery-footer matcher owned by `bin/fm-composer-lib.sh`, while `bin/fm-pending-reply-lib.sh` owns the secondmate delivery-confirmation observation.
 Recorded harnesses select their own signatures; identityless guards include verified omp signals, while non-omp tmux submit acknowledgement retains its legacy matcher. None is a recorded worker state source.

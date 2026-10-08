@@ -142,6 +142,12 @@ SH
 new_case() {
   local dir="$TMP_ROOT/$1-$RANDOM"
   mkdir -p "$dir/home/state" "$dir/home/data" "$dir/home/config" "$dir/fake"
+  mkdir -p "$dir/code"
+  cp -R "$ROOT/bin" "$dir/code/bin"
+  git init -q "$dir/code"
+  git -C "$dir/code" add bin
+  ln -s "$ROOT/.omp" "$dir/code/.omp"
+  ln -s "$ROOT/.agents" "$dir/code/.agents"
   printf 'claude\n' > "$dir/home/config/secondmate-harness"
   : > "$dir/fake/literal"
   : > "$dir/fake/keys"
@@ -255,6 +261,7 @@ arm_answer() {
 run_restart() {  # <case-dir> <args...>
   local dir=$1; shift
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_ROOT_OVERRIDE="$dir/code" \
     FM_CONFIG_OVERRIDE="$dir/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
     FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
@@ -265,6 +272,7 @@ run_restart() {  # <case-dir> <args...>
 run_recorded_restart_transaction() {  # <case-dir> <id>
   local dir=$1 id=$2
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_ROOT_OVERRIDE="$dir/code" \
     FM_CONFIG_OVERRIDE="$dir/home/config" FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
     bash -c '
       . "$1/bin/fm-secondmate-restart-lib.sh"
@@ -292,6 +300,7 @@ assert_no_line() {
 process_requests() {
   local dir=$1
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_ROOT_OVERRIDE="$dir/code" \
     FM_CONFIG_OVERRIDE="$dir/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
     FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
@@ -1285,7 +1294,9 @@ test_outcome_consumers_hold_lock_and_preserve_failed_retirement() {
     add_local_mate "$dir" sm1
     state="$dir/home/state"
     out=$(run_restart "$dir" sm1) || fail "could not record request: $out"
-    printf 'restarted: sm1 (completed)\n' > "$state/.secondmate-restart-sm1.outcome"
+    printf 'restarted: sm1 (completed)\ncorr=%s\n' \
+      "$(sed -n 's/^corr=//p' "$state/.secondmate-restart-sm1.request")" \
+      > "$state/.secondmate-restart-sm1.outcome"
     cat > "$dir/fakebin/rm" <<'SH'
 #!/usr/bin/env bash
 for arg in "$@"; do
@@ -1376,6 +1387,7 @@ test_concurrent_admission_creates_one_request() {
   local dir state first second i out count
   dir=$(new_case concurrent-admission)
   add_local_mate "$dir" sm1
+  add_local_mate "$dir" sm2
   state="$dir/home/state"
   cat > "$dir/fakebin/mv" <<'SH'
 #!/usr/bin/env bash
@@ -1390,12 +1402,12 @@ fi
 exec /bin/mv "$@"
 SH
   chmod +x "$dir/fakebin/mv"
-  ( run_restart "$dir" sm1 > "$dir/first.out"; printf '%s\n' "$?" > "$dir/first.rc" ) &
+  ( run_restart "$dir" sm1 sm2 > "$dir/first.out"; printf '%s\n' "$?" > "$dir/first.rc" ) &
   first=$!
   i=0
   while [ ! -e "$dir/fake/admission-publishing" ] && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i + 1)); done
   [ -e "$dir/fake/admission-publishing" ] || { kill "$first" 2>/dev/null; fail "the first admission never reached publication"; }
-  ( run_restart "$dir" sm1 > "$dir/second.out"; printf '%s\n' "$?" > "$dir/second.rc" ) &
+  ( run_restart "$dir" sm2 sm1 > "$dir/second.out"; printf '%s\n' "$?" > "$dir/second.rc" ) &
   second=$!
   i=0
   while ! grep -q 'waiting to record its restart request' "$dir/second.out" 2>/dev/null && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i + 1)); done
@@ -1405,6 +1417,12 @@ SH
   count=$(find "$state/sm1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
   [ "$count" = 1 ] || fail "concurrent admission delivered $count persist requests"
   : > "$dir/fake/admission-release"
+  i=0
+  while { kill -0 "$first" 2>/dev/null || kill -0 "$second" 2>/dev/null; } && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i+1)); done
+  if kill -0 "$first" 2>/dev/null || kill -0 "$second" 2>/dev/null; then
+    kill "$first" "$second" 2>/dev/null || true
+    fail "overlapping fleet admissions deadlocked on reversed mate order"
+  fi
   wait "$first" || fail "the first admission driver failed"
   wait "$second" || fail "the second admission driver failed"
   expect_code 0 "$(cat "$dir/first.rc")" "the first request was not retained"
@@ -1414,11 +1432,12 @@ $(cat "$dir/second.out")"
   assert_contains "$out" "queued: sm1" "concurrent admission did not retain the restart"
   assert_not_contains "$out" "nudged: sm1" "concurrent admission fell back to a nudge"
   count=$(find "$state/pending-replies" -maxdepth 1 -type f | wc -l | tr -d ' ')
-  [ "$count" = 1 ] || fail "the second admission replaced the original correlation"
+  [ "$count" = 2 ] || fail "overlapping fleet admissions did not preserve one correlation per mate"
   count=$(find "$state/sm1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
   [ "$count" = 1 ] || fail "the second admission resent the persist request"
   assert_present "$state/.secondmate-restart-sm1.request" "concurrent admission lost the request"
-  pass "concurrent admissions hold one lock across correlation, delivery, and publication"
+  assert_present "$state/.secondmate-restart-sm2.request" "concurrent fleet admission lost the sibling request"
+  pass "overlapping fleet admissions serialize each mate without reversed-order deadlock"
 }
 
 test_watcher_propagates_failed_request_worker() {
@@ -1442,6 +1461,160 @@ test_watcher_propagates_failed_request_worker() {
   assert_present "$dir/home/state/.secondmate-restart-sm1.request" "the watcher discarded the failed worker's request"
   assert_no_line '/exit' "$dir/fake/literal" "the failed worker triggered an unconfirmed restart"
   pass "the watcher propagates a failed request-processing worker"
+}
+
+test_cli_owns_completion_from_admission_through_service() {
+  local dir state out kind
+  for kind in existing-outcome existing-request new-request; do
+    dir=$(new_case "handoff-$kind")
+    add_local_mate "$dir" sm1
+    state="$dir/home/state"
+    if [ "$kind" != new-request ]; then
+      out=$(run_restart "$dir" sm1) || fail "could not queue request: $out"
+      answer_now "$dir" sm1
+      if [ "$kind" = existing-outcome ]; then
+        out=$(process_requests "$dir") || fail "could not complete request: $out"
+      fi
+    else
+      arm_answer "$dir" sm1
+    fi
+    cat > "$dir/fakebin/rm" <<'SH'
+#!/usr/bin/env bash
+handoff=0
+for arg in "$@"; do
+  [ "$arg" != "$FM_HOME/state/.secondmate-liveness-sm1.lock" ] || handoff=1
+done
+/bin/rm "$@" || exit $?
+if [ "$handoff" = 1 ] && [ ! -e "$FM_FAKE_DIR/handoff-seen" ]; then
+  : > "$FM_FAKE_DIR/handoff-seen"
+  bash -c '
+    . "$FM_TEST_ROOT/bin/fm-watch.sh"
+    wake() { :; }
+    touch "$STATE/.secondmate-restart-tick"
+    fm_secondmate_restart_service "$STATE" sm1 >/dev/null
+    secondmate_restart_tick
+  ' > "$FM_FAKE_DIR/handoff.out" 2>&1
+fi
+SH
+    chmod +x "$dir/fakebin/rm"
+    out=$(FM_TEST_ROOT="$ROOT" run_restart "$dir" sm1) || fail "$kind lost completion ownership: $out"
+    assert_contains "$out" "restarted: sm1" "$kind did not report the completed restart"
+    assert_not_contains "$out" "unreached:" "$kind falsely reported a failed restart"
+    assert_present "$dir/fake/handoff-seen" "$kind did not exercise a competing consumer"
+    assert_absent "$state/.secondmate-restart-sm1.request" "$kind left the request behind"
+    assert_absent "$state/.secondmate-restart-sm1.outcome" "$kind left the outcome behind"
+    [ "$(grep -cx '/exit' "$dir/fake/literal")" = 1 ] || fail "$kind repeated the restart"
+    [ ! -s "$state/.wake-queue" ] || fail "$kind was reported by both CLI and watcher"
+  done
+  pass "CLI admission retains completion ownership across competing watcher servicing"
+}
+
+test_completion_notification_replays_one_identity_under_queue_lock() {
+  local dir state out corr count holder ack i generation sequence second_corr
+  dir=$(new_case notification-replay)
+  add_local_mate "$dir" sm1
+  state="$dir/home/state"
+  out=$(run_restart "$dir" sm1) || fail "could not queue request: $out"
+  corr=$(sed -n 's/^corr=//p' "$state/.secondmate-restart-sm1.request")
+  answer_now "$dir" sm1
+  out=$(process_requests "$dir") || fail "could not complete request: $out"
+  cat > "$dir/fakebin/date" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = +%s ] && [ -f "$FM_FAKE_DIR/tick-time" ]; then
+  cat "$FM_FAKE_DIR/tick-time"
+else
+  exec /bin/date "$@"
+fi
+SH
+  cat > "$dir/fakebin/rm" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [ "$arg" = "$FM_HOME/state/.secondmate-restart-sm1.outcome" ]; then
+    [ -L "$FM_HOME/state/.wake-queue.lock" ] || {
+      : > "$FM_FAKE_DIR/unlocked-handoff"
+      exit 1
+    }
+    if [ -e "$FM_FAKE_DIR/refuse-consumption" ]; then exit 1; fi
+    if [ -e "$FM_FAKE_DIR/pause-consumption" ]; then
+      : > "$FM_FAKE_DIR/consumption-paused"
+      for ((i = 0; i < 500; i++)); do
+        [ ! -e "$FM_FAKE_DIR/pause-consumption" ] || { /bin/sleep 0.01; continue; }
+        break
+      done
+    fi
+  fi
+done
+exec /bin/rm "$@"
+SH
+  cat > "$dir/fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+if [ "${FM_FAKE_ACK:-0}" = 1 ] && [ "${1:-}" = 0.1 ]; then
+  : > "$FM_FAKE_DIR/ack-blocked"
+fi
+exec /bin/sleep 0.01
+SH
+  chmod +x "$dir/fakebin/date" "$dir/fakebin/rm" "$dir/fakebin/sleep"
+  printf '%s\n' "$(date +%s)" > "$dir/fake/tick-time"
+  : > "$dir/fake/refuse-consumption"
+  out=$(run_restart_watcher_tick "$dir")
+  expect_code 1 "$?" "failed outcome consumption was suppressed: $out"
+  assert_contains "$out" "could not be consumed" "the handoff did not reach outcome consumption"
+  assert_absent "$dir/fake/unlocked-handoff" "outcome retirement did not hold the queue lock"
+  assert_present "$state/.secondmate-restart-sm1.outcome" "failed handoff lost its completion marker"
+  count=$(awk -F '\t' -v key="secondmate-restart-sm1-$corr" '$4 == key { n++ } END { print n+0 }' "$state/.wake-queue")
+  [ "$count" = 1 ] || fail "the first handoff did not publish exactly one completion identity"
+  generation=$(cat "$state/.watcher-down")
+  generation=${generation##*:}
+  sequence=$(awk -F '\t' 'END { print $2 }' "$state/.wake-queue")
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" activate "$$" restart-handoff || fail "could not activate branch"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" publish restart-handoff "$sequence" || fail "could not grant completion row"
+  out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_STATE_OVERRIDE="$state" \
+    FM_SUPERVISION_ACTOR=branch FM_FAKE_DIR="$dir/fake" "$ROOT/bin/fm-wake-drain.sh" \
+    --ack-through "$sequence" --recovery-generation "$generation" 2>&1)
+  expect_code 1 "$?" "branch acknowledgement consumed an interrupted handoff: $out"
+  assert_contains "$out" "handoff is not retired" "branch acknowledgement bypassed the shared handoff invariant"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" deactivate "$$" restart-handoff || fail "could not release branch"
+  out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_STATE_OVERRIDE="$state" \
+    FM_FAKE_DIR="$dir/fake" "$ROOT/bin/fm-wake-drain.sh" \
+    --ack-through "$sequence" --recovery-generation "$generation" 2>&1)
+  expect_code 1 "$?" "acknowledgement consumed an interrupted handoff: $out"
+  assert_contains "$out" "handoff is not retired" "acknowledgement did not explain the pending handoff"
+  [ -s "$state/.wake-queue" ] || fail "acknowledgement removed the replay deduplication row"
+  rm -f "$dir/fake/refuse-consumption"
+  printf '%s\n' "$(( $(cat "$dir/fake/tick-time") + 10 ))" > "$dir/fake/tick-time"
+  : > "$dir/fake/pause-consumption"
+  run_restart_watcher_tick "$dir" > "$dir/tick.out" &
+  holder=$!
+  i=0
+  while [ ! -e "$dir/fake/consumption-paused" ] && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i+1)); done
+  assert_present "$dir/fake/consumption-paused" "replayed handoff never reached retirement"
+  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_STATE_OVERRIDE="$state" \
+    FM_FAKE_DIR="$dir/fake" FM_FAKE_ACK=1 \
+    "$ROOT/bin/fm-wake-drain.sh" --ack-through "$sequence" --recovery-generation "$generation" \
+    > "$dir/ack.out" 2>&1 &
+  ack=$!
+  i=0
+  while [ ! -e "$dir/fake/ack-blocked" ] && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i+1)); done
+  assert_present "$dir/fake/ack-blocked" "acknowledgement did not wait for completion retirement"
+  count=$(awk -F '\t' '$3 == "check" { n++ } END { print n+0 }' "$state/.wake-queue")
+  [ "$count" = 1 ] || fail "the replay queued a duplicate at a different tick time"
+  rm -f "$dir/fake/pause-consumption"
+  wait "$holder" || fail "replayed handoff failed: $(cat "$dir/tick.out")"
+  wait "$ack" || fail "acknowledgement failed: $(cat "$dir/ack.out")"
+  assert_absent "$state/.secondmate-restart-sm1.outcome" "successful handoff left its outcome"
+  [ ! -s "$state/.wake-queue" ] || fail "acknowledgement left the completion queued"
+  out=$(run_restart_watcher_tick "$dir") || fail "post-ack tick failed: $out"
+  [ ! -s "$state/.wake-queue" ] || fail "post-ack tick repeated the completion"
+  out=$(run_restart "$dir" sm1) || fail "could not queue a subsequent restart: $out"
+  second_corr=$(sed -n 's/^corr=//p' "$state/.secondmate-restart-sm1.request")
+  [ "$corr" != "$second_corr" ] || fail "subsequent restart reused the first completion identity"
+  answer_now "$dir" sm1
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" sm1 --state idle --source claude-hook --event stop >/dev/null || fail "could not close replacement turn"
+  out=$(process_requests "$dir") || fail "subsequent restart failed: $out"
+  out=$(run_restart_watcher_tick "$dir") || fail "subsequent completion handoff failed: $out"
+  count=$(awk -F '\t' -v key="secondmate-restart-sm1-$second_corr" '$4 == key { n++ } END { print n+0 }' "$state/.wake-queue")
+  [ "$count" = 1 ] || fail "a fixed per-mate notification key suppressed the subsequent completion"
+  pass "completion replay uses stable per-outcome identity and excludes acknowledgement during retirement"
 }
 
 test_persist_gates_and_asks_only_for_open_records
@@ -1477,4 +1650,6 @@ test_outcome_consumers_hold_lock_and_preserve_failed_retirement
 test_completion_publication_failures_are_visible
 test_concurrent_admission_creates_one_request
 test_watcher_propagates_failed_request_worker
+test_cli_owns_completion_from_admission_through_service
+test_completion_notification_replays_one_identity_under_queue_lock
 echo "# all fm-secondmate-restart tests passed"
