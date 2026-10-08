@@ -423,6 +423,72 @@ assert rows(pipeline_report, 'stalled_worker')['future-progress']['age_seconds']
 print('PASS: future pipeline stamps do not mask older valid progress', flush=True)
 print('PASS: future status commit and reflog cannot hide unknown-age stalls', flush=True)
 
+progress_tasks = []
+for index in range(2):
+    name = 'store-worker-' + str(index)
+    original = task_copy(name, commit_age=5)
+    lane = world / ('progress-lane-' + str(index))
+    lane.mkdir()
+    copy = lane / 'wt'
+    original.rename(copy)
+    progress_tasks.append(task(name, copy))
+    status = home / ('state/' + name + '.status')
+    status.write_text('working: building\n')
+    os.utime(status, (hours(5), hours(5)))
+    reflog = Path(git(copy, 'rev-parse', '--absolute-git-dir')) / 'logs/HEAD'
+    os.utime(reflog, (hours(5), hours(5)))
+fixture(progress_tasks)
+progress_user, progress_cwd = world / 'progress-user', world / 'progress-cwd'
+progress_user.mkdir()
+progress_cwd.mkdir()
+
+def progress_store(path, stamps):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(path) as db:
+        db.executescript('CREATE TABLE repos (id INTEGER, working_path TEXT);'
+                        'CREATE TABLE runs (id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT);'
+                        'CREATE TABLE step_results (run_id INTEGER, started_at TEXT, completed_at TEXT);')
+        db.execute('INSERT INTO repos VALUES (?, ?)', (1, progress_tasks[0]['project']))
+        for index, stamp in enumerate(stamps):
+            db.execute('INSERT INTO runs VALUES (?, ?, ?, ?)',
+                       (index, 1, progress_tasks[index]['branch'], iso(hours(5))))
+            db.execute('INSERT INTO step_results VALUES (?, ?, ?)', (index, iso(stamp), iso(stamp)))
+
+absolute_store = world / 'absolute-progress'
+default_store = progress_user / '.no-mistakes'
+progress_store(absolute_store / 'state.sqlite', [now - 60, hours(4)])
+progress_store(default_store / 'state.sqlite', [now - 60, hours(4)])
+for index, item in enumerate(progress_tasks):
+    local_store = Path(item['paths']['worktree']['path']).parent / 'nm/state.sqlite'
+    progress_store(local_store, [now - 60, hours(4) if index == 1 else now - 60])
+progress_store(progress_cwd.parent / 'nm/state.sqlite', [now - 60, now - 60])
+for selection in (str(absolute_store), '../nm', '', None):
+    progress_env = dict(env, HOME=str(progress_user))
+    if selection is None:
+        progress_env.pop('NM_HOME', None)
+    else:
+        progress_env['NM_HOME'] = selection
+    progress_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                                    env=progress_env, cwd=progress_cwd))
+    assert progress_report['complete'], (selection, progress_report)
+    progress_stalls = rows(progress_report, 'stalled_worker')
+    assert set(progress_stalls) == {'store-worker-1'}, (selection, progress_report)
+    assert progress_stalls['store-worker-1']['age_seconds'] == 4 * 3600, (selection, progress_report)
+missing_store = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                              env=dict(env, NM_HOME='../absent-nm'), cwd=progress_cwd))
+assert missing_store['complete'], missing_store
+assert set(rows(missing_store, 'stalled_worker')) == {'store-worker-0', 'store-worker-1'}, missing_store
+for index, item in enumerate(progress_tasks):
+    store = Path(item['paths']['worktree']['path']).parent / 'nm/state.sqlite'
+    store.unlink()
+    store.write_text('not a database\n')
+    unreadable_store = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                                     env=dict(env, NM_HOME='../nm'), cwd=progress_cwd))
+    assert not unreadable_store['complete'], unreadable_store
+    assert 'no-mistakes run store ' + item['id'] in rows(unreadable_store, 'coverage')['ledger degraded']['evidence']
+    assert item['id'] in rows(unreadable_store, 'stalled_worker'), unreadable_store
+print('PASS: absolute relative empty and default pipeline stores preserve task-scoped progress', flush=True)
+
 readonly = task_copy('readonly-proof', commit_age=2)
 git(readonly, 'checkout', '-q', 'main')
 (readonly / 'default-progress').write_text('advanced\n')

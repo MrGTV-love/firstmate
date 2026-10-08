@@ -267,6 +267,29 @@ test_detached_helper_runs_and_a_blind_ledger_wakes() {
   pass "the watcher runs the reconciler detached and a partly blind ledger still wakes"
 }
 
+test_missing_ledger_collects_with_large_interval_and_then_throttles() {
+  local dir state fakebin out pid
+  dir=$(make_case ledger-large-interval); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_helper "$fakebin"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=1209600 \
+    FM_OPEN_LOOPS_BIN="$fakebin/fake-open-loops"
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a missing ledger was not collected with a large interval"; }
+  [ -e "$state/.helper-ran" ] || fail "the initial collector did not run"
+  [ -e "$state/.open-loops-started" ] || fail "initial collection did not record its start"
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  ack_stopped_cycle "$state" || fail "could not acknowledge the initial large-interval collection"
+  rm -f "$state/.helper-ran"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=1209600 \
+    FM_OPEN_LOOPS_BIN="$fakebin/fake-open-loops"
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "a fresh large-interval ledger did not stay quiet"; }
+  [ ! -e "$state/.helper-ran" ] || { reap "$pid"; fail "a fresh ledger was collected before its interval"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "the acknowledged ledger woke again"; }
+  reap "$pid"
+  pass "a missing ledger collects with a large interval and its fresh publication stays throttled"
+}
+
 test_unpublished_ledger_is_its_own_wake() {
   local dir state fakebin out pid
   dir=$(make_case ledger-stale); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
@@ -808,6 +831,7 @@ tests=(
   test_unchanged_overdue_set_stays_quiet_then_new_row_wakes
   test_ledger_without_overdue_rows_is_silent
   test_detached_helper_runs_and_a_blind_ledger_wakes
+  test_missing_ledger_collects_with_large_interval_and_then_throttles
   test_unpublished_ledger_is_its_own_wake
   test_failed_publication_retries_the_same_ledger
   test_blocked_publication_does_not_commit_cooldown

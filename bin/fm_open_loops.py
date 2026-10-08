@@ -256,7 +256,6 @@ class Collector:
         return alive
 
     def worker_rows(self):
-        runs = self.source("no-mistakes run store", self.pipeline_progress) or {}
         for task in self.tasks:
             alive = self.source("worker liveness " + task["id"], self.liveness, task)
             if (task["current_state"].get("state") == "unknown"
@@ -272,13 +271,17 @@ class Collector:
                     self.add("failed_task", task["id"], "recover the failed work or record why it ends",
                              mtime(self.state / (task["id"] + ".status")))
             elif task["current_state"].get("state") == "working" and alive == "alive":
-                self.source("progress " + task["id"], self.stalled, task, runs)
+                self.source("progress " + task["id"], self.stalled, task)
             self.source("unlanded work " + task["id"], self.unlanded, task)
 
-    def pipeline_progress(self):
+    def pipeline_progress(self, worktree):
         """Latest recorded pipeline step time per (project, branch); no store is not a failure."""
-        root = Path(os.environ.get("NM_HOME", Path.home() / ".no-mistakes"))
-        database = root / "state.sqlite"
+        root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
+        if not root.is_absolute():
+            if not worktree:
+                raise ValueError("relative NM_HOME requires a task worktree")
+            root = Path(worktree) / root
+        database = root.resolve() / "state.sqlite"
         if not database.exists():
             return {}
         out = {}
@@ -300,7 +303,7 @@ class Collector:
                     out[key] = max([out[key]] + valid) if key in out else max(valid)
         return out
 
-    def stalled(self, task, runs):
+    def stalled(self, task):
         stamps = [mtime(self.state / (task["id"] + ".status"))]
         worktree = self.task_worktree(task)
         if worktree:
@@ -308,6 +311,8 @@ class Collector:
             # The reflog stamps when a commit was observed, not when it was authored.
             stamps.append(mtime(Path(self.git(worktree, "rev-parse", "--absolute-git-dir")) / "logs/HEAD"))
         if task.get("project") and task.get("branch"):
+            runs = self.source("no-mistakes run store " + task["id"], self.pipeline_progress,
+                               task["paths"]["worktree"].get("path")) or {}
             stamps.append(runs.get((str(Path(task["project"]).resolve()), task["branch"])))
         since = max((s for s in stamps if s is not None and s <= self.now), default=None)
         if since is not None and self.now - since < self.ages["stalled_worker"]:

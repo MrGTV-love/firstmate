@@ -2799,7 +2799,8 @@ while :; do
 
   # Ledger refresh and surfacing run before any signal or check exit below, so a chatty
   # fleet can never starve the obligation scan (wake() exits the cycle).
-  if [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
+  if [ ! -e "$STATE/open-loops.json" ] \
+    || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
     open_loops_refresh_detached
   fi
   open_loops_surface

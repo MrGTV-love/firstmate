@@ -264,9 +264,7 @@ fm_test_drop_file() {
 }
 fm_test_drop_file >/dev/null
 
-# The open-work ledger refresh is a watcher feature with its own tests; every other suite that runs a
-# real watcher keeps it off unless it sets FM_OPEN_LOOPS_INTERVAL itself.
-export FM_OPEN_LOOPS_INTERVAL=${FM_OPEN_LOOPS_INTERVAL:-99999999}
+export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
 
 trap fm_test_cleanup EXIT
 trap 'fm_test_cleanup; exit 130' INT

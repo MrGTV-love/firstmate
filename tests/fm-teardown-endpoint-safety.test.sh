@@ -1054,10 +1054,20 @@ SH
 # exist, which keeps the cases below on the endpoint close itself - the pool
 # return and its own refusals are covered elsewhere in this file.
 write_endpoint_close_meta() {  # <case-dir> <id> <window>
+  cat > "$1/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "pr view https://github.com/example/repo/pull/7 --json state -q .state")
+    printf '%s\n' MERGED
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$1/fakebin/gh"
   fm_write_meta "$1/home/state/$2.meta" \
     "window=$3" "endpoint_task_id=$2" \
     "worktree=$1/nonexistent-worktree" "project=$1/nonexistent-project" \
-    "kind=ship" "mode=no-mistakes"
+    "kind=ship" "mode=no-mistakes" "pr=https://github.com/example/repo/pull/7"
 }
 
 test_failed_endpoint_close_refuses_before_removing_the_record() {
