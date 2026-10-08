@@ -1,0 +1,58 @@
+COMMAND: FM_OMP_WAKE_RESTORE_LIVE=1 FM_OMP_WAKE_RESTORE_LIVE_MODEL=openai-codex/gpt-6.1-sol bash tests/fm-omp-wake-restore-live-e2e.test.sh
+Note: switching to 'b78bae43d62e0cade7bcf2ed107dbf828e36dab5'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+│ wakelab1                                                                                                             │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                           │
+│ wakelab1 done: wake lab signal wakelab1                                                                              │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                           │
+│ ⟦Wall: 2.45s | Timeout: 30s⟧                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ● Read state/wakelab1.status
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 62241.1791440765.IGpoLD                                 │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                          │
+│ ⟦Wall: 1.17s | Timeout: 30s⟧                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, the wake lab reported completion. Its parent report could not be delivered because the parent binding is
+ missing or unreadable. I’ve acknowledged the notification.
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2/.nm-live/tmp/fm-omp-wake-restore
+ .8vrcvF/project/state/wakelab1.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                          │
+│ ⟦Wall: 1.46s | Timeout: 30s⟧                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, shipshape.
+
+❯
+ π · ◔ GPT-6.1-Sol 🙈 · 🗑 fm-omp-wake-restore.8vrcvF/project · ⑂ detached *2 ?1 · ◫ 8.1%/272K ⟲ · S0.08 + 👁 0.09
+not ok - omp (omp/18.8.1) on herdr 0.9.1: wakelab1 was not submitted into the running turn's follow-up queue (queue rows: 0)
+EXIT: 1

@@ -1,0 +1,58 @@
+COMMAND: FM_OMP_WAKE_RESTORE_LIVE=1 FM_OMP_WAKE_RESTORE_LIVE_MODEL=openai-codex/gpt-6.1-sol bash tests/fm-omp-wake-restore-live-e2e.test.sh
+Note: switching to 'b78bae43d62e0cade7bcf2ed107dbf828e36dab5'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+│ 1791442143   7   check   inactive-reconcile:9d39c7eb54b840c954125055783dd521   child outcome needs parent report: child=wakelab3 state=done (missing or unreadable parent binding .fm-secondmate-parent)                                                                                                                     │
+│ 1791442148   9   signal   wakelab3.status   signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2/.nm-live/tmp/fm-omp-wake-restore.hWjCyX/project/state/wakelab3.status                                                                                                              │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 90111.1791442143.0vlDMt                                                                                                                                                                                           │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: wakelab3.status: done: wake lab signal wakelab3                                                                                                                                                                                                     │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                                                                                                                                                                                   │
+│ wakelab3 done: wake lab signal wakelab3                                                                                                                                                                                                                                                                                      │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                                                                                                                                                                                   │
+│ ⟦Wall: 3.56s | Timeout: 30s⟧                                                                                                                                                                                                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ● Read state/wakelab3.status
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 90111.1791442143.0vlDMt                                                                                                                                                                                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                                                                                                                                                                                  │
+│ ⟦Wall: 1.58s | Timeout: 30s⟧                                                                                                                                                                                                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, the third wake-recovery lab reported completion, and I acknowledged the notification. Its parent report could not be delivered because the parent binding is missing or unreadable.
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2/.nm-live/tmp/fm-omp-wake-restore.hWjCyX/project/state/wakelab3.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                                                                                                                                                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                                                                                                                                                                                  │
+│ ⟦Wall: 1.42s | Timeout: 30s⟧                                                                                                                                                                                                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, shipshape.
+
+╭── π > ◔ GPT-6.1-Sol 🙈 > 🗑 fm-omp-wake-restore.hWjCyX/project > ⑂ detached *2 ?2 > S0.22 + 👁 0.14 ▶───────────────────────11%─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╎───────────────────┃─────────────────────────────272K─◀ 🆔 01a11a3d ──╮
+╰─                                                                                                                                                                                                                                                                                                                            ─╯
+not ok - omp (omp/18.8.1) on herdr 0.9.1: no fresh wake was observed restored into a pending composer after Escape in 3 attempts
+EXIT: 1

@@ -1,0 +1,121 @@
+
+=== idle-box ===
+████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                                        Tip: You can /btw to ask a side question
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ◔ GPT-6.1-Sol 👁 > 🌳 32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2 > ⑂ detached *1 ?2 > (sub) ▶─8%────────╎─┃─272K───╮
+╰─                                                                                       ⇧⇥ to change thinking effort ─╯
+Idle composer: empty
+Cursor: 15,3,omp,40,120
+Busy-turn submission verdict: empty
+
+=== busy-pending-draft ===
+████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                                        Tip: You can /btw to ask a side question
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Run only the bash command sleep 90, then reply DONE. Do not modify files.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 90                                                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Waiting ninety seconds
+
+╭── ⠧ 2s > ◔ GPT-6.1-Sol 👁 > 🌳 32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2 > ⑂ detached *1 ?2 > (sub) ▶─8%──────╎┃─272K───╮
+╰─ operator tmux draft kept                                                                                           ─╯
+Busy doorbell submission verdict: empty
+
+=== queued-doorbell ===
+████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                                        Tip: You can /btw to ask a side question
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Run only the bash command sleep 90, then reply DONE. Do not modify files.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 90                                                                                                           │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Backgrounded early to handle an incoming message; the command keeps running.                                         │
+│ ⟦Backgrounded: bg_1 | Timeout: 100s⟧                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ After the current command, reply exactly TMUX_DOORBELL_HANDLED. Do not modify files.
+
+
+  ⎋ Waiting ninety seconds
+
+╭── ⠧ 4s > ◔ GPT-6.1-Sol 👁 > 🌳 32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2 > ⑂ detached *1 ?2 > S0.04 ▶─7%─╎┃272K─◀ ⚙ 1 ──╮
+╰─                                                                                                                    ─╯
+
+=== doorbell-handled ===
+████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                                        Tip: You can /btw to ask a side question
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Run only the bash command sleep 90, then reply DONE. Do not modify files.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 90                                                                                                           │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Backgrounded early to handle an incoming message; the command keeps running.                                         │
+│ ⟦Backgrounded: bg_1 | Timeout: 100s⟧                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ After the current command, reply exactly TMUX_DOORBELL_HANDLED. Do not modify files.
+
+
+✔ 1 job settled 1 done
+└─ • ⟦bash⟧ bg_1 sleep 90 · 1m30s
+     (no output)
+
+ TMUX_DOORBELL_HANDLED
+
+╭── π > ◔ GPT-6.1-Sol 👁 > 🌳 32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2 > ⑂ detached *1 ?2 > S0.05 + 👁 0.02 ▶─7%─╎┃272K───╮
+╰─                                                                                                                    ─╯
+PASS: real omp box composer classified empty/pending mid-turn; injected follow-up cleared and was processed.

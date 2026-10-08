@@ -1,0 +1,19 @@
+
+=== timeout ===
+████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                        Tip: Start your prompt with `!` to run it as bash — `!!` runs it without
+                                              adding the output to context
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ◔ GPT-6.1-Sol 👁 > 🌳 32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2 > ⑂ detached *1 ?2 > (sub) ▶─8%────────╎─┃─272K───╮
+╰─                                                                                       ⇧⇥ to change thinking effort ─╯
+FAIL: Timed out waiting for live product state

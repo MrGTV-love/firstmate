@@ -1,0 +1,20 @@
+COMMAND: FM_OMP_WAKE_RESTORE_LIVE=1 FM_OMP_WAKE_RESTORE_LIVE_MODEL=openai-codex/gpt-6.1-sol bash tests/fm-omp-wake-restore-live-e2e.test.sh
+Note: switching to 'b78bae43d62e0cade7bcf2ed107dbf828e36dab5'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+not ok - could not launch the ordinary omp secondmate for wake-ext: error: secondmate home cannot be the firstmate repo: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D24DCSAPVMYEXMYCEPMEW2/.nm-live/tmp/fm-omp-wake-restore.UcAJ3K/project
+EXIT: 1

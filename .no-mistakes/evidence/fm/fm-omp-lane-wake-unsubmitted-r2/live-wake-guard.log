@@ -1,0 +1,24 @@
+COMMAND: FM_OMP_WAKE_RESTORE_LIVE=1 FM_OMP_WAKE_RESTORE_LIVE_MODEL=openai-codex/gpt-6.1-sol bash tests/fm-omp-wake-restore-live-e2e.test.sh
+Note: switching to 'b78bae43d62e0cade7bcf2ed107dbf828e36dab5'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+ok - live omp wake restore: omp (omp/18.8.1) on herdr 0.9.1 re-submitted a wake that Esc restored to the composer, and the lane handled it
+ok - live omp wake restore: omp (omp/18.8.1) on herdr 0.9.1 left the operator's draft exactly as typed while it re-submitted the wake
+ok - live omp markers: omp (omp/18.8.1) on herdr 0.9.1 kept both loaded markers on the session pid 46230 before parent repair and after the parent resumed
+ok - live omp busy composer: omp (omp/18.8.1) on herdr 0.9.1 reads empty and pending while a turn runs
+ok - live omp busy composer: omp (omp/18.8.1) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
+EXIT: 0
