@@ -1692,6 +1692,7 @@ The guard asks Jev three things, exactly as upstream does:
 - After a shell command or file read, whether the output holds instructions aimed at the agent; flagged output reaches the agent with a warning banner.
 
 The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
+For omp native edits, each hashline file section, structured diff and move destination is judged through the upstream write gate without changing the executed edit arguments.
 A block tells the agent the block is final and to report it rather than work around it.
 On Claude the banner arrives as added context next to the unchanged output, because Claude hooks cannot replace a built-in tool's output.
 
@@ -1699,8 +1700,11 @@ The guard sends the command, the written content (first 4,000 characters) and th
 It calls TypeSafe direct first, with the single primary-home `TYPESAFE_API_KEY` resolved at call time through `fm_typesafe_key`; no key ever enters the worker environment.
 Only when the direct call is unavailable or fails does it ask OpenRouter, with `OPENROUTER_API_KEY` read through `fm_openrouter_key` from the same home and primary-home `.env` files, never from the process environment; with no such key there is no fallback call.
 A request whose text matches the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key) is withheld from both.
-A withheld request, missing keys, an exhausted upstream retry budget of 30 seconds per provider, or any other failure lets the tool call proceed, as upstream does.
-Each decision appends one line to the owning home's private `state/jev-guard.jsonl`, with answers, usage, model, answering provider and latency but without the request body.
+Each provider has a 10-second total request budget including upstream retries and response bodies, and each complete handler shares a 25-second cancellation budget across every edit target.
+Both omp's native handler deadline and Claude's hook timeout remain 30 seconds, including result screening.
+A withheld request, missing keys, exhausted budget or any other failure lets the tool call proceed, as upstream does.
+Each decision appends one line to the owning home's private `state/jev-guard.jsonl`, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
+Only the session entry retains the full upstream payload.
 [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) is the portable regression, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) holds the live host evidence.
 
 ## Jev belay Stop hook

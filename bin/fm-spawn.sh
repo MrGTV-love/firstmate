@@ -5052,7 +5052,7 @@ if [ "$KIND" != secondmate ]; then
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
     j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data")")
     cat >"$WT/.claude/settings.local.json" <<EOF
-{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Write|Edit)$","hooks":[{"type":"command","command":"$j_guard","timeout":70}]}],"PostToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guard","timeout":70}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop","timeout":25}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Write|Edit)$","hooks":[{"type":"command","command":"$j_guard","timeout":30}]}],"PostToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guard","timeout":30}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop","timeout":25}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
 EOF
     exclude_path '.claude/settings.local.json'
     ;;

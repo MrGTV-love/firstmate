@@ -9,6 +9,7 @@
  * `decide` is the one way an extension calls Jev: it validates, calls, reports, and returns.
  * `extra` must not use the keys the report already sets: source, state, questions, answers, usage, model, ms.
  */
+import { AsyncLocalStorage } from "node:async_hooks";
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -23,6 +24,26 @@ let config = resolve(home, "config");
 let ledger: string | undefined;
 let task = "";
 
+const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
+
+export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), 25_000);
+  try {
+    return await budgets.run({ until: performance.now() + 25_000, signal: controller.signal }, run);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function preflightTimeout(): number {
+  const budget = budgets.getStore();
+  budget?.signal.throwIfAborted();
+  const remaining = budget ? Math.ceil(budget.until - performance.now()) : 25_000;
+  if (remaining <= 0) throw new DOMException("Jev handler timed out.", "TimeoutError");
+  return remaining;
+}
+
 /** Firstmate: the owning home, its config and state directories, and the task this session runs. */
 export function configure(c: { home: string; config: string; state: string; task: string }): void {
   home = c.home;
@@ -36,6 +57,7 @@ function typesafeKey(): string {
   return execFileSync("bash", ["-c", '. "$1"; fm_typesafe_key "$2" && printf %s "$TYPESAFE_API_KEY_PRIVATE"', "jev-guard", lib, home], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
+    timeout: preflightTimeout(),
   });
 }
 
@@ -44,6 +66,7 @@ function openrouterKey(): string {
   return execFileSync("bash", ["-c", '. "$1"; fm_openrouter_key "$2" && printf %s "$OPENROUTER_API_KEY_PRIVATE"', "jev-guard", lib, home], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
+    timeout: preflightTimeout(),
   });
 }
 
@@ -52,22 +75,24 @@ function permitted(state: State): void {
   execFileSync("bash", ["-c", '. "$1"; s=$(mktemp) || exit 1; fm_typesafe_permitted "$(cat)" "$2" "$s"; rc=$?; rm -f "$s"; exit "$rc"', "jev-guard", lib, resolve(config, "dispatch-never-send")], {
     input: JSON.stringify(state),
     stdio: ["pipe", "ignore", "ignore"],
+    timeout: preflightTimeout(),
   });
 }
 
 const seam = (name: string) => process.env.FM_TEST_SEAM === "1" ? process.env[name] || undefined : undefined;
 let client: JevClient | undefined;
-export const jev = () => (client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), baseUrl: seam("FM_JEV_GUARD_BASE_URL") }));
+export const jev = () => (client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), baseUrl: seam("FM_JEV_GUARD_BASE_URL"), timeoutMs: 10_000 }));
 let fallback: JevClient | undefined;
-const openrouter = () => (fallback ??= new JevClient({ provider: "openrouter", apiKey: openrouterKey(), baseUrl: seam("FM_JEV_GUARD_OPENROUTER_URL") }));
+const openrouter = () => (fallback ??= new JevClient({ provider: "openrouter", apiKey: openrouterKey(), baseUrl: seam("FM_JEV_GUARD_OPENROUTER_URL"), timeoutMs: 10_000 }));
 
 /** Firstmate: TypeSafe direct first; OpenRouter only when the direct call is unavailable or fails. */
 async function systemOne(state: State, questions: Questions) {
   try {
-    return await jev().systemOne(state, questions);
+    return await jev().systemOne(state, questions, { signal: budgets.getStore()?.signal });
   } catch (direct) {
     try {
-      return await openrouter().systemOne(state, questions);
+      preflightTimeout();
+      return await openrouter().systemOne(state, questions, { signal: budgets.getStore()?.signal });
     } catch {
       throw direct;
     }
@@ -85,8 +110,10 @@ export function levelConfig<T extends object>(fallback: T): T {
 }
 
 export function report(pi: any, kind: string, payload: Record<string, unknown>): void {
-  const { state: _state, questions: _questions, ...rest } = payload;
-  const body = { kind, at: Date.now(), task, ...rest };
+  const { source, hook, tool, block, flag, noul, answers, model, provider, ms } = payload;
+  const usage = payload.usage as Decision["usage"] | undefined;
+  const body = { kind, at: Date.now(), task, source, hook, tool, block, flag, noul, answers, model, provider, ms,
+    usage: usage && { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cost: usage.cost } };
   try { if (ledger) appendFileSync(ledger, JSON.stringify(body) + "\n", { mode: 0o600 }); } catch { /* the ledger is optional */ }
   try { pi.appendEntry?.(`jev-${kind}`, payload); } catch { /* entries are optional */ }
 }
