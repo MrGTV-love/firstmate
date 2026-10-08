@@ -144,7 +144,6 @@ Some digest work remains local but unbounded:
 - The backlog listing.
 
 So the whole digest still runs as one bounded child, default 120s via `FM_SESSION_START_TIMEOUT`.
-Set `FM_SESSION_START_STAGE_TIMES_FILE` to a path to append one `<seconds> <stage>` line as each stage begins, which times a slow start stage by stage.
 
 Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by `FM_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default).
 So a read that hangs or dies becomes that task's own `endpoint: error` line and the digest continues.

@@ -322,6 +322,7 @@ test_previous_fold_cache_is_refolded_under_current_semantics() {
   ident=$(sed -n 's/^ident=//p' "$cursor")
   status_bytes=$(LC_ALL=C wc -c < "$status" | tr -d '[:space:]')
   {
+    printf 'version=9:unknown\n'
     printf 'offset=%s\n' "$status_bytes"
     printf 'ident=%s\n' "$ident"
     printf 'pending-reply-abcdef0123456789\tblocked\tforged decision'
@@ -445,7 +446,36 @@ write_golden_corpus() {  # <status-file>
 # Byte offsets of every line end in <file> (the boundaries a checkpoint may
 # legitimately sit on), plus 0.
 line_end_offsets() {  # <file>
-  LC_ALL=C awk 'BEGIN { n = 0; print 0 } { n += length($0) + 1; print n }' "$1"
+  local LC_ALL=C offset=0 line
+  printf '0\n'
+  while IFS= read -r line; do
+    offset=$((offset + ${#line} + 1))
+    printf '%s\n' "$offset"
+  done < "$1"
+}
+
+line_split_offsets() {  # <file>
+  local LC_ALL=C offset=0 line head
+  while IFS= read -r line; do
+    case "$line" in
+      needs-decision*|blocked*|resolved*|captain-held*)
+        printf '%s\n' "$((offset + 3))"
+        case "$line" in
+          *'[key='*)
+            head=${line%%'[key='*}
+            printf '%s\n' "$((offset + ${#head} + 6))"
+            ;;
+        esac
+        case "$line" in
+          *': '*)
+            head=${line%%': '*}
+            printf '%s\n' "$((offset + ${#head} + 4))"
+            ;;
+        esac
+        ;;
+    esac
+    offset=$((offset + ${#line} + 1))
+  done < "$1"
 }
 
 # Span reader that records every span it serves, so a test can prove a seeded
@@ -476,16 +506,21 @@ test_seeded_whole_file_fold_matches_a_fold_from_line_one() {
     printf 'kind=%s\n' "$kind" > "$state/task.meta"
     out=$(FM_TEST_SPAN_LOG="$spanlog" bash -c '
       . "$1"
-      f=$2 reader=$3 spanlog=$4 offsets=$5
+      f=$2 reader=$3 spanlog=$4 offsets=$5 splits=$6
+      kind=$(_fm_status_kind "$f")
+      prefix="${f%.status}-prefix.status"
       cf="$(dirname "$f")/.task.open-decisions-cursor"
       size=$(LC_ALL=C wc -c < "$f" | tr -d "[:space:]")
       rm -f "$cf"
       reference=$(status_open_decisions "$f")
       [ -n "$reference" ] || { echo "the corpus folded to nothing"; exit 1; }
-      for k in $offsets $((size - 7)) 3; do
+      for k in $offsets $splits "$size" $((size - 7)) 3; do
         [ "$k" -le "$size" ] || continue
         rm -f "$cf"
-        status_open_decisions_incremental "$f" "$k" >/dev/null
+        _fm_status_read_span "$f" 0 "$k" > "$prefix" || exit 1
+        expected=$(status_open_decisions "$prefix" "$kind")
+        incremental=$(status_open_decisions_incremental "$f" "$k")
+        [ "$incremental" = "$expected" ] || { echo "first incremental fold at $k differs from its byte-0 prefix"; exit 1; }
         grep -qx "offset=$k" "$cf" || { echo "writer did not checkpoint at $k"; exit 1; }
         : > "$spanlog"
         seeded=$(FM_STATUS_SPAN_READER=$reader status_open_decisions "$f")
@@ -500,13 +535,190 @@ test_seeded_whole_file_fold_matches_a_fold_from_line_one() {
             ! grep -q "^$k " "$spanlog" || { echo "offset $k: a mid-line checkpoint seeded the fold"; exit 1; }
             ;;
         esac
+        : > "$spanlog"
+        completed=$(FM_STATUS_SPAN_READER=$reader status_open_decisions_incremental "$f")
+        [ "$completed" = "$reference" ] || { echo "retained cursor at $k corrupted the completing incremental fold"; exit 1; }
+        case " $offsets " in
+          *" $k "*)
+            if [ "$k" -lt "$size" ]; then
+              grep -qx "$k $((size - k))" "$spanlog" || { echo "retained boundary $k did not fold only the new tail"; exit 1; }
+            fi
+            ;;
+          *)
+            grep -qx "0 $size" "$spanlog" || { echo "retained partial endpoint $k did not refold from byte 0"; exit 1; }
+            ;;
+        esac
+        [ "$(status_open_decisions "$f")" = "$reference" ] || { echo "completed cursor at $k poisoned the whole-file fold"; exit 1; }
       done
       rm -f "$cf"
       [ "$(status_open_decisions "$f")" = "$reference" ] || { echo "fold without a checkpoint changed"; exit 1; }
-    ' _ "$ROOT/bin/fm-classify-lib.sh" "$status" "$reader" "$spanlog" "$(line_end_offsets "$status" | tr '\n' ' ')" 2>&1) \
+    ' _ "$ROOT/bin/fm-classify-lib.sh" "$status" "$reader" "$spanlog" \
+      "$(line_end_offsets "$status" | tr '\n' ' ')" "$(line_split_offsets "$status" | tr '\n' ' ')" 2>&1) \
       || fail "seeded fold diverged for kind $kind: $out"
   done
-  pass "golden: a checkpoint-seeded whole-file fold equals the fold from line 1 at every boundary and kind"
+  pass "golden: retained cursors across two incremental calls match byte-0 folds at complete and split lines for every kind"
+}
+
+test_partial_appends_and_previous_version_are_refused_by_every_consumer() {
+  local dir state kind reading out
+  for kind in ship scout secondmate; do
+    for reading in default resolve held reserved all; do
+      dir=$(make_case "partial-$kind-$reading"); state="$dir/state"
+      printf 'kind=%s\n' "$kind" > "$state/task.meta"
+      out=$(bash -c '
+        . "$1"
+        state=$2 reading=$3
+        case "$reading" in resolve|all) export FM_CLASSIFY_RESOLVE_VERB=answered ;; esac
+        case "$reading" in held|all) export FM_CLASSIFY_CAPTAIN_HELD_VERB=awaiting-captain ;; esac
+        case "$reading" in reserved|all) export FM_CLASSIFY_RESERVED_KEY_PREFIXES="pending-reply- secret-" ;; esac
+        f="$state/task.status"; cf="$state/.task.open-decisions-cursor"
+        ref="$state/reference.status"; copy="$state/copy.status"; ccf="$state/.copy.open-decisions-cursor"
+        snapshot="$state/export.cursor"; probe="$state/probe"
+        kind=$(_fm_status_kind "$f")
+        resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+        held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+        file_size() { _fm_status_file_size "$f"; }
+        reference() { cp "$f" "$ref" && status_open_decisions "$ref" "$kind"; }
+        check_incremental() {
+          expected=$(reference) || exit 1
+          got=$(FM_OPEN_DECISIONS_READ_PROBE=$probe status_open_decisions_incremental "$f") || exit 1
+          [ "$got" = "$expected" ] || { echo "$1 incremental differs from its byte-0 fold"; exit 1; }
+          [ "$(status_open_decisions "$f")" = "$expected" ] || { echo "$1 checkpoint poisoned the whole-file fold"; exit 1; }
+          grep -qx "offset=$(file_size)" "$cf" || { echo "$1 did not retain its observed endpoint"; exit 1; }
+        }
+        check_refusal() {
+          cp "$cf" "$cf.saved"
+          _fm_open_decisions_checkpoint_parse "$cf" || exit 1
+          {
+            printf "version=%s\noffset=%s\nident=%s\n" "$_FM_ODC_VERSION" "$_FM_ODC_OFFSET" "$_FM_ODC_IDENT"
+            printf "poison\tneeds-decision\tuntrusted checkpoint"
+          } > "$cf"
+          before=$(cat "$cf")
+          expected=$(reference) || exit 1
+          [ "$(status_open_decisions "$f")" = "$expected" ] || { echo "$1 whole-file fold reused an invalid endpoint"; exit 1; }
+          [ "$(cat "$cf")" = "$before" ] || { echo "$1 pure fold rewrote the checkpoint"; exit 1; }
+          [ "$(status_presentation_cursor_offset "$f")" = 0 ] || { echo "$1 legacy presentation reused an invalid endpoint"; exit 1; }
+          [ "$(FM_STATUS_CURSOR_SNAPSHOT_FILE=$snapshot status_open_decisions_cursor_offset "$f")" = 0 ] \
+            || { echo "$1 legacy cursor exported an invalid endpoint"; exit 1; }
+          _fm_open_decisions_checkpoint_parse "$snapshot" || exit 1
+          [ "$_FM_ODC_OFFSET" = 0 ] && [ -z "$_FM_ODC_OPEN" ] || { echo "$1 exported the invalid open set"; exit 1; }
+          cp "$f" "$copy"; rm -f "$ccf"
+          status_open_decisions_checkpoint_carry "$f" "$copy" "$(_fm_open_decisions_file_ident "$f")"
+          [ ! -e "$ccf" ] || { echo "$1 carried an invalid checkpoint"; exit 1; }
+          [ "$(status_open_decisions "$copy" "$kind")" = "$expected" ] || { echo "$1 scratch copy did not fold from byte 0"; exit 1; }
+          [ "$(cat "$cf")" = "$before" ] || { echo "$1 reader or carry mutated the live checkpoint"; exit 1; }
+          mv "$cf.saved" "$cf"
+        }
+        printf "needs-deci" > "$f"
+        check_incremental split-open
+        check_incremental unchanged-partial-eof
+        printf "sion [key=split]: choose the option\n" >> "$f"
+        check_incremental completed-open
+        first_size=$(file_size)
+        printf "blocked [key=key-" >> "$f"
+        check_incremental split-key
+        printf "split]: waiting\n" >> "$f"
+        check_incremental completed-key
+        printf "needs-decision [key=note]: part" >> "$f"
+        check_incremental split-note
+        check_refusal partial-eof
+        printf "ial note\n" >> "$f"
+        check_refusal completed-file-with-partial-checkpoint
+        check_incremental completed-note
+        printf "%s" "${resolve:0:3}" >> "$f"
+        check_incremental split-resolution
+        printf "%s [key=split]: answered\n" "${resolve:3}" >> "$f"
+        check_incremental completed-resolution
+        printf "%s" "${held:0:3}" >> "$f"
+        check_incremental split-held-transfer
+        printf "%s [key=key-split]: tracked\n" "${held:3}" >> "$f"
+        check_incremental completed-held-transfer
+        printf "needs-decision [key=secret-vote]: ordinary question\ndo" >> "$f"
+        check_incremental split-terminal
+        printf "ne: report saved\n" >> "$f"
+        check_incremental completed-terminal
+
+        _fm_open_decisions_checkpoint_parse "$cf" || exit 1
+        printf "version=9:%s\noffset=%s\nident=%s\npoison\tneeds-decision\told polluted state" \
+          "${_FM_ODC_VERSION#*:}" "$_FM_ODC_OFFSET" "$_FM_ODC_IDENT" > "$cf"
+        check_refusal previous-version-at-valid-boundary
+        size=$(file_size)
+        ident=$(_fm_open_decisions_file_ident "$f")
+        printf "task\t%s\t%s\t%s\n" "$ident" "$size" "$size" > "$state/.status-presentation-cursor"
+        manifest=$(cat "$state/.status-presentation-cursor")
+        [ "$(status_presentation_cursor_offset "$f")" = "$size" ] || { echo "old fold version rewound the independent presentation manifest"; exit 1; }
+        [ -z "$(status_new_lines_since_cursor "$f")" ] || { echo "old fold version replayed already-presented status"; exit 1; }
+        : > "$probe"
+        check_incremental previous-version-rebuild
+        [ "$(tail -1 "$probe" | cut -f2)" = "$size" ] || { echo "old version was not rebuilt from byte 0"; exit 1; }
+        [ "$(cat "$state/.status-presentation-cursor")" = "$manifest" ] || { echo "fold repair changed the presentation manifest"; exit 1; }
+        _fm_open_decisions_checkpoint_parse "$cf" || exit 1
+        [ "$_FM_ODC_VERSION" = "$(_fm_open_decisions_fold_signature "$kind")" ] || { echo "fold repair retained the old signature"; exit 1; }
+        [ "$(status_open_decisions_cursor_offset "$f")" = "$size" ] || { echo "a valid rebuilt legacy endpoint was refused"; exit 1; }
+        [ "$(FM_STATUS_CURSOR_SNAPSHOT_FILE=$snapshot status_open_decisions_cursor_offset "$f")" = "$size" ] || exit 1
+        _fm_open_decisions_checkpoint_parse "$snapshot" || exit 1
+        [ "$_FM_ODC_OPEN" = "$(reference)" ] || { echo "a valid migration snapshot lost the open set"; exit 1; }
+        cp "$f" "$copy"; rm -f "$ccf"
+        status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+        [ -f "$ccf" ] || { echo "a valid current-signature checkpoint was not carried"; exit 1; }
+        _fm_open_decisions_checkpoint_parse "$ccf" || exit 1
+        [ "$_FM_ODC_IDENT" = "$(_fm_open_decisions_file_ident "$copy")" ] || { echo "valid carry did not rebind identity"; exit 1; }
+        [ "$(status_open_decisions "$copy" "$kind")" = "$(reference)" ] || { echo "valid carry changed the copied fold"; exit 1; }
+
+        printf "needs-decision [key=current]: a fresh append\n" >> "$f"
+        appended=$(($(file_size) - size))
+        : > "$probe"
+        check_incremental ordinary-append-after-rebuild
+        [ "$(tail -1 "$probe" | cut -f2)" = "$appended" ] || { echo "a valid new-byte fold reread history"; exit 1; }
+        _fm_status_read_span "$f" 0 "$first_size" > "$ref" || exit 1
+        expected=$(status_open_decisions "$ref" "$kind")
+        [ "$(status_open_decisions_incremental "$f" "$first_size")" = "$expected" ] \
+          || { echo "a later valid checkpoint leaked past an earlier captured endpoint"; exit 1; }
+        check_incremental restored-current-endpoint
+      ' _ "$ROOT/bin/fm-classify-lib.sh" "$state" "$reading" 2>&1) \
+        || fail "partial/checkpoint consumers for $kind/$reading: $out"
+    done
+  done
+  pass "partial appends and valid-boundary old versions are refused across folds, legacy/export, and carry for every kind and override signature"
+}
+
+test_boundary_read_failure_never_advances_or_exports_a_checkpoint() {
+  local dir state out
+  dir=$(make_case checkpoint-boundary-read-failure); state="$dir/state"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  printf 'needs-decision [key=kept]: already trusted\n' > "$state/task.status"
+  cat > "$dir/failing-reader" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+  chmod +x "$dir/failing-reader"
+  out=$(bash -c '
+    . "$1"
+    f=$2 reader=$3
+    cf=$(_fm_open_decisions_cursor_path "$f")
+    copy="${f%.status}-copy.status"; ccf=$(_fm_open_decisions_cursor_path "$copy")
+    snapshot="${f%.status}-export.cursor"
+    trusted=$(status_open_decisions_incremental "$f")
+    before=$(cat "$cf")
+    printf "needs-decision [key=new]: not yet folded\n" >> "$f"
+    printf "do not overwrite\n" > "$snapshot"
+    got=$(FM_STATUS_SPAN_READER=$reader status_open_decisions_incremental "$f")
+    [ "$got" = "$trusted" ] || { echo "boundary IO failure silently lost the retained open set"; exit 1; }
+    [ "$(cat "$cf")" = "$before" ] || { echo "boundary IO failure advanced or rewrote the cursor"; exit 1; }
+    if FM_STATUS_SPAN_READER=$reader FM_STATUS_CURSOR_SNAPSHOT_FILE=$snapshot status_open_decisions_cursor_offset "$f"; then
+      echo "boundary IO failure was exported as a successful legacy offset"; exit 1
+    fi
+    [ "$(cat "$snapshot")" = "do not overwrite" ] || { echo "boundary IO failure overwrote the migration snapshot"; exit 1; }
+    cp "$f" "$copy"
+    FM_STATUS_SPAN_READER=$reader status_open_decisions_checkpoint_carry "$f" "$copy" "$(_fm_open_decisions_file_ident "$f")"
+    [ ! -e "$ccf" ] || { echo "boundary IO failure carried uncertain state"; exit 1; }
+    expected=$(status_open_decisions "$copy" secondmate)
+    [ "$(FM_STATUS_SPAN_READER=$reader status_open_decisions "$f")" = "$expected" ] \
+      || { echo "pure whole-file fold did not rebuild after boundary IO failure"; exit 1; }
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "boundary IO recovery failed to consume the pending append"; exit 1; }
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$state/task.status" "$dir/failing-reader" 2>&1) \
+    || fail "checkpoint boundary read failure: $out"
+  pass "boundary IO failure preserves live fold state, fails legacy export, refuses carry, and recovers on the next read"
 }
 
 # A checkpoint is reused only under the exact reading that wrote it: another
@@ -625,6 +837,8 @@ test_golden_fold_equivalence_on_real_status_logs() {
 test_terminal_supersession_reaches_cached_drains
 test_kind_changes_invalidate_folded_decisions
 test_seeded_whole_file_fold_matches_a_fold_from_line_one
+test_partial_appends_and_previous_version_are_refused_by_every_consumer
+test_boundary_read_failure_never_advances_or_exports_a_checkpoint
 test_seeded_fold_refuses_checkpoints_from_another_reading
 test_checkpoint_carries_onto_a_snapshot_copy_only_when_it_describes_it
 test_golden_fold_equivalence_on_real_status_logs

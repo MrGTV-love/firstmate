@@ -15,9 +15,9 @@
 # either the prior complete document or the new complete document, never torn output.
 # A home-local refresh lock serializes concurrent triggers so an older in-flight
 # summary cannot overwrite one computed after a later status change. The shared
-# timeout owner bounds the complete refresh with FM_HOME_SUMMARY_TIMEOUT
-# (default 60 seconds). No reader can observe temporary output through the
-# ledger path.
+# timeout owner bounds state initialization, lock acquisition, and publication
+# with FM_HOME_SUMMARY_TIMEOUT (default 60 seconds). No reader can observe
+# temporary output through the ledger path.
 #
 # With --best-effort, a failure is appended to the bounded home-local
 # state/.home-summary-refresh.log when available, with stderr as the bounded
@@ -35,9 +35,9 @@
 # makes a burst of triggers converge on one follow-up refresh.
 #
 # A failure that repeats must not stay a logged line. state/.home-summary-refresh.streak
-# counts consecutive failures; the first success clears it. When the count
-# reaches FM_HOME_SUMMARY_ESCALATE_AFTER (default 3) the home appends one
-# `check: home-summary-refresh` wake naming the reason, the streak start, and how
+# counts consecutive failures of attempts that acquired the refresh lock; the
+# first success clears it. Three failures raise one `check: home-summary-refresh`
+# wake naming the reason, the streak start, and how
 # long the failed attempt ran. It is raised once per failure class: it is raised
 # again only when the reason changes or after a success ends the streak.
 set -u
@@ -57,8 +57,6 @@ STREAK_FILE="$STATE/.home-summary-refresh.streak"
 ERROR_LOG_MAX_BYTES=${FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES:-65536}
 HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-60}
 HOME_SUMMARY_IF_IDLE=${FM_HOME_SUMMARY_IF_IDLE:-0}
-HOME_SUMMARY_ESCALATE_AFTER=${FM_HOME_SUMMARY_ESCALATE_AFTER:-3}
-HOME_SUMMARY_RERUN_MAX=3
 BEST_EFFORT=0
 DETACH=0
 HOME_SUMMARY_MODE=parent
@@ -87,6 +85,7 @@ case "${1:-}" in
     ;;
   --_log-failure) HOME_SUMMARY_MODE=log-failure ;;
   --_note-failure) HOME_SUMMARY_MODE='note-failure' ;;
+  --_release-lock) HOME_SUMMARY_MODE=release-lock ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
@@ -99,9 +98,6 @@ esac
 case "$HOME_SUMMARY_IF_IDLE" in
   0|1) ;;
   *) HOME_SUMMARY_IF_IDLE=0 ;;
-esac
-case "$HOME_SUMMARY_ESCALATE_AFTER" in
-  ''|*[!0-9]*|0) HOME_SUMMARY_ESCALATE_AFTER=3 ;;
 esac
 
 if [ "$HOME_SUMMARY_MODE" != parent ]; then
@@ -140,10 +136,21 @@ home_summary_refresh_once() {
     # an in-flight run is seen by that run's parent when it finishes.
     : > "$PENDING_MARK" 2>/dev/null || true
     fm_lock_try_acquire "$REFRESH_LOCK" || return "$HOME_SUMMARY_SKIPPED_STATUS"
+    HOME_SUMMARY_LOCK_HELD=1
+    if ! printf '%s\n' "$FM_HOME_SUMMARY_PARENT_PID" > "$REFRESH_LOCK/pid" 2>/dev/null; then
+      home_summary_fail "could not hand the refresh lock to its timeout owner"
+      return 1
+    fi
+    HOME_SUMMARY_LOCK_HELD=0
   else
-    fm_lock_acquire_wait "$REFRESH_LOCK"
+    if ! _fm_lock_acquire_wait_handoff "$REFRESH_LOCK" "$FM_HOME_SUMMARY_PARENT_PID"; then
+      home_summary_fail "could not hand the refresh lock to its timeout owner"
+      return 1
+    fi
   fi
-  HOME_SUMMARY_LOCK_HELD=1
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   # Every trigger written before this point is covered by the snapshot taken now.
   rm -f -- "$PENDING_MARK" 2>/dev/null || true
   HOME_SUMMARY_TMP=$(umask 077; mktemp "$STATE/.home-summary.json.XXXXXX") || {
@@ -214,8 +221,6 @@ home_summary_refresh_once() {
   fi
   HOME_SUMMARY_TMP=
   rm -f -- "$STREAK_FILE" 2>/dev/null || true
-  fm_lock_release "$REFRESH_LOCK"
-  HOME_SUMMARY_LOCK_HELD=0
   trap - EXIT HUP INT TERM
   return 0
 }
@@ -252,7 +257,7 @@ home_summary_note_failure() {  # <reason> <stamp> <seconds-the-attempt-ran>
   [ -n "$first" ] || first=$stamp
   tmp="$STREAK_FILE.tmp.${BASHPID:-$$}"
   home_summary_write_streak "$tmp" "$count" "$first" "$class" "$escalated" || return 0
-  [ "$count" -ge "$HOME_SUMMARY_ESCALATE_AFTER" ] || return 0
+  [ "$count" -ge 3 ] || return 0
   [ "$escalated" != "$class" ] || return 0
   payload="check: home-summary-refresh: $count consecutive refresh failures since $first; last: $reason (the failed attempt ran ${seconds}s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log"
   fm_wake_append check home-summary-refresh "$payload" || return 0
@@ -280,6 +285,18 @@ home_summary_log_failure() {
   fi
 }
 
+home_summary_parent_owns_lock() {
+  local parent_pid=${FM_HOME_SUMMARY_PARENT_PID:-}
+  case "$parent_pid" in ''|*[!0-9]*|0) return 1 ;; esac
+  fm_pid_alive "$parent_pid" \
+    && [ "$(cat "$REFRESH_LOCK/pid" 2>/dev/null)" = "$parent_pid" ]
+}
+
+home_summary_release_parent_lock() {
+  fm_run_timed 4 env FM_HOME_SUMMARY_PARENT_PID="$$" \
+    "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_release-lock >/dev/null 2>&1
+}
+
 if [ "$HOME_SUMMARY_MODE" = log-failure ]; then
   HOME_SUMMARY_ERROR=${FM_HOME_SUMMARY_PARENT_ERROR:-"refresh worker failed"}
   HOME_SUMMARY_FAILURE_STAMP=${FM_HOME_SUMMARY_PARENT_STAMP:-}
@@ -288,10 +305,17 @@ if [ "$HOME_SUMMARY_MODE" = log-failure ]; then
 fi
 
 if [ "$HOME_SUMMARY_MODE" = note-failure ]; then
+  home_summary_parent_owns_lock || exit 0
   home_summary_note_failure "${FM_HOME_SUMMARY_PARENT_ERROR:-refresh worker failed}" \
     "${FM_HOME_SUMMARY_PARENT_STAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" \
     "${FM_HOME_SUMMARY_PARENT_SECONDS:-0}"
   exit 0
+fi
+
+if [ "$HOME_SUMMARY_MODE" = release-lock ]; then
+  home_summary_parent_owns_lock || exit 0
+  fm_lock_remove_path "$REFRESH_LOCK"
+  exit "$?"
 fi
 
 if [ "$HOME_SUMMARY_MODE" = parent ]; then
@@ -300,7 +324,6 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
     # stdio to /dev/null so no caller's pipe is held open, nohup so the refresh
     # outlives the shell that launched it, and its own process group so the
     # bounded child that runs session start cannot take it down with it.
-    mkdir -p "$STATE" 2>/dev/null || exit 0
     case $- in *m*) monitor_was_on=1 ;; *) monitor_was_on=0 ;; esac
     set -m 2>/dev/null || true
     FM_HOME_SUMMARY_IF_IDLE=1 nohup "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort \
@@ -308,18 +331,18 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
     [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
     exit 0
   fi
-  rerun=0
   while :; do
     attempt_stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || attempt_stamp=
     attempt_start=$SECONDS
-    if fm_run_timed "$HOME_SUMMARY_TIMEOUT" env \
+    if worker_error=$(fm_run_timed "$HOME_SUMMARY_TIMEOUT" env \
+      FM_HOME_SUMMARY_PARENT_PID="$$" \
       FM_HOME_SUMMARY_WORKER_BEST_EFFORT="$BEST_EFFORT" \
       FM_HOME_SUMMARY_IF_IDLE="$HOME_SUMMARY_IF_IDLE" \
-      "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_worker; then
+      "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_worker); then
+      home_summary_release_parent_lock || exit 0
       # A trigger that found this run in flight left its marker behind. Refresh
       # once more so the published summary is not older than that trigger.
-      if [ -e "$PENDING_MARK" ] && [ "$rerun" -lt "$HOME_SUMMARY_RERUN_MAX" ]; then
-        rerun=$((rerun + 1))
+      if [ -e "$PENDING_MARK" ]; then
         HOME_SUMMARY_IF_IDLE=1
         continue
       fi
@@ -333,12 +356,12 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   if [ "$BEST_EFFORT" -eq 1 ]; then
     if [ "$refresh_rc" -eq 124 ]; then
       parent_error="refresh exceeded its ${HOME_SUMMARY_TIMEOUT}-second deadline"
+    elif [ -n "$worker_error" ]; then
+      parent_error=$worker_error
     else
       parent_error="refresh worker failed with exit $refresh_rc"
     fi
-    # Logging is bounded tightly: if the state directory cannot be written there
-    # is nothing to log to and nothing to escalate through. Escalation then gets
-    # its own bound, because it waits on the wake queue lock.
+    attempt_seconds=$((SECONDS - attempt_start))
     if fm_run_timed 4 env \
       FM_HOME_SUMMARY_PARENT_ERROR="$parent_error" \
       FM_HOME_SUMMARY_PARENT_STAMP="$attempt_stamp" \
@@ -346,11 +369,14 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
       fm_run_timed 10 env \
         FM_HOME_SUMMARY_PARENT_ERROR="$parent_error" \
         FM_HOME_SUMMARY_PARENT_STAMP="$attempt_stamp" \
-        FM_HOME_SUMMARY_PARENT_SECONDS="$((SECONDS - attempt_start))" \
+        FM_HOME_SUMMARY_PARENT_SECONDS="$attempt_seconds" \
+        FM_HOME_SUMMARY_PARENT_PID="$$" \
         "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_note-failure >/dev/null || true
+      home_summary_release_parent_lock || true
     fi
     exit 0
   fi
+  home_summary_release_parent_lock || true
   if [ "$refresh_rc" -eq 124 ]; then
     printf 'fm-home-summary-refresh: refresh exceeded its %s-second deadline\n' \
       "$HOME_SUMMARY_TIMEOUT" >&2
@@ -366,9 +392,8 @@ fi
 # Another refresh holds the lock and will see this trigger's marker: not a failure.
 [ "$refresh_rc" -ne "$HOME_SUMMARY_SKIPPED_STATUS" ] || exit "$HOME_SUMMARY_SKIPPED_STATUS"
 if [ "$BEST_EFFORT" -eq 1 ]; then
-  home_summary_log_failure
-  home_summary_note_failure "$HOME_SUMMARY_ERROR" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SECONDS"
-  exit 0
+  printf '%s\n' "$HOME_SUMMARY_ERROR"
+  exit "$refresh_rc"
 fi
 printf 'fm-home-summary-refresh: %s\n' "$HOME_SUMMARY_ERROR" >&2
 exit "$refresh_rc"

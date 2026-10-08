@@ -21,6 +21,7 @@ LARGE_PARENT_HOME="$TMP_ROOT/large-parent-home"
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 WATCH_PID=
 SLOW_WRITER_PID=
+SUCCESS_WRITER_PID=
 SLOW_WORKER_PGID=
 SLOW_NM_PID=
 LOCK_HOLDER_PID=
@@ -31,7 +32,7 @@ cleanup() {
     ''|*[!0-9]*) ;;
     *) kill -KILL -- "-$SLOW_WORKER_PGID" >/dev/null 2>&1 || true ;;
   esac
-  for pid in "$WATCH_PID" "$SLOW_WRITER_PID" "$SLOW_NM_PID" "$LOCK_HOLDER_PID"; do
+  for pid in "$WATCH_PID" "$SLOW_WRITER_PID" "$SUCCESS_WRITER_PID" "$SLOW_NM_PID" "$LOCK_HOLDER_PID"; do
     [ -n "$pid" ] || continue
     kill -KILL "$pid" >/dev/null 2>&1 || true
   done
@@ -458,6 +459,8 @@ grep -F 'summary producer failed' "$HOME_DIR/state/.home-summary-refresh.log" >/
 pass "best-effort publication logs and continues"
 
 LOCK_MARKER="$TMP_ROOT/lock-held"
+cp "$HOME_DIR/state/.home-summary-refresh.streak" "$TMP_ROOT/before-lock-timeouts.streak" \
+  || fail "the acquired producer failure left no failure streak"
 rm -f "$HOME_DIR/state/.home-summary-refresh.log"
 FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" bash -c '
   . "$1/bin/fm-wake-lib.sh"
@@ -484,6 +487,8 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" \
   || fail "repeated lock timeout changed the best-effort caller result"
 [ "$(grep -c 'refresh exceeded its 1-second deadline' "$HOME_DIR/state/.home-summary-refresh.log" 2>/dev/null || true)" -ge 2 ] \
   || fail "repeated publication lock timeouts vanished from failure reporting"
+cmp -s "$TMP_ROOT/before-lock-timeouts.streak" "$HOME_DIR/state/.home-summary-refresh.streak" \
+  || fail "lock-contention failures changed the streak without refresh ownership"
 kill "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 wait "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 LOCK_HOLDER_PID=
@@ -521,6 +526,9 @@ cat > "$MKBIN/mkdir" <<'SH'
 #!/usr/bin/env bash
 for arg in "$@"; do
   if [ "$arg" = "$FM_TEST_STALLED_STATE" ]; then
+    if [ -n "${FM_TEST_MKDIR_MARKER:-}" ] && [ ! -e "$FM_TEST_MKDIR_MARKER" ]; then
+      printf '%s\n' "$$" > "$FM_TEST_MKDIR_MARKER"
+    fi
     sleep 30
   fi
 done
@@ -537,6 +545,43 @@ elapsed=$(( $(date +%s) - started ))
 [ "$elapsed" -lt 6 ] \
   || fail "best-effort refresh waited $elapsed seconds before bounded state initialization"
 pass "best-effort refresh bounds state initialization"
+
+DETACH_INIT_MARKER="$TMP_ROOT/detach-init-entered"
+PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
+  FM_TEST_STALLED_STATE="$HOME_DIR/state" FM_TEST_MKDIR_MARKER="$DETACH_INIT_MARKER" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
+  WRITER="$WRITER" python3 - <<'PY' \
+  || fail "detached state initialization blocked its foreground caller"
+import os
+import signal
+import subprocess
+import time
+
+started = time.monotonic()
+process = subprocess.Popen(
+    [os.environ["WRITER"], "--detach"],
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+    start_new_session=True,
+)
+try:
+    result = process.wait(timeout=3)
+except subprocess.TimeoutExpired:
+    os.killpg(process.pid, signal.SIGKILL)
+    process.wait()
+    raise SystemExit("the detached foreground caller stalled on state initialization")
+if result != 0:
+    raise SystemExit(f"detached initialization changed caller result: {result}")
+if time.monotonic() - started >= 2:
+    raise SystemExit("the detached foreground caller waited for state initialization")
+PY
+fm_test_wait_until 60 test -e "$DETACH_INIT_MARKER" \
+  || fail "the detached worker never attempted its bounded state initialization"
+detach_init_pid=$(cat "$DETACH_INIT_MARKER")
+fm_test_wait_until 80 bash -c '! kill -0 "$1" 2>/dev/null' _ "$detach_init_pid" \
+  || fail "the detached worker left its stalled initialization running past the bound"
+pass "detached foreground returns before stalled bounded state initialization"
 
 SIGNALBIN="$TMP_ROOT/signalbin"
 SIGNAL_MARKER="$TMP_ROOT/worker-signaled"
@@ -1203,21 +1248,133 @@ sleep 1
   || fail "the follow-up refresh left the trigger marker behind"
 pass "triggers during a refresh coalesce into exactly one follow-up refresh"
 
-# A failure that repeats must become a wake, not a logged line. Recorded case:
-# the refresh could not finish inside its deadline, so every attempt logged
-# "refresh exceeded its 60-second deadline"; 425 identical lines and not one
-# notice reached firstmate. Hold the lock so each attempt really hits its deadline.
-ESC_HOME=$(new_bare_home escalate-home)
-hold_refresh_lock "$ESC_HOME" 300
+SERIALBIN="$TMP_ROOT/serialbin"
+mkdir -p "$SERIALBIN"
+cat > "$SERIALBIN/jq" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${FM_TEST_VALIDATE_DIR:-}" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      */.home-summary.json.*)
+        run=$(cat "$FM_TEST_VALIDATE_DIR/count" 2>/dev/null || printf 0)
+        run=$((run + 1))
+        printf '%s\n' "$run" > "$FM_TEST_VALIDATE_DIR/count"
+        : > "$FM_TEST_VALIDATE_DIR/entered.$run"
+        while [ ! -e "$FM_TEST_VALIDATE_DIR/release.$run" ]; do sleep 0.05; done
+        break
+        ;;
+    esac
+  done
+fi
+exec "$FM_TEST_REAL_JQ" "$@"
+SH
+cat > "$SERIALBIN/env" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${FM_TEST_WORKER_ENTERED:-}" ]; then
+  for arg in "$@"; do
+    [ "$arg" != --_worker ] || : > "$FM_TEST_WORKER_ENTERED"
+  done
+fi
+exec "$FM_TEST_REAL_ENV" "$@"
+SH
+chmod +x "$SERIALBIN/jq" "$SERIALBIN/env"
+
+DRAIN_HOME=$(new_bare_home drain-home)
+VALIDATE_DIR="$TMP_ROOT/drain-validation"
+mkdir -p "$VALIDATE_DIR"
+PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+  FM_TEST_REAL_ENV="$REAL_ENV" FM_TEST_VALIDATE_DIR="$VALIDATE_DIR" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" "$WRITER" --best-effort &
+SLOW_WRITER_PID=$!
+for run in 1 2 3 4 5 6; do
+  fm_test_wait_until 120 test -e "$VALIDATE_DIR/entered.$run" \
+    || fail "pending triggers stopped draining before successful refresh $run"
+  if [ "$run" -lt 6 ]; then
+    printf '## In flight\n\n## Queued\n- [ ] pending-%s - Latest pending trigger (repo: firstmate) (kind: ship)\n\n## Done\n' "$run" \
+      > "$DRAIN_HOME/data/backlog.md"
+    PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" \
+      "$WRITER" --detach || fail "pending trigger $run changed its caller result"
+    fm_test_wait_until 60 test -e "$DRAIN_HOME/state/.home-summary-refresh.pending" \
+      || fail "pending trigger $run left no marker"
+  fi
+  : > "$VALIDATE_DIR/release.$run"
+done
+wait "$SLOW_WRITER_PID" || fail "draining successful pending refreshes failed"
+SLOW_WRITER_PID=
+[ "$(cat "$VALIDATE_DIR/count")" -eq 6 ] \
+  || fail "successful pending refreshes did not drain through six attempts"
+[ ! -e "$DRAIN_HOME/state/.home-summary-refresh.pending" ] \
+  || fail "successful pending refreshes left an unconsumed trigger"
+jq -e 'any(.queued[]; .id == "pending-5")' "$DRAIN_HOME/state/home-summary.json" >/dev/null \
+  || fail "the final successful refresh did not cover the last pending trigger"
+pass "successful pending refreshes drain beyond four attempts"
+
+SERIAL_HOME=$(new_bare_home serial-home)
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
+  FM_SNAPSHOT_NOW="$NOW_ONE" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
+  "$WRITER" || fail "could not seed the serialized outcome ledger"
 for attempt in 1 2; do
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
+  PATH="$FAILBIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
+    "$WRITER" --best-effort || fail "serialization seed failure $attempt changed its caller result"
+done
+SERIAL_WAKE_MARKER="$TMP_ROOT/serial-wake-lock-held"
+FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" bash -c '
+  . "$1/bin/fm-wake-lib.sh"
+  fm_lock_acquire_wait "$2/state/.wake-queue.lock"
+  : > "$3"
+  sleep 120
+' _ "$ROOT" "$SERIAL_HOME" "$SERIAL_WAKE_MARKER" &
+LOCK_HOLDER_PID=$!
+fm_test_wait_until 60 test -e "$SERIAL_WAKE_MARKER" \
+  || fail "could not hold the wake lock for serialized timeout accounting"
+PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" FM_HOME_SUMMARY_TIMEOUT=1 \
+  "$WRITER" --best-effort &
+SLOW_WRITER_PID=$!
+fm_test_wait_until 100 grep -Fx count=3 "$SERIAL_HOME/state/.home-summary-refresh.streak" \
+  || fail "the timed-out attempt did not reach serialized wake accounting"
+SUCCESS_ENTERED="$TMP_ROOT/serial-success-entered"
+PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+  FM_TEST_REAL_ENV="$REAL_ENV" FM_TEST_WORKER_ENTERED="$SUCCESS_ENTERED" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
+  FM_SNAPSHOT_NOW="$NOW_TWO" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_TWO" "$WRITER" &
+SUCCESS_WRITER_PID=$!
+fm_test_wait_until 60 test -e "$SUCCESS_ENTERED" \
+  || fail "the succeeding refresh never started during timeout accounting"
+sleep 1
+jq -e --arg now "$NOW_ONE" '.generated == $now' "$SERIAL_HOME/state/home-summary.json" >/dev/null \
+  || fail "a newer success published before the prior timeout finished wake accounting"
+[ "$(cat "$SERIAL_HOME/state/.home-summary-refresh.lock/pid")" = "$SLOW_WRITER_PID" ] \
+  || fail "the timeout owner released refresh ownership before its wake accounting"
+[ "$(wake_row_count "$SERIAL_HOME")" = 0 ] \
+  || fail "the blocked timeout wake bypassed the wake queue lock"
+release_refresh_lock
+wait "$SLOW_WRITER_PID" || fail "serialized timeout changed its best-effort result"
+SLOW_WRITER_PID=
+wait "$SUCCESS_WRITER_PID" || fail "the succeeding serialized refresh failed"
+SUCCESS_WRITER_PID=
+jq -e --arg now "$NOW_TWO" '.generated == $now' "$SERIAL_HOME/state/home-summary.json" >/dev/null \
+  || fail "the succeeding refresh did not publish after timeout accounting"
+[ ! -e "$SERIAL_HOME/state/.home-summary-refresh.streak" ] \
+  || fail "older timeout accounting restored a failure streak after the newer success"
+[ "$(wake_row_count "$SERIAL_HOME")" = 1 ] \
+  || fail "the serialized third failure did not publish exactly one wake"
+pass "timeout wake accounting finishes before a newer success publishes and resets the streak"
+
+# A failure that repeats must become a wake, not a logged line. Each attempt
+# acquires refresh ownership before validation hits its deadline.
+ESC_HOME=$(new_bare_home escalate-home)
+for attempt in 1 2; do
+  PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
     FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort \
     || fail "failed attempt $attempt changed the best-effort caller result"
 done
 [ -z "$(wake_rows "$ESC_HOME")" ] \
   || fail "two failures woke firstmate before the threshold: $(wake_rows "$ESC_HOME")"
-PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
-  FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort || fail "the third failed attempt changed the caller result"
+PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" FM_HOME_SUMMARY_TIMEOUT=1 \
+  "$WRITER" --best-effort || fail "the third failed attempt changed the caller result"
 [ "$(wake_row_count "$ESC_HOME")" = 1 ] \
   || fail "three consecutive deadline failures did not raise exactly one wake: $(wake_rows "$ESC_HOME")"
 wake_row=$(wake_rows "$ESC_HOME")
@@ -1226,7 +1383,8 @@ case "$wake_row" in
   *) fail "the wake omitted the count, the reason, or the measured duration: $wake_row" ;;
 esac
 for attempt in 4 5 6; do
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
+  PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
     FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort || fail "failed attempt $attempt changed the caller result"
 done
 [ "$(wake_row_count "$ESC_HOME")" = 1 ] \
@@ -1235,7 +1393,6 @@ pass "three consecutive deadline failures raise one wake that names the reason a
 
 # A real change of reason is new information and wakes again; the same reason
 # does not. Replace the deadline with a producer that fails outright.
-release_refresh_lock
 PATH="$FAILBIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
   "$WRITER" --best-effort || fail "a producer failure changed the caller result"
 [ "$(wake_row_count "$ESC_HOME")" = 2 ] \
@@ -1253,14 +1410,13 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
   "$WRITER" || fail "the recovering refresh failed"
 [ ! -e "$ESC_HOME/state/.home-summary-refresh.streak" ] \
   || fail "a successful publication left its failure streak behind"
-hold_refresh_lock "$ESC_HOME" 300
 for attempt in 1 2 3; do
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
+  PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
     FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort || fail "post-recovery attempt $attempt changed the caller result"
 done
 [ "$(wake_row_count "$ESC_HOME")" = 3 ] \
   || fail "failures after a recovery were not reported as a new streak: $(wake_rows "$ESC_HOME")"
-release_refresh_lock
 pass "a successful publication ends the streak so a later streak wakes again"
 
 # --- publication cost on a home whose status history is large ------------------

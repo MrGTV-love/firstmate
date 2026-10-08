@@ -285,7 +285,7 @@ EOF
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
   local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
-  local target_cursor kind fold_version
+  local target_cursor kind fold_version boundary_rc
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_fm_status_kind "$f")
   fold_version=$(_fm_open_decisions_fold_signature "$kind")
@@ -320,7 +320,16 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     size=$actual_size
   fi
 
-  if [ -z "$version" ] || [ -z "$ident" ] || [ "$ident" != "$cur_ident" ] || [ "$offset" -gt "$actual_size" ]; then
+  if [ -n "$version" ] && [ -n "$ident" ] && [ "$ident" = "$cur_ident" ] && [ "$offset" -le "$size" ]; then
+    if _fm_open_decisions_checkpoint_boundary "$f" "$offset"; then
+      :
+    else
+      boundary_rc=$?
+      [ "$boundary_rc" -ne 2 ] || { printf '%s' "$trusted_open"; return 0; }
+      version=''
+    fi
+  fi
+  if [ -z "$version" ] || [ -z "$ident" ] || [ "$ident" != "$cur_ident" ] || [ "$offset" -gt "$size" ]; then
     offset=0
     open=''
     trusted_open=''
@@ -379,6 +388,7 @@ status_open_decisions_checkpoint_carry() {  # <live-status> <captured-status> <l
   [ -n "$live_ident" ] || return 0
   [ -f "$copy" ] && [ ! -L "$copy" ] || return 0
   _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$live")" || return 0
+  [ "$_FM_ODC_VERSION" = "$(_fm_open_decisions_fold_signature "$(_fm_status_kind "$live")")" ] || return 0
   [ "$_FM_ODC_IDENT" = "$live_ident" ] || return 0
   now_ident=$(_fm_open_decisions_file_ident "$live" 2>/dev/null) || return 0
   [ "$now_ident" = "$live_ident" ] || return 0
@@ -388,6 +398,7 @@ status_open_decisions_checkpoint_carry() {  # <live-status> <captured-status> <l
   copy_size=${copy_size//[[:space:]]/}
   case "$copy_size" in ''|*[!0-9]*) return 0 ;; esac
   [ "$_FM_ODC_OFFSET" -le "$copy_size" ] || return 0
+  _fm_open_decisions_checkpoint_boundary "$copy" "$_FM_ODC_OFFSET" || return 0
   target=$(_fm_open_decisions_cursor_path "$copy")
   {
     printf 'version=%s\n' "$_FM_ODC_VERSION"

@@ -30,7 +30,7 @@ fi
 # Version 4 was already spent on the bracketed-tag parser change above, and a
 # cursor persisted under that reading predates this one, so it must still be
 # discarded and rebuilt from byte 0 under the new reading.
-FM_OPEN_DECISIONS_FOLD_VERSION=9
+FM_OPEN_DECISIONS_FOLD_VERSION=10
 
 # The resolution verb and durable-backlog-transfer verb that CLOSE a keyed
 # status decision opened by needs-decision or blocked. See status_open_decisions
@@ -488,11 +488,22 @@ _fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
   return 0
 }
 
+_fm_open_decisions_checkpoint_boundary() {  # <status-file> <offset>
+  local last
+  [ "$2" -gt 0 ] || return 0
+  last=$(_fm_status_read_span "$1" "$(($2 - 1))" 1 2>/dev/null && printf '.') || return 2
+  case "$last" in
+    $'\n.') return 0 ;;
+    .) return 2 ;;
+    *) return 1 ;;
+  esac
+}
+
 # 0 when <status-file>'s checkpoint can seed a fold for <kind>, with the seed in
 # _FM_ODC_OPEN / _FM_ODC_OFFSET and the current file size in _FM_ODC_SIZE.
 # Read-only; status_open_decisions above owns every rejection reason.
 _fm_open_decisions_checkpoint_seed() {  # <status-file> <kind>
-  local f=$1 kind=$2 cur_ident last
+  local f=$1 kind=$2 cur_ident
   _FM_ODC_SIZE=0
   _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$f")" || return 1
   [ "$_FM_ODC_VERSION" = "$(_fm_open_decisions_fold_signature "$kind")" ] || return 1
@@ -502,9 +513,7 @@ _fm_open_decisions_checkpoint_seed() {  # <status-file> <kind>
   _FM_ODC_SIZE=${_FM_ODC_SIZE//[[:space:]]/}
   case "$_FM_ODC_SIZE" in ''|*[!0-9]*) return 1 ;; esac
   [ "$_FM_ODC_OFFSET" -le "$_FM_ODC_SIZE" ] || return 1
-  [ "$_FM_ODC_OFFSET" -gt 0 ] || return 0
-  last=$(_fm_status_read_span "$f" "$((_FM_ODC_OFFSET - 1))" 1 2>/dev/null | od -An -c 2>/dev/null) || return 1
-  case "$last" in *'\n'*) return 0 ;; *) return 1 ;; esac
+  _fm_open_decisions_checkpoint_boundary "$f" "$_FM_ODC_OFFSET"
 }
 
 # 0 when <key> has a record in a folded "<key>\t<verb>\t<note>" open set.

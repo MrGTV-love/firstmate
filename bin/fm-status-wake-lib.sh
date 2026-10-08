@@ -124,7 +124,7 @@ status_presentation_marker_commit() {
 # a caller explicitly requests a migration snapshot.
 status_open_decisions_cursor_offset() {  # <status-file>
   local f=$1 cf offset=0 ident='' version='' cursor_data first rest open=''
-  local offset_line ident_line cur_ident size fold_version
+  local offset_line ident_line cur_ident size fold_version boundary_rc
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 1
   fold_version=$(_fm_open_decisions_fold_signature "$(_fm_status_kind "$f")")
   cf=$(_fm_open_decisions_cursor_path "$f")
@@ -173,6 +173,13 @@ status_open_decisions_cursor_offset() {  # <status-file>
   size=${size//[[:space:]]/}
   case "$size" in ''|*[!0-9]*) return 1 ;; esac
   if [ -z "$version" ] || [ -z "$ident" ] || [ "$ident" != "$cur_ident" ] || [ "$offset" -gt "$size" ]; then
+    offset=0
+    open=''
+  elif _fm_open_decisions_checkpoint_boundary "$f" "$offset"; then
+    :
+  else
+    boundary_rc=$?
+    [ "$boundary_rc" -ne 2 ] || return 1
     offset=0
     open=''
   fi
