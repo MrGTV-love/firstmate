@@ -1003,7 +1003,8 @@ test_forced_dirty_landed_deliverables_retain_captain_words() {
     [ "$(backlog_row_state "$case_dir")" = done ] || fail "forced-dirty-$kind: backlog was not closed"
     if [ "$kind" = ship ]; then
       grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" || fail "forced-dirty-$delivery: ship did not record the fixed drop note"
-      assert_no_grep 'local main|https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" "forced-dirty-$delivery: ship retained a landing label instead of dropped"
+      assert_no_grep 'local main' "$case_dir/data/backlog.md" "forced-dirty-$delivery: ship retained a landing label instead of dropped"
+      assert_no_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" "forced-dirty-$delivery: ship retained a landing label instead of dropped"
     else
       ! grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" || fail "forced-dirty-scout: delivered report was mislabeled dropped"
       assert_grep 'task-x1/report.md' "$case_dir/data/backlog.md" "forced-dirty-scout: report completion was lost"

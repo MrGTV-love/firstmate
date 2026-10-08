@@ -391,32 +391,58 @@ SH
   pass "all completion spellings preserve retained captain calls before accepting drop, report, or merged PR evidence"
 }
 
-test_public_restart_retires_drop_provenance() {
-  local dir verb body stored out
+test_public_restart_retires_drop_provenance() (
+  local dir verb noun layout id stored out data
+  local prefix=()
   dir=$(make_split public-restart-drop)
   printf 'Keep these exact captain words: café 航海.\n' > "$dir/words.txt"
   printf '%s\n' 'Body café 航海' '  dropped  ' ' Deliverable of the finished work: dropped ' \
     'Question: keep dropped as a word?' 'dropped later' > "$dir/body.txt"
-  for verb in reopen start; do
-    wrapper_from_code "$dir" add "restart-$verb" "restart $verb" --kind scout >/dev/null \
-      || fail "could not add restart fixture"
-    wrapper_from_code "$dir" done "restart-$verb" --drop-file "$dir/words.txt" >/dev/null \
-      || fail "could not drop restart fixture"
-    wrapper_from_code "$dir" update "restart-$verb" --body-file "$dir/body.txt" >/dev/null \
-      || fail "could not attach restart body"
-    out=$(wrapper_from_code "$dir" task "$verb" "restart-$verb" 2>&1) \
-      || fail "public $verb failed: $out"
-    stored=$(wrapper_from_code "$dir" show "restart-$verb" --full) || fail "could not read restarted row"
-    assert_contains "$stored" "Historical captain disposition: dropped" "$verb left drop disposition active"
-    assert_contains "$stored" "Historical deliverable of the finished work: dropped" "$verb left dropped deliverable active"
-    assert_contains "$stored" "Body café 航海" "$verb changed Unicode body bytes"
-    assert_contains "$stored" "Question: keep dropped as a word?" "$verb changed the captain question"
-    assert_contains "$stored" "dropped later" "$verb rewrote a non-exact dropped line"
-    cmp -s "$dir/words.txt" "$dir/home/data/restart-$verb/captain-drop.md" \
-      || fail "$verb changed retained captain words"
+  for layout in home relative; do
+    if [ "$layout" = relative ]; then
+      export FM_DATA_OVERRIDE=relocated/data
+      data="$dir/code/relocated/data"
+      mkdir -p "$data"
+      empty_backlog "$data/backlog.md"
+    else
+      unset FM_DATA_OVERRIDE
+      data="$dir/home/data"
+    fi
+    for verb in reopen start; do
+      for noun in bare task; do
+        id="$layout-$verb-$noun"
+        if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
+        wrapper_from_code "$dir" add "$id" "$id" --kind scout >/dev/null \
+          || fail "could not add restart fixture"
+        wrapper_from_code "$dir" done "$id" --drop-file "$dir/words.txt" >/dev/null \
+          || fail "could not drop restart fixture"
+        wrapper_from_code "$dir" update "$id" --body-file "$dir/body.txt" >/dev/null \
+          || fail "could not attach restart body"
+        out=$(wrapper_from_code "$dir" "${prefix[@]}" "$id" 2>&1) \
+          || fail "public $layout $noun $verb failed: $out"
+        stored=$(wrapper_from_code "$dir" show "$id" --full) || fail "could not read restarted row"
+        if [ "$verb" = start ]; then
+          assert_contains "$stored" "state: in_flight" "$layout $noun start did not change state"
+        else
+          assert_contains "$stored" "state: queued" "$layout $noun reopen did not change state"
+        fi
+        assert_contains "$stored" "Historical captain disposition: dropped" "$layout $noun $verb left drop disposition active"
+        assert_contains "$stored" "Historical deliverable of the finished work: dropped" "$verb left dropped deliverable active"
+        assert_contains "$stored" "Body café 航海" "$verb changed Unicode body bytes"
+        assert_contains "$stored" "Question: keep dropped as a word?" "$verb changed the captain question"
+        assert_contains "$stored" "dropped later" "$verb rewrote a non-exact dropped line"
+        cmp -s "$dir/words.txt" "$data/$id/captain-drop.md" \
+          || fail "$layout $noun $verb changed retained captain words"
+        assert_grep "$id" "$data/backlog.md" "$layout $noun $verb missed the addressed backlog"
+        if [ "$layout" = relative ]; then
+          assert_no_grep "$id" "$dir/home/data/backlog.md" "relative restart wrote the home backlog"
+          assert_absent "$dir/home/relocated/data" "relative restart resolved data from home"
+        fi
+      done
+    done
   done
-  pass "public reopen and start retire exact drop provenance without changing body text or retained words"
-}
+  pass "public reopen and start with either noun retire drop provenance in home and caller-relative data, preserving body and words"
+)
 
 test_restart_handles_sole_drop_and_failed_body_update() {
   local dir fakebin real before rc
@@ -698,19 +724,22 @@ SH
   pass "start and reopen keep body updates outside retirement, failed-command readback, and rollback custody"
 )
 
-test_failed_restart_reads_back_before_restoring_drop() {
-  local dir fakebin real verb outcome id out rc stored
+test_failed_restart_reads_back_before_restoring_drop() (
+  local dir fakebin real verb noun layout outcome id out rc stored data
+  local prefix=()
   dir=$(make_split failed-restart-readback)
   fakebin=$(fm_fakebin "$dir")
   real=$(command -v tasks-axi)
   printf 'Exact drop words café 航海.\n' > "$dir/words"
   cat > "$fakebin/tasks-axi" <<SH
 #!/usr/bin/env bash
+command=\${1:-}
+[ "\$command" != task ] || command=\${2:-}
 if [ "\${1:-}" = show ] && [ "\$FAKE_RESTART_OUTCOME" = unreadable ] && [ -e "$dir/restart-failed" ]; then
   printf 'readback unavailable\n' >&2
   exit 46
 fi
-if [ "\${1:-}" = "\$FAKE_RESTART_VERB" ]; then
+if [ "\$command" = "\$FAKE_RESTART_VERB" ]; then
   if [ "\$FAKE_RESTART_OUTCOME" = committed ]; then
     "$real" "\$@" || exit \$?
   fi
@@ -721,42 +750,62 @@ fi
 exec "$real" "\$@"
 SH
   chmod +x "$fakebin/tasks-axi"
-  for verb in start reopen; do
-    for outcome in before committed unreadable; do
-      id="$verb-$outcome"
-      wrapper_from_code "$dir" add "$id" "$id" --kind scout >/dev/null || fail "could not add restart failure fixture"
-      wrapper_from_code "$dir" done "$id" --drop-file "$dir/words" >/dev/null || fail "could not drop restart failure fixture"
-      rm -f "$dir/restart-failed"
-      rc=0
-      out=$(PATH="$fakebin:$PATH" FAKE_RESTART_VERB="$verb" FAKE_RESTART_OUTCOME="$outcome" \
-        wrapper_from_code "$dir" "$verb" "$id" 2>&1) || rc=$?
-      expect_code 47 "$rc" "$verb $outcome failure"
-      assert_contains "$out" "restart command failed" "$verb $outcome lost the original command error"
-      stored=$(wrapper_from_code "$dir" show "$id" --full) || fail "could not read failed restart row"
-      if [ "$outcome" = before ]; then
-        assert_contains "$stored" "state: done" "$verb failed-before-mutation changed state"
-        assert_not_contains "$stored" "Historical captain disposition:" "$verb did not roll back proved unchanged disposition"
-      else
-        assert_contains "$stored" "Historical captain disposition: dropped" "$verb $outcome restored active drop provenance"
-        assert_contains "$out" "prior drop provenance was not restored" "$verb $outcome did not describe withheld rollback"
-        if [ "$outcome" = committed ]; then
-          if [ "$verb" = start ]; then
-            assert_contains "$stored" "state: in_flight" "failed committed start was not applied"
+  for layout in home relative; do
+    if [ "$layout" = relative ]; then
+      export FM_DATA_OVERRIDE=relocated/data
+      data="$dir/code/relocated/data"
+      mkdir -p "$data"
+      empty_backlog "$data/backlog.md"
+    else
+      unset FM_DATA_OVERRIDE
+      data="$dir/home/data"
+    fi
+    for verb in start reopen; do
+      for noun in bare task; do
+        if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
+        for outcome in before committed unreadable; do
+          id="$layout-$verb-$noun-$outcome"
+          wrapper_from_code "$dir" add "$id" "$id" --kind scout >/dev/null || fail "could not add restart failure fixture"
+          wrapper_from_code "$dir" done "$id" --drop-file "$dir/words" >/dev/null || fail "could not drop restart failure fixture"
+          rm -f "$dir/restart-failed"
+          rc=0
+          out=$(PATH="$fakebin:$PATH" FAKE_RESTART_VERB="$verb" FAKE_RESTART_OUTCOME="$outcome" \
+            wrapper_from_code "$dir" "${prefix[@]}" "$id" 2>&1) || rc=$?
+          expect_code 47 "$rc" "$layout $noun $verb $outcome failure"
+          assert_contains "$out" "restart command failed" "$verb $outcome lost the original command error"
+          stored=$(wrapper_from_code "$dir" show "$id" --full) || fail "could not read failed restart row"
+          if [ "$outcome" = before ]; then
+            assert_contains "$stored" "state: done" "$verb failed-before-mutation changed state"
+            assert_not_contains "$stored" "Historical captain disposition:" "$verb did not roll back proved unchanged disposition"
+            assert_contains "$stored" "dropped" "$layout $noun $verb lost the original active drop body"
           else
-            assert_contains "$stored" "state: queued" "failed committed reopen was not applied"
+            assert_contains "$stored" "Historical captain disposition: dropped" "$verb $outcome restored active drop provenance"
+            assert_contains "$out" "prior drop provenance was not restored" "$verb $outcome did not describe withheld rollback"
+            if [ "$outcome" = committed ]; then
+              if [ "$verb" = start ]; then
+                assert_contains "$stored" "state: in_flight" "failed committed start was not applied"
+              else
+                assert_contains "$stored" "state: queued" "failed committed reopen was not applied"
+              fi
+            else
+              assert_contains "$stored" "state: done" "$verb unreadable fixture unexpectedly mutated state"
+              assert_contains "$out" "restart outcome could not be verified" "$verb unreadable failure was not reported"
+            fi
           fi
-        else
-          assert_contains "$stored" "state: done" "$verb unreadable fixture unexpectedly mutated state"
-          assert_contains "$out" "restart outcome could not be verified" "$verb unreadable failure was not reported"
-        fi
-      fi
-      cmp -s "$dir/words" "$dir/home/data/$id/captain-drop.md" || fail "$verb $outcome changed retained captain words"
-      assert_absent "$dir/home/state/.control-$id.lock" "$verb $outcome leaked control custody"
-      assert_absent "$dir/home/state/.meta-$id.lock" "$verb $outcome leaked metadata custody"
+          cmp -s "$dir/words" "$data/$id/captain-drop.md" || fail "$verb $outcome changed retained captain words"
+          assert_grep "$id" "$data/backlog.md" "$layout $noun $verb missed the addressed backlog"
+          if [ "$layout" = relative ]; then
+            assert_no_grep "$id" "$dir/home/data/backlog.md" "failed relative restart wrote the home backlog"
+            assert_absent "$dir/home/relocated/data" "failed relative restart resolved data from home"
+          fi
+          assert_absent "$dir/home/state/.control-$id.lock" "$verb $outcome leaked control custody"
+          assert_absent "$dir/home/state/.meta-$id.lock" "$verb $outcome leaked metadata custody"
+        done
+      done
     done
   done
-  pass "failed start and reopen restore active drop only after readback proves no restart was applied"
-}
+  pass "failed start and reopen with either noun read back home and caller-relative data before restoring only proved unchanged drops"
+)
 
 test_resumed_deliveries_reach_landed_output() {
   local dir fakebin id kind json out
@@ -810,9 +859,14 @@ test_bounded_mutation_grammar_refuses_before_side_effects() {
   real=$(command -v tasks-axi)
   wrapper_from_code "$dir" add bounded "bounded scout" --kind scout >/dev/null || fail "could not add bounded row"
   wrapper_from_code "$dir" add decoy "decoy docs" --kind docs >/dev/null || fail "could not add decoy row"
+  wrapper_from_code "$dir" add ship-row "ship row" --kind ship >/dev/null || fail "could not add ship fixture"
+  wrapper_from_code "$dir" add docs-row "docs row" --kind docs >/dev/null || fail "could not add docs fixture"
+  wrapper_from_code "$dir" add retained-row "retained drop" --kind scout >/dev/null || fail "could not add retained fixture"
   printf 'dropped\n' > "$dir/body"
   wrapper_from_code "$dir" update bounded --body-file "$dir/body" >/dev/null || fail "could not set dropped provenance"
   printf 'Captain words stay private.\n' > "$dir/words"
+  printf 'Replacement must never be retained.\n' > "$dir/replacement"
+  wrapper_from_code "$dir" done retained-row --drop-file "$dir/words" >/dev/null || fail "could not retain original words"
   before=$(cat "$dir/home/data/backlog.md")
   cat > "$fakebin/tasks-axi" <<SH
 #!/usr/bin/env bash
@@ -823,7 +877,7 @@ SH
   for verb in done close start reopen; do
     for noun in bare task; do
       if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
-      for form in global-split global-equals unknown extra separator short-help help-equals missing-id; do
+      for form in global-split global-equals unknown extra separator short-help help-equals missing-id consumed-pr consumed-note consumed-keep; do
         case "$form" in
           global-split) args=(--backend markdown bounded) ;;
           global-equals) args=(bounded --backend=markdown) ;;
@@ -833,6 +887,18 @@ SH
           short-help) args=(bounded -h) ;;
           help-equals) args=(bounded --help=true) ;;
           missing-id) args=() ;;
+          consumed-pr)
+            [ "$verb" = done ] || continue
+            args=(--pr --backend=markdown https://github.com/o/r/pull/9 ship-row)
+            ;;
+          consumed-note)
+            [ "$verb" = done ] || continue
+            args=(--note --backend=markdown docs-row ship-row)
+            ;;
+          consumed-keep)
+            [ "$verb" = done ] || continue
+            args=(retained-row --drop-file "$dir/replacement" --keep --help)
+            ;;
         esac
         rm -f "$dir/sdk-called"
         rc=0
@@ -842,6 +908,8 @@ SH
         assert_absent "$dir/sdk-called" "$noun $verb $form reached the SDK"
         assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "$noun $verb $form changed row or provenance"
         assert_absent "$dir/home/data/bounded/captain-drop.md" "$noun $verb $form retained drop words"
+        cmp -s "$dir/words" "$dir/home/data/retained-row/captain-drop.md" \
+          || fail "$noun $verb $form replaced retained captain words"
         assert_absent "$dir/home/data/done-archive.md" "$noun $verb $form archived a row"
         assert_absent "$dir/home/state/.control-bounded.lock" "$noun $verb $form left control custody"
         assert_absent "$dir/home/state/.meta-bounded.lock" "$noun $verb $form left metadata custody"
@@ -874,6 +942,57 @@ SH
   done
   pass "bounded completion and restart grammar refuses before SDK calls, drop retention, retirement, or archiving"
 }
+
+test_bounded_refusals_preserve_retained_words_with_ambient_backends() (
+  local dir fakebin source verb noun form out rc before
+  local prefix=() args=()
+  dir=$(make_split bounded-retained-backends)
+  fakebin=$(fm_fakebin "$dir")
+  wrapper_from_code "$dir" add retained-row "retained drop" --kind scout >/dev/null || fail "could not add retained fixture"
+  printf 'Original captain words café 航海.\n' > "$dir/words"
+  wrapper_from_code "$dir" done retained-row --drop-file "$dir/words" >/dev/null || fail "could not retain original words"
+  before=$(cat "$dir/home/data/backlog.md")
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+: > "$dir/sdk-called"
+exit 99
+SH
+  chmod +x "$fakebin/tasks-axi"
+  for source in default environment home-config; do
+    unset TASKS_AXI_BACKEND
+    case "$source" in
+      environment) export TASKS_AXI_BACKEND=beads ;;
+      home-config)
+        printf 'backend = "beads"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\n' \
+          > "$dir/home/.tasks.toml"
+        ;;
+    esac
+    for verb in done close start reopen; do
+      for noun in bare task; do
+        if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
+        for form in backend-split backend-equals; do
+          case "$form" in
+            backend-split) args=(retained-row --backend markdown) ;;
+            backend-equals) args=(retained-row --backend=markdown) ;;
+          esac
+          rm -f "$dir/sdk-called"
+          rc=0
+          out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" "${prefix[@]}" "${args[@]}" 2>&1) || rc=$?
+          expect_code 2 "$rc" "$source $noun $verb $form"
+          assert_contains "$out" "tasks-axi directly" "$source $noun $verb $form did not name the direct SDK escape"
+          assert_absent "$dir/sdk-called" "$source $noun $verb $form invoked the SDK"
+          assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "$source $noun $verb $form changed rows or provenance"
+          cmp -s "$dir/words" "$dir/home/data/retained-row/captain-drop.md" \
+            || fail "$source $noun $verb $form replaced retained captain words"
+          assert_absent "$dir/home/data/done-archive.md" "$source $noun $verb $form archived a row"
+          assert_absent "$dir/home/state/.control-retained-row.lock" "$source $noun $verb $form leaked control custody"
+          assert_absent "$dir/home/state/.meta-retained-row.lock" "$source $noun $verb $form leaked metadata custody"
+        done
+      done
+    done
+  done
+  pass "bounded backend refusals preserve rows and retained captain words under default, environment beads, and home beads configuration"
+)
 
 test_exact_mutation_help_has_no_side_effects() {
   local dir verb noun before out
@@ -952,6 +1071,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_restart_handles_sole_drop_and_failed_body_update
   test_unsupported_leading_backend_preserves_the_row
   test_bounded_mutation_grammar_refuses_before_side_effects
+  test_bounded_refusals_preserve_retained_words_with_ambient_backends
   test_exact_mutation_help_has_no_side_effects
   test_completion_keep_count_and_normal_options
   test_task_mutations_wait_for_lifecycle_custody || exit "$?"

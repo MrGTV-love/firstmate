@@ -361,6 +361,7 @@ When a spawn is interrupted after launch delivery began, its exit path re-reads 
 ### Which backlog receives a transition
 
 Automatic transitions run from the configured data directory's parent, letting that home's effective tasks-axi configuration address its selected adapter while keeping relative scout-report links rooted there.
+The wrapper resolves the data directory against the caller's working directory before entering that parent, and uses the same absolute path for restart provenance updates, failed-transition readback, and rollback.
 A markdown backlog is additionally addressed by an explicit `--file` at `<data>/backlog.md`, so the change lands in the home that owns the task regardless of the caller's working directory.
 
 Any other configured adapter is addressed by that root alone, because `--file` would override the adapter's own workspace path.

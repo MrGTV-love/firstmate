@@ -259,6 +259,9 @@ guard_completion() {
 }
 
 FM_BACKLOG_TRANSITION_ERROR=
+resolved_data=$(fm_backlog_data_absolute "$DATA") \
+  || fail "data directory cannot be resolved: $DATA"
+DATA=$resolved_data
 if ! fm_backlog_tasks_axi_addressing "$DATA"; then
   fail "${FM_BACKLOG_TRANSITION_ERROR:-data directory cannot be resolved: $DATA}"
 fi
