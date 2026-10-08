@@ -874,7 +874,7 @@ test_herdr_exit_foreign_text_during_proof_is_a_known_send_failure() {
   assert_no_grep 'enter' "$dir/fake/typed" "foreign text in the composer must not be submitted"
   assert_no_grep 'ctrl+u' "$dir/fake/typed" "a human's text must never be cleared"
   reads=$(grep -c -- '--format ansi' "$dir/fake/reads")
-  [ "$reads" -eq 3 ] || fail "foreign text is refused on the first proof read (guard, pre-send, proof); saw $reads styled reads"
+  [ "$reads" -eq 4 ] || fail "foreign text is refused on the first proof read (guard, picker check, pre-send, proof); saw $reads styled reads"
   pass "fm-control exit on herdr: foreign text during the payload proof is a known send failure with no marker, Enter or clear"
 }
 
