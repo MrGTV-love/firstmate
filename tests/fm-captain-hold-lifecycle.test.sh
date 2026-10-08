@@ -33,6 +33,7 @@ EOF
   fakebin=$(fm_fakebin "$home")
   fm_fake_exit0 "$fakebin" tmux treehouse no-mistakes gh gh-axi
   printf '%s\n' "$home"
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
 }
 
 # The Lavish review adapter, run against this suite's isolated home. The
@@ -2261,6 +2262,7 @@ test_board_answer_reaches_the_keyed_answer_intake() {
   stub="$home/board-source.sh"
   cat > "$stub" <<'SH'
 #!/usr/bin/env bash
+printf 'called\n' >> "$FM_HOME/board-source.calls"
 cat <<'OUT'
 session:
   status: feedback
@@ -2276,11 +2278,21 @@ SH
   run_captain "$home" bind "$sid" >/dev/null \
     || fail "could not bind the board source to the keyed-answer intake"
 
-  out=$(run_procevent "$home" start "$sid" 2>&1) \
-    || fail "the board source runner did not complete: $out"
+  out=$(fm_run_timed 30 env PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+    "$ROOT/bin/fm-procevent.sh" start "$sid" 2>&1) \
+    || fail "the board source runner did not complete within 30 seconds: $out"
   assert_contains "$out" "$sid.1.result" "the board answer was never durably captured: $out"
   assert_contains "$out" "answers-fed: $sid" \
     "the captured board answer never reached the keyed-answer intake: $out"
+  assert_equals called "$(cat "$home/board-source.calls")" \
+    "the replayable board source must run exactly once"
+  assert_absent "$home/state/procevent-inbox/$sid.2.result" \
+    "the replayable board source captured the same answer twice"
+  assert_absent "$home/procevent-claims/$sid.claim" \
+    "the completed attached board source retained its claim"
 
   queue=$(cat "$home/state/.wake-queue" 2>/dev/null || true)
   assert_contains "$queue" "check: procevent lavish $sid 1" \
@@ -2291,6 +2303,8 @@ SH
   assert_contains "$show" "north" "the board answer lost the captain's selection"
   assert_contains "$show" "the captured result $sid sequence 1" \
     "the recorded answer did not name the board result that carried it"
+  run_procevent "$home" retire "$sid" >/dev/null \
+    || fail "could not retire the board-answer source"
   pass "a board answer reaches the keyed-answer intake and wakes firstmate"
 }
 
@@ -4145,3 +4159,23 @@ fi
 for selected_test in "${tests[@]}"; do
   "$selected_test" || exit "$?"
 done
+
+# Run the ordinary home-scoped cleanup before checking actual process state.
+# The watchdog may be asleep until its next owner check after a runner exits.
+fm_test_cleanup
+perl -MTime::HiRes=time,sleep -e '
+  my ($root) = @ARGV;
+  my $deadline = time + 10;
+  while (1) {
+    open my $ps, "-|", "ps", "axeww", "-o", "pid=", "-o", "command=" or die "ps: $!";
+    my @leaked = grep {
+      index($_, "$root/") >= 0 &&
+      m{/fm-procevent[.]sh\s+(?:_start|_owner-watchdog)\s}
+    } <$ps>;
+    close $ps or die "cannot inspect process-event cleanup";
+    exit 0 unless @leaked;
+    die "runner or watchdog survived lifecycle cleanup:\n", @leaked if time >= $deadline;
+    sleep 0.1;
+  }
+' "$TMP_ROOT" || fail "captain-hold lifecycle leaked a runner or watchdog"
+pass "captain-hold lifecycle leaves no runner or watchdog processes"
