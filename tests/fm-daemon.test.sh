@@ -1886,14 +1886,18 @@ test_omp_busy_box_defers_afk_injection() {
   state="$dir/state"; fakebin="$dir/fakebin"
   sent="$dir/sent.log"; : > "$sent"
   capture="$dir/pane.txt"
-  (
-    export PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state"
+  env -u FM_FAKE_TMUX_SWALLOW_FILE PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" \
+    bash -s -- "$ROOT" "$dir" "$state" "$sent" "$capture" <<'SH' \
+    || fail "omp busy-box injection regression failed"
+    set -u
+    ROOT=$1 dir=$2 state=$3 sent=$4 capture=$5
+    . "$ROOT/tests/lib.sh"
+    . "$ROOT/bin/fm-supervise-daemon.sh"
     export FM_DAEMON_PRIMARY_HARNESS=omp FM_SUPERVISOR_BACKEND=tmux FM_SUPERVISOR_TARGET=fakepane
     export FM_FAKE_TMUX_PANE_ALIVE=1 FM_FAKE_TMUX_SENT="$sent" FM_FAKE_TMUX_CAPTURE="$capture"
     export FM_FAKE_TMUX_CURSOR_Y=3 FM_ESCALATE_BATCH_SECS=0
     export FM_INJECT_CONFIRM_RETRIES=1 FM_INJECT_CONFIRM_SLEEP=0
     export TMPDIR="$dir"
-    unset FM_FAKE_TMUX_SWALLOW_FILE
     LOG="$dir/daemon.log"
     . "$ROOT/bin/backends/herdr.sh"
     fm_backend_herdr_capture() {
@@ -1901,7 +1905,6 @@ test_omp_busy_box_defers_afk_injection() {
         || fail "unexpected Herdr capture args: $*"
       cat "$capture"
     }
-    local mode harness expected top waiting out buffered
     afk_enter "$state"
     escalate_add "$state" "done: omp busy-box regression"
     buffered=$(cat "$state/.subsuper-escalations")
@@ -1953,7 +1956,7 @@ test_omp_busy_box_defers_afk_injection() {
         [ ! -s "$state/.subsuper-escalations" ] || fail "idle omp flush retained its delivered buffer"
       fi
     done
-  ) || fail "omp busy-box injection regression failed"
+SH
   pass "working omp empty boxes defer afk injection; idle omp boxes submit the retained digest"
 }
 

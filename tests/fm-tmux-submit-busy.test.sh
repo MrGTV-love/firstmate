@@ -454,12 +454,14 @@ test_omp_pending_frame_refreshes_before_retry() (
   for initial in pending pending-unproven; do
     for final in empty unknown; do
       : > "$dir/enters"; printf '0' > "$dir/reads"
+      # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
       tmux() {
         case "$1" in
           display-message) printf 'omp\n' ;;
           send-keys) printf 'Enter\n' >> "$dir/enters" ;;
         esac
       }
+      # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
       fm_tmux_composer_state() {
         local n
         n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
@@ -499,6 +501,7 @@ test_nonomp_unknown_and_retry_keep_main_behavior() (
   local dir="$TMP_ROOT/legacy-main" pane_command out
   mkdir -p "$dir"
   for pane_command in pi-launcher kimi; do
+    # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
     tmux() {
       case "$1" in
         display-message)
@@ -507,7 +510,9 @@ test_nonomp_unknown_and_retry_keep_main_behavior() (
         send-keys) printf 'Enter\n' >> "$dir/enters" ;;
       esac
     }
+    # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
     fm_pane_is_busy() { return 0; }
+    # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
     fm_tmux_composer_state() { printf 'unknown'; }
     : > "$dir/enters"
     out=$(fm_tmux_submit_enter_core win 3 0 1)
@@ -516,6 +521,7 @@ test_nonomp_unknown_and_retry_keep_main_behavior() (
     out=$(fm_tmux_submit_enter_core win 3 0)
     [ "$out" = unknown ] || fail "$pane_command unknown without baseline must remain unknown, got '$out'"
     : > "$dir/enters"; printf '0' > "$dir/reads"
+    # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
     fm_tmux_composer_state() {
       local n enters
       n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
@@ -526,6 +532,7 @@ test_nonomp_unknown_and_retry_keep_main_behavior() (
     out=$(fm_tmux_submit_enter_core win 3 0)
     [ "$out" = empty ] || fail "$pane_command legacy third Enter must clear the composer, got '$out'"
     [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 3 ] || fail "$pane_command must retain all three legacy Enter attempts"
+    # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
     fm_tmux_composer_state() { printf 'pending'; }
     : > "$dir/enters"
     out=$(fm_tmux_submit_enter_core win 3 0)
@@ -540,6 +547,7 @@ test_omp_identity_snapshot_survives_missing_later_identity() (
   local dir="$TMP_ROOT/omp-identity-snapshot" out
   mkdir -p "$dir"
   : > "$dir/enters"; printf '0' > "$dir/identities"
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   tmux() {
     local n
     case "$1" in
@@ -552,11 +560,14 @@ test_omp_identity_snapshot_survives_missing_later_identity() (
         ;;
     esac
   }
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   fm_tmux_composer_state() {
     tmux display-message -p -t win '#{pane_current_command}' >/dev/null
     printf 'unknown'
   }
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   fm_pane_busy_state() { printf 'idle'; }
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   fm_pane_is_busy() { return 0; }
   out=$(fm_tmux_submit_core win retained 3 0 0)
   [ "$out" = pending ] || fail "missing later identity must not discard a proven omp snapshot, got '$out'"
@@ -569,6 +580,7 @@ test_omp_identity_snapshot_survives_missing_later_identity
 test_omp_foreground_identity_controls_submit_scope() (
   local dir="$TMP_ROOT/omp-foreground-identity" scenario title processes expected out
   mkdir -p "$dir"
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   tmux() {
     case "$1" in
       display-message)
@@ -580,10 +592,13 @@ test_omp_foreground_identity_controls_submit_scope() (
       send-keys) printf 'Enter\n' >> "$dir/enters" ;;
     esac
   }
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   ps() {
     printf '%s\n' "$processes"
   }
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   fm_tmux_composer_state() { printf 'unknown'; }
+  # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
   fm_pane_is_busy() { return 0; }
   for scenario in absent-title rewritten-title background-omp; do
     case "$scenario" in
@@ -622,6 +637,7 @@ test_missing_initial_identity_never_confirms_busy_input() (
       printf '0' > "$dir/reads"; : > "$sent"
       printf '│ > retained wake\n' > "$composer"
       touch "$dir/.swallow"
+      # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
       fm_tmux_composer_state() {
         local n
         n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
@@ -631,16 +647,16 @@ test_missing_initial_identity_never_confirms_busy_input() (
         esac
       }
       out=$(
-        export PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent"
+        export FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent"
         export FM_FAKE_MISSING_IDENTITY=1 FM_FAKE_APPEND_BUSY=1
         export FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1
-        [ "$(fm_tmux_submit_harness win)" = unavailable ] || fail "both missing probes must establish unavailable identity"
+        [ "$(PATH="$fakebin:$PATH" fm_tmux_submit_harness win)" = unavailable ] || fail "both missing probes must establish unavailable identity"
         if [ "$path" = typed ]; then
-          fm_tmux_submit_core win 'retained wake' 3 0 0
+          PATH="$fakebin:$PATH" fm_tmux_submit_core win 'retained wake' 3 0 0
         elif [ "$path" = explicit-empty ]; then
-          fm_tmux_submit_enter_core win 3 0 1 ''
+          PATH="$fakebin:$PATH" fm_tmux_submit_enter_core win 3 0 1 ''
         else
-          fm_tmux_submit_enter_core win 3 0 1
+          PATH="$fakebin:$PATH" fm_tmux_submit_enter_core win 3 0 1
         fi
       )
       [ "$out" = pending ] || fail "$path $fixture_state with unavailable initial identity must stay pending, got '$out'"
@@ -666,6 +682,7 @@ test_nonomp_uses_unchanged_legacy_busy_predicate() (
       PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_pane_is_busy win legacy-tmux \
         && fail "$command legacy matcher must not newly accept '$signal'"
       for fixture_state in unknown pending; do
+        # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
         fm_tmux_composer_state() { printf '%s' "$fixture_state"; }
         out=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_HARNESS="$command" \
           FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
@@ -674,6 +691,7 @@ test_nonomp_uses_unchanged_legacy_busy_predicate() (
       done
     done
     printf 'idle\n' > "$composer"
+    # shellcheck disable=SC2329 # Invoked indirectly by the submit helper under test.
     fm_tmux_composer_state() { printf 'unknown'; }
     out=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_HARNESS="$command" \
       FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_APPEND_BUSY=1 \
