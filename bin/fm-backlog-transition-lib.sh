@@ -540,6 +540,7 @@ fm_backlog_new_work_transition() {
   FM_BACKLOG_TRANSITION_ERROR=
   out=$(fm_backlog_row_show "$data" "$id" --full)
   status=$?
+  [ "$status" -ne 124 ] || FM_BACKLOG_ROW_SHOW_WEDGED=1
   if [ "$status" -ne 0 ]; then
     FM_BACKLOG_TRANSITION_ERROR=${out%%$'\n'*}
     return "$status"
