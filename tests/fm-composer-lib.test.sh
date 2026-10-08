@@ -1005,6 +1005,51 @@ test_omp_box_busy_status_border_reads_the_composer() {
   pass "matrix: omp's box composer is readable while a turn runs (spinner and elapsed time in the top border), so a typed line that never submitted reads pending"
 }
 
+test_omp_box_working_renders_match_delivery_busy() {
+  local top empty typed wrapped screen frame elapsed separator harness invalid
+  local waiting=$'  ⎋ Waiting requested sixty seconds'
+  top=$(omp_box_busy_top ⠦ 13s)
+  empty=$'transcript\n\n'"$waiting"$'\n\n'"$top"$'\n'"$(omp_box_last '')"
+  typed=$'transcript\n\n'"$waiting"$'\n\n'"$top"$'\n'"$(omp_box_last 'half typed draft while busy')"
+  wrapped=$'transcript\n\n'"$waiting"$'\n\n'"$(omp_box_busy_top ⠹ 16s)"$'\n│  half typed draft while busy and a long wrapped continuation that goes on and on and on and on  │\n'"$(omp_box_last 'on and on and on and on')"
+  for screen in "$top" "$waiting" "$empty" "$typed" "$wrapped"; do
+    for harness in omp ''; do
+      printf '%s\n' "$screen" | fm_busy_lines_match "$harness" \
+        || fail "omp working render must match delivery busy for harness '$harness': $screen"
+    done
+    for harness in claude devin codex opencode pi pi-signed grok agy kimi cursor unregistered; do
+      if printf '%s\n' "$screen" | fm_busy_lines_match "$harness"; then
+        fail "omp working render must not match another harness '$harness': $screen"
+      fi
+    done
+  done
+  for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏ ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷; do
+    for elapsed in 59s 1m3s 2h5m; do
+      for separator in '>' '·'; do
+        top=$(omp_box_busy_top "$frame" "$elapsed")
+        top=${top/ > / $separator }
+        for harness in omp ''; do
+          printf '%s\n' "$top" | fm_busy_lines_match "$harness" \
+            || fail "omp busy border $frame $elapsed $separator must match delivery busy for harness '$harness'"
+        done
+      done
+    done
+  done
+  for invalid in \
+    "$(omp_box_top)" \
+    '╭── 13s > ◔ GPT-6-Astra ──╮' \
+    '╭── ⠦ > ◔ GPT-6-Astra ──╮' \
+    '╭── ⠦ 13s ◔ GPT-6-Astra ──╮' \
+    '╭── x 13s > ◔ GPT-6-Astra ──╮'; do
+    for harness in omp ''; do
+      if printf '%s\n' "$invalid" | fm_busy_lines_match "$harness"; then
+        fail "idle or incomplete omp border must not match delivery busy for harness '$harness': $invalid"
+      fi
+    done
+  done
+  pass "omp working borders and waiting rows are delivery busy independently of empty or pending composer contents"
+}
+
 test_omp_box_requires_omp_identity_and_complete_shape() {
   local top empty_last
   top=$(omp_box_top)
@@ -1598,6 +1643,7 @@ test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_omp_effort_hint_remnant
 test_matrix_omp_box_composer
 test_omp_box_busy_status_border_reads_the_composer
+test_omp_box_working_renders_match_delivery_busy
 test_omp_box_requires_omp_identity_and_complete_shape
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity

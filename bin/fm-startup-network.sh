@@ -189,9 +189,10 @@ seconds_until() {  # <deadline-epoch>
   printf '%s' "$left"
 }
 
-# Every lock this script takes is bounded by the caller's remaining budget;
-# bin/fm-wake-lib.sh owns fm_lock_acquire_wait_bounded's deadline and blocker
-# contract. An unbounded wait could keep a wedged harvest alive past its timeout.
+# Every lock this script takes goes through here: bounded by the caller's
+# remaining budget, 124 when a live holder still owns it at the deadline
+# (FM_LOCK_HELD_PID names it). An unbounded wait here is what let a wedged
+# harvest keep the detached worker alive for hours past its own timeout.
 take_lock() {  # <lockdir> <seconds>
   fm_lock_acquire_wait_bounded "$1" "$2"
 }
@@ -369,8 +370,8 @@ await_delivery() {  # <generation> <state>
   while :; do
     claim_live=0
     if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
-      # The lock was not acquired within the delivery budget, so the claim
-      # cannot be judged under it. A possible duplicate of an inline print is
+      # A live holder outlived the whole delivery budget, so the claim cannot be
+      # judged under the lock. A possible duplicate of an inline print is
       # cheaper than an actionable result nobody is woken for.
       ! report_requires_wake "$state" || queue_result_wake "$state"
       return 1

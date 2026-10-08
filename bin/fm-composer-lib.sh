@@ -389,7 +389,6 @@ fm_composer_strip_ghost() {
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
 # turn-started acknowledgement that path can read.
-FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
 FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 # Devin 3000.11.1: the working composer and interrupt hint are independent
 # delivery signals. Neither is used as semantic worker-state evidence.
@@ -413,7 +412,7 @@ FM_DELIVERY_PI_BUSY_REGEX_DEFAULT='Working\.\.\.'
 # ("Invalid collation character"), so `[⠁-⣿]` compiled on macOS and failed
 # every omp busy and furniture read on Linux CI.
 FM_OMP_SPINNER_FRAMES_RE='(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|⣾|⣽|⣻|⢿|⡿|⣟|⣯|⣷)'
-FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]'
+FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]|^[[:space:]]*╭─+[[:space:]]+'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+([0-9]+[smh])+[[:space:]]+(>|·)[[:space:]]|^[[:space:]]*⎋[[:space:]]+Waiting([[:space:]]|$)'
 FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT='Ctrl\+c:cancel'
 # cursor-agent's busy footer. The TOKEN is matched, not the spinner verb: the
 # same version rendered both `Working` and `Running` beside its braille spinner
@@ -432,6 +431,7 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # agy-regex fold in bin/fm-busy-lib.sh.
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
+FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$|'"$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT"
 
 fm_busy_lines_match() {  # [harness]
   local harness=${1:-} lines regex

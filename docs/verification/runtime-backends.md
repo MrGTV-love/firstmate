@@ -1232,7 +1232,7 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
   [Extension supervision proof](../turnend-guard.md#extension-model) owns exact-lock marker and watcher ownership, including load-time marker writes before a live lock exists.
   The current live guard requires a fresh lab-local success record written only after the requested child command exits successfully before checking either marker.
   It loads the backend metadata dispatcher separately from the Herdr adapter and brackets busy-composer observations with agent liveness and Herdr's process-validated native busy state, checking that evidence immediately before adapter submission without loading a parent-task secondmate busy adapter.
-  The rendered busy-footer API does not recognize an omp box-border spinner as a standalone footer, so it cannot establish that a sleeping box-composer lane is idle.
+  Rendered delivery-busy readers recognize both the spinner-bearing box border and the `⎋ Waiting …` row, including when no harness identity is available. An empty working editor remains readable as `empty`, but the away-mode daemon defers injection until the turn is idle.
 
 `tests/fm-omp-harness.test.sh` carries restored-wake editor recovery, descendant sessions, and marker self-repair; `tests/fm-composer-lib.test.sh` carries working-box fixtures captured during this verification; backend submit regressions carry dropped-Enter and stale-frame reread protections, and `tests/fm-wake-queue.test.sh` carries the ordinary stalled-loop alarm and idle-ring boundaries.
 Earlier correction runs exercised portable composer, backend-submit, omp-harness, and wake-queue regressions, including a parent recovery path that has since been removed.
@@ -1246,6 +1246,10 @@ No real model or Herdr session was exercised; the live guard has not been rerun 
 The test-scope removal round passed the composer and Zellij test files and an executable key-delivery smoke: the prior helper continued after a failed Escape, while the current helper stopped on failed Escape, Enter, and C-u and continued on successful sends.
 The omp harness file stopped at its restored baseline decoy-detection case under this review process's omp ancestry; that case was not rerun.
 A direct execution of the retained restored-wake, descendant-ownership, and marker-self-repair tests passed; no real model or Herdr session was exercised.
+
+The delivery-busy correction round reproduced both working signals reading `idle` with an `empty` composer before the fix, and `busy` afterward, for omp-scoped and harnessless matching.
+Direct execution of the working-box composer, delivery-busy matcher, and away-mode injection regressions passed, including tmux and Herdr rendered readers, busy deferral with an unchanged escalation buffer, and idle submission of that retained digest.
+The full composer test file exceeded the verification timeout; no full-suite or live-model result is claimed.
 
 The live guard that refreshes this entry submits real prompts and stays opt-in:
 
