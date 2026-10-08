@@ -2425,7 +2425,7 @@ EOF
 # two hours. An open Stop-hook claim makes the hook the only deliverer, so the
 # re-emit must report the queue and leave both queue and marker alone.
 test_reemit_leaves_queue_and_marker_alone_while_a_stop_hook_claim_is_open() {
-  local rec root home fakebin owner identity reemit again
+  local rec root home fakebin owner identity reemit again mode reason queue_before
   rec=$(new_world reemit-open-claim)
   IFS='|' read -r root home fakebin <<EOF
 $rec
@@ -2437,24 +2437,52 @@ EOF
   awk '{ print } !done && /^case "\$\*" in$/ { print "  *\"lstart=\"*) exec /bin/ps \"$@\" ;;"; done = 1 }' \
     "$fakebin/ps" > "$fakebin/ps.new" && mv "$fakebin/ps.new" "$fakebin/ps" && chmod +x "$fakebin/ps"
   append_wake "$home/state" signal task-c "done: queued while the hook arms" || fail "seed wake failed"
+  queue_before=$(cat "$home/state/.wake-queue")
+  fm_write_meta "$home/state/task-c.meta" "window=firstmate:fm-task-c" "kind=ship"
   printf 'pending:downtime:claim-test-generation\n' > "$home/state/.watcher-down"
-  touch "$home/state/.last-watcher-beat"
   sleep 60 &
   owner=$!
   identity=$(fm_test_pid_identity "$owner") || fail "could not compute the claim owner identity"
   printf 'epoch=3 owner_pid=%s outcome=arming updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \
     > "$home/state/.claude-autoarm-epoch"
 
-  reemit=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
-    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-    "$SESSION_START" --reemit)
-  assert_contains "$reemit" "deferred (context re-emit while the Stop hook owns wake delivery) - 1 record(s) are queued" \
-    "--reemit did not report the queue it deferred"
-  assert_not_contains "$reemit" "done: queued while the hook arms" "--reemit presented a wake the Stop hook must deliver"
-  assert_not_contains "$reemit" "WAKE_ACK_REQUIRED: after handling" "--reemit demanded an acknowledgement for wakes it did not present"
-  [ "$(cat "$home/state/.watcher-down")" = pending:downtime:claim-test-generation ] \
-    || fail "--reemit moved the recovery marker while a Stop-hook claim was open: $(cat "$home/state/.watcher-down")"
-  [ -s "$home/state/.wake-queue" ] || fail "--reemit consumed the queue while a Stop-hook claim was open"
+  for mode in fresh stale mutex; do
+    reason='the Stop hook owns wake delivery'
+    if [ "$mode" = fresh ]; then
+      touch "$home/state/.last-watcher-beat"
+    else
+      rm -f "$home/state/.last-watcher-beat"
+    fi
+    if [ "$mode" = mutex ]; then
+      reason='wake delivery ownership is being decided'
+      printf 'epoch=3 owner_pid=%s outcome=rewake updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \
+        > "$home/state/.claude-autoarm-epoch"
+      mkdir "$home/state/.claude-autoarm.lock"
+      printf '%s\n' "$owner" > "$home/state/.claude-autoarm.lock/pid"
+    fi
+    printf 'unchanged-episode\n' > "$home/state/.guard-watcher-stale-banner"
+    reemit=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
+      env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+      "$SESSION_START" --reemit)
+    assert_contains "$reemit" "deferred (context re-emit while $reason) - 1 record(s) are queued" \
+      "--reemit did not report the queue it deferred ($mode)"
+    assert_not_contains "$reemit" "done: queued while the hook arms" "--reemit presented a wake the Stop hook must deliver"
+    assert_not_contains "$reemit" "WAKE_ACK_REQUIRED: after handling" "--reemit demanded an acknowledgement for wakes it did not present"
+    assert_not_contains "$reemit" "lacks verified fleet-lock ownership" "delivery deferral denied verified lock ownership"
+    assert_not_contains "$reemit" "read-only session" "delivery deferral emitted lock-refused guidance"
+    assert_not_contains "$reemit" "After draining queued wakes" "delivery deferral instructed immediate wake handling"
+    assert_not_contains "$reemit" "drain them with bin/fm-wake-drain.sh" "delivery deferral instructed an immediate drain"
+    if [ "$mode" != fresh ]; then
+      assert_contains "$reemit" "WATCHER DOWN - SUPERVISION IS OFF" "delivery deferral suppressed the supervision alarm"
+    fi
+    [ "$(cat "$home/state/.guard-watcher-stale-banner")" = unchanged-episode ] \
+      || fail "delivery deferral mutated the guard episode ($mode)"
+    [ "$(cat "$home/state/.watcher-down")" = pending:downtime:claim-test-generation ] \
+      || fail "--reemit moved the recovery marker while delivery was deferred ($mode)"
+    [ "$(cat "$home/state/.wake-queue")" = "$queue_before" ] \
+      || fail "--reemit changed the queue while delivery was deferred ($mode)"
+  done
+  rm -rf "$home/state/.claude-autoarm.lock"
 
   # Control: once the claim is finished, the same re-emit drains as before.
   printf 'epoch=3 owner_pid=%s outcome=rewake updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \

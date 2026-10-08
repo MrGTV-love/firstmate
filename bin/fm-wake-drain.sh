@@ -856,7 +856,7 @@ if [ "$REEMIT" = true ]; then
     fm_lock_release "$FM_WAKE_QUEUE_LOCK"
     DRAIN_LOCK_HELD=false
     printf 'deferred (%s) - %s record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.\n' "$DEFER" "$QLEN"
-    FM_GUARD_READ_ONLY=1 "$SCRIPT_DIR/fm-guard.sh" || true
+    FM_GUARD_DELIVERY_DEFERRED=1 "$SCRIPT_DIR/fm-guard.sh" || true
     exit 0
   fi
 fi
