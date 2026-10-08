@@ -1609,7 +1609,7 @@ Firstmate passes its profile line unless it states a reason to override, such as
 
 - The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
 - The resolver sends its key to `curl` only as a header read from a file descriptor, never on argv.
-  The skill picker pipes its keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; they never enter Node's environment or arguments.
+  The skill picker pipes its resolved keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; the picker does not export the resolved key variables or put their values on argv.
   Neither tool prints, logs, or writes keys to files.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
@@ -1734,7 +1734,8 @@ For a promoted scout's ship relaunch, skill selection retains the original Capta
 Legacy provenance uses the same fence and indentation exclusions as promotion.
 Privacy-hidden promotion instructions never revive the superseded spec.
 The picker uses the shared [TypeSafe key lookup](#typed-dispatch-resolution-env-typesafe_api_key), including the local primary-home fallback, and asks TypeSafe directly first when that key is available.
-When the direct call is unavailable because its key is absent or fails and `OPENROUTER_API_KEY` is set in the calling home's `.env`, the same request and the rest of that pick go through OpenRouter.
+When the TypeSafe key is absent or a direct request fails and `OPENROUTER_API_KEY` is set in the calling home's `.env`, the same request and the rest of that pick go through OpenRouter.
+Privacy refusals, question-validation failures, and expiry of the picker's overall deadline stop selection without triggering provider fallback.
 Unlike the TypeSafe key, the OpenRouter key is read only from that home's `.env`, with no primary-home or ambient-environment fallback.
 This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
 Fallback provenance is retained for picked, no-selection, and unavailable outcomes.
