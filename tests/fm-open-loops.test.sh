@@ -670,6 +670,37 @@ printf '%s' "$LEDGER" | jq -e '
   any(.rows[]; .category == "unanswered_question" and .subject == "held-drop:retained")
   and all(.rows[]; .subject != "held-drop" or (.category != "failed_task" and .category != "unlanded_commit"))' >/dev/null \
   || { echo "FAIL: retained dropped work must preserve only its unresolved question" >&2; exit 1; }
+
+HOLD_HOME=$TMP_ROOT/captain-question-home
+mkdir -p "$HOLD_HOME/state" "$HOLD_HOME/data" "$HOLD_HOME/config" "$HOLD_HOME/projects"
+cat > "$HOLD_HOME/data/backlog.md" <<'BACKLOG'
+## In flight
+- [ ] live-hold - Decide rollout (repo: firstmate) (kind: ship) (hold: approve rollout) (hold-kind: captain)
+  Captain hold set: 2026-07-11T00:00:00Z
+
+## Queued
+- [ ] aged-hold - Decide migration (repo: firstmate) (kind: program) (hold: approve migration) (hold-kind: captain)
+  Captain hold set: 2026-06-01T00:00:00Z
+- [ ] blocked-hold - Blocked decision (repo: firstmate) (kind: ship) (hold: blocked) (hold-kind: captain) blocked-by: live-hold
+- [ ] dated-hold - Deferred decision (repo: firstmate) (kind: ship) (hold: deferred) (hold-kind: captain) (hold-until: 2999-01-01)
+- [ ] other-hold - Worker dependency (repo: firstmate) (kind: ship) (hold: worker) (hold-kind: worker)
+
+## Done
+- [x] closed-hold - Closed decision (repo: firstmate) (kind: ship) (hold: resolved) (hold-kind: captain) (done 2026-07-11)
+BACKLOG
+printf 'needs-decision [at=1783728000] [key=separate]: decide the remaining policy question\n' > "$HOLD_HOME/state/aged-hold.status"
+LEDGER=$(FM_HOME="$HOLD_HOME" FM_OPEN_LOOPS_NOW=1783814400 bash "$ROOT/bin/fm-open-loops.sh" --json)
+printf '%s' "$LEDGER" | jq -e '
+  .complete == true
+  and ([.rows[] | select(.category == "unanswered_question") | .subject] | sort)
+      == ["aged-hold:captain-hold", "aged-hold:separate", "live-hold:captain-hold"]
+  and any(.rows[]; .subject == "live-hold:captain-hold" and .owner == "captain"
+      and .age_seconds == 86400 and .overdue and .evidence == "approve rollout")
+  and any(.rows[]; .subject == "aged-hold:captain-hold" and .owner == "captain"
+      and .age_seconds > 14 * 86400 and .overdue and .evidence == "approve migration")
+  and all(.rows[]; .category != "ready_not_started" and .category != "missing_worker")' >/dev/null \
+  || { echo "FAIL: shared question boundary must include live and aged captain holds only" >&2; exit 1; }
+echo "PASS: live and aged captain holds share unresolved-question coverage with status decisions"
 mkdir -p "$TMP_ROOT/unreadable-bin"
 cat > "$TMP_ROOT/unreadable-bin/tmux" <<'SH'
 #!/usr/bin/env bash

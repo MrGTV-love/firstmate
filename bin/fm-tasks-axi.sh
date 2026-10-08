@@ -131,7 +131,7 @@ done
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/fm-bootstrap.sh for the install command"
 
 parse_task_mutation() {
-  local tokens=("$@") i=0 expect='' token
+  local tokens=("$@") i=0 expect='' token bounded=0
   TASK_COMMAND=
   TASK_ID=
   TASK_HELP=0
@@ -141,14 +141,54 @@ parse_task_mutation() {
   TASK_NOTE=0
   [ "${tokens[0]:-}" != task ] || i=1
   TASK_COMMAND=${tokens[i]:-}
-  case "$TASK_COMMAND" in done|close|start|reopen|hold|unhold|update|edit) ;; *) return 0 ;; esac
+  case "$TASK_COMMAND" in
+    -*) fail "unsupported global options; run tasks-axi directly for that invocation" ;;
+    done|close|start|reopen) bounded=1 ;;
+    hold|unhold|update|edit) ;;
+    *) return 0 ;;
+  esac
   for token in "${tokens[@]:$((i + 1))}"; do
     if [ -n "$expect" ]; then
+      if [ "$bounded" = 1 ]; then
+        case "$token" in
+          ''|-*) fail "$expect requires a value, not an option; run tasks-axi directly for other grammar" ;;
+        esac
+        if [ "$expect" = --keep ] && ! [[ "$token" =~ ^[0-9]+$ ]]; then
+          fail "--keep requires a non-negative count; run tasks-axi directly for other grammar"
+        fi
+      fi
       case "$expect" in
         --pr) TASK_PR=$token ;; --report) TASK_REPORT=$token ;;
         --drop-file) TASK_DROP=$token ;; --note) TASK_NOTE=1 ;;
       esac
       expect=''
+      continue
+    fi
+    if [ "$bounded" = 1 ]; then
+      case "$TASK_COMMAND:$token" in
+        *:--help) TASK_HELP=1; continue ;;
+        *:--json) continue ;;
+        done:--no-prune|close:--no-prune) continue ;;
+        done:--pr|close:--pr|done:--report|close:--report|done:--drop-file|close:--drop-file|done:--note|close:--note|done:--keep|close:--keep)
+          expect=$token; continue ;;
+        done:--pr=*|close:--pr=*|done:--report=*|close:--report=*|done:--drop-file=*|close:--drop-file=*|done:--note=*|close:--note=*|done:--keep=*|close:--keep=*)
+          expect=${token%%=*}
+          token=${token#*=}
+          case "$token" in
+            ''|-*) fail "$expect requires a value, not an option; run tasks-axi directly for other grammar" ;;
+          esac
+          case "$expect" in
+            --pr) TASK_PR=$token ;; --report) TASK_REPORT=$token ;;
+            --drop-file) TASK_DROP=$token ;; --note) TASK_NOTE=1 ;;
+            --keep) [[ "$token" =~ ^[0-9]+$ ]] || fail "--keep requires a non-negative count; run tasks-axi directly for other grammar" ;;
+          esac
+          expect=''
+          continue ;;
+        *:-*) fail "unsupported $TASK_COMMAND option '$token'; run tasks-axi directly for that invocation" ;;
+      esac
+      [ -z "$TASK_ID" ] || fail "$TASK_COMMAND accepts exactly one id; run tasks-axi directly for other grammar"
+      [[ "$token" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsupported task id '$token'; run tasks-axi directly for that invocation"
+      TASK_ID=$token
       continue
     fi
     case "$token" in
@@ -160,6 +200,10 @@ parse_task_mutation() {
       *) [ -n "$TASK_ID" ] || TASK_ID=$token ;;
     esac
   done
+  if [ "$bounded" = 1 ]; then
+    [ -z "$expect" ] || fail "$expect requires a value; run tasks-axi directly for other grammar"
+    [ "$TASK_HELP" = 1 ] || [ -n "$TASK_ID" ] || fail "$TASK_COMMAND requires exactly one id; run tasks-axi directly for other grammar"
+  fi
 }
 
 TASK_CONTROL_LOCK_HELD=0
@@ -176,7 +220,8 @@ task_mutation_cleanup() {
 }
 
 guard_completion() {
-  local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop=$TASK_DROP note=$TASK_NOTE
+  local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop note=$TASK_NOTE
+  drop=$(absolute_from_caller "$TASK_DROP")
   case "$TASK_COMMAND" in done|close) ;; *) return 0 ;; esac
   [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || return 0
   fm_backlog_row_probe "$DATA" "$id" || {
@@ -229,7 +274,7 @@ fi
 
 GUARD_ARGS=()
 GUARD_STRIP_DROP=0
-parse_task_mutation ${ARGS[@]+"${ARGS[@]}"}
+parse_task_mutation "$@"
 if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
   . "$SCRIPT_DIR/fm-wake-lib.sh"
   trap task_mutation_cleanup EXIT

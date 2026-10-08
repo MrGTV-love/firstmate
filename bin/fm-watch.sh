@@ -2552,15 +2552,15 @@ open_loops_refresh_detached() {
 # OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
 # The durable row is appended before wake() exits, and firstmate's acknowledgement clears it.
 open_loops_stale_wake() {  # <ledger-path>
-  local marker="$STATE/.open-loops-stale-surfaced"
+  local marker="$STATE/.open-loops-stale-surfaced" reason
   [ ! -e "$marker" ] || [ "$(age_of "$marker")" -ge "$OPEN_LOOPS_RESURFACE" ] || return 0
-  fm_wake_append check open-loop-ledger-stale \
-    "open-loop-ledger-stale: the reconciler stopped publishing $1; run bin/fm-open-loops.sh and restore its sources" || exit 1
+  reason="check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)"
+  fm_wake_append check open-loop-ledger-stale "$reason" || exit 1
   : > "$marker"
-  wake "check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)"
+  wake "$reason"
 }
 open_loops_surface() {
-  local ledger="$STATE/open-loops.json" marker="$STATE/.open-loops-surfaced" ids digest previous overdue
+  local ledger="$STATE/open-loops.json" marker="$STATE/.open-loops-surfaced" ids digest previous overdue reason
   if [ -f "$ledger" ] && [ ! -L "$ledger" ]; then
     [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ] || open_loops_stale_wake "$ledger"
   else
@@ -2592,10 +2592,10 @@ open_loops_surface() {
     return 0
   fi
   overdue=$(printf '%s\n' "$ids" | wc -l | tr -d '[:space:]')
-  fm_wake_append check open-loop-ledger \
-    "open-loop-ledger: $overdue overdue owned obligations; read $ledger" || exit 1
+  reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
+  fm_wake_append check open-loop-ledger "$reason" || exit 1
   printf '%s\n' "$digest" > "$marker"
-  wake "check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
+  wake "$reason"
 }
 
 # One reconcile pass can wait on a single shared launch-confirmation window of up

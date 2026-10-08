@@ -105,6 +105,9 @@ printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
+      *state,headRefOid,url*)
+        printf 'MERGED\t%s\t%s\n' "${FM_TEST_MERGED_HEAD:-}" "${FM_TEST_MERGED_PR:-}"
+        ;;
       *statusCheckRollup*)
         printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}'
         ;;
@@ -3849,7 +3852,9 @@ test_released_merge_passes_the_entrypoint_and_lands() {
     || fail "the released merge was refused: $(cat "$home/merge.err")"
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_TEST_GH_LOG="$home/gh.log" \
+    FM_TEST_MERGED_HEAD="$(git -C "$wt" rev-parse HEAD)" FM_TEST_MERGED_PR="$pr" \
+    "$TEARDOWN" "$id" \
     > "$home/teardown.out" 2> "$home/teardown.err" \
     || fail "the released merge cleanup failed: $(cat "$home/teardown.err")"
   json=$(run_bearings "$home") || fail "Bearings failed after the released merge lifecycle"
@@ -4034,7 +4039,6 @@ test_retained_body_keeps_its_utf8_bytes() {
   pass "cleanup preserves every byte of a retained body's non-ASCII characters"
 }
 
-test_uninventoried_report_decision_refuses_completion
 test_internal_retention_preserves_active_drop_provenance() (
   local home id stored before
   home=$(make_home retain-drop-provenance)
@@ -4070,6 +4074,8 @@ test_internal_retention_preserves_active_drop_provenance() (
   pass "internal retention and read-only admission preserve active captain drop classification"
 )
 
+tests=(
+test_uninventoried_report_decision_refuses_completion
 test_internal_retention_preserves_active_drop_provenance
 test_hold_decodes_a_bare_scalar_body_without_the_nonref_default
 test_retained_body_keeps_its_utf8_bytes
@@ -4123,3 +4129,17 @@ test_verify_names_the_unresolvable_legacy_id_once
 test_verify_resolves_a_pre_collapse_key_through_its_derived_marker
 test_captain_hold_mutations_address_the_beads_backend
 test_hold_creates_a_captain_row_when_beads_requires_due_without_custom_type
+)
+if [ "$#" -gt 0 ]; then
+  for requested in "$@"; do
+    selected=0
+    for candidate in "${tests[@]}"; do
+      [ "$requested" != "$candidate" ] || selected=1
+    done
+    [ "$selected" -eq 1 ] || fail "unknown captain hold lifecycle test: $requested"
+  done
+  tests=("$@")
+fi
+for selected_test in "${tests[@]}"; do
+  "$selected_test" || exit "$?"
+done

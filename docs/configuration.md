@@ -579,7 +579,7 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 | --- | --- | --- |
 | `missing_worker` | an In flight item or task record has no live worker | 600 s |
 | `ready_not_started` | a Queued item has no hold, no open blocker, and a due date | 1800 s |
-| `unanswered_question` | a `needs-decision` or `blocked` status key is still open, aged from its stamped opening | 1800 s |
+| `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
 | `stalled_worker` | a live worker reads `working` but has no commit, status line, or pipeline progress; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
 | `unlanded_commit` | a ship task's copy holds commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
@@ -588,6 +588,7 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
+Status questions age from their stamped opening. Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata. Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
 Registered non-GitHub origins are disclosed as degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
@@ -599,6 +600,7 @@ The helper's `--heartbeat` mode atomically publishes the dated result to `state/
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
 A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
+Both durable payloads are identical to their printed wake reasons, including the canonical `check:` prefix.
 Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults. Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
 Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
@@ -620,6 +622,7 @@ A malformed configuration is reported as an error rather than ignored.
 
 A recorded work item reaches Done with its deliverable or the captain's own words, subject to the live-teardown limitations below.
 `bin/fm-tasks-axi.sh done|close` of a ship or scout row requires a written non-empty report (scout), a GitHub PR the forge reports merged (ship), or `--drop-file` holding the captain's words.
+Completion accepts only an optional `task` noun, `done` or `close`, exactly one ID, and `--pr`, `--report`, `--note`, `--drop-file`, `--keep`, `--no-prune`, `--json`, or `--help`. Valued options accept split or `=` forms; `--keep` requires a non-negative count. `start` and `reopen` accept the same noun and single-ID forms with only `--json` or `--help`. Exact unconsumed `--help` prints help without mutation and may omit the ID; a help token consumed as a value is refused. Unknown or global options (including `--backend`), option-like values, and extra positionals are refused before writes; use `tasks-axi` directly for unsupported grammar.
 A retained captain-held question must be resolved through `bin/fm-captain-hold.sh answer` or `reconcile close`; delivery evidence or drop authority cannot answer it.
 A live task record completes only through `bin/fm-teardown.sh`, whose landed-work test treats a pushed branch as recoverable work, not a delivered result.
 In local-only mode, a clean existing ship copy whose `HEAD` is contained in `refs/heads/<default>` is landed regardless of remote reachability or pushed status. A genuinely merged GitHub PR whose actual head contains the current work or default-content proof remains an alternative, including fork delivery, for non-forced teardown.
@@ -630,7 +633,7 @@ If a recorded Orca copy path is missing, record-only cleanup never removes a bac
 `bin/fm-teardown.sh --force` on ordinary work additionally requires `--drop-file`; the words (1..8192 bytes) are retained at `data/<id>/captain-drop.md` before anything is discarded.
 A forced ship with `--drop-file` always records the fixed note `dropped` without a landing probe; a scout with a regular, nonsymlink, nonempty report keeps report completion, and both retain the captain's exact words.
 Dropped work is never presented as recently landed. A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
-Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`. Completion and new-work entry points, including supported command-first `--backend` forms, retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions. A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status. A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`. Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions. A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status. A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 

@@ -198,6 +198,17 @@ SH
   chmod +x "$1/fake-open-loops"
 }
 
+assert_ledger_queue_reason() {  # <state> <out> <key>
+  local state=$1 out=$2 key=$3 payload reason
+  payload=$(awk -F '\t' -v key="$key" '$3 == "check" && $4 == key { print $5 }' "$state/.wake-queue")
+  reason=$(cat "$out")
+  case "$reason" in
+    "check: $key ("*) ;;
+    *) fail "ledger wake did not use its canonical check reason: $reason" ;;
+  esac
+  [ "$payload" = "$reason" ] || fail "queued ledger reason differs from watcher output: $payload / $reason"
+}
+
 test_overdue_row_wakes_with_a_durable_row() {
   local dir state fakebin out pid
   dir=$(make_case ledger-wake); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
@@ -206,7 +217,7 @@ test_overdue_row_wakes_with_a_durable_row() {
   pid=$!
   wait_watch_exit "$pid" 100 || { reap "$pid"; fail "watcher did not exit for an overdue ledger row"; }
   grep -q 'check: open-loop-ledger (1 overdue' "$out" || fail "wake reason missing the overdue count: $(cat "$out")"
-  grep -q 'open-loop-ledger' "$state/.wake-queue" || fail "overdue ledger wake was not durably queued"
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
   [ -s "$state/.open-loops-surfaced" ] || fail "surfacing marker was not recorded"
   pass "an overdue ledger row wakes firstmate and leaves a durable queue row"
 }
@@ -268,7 +279,7 @@ test_unpublished_ledger_is_its_own_wake() {
   pid=$!
   wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a ledger nobody refreshes did not wake"; }
   grep -q 'check: open-loop-ledger-stale' "$out" || fail "stale wake reason missing: $(cat "$out")"
-  grep -q 'open-loop-ledger-stale' "$state/.wake-queue" || fail "stale ledger wake was not durably queued"
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger-stale
   pass "a ledger the reconciler stopped publishing is its own wake"
 }
 
@@ -323,9 +334,9 @@ test_failed_publication_retries_the_same_ledger() {
         || { reap "$pid"; fail "$kind/$failure retry lost the identical ledger notification"; }
       count=$(awk -F '\t' -v key="$key" '$3 == "check" && $4 == key { n++ } END { print n+0 }' "$state/.wake-queue")
       [ "$count" -eq 1 ] || fail "$kind/$failure retry published $count ledger notifications"
-      grep -q "check: $key" "$out" || fail "$kind/$failure retry delivered the wrong reason"
+      assert_ledger_queue_reason "$state" "$out" "$key"
       if [ "$kind" = overdue ]; then
-        grep -q '2 overdue owned obligations' "$state/.wake-queue" \
+        grep -q '2 overdue assigned obligations' "$state/.wake-queue" \
           || fail "$kind/$failure retry changed the overdue set"
       fi
       [ -e "$marker" ] || fail "$kind/$failure successful retry did not record its cooldown"
@@ -377,7 +388,7 @@ test_blocked_publication_does_not_commit_cooldown() {
     rmdir "$state/.wake-queue.lock"
     wait_watch_exit "$pid" 100 \
       || { reap "$pid"; fail "$kind notification was lost after its queue lock was repaired"; }
-    grep -q "check: $key" "$out" || fail "$kind lock repair delivered the wrong wake"
+    assert_ledger_queue_reason "$state" "$out" "$key"
     [ -e "$marker" ] || fail "$kind lock repair did not commit cooldown after publication"
   done
   pass "overdue and stale publication wait for their queue lock before committing cooldown"
@@ -693,8 +704,7 @@ SH
       || { reap "$pid"; fail "$kind historical stale wake was lost after queue release"; }
     count=$(awk -F '\t' '$3 == "check" && $4 == "open-loop-ledger-stale" { n++ } END { print n+0 }' "$state/.wake-queue")
     [ "$count" -eq 1 ] || fail "$kind historical stale notification was not queued exactly once"
-    grep -q 'check: open-loop-ledger-stale' "$out" \
-      || fail "$kind blocked append delivered the wrong wake"
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger-stale
     [ -e "$state/.open-loops-stale-surfaced" ] \
       || fail "$kind fixture did not recreate stale suppression after recovery"
     cooldown=$(file_mtime "$state/.open-loops-stale-surfaced")
@@ -724,8 +734,7 @@ SH
       || { reap "$pid"; fail "$kind distinct outage was suppressed after fresh observation"; }
     count=$(awk -F '\t' '$3 == "check" && $4 == "open-loop-ledger-stale" { n++ } END { print n+0 }' "$state/.wake-queue")
     [ "$count" -eq 1 ] || fail "$kind distinct outage did not queue exactly one stale notification"
-    grep -q 'check: open-loop-ledger-stale' "$out" \
-      || fail "$kind distinct outage did not deliver an actionable stale wake"
+    assert_ledger_queue_reason "$state" "$out" open-loop-ledger-stale
     [ -e "$state/.open-loops-stale-surfaced" ] \
       || fail "$kind distinct outage did not commit its own stale cooldown"
     [ "$(cat "$state/.open-loops-surfaced")" = "$digest" ] \

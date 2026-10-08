@@ -420,6 +420,12 @@ class Collector:
             self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
 
     def question_rows(self):
+        for record in self.backlog:
+            if record.get("hold_kind") == "captain" and record.get("hold_bucket") in ("live", "aged"):
+                self.add("unanswered_question", record["id"] + ":captain-hold",
+                         "resolve the captain hold or record its next decision date",
+                         epoch(record.get("hold_set") or record.get("since")), owner="captain",
+                         evidence=record.get("hold_reason") or record.get("title") or "")
         for status in sorted(self.state.glob("*.status")):
             if status.is_symlink():
                 continue

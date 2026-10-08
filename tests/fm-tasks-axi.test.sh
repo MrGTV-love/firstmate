@@ -283,7 +283,7 @@ test_completion_needs_proof_of_the_deliverable() {
   completion_refused "$dir" "empty report" "done" scout-a --report data/scout-a/report.md >/dev/null
   printf '# findings\n' > "$dir/home/data/scout-a/report.md"
   completion_refused "$dir" "report for a ship" "done" ship-a --report data/scout-a/report.md >/dev/null
-  out=$(wrapper_from_code "$dir" task close --backend markdown scout-a --report data/scout-a/report.md 2>&1) \
+  out=$(wrapper_from_code "$dir" task close scout-a --report data/scout-a/report.md 2>&1) \
     || fail "a written report was refused: $out"
   [ "$(row_state "$dir" scout-a)" = x ] || fail "the reported scout did not close"
   completion_refused "$dir" "non-GitHub pull request" "done" ship-a --pr https://forge.example.com/o/r/pulls/3 >/dev/null
@@ -315,7 +315,7 @@ test_completion_by_the_captains_own_words() {
   printf 'Drop it; the premise is gone.\n' > "$words"
   completion_refused "$dir" "symbolic link words" "done" ship-d --drop-file "$dir/words-link.txt" >/dev/null
   completion_refused "$dir" "words with a pull request" "done" ship-d --drop-file "$words" --pr https://github.com/o/r/pull/9 >/dev/null
-  out=$(wrapper_from_code "$dir" task done --backend=markdown ship-d --drop-file "$words" 2>&1) \
+  out=$(wrapper_from_code "$dir" task done ship-d --drop-file "$words" 2>&1) \
     || fail "the captain's words were refused: $out"
   [ "$(row_state "$dir" ship-d)" = x ] || fail "the dropped row did not close"
   cmp -s "$words" "$dir/home/data/ship-d/captain-drop.md" || fail "the exact words were not retained"
@@ -328,8 +328,8 @@ test_completion_by_the_captains_own_words() {
 }
 
 test_completion_preserves_retained_captain_calls() {
-  local dir fakebin words before spelling evidence out backend
-  local command_args=() evidence_args=() backend_args=()
+  local dir fakebin words before spelling evidence out
+  local command_args=() evidence_args=()
   dir=$(make_split retained-captain-call)
   fakebin=$(fm_fakebin "$dir")
   words="$dir/drop.txt"
@@ -359,11 +359,6 @@ SH
       task-done) command_args=(task done) ;;
       task-close) command_args=(task close) ;;
     esac
-    for backend in split equals; do
-      case "$backend" in
-        split) backend_args=(--backend markdown) ;;
-        equals) backend_args=(--backend=markdown) ;;
-      esac
     for evidence in ship-drop scout-drop report pr; do
       case "$evidence" in
         ship-drop) evidence_args=(held-ship --drop-file "$words") ;;
@@ -372,12 +367,11 @@ SH
         pr) evidence_args=(held-ship --pr=https://github.com/o/r/pull/9) ;;
       esac
       out=$(PATH="$fakebin:$PATH" FAKE_FORGE_LOG="$dir/forge-called" \
-        completion_refused "$dir" "$backend $spelling with $evidence" "${command_args[@]}" "${backend_args[@]}" "${evidence_args[@]}")
+        completion_refused "$dir" "$spelling with $evidence" "${command_args[@]}" "${evidence_args[@]}")
       assert_contains "$out" "open captain call" "$spelling with $evidence missed the captain hold"
       assert_contains "$out" "fm-captain-hold.sh answer" "$spelling with $evidence did not name the answer boundary"
       assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" \
         "$spelling with $evidence changed the retained captain call"
-    done
     done
   done
   assert_absent "$dir/forge-called" "a retained captain call reached the forge evidence check"
@@ -410,7 +404,7 @@ test_public_restart_retires_drop_provenance() {
       || fail "could not drop restart fixture"
     wrapper_from_code "$dir" update "restart-$verb" --body-file "$dir/body.txt" >/dev/null \
       || fail "could not attach restart body"
-    out=$(wrapper_from_code "$dir" task "$verb" --backend=markdown "restart-$verb" 2>&1) \
+    out=$(wrapper_from_code "$dir" task "$verb" "restart-$verb" 2>&1) \
       || fail "public $verb failed: $out"
     stored=$(wrapper_from_code "$dir" show "restart-$verb" --full) || fail "could not read restarted row"
     assert_contains "$stored" "Historical captain disposition: dropped" "$verb left drop disposition active"
@@ -494,23 +488,26 @@ test_unsupported_leading_backend_preserves_the_row() {
     || fail "could not drop leading backend fixture"
   before=$(cat "$dir/home/data/backlog.md")
   for verb in done close start reopen; do
-    for form in prefix-split prefix-equals noun-split noun-equals; do
+    for form in prefix-split prefix-equals noun-split noun-equals prefix-json noun-json; do
       case "$form" in
         prefix-split) args=(--backend markdown "$verb" leading-drop) ;;
         prefix-equals) args=(--backend=markdown task "$verb" leading-drop) ;;
         noun-split) args=(task --backend markdown "$verb" leading-drop) ;;
         noun-equals) args=(task --backend=markdown "$verb" leading-drop) ;;
+        prefix-json) args=(--json "$verb" leading-drop) ;;
+        noun-json) args=(task --json "$verb" leading-drop) ;;
       esac
       rc=0
       out=$(wrapper_from_code "$dir" "${args[@]}" 2>&1) || rc=$?
       expect_code 2 "$rc" "$form $verb"
+      assert_contains "$out" "tasks-axi directly" "$form $verb did not name the direct SDK escape"
       assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" \
-        "$form $verb changed provenance before tasks-axi rejected its leading flag"
+        "$form $verb changed provenance despite the wrapper refusal"
       cmp -s "$dir/words" "$dir/home/data/leading-drop/captain-drop.md" \
         || fail "$form $verb changed retained captain words"
     done
   done
-  pass "unsupported leading backend forms retain tasks-axi's refusal without changing the task"
+  pass "unsupported leading global forms are refused by the wrapper without changing the task"
 }
 
 test_task_mutations_wait_for_lifecycle_custody() (
@@ -546,10 +543,10 @@ SH
       holder=$!
       wait_mutation_fixture "$dir/locked" "$lock_kind holder" "$holder"
       case "$verb" in
-        done) args=(done --backend markdown custody --report data/custody/report.md) ;;
-        close) args=(task close custody --backend=markdown --report data/custody/report.md) ;;
-        start) args=(task start --backend=markdown custody) ;;
-        reopen) args=(reopen custody --backend markdown) ;;
+        done) args=(done custody --report data/custody/report.md) ;;
+        close) args=(task close custody --report data/custody/report.md) ;;
+        start) args=(task start custody) ;;
+        reopen) args=(reopen custody) ;;
       esac
       PATH="$fakebin:$PATH" FAKE_LOCK_WAIT="$dir/lock-wait" \
         wrapper_from_code "$dir" "${args[@]}" > "$dir/result" 2>&1 &
@@ -611,7 +608,7 @@ SH
   holding=$!
   wait_mutation_fixture "$dir/hold-entered" "hold mutation" "$holding" "$dir/hold-result"
   PATH="$fakebin:$PATH" FAKE_LOCK_WAIT="$dir/completion-wait" \
-    wrapper_from_code "$dir" task close --backend markdown hold-first --pr https://github.com/o/r/pull/9 \
+    wrapper_from_code "$dir" task close hold-first --pr https://github.com/o/r/pull/9 \
     > "$dir/completion-result" 2>&1 &
   completion=$!
   wait_mutation_fixture "$dir/completion-wait" "completion behind hold" "$completion" "$dir/completion-result"
@@ -732,7 +729,7 @@ SH
       rm -f "$dir/restart-failed"
       rc=0
       out=$(PATH="$fakebin:$PATH" FAKE_RESTART_VERB="$verb" FAKE_RESTART_OUTCOME="$outcome" \
-        wrapper_from_code "$dir" "$verb" --backend=markdown "$id" 2>&1) || rc=$?
+        wrapper_from_code "$dir" "$verb" "$id" 2>&1) || rc=$?
       expect_code 47 "$rc" "$verb $outcome failure"
       assert_contains "$out" "restart command failed" "$verb $outcome lost the original command error"
       stored=$(wrapper_from_code "$dir" show "$id" --full) || fail "could not read failed restart row"
@@ -776,12 +773,12 @@ SH
   for id in resumed-scout resumed-ship untouched-drop; do
     case "$id" in resumed-scout) kind=scout ;; *) kind=ship ;; esac
     wrapper_from_code "$dir" add "$id" "$id" --kind "$kind" >/dev/null || fail "could not create landed fixture"
-    out=$(wrapper_from_code "$dir" task done --backend=markdown "$id" --drop-file "$dir/words" 2>&1) \
+    out=$(wrapper_from_code "$dir" task done "$id" --drop-file "$dir/words" 2>&1) \
       || fail "could not drop landed fixture: $out"
   done
-  out=$(wrapper_from_code "$dir" task reopen --backend markdown resumed-scout 2>&1) \
+  out=$(wrapper_from_code "$dir" task reopen resumed-scout 2>&1) \
     || fail "could not reopen scout: $out"
-  out=$(wrapper_from_code "$dir" task start --backend=markdown resumed-ship 2>&1) \
+  out=$(wrapper_from_code "$dir" task start resumed-ship 2>&1) \
     || fail "could not restart ship: $out"
   json=$(FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
     "$ROOT/bin/fm-fleet-snapshot.sh" --home-input) || fail "resumed snapshot failed"
@@ -791,9 +788,9 @@ SH
     and (.backlog.records | any(.id == "untouched-drop" and .captain_drop == true))
   ' >/dev/null || fail "snapshot conflated resumed and untouched captain drops"
   printf '# Fresh findings\n' > "$dir/home/data/resumed-scout/report.md"
-  out=$(wrapper_from_code "$dir" task done --backend markdown resumed-scout --report data/resumed-scout/report.md 2>&1) \
+  out=$(wrapper_from_code "$dir" task done resumed-scout --report data/resumed-scout/report.md 2>&1) \
     || fail "resumed scout report was refused: $out"
-  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" task close --backend=markdown resumed-ship --pr https://github.com/o/r/pull/9 2>&1) \
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" task close resumed-ship --pr https://github.com/o/r/pull/9 2>&1) \
     || fail "resumed merged ship was refused: $out"
   json=$(FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
     "$ROOT/bin/fm-bearings-snapshot.sh" --json --all-landed) || fail "resumed bearings failed"
@@ -803,6 +800,129 @@ SH
     and (.landed | any(.id == "untouched-drop") | not)
   ' >/dev/null || fail "Recently Landed did not select resumed deliveries and exclude untouched drop"
   pass "real snapshot and landed projection distinguish resumed deliveries from untouched captain drops"
+}
+
+test_bounded_mutation_grammar_refuses_before_side_effects() {
+  local dir fakebin real verb noun form token spelling out rc before
+  local prefix=() args=()
+  dir=$(make_split bounded-mutations)
+  fakebin=$(fm_fakebin "$dir")
+  real=$(command -v tasks-axi)
+  wrapper_from_code "$dir" add bounded "bounded scout" --kind scout >/dev/null || fail "could not add bounded row"
+  wrapper_from_code "$dir" add decoy "decoy docs" --kind docs >/dev/null || fail "could not add decoy row"
+  printf 'dropped\n' > "$dir/body"
+  wrapper_from_code "$dir" update bounded --body-file "$dir/body" >/dev/null || fail "could not set dropped provenance"
+  printf 'Captain words stay private.\n' > "$dir/words"
+  before=$(cat "$dir/home/data/backlog.md")
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+: > "$dir/sdk-called"
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  for verb in done close start reopen; do
+    for noun in bare task; do
+      if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
+      for form in global-split global-equals unknown extra separator short-help help-equals missing-id; do
+        case "$form" in
+          global-split) args=(--backend markdown bounded) ;;
+          global-equals) args=(bounded --backend=markdown) ;;
+          unknown) args=(bounded --mystery) ;;
+          extra) args=(bounded decoy) ;;
+          separator) args=(-- bounded) ;;
+          short-help) args=(bounded -h) ;;
+          help-equals) args=(bounded --help=true) ;;
+          missing-id) args=() ;;
+        esac
+        rm -f "$dir/sdk-called"
+        rc=0
+        out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" "${prefix[@]}" ${args[@]+"${args[@]}"} 2>&1) || rc=$?
+        expect_code 2 "$rc" "$noun $verb $form"
+        assert_contains "$out" "tasks-axi directly" "$noun $verb $form did not name the direct SDK escape"
+        assert_absent "$dir/sdk-called" "$noun $verb $form reached the SDK"
+        assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "$noun $verb $form changed row or provenance"
+        assert_absent "$dir/home/data/bounded/captain-drop.md" "$noun $verb $form retained drop words"
+        assert_absent "$dir/home/data/done-archive.md" "$noun $verb $form archived a row"
+        assert_absent "$dir/home/state/.control-bounded.lock" "$noun $verb $form left control custody"
+        assert_absent "$dir/home/state/.meta-bounded.lock" "$noun $verb $form left metadata custody"
+      done
+    done
+  done
+  for verb in done close; do
+    for noun in bare task; do
+      if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
+      for form in --note --pr --report --drop-file --keep; do
+        for token in --help --backend=markdown --json; do
+          for spelling in split equals; do
+            if [ "$spelling" = split ]; then args=("$form" "$token"); else args=("$form=$token"); fi
+            rm -f "$dir/sdk-called"
+            rc=0
+            out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" "${prefix[@]}" bounded "${args[@]}" --drop-file "$dir/words" 2>&1) || rc=$?
+            expect_code 2 "$rc" "$noun $verb $form $spelling $token"
+            assert_absent "$dir/sdk-called" "consumed option value reached production help/global parsing"
+            assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "consumed option value changed backlog"
+            assert_absent "$dir/home/data/bounded/captain-drop.md" "consumed option value retained drop words"
+          done
+        done
+        rm -f "$dir/sdk-called"
+        rc=0
+        out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" "${prefix[@]}" bounded "$form" 2>&1) || rc=$?
+        expect_code 2 "$rc" "$noun $verb missing $form value"
+        assert_absent "$dir/sdk-called" "missing value reached the SDK"
+      done
+    done
+  done
+  pass "bounded completion and restart grammar refuses before SDK calls, drop retention, retirement, or archiving"
+}
+
+test_exact_mutation_help_has_no_side_effects() {
+  local dir verb noun before out
+  local prefix=()
+  dir=$(make_split exact-help)
+  wrapper_from_code "$dir" add help-row "help scout" --kind scout >/dev/null || fail "could not create help fixture"
+  printf 'dropped\n' > "$dir/body"
+  wrapper_from_code "$dir" update help-row --body-file "$dir/body" >/dev/null || fail "could not set help body"
+  printf 'Do not retain these words for help.\n' > "$dir/words"
+  before=$(cat "$dir/home/data/backlog.md")
+  for verb in done close start reopen; do
+    for noun in bare task; do
+      if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
+      out=$(wrapper_from_code "$dir" "${prefix[@]}" --help 2>&1) || fail "$noun $verb help failed: $out"
+      assert_contains "$out" "usage: tasks-axi" "$noun $verb did not print production help"
+      if [ "$verb" = done ] || [ "$verb" = close ]; then
+        out=$(wrapper_from_code "$dir" "${prefix[@]}" help-row --drop-file "$dir/words" --help 2>&1) || fail "drop help failed: $out"
+      else
+        out=$(wrapper_from_code "$dir" "${prefix[@]}" help-row --json --help 2>&1) || fail "restart help failed: $out"
+      fi
+      assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "$noun $verb help mutated provenance"
+      assert_absent "$dir/home/data/help-row/captain-drop.md" "$noun $verb help retained drop words"
+      assert_absent "$dir/home/data/done-archive.md" "$noun $verb help archived a row"
+      assert_absent "$dir/home/state/.control-help-row.lock" "$noun $verb help took control custody"
+    done
+  done
+  pass "only exact unconsumed help tokens reach production help without completion or restart side effects"
+}
+
+test_completion_keep_count_and_normal_options() {
+  local dir id form out
+  dir=$(make_split completion-keep)
+  for form in split equals no-prune; do
+    id="keep-$form"
+    wrapper_from_code "$dir" add "$id" "$id" --kind docs >/dev/null || fail "could not add keep fixture"
+    case "$form" in
+      split) out=$(wrapper_from_code "$dir" done "$id" --keep 0 --note "Count zero" --json 2>&1) ;;
+      equals) out=$(wrapper_from_code "$dir" task close "$id" --keep=0 --note="Count zero" --json 2>&1) ;;
+      no-prune) out=$(wrapper_from_code "$dir" close "$id" --keep 0 --no-prune --note "Retain this row" --json 2>&1) ;;
+    esac
+    [ "$?" -eq 0 ] || fail "$form keep completion failed: $out"
+    if [ "$form" = no-prune ]; then
+      assert_grep "$id" "$dir/home/data/backlog.md" "--no-prune did not retain the completed row"
+    else
+      assert_not_contains "$(cat "$dir/home/data/backlog.md")" "$id" "--keep 0 did not prune the completed row"
+      assert_grep "$id" "$dir/home/data/done-archive.md" "--keep 0 did not archive the completed row"
+    fi
+  done
+  pass "documented numeric keep forms, no-prune, note, json, and optional noun preserve ordinary completion"
 }
 
 if [ "$#" -gt 0 ]; then
@@ -831,6 +951,9 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_resumed_deliveries_reach_landed_output
   test_restart_handles_sole_drop_and_failed_body_update
   test_unsupported_leading_backend_preserves_the_row
+  test_bounded_mutation_grammar_refuses_before_side_effects
+  test_exact_mutation_help_has_no_side_effects
+  test_completion_keep_count_and_normal_options
   test_task_mutations_wait_for_lifecycle_custody || exit "$?"
   test_completion_serializes_with_a_concurrent_hold || exit "$?"
   test_restart_serializes_with_a_concurrent_body_change || exit "$?"
