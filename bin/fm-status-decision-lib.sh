@@ -175,7 +175,7 @@ _fm_key_before_colon() {  # <status-line>
 # the line has no colon or no complete token there; slug charset validity is
 # the caller's check via _fm_decision_slug_ok, exactly as for the before-colon
 # position.
-_fm_key_at_note_head() {  # <status-line> -> raw slug
+_fm_key_at_note_head() {  # <status-line> [<out-var>] -> raw slug
   local rest
   case "$1" in
     *:*) rest=${1#*:} ;;
@@ -183,7 +183,10 @@ _fm_key_at_note_head() {  # <status-line> -> raw slug
   esac
   rest=${rest#"${rest%%[![:space:]]*}"}
   case "$rest" in
-    \[key=*\]*) rest=${rest#\[key=}; printf '%s' "${rest%%\]*}" ;;
+    \[key=*\]*)
+      rest=${rest#\[key=}; rest=${rest%%\]*}
+      if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$rest"; else printf '%s' "$rest"; fi
+      ;;
     *) return 1 ;;
   esac
 }
@@ -198,35 +201,41 @@ _fm_decision_slug_ok() {  # <slug>
 # worker-written stamp cannot move it: a readable time like [at=10:30] carries
 # colons that would otherwise end the head mid-tag and hand the caller a note
 # and a key sliced out of the timestamp. The line's own bytes are never altered.
-status_line_note() {  # <status-line> -> text after the first colon, trimmed
+status_line_note() {  # <status-line> [<out-var>] -> text after the first colon, trimmed
   local n k unstamped
   _fm_status_unstamped "$1" unstamped
   case "$unstamped" in
     *:*) n=${unstamped#*:}; n=${n#"${n%%[![:space:]]*}"} ;;
-    *) printf '%s' "$unstamped"; return 0 ;;
+    *) n=$unstamped; if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$n"; else printf '%s' "$n"; fi; return 0 ;;
   esac
   # A note-head token that states this line's key (no before-colon token, valid
   # slug) is key metadata, not note text: strip it so both stated-key positions
   # yield the same note.
-  if ! _fm_key_before_colon "$unstamped" && k=$(_fm_key_at_note_head "$unstamped") \
+  if ! _fm_key_before_colon "$unstamped" && _fm_key_at_note_head "$unstamped" k \
     && _fm_decision_slug_ok "$k"; then
     n=${n#"[key=$k]"}
     n=${n#"${n%%[![:space:]]*}"}
   fi
-  printf '%s' "$n"
+  if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$n"; else printf '%s' "$n"; fi
+}
+_fm_decision_key_into() {  # <status-line> <keyless> <out-var> -> sets <out-var> to the key slug, or <keyless> when no token
+  local __fm_dk_k __fm_dk_unstamped
+  _fm_status_unstamped "$1" __fm_dk_unstamped
+  if _fm_key_before_colon "$__fm_dk_unstamped"; then
+    __fm_dk_k=${__fm_dk_unstamped%%:*}
+    __fm_dk_k=${__fm_dk_k#*\[key=}
+    __fm_dk_k=${__fm_dk_k%%\]*}
+  elif ! _fm_key_at_note_head "$__fm_dk_unstamped" __fm_dk_k; then
+    printf -v "$3" '%s' "$2"
+    return 0
+  fi
+  _fm_decision_slug_ok "$__fm_dk_k" || return 1
+  printf -v "$3" '%s' "$__fm_dk_k"
 }
 _fm_decision_key() {  # <status-line> [<keyless>] -> key slug, or <keyless> (default "default") when no token
-  local k unstamped
-  _fm_status_unstamped "$1" unstamped
-  if _fm_key_before_colon "$unstamped"; then
-    k=${unstamped%%:*}
-    k=${k#*\[key=}
-    k=${k%%\]*}
-  else
-    k=$(_fm_key_at_note_head "$unstamped") || { printf '%s' "${2-default}"; return 0; }
-  fi
-  _fm_decision_slug_ok "$k" || return 1
-  printf '%s' "$k"
+  local __fm_dk_out
+  _fm_decision_key_into "$1" "${2-default}" __fm_dk_out || return 1
+  printf '%s' "$__fm_dk_out"
 }
 # Drop the record for <key> from a newline-terminated "<key>\t<verb>\t<note>" set.
 # Portable (no associative arrays) so the fold runs on bash 3.2 as well as 4+.
@@ -508,7 +517,7 @@ _fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
   local cf=$1 data first rest line
   _FM_ODC_VERSION='' _FM_ODC_OFFSET=0 _FM_ODC_IDENT='' _FM_ODC_OPEN=''
   [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ] || return 1
-  data=$(< "$cf") || return 1
+  data=$(LC_ALL=C command cat "$cf" 2>/dev/null) || return 1
   first=${data%%$'\n'*}
   case "$first" in version=?*) _FM_ODC_VERSION=${first#version=} ;; *) return 1 ;; esac
   case "$data" in *$'\n'*) rest=${data#*$'\n'} ;; *) return 1 ;; esac
