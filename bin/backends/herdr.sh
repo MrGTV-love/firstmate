@@ -3298,21 +3298,12 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 # claude/codex popups, so the caller's <settle> before the first Enter matters
 # here the same way it does for tmux.
 #
-# Confirmation signal: when the target is legibly idle before Enter,
-# submission is confirmed by fm_backend_herdr_wait_for_working observing a
-# submit-active agent_status after Enter. Live Claude on Herdr 0.8.0 can
-# keep agent_status idle for a whole landed turn, so an idle native result
-# falls through to the shared composer verdict: empty is positive delivery,
+# docs/herdr-backend.md "Submit confirmation" owns identity-gated native,
+# rendered-transition, and queued-Enter eligibility.
 #
-# Incident (2026-07-07, followed up on 2026-07-08): a redelivery loop in the
-# away-mode daemon. Root cause: composer-content submit confirmation was too
-# sensitive to harness rendering details. Real claude/codex use bare prompt
-# rows, and real codex adds dynamic idle suggestions after `›`; the later
-# ANSI-aware composer classifier now handles that Codex shape, and idle-baseline
-# submit confirmation still prefers native agent-state so a faint idle tip
-# cannot block a landed send. Composer content is consulted only after native
-# state stays idle, as the empty/pending owner, and for submit attempts whose
-# pre-Enter agent-state baseline is not legibly idle.
+# Native confirmation avoids composer-only false refusals from faint idle
+# suggestions. Live Claude on Herdr 0.8.0 can remain natively idle for a landed
+# turn, so native idle is not a swallow: composer clearance is still proof.
 #
 # This also still correctly handles the earlier 2026-07-03 incident (a
 # slash-command popup selection/placeholder-fill on the FIRST Enter is not a
@@ -3322,9 +3313,8 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 # loop below sends a second Enter exactly as it did before - the fix
 # generalizes instead of special-casing the popup shape.
 #
-# Failure-mode analysis (the two directions the caller-facing contract must
-# not get wrong - see docs/herdr-backend.md "Native agent-state submit
-# confirmation" for the empirical timing behind this):
+# Slow-transition safety (see docs/herdr-backend.md "Native agent-state submit
+# confirmation" for the empirical timing):
 #   - Slow transition: fm_backend_herdr_wait_for_working samples repeatedly
 #     across herdr's per-attempt confirmation budget (not once at the end), so a
 #     transition landing partway through a window is still caught before this

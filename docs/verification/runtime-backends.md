@@ -1221,7 +1221,6 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
   The composer then read `pending`, the lane read idle, and a bare Enter submitted the wake, which the lane then handled.
   omp joins restored messages and any operator draft with a blank line (`<wake>` blank line `<draft>`).
   [Watcher continuity](../watcher-continuity.md#omp-restored-wake-recovery) owns current recovery behavior and known limits; [architecture](../architecture.md#event-driven-supervision) owns parent alarm and idle-ring eligibility.
-  The earlier guard run reported exact operator-draft preservation, but did not require fresh queued-wake evidence before every interruption.
 - **A working lane's box composer is readable.**
   While a turn runs, the box top border carries a braille spinner frame and the elapsed time (`╭── ⠦ 13s > ◔ GPT-6-Astra …`) instead of the idle `π >` identity.
   The shared classifier used to read that border as `unknown`, so a doorbell typed into a working lane could not be seen as unsubmitted and the adapter's submit never retried a dropped Enter.
@@ -1230,35 +1229,24 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
 - **A descendant omp must not take the markers.**
   An `omp --print` child that a turn ran loaded the same `.omp/extensions` from the same directory, wrote its own pid into `state/.omp-turnend-extension-loaded`, and died, leaving the supervision proof reading `not loaded` under a healthy session.
   [Extension supervision proof](../turnend-guard.md#extension-model) owns exact-lock marker and watcher ownership, including load-time marker writes before a live lock exists.
-  The current live guard requires a fresh lab-local success record written only after the requested child command exits successfully before checking either marker.
-  It loads the backend metadata dispatcher separately from the Herdr adapter and brackets busy-composer observations with agent liveness and Herdr's process-validated native busy state, checking that evidence immediately before adapter submission without loading a parent-task secondmate busy adapter.
-  Rendered delivery-busy readers recognize both the spinner-bearing box border and the `⎋ Waiting …` row, including when no harness identity is available. An empty working editor remains readable as `empty`, but the away-mode daemon defers injection until the turn is idle.
+  The current live guard requires a fresh lab-local success record written only after the child command succeeds and both marker PIDs match the session lock PID, before the parent can repair them at its next turn boundary.
+  It checks both markers again after the parent resumes and brackets busy-composer observations with agent liveness and Herdr's process-validated native busy state, checking that evidence immediately before adapter submission.
+  Rendered delivery-busy readers recognize both the spinner-bearing box border and the `⎋ Waiting …` row, including when no harness identity is available.
+  An empty working editor remains readable as `empty`, but the away-mode daemon defers injection until the turn is idle.
 
 `tests/fm-omp-harness.test.sh` carries restored-wake editor recovery, descendant sessions, and marker self-repair; `tests/fm-composer-lib.test.sh` carries working-box fixtures captured during this verification; backend submit regressions carry dropped-Enter and stale-frame reread protections, and `tests/fm-wake-queue.test.sh` carries the ordinary stalled-loop alarm and idle-ring boundaries.
-Earlier correction runs exercised portable composer, backend-submit, omp-harness, and wake-queue regressions, including a parent recovery path that has since been removed.
-Those results are historical evidence for their then-current code, not verification of this removal.
 
-On 2026-10-07, focused review verification passed `tests/fm-omp-harness.test.sh`, exercising restored-wake scenarios, ordinary generated worker lifecycle behavior, and literal path preservation.
-An executable smoke of the live guard's generated Herdr wrapper, using the real lab helper with a fixture CLI, passed the exact `status --json` probe and ordinary scoped calls, and rejected foreign sessions and nonexact unscoped calls.
-The touched spawn, live-guard, and wake-queue shell files passed syntax checks.
-No real model or Herdr session was exercised; the live guard has not been rerun here.
-
-The test-scope removal round passed the composer and Zellij test files and an executable key-delivery smoke: the prior helper continued after a failed Escape, while the current helper stopped on failed Escape, Enter, and C-u and continued on successful sends.
-The omp harness file stopped at its restored baseline decoy-detection case under this review process's omp ancestry; that case was not rerun.
-A direct execution of the retained restored-wake, descendant-ownership, and marker-self-repair tests passed; no real model or Herdr session was exercised.
-
-The delivery-busy correction round reproduced both working signals reading `idle` with an `empty` composer before the fix, and `busy` afterward, for omp-scoped and harnessless matching.
-Direct execution of the working-box composer, delivery-busy matcher, and away-mode injection regressions passed, including tmux and Herdr rendered readers, busy deferral with an unchanged escalation buffer, and idle submission of that retained digest.
-The full composer test file exceeded the verification timeout; no full-suite or live-model result is claimed.
-
-The live guard that refreshes this entry submits real prompts and stays opt-in:
+The live guard that refreshes this entry submits real prompts and stays opt-in.
+Both recovery probes require the fresh queued wake to be observed in a pending composer after Escape before queue drainage or draft preservation can count as recovery proof.
+If restoration is not observed, the probe retries from a fresh busy turn at most three times, then fails rather than accepting ordinary queued delivery as recovery.
 
 ```sh
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
-Historical output for the kept behavior from the earlier guard (the restored-wake probes lacked per-interruption freshness and queued-state assertions, the marker probe lacked successful child-command evidence, and the busy-composer probes lacked current busy evidence at their observations and submission; the current guard has not been rerun here).
-That run also exercised the now-removed parent Enter recovery; its results do not establish the current contract and are omitted below.
+The current live guard has not been rerun for this change.
+Historical output below predates its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
+These results do not establish the current recovery contract; output for the removed parent Enter recovery is omitted.
 
 ```text
 ok - live omp wake restore: omp (omp/18.7.0) on herdr 0.9.1 re-submitted a wake that Esc restored to the composer, and the lane handled it

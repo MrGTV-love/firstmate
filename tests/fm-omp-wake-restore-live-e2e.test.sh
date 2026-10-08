@@ -49,6 +49,7 @@ ORIGINAL_PATH=$PATH
 SESSION=$("$LAB_HELPER" name omp-wake-restore)
 LAB=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-omp-wake-restore.XXXXXX")
 PROJECT="$LAB/project"
+CODE_ROOT="$LAB/code-root"
 FAKEBIN="$LAB/fakebin"
 PARENT="$LAB/parent"
 REAL_OMP=$(PATH="$ORIGINAL_PATH" command -v omp)
@@ -70,6 +71,7 @@ reap_lab() {
 
 cleanup() {
   local rc=$?
+  [ -z "${TERMINAL_CONTROL_PID:-}" ] || kill "$TERMINAL_CONTROL_PID" 2>/dev/null || true
   trap - EXIT
   reap_lab
   if ! PATH="$ORIGINAL_PATH" "$LAB_HELPER" teardown "$SESSION"; then
@@ -123,17 +125,22 @@ while IFS= read -r path; do
 done <<EOF
 $(git -C "$ROOT" ls-files --modified --others --exclude-standard)
 EOF
+# The launching code root must be distinct from the secondmate home; the
+# ordinary spawn interface deliberately refuses its own repository as a home.
+cp -R "$PROJECT" "$CODE_ROOT" || fail "could not prepare the isolated launching code root"
 mkdir -p "$PROJECT/state" "$PROJECT/config" "$PROJECT/data"
 
 # The session overlay with the composer shape every lane that lost its pin shows.
 BOX_OVERLAY="$LAB/box-overlay.yml"
 sed 's/^  shape: borderless$/  shape: box/' "$ROOT/.omp/fm-session-overlay.yml" > "$BOX_OVERLAY"
 cp "$BOX_OVERLAY" "$PROJECT/.omp/fm-session-overlay.yml"
+cp "$BOX_OVERLAY" "$CODE_ROOT/.omp/fm-session-overlay.yml"
 mkdir -p "$PARENT/state" "$PARENT/config" "$PARENT/data" "$PARENT/projects"
 printf 'Live wake recovery lab: arm watcher when asked, perform only requested checks, and otherwise stay idle.\n' > "$PROJECT/data/charter.md"
 
 PANE=
 TARGET=
+TERMINAL_CONTROL_PID=
 WAKE_PROBE=0
 WAKE_TASK=
 
@@ -180,13 +187,17 @@ start_omp() {
   printf '#!/usr/bin/env bash\nexec env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 %q "$@"\n' "$REAL_OMP" > "$FAKEBIN/omp"
   chmod +x "$FAKEBIN/omp"
   FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_SKIP_SECONDMATE_SYNC=1 FM_SKIP_SECONDMATE_INHERIT=1 \
-    FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$PROJECT" FM_STATE_OVERRIDE="$PARENT/state" \
+    FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$CODE_ROOT" FM_STATE_OVERRIDE="$PARENT/state" \
     FM_CONFIG_OVERRIDE="$PARENT/config" FM_DATA_OVERRIDE="$PARENT/data" \
     HERDR_SESSION="$SESSION" "$PROJECT/bin/fm-spawn.sh" wakemate "$PROJECT" omp --secondmate \
     --backend herdr --model "$MODEL" --effort low > "$LAB/spawn-$label.out" 2>&1 \
     || fail "could not launch the ordinary omp secondmate for $label: $(cat "$LAB/spawn-$label.out")"
   TARGET=$(fm_backend_target_of_meta "$PARENT/state/wakemate.meta")
   PANE=${TARGET#*:}
+  # Keep the fresh signal filename visible in the queue even when the isolated
+  # worktree path is long; omp truncates each queued message to the viewport.
+  lab terminal session control "$PANE" --cols 320 --rows 40 > "$LAB/terminal-control.log" 2>&1 &
+  TERMINAL_CONTROL_PID=$!
   wait_for 120 is_idle || { screen >&2; fail "$SUBJECT never published settled task evidence for $label"; }
   sleep 2
   send_text 'Call the fm_watch_arm_omp tool exactly once now, then reply with only the word ARMED.'
