@@ -32,10 +32,10 @@
 #   B. RESTART. Only after that mate's own correlated answer lands on the parent
 #      channel and affirmative evidence proves its turn ended. Both gates are
 #      events, never a wall clock: this command records a durable restart
-#      request, tries it once, and returns. Missing or inconclusive turn evidence,
-#      including a remote route without turn evidence, leaves the restart queued
-#      for supervision (bin/fm-secondmate-restart-lib.sh owns the request record,
-#      gates, and the lock shared with the watcher's automatic relaunch). An
+#      request, tries it once, and returns. Only a mate with a reachable verified
+#      turn-end producer is admitted; unavailable evidence after admission
+#      leaves the restart queued for supervision (bin/fm-secondmate-restart-lib.sh
+#      owns the gates and the lock shared with automatic relaunch). An
 #      unanswered request stays a genuine open loop owned by the ordinary
 #      pending-reply recovery ladder, not state this restart pass may close.
 #
@@ -49,16 +49,6 @@
 # a nudge, never as a clean reload. Once a relaunch is attempted, any failed or
 # ambiguous result is reported as unknown rather than attributing it to either
 # incarnation.
-#
-# Placement changes the transport and nothing else. A local mate is restarted
-# with bin/fm-control.sh <id> relaunch, which republishes this home's own
-# metadata directly; a remote mate is restarted with
-# bin/fm-remote-secondmate-relaunch.sh, which runs that same command on its
-# host over bin/fm-on.sh and then republishes this primary's own route
-# metadata from the identity the host confirmed, since the host-local verb can
-# only rewrite its own endpoint record. The restart decision, the profile, the
-# request text, the bound, the failure vocabulary, and this report are all
-# computed here in the primary and are identical for both.
 #
 # Nothing here forces, stashes, or discards anything. bin/fm-control.sh owns the
 # restart transaction, its checkpoint, its journal, and its rollback; a refusal
@@ -84,7 +74,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
-  sed -n '2,80{s/^# \{0,1\}//;p;}' "$0"
+  sed -n '2,70{s/^# \{0,1\}//;p;}' "$0"
 }
 
 PROCESS_REQUESTS=0
@@ -209,11 +199,6 @@ done
 # reason already decided.
 PLAN=()
 REASON=()
-PLACEMENT=()
-HOST=()
-HARNESS=()
-MODEL=()
-EFFORT=()
 RESTART_PID=()
 RESTART_RESULT=()
 
@@ -343,57 +328,10 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   id=${IDS[$i]}
   PLAN[i]="fallback"
   REASON[i]=""
-  PLACEMENT[i]=""
-  HOST[i]=""
-  HARNESS[i]=""
-  MODEL[i]=""
-  EFFORT[i]=""
   if ! fm_secondmate_liveness_lock "$id"; then
     printf 'waiting: %s: supervision is probing or relaunching its endpoint; waiting to record its restart request\n' "$id" >&2
     fm_lock_acquire_wait "$STATE/.secondmate-liveness-$id.lock"
   fi
-  if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
-    REASON[i]=$FM_SECONDMATE_RESTART_REASON
-    fm_secondmate_liveness_unlock "$id"
-    i=$((i + 1))
-    continue
-  fi
-  PLACEMENT[i]=$FM_SECONDMATE_RESTART_PLACEMENT
-  HOST[i]=$FM_SECONDMATE_RESTART_HOST
-  HARNESS[i]=$FM_SECONDMATE_RESTART_HARNESS
-  if [ "${PLACEMENT[i]}" = remote ]; then
-    # A local relaunch re-resolves this home's durable secondmate pin on its own,
-    # which is the one owner of that resolution. A remote one cannot: it runs in
-    # a home whose config/secondmate-harness is deliberately NOT inherited, so
-    # the file on that host belongs to a different home and re-resolving there
-    # would silently move the mate onto another runtime. Resolve the pin here and
-    # pass it explicitly, so both placements land on the same decision.
-    HARNESS[i]=$("$SCRIPT_DIR/fm-harness.sh" secondmate 2>/dev/null || true)
-    [ -n "${HARNESS[i]}" ] || HARNESS[i]=$FM_SECONDMATE_RESTART_HARNESS
-    MODEL[i]=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model 2>/dev/null || true)
-    EFFORT[i]=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort 2>/dev/null || true)
-    case "${EFFORT[i]}" in
-      ''|low|medium|high|xhigh|max|ultra) ;;
-      *) EFFORT[i]="" ;;
-    esac
-    resolved_model=${MODEL[i]}
-    if [ -n "${MODEL[i]}" ] && ! resolved_model=$("$SCRIPT_DIR/fm-model-index.sh" model "${HARNESS[i]}" "${MODEL[i]}" 2>/dev/null); then
-      REASON[i]="its configured model does not resolve through the model index (a retired id or an unconfigured role)"
-      fm_secondmate_liveness_unlock "$id"
-      i=$((i + 1))
-      continue
-    fi
-    if [ "${EFFORT[i]}" = ultra ] && ! "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "${HARNESS[i]}" "$resolved_model" "${EFFORT[i]}"; then
-      REASON[i]="the configured Ultra profile does not select native Codex through Pi"
-      fm_secondmate_liveness_unlock "$id"
-      i=$((i + 1))
-      continue
-    fi
-  fi
-
-  # A restart already recorded for this mate is still waiting on that mate's
-  # own events; asking again would only queue a second persist request behind
-  # the first, so the recorded request is tried instead.
   if [ -f "$(fm_secondmate_restart_outcome_path "$STATE" "$id")" ]; then
     RESTART_RESULT[i]="$RESULT_DIR/$i.result"
     RESTART_PID[i]=""
@@ -404,6 +342,13 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
+  if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
+    REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    fm_secondmate_liveness_unlock "$id"
+    i=$((i + 1))
+    continue
+  fi
+
   if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ]; then
     PLAN[i]="recorded"
     i=$((i + 1))
@@ -426,8 +371,8 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
-  if ! fm_secondmate_restart_request_write "$STATE" "$id" "$corr" "${PLACEMENT[i]}" \
-    "${HOST[i]}" "${HARNESS[i]}" "${MODEL[i]}" "${EFFORT[i]}"; then
+  if ! fm_secondmate_restart_request_write "$STATE" "$id" "$corr" local \
+    '' "$FM_SECONDMATE_RESTART_HARNESS" '' ''; then
     REASON[i]="its restart request could not be recorded, so it was asked to write down its open work but will not be restarted"
     fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))

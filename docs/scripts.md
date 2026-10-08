@@ -22,8 +22,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
 | `fm-secondmate-reconcile.sh` | Queue Bearings reconcile requests for later supervision delivery and ask each mismatched home through its durable inbox with a per-home cooldown |
 | `fm-update.sh`           | Guarded self-update of firstmate and local or remote secondmate homes, reconciling redundant divergence and classifying every live mate left on the target commit for restart or fallback nudge |
-| `fm-secondmate-restart.sh` | Persist open conversational work, then restart eligible second mates once they confirm and their turn ends, or report the fallback outcome |
-| `fm-secondmate-restart-lib.sh` | Shared second-mate restart capability, persistence-request contract, and the recorded event-driven restart supervision finishes |
+| `fm-secondmate-restart.sh` | Persist open conversational work, then restart mates with current-launch turn-end producers once they confirm and their turn ends; nudge unwired, unverified, or remote mates without queueing a restart |
+| `fm-secondmate-restart-lib.sh` | Shared producer-aware second-mate restart admission, persistence-request contract, and the recorded event-driven restart supervision finishes |
 | `fm-on.sh`               | Execute one tracked Firstmate command in a configured remote secondmate home, using its job worker except for the doctor bootstrap |
 | `fm-remote-job-lib.sh`   | Shared bounded remote job queue, worker readiness, LaunchAgent contract, and filesystem-composed PATH |
 | `fm-remote-job-worker.sh` | Long-lived remote queue worker for tracked `fm-*.sh` commands in the account runtime |
