@@ -115,6 +115,14 @@ case "$1" in
   models)
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
+  config)
+    # `omp config get modelRoles --json` prints the shared roles record; a
+    # roles.json beside this fake stands in for the captain's global config, and
+    # no such file models an unreadable config.
+    roles="$(dirname "$0")/roles.json"
+    [ -f "$roles" ] || exit 1
+    printf '{"key":"modelRoles","value":%s,"type":"record","description":""}\n' "$(cat "$roles")"
+    ;;
 esac
 exit 0
 SH
@@ -206,6 +214,59 @@ test_spawn_model_validation_scoped_to_listed_providers() {
   status=$?
   expect_code 0 "$status" "a bare fuzzy pattern is omp's own matcher's job: $out"
   pass "fm-spawn: omp model validation is scoped to providers the listing can prove"
+}
+
+# omp's default role lives in one global file that every interactive omp session
+# can rewrite. A launch with no --model reads it, and a missing or unlisted role
+# makes omp silently pick the first credentialed model (a free-tier model that
+# answers HTTP 429). The launch must refuse with the remedy instead.
+test_spawn_refuses_a_missing_or_unlisted_default_role() {
+  local rec id out status
+  rec=$(make_spawn_case role-missing omp omp-role-missing-q5)
+  read_case_record "$rec"
+  id=omp-role-missing-q5
+  printf '%s' '{"advisor":"openai-codex/gpt-6-astra:high"}' > "$FAKEBIN_DIR/roles.json"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 1 "$status" "an omp launch with no model and no default role must refuse: $out"
+  assert_contains "$out" "omp modelRoles.default is not set in the shared omp config" "refusal did not name the missing role"
+  assert_contains "$out" "pass --model <provider>/<id>" "refusal did not carry the remedy"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused spawn must publish no record"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused spawn must record no launch: $(cat "$LAUNCH_LOG")"
+
+  rec=$(make_spawn_case role-unlisted omp omp-role-unlisted-q6)
+  read_case_record "$rec"
+  id=omp-role-unlisted-q6
+  printf '%s' '{"default":"openai-codex/gpt-gone:high"}' > "$FAKEBIN_DIR/roles.json"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 1 "$status" "a default role naming an unlisted id must refuse: $out"
+  assert_contains "$out" "omp modelRoles.default 'openai-codex/gpt-gone:high' is not listed by 'omp models --json' although provider 'openai-codex' is" "refusal did not name the unresolvable role"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused spawn must publish no record"
+
+  rec=$(make_spawn_case role-listed omp omp-role-listed-q7)
+  read_case_record "$rec"
+  id=omp-role-listed-q7
+  printf '%s' '{"default":"openai-codex/gpt-6-astra:high"}' > "$FAKEBIN_DIR/roles.json"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 0 "$status" "a listed default role (thinking suffix included) must launch: $out"
+
+  rec=$(make_spawn_case role-pinned omp omp-role-pinned-q8)
+  read_case_record "$rec"
+  id=omp-role-pinned-q8
+  printf '%s' '{}' > "$FAKEBIN_DIR/roles.json"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra)
+  status=$?
+  expect_code 0 "$status" "a launch that passes --model never reads the default role: $out"
+
+  rec=$(make_spawn_case role-unreadable omp omp-role-unreadable-q9)
+  read_case_record "$rec"
+  id=omp-role-unreadable-q9
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 0 "$status" "an unreadable roles config establishes nothing and must launch: $out"
+  pass "fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy"
 }
 
 test_secondmate_launch_relies_on_discovery() {
@@ -1373,6 +1434,7 @@ test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
+test_spawn_refuses_a_missing_or_unlisted_default_role
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle

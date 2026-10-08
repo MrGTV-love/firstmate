@@ -271,7 +271,13 @@
 #   provider absent from the listing (an extension-registered provider such as
 #   claude-bridge, which omp never lists) passes through unvalidated with a
 #   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
-#   own matcher. Indexed selections follow docs/configuration.md "Fleet model
+#   own matcher. An omp launch that resolves no model reads the shared
+#   modelRoles.default, which any interactive omp session can clear and which
+#   omp replaces with the first credentialed model when it is missing or
+#   unlisted; that launch is refused with the remedy when `omp config get
+#   modelRoles --json` shows the role unset or `omp models --json` shows it
+#   unlisted, and an unreadable config or listing establishes nothing. Indexed
+#   selections follow docs/configuration.md "Fleet model
 #   index". A crewmate or scout loads its per-task busy-state extension with -e
 #   from state/ (outside the worktree, so
 #   auto-discovery cannot load it a second time); a secondmate passes no -e at
@@ -2213,23 +2219,74 @@ pi_supports_approve() {
 # through with a notice, a bare fuzzy pattern is omp's own matcher's job, and an
 # unreadable listing establishes nothing (harness-adapters model-and-effort.md).
 omp_model_validate() { # <omp-bin> <model>
-  local bin=$1 model=$2 provider listing providers
+  local bin=$1 model=$2 provider verdict
   [ -n "$model" ] && [ "$model" != default ] || return 0
   case "$model" in */*) ;; *) return 0 ;; esac
-  command -v jq >/dev/null 2>&1 || return 0
-  listing=$(OMP_SKIP_SETUP=1 "$bin" models --json 2>/dev/null) || return 0
-  providers=$(printf '%s' "$listing" | jq -r '.models[]?.provider // empty' 2>/dev/null | sort -u) || return 0
-  [ -n "$providers" ] || return 0
   provider=${model%%/*}
-  if ! printf '%s\n' "$providers" | grep -qxF -- "$provider"; then
+  verdict=$(omp_catalog_verdict "$bin" "$model")
+  case "$verdict" in
+  listed | unreadable) return 0 ;;
+  unknown-provider)
     echo "notice: omp provider '$provider' is not in 'omp models --json' (extension-registered providers are never listed); launching '$model' unvalidated" >&2
     return 0
-  fi
-  if printf '%s' "$listing" | jq -e --arg m "$model" '.models[]? | select(.selector == $m)' >/dev/null 2>&1; then
-    return 0
-  fi
+    ;;
+  esac
   echo "error: omp model '$model' is not listed by 'omp models --json' although provider '$provider' is; choose a listed <provider>/<id> or omit --model" >&2
   return 1
+}
+
+# Shared catalog verdict for a <provider>/<id> selector, printed on stdout:
+# listed, unlisted (provider listed, id not), unknown-provider, or unreadable
+# (no jq, no listing, or an empty one - which establishes nothing).
+omp_catalog_verdict() { # <omp-bin> <provider/id>
+  local bin=$1 model=$2 provider listing providers
+  command -v jq >/dev/null 2>&1 || { echo unreadable; return 0; }
+  listing=$(OMP_SKIP_SETUP=1 "$bin" models --json 2>/dev/null) || { echo unreadable; return 0; }
+  providers=$(printf '%s' "$listing" | jq -r '.models[]?.provider // empty' 2>/dev/null | sort -u) || { echo unreadable; return 0; }
+  [ -n "$providers" ] || { echo unreadable; return 0; }
+  provider=${model%%/*}
+  if ! printf '%s\n' "$providers" | grep -qxF -- "$provider"; then
+    echo unknown-provider
+  elif printf '%s' "$listing" | jq -e --arg m "$model" '.models[]? | select(.selector == $m)' >/dev/null 2>&1; then
+    echo listed
+  else
+    echo unlisted
+  fi
+}
+
+# omp's shared default role is global (modelRoleStorage: global), so every omp
+# session the captain opens can change or clear it. When it is missing or names
+# an id the catalog does not list, omp does not fail: it silently takes the
+# first model that has credentials, which here is a free-tier model that answers
+# every call with HTTP 429. A launch that passes no --model depends on that
+# role, so it is refused here with the remedy rather than left to fall back.
+# A launch with --model never reads the role, an unreadable config or listing
+# establishes nothing, and a default that names a provider the listing does not
+# know or a bare pattern is omp's own matcher's job (same scope as
+# omp_model_validate).
+omp_default_role_validate() { # <omp-bin> <model>
+  local bin=$1 model=$2 roles role selector verdict remedy
+  { [ -z "$model" ] || [ "$model" = default ]; } || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  roles=$(OMP_SKIP_SETUP=1 "$bin" config get modelRoles --json 2>/dev/null) || return 0
+  printf '%s' "$roles" | jq -e '.value | type == "object"' >/dev/null 2>&1 || return 0
+  role=$(printf '%s' "$roles" | jq -r '.value.default // empty' 2>/dev/null) || return 0
+  remedy="pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model"
+  if [ -z "$role" ]; then
+    echo "error: omp modelRoles.default is not set in the shared omp config, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); $remedy" >&2
+    return 1
+  fi
+  selector=$role
+  case "$role" in
+  *:off | *:minimal | *:low | *:medium | *:high | *:xhigh | *:max | *:auto) selector=${role%:*} ;;
+  esac
+  case "$selector" in */*) ;; *) return 0 ;; esac
+  verdict=$(omp_catalog_verdict "$bin" "$selector")
+  if [ "$verdict" = unlisted ]; then
+    echo "error: omp modelRoles.default '$role' is not listed by 'omp models --json' although provider '${selector%%/*}' is, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); $remedy" >&2
+    return 1
+  fi
+  return 0
 }
 
 # agy pre-launch validation for non-index-entry literals. `agy models`
@@ -2767,6 +2824,9 @@ if [ "$EFFORT" = ultra ]; then
 fi
 if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
   omp_model_validate "$OMP_BIN" "$MODEL" || exit 1
+fi
+if [ "$HARNESS" = omp ]; then
+  omp_default_role_validate "$OMP_BIN" "$MODEL" || exit 1
 fi
 if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
