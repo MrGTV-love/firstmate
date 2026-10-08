@@ -3,7 +3,7 @@
 // Usage: node bin/fm-jev-guardrail.mjs hook --host claude|omp < native-tool.json
 //        node bin/fm-jev-guardrail.mjs metrics [--log <jsonl>]
 //        node bin/fm-jev-guardrail.mjs evaluate --cases <json> [--log <jsonl>]
-// Key: existing TYPESAFE_API_KEY, else fm_typesafe_key (bin/fm-typesafe-lib.sh): home/.env, then the primary home's.
+// Key resolution and precedence: fm_typesafe_key in bin/fm-typesafe-lib.sh.
 // Uses the TypeSafe endpoint and Choice schema; no SDK or retries.
 // Commands, paths, contents, response bodies and keys never enter records or state.
 // Records: attempt (before HTTP); result (including selection and unavailable usage).

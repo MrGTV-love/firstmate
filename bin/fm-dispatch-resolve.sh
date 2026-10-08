@@ -5,12 +5,11 @@
 # Usage:
 #   fm-dispatch-resolve.sh <brief-file> [--project <name>]
 #
-# Opt-in gate: TYPESAFE_API_KEY non-empty in this process environment, else a
-#   TYPESAFE_API_KEY= line in $FM_HOME/.env, then in the primary home's .env,
-#   read with fmx_env_get, the same accessor as FMX_PAIRING_TOKEN
-#   (bin/fm-env-lib.sh). The environment wins; fm_typesafe_key owns the order.
-#   Absent in both: one "dispatch-resolve: off" line on stderr, nothing on
-#   stdout, exit 0, no network call, so firstmate dispatches exactly as today.
+# Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
+#   resolution and precedence.
+#   With no key from any source: one "dispatch-resolve: off" line on stderr,
+#   nothing on stdout, exit 0, no network call, so firstmate dispatches exactly
+#   as today.
 #   The key lives in one shell variable and reaches curl as a header read from
 #   a file descriptor, never on argv; nothing logs or writes it.
 #

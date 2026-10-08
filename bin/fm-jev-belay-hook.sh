@@ -6,19 +6,19 @@
 #
 # belay.mjs reads the key only from its own process environment, and Firstmate
 # keeps the key out of worker environments, so this wrapper resolves it with
-# fm_typesafe_key (environment, home .env, then the primary home .env) and sets
-# it for the one node process it execs: never in Claude's environment, never in
-# a file, never on argv.
+# fm_typesafe_key in bin/fm-typesafe-lib.sh (the credential-precedence owner)
+# and sets it for the one bounded node process: never in Claude's environment,
+# never in a file, never on argv.
 # belay.mjs comes from the pinned, gitignored clone of valentynkit/jev-belay at
 # <primary home>/data/vendor/jev-belay (commit ef719db7eaadc56aa4def86c4da4ffff5bcbca35).
 # It runs only when the file's git blob id equals the pin, so a changed or
 # replaced file is never executed with the key. docs/configuration.md "Jev belay
 # Stop hook" owns the contract and the install command.
-# Every refusal exits 0 silently: a missing clone, key, node, or a pin mismatch
-# must never block or delay a worker's stop. belay.mjs keeps its published
-# defaults; only the variables that could redirect the key or change the model
-# pin (JEV_BASE_URL, JEV_MODEL, JEV_API_KEY and the plugin option copy) are
-# cleared first.
+# Missing prerequisites or a pin mismatch exit 0 silently.
+# Once launched, the wrapper preserves the upstream exit status unless its
+# 20-second deadline fires, returning 124 after a 0.2-second termination grace.
+# The policy preload checks requests before transport; JEV_BASE_URL, JEV_MODEL,
+# JEV_API_KEY and the plugin option copy are cleared before launch.
 # FM_JEV_BELAY_BLOB overrides the pin only when FM_TEST_SEAM=1.
 set -u
 

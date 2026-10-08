@@ -1118,7 +1118,7 @@ The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapt
 The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
 Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
 The controller reuses that package's request format, profile parsing and snapshot/redaction without creating another credential store.
-Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
+The [compact-adviser setting](#compact-adviser-setting-configcompact-adviser) owns the pending compaction key-delivery contract.
 `FM_JEV_PIPELINE_AGENT_DIR` selects the adviser configuration directory; when omitted, the controller uses omp's public `getAgentDir()` and reads that configuration without modifying it.
 `TYPESAFE_BASE` follows compact-adviser's HTTPS-or-loopback-only endpoint policy.
 Neither installation nor loading changes global plugins or settings.
@@ -1395,7 +1395,7 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, advisory skill-selection, or [belay Stop-hook](#jev-belay-stop-hook) requests, and keeps marked brief regions out of Jev resolver requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so both tools there withhold the same values.
+Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so all consumers there withhold the same values.
 
 Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
@@ -1411,7 +1411,7 @@ Example Client Ltd
 # dispatch-never-send marked-sections
 ```
 
-The following marked-region rules apply only to dispatch resolution; advisory skill selection neither removes nor validates these markers.
+The following marked-region rules apply only to dispatch resolution; advisory skill selection and belay neither remove nor validate these markers.
 
 Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
 
@@ -1434,7 +1434,7 @@ A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
 Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
 
-Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; advisory skill selection checks every request string through `bin/fm-typesafe-lib.sh`.
+Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; advisory skill selection and belay check every request string through `bin/fm-typesafe-lib.sh`.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -1538,7 +1538,7 @@ Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERR
 The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
 Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
 
-The screen uses the existing `TYPESAFE_API_KEY` environment-first, home-then-primary-`.env` accessor (`fm_typesafe_key`) and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+The screen uses the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
 Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
 It does not grant account, billing, egress, command, or secret-access authority.
 No key means `missing_key`, not a synthetic judgment.
@@ -1599,7 +1599,7 @@ Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event
 Secondmate sessions and other harnesses do not run it.
 
 The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
-The wrapper therefore resolves the key at call time with `fm_typesafe_key` (the environment, the home `.env`, then the primary home `.env`) and sets it for the one upstream `node` process.
+The wrapper therefore resolves the key at call time through the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and sets it for the one upstream `node` process.
 The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
 Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
 Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.

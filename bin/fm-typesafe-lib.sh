@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Shared TypeSafe boundary for dispatch and advisory skill selection.
+# Shared TypeSafe boundary for Firstmate's dispatch and Jev integrations.
 # Usage: source this before launching children, then fm_typesafe_key <home>.
 # fm_typesafe_key resolves the key from, in order, the process environment,
 # <home>/.env, then the .env of the top-most local home reached through the

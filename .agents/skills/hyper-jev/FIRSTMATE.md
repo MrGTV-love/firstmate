@@ -1,6 +1,6 @@
 - The direct TypeSafe endpoint is POST https://api.typesafe.ai/v1/systemone.
 - TypeSafe direct first; fall back to OpenRouter when the direct call is unavailable or fails.
 - This is a captain-ordered deviation from upstream `SKILL.md` lines 20-21 (no provider switch after a failed call), authorized on 2026-10-07 by "it falls back to openrouter" and "regarding openrouter and Jev, I already indicated that openrouter is a fallback from directly using the typesafe api".
-- The key is `TYPESAFE_API_KEY` in the primary home `.env` only, resolved at call time with `fm_typesafe_key` from `bin/fm-typesafe-lib.sh`.
+- Keep the single stored `TYPESAFE_API_KEY` in the primary home `.env`; resolve it at call time with `fm_typesafe_key` from `bin/fm-typesafe-lib.sh`.
 - Never create a service `.env`, an `.env.example` key, a secret-manager entry, or any copy of the key.
 - Where the upstream skill text differs (service-local `.env`), this overlay wins in firstmate.

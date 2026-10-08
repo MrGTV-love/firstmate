@@ -4760,16 +4760,13 @@ if [ "$KIND" != secondmate ]; then
   case "$HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
-    # a turn; Stop (normal completion), StopFailure (API-error turn end),
-    # and SessionEnd (process shutdown) all close it, so an abnormal end can
-    # never leave a stale busy record. Claude fires no hook for a manual
+    # a turn; accepted Stop, StopFailure (API-error turn end), and SessionEnd
+    # (process shutdown) close it. docs/configuration.md "Jev belay Stop hook"
+    # owns Stop acceptance and completion. Claude fires no hook for a manual
     # interrupt: fm-control preserves the adapter-owned state, while the
-    # legacy fm-send --key Escape path records idle/fm-interrupt. Stop keeps
-    # the turn-ended NOTIFICATION touch for the watcher. Every
-    # hook command tolerates a refused event (|| true) so a stale-gen writer
-    # can never break Claude's own lifecycle. The Stop group also carries the
-    # published jev-belay hook through bin/fm-jev-belay-hook.sh, which supplies
-    # the TypeSafe key to that one process only and exits 0 when it cannot run.
+    # legacy fm-send --key Escape path records idle/fm-interrupt.
+    # Busy-event publication tolerates a refused event (|| true) so a stale-gen
+    # writer can never break Claude's own lifecycle.
     mkdir -p "$WT/.claude"
     busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
     busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source claude-hook"
