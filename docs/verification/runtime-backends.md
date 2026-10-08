@@ -1764,7 +1764,7 @@ That screen still classifies as pending, the same verdict as unsubmitted compose
 A second Enter would confirm the selected row.
 The picker is recognised by its recorded structure only: the heading on its own line, then the selected row alone on its row, with `Enter to confirm · Esc to cancel` as the last non-blank row.
 The same strings quoted above a normal composer, as a diff, this note, or a test fixture shows them, are not a picker.
-Submit retries now stop after the Enter that opened the picker and report unknown.
+Submit retries stop after the Enter that opened the picker and report unknown, including when the picker first appears on the pending-frame refresh before a retry.
 A typed submit to a pane that already shows the picker types nothing and sends no Enter.
 Exit reports that the worker is blocked on the Claude background-task exit picker and does not type another Enter.
 A submit can return before any read sees the picker, so exit reads the screen once more when its wait for the agent to stop times out, and names the picker there too.
