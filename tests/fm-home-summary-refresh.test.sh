@@ -989,6 +989,12 @@ if ! kill -0 "$WATCH_PID" 2>/dev/null; then
   wait_for_restart_beacon \
     || fail "the recovery replacement watcher did not begin polling: $(cat "$TMP_ROOT/restart-watch-three.err")"
 fi
+# The short watcher deadline above is a contention guard, not a publication
+# budget. Stop its competing detached trigger before the direct stale-owner
+# recovery check so that trigger cannot win and time out mid-production.
+kill "$WATCH_PID" >/dev/null 2>&1 || true
+wait "$WATCH_PID" >/dev/null 2>&1 || true
+WATCH_PID=
 kill -KILL "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 wait "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 LOCK_HOLDER_PID=
@@ -1002,9 +1008,6 @@ while [ ! -e "$RESTART_HOME/state/home-summary.json" ] && [ "$i" -lt 200 ]; do
 done
 [ -e "$RESTART_HOME/state/home-summary.json" ] \
   || fail "a dead publication lock wedged publication"
-kill "$WATCH_PID" >/dev/null 2>&1 || true
-wait "$WATCH_PID" >/dev/null 2>&1 || true
-WATCH_PID=
 pass "publication remains single-flight across watcher restart"
 
 # A publication that keeps failing is deliberately non-fatal to its caller, so
@@ -1401,38 +1404,47 @@ jq -e --arg now "$NOW_TWO" '.generated == $now' "$SERIAL_HOME/state/home-summary
   || fail "the serialized third failure did not publish exactly one wake"
 pass "timeout wake accounting finishes before a newer success publishes and resets the streak"
 
-# A failure that repeats must become a wake, not a logged line. Each attempt
-# acquires refresh ownership before validation hits its deadline.
+# A failure that repeats must become a wake, not a logged line. Use a real
+# publication failure after acquisition rather than making host-dependent cold
+# startup fit a tiny deadline; deadline behavior is covered independently above.
+run_owned_publication_failure() {  # <home> <expected-streak-count>
+  local home=$1 count=$2 ledger="$1/state/home-summary.json"
+  if [ -f "$ledger" ]; then
+    mv "$ledger" "$home/state/.test-ledger-before-failure"
+  fi
+  mkdir -p "$ledger"
+  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    "$WRITER" --best-effort \
+    || fail "failed attempt $count changed the best-effort caller result"
+  grep -qx "count=$count" "$home/state/.home-summary-refresh.streak" \
+    || fail "attempt $count did not account for its acquired publication failure"
+  assert_grep "atomic ledger replacement failed: destination is a directory:" \
+    "$home/state/.home-summary-refresh.log" \
+    "attempt $count did not reach the real publication boundary"
+}
 ESC_HOME=$(new_bare_home escalate-home)
 for attempt in 1 2; do
-  PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
-    FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort \
-    || fail "failed attempt $attempt changed the best-effort caller result"
+  run_owned_publication_failure "$ESC_HOME" "$attempt"
 done
 [ -z "$(wake_rows "$ESC_HOME")" ] \
   || fail "two failures woke firstmate before the threshold: $(wake_rows "$ESC_HOME")"
-PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" FM_HOME_SUMMARY_TIMEOUT=1 \
-  "$WRITER" --best-effort || fail "the third failed attempt changed the caller result"
+run_owned_publication_failure "$ESC_HOME" 3
 [ "$(wake_row_count "$ESC_HOME")" = 1 ] \
-  || fail "three consecutive deadline failures did not raise exactly one wake: $(wake_rows "$ESC_HOME")"
+  || fail "three consecutive publication failures did not raise exactly one wake: $(wake_rows "$ESC_HOME")"
 wake_row=$(wake_rows "$ESC_HOME")
 case "$wake_row" in
-  *'3 consecutive refresh failures'*'refresh exceeded its 1-second deadline'*'ran '[0-9]*s*) ;;
+  *'3 consecutive refresh failures'*'atomic ledger replacement failed: destination is a directory:'*'ran '[0-9]*s*) ;;
   *) fail "the wake omitted the count, the reason, or the measured duration: $wake_row" ;;
 esac
 for attempt in 4 5 6; do
-  PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
-    FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort || fail "failed attempt $attempt changed the caller result"
+  run_owned_publication_failure "$ESC_HOME" "$attempt"
 done
 [ "$(wake_row_count "$ESC_HOME")" = 1 ] \
   || fail "an unchanged repeating failure raised another wake: $(wake_rows "$ESC_HOME")"
-pass "three consecutive deadline failures raise one wake that names the reason and duration, and no more"
+pass "three consecutive publication failures raise one wake that names the reason and duration, and no more"
 
 # A real change of reason is new information and wakes again; the same reason
-# does not. Replace the deadline with a producer that fails outright.
+# does not. Replace the publication failure with a producer that fails outright.
 PATH="$FAILBIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
   "$WRITER" --best-effort || fail "a producer failure changed the caller result"
 [ "$(wake_row_count "$ESC_HOME")" = 2 ] \
@@ -1446,14 +1458,13 @@ PATH="$FAILBIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
 pass "a changed failure reason raises a new wake and a repeated one does not"
 
 # The first success ends the streak, so the next run of failures is news again.
+rmdir "$ESC_HOME/state/home-summary.json"
 PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
   "$WRITER" || fail "the recovering refresh failed"
 [ ! -e "$ESC_HOME/state/.home-summary-refresh.streak" ] \
   || fail "a successful publication left its failure streak behind"
 for attempt in 1 2 3; do
-  PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
-    FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort || fail "post-recovery attempt $attempt changed the caller result"
+  run_owned_publication_failure "$ESC_HOME" "$attempt"
 done
 [ "$(wake_row_count "$ESC_HOME")" = 3 ] \
   || fail "failures after a recovery were not reported as a new streak: $(wake_rows "$ESC_HOME")"

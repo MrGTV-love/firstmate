@@ -363,12 +363,13 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
 # Carry a live log's fold checkpoint onto a point-in-time copy of that log, so
 # a whole-file fold of the copy (the fleet snapshot folds its captured copies)
 # starts from the checkpoint instead of line 1. <live-ident> is the live log's
-# identity read BEFORE the copy was taken; the checkpoint is carried only when
-# it was folded from that same file, the file still has that identity now (so
-# the copy's bytes are a prefix-preserving sample of the log the checkpoint
-# describes), and its offset lies within the copy. The carried checkpoint names
-# the copy's own identity and is written only beside the copy. Anything else
-# writes nothing, and the copy's fold simply starts from line 1.
+# identity read BEFORE the copy was taken; the checkpoint is carried only under
+# the live log's current fold signature and that same file identity, which must
+# still match now (so the copy is a prefix-preserving sample of the described
+# log). Its offset must lie within the copy at a complete-line boundary.
+# The carried checkpoint names the copy's own identity and is written only
+# beside the copy. The copy's read-only fold applies the seed-validation
+# contract owned by bin/fm-status-decision-lib.sh.
 status_open_decisions_checkpoint_carry() {  # <live-status> <captured-status> <live-ident>
   local live=$1 copy=$2 live_ident=$3 now_ident copy_ident copy_size target
   [ -n "$live_ident" ] || return 0
@@ -397,10 +398,8 @@ status_open_decisions_checkpoint_carry() {  # <live-status> <captured-status> <l
 }
 
 # Incremental sibling of scan_open_decisions: same fleet-wide directory walk and
-# output shape ("<task>\t<key>\t<verb>\t<note>" per open decision), but folds
-# each task's status log through status_open_decisions_incremental instead of
-# the whole-file status_open_decisions, so a fleet-wide per-drain scan stays
-# bounded by new appends rather than total lifetime log size across every task.
+# output shape ("<task>\t<key>\t<verb>\t<note>" per open decision), with checkpoint
+# persistence and cold-rebuild behavior owned by status_open_decisions_incremental.
 scan_open_decisions_incremental() {  # <state>
   local state=$1 f task open line
   for f in "$state"/*.status; do
