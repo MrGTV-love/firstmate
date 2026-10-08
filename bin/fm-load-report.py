@@ -18,26 +18,21 @@ The default samples file is FM_LOAD_SAMPLES, else load-samples.tsv in the CPU
 pass pool directory (FM_CPU_POOL_DIR, else $HOME/.cache/fm-cpu-pool), so one
 host-wide file serves every home.
 
-`report` prints the window's facts and two verdicts:
+`report` prints the window's facts and the two verdicts whose acceptance rules
+are owned by docs/cpu-pass-pool.md#judging-the-pool:
   - load: sample count, cpus, load1 p50/p95/max, the share of samples above
-    2x cpus, and pool use. Verdict load_within_2x_cpus is true when load1 p95
-    is at most 2x cpus.
+    2x cpus, and pool use.
   - pipeline: from the no-mistakes state database (read-only; default
-    ~/.no-mistakes/state.sqlite), the first 10 runs that reached review
-    created since --since, ordered oldest first (then by run id for ties),
-    each with its review-fix and test-fix round counts, agent minutes, and
-    whether it converged: completed successfully with at most 2 review-fix
-    rounds and no timeout-class run error (wall-clock limit, WaitDelay,
-    did not reply, timed out); per-purpose agent duration p50/p95; agent
-    failures by category; and every timeout-class run error in the window.
-    Verdict converged_within_2_fix_rounds is null (pending) until 10 such runs
-    exist and no pending or running run created since --since sorts at or before
-    the tenth member, including runs that have not yet reached review.
-    Once settled, it is true when all members converged, otherwise false;
-    later-created runs cannot change the cohort or verdict.
+    ~/.no-mistakes/state.sqlite), the measurement cohort, each with its
+    review-fix and test-fix round counts, agent minutes, and convergence;
+    per-purpose agent duration p50/p95; agent failures by category; and every
+    timeout-class run error in the window.
+    Timeout classification matches the literal substrings wall-clock, WaitDelay,
+    did not reply, or timed out in the run error.
 --since defaults to the first sample's epoch.
 
-Read-only toward everything except the samples file; no network or model call.
+`report` is read-only; `record` and `watch` append samples and query pool status,
+which may create the pool directory and slot files. No network or model call.
 Exit status: 0 on a report or recorded sample, 1 when the samples file or
 database cannot be read, 2 for a usage error.
 """

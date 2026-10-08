@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # fm-cpu-pass.sh - Host-wide CPU pass pool for CPU-heavy test bursts; see engine --help.
 # docs/cpu-pass-pool.md owns the cross-repository contract.
-# Without python3, `run` executes its command directly with no pass and one
-# notice on its --log-fd (default stderr): the pool governs throughput and must
-# never stop the work.
+# The engine header owns command behavior, including the no-Python run path.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

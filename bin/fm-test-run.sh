@@ -120,16 +120,16 @@
 # configuration, including one that sources no test helper of its own;
 # tests/git-config-helpers.sh owns that contract and its limits.
 #
-# Every executed script first takes one pass from the host-wide CPU pass pool
+# An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
-# per-script bound, so test bursts from every worktree on the host take turns.
+# per-script bound, so participating test bursts across worktrees take turns.
 # A runner already inside a pass (FM_CPU_PASS_HELD set) runs directly with at
 # most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # The marker must be a nonnegative decimal integer or execution exits 125;
 # 0 denotes degraded work and imposes no budget.
 # Without python3 or the pool tool beside it, scripts run directly.
-# --jobs above the pool size still starts that many workers, but only pool-size
-# scripts run at once.
+# With a usable pool, --jobs above its size still starts that many workers,
+# but only pool-size scripts run at once.
 #
 # Family labels, the changed-file map, and production portable-shard composition
 # live in this script only (one owner). The proven-isolated candidate set remains

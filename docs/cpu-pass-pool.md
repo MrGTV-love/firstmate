@@ -9,7 +9,7 @@ Interactive agents, lanes, and sessions never ask for a pass and are never queue
 Only the work that swings host load - suites sized to every core in every copy, parallel test workers, deliberate load generation - takes turns.
 
 This page owns the cross-repository protocol.
-`bin/fm-cpu-pass.sh` is its reference implementation, and its engine header (`bin/fm-cpu-pass.py`, also `bin/fm-cpu-pass.sh --help`) owns the command's waiting, notice, signal, and exit-status behavior.
+`bin/fm-cpu-pass.sh` is its reference implementation; the [`bin/fm-cpu-pass.py` header](../bin/fm-cpu-pass.py) owns command behavior, while `bin/fm-cpu-pass.sh --help` lists subcommands and each subcommand's `--help` lists its options.
 
 ## Why file locks
 
@@ -38,8 +38,8 @@ Every participant on a host follows these rules, so one pool is shared by every 
    This validation also applies to nested and degraded execution; without Python, oversized counts are refused when the host CPU count can be read using `sysctl` or `getconf`.
 6. **Nested work:** a holder exports `FM_CPU_PASS_HELD=<k>` to the work it runs.
    A participant that finds `FM_CPU_PASS_HELD` set runs without taking another pass, because taking another could deadlock a full pool.
-   Nested work never runs more concurrent CPU-bound workers than the inherited count; a caller needing parallel nested work reserves enough passes before starting the outer work.
-   Firstmate's runner reduces concurrency to the inherited count and reports the reduction on its notice fd; an explicit pass request above that count is a usage error.
+   With a positive inherited count, nested work never runs more concurrent CPU-bound workers than that count; a caller needing parallel nested work reserves enough passes before starting the outer work.
+   An explicit pass request above a positive inherited count is a usage error; the [`fm-test-run.sh` header](../bin/fm-test-run.sh) owns the runner's concurrency-reduction behavior.
    The marker must be a nonnegative decimal integer in both Python and no-Python execution; a malformed marker is a usage error, while `0` denotes degraded work with no reservation or concurrency limit.
 7. **Degrade, never block:** a participant that cannot use the pool (no `flock`, no pool directory, a foreign-owned directory) runs its work without a pass and says so once.
    Degradation notices use `--log-fd` (default stderr), separate from the work's stdout, including when Python is unavailable.
@@ -59,7 +59,7 @@ bin/fm-cpu-pass.sh size
 ```
 
 A repository that cannot assume a Firstmate checkout implements the protocol directly with its language's `flock`, as rules 1-8 describe.
-Firstmate's own `bin/fm-test-run.sh` takes one pass per executed test script, outside its per-script bound, and runs directly when it is already inside a pass; its header owns that wiring.
+The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner integration.
 
 ## Phase 1 cutover
 
@@ -70,7 +70,7 @@ Phase 1 completes only when the Vernant participant lands as a separate Vernant-
 
 ## Judging the pool
 
-`bin/fm-load-report.sh` records host load and reads pipeline agent durations so a change to the pool can be judged on data; its engine header owns the sample format and verdict rules.
+`bin/fm-load-report.sh` records host load and reads pipeline agent durations; its [engine header](../bin/fm-load-report.py) owns the sample format and command behavior, while this recipe owns the measurement window and acceptance criteria.
 
 1. Only once Phase 1 is complete, note the time with `date +%s` and start one recorder per host: `nohup bin/fm-load-report.sh watch --interval 60 >/dev/null 2>&1 &`.
 2. After 24 to 48 hours of normal fleet work, run `bin/fm-load-report.sh report --since <that epoch>`.
@@ -80,3 +80,5 @@ Phase 1 completes only when the Vernant participant lands as a separate Vernant-
    Once those earlier runs are terminal, cohort membership and the true or false verdict are fixed; later-created runs do not change them.
    Its list of timeout-class run errors should be empty.
 4. Stop the recorder when the window closes.
+5. Compare per-purpose agent durations over a week and aggregate wall time with the pre-Phase-1 baseline; aggregate wall time must not worsen, review-fix time should be about 25 minutes, and post-merge defects must not rise.
+   Neither report verdict measures post-merge defects or makes the before/after comparison automatically.
