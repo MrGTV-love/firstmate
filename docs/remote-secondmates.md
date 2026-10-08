@@ -101,15 +101,9 @@ The worker serves one lane per staged home:
 - Jobs for the same home follow the staging-order contract owned by [`bin/fm-remote-job-lib.sh`](../bin/fm-remote-job-lib.sh).
 - Different homes' lanes run concurrently, so one home's long job never delays another home's commands.
 
-Within a home's lane, the worker preempts a running reply long-poll on its next queue check when any command other than another reply long-poll is queued for that home.
-As a result, interactive commands and startup checks are never serialized behind a poll window.
-
-`bin/fm-remote-job-lib.sh` owns that preemption contract.
-It distinguishes preemption from a wait window that closes with no data:
-
-- Only a genuinely quiet window proves channel freshness.
-- Either outcome can re-arm without losing data.
-- The parent's reply listener polls again under the same claim after either one, so a same-home command such as the per-cycle liveness probe never tears the listener down; [`bin/fm-procevent-remote-reply.sh`](../bin/fm-procevent-remote-reply.sh) owns that mapping.
+Interactive commands can preempt a same-home reply long-poll instead of waiting out its poll window; [`bin/fm-remote-job-lib.sh`](../bin/fm-remote-job-lib.sh) owns eligibility, check cadence, and outcomes.
+[`bin/fm-procevent-remote-reply.sh`](../bin/fm-procevent-remote-reply.sh) owns the listener's preemption mapping and same-claim relisten behavior.
+Only a genuinely quiet window proves channel freshness.
 
 ### Cancelled and orphaned jobs
 

@@ -29,7 +29,7 @@ Its separate routing lookup reads the board's saved Lavish session; the adapter 
 
 ## Why an ended Lavish review is terminal
 
-Re-verified on 2026-08-01 against the same installed build.
+Re-verified on 2026-08-01 against lavish-axi 0.1.45.
 The published poll help states the lifecycle directly:
 
 ```text

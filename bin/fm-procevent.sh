@@ -151,7 +151,7 @@
 # Applying a built-in result is adapter-owned through the same kind of seam. Some results
 # carry no judgement at all - they must simply be applied idempotently to the
 # home's own durable state - and leaving that to an agent that has to remember
-# means it silently does not happen. So after publishing, `start` calls
+# means it silently does not happen. `start` uses the announcement order below to call
 # `bin/fm-procevent-<adapter>.sh autohandle <source-id> <sequence> <result-file>`
 # and lets the adapter apply and acknowledge its own result. Exit 0 means the
 # adapter fully handled it. A missing command, an error, or any other exit is not

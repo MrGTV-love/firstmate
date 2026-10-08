@@ -16,8 +16,8 @@
 # home's state/parent-replies.status log. The process-event runner owns blocking,
 # capture, publication, and one machine-wide source owner. Each captured delta is
 # terminal for that exact registration; `handle` validates and idempotently
-# ingests it, acknowledges the captured generation, then registers the next
-# cursor-anchored source. `relisten` tells that runner to poll again in the same
+# ingests it, registers the next cursor-anchored source for a good delta, then
+# acknowledges the captured generation. `relisten` tells that runner to poll again in the same
 # process, still holding the claim, after an empty window and after that re-arm.
 # A window the remote job worker preempted is reported to the runner as an empty
 # window, so it relistens too (see JOB_PREEMPTED below).

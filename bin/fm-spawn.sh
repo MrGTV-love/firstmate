@@ -42,9 +42,9 @@
 #   to start from and target instead of origin's default branch. A fresh launch
 #   resets its pooled copy to origin/<branch>, refusing when the project has no
 #   origin or origin lacks that branch, or when the project's registered forge
-#   cannot carry it. It must agree with every Setup "Base branch:" line in the
-#   brief (bin/fm-brief.sh --base-branch writes one; other such lines are prose),
-#   and a brief with such a line refuses a spawn without the flag. The spawn records it as
+#   cannot carry it. It must agree with every base line selected by
+#   fm_brief_base_branches in bin/fm-dod-lib.sh, which owns recognition.
+#   A brief with a selected line refuses a spawn without the flag. The spawn records it as
 #   base_branch= in state/<id>.meta, which a relaunch reuses and later review and
 #   cleanup read; it is refused on secondmates and relaunches, and without it
 #   nothing changes.

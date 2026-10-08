@@ -86,9 +86,13 @@
 #                that (`─` rule, `❯`+NBSP, `─` rule), so the glyph inside the
 #                pair carries the shape and no identity is needed. Once the
 #                session has a name, claude writes it into the top rule
-#                (`──── <title> ─`); that TITLED rule opens the pair the same
-#                way, but only with the glyph row inside it, and never closes
-#                one (see _fm_composer_titled_rule_row).
+#                (`──── <title> ─`); a TITLED rule only opens a pair, never
+#                closes one (see _fm_composer_titled_rule_row). Proof requires
+#                the glyph row inside, a printable ASCII title, and an opener
+#                spanning exactly the closing rule's columns. A glyph-bearing
+#                pair rejected by that proof stays ambiguous: classification
+#                returns unknown and extraction refuses, never falling back to
+#                a bare prompt inside the rejected region.
 #
 # THE COMPOSER FOOTER ZONE (task firstmate-doorbell-vals-pending-p1): a
 # harness draws its own furniture BELOW the composer - a user statusLine, a
