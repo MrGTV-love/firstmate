@@ -1594,6 +1594,94 @@ test_claude_crewmate_launch_carries_the_attribution_policy() {
   pass "a claude crewmate launch carries the attribution-off policy in its own settings"
 }
 
+# A project copy nested under a firstmate home sits below that home's
+# CLAUDE.md, which imports the supervisor contract; Claude Code loads ancestor
+# memory files, so the worker met the external-imports dialog and, once it was
+# allowed, the first mate's job description. The launch must exclude exactly
+# the ancestor home's memory files and nothing the worker is meant to read.
+make_firstmate_home_shape() {  # <home-dir> [secondmate-marker-id]
+  mkdir -p "$1/bin" "$1/projects"
+  printf '# Firstmate\n' > "$1/AGENTS.md"
+  printf '@AGENTS.md\n' > "$1/CLAUDE.md"
+  : > "$1/bin/fm-spawn.sh"
+  [ -z "${2:-}" ] || printf '%s\n' "$2" > "$1/.fm-secondmate-home"
+}
+
+# nested_claude_excludes <case-name> <home-dir-under-case|""> [marker-id]
+# Spawns a claude ship whose task copy lives under <home-dir> and leaves the
+# claudeMdExcludes array the launch delivers, one entry per line, in
+# NESTED_EXCLUDES (called directly so the case globals survive).
+nested_claude_excludes() {
+  local name=$1 nested_home=$2 marker=${3:-} rec id out status launch wt
+  id="nested-$name-z1"
+  rec=$(make_spawn_case "nested-$name" claude "$id")
+  read_case_record "$rec"
+  if [ -n "$nested_home" ]; then
+    nested_home="$CASE_DIR/$nested_home"
+    make_firstmate_home_shape "$nested_home" "$marker"
+    wt="$nested_home/projects/proj/.claude/worktrees/task"
+    mkdir -p "$(dirname "$wt")"
+    git -C "$PROJ_DIR" worktree add --quiet -b "nested-$name" "$wt"
+    WT_DIR=$wt
+  fi
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "claude spawn for the nested-home case should succeed"$'\n'"$out"
+  launch=$(cat "$LAUNCH_LOG")
+  NESTED_EXCLUDES=$(claude_settings_json_arg "$launch" | jq -r '(.claudeMdExcludes // [])[]')
+}
+
+test_claude_worker_nested_under_a_firstmate_home_excludes_its_memory_files() {
+  local home f
+  nested_claude_excludes nested-home "fm-home"
+  home="$CASE_DIR/fm-home"
+  for f in CLAUDE.md CLAUDE.local.md AGENTS.md .claude/CLAUDE.md '.claude/rules/**'; do
+    printf '%s\n' "$NESTED_EXCLUDES" | grep -Fxq "$home/$f" \
+      || fail "launch under $home does not exclude $home/$f; got: $NESTED_EXCLUDES"
+  done
+  pass "a claude worker nested under a firstmate home excludes that home's memory files"
+}
+
+test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files() {
+  nested_claude_excludes nested-sm "sm-home" "sm-id"
+  printf '%s\n' "$NESTED_EXCLUDES" | grep -Fxq "$CASE_DIR/sm-home/CLAUDE.md" \
+    || fail "a worker nested under a seeded secondmate home does not exclude its CLAUDE.md; got: $NESTED_EXCLUDES"
+  pass "a claude worker nested under a seeded secondmate home excludes that home's memory files"
+}
+
+test_claude_worker_exclusion_survives_special_characters_in_the_home_path() {
+  nested_claude_excludes nested-odd "odd [home] it's {x}"
+  printf '%s\n' "$NESTED_EXCLUDES" | grep -Fxq "$CASE_DIR/odd \\[home\\] it's \\{x\\}/CLAUDE.md" \
+    || fail "glob metacharacters in the home path were not escaped for picomatch; got: $NESTED_EXCLUDES"
+  pass "a home path with glob and quote characters reaches the launch as an escaped, intact exclusion"
+}
+
+test_claude_worker_outside_any_firstmate_home_gets_no_exclusion() {
+  nested_claude_excludes plain ""
+  [ -z "$NESTED_EXCLUDES" ] || fail "a worker not nested under a firstmate home got exclusions: $NESTED_EXCLUDES"
+  pass "a claude worker whose copy is not under a firstmate home gets no memory exclusion"
+}
+
+# The firstmate repo's own ship worker and a secondmate load the AGENTS.md at
+# the root of their own pane directory; only STRICT ancestors are excluded.
+test_claude_worker_keeps_its_own_root_memory_files() {
+  local rec id out status launch settings
+  id="nested-self-z1"
+  rec=$(make_spawn_case nested-self claude "$id")
+  read_case_record "$rec"
+  make_firstmate_home_shape "$WT_DIR"
+  # The shape files are scenery, not work: keep the pooled copy clean.
+  printf '%s\n' AGENTS.md CLAUDE.md bin/ projects/ >> "$(git -C "$WT_DIR" rev-parse --git-path info/exclude)"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "claude spawn into a firstmate-shaped copy should succeed"$'\n'"$out"
+  launch=$(cat "$LAUNCH_LOG")
+  settings=$(claude_settings_json_arg "$launch")
+  printf '%s' "$settings" | jq -e 'has("claudeMdExcludes") | not' >/dev/null \
+    || fail "a worker whose own root is a firstmate home had its own memory excluded: $settings"
+  pass "a worker keeps the CLAUDE.md and AGENTS.md at the root of its own directory"
+}
+
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks() {
   local rec id out status launch
   id=profile-claude-keep-attribution-z25
@@ -2249,6 +2337,11 @@ test_claude_permission_mode_invalid_refuses_before_endpoint_or_metadata
 test_claude_task_launch_carries_control_channel_authority
 test_claude_secondmate_launch_omits_task_control_channel_authority
 test_claude_crewmate_launch_carries_the_attribution_policy
+test_claude_worker_nested_under_a_firstmate_home_excludes_its_memory_files
+test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files
+test_claude_worker_exclusion_survives_special_characters_in_the_home_path
+test_claude_worker_outside_any_firstmate_home_gets_no_exclusion
+test_claude_worker_keeps_its_own_root_memory_files
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks
 test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches
 test_claude_secondmate_launch_carries_the_attribution_policy

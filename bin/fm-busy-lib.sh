@@ -935,8 +935,36 @@ fm_busy_claude_launch_prompt_tail() {
     && printf '%s' "$buf" | grep -qiE 'No, exit|Enter to confirm'; then
     return 0
   fi
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
-    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'
+  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'; then
+    return 0
+  fi
+  # The machine-level bypass-permissions confirmation and the custom-API-key
+  # choice, live-verified on Claude Code 2.1.294 in a scratch config. Each
+  # is paired with its own rendered option, for the same self-reference reason.
+  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_BYPASS_PROMPT_REGEX:-WARNING: Claude Code running in Bypass Permissions mode}" \
+    && printf '%s' "$buf" | grep -qiE 'Yes, I accept'; then
+    return 0
+  fi
+  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_APIKEY_PROMPT_REGEX:-Do you want to use this API key\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No \(recommended\)'
+}
+
+# fm_busy_claude_launch_prompt_name: names which of the dialogs above the
+# captured pane on stdin shows, for a report a person can act on. Prints
+# nothing when none matches.
+fm_busy_claude_launch_prompt_name() {
+  local buf
+  buf=$(cat)
+  if printf '%s' "$buf" | grep -qiE 'Allow external CLAUDE\.md file imports\?'; then
+    printf '%s' 'Allow external CLAUDE.md file imports?'
+  elif printf '%s' "$buf" | grep -qiE 'Quick safety check: Is this a project you created or one you trust\?'; then
+    printf '%s' 'workspace trust (Quick safety check)'
+  elif printf '%s' "$buf" | grep -qiE 'WARNING: Claude Code running in Bypass Permissions mode'; then
+    printf '%s' 'bypass-permissions confirmation'
+  elif printf '%s' "$buf" | grep -qiE 'Do you want to use this API key\?'; then
+    printf '%s' 'custom API key choice'
+  fi
 }
 
 # fm_busy_pi_launch_prompt_tail: Pi's project-trust dialog. Live-verified on

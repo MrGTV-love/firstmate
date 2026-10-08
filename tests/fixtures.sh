@@ -123,6 +123,15 @@ case "${1:-}" in
     exit 0
     ;;
   has-session|new-session|new-window|kill-window|set-window-option) exit 0 ;;
+  capture-pane)
+    # A suite that asserts on what a spawn does with the pane's screen opts in
+    # with FM_FAKE_CAPTURE_FILE (the screen to show) and may add
+    # FM_FAKE_CAPTURE_HOOK (a command run on every capture, standing in for
+    # whatever changes the screen or the harness's records over time).
+    [ -z "${FM_FAKE_CAPTURE_HOOK:-}" ] || eval "$FM_FAKE_CAPTURE_HOOK" >/dev/null 2>&1
+    [ -z "${FM_FAKE_CAPTURE_FILE:-}" ] || [ ! -f "$FM_FAKE_CAPTURE_FILE" ] || cat "$FM_FAKE_CAPTURE_FILE"
+    exit 0
+    ;;
   show-environment)
     knob=FM_FAKE_TMUX_ENV_
     for a in "$@"; do
@@ -355,6 +364,7 @@ fm_test_run_spawn() {
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$pane" TMUX="${TMUX:-fake,1,0}" \
+    FM_CLAUDE_START_POLL_INTERVAL="${FM_CLAUDE_START_POLL_INTERVAL:-0.02}" \
     PATH="$fakebin:$PATH" \
     "$ROOT/bin/fm-spawn.sh" "$@" 2>&1
 }

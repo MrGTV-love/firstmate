@@ -799,6 +799,44 @@ ok - unseeded path without --approve still prompts on Trust project folder?
 
 Portable launch-command coverage lives in `tests/fm-spawn-dispatch-profile.test.sh` (`test_pi_seeded_secondmate_preapproves_project_trust`, `test_pi_worker_launch_omits_seeded_home_approve`, `test_pi_approve_probe_omits_unsupported_flag`).
 
+## Nested firstmate home memory exclusion
+
+A Claude task copy nested under a firstmate home (`<home>/projects/<project>/.claude/worktrees/<task>`) reads the home's `CLAUDE.md` (`@AGENTS.md`) as a parent file, parks on "Allow external CLAUDE.md file imports?", and, once the import is allowed, loads the supervisor contract into a project worker.
+`bin/fm-claude-memory-lib.sh` excludes the memory files of every firstmate home that is a strict ancestor of the pane directory through the documented `claudeMdExcludes` setting, carried in the launch's per-launch `--settings` JSON.
+`tests/fm-claude-nested-home-live-e2e.test.sh` drives the installed binary in a scratch config with no prompt submitted and no dialog answered, so it spends no model tokens: a copy outside any home reaches the composer, the nested copy without the exclusion parks on the imports dialog, and the same copy with the production fragment reaches the composer with no dialog.
+`tests/fm-spawn-dispatch-profile.test.sh` pins that the launch carries the fragment for a nested copy and not for a copy outside a home or a pane directory that is itself the home.
+
+Verified 2026-10-08 on Claude Code 2.1.294.
+
+```sh
+FM_CLAUDE_NESTED_HOME_LIVE=1 bash tests/fm-claude-nested-home-live-e2e.test.sh
+```
+
+```
+# live claude version: 2.1.294 (Claude Code)
+ok - control: a copy that is not nested under a firstmate home reaches the composer
+ok - reproduction: a nested copy without the exclusion parks on 'Allow external CLAUDE.md file imports?'
+ok - fixed: the same nested copy launched with the production exclusion reaches the composer with no dialog
+# checked the nested-home memory exclusion against 2.1.294 (Claude Code)
+```
+
+The reproduction pane, launched from a nested copy with no exclusion:
+
+```
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for third-party
+  repositories.
+
+  External imports:
+    <lab>/fmhome/AGENTS.md
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel
+```
+
 ## Launch-prompt backstop signatures
 
 `bin/fm-busy-lib.sh`'s launch-prompt backstop (`fm_busy_launch_prompt_parked`) reclassifies a launch whose busy record is still pinned at the fm-spawn seed as `unknown launch-prompt`, rather than `busy fm-spawn`, when the captured pane matches that harness's own recognized trust, sign-in, or first-run dialog.
@@ -821,6 +859,35 @@ ok - pi, pi-signed, omp: a real Pi-engine launch parked on its own rendered trus
 # live gemini version: 0.60.0
 ok - gemini: a real launch parked on its own rendered auth or trust dialog surfaces through the watcher gate
 # checked 3 launch-prompt signature(s) against real installed binaries
+```
+
+The Claude signature also covers the external-imports dialog (captured above in "Nested firstmate home memory exclusion"), the machine-level bypass-permissions confirmation, and the custom-API-key choice.
+The last two were captured 2026-10-08 on Claude Code 2.1.294 in a scratch `CLAUDE_CONFIG_DIR`, launching `claude --dangerously-skip-permissions` with onboarding complete and, for the second, `ANTHROPIC_API_KEY` set to a throwaway value that was not yet approved:
+
+```
+  WARNING: Claude Code running in Bypass Permissions mode
+
+  In Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous commands.
+  This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged.
+  By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.
+
+  ❯ No, exit
+    Yes, I accept
+
+  Enter to confirm · Esc to cancel
+```
+
+```
+  Detected a custom API key in your environment
+
+  ANTHROPIC_API_KEY: sk-ant-...<last 20 characters>
+
+  Do you want to use this API key?
+
+    Yes
+  ❯ No (recommended)
+
+  Enter to confirm · Esc to cancel
 ```
 
 Claude, launched `--dangerously-skip-permissions` into a brand-new worktree under the operator's own already-onboarded config (the shape a real crewmate spawn produces):
