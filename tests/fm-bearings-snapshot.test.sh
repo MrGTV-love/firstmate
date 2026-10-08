@@ -42,6 +42,22 @@ SH
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
+  list-windows)
+    # Inventories belong to the observed home, including registered child homes.
+    session=${3#=}
+    state=${FM_STATE_OVERRIDE:-"$FM_HOME/state"}
+    for meta in "$state"/*.meta; do
+      [ -f "$meta" ] || continue
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+          window="$session:"*)
+            window=${line#*:}
+            case "$window" in *dead-*) ;; *) printf '%s\n' "$window" ;; esac
+            ;;
+        esac
+      done < "$meta"
+    done
+    ;;
   display-message) case "$*" in *dead-*) exit 1 ;; *) printf '%%1\n' ;; esac ;;
   capture-pane)
     case "$*" in
@@ -3083,6 +3099,10 @@ EOF
   printf 'working: old generation\n' > "$home/state/generation-race.status"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = list-windows ]; then
+  printf 'fm-generation-race\n'
+  exit 0
+fi
 if [ "${1:-}" = display-message ]; then
   if mkdir "$RACE_ONCE" 2>/dev/null; then
     tmp="$RACE_META.tmp.$$"
@@ -3114,6 +3134,8 @@ SH
     RACE_REPORT="$home/data/generation-race/report.md" RACE_WORKTREE="$worktree" \
     "$ROOT/bin/fm-fleet-snapshot.sh" --json) \
     || fail "fleet snapshot failed during endpoint generation race"
+  grep -qx 'spawn_gen=new-generation' "$home/state/generation-race.meta" \
+    || fail "endpoint generation race fixture did not publish the replacement generation"
   printf '%s' "$json" | jq -e '
     .tasks[] | select(.id == "generation-race")
     | .spawn_gen == "old-generation"

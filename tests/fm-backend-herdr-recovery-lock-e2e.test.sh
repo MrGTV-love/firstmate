@@ -810,11 +810,14 @@ for phase in conclude reap; do
   rm "$TEST_DIR/fail-transition-$id"
   bootstrap_primary >"$TEST_DIR/$lane-replay.out" 2>"$TEST_DIR/$lane-replay.err" || fail "$phase actual startup replay failed"
   [ ! -e "$marker" ] || fail "$phase actual startup did not consume its deferred marker"
+  cmp -s "$TEST_DIR/captain-words.txt" "$TEST_DIR/home-primary/data/$id/captain-drop.md" \
+    || fail "$phase replay lost the captain's exact discard authorization"
   row=$(tasks-axi show "$id" --file "$TEST_DIR/home-primary/data/backlog.md" --full)
   if [ "$phase" = reap ]; then
     printf '%s\n' "$row" | grep -F '  state: queued' >/dev/null || fail "captain-held replay did not retain the row queued"
     printf '%s\n' "$row" | grep -F '  hold_kind: captain' >/dev/null || fail "captain-held replay lost the captain decision"
-    printf '%s\n' "$row" | grep -F 'https://github.com/example/fixture/pull/1' >/dev/null || fail "captain-held replay lost its deliverable"
+    printf '%s\n' "$row" | grep -F 'Deliverable of the finished work: dropped' >/dev/null \
+      || fail "captain-held replay lost its authorized drop outcome"
   else
     printf '%s\n' "$row" | grep -F '  state: done' >/dev/null || fail "ordinary startup replay did not close its row"
   fi
