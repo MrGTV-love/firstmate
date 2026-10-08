@@ -505,9 +505,6 @@ install_omp_extension_fixture() {  # <repo>
   chmod +x "$repo/bin/fm-operational-input.sh"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
   printf 'export const Type = { Object(p) { return { type: "object", properties: p }; } };\n' > "$repo/node_modules/typebox/index.js"
-  mkdir -p "$repo/node_modules/@oh-my-pi/pi-coding-agent"
-  printf '{"type":"module","exports":{"./registry/agent-registry":"./registry.js"}}\n' > "$repo/node_modules/@oh-my-pi/pi-coding-agent/package.json"
-  printf 'export class AgentRegistry { static global() { return { list() { return []; } }; } }\n' > "$repo/node_modules/@oh-my-pi/pi-coding-agent/registry.js"
 }
 
 test_turnend_guard_extension_compels_one_continuation() {
@@ -850,14 +847,8 @@ EOF
 
 test_task_session_proof_tracks_active_session() {
   local case_dir="$TMP_ROOT/task-session-proof" status
-  mkdir -p "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent"
+  mkdir -p "$case_dir/extension"
   cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$case_dir/extension/"
-  printf '{"type":"module","exports":{"./registry/agent-registry":"./registry.js"}}\n' > "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent/package.json"
-  cat > "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent/registry.js" <<'EOF'
-export class AgentRegistry {
-  static global() { return { list() { return globalThis.proofRefs; } }; }
-}
-EOF
   FM_PROOF_CASE="$case_dir" EXT="$case_dir/extension/fm-task-session.ts" node --input-type=module <<'EOF'
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, existsSync, realpathSync, mkdirSync, symlinkSync } from "node:fs";
@@ -874,7 +865,7 @@ writeFileSync(personal, "{}\n");
 writeFileSync(`${state}/demo.meta`, "spawn_gen=proof-gen\n");
 process.env.FM_SPAWN_GEN = "proof-gen";
 const handlers = new Map(), warnings = [];
-const pi = { on(event, handler) { handlers.set(event, handler); } };
+const pi = { pi: { AgentRegistry: { global() { return { list() { return globalThis.proofRefs; } }; } } }, on(event, handler) { handlers.set(event, handler); } };
 installTaskSessionProof(pi, state, "demo");
 let file = task;
 const ctx = { agent: { kind: "main", id: "Main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
@@ -1063,7 +1054,7 @@ try {
       const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
       const state = process.env.FM_PROOF_CASE;
       const handlers = new Map();
-      const pi = { on(event, handler) { handlers.set(event, handler); } };
+      const pi = { pi: { AgentRegistry: { global() { return { list() { return globalThis.proofRefs; } }; } } }, on(event, handler) { handlers.set(event, handler); } };
       installTaskSessionProof(pi, state, "demo");
       let file = process.env.FM_REPLACEMENT_FILE;
       const ctx = { sessionManager: { getSessionFile() { return file; } } };

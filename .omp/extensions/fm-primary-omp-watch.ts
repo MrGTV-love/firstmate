@@ -75,6 +75,7 @@ import { installTaskSessionProof, resolveLocalSecondmateTask } from "./lib/fm-ta
 // separately installable type package, so the contract is declared locally
 // rather than imported from the Pi package name.
 type ExtensionAPI = {
+  pi: Parameters<typeof installTaskSessionProof>[0]["pi"];
   on?: (event: string, handler: (event: any, ctx: any) => unknown) => void;
   sendUserMessage: (content: string, options?: { deliverAs?: string }) => unknown;
   registerCommand?: (name: string, command: { description: string; handler: (args: string, ctx: any) => Promise<void> | void }) => void;

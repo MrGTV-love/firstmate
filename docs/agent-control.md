@@ -157,6 +157,7 @@ The shared attribution guard requires that active file to resolve to the recorde
 Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
 Cancelled or rolled-back switches and branches restore the predecessor proof only after omp's session transition settles and only if no newer transition or shutdown intervened.
 Every proof callback requires a unique registered top-level session sharing its context's session manager, and settled restoration rechecks that owner, so delegated or unregistered sessions cannot mutate the parent proof and omp 18.1.20 contexts need no agent identity.
+The proof installer uses the live registry exposed by omp's extension API rather than importing an on-disk SDK package; `FM_OMP_TASK_SESSION_LIVE=1 bash tests/fm-omp-task-session-live-e2e.test.sh` verifies production extension loading and session proof in the installed executable without model calls.
 This inspection does not change Herdr's session-wide auto-resume setting.
 The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
 

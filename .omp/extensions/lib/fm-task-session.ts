@@ -3,11 +3,12 @@
 import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
 
 type Context = { sessionManager?: { getSessionFile?: () => string | undefined }; ui?: { notify?: (message: string, level: string) => void } };
 type Proof = { version: 1; spawn_gen: string; pid: number; task_session_file: string; current_session_file: string };
-type API = { on?: (event: string, handler: (event: unknown, ctx: Context) => void) => void };
+type SessionOwner = { sessionManager: Context["sessionManager"]; waitForSessionTransition: () => Promise<void> };
+type Registry = { list: () => { kind: string; session: SessionOwner | null }[] };
+type API = { pi: { AgentRegistry: { global: () => Registry } }; on?: (event: string, handler: (event: unknown, ctx: Context) => void) => void };
 
 // Use the existing identity/parent parser, not an environment-supplied task id.
 // Remote secondmates and main homes have no local parent task proof to publish.
@@ -28,7 +29,7 @@ export function resolveLocalSecondmateTask(fmRoot: string, home: string, state: 
   return { state: dirname(destination), id };
 }
 
-export function createTaskSessionProof(state: string, id: string): { start: (ctx: Context) => void; shutdown: (ctx: Context) => void; before: (ctx: Context) => void } {
+export function createTaskSessionProof(state: string, id: string, registry: Registry): { start: (ctx: Context) => void; shutdown: (ctx: Context) => void; before: (ctx: Context) => void } {
   if (!/^[A-Za-z0-9_-][A-Za-z0-9._-]*$/.test(id)) throw new Error("invalid omp task-session id");
   const path = resolve(state, `${id}.omp-session.json`);
   const meta = resolve(state, `${id}.meta`);
@@ -78,7 +79,7 @@ export function createTaskSessionProof(state: string, id: string): { start: (ctx
   function owner(ctx: Context) {
     if (!ctx.sessionManager) return undefined;
     let match;
-    for (const ref of AgentRegistry.global().list()) {
+    for (const ref of registry.list()) {
       if (!ref.session || ref.session.sessionManager !== ctx.sessionManager) continue;
       if (match) return undefined;
       match = ref;
@@ -146,7 +147,9 @@ export function createTaskSessionProof(state: string, id: string): { start: (ctx
 }
 
 export function installTaskSessionProof(pi: API, state: string, id: string): void {
-  const proof = createTaskSessionProof(state, id);
+  // The extension API exposes the host SDK, including its live registry, even
+  // in compiled omp executables with no separately resolvable package.
+  const proof = createTaskSessionProof(state, id, pi.pi.AgentRegistry.global());
   // omp 18.8.1 /resume emits before_switch/switch, not shutdown/start.
   // Before-events invalidate while ctx still names the predecessor; after-
   // events synchronously publish the activated file before lifecycle readers.
