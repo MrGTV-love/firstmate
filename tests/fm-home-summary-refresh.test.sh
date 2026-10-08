@@ -543,7 +543,7 @@ PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
 [ -s "$INIT_ENTERED" ] || fail "the refresh never attempted state initialization"
 [ ! -e "$INIT_DONE" ] || fail "the stalled initializer completed instead of being interrupted"
 init_pid=$(cat "$INIT_ENTERED")
-fm_test_wait_until 80 bash -c '! kill -0 "$1" 2>/dev/null' _ "$init_pid" \
+fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$init_pid" \
   || fail "the refresh left its stalled initializer alive"
 cmp -s "$TMP_ROOT/before-state-init-ledger.json" "$HOME_DIR/state/home-summary.json" \
   || fail "interrupted initialization changed the prior published ledger"
@@ -582,7 +582,7 @@ PY
 fm_test_wait_until 60 test -e "$DETACH_INIT_MARKER" \
   || fail "the detached worker never attempted its bounded state initialization"
 detach_init_pid=$(cat "$DETACH_INIT_MARKER")
-fm_test_wait_until 80 bash -c '! kill -0 "$1" 2>/dev/null' _ "$detach_init_pid" \
+fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$detach_init_pid" \
   || fail "the detached worker left its stalled initialization running past the bound"
 pass "detached foreground returns before stalled bounded state initialization"
 

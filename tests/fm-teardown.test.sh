@@ -834,10 +834,10 @@ test_local_only_fork_remote_allows() {
     || fail "fork-allow: post-teardown branch report recreated the retired task index"
   [ "$(cat "$case_dir/state/.branch-outcome-index-ready")" = 1 ] \
     || fail "fork-allow: post-teardown branch report did not publish its ready sequence"
-  fm_test_wait_until 60 jq -e --arg id task-x1 '
-    .schema == "fm-secondmate-home-summary.v1"
-    and all(.endpoints[]; .id != $id)
-  ' "$case_dir/state/home-summary.json" \
+  fm_test_wait_until 60 jq -e --arg id task-x1 "
+    .schema == \"fm-secondmate-home-summary.v1\"
+    and all(.endpoints[]; .id != \$id)
+  " "$case_dir/state/home-summary.json" \
     || fail "successful task teardown did not publish the task's removal from the home summary ledger"
   pass "local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed"
 }

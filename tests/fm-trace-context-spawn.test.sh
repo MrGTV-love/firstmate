@@ -300,10 +300,10 @@ test_enabled_records_and_injects_identical_carrier_before_launch() {
   expect_code 0 "$status" "enabled trace-context spawn should succeed"
   assert_contains "$out" "spawned $CASE_ID" "enabled spawn should report success"
   meta="$HOME_DIR/state/$CASE_ID.meta"
-  fm_test_wait_until 60 jq -e --arg id "$CASE_ID" '
-    .schema == "fm-secondmate-home-summary.v1"
-    and any(.endpoints[]; .id == $id)
-  ' "$HOME_DIR/state/home-summary.json" \
+  fm_test_wait_until 60 jq -e --arg id "$CASE_ID" "
+    .schema == \"fm-secondmate-home-summary.v1\"
+    and any(.endpoints[]; .id == \$id)
+  " "$HOME_DIR/state/home-summary.json" \
     || fail "successful task spawn did not publish the task in the home summary ledger"
 
   mtp=$(meta_traceparent "$meta")

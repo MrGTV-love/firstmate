@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 TMP_ROOT=$(fm_test_tmproot fm-home-summary-ownership)
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
