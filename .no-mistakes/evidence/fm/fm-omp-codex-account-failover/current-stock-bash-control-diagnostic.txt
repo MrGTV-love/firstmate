@@ -1,0 +1,6 @@
+exit=124
+ok - held replacement admission refuses before touching the live owner
+ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority
+ok - automatic, direct, and ordinary replacement inherit recovery until explicit clearance, then remain ordinary
+ok - reconciliation-only admission refuses live owners, queued work, fresh dispatch, and absent backlog authority
+

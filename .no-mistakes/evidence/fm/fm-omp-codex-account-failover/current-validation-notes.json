@@ -1,0 +1,8 @@
+{
+  "scope": "Current-run live evidence only; earlier evidence was consulted solely to reconstruct disposable drivers.",
+  "stdin_setup": "First two print-mode attempts inherited an open stdin and sent no provider request. Passing redrive supplied stdin=DEVNULL.",
+  "tmux_isolation": "Private fm-lab socket in the marked worktree-local lab root, 120x40 grid. The /tmux subdirectory would exceed Darwin socket path length; no default server was used.",
+  "watcher_limitation": "The real watcher detected the actual quota-exhausted busy event and queued a recovery failure, but its control call sets FM_STATE_OVERRIDE even for the stock home state directory, so gate lab allowance refuses before capacity inspection. Direct automatic control was separately exercised without a relocation override and correctly refused unknown adopted authentication.",
+  "credentials": "Isolated omp usage returned zero native accounts. Isolated catalog had only Apple on-device. TeamClaude absent from PATH and isolated readiness refused. Local providers are not native Codex account evidence.",
+  "cleanup": "All own disposable product labs were removed; only test evidence and pre-existing local Bash dependency remain."
+}

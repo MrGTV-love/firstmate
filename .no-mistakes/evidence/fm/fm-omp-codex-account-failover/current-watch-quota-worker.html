@@ -1,0 +1,56 @@
+<!doctype html><meta charset="utf-8"><title>quota-worker</title><body style="background:#101418;color:#dce4e8"><pre style="font:14px monospace;line-height:1.3">
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                         Tip: `/shake` rips heavy tool results out of context to reclaim tokens
+                              without a full /compact — `/shake images` drops just images
+
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: # Current worker role contract
+ You are a crewmate: an autonomous worker agent managed by firstmate.
+ This section establishes your current identity before every project or task instruction below and supersedes any
+ conflicting role identity in those instructions.
+ Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+ identity, delegate the task, run fleet supervision, or address the captain.
+ Your steering inbox is
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/state/task.inbox; this exact
+ path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so
+ read and acknowledge its messages and do not reject it as another home&#x27;s state.
+ Never inspect or change any other home&#x27;s endpoint namespace; this authorization is limited to the exact task paths
+ named by this brief.
+ When this task works on Firstmate itself, the repository root AGENTS.md (also imported by CLAUDE.md) is project
+ content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+ contract.
+ Project instructions still govern the work wherever they do not conflict with this worker identity, including
+ CONTRIBUTING.md and firstmate-coding-guidelines for Firstmate changes.
+
+ Task
+
+ Captain&#x27;s intent
+
+ Verify that local work is preserved during quota recovery.
+
+ Firstmate spec
+
+ Do not edit or call tools. Return only the completion marker.
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Error: 429 usage_limit_reached: isolated provider quota exhausted
+   usage_limit_reached: isolated provider quota exhausted (type=usage_limit_reached param=usage_limit_reached)
+
+ Error: Retry failed after 1 attempts: Provider requested 1800000ms wait, exceeds retry.maxDelayMs (300000ms). Original
+ error: 429 usage_limit_reached: isolated provider quota exhausted
+ usage_limit_reached: isolated provider quota exhausted (type=usage_limit_reached param=usage_limit_reached)
+
+❯
+ π · ⬢ gpt-6.1-sol · 🌳 project/worker · ⑂ lab-task · ◫ 23.2%/33K ⟲
+</pre></body>

@@ -1,0 +1,155 @@
+{
+  "commands": [
+    {
+      "command": [
+        "quota-axi",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"generatedAt\": \"2026-10-08T12:44:53.594Z\",\n  \"schemaVersion\": 5,\n  \"providers\": [\n    {\n      \"provider\": \"claude\",\n      \"windows\": [\n        {\n          \"id\": \"seven_day\",\n          \"label\": \"week\",\n          \"kind\": \"weekly\",\n          \"percentRemaining\": 75,\n          \"resetsAt\": \"2026-10-15T12:44:53.430071+00:00\",\n          \"pace\": {\n            \"status\": \"ahead\",\n            \"reservePercentPoints\": -25,\n            \"burnMultiple\": 921951.2195\n          }\n        }\n      ],\n      \"state\": {\n        \"status\": \"fresh\",\n        \"stale\": false,\n        \"refreshedAt\": \"2026-10-08T12:44:53.430071+00:00\",\n        \"reused\": true\n      },\n      \"quotaSemantics\": {\n        \"status\": \"known\",\n        \"effectiveAvailability\": [\n          {\n            \"scope\": \"all_models\",\n            \"status\": \"known\",\n            \"effectivePercentRemaining\": 75,\n            \"boundedBy\": [\n              \"seven_day\"\n            ],\n            \"limitingWindowIds\": [\n              \"seven_day\"\n            ],\n            \"pace\": {\n              \"status\": \"ahead\",\n              \"aheadWindowIds\": [\n                \"seven_day\"\n              ],\n              \"worstReservePercentPoints\": -25,\n              \"worstReserveWindowId\": \"seven_day\"\n            },\n            \"runway\": {\n              \"status\": \"projected_exhaustion\",\n              \"usableRunwaySeconds\": 0,\n              \"projectedExhaustedAt\": \"2026-10-08T12:44:54.086Z\",\n              \"limitingWindowId\": \"seven_day\",\n              \"projectionConfidence\": \"early\"\n            },\n            \"selection\": {\n              \"status\": \"known\",\n              \"spendPriority\": -100\n            }\n          }\n        ]\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"codex\",\n      \"windows\": [\n        {\n          \"id\": \"weekly\",\n          \"label\": \"week\",\n          \"kind\": \"weekly\",\n          \"percentRemaining\": 0,\n          \"resetsAt\": \"2026-10-15T12:44:53.430071+00:00\",\n          \"pace\": {\n            \"status\": \"ahead\",\n            \"reservePercentPoints\": -100,\n            \"burnMultiple\": 3687804.878\n          }\n        }\n      ],\n      \"state\": {\n        \"status\": \"fresh\",\n        \"stale\": false,\n        \"refreshedAt\": \"2026-10-08T12:44:53.430071+00:00\",\n        \"reused\": true\n      },\n      \"quotaSemantics\": {\n        \"status\": \"known\",\n        \"effectiveAvailability\": [\n          {\n            \"scope\": \"all_models\",\n            \"status\": \"known\",\n            \"effectivePercentRemaining\": 0,\n            \"boundedBy\": [\n              \"weekly\"\n            ],\n            \"limitingWindowIds\": [\n              \"weekly\"\n            ],\n            \"pace\": {\n              \"status\": \"ahead\",\n              \"aheadWindowIds\": [\n                \"weekly\"\n              ],\n              \"worstReservePercentPoints\": -100,\n              \"worstReserveWindowId\": \"weekly\"\n            },\n            \"runway\": {\n              \"status\": \"exhausted_now\",\n              \"usableRunwaySeconds\": 0,\n              \"limitingWindowId\": \"weekly\",\n              \"projectedExhaustedAt\": \"2026-10-08T12:44:53.594Z\"\n            },\n            \"selection\": {\n              \"status\": \"known\",\n              \"spendPriority\": -100\n            }\n          }\n        ]\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"cursor\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"copilot\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"grok\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"kimi\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"zai\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"agy\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"alibaba\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"opencode-go\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"commandcode\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"minimax\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"mimo\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"deepseek\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"openrouter\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"elevenlabs\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"devin\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"muse\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"not_in_snapshot\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "openssl",
+        "req",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-nodes",
+        "-keyout",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/key.pem",
+        "-out",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/cert.pem",
+        "-days",
+        "1",
+        "-subj",
+        "/CN=api.typesafe.ai",
+        "-addext",
+        "subjectAltName=DNS:api.typesafe.ai"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ".+.........+......+.....+......+......+...+++++++++++++++++++++++++++++++++++++++*............+..+..........+..+++++++++++++++++++++++++++++++++++++++*..+.+......+...+...+..+.+..+.........+...+............+....+.........+..+......+.......+..+.....................+....+...+......+..+..........+.........+.........+.....+......+.+..............+.+........+.+......+...............+.........+...+.....+.......+...+........+...+...............+.......+.....+...............+...+.+...+...+........+....+..+..................+.+..+..........+...+.........+.....+.......+.....+...+.............+.........+.........+..+.......+...+...+.........+.....+..........+.....+......+.......+...+...............+..+...+....+..+.+..............+.+.................+.+......+.........+......+...+...+..+...+....+........+.+......+......+..+.+.....+.........+......+....+...............+..+.+..+.+..+.........+......+.......+.....................+......+.....+......++++++\n......+....+..+...+...+...+.......+...+..+.........+...+.+..+....+...+..+...+.+......+......+..+.+++++++++++++++++++++++++++++++++++++++*.......+....+.....+.+........+.........+...+.......+.....+...+...+....+...+.....+++++++++++++++++++++++++++++++++++++++*.......+............+......+.....+....+..+.............+..+......+...+....+...........+.+...+...+.........+......+...+.....+.......+.....+...+.+......+...+.....+....+............+...+..+...+...............+............+....+.....+.+.....+....+...........+...+......+....+..+.+..................+..+.......+......+......+...+........+...+.+...+...+........+......+.+........+......+...+......+.+.....+......+......................+.....+.+.................+..........+..+...............+.+..+.......+..++++++\n-----\n"
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md",
+        "--project",
+        "disposable quota lab"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 3   tokens: 1/1\n  rule: rule_1 (Validate quota boundaries.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  reason: no rankable eligible candidate\n  note: rule matched\n  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={\"status\":\"unknown\",\"accounts\":[],\"reason\":\"destination OMP authentication scope is not established\"}  spendPriority=unknown  runway=unknown  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty\n  timings: api_ms=3 quota_ms=125 local_ms=408 total_ms=536\n  usage: input_tokens=1 output_tokens=1 jev_cost_usd=4.2000000000000006e-08 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md",
+        "--project",
+        "disposable quota lab"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 2   tokens: 1/1\n  rule: rule_1 (Validate quota boundaries.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  reason: no rankable eligible candidate\n  note: rule matched\n  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={\"status\":\"unknown\",\"accounts\":[],\"reason\":\"destination OMP authentication scope is not established\"}  spendPriority=unknown  runway=unknown  -> eligible, unranked: OMP pool profile floor is unverifiable: disclosed uncertainty\n  timings: api_ms=2 quota_ms=117 local_ms=542 total_ms=661\n  usage: input_tokens=1 output_tokens=1 jev_cost_usd=4.2000000000000006e-08 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md",
+        "--project",
+        "disposable quota lab"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 3   tokens: 1/1\n  rule: rule_1 (Validate quota boundaries.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={\"status\":\"unknown\",\"accounts\":[],\"reason\":\"destination OMP authentication scope is not established\"}  spendPriority=unknown  runway=unknown  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty\n  timings: api_ms=3 quota_ms=123 local_ms=318 total_ms=444\n  usage: input_tokens=1 output_tokens=1 jev_cost_usd=4.2000000000000006e-08 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/fm/config/dispatch-never-send line 1; nothing sent)\n"
+    },
+    {
+      "privacy_refusal_sent_requests": 0
+    }
+  ],
+  "local_typesafe_requests": [
+    {
+      "path": "/v1/systemone",
+      "request": {
+        "model": "jev-latest",
+        "state": {
+          "task": {
+            "project": "disposable quota lab",
+            "brief": "## Captain's intent\nValidate the quota boundary.\n\n## Firstmate spec\nDo not send secrets or change any file.\n"
+          }
+        },
+        "questions": {
+          "rule": {
+            "type": "choice",
+            "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+            "criteria": {
+              "rule_1": "Validate quota boundaries.",
+              "default": "No listed rule applies to this task."
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/v1/systemone",
+      "request": {
+        "model": "jev-latest",
+        "state": {
+          "task": {
+            "project": "disposable quota lab",
+            "brief": "## Captain's intent\nValidate the quota boundary.\n\n## Firstmate spec\nDo not send secrets or change any file.\n"
+          }
+        },
+        "questions": {
+          "rule": {
+            "type": "choice",
+            "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+            "criteria": {
+              "rule_1": "Validate quota boundaries.",
+              "default": "No listed rule applies to this task."
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/v1/systemone",
+      "request": {
+        "model": "jev-latest",
+        "state": {
+          "task": {
+            "project": "disposable quota lab",
+            "brief": "## Captain's intent\nValidate the quota boundary.\n\n## Firstmate spec\nDo not send secrets or change any file.\n"
+          }
+        },
+        "questions": {
+          "rule": {
+            "type": "choice",
+            "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+            "criteria": {
+              "rule_1": "Validate quota boundaries.",
+              "default": "No listed rule applies to this task."
+            }
+          }
+        }
+      }
+    }
+  ],
+  "setup": "Real resolver, real curl via local TLS endpoint, real quota-axi in documented snapshot mode with disposable quota data; no mocked product executable",
+  "cleanup": "TLS endpoint stopped and lab removed"
+}

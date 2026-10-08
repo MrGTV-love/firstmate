@@ -1,0 +1,128 @@
+FM_TEST_BEGIN 2026-10-08T13:28:39Z tests/fm-spawn-dispatch-profile.test.sh family=backend-dispatch expected_gate_skip=none
+ok - allowlist=absent preserves the operational floor and filters only when opted in
+ok - allowlist=missing-config preserves the operational floor and filters only when opted in
+ok - allowlist=enabled preserves the operational floor and filters only when opted in
+ok - allowlist=empty preserves the operational floor and filters only when opted in
+ok - invalid allowlist names refuse before launch or task publication
+ok - inaccessible config with present allowlist refuses before launch or task publication
+ok - inaccessible config with absent allowlist refuses before launch or task publication
+ok - inaccessible ancestor with present allowlist refuses before launch or task publication
+ok - inaccessible ancestor with absent allowlist refuses before launch or task publication
+ok - secondmate launch inherits the allowlist for subsequent worker launches
+ok - local inheritance preserves the allowlist on source errors and mirrors proven absence
+ok - remote inheritance preserves the allowlist on source errors and mirrors proven absence
+ok - spawn records and launches concrete role ids and refuses retired literals before publication
+ok - a config/secondmate-harness model pin resolves roles and refuses retired ids through the model index
+ok - fm-spawn: actual ship/scout launch commands deliver the worker role contract
+ok - no --model/--effort records the default profile
+ok - an ordinary non-OMP spawn without crew-dispatch.json succeeds without required jq and preserves its durable profile
+ok - Claude spawn retains forwarded API auth, filters excluded credentials, and treats an allow flag alone as native authentication
+ok - initialized Claude settings retain unknown auth without borrowing quota or executing helpers; neutral settings preserve dispatch
+ok - fresh fallback spawns preserve done, failed, and paused declarations published during launch delivery
+ok - direct stopped-Claude relaunch preserves its recorded rule, resolves new profiles independently, and honors explicit rule selection with profile overrides
+ok - a claude launch publishes the brief as an operational-inbox record and passes only the doorbell
+ok - a secondmate claude launch publishes its brief record into the secondmate's own home
+ok - a claude spawn whose launch-brief record cannot publish stops with a clear error and sends no launch
+ok - non-cursor launches clear inherited Cursor identity markers
+ok - relative home overrides ignore CDPATH and become absolute before spawn launch construction
+ok - FM_HOME defaults resolve relative paths and preserve absolute spellings
+ok - absolute override spellings are preserved in spawn launch paths
+ok - unresolvable relative spawn overrides fail with named diagnostics
+ok - active crew-dispatch profile requires an explicit harness for ship spawns
+ok - active crew-dispatch profile requires an explicit harness for scout spawns
+ok - active crew-dispatch profile allows an explicit resolved harness
+ok - active crew-dispatch profile allows the legacy positional harness form
+ok - active crew-dispatch profile allows the raw launch-command escape hatch
+ok - a chained raw launch commits through the AI-trailer strip in every step
+ok - claude receives --model and --effort profile flags
+ok - codex receives --model and model_reasoning_effort profile flags
+ok - codex Luna receives --model and model_reasoning_effort max profile flags
+ok - codex omits max for models without the catalog capability
+ok - a codex crewmate launches with no hook layer and keeps its turn-end signal
+ok - a codex secondmate keeps the project hook layer its primary session runs on
+ok - grok receives --model and --reasoning-effort profile flags
+ok - grok omits unsupported max reasoning effort
+ok - grok omits unsupported xhigh reasoning effort
+ok - cursor receives its model-qualified reasoning class and exact task workspace
+ok - cursor refuses model ids absent from its resolved binary's live catalog
+ok - cursor preserves the requested model when its live catalog is unreachable
+ok - opencode receives --model and the effort as its config's agent variant
+ok - opencode without an effort keeps its launch config unchanged
+ok - opencode emits the variant for an effort the openai family exposes
+ok - opencode omits the variant for an effort outside the model family's list
+ok - native effort validator checks harness and model as separate axes
+ok - Ultra is explicit for native Pi and Pi-signed, including direct-PR, and refuses unsupported profiles before provisioning
+ok - batch dispatch preserves native Ultra in metadata and launch flags
+ok - Pi scout spawn enters the recorded worktree before launch
+ok - pi receives --model and --thinking max profile flags
+ok - Pi launch probing omits --tui-mode on older Pi and preserves it on supporting Pi
+ok - pi-signed shares Pi launch semantics while preserving its configured and recorded identity
+ok - pi-signed refuses safely and actionably when the selected executable is unavailable
+ok - pi-signed is a distinct persistent secondmate runtime with shared Pi supervision semantics
+ok - batch dispatch forwards shared --harness, --model, and --effort to every pair
+ok - claude forwards firstmate's CLAUDE_CONFIG_DIR so the crewmate uses the same credential store
+ok - the primary-owned Lavish server address reaches every worker launch
+cat: /Users/charlesabrooker/tmp/fm-spawn-dispatch-profile.8JvY3v/profile-lavish-ambient/pane.log: No such file or directory
+ok - absent Lavish configuration preserves the destination environment
+ok - config/claude-permission-mode=auto replaces --dangerously-skip-permissions with --permission-mode auto
+ok - config/claude-permission-mode=auto reaches scout launches too
+ok - claude worker launches cover the task-channel directories in bypass and auto modes
+ok - an unrecognized config/claude-permission-mode token refuses before any endpoint or metadata
+ok - a claude task launch establishes only Firstmate's task control channels through the system prompt
+ok - a persistent claude secondmate keeps its supervisor contract without a task-worker authority overlay
+ok - a claude crewmate launch carries the attribution-off policy in its own settings
+ok - keep-ai-trailers omits Claude attribution settings and the pane strip hooks
+ok - a secondmate's home-local keep-ai-trailers choice survives spawn and applies to its crew
+ok - a claude secondmate launch carries the attribution-off policy too
+ok - active crew-dispatch profile does not block secondmate launches
+ok - config/claude-launcher=teamclaude: a fresh claude spawn reaches claude with the TeamClaude proxy
+ok - an absent config/claude-launcher keeps the direct claude launch with no proxy
+ok - config/claude-launcher=teamclaude: a claude secondmate launch reaches claude with the TeamClaude proxy
+ok - config/claude-launcher=teamclaude refuses a stopped proxy or an unknown token before any task exists
+ok - TeamClaude configuration paths reach only the worker's teamclaude calls, and a relative one refuses
+ok - TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration
+ok - config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments
+ok - config/claude-launcher is inherited by secondmate homes
+ok - fresh default-model secondmates retain warning-only routing inheritance
+# all fm-spawn-dispatch-profile tests passed
+FM_TEST_END 2026-10-08T13:57:48Z tests/fm-spawn-dispatch-profile.test.sh exit=0 duration_ms=1748875 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T13:57:48Z tests/fm-spawn-claude-api-key-guard.test.sh family=unclassified expected_gate_skip=none
+ok - claude spawn refuses when ANTHROPIC_API_KEY is set and no allowlist
+ok - claude spawn refuses when ANTHROPIC_AUTH_TOKEN is set and no allowlist
+ok - claude spawn succeeds when no API key is set
+ok - claude spawn succeeds when ANTHROPIC_API_KEY is filtered out by allowlist
+ok - claude spawn succeeds with --allow-api-key flag
+ok - non-claude harness ignores ANTHROPIC_API_KEY
+ok - claude spawn succeeds with pin shed when ANTHROPIC_API_KEY is set
+ok - task meta records api_key=allow when --allow-api-key is used
+ok - claude spawn refuses a key set only in the tmux session environment
+ok - claude spawn refuses a key set only in the tmux global environment
+ok - claude spawn honors a tmux session removal marker over a global key
+ok - claude spawn succeeds with pin shed when the tmux environment holds a key
+ok - claude spawn tmux-environment check follows config/launch-env-allowlist
+ok - a non-opt-in launch sheds credentials captured by the pane
+ok - an opted-in launch passes credentials captured by the pane
+ok - ambient compound Claude launch enforces credentials and account on both invocations
+ok - allowlist compound Claude launch enforces credentials and account on both invocations
+ok - opt-in-ambient compound Claude launch enforces credentials and account on both invocations
+ok - opt-in-allowlist compound Claude launch enforces credentials and account on both invocations
+ok - named compound Claude launch enforces credentials and account on both invocations
+ok - ordinary compound Claude launch enforces credentials and account on both invocations
+ok - named-opt-in compound Claude launch enforces credentials and account on both invocations
+ok - ordinary-opt-in compound Claude launch enforces credentials and account on both invocations
+ok - named-allowlist compound Claude launch enforces credentials and account on both invocations
+ok - ordinary-allowlist compound Claude launch enforces credentials and account on both invocations
+ok - the shared guard enforces non-tmux Claude keys and respects opt-in and filtering
+ok - config/claude-launcher=teamclaude keeps the API-key refusal and the --allow-api-key opt-in
+ok - existing tmux with or without firstmate ignores both caller-only credentials
+ok - existing tmux without firstmate checks both global credentials
+ok - fresh tmux honors auth-token filtering, pin shedding, and explicit opt-in
+ok - prospective tmux imports both credentials with glob patterns and honors removal, emptiness, filtering, pins, and opt-in
+ok - fresh Claude dispatch consumes initialized pane authentication, filters inherited alternate roots, and binds native quota only to matching default HOME
+FM_TEST_END 2026-10-08T14:04:37Z tests/fm-spawn-claude-api-key-guard.test.sh exit=0 duration_ms=409161 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=2158265
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=1748875 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=409161 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-dispatch-profile.test.sh duration_ms=1748875
+FM_TEST_SLOWEST rank=2 script=tests/fm-spawn-claude-api-key-guard.test.sh duration_ms=409161
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M49AAWM08X3K86CZWW2AQZ0P/current-spawn-redrive-timing.json

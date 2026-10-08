@@ -1,0 +1,202 @@
+{
+  "commands": [
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/fm"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/fm\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-c",
+        "user.name=Disposable Lab",
+        "-c",
+        "user.email=lab@example.invalid",
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "Disposable project"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "helper_was_executed": false
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {
+        "ANTHROPIC_BASE_URL": "https://gateway.invalid"
+      },
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {
+        "ANTHROPIC_CUSTOM_HEADERS": "Authorization: disposable-local-only"
+      },
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {
+        "CLAUDE_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/alternate-store"
+      },
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json",
+        "--candidate",
+        "omp:openai-codex/gpt-6.1-sol"
+      ],
+      "environment_changes": {},
+      "exit": 1,
+      "stdout": "none\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-brief.sh",
+        "guard",
+        "project",
+        "--scout"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/fm/data/guard/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh",
+        "guard",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/project",
+        "--scout",
+        "--harness",
+        "claude",
+        "--model",
+        "sonnet",
+        "--effort",
+        "high"
+      ],
+      "environment_changes": {
+        "ANTHROPIC_API_KEY": "disposable-test-key"
+      },
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API\n"
+    },
+    {
+      "guard_task_metadata_created": false
+    }
+  ],
+  "setup": "Real chooser and spawn executables, disposable HOME and snapshot input; no production credentials",
+  "cleanup": "Disposable lab removed"
+}

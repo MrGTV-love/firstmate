@@ -1,0 +1,38 @@
+{
+  "observations": [
+    {
+      "command": [
+        "omp",
+        "usage",
+        "--provider",
+        "openai-codex",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"generatedAt\": 1791464097585,\n  \"reports\": [],\n  \"accountsWithoutUsage\": [],\n  \"disabledCredentials\": [],\n  \"capacity\": {}\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "omp",
+        "models",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"models\":[{\"provider\":\"apple\",\"kind\":\"chat\",\"id\":\"on-device\",\"selector\":\"apple/on-device\",\"name\":\"Apple AFM 3 Core Advanced\",\"contextWindow\":8192,\"maxTokens\":8192,\"reasoning\":false,\"thinking\":null,\"input\":[\"text\",\"image\"],\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0},\"pricingStatus\":\"unknown\"}]}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-teamclaude-launch.sh",
+        "--check"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: TeamClaude is not installed: install an executable teamclaude on PATH or under one Node version in ~/.nvm/versions/node; refusing to launch Claude without it\n"
+    }
+  ],
+  "isolation": "Disposable HOME, agent directory, XDG configuration; normal credentials never imported",
+  "cleanup": "Disposable home removed"
+}

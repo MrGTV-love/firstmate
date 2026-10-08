@@ -1,0 +1,6 @@
+{
+  "completed_with_open_stdin": true,
+  "exit": 0,
+  "stdout": "ok - fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration\n",
+  "stderr": ""
+}

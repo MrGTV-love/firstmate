@@ -1,0 +1,94 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 1500505,
+      "failed": 1,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 2,
+      "duration_ms": 545388,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 2,
+      "duration_ms": 256384,
+      "failed": 0,
+      "name": "standalone"
+    },
+    {
+      "count": 1,
+      "duration_ms": 64945,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-10-08T13:20:25Z",
+  "run_id": "fm-test-run-1791463409107-68571",
+  "scripts": [
+    {
+      "duration_ms": 66768,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-dispatch-capacity.test.sh"
+    },
+    {
+      "duration_ms": 478620,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-omp-harness.test.sh"
+    },
+    {
+      "duration_ms": 86154,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-quota-choose.test.sh"
+    },
+    {
+      "duration_ms": 170230,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-dispatch-resolve.test.sh"
+    },
+    {
+      "duration_ms": 64945,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-session-end-relaunch.test.sh"
+    },
+    {
+      "duration_ms": 1500505,
+      "exit": 124,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control-relaunch.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=4",
+  "started_at": "2026-10-08T12:43:28Z",
+  "summary": {
+    "duration_ms": 2216530,
+    "failed": 1,
+    "skipped_gate": 0,
+    "total": 6
+  }
+}

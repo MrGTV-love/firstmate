@@ -1,0 +1,589 @@
+## Typed routing
+$ quota-axi --json
+exit=0
+{
+  "generatedAt": "2026-10-08T12:44:53.594Z",
+  "schemaVersion": 5,
+  "providers": [
+    {
+      "provider": "claude",
+      "windows": [
+        {
+          "id": "seven_day",
+          "label": "week",
+          "kind": "weekly",
+          "percentRemaining": 75,
+          "resetsAt": "2026-10-15T12:44:53.430071+00:00",
+          "pace": {
+            "status": "ahead",
+            "reservePercentPoints": -25,
+            "burnMultiple": 921951.2195
+          }
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "refreshedAt": "2026-10-08T12:44:53.430071+00:00",
+        "reused": true
+      },
+      "quotaSemantics": {
+        "status": "known",
+        "effectiveAvailability": [
+          {
+            "scope": "all_models",
+            "status": "known",
+            "effectivePercentRemaining": 75,
+            "boundedBy": [
+              "seven_day"
+            ],
+            "limitingWindowIds": [
+              "seven_day"
+            ],
+            "pace": {
+              "status": "ahead",
+              "aheadWindowIds": [
+                "seven_day"
+              ],
+              "worstReservePercentPoints": -25,
+              "worstReserveWindowId": "seven_day"
+            },
+            "runway": {
+              "status": "projected_exhaustion",
+              "usableRunwaySeconds": 0,
+              "projectedExhaustedAt": "2026-10-08T12:44:54.086Z",
+              "limitingWindowId": "seven_day",
+              "projectionConfidence": "early"
+            },
+            "selection": {
+              "status": "known",
+              "spendPriority": -100
+            }
+          }
+        ]
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "codex",
+      "windows": [
+        {
+          "id": "weekly",
+          "label": "week",
+          "kind": "weekly",
+          "percentRemaining": 0,
+          "resetsAt": "2026-10-15T12:44:53.430071+00:00",
+          "pace": {
+            "status": "ahead",
+            "reservePercentPoints": -100,
+            "burnMultiple": 3687804.878
+          }
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "refreshedAt": "2026-10-08T12:44:53.430071+00:00",
+        "reused": true
+      },
+      "quotaSemantics": {
+        "status": "known",
+        "effectiveAvailability": [
+          {
+            "scope": "all_models",
+            "status": "known",
+            "effectivePercentRemaining": 0,
+            "boundedBy": [
+              "weekly"
+            ],
+            "limitingWindowIds": [
+              "weekly"
+            ],
+            "pace": {
+              "status": "ahead",
+              "aheadWindowIds": [
+                "weekly"
+              ],
+              "worstReservePercentPoints": -100,
+              "worstReserveWindowId": "weekly"
+            },
+            "runway": {
+              "status": "exhausted_now",
+              "usableRunwaySeconds": 0,
+              "limitingWindowId": "weekly",
+              "projectedExhaustedAt": "2026-10-08T12:44:53.594Z"
+            },
+            "selection": {
+              "status": "known",
+              "spendPriority": -100
+            }
+          }
+        ]
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "cursor",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "copilot",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "grok",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "kimi",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "zai",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "agy",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "alibaba",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "opencode-go",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "commandcode",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "minimax",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "mimo",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "deepseek",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "openrouter",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "elevenlabs",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "devin",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "muse",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    }
+  ]
+}
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md --project disposable quota lab
+exit=0
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 3   tokens: 1/1
+  rule: rule_1 (Validate quota boundaries.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={"status":"unknown","accounts":[],"reason":"destination OMP authentication scope is not established"}  spendPriority=unknown  runway=unknown  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  timings: api_ms=3 quota_ms=125 local_ms=408 total_ms=536
+  usage: input_tokens=1 output_tokens=1 jev_cost_usd=4.2000000000000006e-08 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md --project disposable quota lab
+exit=0
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 2   tokens: 1/1
+  rule: rule_1 (Validate quota boundaries.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={"status":"unknown","accounts":[],"reason":"destination OMP authentication scope is not established"}  spendPriority=unknown  runway=unknown  -> eligible, unranked: OMP pool profile floor is unverifiable: disclosed uncertainty
+  timings: api_ms=2 quota_ms=117 local_ms=542 total_ms=661
+  usage: input_tokens=1 output_tokens=1 jev_cost_usd=4.2000000000000006e-08 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md --project disposable quota lab
+exit=0
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 3   tokens: 1/1
+  rule: rule_1 (Validate quota boundaries.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  reason: rule requires the captain's explicit approval before dispatch
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={"status":"unknown","accounts":[],"reason":"destination OMP authentication scope is not established"}  spendPriority=unknown  runway=unknown  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  timings: api_ms=3 quota_ms=123 local_ms=318 total_ms=444
+  usage: input_tokens=1 output_tokens=1 jev_cost_usd=4.2000000000000006e-08 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/brief.md
+exit=0
+
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/resolver-d3690x6i/fm/config/dispatch-never-send line 1; nothing sent)
+{"privacy_refusal_sent_requests": 0}
+Cleanup: TLS endpoint stopped and lab removed
+
+## Authentication and billing
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/fm
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/fm
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+exit=0
+claude sonnet
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+exit=0
+cursor cursor-grok-4.6-medium
+
+{"helper_was_executed": false}
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+exit=0
+cursor cursor-grok-4.6-medium
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+exit=0
+cursor cursor-grok-4.6-medium
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+exit=0
+cursor cursor-grok-4.6-medium
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+exit=0
+cursor cursor-grok-4.6-medium
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/snapshot.json --candidate omp:openai-codex/gpt-6.1-sol
+exit=1
+none
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-brief.sh guard project --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/fm/data/guard/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh guard /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-mfmtvifi/project --scout --harness claude --model sonnet --effort high
+exit=1
+
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+{"guard_task_metadata_created": false}
+Cleanup: Disposable lab removed
+
+## Fresh spawn and recovery
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-brief.sh fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/data/fresh/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project --scout --harness claude --model sonnet --effort high --dispatch-rule rule_1
+exit=0
+model-matrix fallback launched omp fm-lab-secondary/available for rule_1
+spawned fresh harness=omp kind=scout window=primary:fm-fresh worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/slots/.treehouse/project-2887b3/1/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+{"fresh_spawn_metadata": "window=primary:fm-fresh\nendpoint_task_id=fresh\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/slots/.treehouse/project-2887b3/1/project\nproject=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project\nharness=omp\nkind=scout\ntasktmp=/tmp/fm-fresh\nmodel=fm-lab-secondary/available\neffort=high\nbusy_gen=g1791463567.25268.3688\nspawn_gen=s1791463567.4515.8514\ndispatch_rule=rule_1\n"}
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh task --relaunch
+exit=0
+spawned task harness=omp kind=scout window=primary:fm-task worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+{"actual_worker_busy_records": {"task.busy-state": "v1 gen=g1791463579.53466.12342 seq=3 state=idle source=omp-ext event=quota-exhausted ts=1791463611\n", "task.busy-gen": "g1791463579.53466.12342\n"}}
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh task relaunch --note Recover only with established capacity.
+exit=1
+
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+error: quota-exhausted: automatic recovery capacity is unknown; use a fresh spawn with known capacity or a manual relaunch profile for task (adopted authentication scope)
+{"automatic_refusal_preserved_brief": true, "automatic_refusal_preserved_local_work": true}
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh task relaunch --dispatch-rule rule_99 --note Invalid rule must not stop the worker.
+exit=1
+
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+error: invalid dispatch fallback configuration: jq: error (at <stdin>:19): dispatch rule does not contain the requested profile
+{"invalid_rule_preserved_brief": true}
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh task relaunch --harness omp --model fm-lab-secondary/available --effort high --note Deliberately continue on the permitted local profile, preserving work.
+exit=0
+relaunched task harness=omp from=omp model=fm-lab-secondary/available effort=high backend=tmux endpoint=primary:fm-task worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+{"replacement_metadata": "window=primary:fm-task\nendpoint_task_id=task\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/worker\nproject=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project\nharness=omp\nkind=scout\ntasktmp=/tmp/fm-task\nmodel=fm-lab-secondary/available\neffort=high\nbusy_gen=g1791463618.99930.5579\nspawn_gen=s1791463618.96831.19470\ndispatch_rule=rule_1\ncontrol_relaunch_tx=85658.20261008T124654Z.83\n", "replacement_preserved_local_work": "PRESERVE_LOCAL_WORK\n"}
+Local provider requests: [{"path": "/v1/chat/completions", "model": "available"}, {"path": "/v1/chat/completions", "model": "available"}, {"path": "/v1/chat/completions", "model": "available"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "gpt-6.1-sol"}, {"path": "/v1/chat/completions", "model": "available"}, {"path": "/v1/chat/completions", "model": "available"}, {"path": "/v1/chat/completions", "model": "available"}]
+Cleanup: Private tmux server stopped and lab removed
+
+## Destination catalog containment
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-brief.sh fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/data/fresh/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project --scout --harness claude --model sonnet --effort high --dispatch-rule rule_1
+exit=0
+model-matrix fallback launched omp fm-lab-secondary/available for rule_1
+spawned fresh harness=omp kind=scout window=primary:fm-fresh worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/slots/.treehouse/project-2887b3/1/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+{"fresh_spawn_metadata": "window=primary:fm-fresh\nendpoint_task_id=fresh\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/slots/.treehouse/project-2887b3/1/project\nproject=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project\nharness=omp\nkind=scout\ntasktmp=/tmp/fm-fresh\nmodel=fm-lab-secondary/available\neffort=high\nbusy_gen=g1791464045.85208.9063\nspawn_gen=s1791464045.64539.16129\ndispatch_rule=rule_1\n"}
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-brief.sh catalog-guard /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/no-catalog --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/data/catalog-guard/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh catalog-guard /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/no-catalog --scout --harness claude --model sonnet --effort high --dispatch-rule rule_1
+exit=1
+
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+error: dispatch rule_1 has exhausted capacity and no supported permitted fallback
+{"caller_only_catalog_guard": {"exit": 1, "task_metadata_published": false}}
+Local provider requests: [{"path": "/v1/chat/completions", "model": "available"}, {"path": "/v1/chat/completions", "model": "available"}, {"path": "/v1/chat/completions", "model": "available"}]
+Cleanup: Private tmux server stopped and lab removed
+
+## Native fallback
+$ omp --version
+exit=0
+omp/18.8.1
+
+$ omp usage --provider openai-codex --json
+exit=0
+{
+  "generatedAt": 1791463911109,
+  "reports": [],
+  "accountsWithoutUsage": [],
+  "disabledCredentials": [],
+  "capacity": {}
+}
+
+$ omp --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/live-0fvpvst3/project --no-title --no-session --no-tools --no-lsp --no-skills --no-rules --no-extensions -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/live-0fvpvst3/project/.omp/extensions/local.ts --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/live-0fvpvst3/fallback.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml --model fm-lab-primary/blocked --thinking off --max-time 45 -p Return the completion marker.
+exit=0
+LIVE_STANDIN_COMPLETED
+Working...
+Local provider requests: [{"path": "/v1/chat/completions", "model": "blocked"}, {"path": "/v1/chat/completions", "model": "blocked"}, {"path": "/v1/chat/completions", "model": "blocked"}, {"path": "/v1/chat/completions", "model": "blocked"}, {"path": "/v1/chat/completions", "model": "blocked"}, {"path": "/v1/chat/completions", "model": "blocked"}, {"path": "/v1/chat/completions", "model": "available"}]
+Cleanup: Disposable lab removed
+
+## Provider availability
+$ omp usage --provider openai-codex --json
+exit=0
+{
+  "generatedAt": 1791464097585,
+  "reports": [],
+  "accountsWithoutUsage": [],
+  "disabledCredentials": [],
+  "capacity": {}
+}
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-teamclaude-launch.sh --check
+exit=1
+
+error: TeamClaude is not installed: install an executable teamclaude on PATH or under one Node version in ~/.nvm/versions/node; refusing to launch Claude without it
+Cleanup: Disposable home removed

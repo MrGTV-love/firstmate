@@ -1,0 +1,16 @@
+{
+  "completed_targeted_suites": [
+    "tests/fm-dispatch-capacity.test.sh",
+    "tests/fm-dispatch-resolve.test.sh",
+    "tests/fm-quota-choose.test.sh",
+    "tests/fm-omp-harness.test.sh",
+    "tests/fm-session-end-relaunch.test.sh",
+    "tests/fm-control-relaunch.test.sh",
+    "tests/fm-spawn-dispatch-profile.test.sh",
+    "tests/fm-spawn-claude-api-key-guard.test.sh"
+  ],
+  "initial_limitations": "Initial control and spawn runs exceeded the 1500-second per-suite bound; the spawn invocation also reached its outer deadline. Complete control and spawn/authentication redrives passed with a 2400-second bound and existing worktree-local Bash 5.3. Print-mode live setup required explicit stdin EOF.",
+  "live_product_results": "Native local-provider fallback, declared fresh-spawn fallback, destination-only catalog checks, typed unknown/floor/approval boundaries, Claude authentication and billing guards, pre-mutation recovery refusals, and manual work-preserving replacement passed.",
+  "remaining_live_limits": "Authorized Codex OAuth pools and authenticated DeepSeek/TeamClaude routes were unavailable in isolated homes. The real watcher could emit an escalation, but its injected FM_STATE_OVERRIDE defeats the gate lab allowance before capacity inspection.",
+  "cleanup": "Private tmux servers stopped, local HTTP/TLS endpoints stopped, all own disposable labs and diagnostic/runner scripts removed. No permanent source/test changes or production credential/global configuration changes."
+}

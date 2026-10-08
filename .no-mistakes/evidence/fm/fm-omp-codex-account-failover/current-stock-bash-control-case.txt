@@ -1,0 +1,361 @@
+exit=0
+ok - fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration
+
++ test_herdr_relaunch_resumes_only_the_registered_pi_session
++ local dir out rc=0 command registered
++ for registered in pi claude
++ herdr_case_or_skip resume-pi resume-pi
++ HERDR_CASE_DIR=
++ command -v jq
+++ new_case resume-pi resume-pi
+++ local id=resume-pi dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
+++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/state /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fake
+++ :
+++ :
+++ printf claude
+++ printf claude
+++ printf '%s\n' fm-resume-pi
+++ printf %s fmses
+++ make_tmux_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
+++ local fb=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin
+++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/tmux
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/sleep
+++ make_process_table_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/ps
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/lsof
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
++ HERDR_CASE_DIR=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
++ add_herdr_ship_task /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221 resume-pi fmlab %7
++ local dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221 id=resume-pi ses=fmlab survivor=%7
++ local home=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home proj=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj wt=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt
++ fm_git_worktree /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt task-resume-pi
++ local repo=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt branch=task-resume-pi
++ fm_git_init_commit /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj
++ local dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj
++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj init -q -b main
+++ basename /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj
++ printf '# %s\n' proj
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj add README.md
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj -c 'user.name=Firstmate Tests' -c user.email=tests@example.invalid commit -qm initial
++ fm_git_add_origin /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj.origin.git
++ local repo=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj remote=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj.origin.git remote_abs
++ git clone --quiet --bare /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj.origin.git
+++ cd /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj.origin.git
+++ pwd
++ remote_abs=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj.origin.git
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj remote add origin file:///Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj.origin.git
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj worktree add --quiet -b task-resume-pi /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt
++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi
++ cat
++ echo window=fmlab:%7
++ echo endpoint_task_id=resume-pi
++ echo worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt
++ echo project=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/proj
++ echo harness=claude
++ echo kind=ship
++ echo mode=no-mistakes
++ echo yolo=off
++ echo tasktmp=/tmp/fm-resume-pi
++ echo model=default
++ echo effort=default
++ echo backend=herdr
++ echo herdr_session=fmlab
++ echo herdr_workspace_id=ws1
++ echo herdr_tab_id=tab1
++ echo herdr_pane_id=%7
++ printf %s /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt
++ printf %s %7
++ :
++ :
++ TASK_TMPS+=("/tmp/fm-$id")
++ make_herdr_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
++ local fb=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin
++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin
++ rm -f /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/sleep
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/herdr
++ make_process_table_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/ps
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin/lsof
++ return 0
++ dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
++ rm -f /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fake/herdr-stopped
++ sed 's/^harness=claude$/harness=pi/' /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/state/resume-pi.meta
++ mv /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/pi.meta /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/state/resume-pi.meta
++ printf '{"result":{"agent":{"agent":"%s","agent_status":"idle","agent_session":{"kind":"path","value":"/tmp/pi-bound-session.jsonl"}}}}\n' pi
+++ run_spawn /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221 resume-pi --relaunch --harness pi
+++ local dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221
+++ shift
+++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/user-home
+++ env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID PATH=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources FM_HOME=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home FM_FAKE_DIR=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fake HOME=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/user-home CLAUDE_CONFIG_DIR= FM_SPAWN_NO_GUARD=1 GROK_HOME=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/grokhome /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh resume-pi --relaunch --harness pi
++ out='warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md records no ship branch; defaulting to legacy branch fm/resume-pi
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned resume-pi harness=pi kind=ship mode=no-mistakes yolo=off window=fmlab:%7 worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt'
++ expect_code 0 0 'Herdr Pi relaunch should complete (pi registration)
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md records no ship branch; defaulting to legacy branch fm/resume-pi
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned resume-pi harness=pi kind=ship mode=no-mistakes yolo=off window=fmlab:%7 worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt'
++ local expected=0 actual=0 'label=Herdr Pi relaunch should complete (pi registration)
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md records no ship branch; defaulting to legacy branch fm/resume-pi
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned resume-pi harness=pi kind=ship mode=no-mistakes yolo=off window=fmlab:%7 worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/wt'
++ '[' 0 = 0 ']'
+++ cat /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/fake/launched-command
++ command='fm_launch_git_hooks() {
+  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_i=0 fm_out=0 fm_key= fm_value=
+  case "$fm_count" in '\'''\''|*[!0-9]*) return 0 ;; esac
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+      if [ "$fm_i" -ne "$fm_out" ]; then
+        export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
+      fi
+      fm_out=$((fm_out + 1))
+    fi
+    fm_i=$((fm_i + 1))
+  done
+  fm_i=$fm_out
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
+    fm_i=$((fm_i + 1))
+  done
+  if [ "$fm_keep" = 0 ]; then
+    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+    fm_out=$((fm_out + 1))
+  fi
+  if [ "$fm_out" -eq 0 ]; then
+    unset GIT_CONFIG_COUNT
+  else
+    export GIT_CONFIG_COUNT=$fm_out
+  fi
+}
+
+fm_launch_git_hooks '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/state/resume-pi.git-hooks'\'' 0; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; unset TRACEPARENT; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI FM_PI_HARNESS=pi '\''/Users/charlesabrooker/.npm-global/bin/pi'\'' --tui-mode regular --session '\''/tmp/pi-bound-session.jsonl'\'' -e '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/state/resume-pi.pi-ext.ts'\'' "$('\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-operational-input.sh'\'' encode launch-brief < '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md'\'')"'
++ '[' pi = pi ']'
++ assert_contains 'fm_launch_git_hooks() {
+  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_i=0 fm_out=0 fm_key= fm_value=
+  case "$fm_count" in '\'''\''|*[!0-9]*) return 0 ;; esac
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+      if [ "$fm_i" -ne "$fm_out" ]; then
+        export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
+      fi
+      fm_out=$((fm_out + 1))
+    fi
+    fm_i=$((fm_i + 1))
+  done
+  fm_i=$fm_out
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
+    fm_i=$((fm_i + 1))
+  done
+  if [ "$fm_keep" = 0 ]; then
+    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+    fm_out=$((fm_out + 1))
+  fi
+  if [ "$fm_out" -eq 0 ]; then
+    unset GIT_CONFIG_COUNT
+  else
+    export GIT_CONFIG_COUNT=$fm_out
+  fi
+}
+
+fm_launch_git_hooks '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/state/resume-pi.git-hooks'\'' 0; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; unset TRACEPARENT; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI FM_PI_HARNESS=pi '\''/Users/charlesabrooker/.npm-global/bin/pi'\'' --tui-mode regular --session '\''/tmp/pi-bound-session.jsonl'\'' -e '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/state/resume-pi.pi-ext.ts'\'' "$('\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-operational-input.sh'\'' encode launch-brief < '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-pi-2221/home/data/resume-pi/launch-brief.md'\'')"' '--session '\''/tmp/pi-bound-session.jsonl'\''' 'the replacement Pi must resume the session that owns Herdr status authority'
++ case "$1" in
++ :
++ rc=0
++ for registered in pi claude
++ herdr_case_or_skip resume-claude resume-claude
++ HERDR_CASE_DIR=
++ command -v jq
+++ new_case resume-claude resume-claude
+++ local id=resume-claude dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
+++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/state /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fake
+++ :
+++ :
+++ printf claude
+++ printf claude
+++ printf '%s\n' fm-resume-claude
+++ printf %s fmses
+++ make_tmux_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
+++ local fb=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin
+++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/tmux
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/sleep
+++ make_process_table_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/ps
+++ cat
+++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/lsof
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
++ HERDR_CASE_DIR=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
++ add_herdr_ship_task /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592 resume-claude fmlab %7
++ local dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592 id=resume-claude ses=fmlab survivor=%7
++ local home=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home proj=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj wt=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt
++ fm_git_worktree /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt task-resume-claude
++ local repo=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt branch=task-resume-claude
++ fm_git_init_commit /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj
++ local dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj
++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj init -q -b main
+++ basename /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj
++ printf '# %s\n' proj
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj add README.md
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj -c 'user.name=Firstmate Tests' -c user.email=tests@example.invalid commit -qm initial
++ fm_git_add_origin /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj.origin.git
++ local repo=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj remote=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj.origin.git remote_abs
++ git clone --quiet --bare /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj.origin.git
+++ cd /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj.origin.git
+++ pwd
++ remote_abs=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj.origin.git
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj remote add origin file:///Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj.origin.git
++ git -C /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj worktree add --quiet -b task-resume-claude /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt
++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude
++ cat
++ echo window=fmlab:%7
++ echo endpoint_task_id=resume-claude
++ echo worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt
++ echo project=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/proj
++ echo harness=claude
++ echo kind=ship
++ echo mode=no-mistakes
++ echo yolo=off
++ echo tasktmp=/tmp/fm-resume-claude
++ echo model=default
++ echo effort=default
++ echo backend=herdr
++ echo herdr_session=fmlab
++ echo herdr_workspace_id=ws1
++ echo herdr_tab_id=tab1
++ echo herdr_pane_id=%7
++ printf %s /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt
++ printf %s %7
++ :
++ :
++ TASK_TMPS+=("/tmp/fm-$id")
++ make_herdr_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
++ local fb=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin
++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin
++ rm -f /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/sleep
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/herdr
++ make_process_table_stub /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/ps
++ cat
++ chmod +x /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin/lsof
++ return 0
++ dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
++ rm -f /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fake/herdr-stopped
++ sed 's/^harness=claude$/harness=pi/' /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/state/resume-claude.meta
++ mv /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/pi.meta /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/state/resume-claude.meta
++ printf '{"result":{"agent":{"agent":"%s","agent_status":"idle","agent_session":{"kind":"path","value":"/tmp/pi-bound-session.jsonl"}}}}\n' claude
+++ run_spawn /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592 resume-claude --relaunch --harness pi
+++ local dir=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592
+++ shift
+++ mkdir -p /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/user-home
+++ env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID PATH=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fakebin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources FM_HOME=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home FM_FAKE_DIR=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fake HOME=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/user-home CLAUDE_CONFIG_DIR= FM_SPAWN_NO_GUARD=1 GROK_HOME=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/grokhome /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh resume-claude --relaunch --harness pi
++ out='warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md records no ship branch; defaulting to legacy branch fm/resume-claude
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned resume-claude harness=pi kind=ship mode=no-mistakes yolo=off window=fmlab:%7 worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt'
++ expect_code 0 0 'Herdr Pi relaunch should complete (claude registration)
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md records no ship branch; defaulting to legacy branch fm/resume-claude
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned resume-claude harness=pi kind=ship mode=no-mistakes yolo=off window=fmlab:%7 worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt'
++ local expected=0 actual=0 'label=Herdr Pi relaunch should complete (claude registration)
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md records no ship branch; defaulting to legacy branch fm/resume-claude
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned resume-claude harness=pi kind=ship mode=no-mistakes yolo=off window=fmlab:%7 worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/wt'
++ '[' 0 = 0 ']'
+++ cat /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/fake/launched-command
++ command='fm_launch_git_hooks() {
+  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_i=0 fm_out=0 fm_key= fm_value=
+  case "$fm_count" in '\'''\''|*[!0-9]*) return 0 ;; esac
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+      if [ "$fm_i" -ne "$fm_out" ]; then
+        export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
+      fi
+      fm_out=$((fm_out + 1))
+    fi
+    fm_i=$((fm_i + 1))
+  done
+  fm_i=$fm_out
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
+    fm_i=$((fm_i + 1))
+  done
+  if [ "$fm_keep" = 0 ]; then
+    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+    fm_out=$((fm_out + 1))
+  fi
+  if [ "$fm_out" -eq 0 ]; then
+    unset GIT_CONFIG_COUNT
+  else
+    export GIT_CONFIG_COUNT=$fm_out
+  fi
+}
+
+fm_launch_git_hooks '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/state/resume-claude.git-hooks'\'' 0; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; unset TRACEPARENT; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI FM_PI_HARNESS=pi '\''/Users/charlesabrooker/.npm-global/bin/pi'\'' --tui-mode regular -e '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/state/resume-claude.pi-ext.ts'\'' "$('\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-operational-input.sh'\'' encode launch-brief < '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md'\'')"'
++ '[' claude = pi ']'
++ assert_not_contains 'fm_launch_git_hooks() {
+  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_i=0 fm_out=0 fm_key= fm_value=
+  case "$fm_count" in '\'''\''|*[!0-9]*) return 0 ;; esac
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+      if [ "$fm_i" -ne "$fm_out" ]; then
+        export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
+      fi
+      fm_out=$((fm_out + 1))
+    fi
+    fm_i=$((fm_i + 1))
+  done
+  fm_i=$fm_out
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
+    fm_i=$((fm_i + 1))
+  done
+  if [ "$fm_keep" = 0 ]; then
+    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+    fm_out=$((fm_out + 1))
+  fi
+  if [ "$fm_out" -eq 0 ]; then
+    unset GIT_CONFIG_COUNT
+  else
+    export GIT_CONFIG_COUNT=$fm_out
+  fi
+}
+
+fm_launch_git_hooks '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/state/resume-claude.git-hooks'\'' 0; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; unset TRACEPARENT; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI FM_PI_HARNESS=pi '\''/Users/charlesabrooker/.npm-global/bin/pi'\'' --tui-mode regular -e '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/state/resume-claude.pi-ext.ts'\'' "$('\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-operational-input.sh'\'' encode launch-brief < '\''/Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9/resume-claude-30592/home/data/resume-claude/launch-brief.md'\'')"' --session 'a Pi replacement must not resume a foreign adapter'\''s conversation'
++ case "$1" in
++ :
++ rc=0
++ pass 'fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration'
++ printf 'ok - %s\n' 'fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration'
++ relaunch_cleanup
++ local d
++ for d in '"${TASK_TMPS[@]:-}"'
++ '[' -n /tmp/fm-resume-pi ']'
++ rm -rf /tmp/fm-resume-pi
++ for d in '"${TASK_TMPS[@]:-}"'
++ '[' -n /tmp/fm-resume-claude ']'
++ rm -rf /tmp/fm-resume-claude
++ chmod -R u+w /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9
++ rm -rf /Users/charlesabrooker/tmp/fm-control-relaunch.NvNTa9
