@@ -642,15 +642,22 @@ scope_pr = lambda number, sha, ref=None, **extra: dict(
     updated_at=iso(hours(3)), **extra)
 shas = {n: chr(ord('a') + n - 31) * 40 for n in range(31, 37)}
 double['pulls'] = [scope_pr(31, shas[31]), scope_pr(32, shas[32]), scope_pr(33, shas[33], 'fm/branch-owned'),
-                   scope_pr(34, shas[34]), scope_pr(35, shas[35], requested_teams=[dict(slug='reviewers')])]
+                   scope_pr(34, shas[34]), scope_pr(35, shas[35], requested_teams=[dict(slug='reviewers')]),
+                   scope_pr(36, shas[36], 'fm/other')]
 double['checks'] = {shas[31]: greens(shas[31]), shas[32]: greens(shas[32], conclusion='failure'),
                     shas[33]: greens(shas[33]), shas[34]: greens(shas[34], conclusion='failure'),
-                    shas[35]: greens(shas[35])}
+                    shas[35]: greens(shas[35]), shas[36]: greens(shas[36], conclusion='failure')}
 other = home / 'projects/other'
 out(['git', 'init', '-q', '-b', 'main', other])
 git(other, 'remote', 'add', 'origin', 'https://github.com/test/other.git')
-double['pulls_by_repo'] = {'/repos/test/other': [dict(scope_pr(40, 'f' * 40), html_url='https://github.com/test/other/pull/40')]}
+other_url = 'https://github.com/test/other/pull/'
+double['pulls_by_repo'] = {'/repos/test/other': [
+    dict(scope_pr(40, 'f' * 40, 'fm/branch-owned'), html_url=other_url + '40'),
+    dict(scope_pr(41, '1' * 40, 'fm/other'), html_url=other_url + '41'),
+    dict(scope_pr(42, '2' * 40, 'fm/unrelated'), html_url=other_url + '42')]}
 double['checks']['f' * 40] = greens('f' * 40, conclusion='failure')
+double['checks']['1' * 40] = greens('1' * 40)
+double['checks']['2' * 40] = greens('2' * 40, conclusion='failure')
 (world / 'gh.json').write_text(json.dumps(double))
 scope_tasks = [task('owns-31', fresh, pr=PR_URL + '31'), task('owns-branch', fresh)]
 scope_tasks[1]['branch'] = 'fm/branch-owned'
@@ -664,27 +671,31 @@ def scoped(lane):
     (world / 'gh-requests').write_text('')
     return ledger(), (world / 'gh-requests').read_text()
 try:
-    # Main home: only owned PRs are obligations; the rest is one informational group, never overdue.
     main_scope, main_requests = scoped(False)
     assert set(rows(main_scope, 'red_check')) == {PR_URL + '32'}, main_scope
-    named = {s for s in rows(main_scope, 'open_pr') if s.startswith(PR_URL)}
-    assert named == {PR_URL + '31', PR_URL + '33'}, main_scope
-    group = rows(main_scope, 'open_pr')['unowned project PRs']
-    assert group['informational'] and group['overdue'] is False and group['owner'] == 'none', group
-    for token in ('test/project: #34 #35', 'test/other: #40'):
-        assert token in group['evidence'], group
-    assert [r['subject'] for r in main_scope['rows'] if r.get('informational') and r['category'] == 'open_pr'] \
-        == ['unowned project PRs'], main_scope
-    assert shas[34] not in main_requests and shas[35] not in main_requests, 'unowned PR checks are not fetched'
-    # A lane home shares the origin but lists no unowned PR, no group, and never reads the other repository.
+    assert set(rows(main_scope, 'open_pr')) == {PR_URL + '31', PR_URL + '33'}, main_scope
+    assert all(sha not in main_requests for sha in (shas[34], shas[35], shas[36], 'f' * 40, '1' * 40, '2' * 40)), main_requests
     lane_scope, lane_requests = scoped(True)
     assert set(rows(lane_scope, 'red_check')) == {PR_URL + '32'}, lane_scope
     assert {s for s in rows(lane_scope, 'open_pr')} == {PR_URL + '31', PR_URL + '33'}, lane_scope
     assert not any(r.get('informational') for r in lane_scope['rows'] if r['category'] == 'open_pr'), lane_scope
     assert '/repos/test/other' not in lane_requests, 'a lane does not survey repositories it has no task in'
     marker_file.write_text('not a valid id!\n')
-    assert 'unowned project PRs' in rows(ledger(), 'open_pr'), 'a malformed marker is not a lane home'
-    marker_file.unlink()
+    (world / 'gh-requests').write_text('')
+    malformed_scope = ledger()
+    assert set(rows(malformed_scope, 'open_pr')) == {PR_URL + '31', PR_URL + '33'}, malformed_scope
+    assert '/repos/test/other/pulls?' in (world / 'gh-requests').read_text(), 'a malformed marker is not a lane home'
+    other_task = task('owns-other-branch', fresh)
+    other_task['project'] = str(other)
+    other_task['branch'] = 'fm/other'
+    fixture([*scope_tasks, other_task],
+            [*scope_backlog, dict(id='owns-other-url', structured=True, state='done', pr_url=other_url + '42')])
+    for lane in (False, True):
+        cross_repo, requests = scoped(lane)
+        assert set(rows(cross_repo, 'open_pr')) == {PR_URL + '31', PR_URL + '33', other_url + '41'}, cross_repo
+        assert set(rows(cross_repo, 'red_check')) == {PR_URL + '32', other_url + '42'}, cross_repo
+        assert shas[36] not in requests and 'f' * 40 not in requests, requests
+        assert '1' * 40 in requests and '2' * 40 in requests, requests
 finally:
     marker_file.unlink(missing_ok=True)
     shutil.rmtree(other)
@@ -693,29 +704,59 @@ finally:
     if scope_saved[2] is not None:
         double['pulls_by_repo'] = scope_saved[2]
     (world / 'gh.json').write_text(json.dumps(double))
-print('PASS: PR and red-check rows follow ownership; unowned PRs are one informational main-home group', flush=True)
+print('PASS: PR ownership is repository-scoped; unowned PRs emit no rows or check requests', flush=True)
 
 # A worker that recorded its own stop is not missing, and an unreadable live state does not degrade the ledger.
-def stopped_task(name, last_event, state='unknown', detail='backend target gone: gone', exists=False, alive='missing'):
+def stopped_task(name, last_event, state='unknown', detail='backend target gone: gone', exists=False, alive='missing',
+                 status_text=None):
     item = task(name, world / 'nowhere', state=state, exists=exists, alive=alive)
     item['current_state']['detail'] = detail
     item['paths']['status_log'] = dict(last_event=dict(state=last_event) if last_event else None)
+    if status_text is None:
+        status_text = f'{last_event}: stopped\n' if last_event else ''
+    (home / 'state' / (name + '.status')).write_text(status_text)
     return item
 recorded = [stopped_task('stopped-done', 'done'),
             stopped_task('stopped-paused-gone', 'paused', alive='dead'),
             stopped_task('stopped-paused-live', 'paused', detail='unrecognized run status', exists=True, alive='alive'),
             stopped_task('stopped-parked', None, state='parked', exists=False, alive='dead'),
             stopped_task('lost-silently', 'working', alive='dead'),
-            stopped_task('failed-after-done', 'done', state='failed', alive='dead')]
+            stopped_task('stopped-multiline', None, status_text='paused: waiting for CI\nThe check is still running.\n'),
+            stopped_task('resumed-after-pause', 'working', status_text='paused: waiting\nworking: resumed\n'),
+            stopped_task('lost-prose', None, status_text='The worker was paused while waiting.\n')]
+for state in ('working', 'blocked', 'failed'):
+    for event in ('done', 'paused'):
+        recorded.append(stopped_task(state + '-after-' + event, event, state=state, alive='dead'))
+for state in ('working', 'blocked'):
+    item = stopped_task(state + '-unverified-after-pause', 'paused', state=state, exists=True, alive='unverified')
+    item['backend'] = None
+    recorded.append(item)
 fixture(recorded, [dict(id=t['id'], structured=True, state='in_flight', requires_child_metadata=True,
                         since=iso(hours(9))) for t in recorded])
 stopped_report = ledger()
-assert set(rows(stopped_report, 'missing_worker')) == {'lost-silently', 'failed-after-done'}, stopped_report
-assert 'failed-after-done' in rows(stopped_report, 'failed_task'), 'a recorded stop never hides a failed deliverable'
+expected_missing = {'lost-silently', 'failed-after-done', 'resumed-after-pause', 'lost-prose',
+                    *(state + '-after-' + event for state in ('working', 'blocked', 'failed') for event in ('done', 'paused'))}
+assert set(rows(stopped_report, 'missing_worker')) == expected_missing, stopped_report
+assert {'failed-after-done', 'failed-after-paused'} <= set(rows(stopped_report, 'failed_task')), stopped_report
 degraded_text = ' '.join(r['evidence'] for r in rows(stopped_report, 'coverage').values())
-assert not any(name in degraded_text for name in ('stopped-done', 'stopped-paused', 'stopped-parked')), stopped_report
+assert not any(name in degraded_text for name in ('stopped-done', 'stopped-paused', 'stopped-parked', 'stopped-multiline')), stopped_report
+assert all(state + '-unverified-after-pause' in degraded_text for state in ('working', 'blocked')), stopped_report
+for item in recorded:
+    (home / 'state' / (item['id'] + '.status')).unlink()
+custom_paused = stopped_task('custom-paused', None, status_text='awaiting: waiting for CI\nThe check is still running.\n')
+literal_paused = stopped_task('literal-paused', 'paused')
+fixture([custom_paused, literal_paused],
+        [dict(id=t['id'], structured=True, state='in_flight', requires_child_metadata=True) for t in (custom_paused, literal_paused)])
+try:
+    custom_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                                  env=dict(env, FM_CLASSIFY_PAUSED_VERB='awaiting')))
+    assert set(rows(custom_report, 'missing_worker')) == {'literal-paused'}, custom_report
+    assert custom_report['complete'], custom_report
+finally:
+    for item in (custom_paused, literal_paused):
+        (home / 'state' / (item['id'] + '.status')).unlink()
 fixture(tasks, backlog)
-print('PASS: recorded stopped or parked owners are neither missing nor unknown', flush=True)
+print('PASS: authoritative current state overrides historical stops; configured logical stop events are honored', flush=True)
 
 # Unselected ready items are visible backlog, not overdue obligations; dispatched ones still are.
 (home / 'state/started-ready.status').write_text(f'working [at={hours(1)}]: spawned\n')

@@ -585,19 +585,19 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
 | `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
-| `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing; the main home also carries one informational group row for project PRs nobody owns | 3600 s |
+| `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
 | `red_check` | the latest run of a check on a PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 Each home reports only what it owns.
-A PR is owned when one of this home's task records or backlog items names its URL, or when its head branch is a branch of one of this home's tasks.
-Every other open PR of the discovered repositories is unowned: it gets no `open_pr` or `red_check` row of its own, and its checks are not fetched.
-The main home lists its unowned PRs once, as the single `open_pr` row named `unowned project PRs`, with owner `none` and the PR numbers per repository in its evidence.
-A secondmate home, marked by a valid `.fm-secondmate-home` file, emits no such row and discovers repositories only from its own tasks and owned PR URLs, never from its shared `projects/` clones or its own checkout.
+A PR is owned when one of this home's task records or backlog items names its exact URL, or when its repository and head branch match the origin repository and branch of one of this home's tasks.
+Every other open PR of the discovered repositories is unowned: it gets no ledger rows, and its checks are not fetched. Unowned PR triage is separate from this ledger.
+A secondmate home, marked by a valid `.fm-secondmate-home` file, discovers repositories only from its own tasks and owned PR URLs, never from its shared `projects/` clones or its own checkout.
 An informational row carries `informational: true` and is never overdue at any age, so it neither wakes the watcher nor appears in Bearings.
 A queued item is selected for dispatch once it has a task record or a status log in this home; unselected ready items stay visible as informational rows, so the unprioritized backlog is not an overdue obligation.
-A worker whose current state is `done`, `parked`, or `paused`, or whose status log ends on a `done` or `paused` event, has recorded its own stop: a gone endpoint or an unreadable live state then adds neither a `missing_worker` row nor degraded coverage.
-A recorded stop never hides a `failed` task or its unlanded commits.
+A worker whose current state is `done`, `parked`, or `paused` has recorded its own stop: a gone endpoint or an unreadable live state then adds neither a `missing_worker` row nor degraded coverage.
+When current state is unknown, the latest logical status event can establish a recorded stop: `done` or the configured pause verb (`FM_CLASSIFY_PAUSED_VERB`, default `paused`). The shared status-event parser ignores continuation prose.
+Known `working`, `blocked`, and `failed` current states override historical stop events. A recorded stop never hides unlanded commits.
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
 The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.

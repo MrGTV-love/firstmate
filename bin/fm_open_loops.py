@@ -33,9 +33,6 @@ GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
-# A worker that recorded its own stop is not missing: done or paused in its status log, or a
-# done, parked, or paused current state.
-STOP_EVENTS = {"done", "paused"}
 STOP_STATES = {"done", "parked", "paused"}
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
                        r"|timed? ?out|ECONN|ENOTFOUND|\b(?:error|failure|failed|exception|fatal)\b"
@@ -89,7 +86,6 @@ class Collector:
         self.state_files = []
         self.owned_urls = set()
         self.owned_branches = set()
-        self.unowned = {}
         self.lane = self.is_secondmate_home()
 
     def is_secondmate_home(self):
@@ -254,10 +250,15 @@ class Collector:
     def recorded_stop(self, task):
         """True when the worker's own durable record says it stopped on purpose, so its endpoint
         being gone or its live state being unreadable is expected rather than a loss."""
-        if task["current_state"].get("state") == "failed":
+        state = task["current_state"].get("state")
+        if state in ("working", "blocked", "failed"):
             return False
-        last = ((task.get("paths") or {}).get("status_log") or {}).get("last_event") or {}
-        return task["current_state"].get("state") in STOP_STATES or last.get("state") in STOP_EVENTS
+        if state in STOP_STATES:
+            return True
+        return self.bash('. "$1"; last=$(last_status_line "$2"); '
+                         'if [ "$(status_line_verb "$last")" = done ] || status_is_paused "$last"; '
+                         'then printf stopped; fi',
+                         BIN / "fm-status-event-lib.sh", self.state / (task["id"] + ".status")).strip() == "stopped"
 
     def backlog_rows(self):
         by_id = {t["id"]: t for t in self.tasks}
@@ -296,7 +297,7 @@ class Collector:
 
     def worker_rows(self):
         for task in self.tasks:
-            stopped = self.recorded_stop(task)
+            stopped = self.source("worker stop " + task["id"], self.recorded_stop, task)
             if stopped:  # a recorded stop explains an unreadable endpoint; it never degrades coverage
                 try:
                     alive = self.liveness(task)
@@ -491,14 +492,13 @@ class Collector:
     def load_ownership(self):
         """PRs this home owns: recorded on its tasks or backlog, or opened from a task's branch."""
         self.owned_urls = {t["pr"]["url"] for t in self.tasks if t["pr"].get("url")}
-        self.owned_branches = {t["branch"] for t in self.tasks if t.get("branch")}
         for record in self.backlog:
             for link in [record.get("pr_url"), *(record.get("links") or [])]:
                 if isinstance(link, str) and GITHUB_PR.fullmatch(link):
                     self.owned_urls.add(link)
 
-    def owns_pr(self, pr):
-        return pr["html_url"] in self.owned_urls or (pr.get("head") or {}).get("ref") in self.owned_branches
+    def owns_pr(self, slug, pr):
+        return pr["html_url"] in self.owned_urls or (slug, (pr.get("head") or {}).get("ref")) in self.owned_branches
 
     def repo_slugs(self):
         paths = {t["project"] for t in self.tasks if t.get("project")}
@@ -529,6 +529,8 @@ class Collector:
             match = GITHUB_ORIGIN.fullmatch(origin)
             if match:
                 slugs.add(match[1])
+                self.owned_branches.update((match[1], t["branch"]) for t in self.tasks
+                                           if t.get("project") == path and t.get("branch"))
         return sorted(slugs)
 
     def repo_origin(self, path):
@@ -586,20 +588,8 @@ class Collector:
                 self.pr_state(url)
                 continue
             self.prs[url] = pr
-            if self.owns_pr(pr):
+            if self.owns_pr(slug, pr):
                 self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
-            else:
-                self.unowned.setdefault(slug, []).append(pr.get("number", "?"))
-
-    def unowned_row(self):
-        """Project PRs with no fleet owner: one informational row in the main home, nothing in a lane."""
-        if self.lane or not self.unowned:
-            return
-        total = sum(len(numbers) for numbers in self.unowned.values())
-        listing = "; ".join(f"{slug}: " + " ".join("#" + str(n) for n in sorted(numbers, key=str))
-                            for slug, numbers in sorted(self.unowned.items()))
-        self.add("open_pr", "unowned project PRs", "informational: no fleet owner; route one only on the captain's word",
-                 None, "none", f"{total} open PR(s) with no task or backlog owner - {listing}", informational=True)
 
     def question_rows(self):
         for record in self.backlog:
@@ -633,7 +623,6 @@ class Collector:
         slugs = self.source("project origins", self.repo_slugs) or []
         for slug in slugs:
             self.source("open PRs " + slug, self.pr_rows, slug)
-        self.unowned_row()
         self.source("workers", self.worker_rows)
         self.source("questions", self.question_rows)
         if self.degraded:
