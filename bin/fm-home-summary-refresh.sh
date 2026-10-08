@@ -11,8 +11,9 @@
 #
 # Publication is atomic: the producer writes and validates a unique mode-0600
 # temporary file on the state directory's filesystem, then renames it over the
-# ledger. After a failed, interrupted, or killed refresh, the ledger path holds
-# either the prior complete document or the new complete document, never torn output.
+# ledger. A directory at the ledger path is rejected rather than treated as a
+# successful publication into that directory. After a failed, interrupted, or
+# killed refresh, an existing ledger remains complete, never torn output.
 # A home-local refresh lock serializes concurrent triggers so an older in-flight
 # summary cannot overwrite one computed after a later status change. The shared
 # timeout owner bounds state initialization, lock acquisition, and publication
@@ -214,6 +215,10 @@ home_summary_refresh_once() {
     return 1
   fi
   home_summary_fence || return 1
+  if [ -d "$LEDGER" ]; then
+    home_summary_fail "atomic ledger replacement failed: destination is a directory: $LEDGER"
+    return 1
+  fi
   if ! mv -f -- "$HOME_SUMMARY_TMP" "$LEDGER" 2>/dev/null; then
     home_summary_fail "atomic ledger replacement failed: $LEDGER"
     return 1

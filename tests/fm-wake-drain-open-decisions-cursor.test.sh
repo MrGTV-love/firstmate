@@ -348,6 +348,42 @@ test_previous_fold_cache_is_refolded_under_current_semantics() {
   pass "an old fold cache is rebuilt once before same-version incremental reads resume"
 }
 
+test_large_previous_fold_cache_migrates_within_startup_bound() {
+  local dir state status cursor out probe status_bytes ident probe_bytes
+  dir=$(make_case cursor-large-migration)
+  state="$dir/state"
+  status="$state/task.status"
+  cursor="$state/.task.open-decisions-cursor"
+  out="$dir/drain.out"
+  probe="$dir/probe.tsv"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  printf 'needs-decision [key=upgrade-gate]: choose the migration path\n' > "$status"
+  python3 - "$status" <<'PY'
+import sys
+with open(sys.argv[1], "a") as handle:
+    for i in range(24000):
+        handle.write(f"working: routine checks passed {i:04d}\n")
+PY
+  ident=$(bash -c '. "$1"; _fm_open_decisions_file_ident "$2"' \
+    _ "$ROOT/bin/fm-classify-lib.sh" "$status")
+  status_bytes=$(LC_ALL=C wc -c < "$status" | tr -d '[:space:]')
+  printf 'version=9:secondmate\noffset=%s\nident=%s\n' "$status_bytes" "$ident" > "$cursor"
+  : > "$probe"
+  bash -c '. "$1"; fm_run_timed 120 env FM_STATE_OVERRIDE="$2" FM_OPEN_DECISIONS_READ_PROBE="$3" "$4"' \
+    _ "$ROOT/bin/fm-timeout-lib.sh" "$state" "$probe" "$DRAIN" > "$out" \
+    || fail "previous-version large-history drain exhausted the startup bound"
+  assert_contains "$(cat "$out")" 'task [key=upgrade-gate] needs-decision: choose the migration path' \
+    "large-history migration lost the buried decision"
+  probe_bytes=$(last_probe_bytes "$probe" "$status")
+  [ "$probe_bytes" = "$status_bytes" ] \
+    || fail "large-history migration trusted the obsolete checkpoint instead of folding $status_bytes bytes"
+  FM_STATE_OVERRIDE="$state" FM_OPEN_DECISIONS_READ_PROBE="$probe" "$DRAIN" > "$out" \
+    || fail "cached drain after large-history migration failed"
+  assert_contains "$(cat "$out")" 'task [key=upgrade-gate] needs-decision: choose the migration path' \
+    "migrated checkpoint lost the buried decision on reuse"
+  pass "a previous-version large-history checkpoint rebuilds within the startup bound"
+}
+
 test_terminal_supersession_reaches_cached_drains() {
   local dir state status cursor out kind terminal expected closing ident size span pass_number
   for kind in scout ship secondmate; do
@@ -806,4 +842,5 @@ test_read_failure_preserves_state_for_retry
 test_cursor_cache_read_failure_refolds_without_replaying_unread_status
 test_pre_fix_cursor_refolds_corr_tagged_decision
 test_previous_fold_cache_is_refolded_under_current_semantics
+test_large_previous_fold_cache_migrates_within_startup_bound
 test_buried_decision_survives_many_growing_drains_and_resolution_clears_it
