@@ -11,21 +11,21 @@ FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 command -v jq >/dev/null 2>&1 \
   || fail "these tests run the script's own jq programs over API-shaped JSON with the real jq, which was not found"
 
-# The fake gh answers every query with the JSON shape GitHub returns and runs
-# the --jq program it received with the real jq, so field selection is what is
-# under test.
+# The fake gh answers every query with the JSON shape GitHub returns; the script's
+# own jq programs select the fields, so field selection is what is under test.
+# fm_gh_http_shim wraps it in the HTTP response `gh api -i` prints.
 cat > "$FAKEBIN/gh" <<'SH'
 #!/usr/bin/env bash
 set -o pipefail
 serve() {
   case "$*" in
-    "api /repos/o/r/pulls/7 --jq "*)
+    "api repos/o/r/pulls/7")
       printf '%s\n' '{"user":{"login":"prauthor"},"base":{"sha":"base123"}}'
       ;;
-    "api /repos/o/r/pulls/7/files?per_page=100 --paginate --jq .[].filename")
+    "api repos/o/r/pulls/7/files?per_page=100")
       printf '%s\n' '[{"filename":"a.ts"},{"filename":"dir/b.ts"}]'
       ;;
-    "api --method GET /repos/o/r/commits -f sha=base123 -f path=a.ts -F per_page=100 --jq "*)
+    "api repos/o/r/commits?sha=base123&path=a.ts&per_page=100")
       if [ "${FM_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
         printf '%s\n' '[
           {"sha":"own1","author":{"login":"prauthor","type":"User"}},
@@ -41,7 +41,7 @@ serve() {
           {"sha":"unmapped1","author":null}]'
       fi
       ;;
-    "api --method GET /repos/o/r/commits -f sha=base123 -f path=dir/b.ts -F per_page=100 --jq "*)
+    "api repos/o/r/commits?sha=base123&path=dir%2Fb.ts&per_page=100")
       if [ "${FM_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
         printf '%s\n' '[{"sha":"own2","author":{"login":"prauthor","type":"User"}}]'
       else
@@ -56,15 +56,12 @@ serve() {
       ;;
   esac
 }
-prog=
-prev=
-for arg in "$@"; do
-  [ "$prev" != --jq ] || prog=$arg
-  prev=$arg
-done
-serve "$@" | jq -r "$prog"
+serve "$@"
 SH
 chmod +x "$FAKEBIN/gh"
+fm_gh_http_shim "$FAKEBIN"
+export FM_STATE_OVERRIDE="$TMP_ROOT/state"
+mkdir -p "$FM_STATE_OVERRIDE"
 
 run_reviewers() {
   PATH="$FAKEBIN:$PATH" "$SCRIPT" https://github.com/o/r/pull/7

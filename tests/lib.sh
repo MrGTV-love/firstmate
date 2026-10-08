@@ -570,6 +570,15 @@ fm_fakebin() {
   printf '%s\n' "$fakebin"
 }
 
+# fm_gh_http_shim <fakebin> turns the body-only fixture <fakebin>/gh into gh-backend and installs
+# tests/assets/gh-http-shim.sh as gh, so `gh api -i` calls get ETag, 304 and X-RateLimit-* responses
+# and every call lands in $GH_SHIM_LOG (the shim's header owns the contract).
+fm_gh_http_shim() {
+  mv "$1/gh" "$1/gh-backend"
+  cp "$ROOT/tests/assets/gh-http-shim.sh" "$1/gh"
+  chmod +x "$1/gh" "$1/gh-backend"
+}
+
 # fm_test_bash_only_dir <dir> creates <dir>/bash-only holding only a link to the
 # resolved bash and echoes it, so a clean PATH reaches bash without the rest of
 # bash's install directory (which may also hold teamclaude or claude).
