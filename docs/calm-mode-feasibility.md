@@ -207,8 +207,8 @@ Every tool registered or supplied by Firstmate under `.pi/extensions` has this d
 | --- | --- | --- |
 | `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls` | Calm wrappers for Pi's seven main-session built-ins | Their call and text-result shells hide while Calm is active; ordinary and stock export rendering delegate to Pi's original renderers. |
 | `fm_watch_arm_pi` | Main-session custom tool in `fm-primary-pi-watch.ts` | Its complete self-rendered shell hides while Calm is active and returns unchanged when Calm is off or stock export rendering is active. |
-| `fm_branch_outcomes` | Main-session custom tool in `fm-branch-supervision.ts` | Its complete self-rendered shell hides while Calm is active; when visible, it delegates to a stock Pi `ToolExecutionComponent` with no custom renderers, preserving arguments, framing, output normalization, collapsed preview, expansion, and error styling; stock export rendering falls through to Pi's structured fallback. |
-| `fm_branch_processed` | Main-session custom tool in `fm-branch-supervision.ts` | It uses the same stock-component delegation and Calm visibility boundary as `fm_branch_outcomes`. |
+| `fm_branch_outcomes` | Main-session custom tool in `fm-branch-supervision.ts` | Its complete self-rendered shell hides while Calm is active; when visible, it delegates to a stock Pi `ToolExecutionComponent` with no custom renderers when that component exposes `updateArgs`. Older hosts without that API use a reconstructed boxed shell with version-aware argument headers, normalized output, and a collapsed-preview limit probed from the installed stock component. Stock export rendering falls through to Pi's structured fallback. |
+| `fm_branch_processed` | Main-session custom tool in `fm-branch-supervision.ts` | It shares `fm_branch_outcomes`' visibility and renderer selection above, with no collapsed result preview in the older-host fallback. |
 | `fm_branch_report` | Branch-session custom tool supplied directly to `createAgentSession` | It runs only in the headless supervision session and has no main-session `ToolExecutionComponent`; successful execution writes the outcome store and delivers a routine note or exact captain entry through the separately audited delivery path, so the tool cannot emit a dump-shaped row in the captain's transcript. |
 | branch-local `read` built-in | Branch-session built-in enabled through `createAgentSession` | It runs only in the headless supervision session and has no main-session `ToolExecutionComponent`, so its file output cannot emit a row in the captain's transcript. |
 | branch-local `bash` override | Branch-session replacement supplied directly to `createAgentSession` | It runs only in the headless supervision session and has no main-session `ToolExecutionComponent`, so its command output cannot emit a row in the captain's transcript. |
@@ -562,7 +562,7 @@ FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=30 duration_ms=277700 fai
 
 Pi 0.84.4's stock `ToolExecutionComponent` collapses a text result longer than ten lines, adds Pi's expansion hint, and renders every line when expanded, while the previously verified Pi 0.81.1 stock fallback renders every line in both states.
 The original `fm_branch_outcomes` adaptation probed the installed component's rendered capability once, then reconstructed its preview policy.
-The [current delegation](#firstmate-pi-tool-audit) replaces that reconstruction while preserving the complete-row Calm boundary and stock HTML fallback.
+The [Firstmate Pi tool audit](#firstmate-pi-tool-audit) owns the current renderer selection and older-host fallback.
 
 The real installed-package comparison remains executable through:
 
