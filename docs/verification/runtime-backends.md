@@ -1277,6 +1277,35 @@ ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 reads empty and pen
 ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
 ```
 
+### 2026-10-08 omp stale wake gating
+
+Verified on 2026-10-08 on macOS arm64 against omp 18.8.1, headless over its RPC protocol with the real watch extension, the real wake queue and recovery marker, and the real `bin/fm-wake-drain.sh`.
+Only the watcher arm is a stand-in, and a scripted local OpenAI-compatible model answers every request, so no model tokens were spent.
+The guard plays the lane's part by running the real drain and acknowledgement at the moments a lane would.
+
+- **A lane's drain strands every queued headline.**
+  With the gate disabled (`FM_OMP_WAKE_HOLD_MAX_MS=0`), three watcher closes during a long turn were queued as three follow-ups.
+  The lane drained and acknowledged all three rows inside that turn, and omp then started one wake turn per follow-up, each finding nothing to drain.
+- **A held wake is delivered only to an idle lane that is still owed one.**
+  With the gate on, the same closes produced no wake turn after the lane drained.
+  When the lane did not drain during the long turn, exactly one wake turn followed, the lane drained inside it, and no further wake turn followed.
+
+[Watcher continuity](../watcher-continuity.md#omp-stale-wake-gating) owns the resulting delivery contract.
+The guard spends no model tokens, so it runs by default wherever omp is installed:
+
+```sh
+tests/fm-omp-stale-wake-live-e2e.test.sh
+```
+
+```text
+ok - live omp stale wake: omp (omp/18.8.1) delivered no wake turn after the lane drained and acknowledged every row inside a long turn (stale: no wake turn after the lane drained and acknowledged every row)
+ok - live omp owed wake: omp (omp/18.8.1) delivered exactly one wake turn to a lane that had not drained, and none after the drain that turn ran (owed: one wake turn, and none after the drain it triggered covered every row)
+ok - live omp control: omp (omp/18.8.1) with the gate disabled still shows the stale wake turns the guard exists to prevent (legacy: 3 stale wake turns without the gate)
+```
+
+The control scenario fails the guard if the disabled gate stops producing stale turns, so the other two cannot pass vacuously.
+The guard drives omp's `isIdle()` as the extension context reports it; an omp release that changes that signal fails the guard naming the version.
+
 ### 2026-10-08 omp idle wake behind an advisor note
 
 Verified on 2026-10-08 on macOS arm64 against omp 18.8.1 in isolated Herdr 0.9.1 lab sessions, with omp's advisor enabled and every model role served by a scripted local OpenAI-compatible model, so no model tokens were spent.

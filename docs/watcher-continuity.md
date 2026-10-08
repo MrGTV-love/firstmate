@@ -81,6 +81,32 @@ omp starts no turn for an explicit follow-up that reaches an idle session unless
 The prompt flow never touches the composer, so an operator draft stays unsent, and it also flushes any follow-up already stranded in omp's queue.
 `tests/fm-omp-harness.test.sh` covers idle delivery behind an advisor tail with an empty composer and with a draft, plus the follow-up fallback for an unreadable idle state; the live guard's idle step and its evidence are recorded in [omp idle wake behind an advisor note](verification/runtime-backends.md#2026-10-08-omp-idle-wake-behind-an-advisor-note).
 
+### omp stale wake gating
+
+omp cannot retract a queued follow-up, and a lane drains and acknowledges every durable row inside the turn a follow-up was queued behind.
+Each follow-up queued that way then started one more turn that found nothing to drain, so a lane saw old watcher headlines with no queued wake and answered each with a no-op.
+`.omp/extensions/fm-primary-omp-watch.ts` therefore queues no actionable wake behind a running turn.
+After the successor watcher is verified and the handling handoff is confirmed, the extension reads the session's idle state:
+
+- A busy session holds the wake, still pending and still carried by the replacement handoff, and a one-second timer (`FM_OMP_WAKE_FLUSH_MS`) re-reads the idle state while any wake is held.
+- An idle session receives one wake at a time through the prompt flow, and the next held wake waits for that wake's turn.
+- Before any delivery the extension asks `bin/fm-wake-drain.sh --owed`, and a wake whose answer is "nothing owed" is retired instead of injected, including a wake a replacement session replays from the handoff.
+
+`fm_wake_owed` in `bin/fm-wake-lib.sh` owns that answer: a drain by the actor would hand it a queued row it owns or an unacknowledged recovery episode.
+The check is read-only and silent, and anything it cannot read counts as owed, so only a clean "nothing owed" withholds a wake.
+
+Four cases keep the previous delivery:
+
+- A wake carrying a typed continuity failure is always delivered.
+- A `supervision-host:` line is always delivered.
+- A session whose idle state cannot be read gets the follow-up it got before.
+- A wake held longer than `FM_OMP_WAKE_HOLD_MAX_MS` (default 1800000) is queued as a follow-up, still one at a time and still owed-gated, so a session that misreads busy cannot starve a wake.
+
+Setting `FM_OMP_WAKE_HOLD_MAX_MS=0` restores queue-behind-the-turn delivery outright.
+`tests/fm-omp-harness.test.sh` covers the held, drained, owed, and replacement-handoff scenarios over a fake omp API, and `tests/fm-wake-queue.test.sh` pins the owed predicate against the real queue and recovery marker.
+The live guard and its evidence are recorded in [omp stale wake gating](verification/runtime-backends.md#2026-10-08-omp-stale-wake-gating).
+The Pi and OpenCode extensions still queue every wake as a follow-up and are not covered by this gating.
+
 ### omp restored-wake recovery
 
 omp restores queued user follow-ups to the composer when a run is interrupted with Escape or a message is dequeued with Alt+Up, so accepting a wake as a follow-up does not prove a turn consumed it.

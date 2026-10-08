@@ -11,6 +11,10 @@
 # retirement; docs/watcher-continuity.md owns the recovery contract.
 # --reemit is the context-refresh presentation mode; the same document's
 # "Who presents queued wakes between turns" section owns its delivery exclusion.
+# --owed is the read-only, silent question a wake-delivery path asks before it
+# injects a headline: exit 0 when a drain by this actor would hand it something
+# to acknowledge, 1 when nothing is owed (fm_wake_owed in fm-wake-lib.sh owns the
+# predicate). It presents, claims, and acknowledges nothing.
 # Every scratch file this script mints (.main-eligible-rows.tmp.*,
 # .wake-rows.consume.*, .wake-queue.retire.*, .wake-queue.ack.*,
 # .wake-queue.actor-view.*) is created and removed under the queue lock, so one
@@ -226,6 +230,11 @@ case "${1:-}" in
     [ "$#" -eq 1 ] || { echo "wake drain: unexpected re-emit arguments" >&2; exit 2; }
     REEMIT=true
     ;;
+  --owed)
+    [ "$#" -eq 1 ] || { echo "wake drain: unexpected owed arguments" >&2; exit 2; }
+    fm_wake_owed "$ACTOR"
+    exit $?
+    ;;
   --ack-through)
     ACK_THROUGH=${2:-}
     case "$ACK_THROUGH" in ''|*[!0-9]*) echo "wake drain: invalid acknowledgement sequence" >&2; exit 2 ;; esac
@@ -235,7 +244,7 @@ case "${1:-}" in
     case "$ACK_GENERATION" in ''|*[!A-Za-z0-9._-]*) echo "wake drain: invalid recovery generation" >&2; exit 2 ;; esac
     [ "$#" -eq 4 ] || { echo "wake drain: unexpected acknowledgement arguments" >&2; exit 2; }
     ;;
-  *) echo "usage: fm-wake-drain.sh [--reemit | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
+  *) echo "usage: fm-wake-drain.sh [--reemit | --owed | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
 esac
 
 [ "$ACTOR" != branch ] || require_branch_eligible_rows || exit 1

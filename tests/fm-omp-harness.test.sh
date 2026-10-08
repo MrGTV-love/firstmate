@@ -528,6 +528,9 @@ test_watch_extension_arms_and_delivers() {
   # stays up, so exactly one wake exists to consume.
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
+# The extension confirms a handling handoff through this same script; answering
+# at once keeps its synchronous call from blocking the whole run.
+[ "${1:-}" != --handling-delivered ] || exit 0
 printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
 if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ]; then
   : > "$FM_HOME/state/.e2e-fired"
@@ -871,9 +874,13 @@ EOF
 # the other stall: a wake arriving at an idle lane whose context ends in an
 # advisor note must start its own turn instead of waiting as a follow-up.
 # Each scenario runs in its own process because the arm fixture fires exactly
-# one actionable close.
+# one actionable close. Every scenario except idle-* delivers behind a running
+# turn, the queue-behind-the-turn path that FM_OMP_WAKE_HOLD_MAX_MS=0 keeps, so
+# the recovery of a follow-up omp restored to the composer stays pinned; the
+# default hold-until-idle delivery is pinned by run_watch_hold_scenario.
 run_watch_restore_scenario() {  # <scenario>
-  local scenario=$1 repo home
+  local scenario=$1 repo home hold_max=0
+  case "$scenario" in idle-*) hold_max= ;; esac
   repo="$TMP_ROOT/watch-restore-$scenario/repo"; home="$TMP_ROOT/watch-restore-$scenario/home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
@@ -902,7 +909,7 @@ SH
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
   FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
-    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_OMP_WAKE_HOLD_MAX_MS="$hold_max" \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
@@ -1268,6 +1275,155 @@ test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   pass ".omp watch extension: an idle lane's wake starts its own turn behind an advisor tail; a wake omp restored to the composer is submitted again alone, bounded, and never over a draft or a running turn"
 }
 
+# A wake headline queued behind a running turn goes stale: the lane drains and
+# acknowledges every durable row inside that turn, and each queued follow-up then
+# starts one more turn that finds nothing to drain. The watch extension must
+# therefore queue nothing behind a running turn, deliver at most one wake at a
+# time to an idle lane, and deliver only while a drain would still hand the lane
+# something to acknowledge (bin/fm-wake-drain.sh --owed).
+# Each scenario runs in its own process because the arm fixture is stateful.
+run_watch_hold_scenario() {  # <scenario>
+  local scenario=$1 repo home hold_max=
+  case "$scenario" in cap) hold_max=1500 ;; esac
+  repo="$TMP_ROOT/watch-hold-$scenario/repo"; home="$TMP_ROOT/watch-hold-$scenario/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --handling-delivered ] || exit 0
+printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
+while :; do
+  for f in "${FM_HOME:?}"/state/trigger-*; do
+    [ -e "$f" ] || continue
+    name=${f##*/}
+    rm -f "$f"
+    printf 'signal: %s\n' "$name"
+    exit 0
+  done
+  sleep 0.1
+done
+SH
+  # Stand-in for the durable queue's answer: "drained" means the lane already
+  # acknowledged everything. The real predicate is pinned by fm-wake-queue.test.sh.
+  cat > "$repo/bin/fm-wake-drain.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --owed ] || exit 2
+printf 'asked\n' >> "${FM_HOME:?}/state/.owed-asked"
+[ "$(cat "$FM_HOME/state/.owed" 2>/dev/null)" = drained ] && exit 1
+exit 0
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-wake-drain.sh"
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_OMP_WAKE_FLUSH_MS=100 \
+    FM_OMP_WAKE_HOLD_MAX_MS="$hold_max" \
+    SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+const handoff = `${state}/extensions/omp-primary-watch/session-replacement-actionable.json`;
+const handlers = new Map(); let tool = null; const sent = [];
+let idle = false;
+const ctx = { hasUI: false, isIdle: () => idle, hasPendingMessages: () => false };
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage(m, o) {
+    sent.push({ m, o });
+    // omp's prompt flow starts a turn at once; a follow-up waits behind the run.
+    if (!o?.deliverAs && idle) {
+      idle = false;
+      handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: m }] } }, ctx);
+    }
+    return undefined;
+  },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const fire = async (name) => {
+  writeFileSync(`${state}/${name}`, "");
+  for (let i = 0; i < 100 && existsSync(`${state}/${name}`); i += 1) await sleep(50);
+  await sleep(500);
+};
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, ctx);
+await tool.execute();
+// The lane is inside a long turn while three watcher cycles close.
+await fire("trigger-1");
+if (process.env.SCENARIO === "handoff") {
+  if (sent.length !== 0) throw new Error(`a wake was queued behind the running turn: ${JSON.stringify(sent)}`);
+  await handlers.get("session_shutdown")({}, ctx);
+  const stored = JSON.parse(readFileSync(handoff, "utf8"));
+  if (stored.pending.length !== 1 || !stored.pending[0].message.includes("trigger-1")) throw new Error(`the held wake did not ride the handoff: ${JSON.stringify(stored)}`);
+  // While the session was being replaced the lane acknowledged everything.
+  writeFileSync(`${state}/.owed`, "drained");
+  idle = true;
+  await handlers.get("session_start")({ type: "session_start" }, ctx);
+  await sleep(1500);
+  if (sent.length !== 0) throw new Error(`a drained wake was replayed by the replacement session: ${JSON.stringify(sent)}`);
+  await handlers.get("session_shutdown")({}, ctx);
+  if (existsSync(handoff)) throw new Error("a drained wake stayed in the replacement handoff");
+  process.exit(0);
+}
+if (process.env.SCENARIO === "cap") {
+  // A session that keeps reading busy cannot starve the wake: past the bound it
+  // is queued as a follow-up, once, and still only because the record owes it.
+  if (sent.length !== 0) throw new Error(`the wake was queued before the hold bound: ${JSON.stringify(sent)}`);
+  await sleep(2500);
+  if (sent.length !== 1 || sent[0].o?.deliverAs !== "followUp" || !sent[0].m.includes("signal: trigger-1")) {
+    throw new Error(`expected one follow-up for the wake held past its bound: ${JSON.stringify(sent)}`);
+  }
+  await handlers.get("session_shutdown")({}, ctx);
+  process.exit(0);
+}
+await fire("trigger-2");
+await fire("trigger-3");
+if (sent.length !== 0) throw new Error(`wakes were queued behind the running turn: ${JSON.stringify(sent)}`);
+if (process.env.SCENARIO === "drained") {
+  // The lane drained and acknowledged every row inside its turn, then went idle.
+  writeFileSync(`${state}/.owed`, "drained");
+  idle = true;
+  await sleep(1500);
+  if (sent.length !== 0) throw new Error(`stale wakes reached a lane whose rows were all acknowledged: ${JSON.stringify(sent)}`);
+  if (!existsSync(`${state}/.owed-asked`)) throw new Error("the extension never asked the drain whether anything was owed");
+  await handlers.get("session_shutdown")({}, ctx);
+  if (existsSync(handoff)) throw new Error("drained wakes stayed in the replacement handoff");
+  process.exit(0);
+}
+if (process.env.SCENARIO === "owed") {
+  // The lane went idle without draining: exactly one wake, as its own turn.
+  idle = true;
+  await sleep(1500);
+  if (sent.length !== 1 || sent[0].o?.deliverAs !== undefined) throw new Error(`expected one prompt-flow wake for the owed rows: ${JSON.stringify(sent)}`);
+  if (!sent[0].m.includes("signal: trigger-1")) throw new Error(`the wake does not name the oldest owed headline: ${sent[0].m}`);
+  // That turn drains and acknowledges every row; the other headlines are stale.
+  writeFileSync(`${state}/.owed`, "drained");
+  idle = true;
+  await sleep(1500);
+  if (sent.length !== 1) throw new Error(`a headline the drain already covered was delivered after it: ${JSON.stringify(sent)}`);
+  await handlers.get("session_shutdown")({}, ctx);
+  if (existsSync(handoff)) throw new Error("covered wakes stayed in the replacement handoff");
+  process.exit(0);
+}
+throw new Error(`unknown scenario ${process.env.SCENARIO}`);
+EOF
+  local status=$?
+  cat "$home/scenario.out"
+  return "$status"
+}
+
+test_watch_extension_delivers_a_wake_only_to_an_idle_lane_that_is_still_owed_one() {
+  local scenario out status
+  for scenario in drained owed handoff cap; do
+    out=$(run_watch_hold_scenario "$scenario")
+    status=$?
+    expect_code 0 "$status" "omp watch hold scenario $scenario: $out"
+    [ -z "$out" ] || fail "omp watch hold scenario $scenario printed output: $out"
+  done
+  pass ".omp watch extension: no wake queues behind a running turn, one wake reaches an idle lane at a time, a wake the drain already covered is never injected, and a wake held past its bound is still queued once"
+}
+
 # Only the omp process that holds the session lock may record itself as the
 # loaded session or arm a watcher. A descendant omp (an `omp -p` child a turn
 # runs) auto-discovers the same extensions from the same directory; it used to
@@ -1386,5 +1542,6 @@ test_watch_extension_keeps_the_arm_without_the_file_or_with_off
 test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
+test_watch_extension_delivers_a_wake_only_to_an_idle_lane_that_is_still_owed_one
 test_primary_extensions_ignore_a_descendant_session
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries

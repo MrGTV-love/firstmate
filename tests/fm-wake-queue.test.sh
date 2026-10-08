@@ -1775,6 +1775,70 @@ test_main_is_never_told_to_drain_rows_only_the_branch_owns() {
 # The per-actor count runs awk over the queue, and awk implementations differ on
 # whether a failed input open aborts before the END rule; one that reaches END
 # reports a 0 count for a queue that was never proved empty.
+# A wake headline is stale once the lane has acknowledged what it announced.
+# --owed is the one question a delivery path asks before injecting a headline:
+# would a drain still hand this actor something to acknowledge? It is read-only
+# and silent, and anything it cannot read counts as owed.
+test_owed_reports_whether_a_drain_would_still_hand_over_work() {
+  local dir state ack_line ack_seq ack_gen out rc before after marker
+  dir=$(make_case owed-predicate)
+  state="$dir/state"
+  owed() { FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 2> "$dir/owed.err"; }
+
+  owed && fail "an empty queue with no recovery marker was reported as owed"
+  [ ! -s "$dir/owed.err" ] || fail "--owed was not silent on an empty queue: $(cat "$dir/owed.err")"
+
+  append_wake "$state" signal task.status "signal: task.status" || fail "seed wake failed"
+  owed || fail "a queued row was reported as nothing owed"
+
+  # The lane drains and acknowledges everything: the headline it was queued
+  # behind is now stale, which is exactly the case --owed must name.
+  out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" 2>&1) || fail "drain failed"
+  ack_line=$(printf '%s\n' "$out" | grep '^WAKE_ACK_REQUIRED:') || fail "drain printed no acknowledgement command"
+  ack_seq=$(printf '%s\n' "$ack_line" | sed 's/.*--ack-through \([0-9]*\).*/\1/')
+  ack_gen=$(printf '%s\n' "$ack_line" | sed 's/.*--recovery-generation \([A-Za-z0-9._-]*\).*/\1/')
+  owed || fail "a presented but unacknowledged row was reported as nothing owed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$ack_seq" --recovery-generation "$ack_gen" >/dev/null 2>&1 \
+    || fail "acknowledgement failed"
+  owed && fail "an acknowledged queue was still reported as owed"
+
+  # A row that arrived after the acknowledgement is owed again.
+  append_wake "$state" stale default:w1:p2 "stale: default:w1:p2" || fail "second wake failed"
+  owed || fail "a row appended after the acknowledgement was reported as nothing owed"
+  : > "$state/.wake-queue"
+
+  # No row, but an unacknowledged recovery episode: the drain still starts a
+  # handling turn, so the wake is owed. An acknowledged episode owes nothing.
+  for marker in pending:downtime:g1 announced:downtime:g2 pending:handling:g3 announced:handling:g4; do
+    printf '%s\n' "$marker" > "$state/.watcher-down"
+    owed || fail "an empty queue with recovery marker $marker was reported as nothing owed"
+  done
+  for marker in acked:downtime:g5 acked:handling:g6; do
+    printf '%s\n' "$marker" > "$state/.watcher-down"
+    owed && fail "an empty queue with acknowledged marker $marker was reported as owed"
+  done
+
+  # Anything unreadable is owed: a stale headline costs a turn, a dropped wake costs the lane.
+  printf 'not a marker\n' > "$state/.watcher-down"
+  owed || fail "an unreadable recovery marker was reported as nothing owed"
+  rm -f "$state/.watcher-down"
+  append_wake "$state" signal task.status "signal: task.status" || fail "third wake failed"
+  chmod 000 "$state/.wake-queue" || fail "could not make the queue unreadable"
+  owed || { chmod 600 "$state/.wake-queue"; fail "an unreadable queue was reported as nothing owed"; }
+  chmod 600 "$state/.wake-queue" || fail "could not restore the queue"
+  [ ! -s "$dir/owed.err" ] || fail "--owed was not silent on an unreadable queue: $(cat "$dir/owed.err")"
+
+  # It never presents, claims, or acknowledges anything.
+  before=$(cat "$state/.wake-queue" "$state/.wake-queue.seq" 2>/dev/null; ls -A "$state")
+  owed || :
+  after=$(cat "$state/.wake-queue" "$state/.wake-queue.seq" 2>/dev/null; ls -A "$state")
+  [ "$before" = "$after" ] || fail "--owed changed the durable record"
+
+  out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --owed extra 2>&1); rc=$?
+  [ "$rc" -eq 2 ] || fail "--owed with extra arguments was not refused (rc=$rc)"
+  pass "fm-wake-drain --owed: reports whether a drain would still hand the lane work, silently and without touching the record"
+}
+
 test_uncountable_queue_still_raises_the_pending_alarm() {
   local dir state awkbin real_awk
   dir=$(make_case uncountable-queue)
@@ -3736,6 +3800,7 @@ test_main_drain_excludes_rows_already_granted_to_branch
 test_branch_ack_commits_secondmate_stall_receipts
 test_main_is_never_told_to_drain_rows_only_the_branch_owns
 test_uncountable_queue_still_raises_the_pending_alarm
+test_owed_reports_whether_a_drain_would_still_hand_over_work
 test_unconsumable_rows_are_retired_instead_of_wedging_the_queue
 test_branch_grant_refuses_rows_already_claimed_by_main
 test_main_ack_leaves_a_row_that_arrived_after_its_drain_unclaimed

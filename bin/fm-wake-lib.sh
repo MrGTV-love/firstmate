@@ -2406,6 +2406,25 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   printf '%s\n' "$count"
 }
 
+# Whether a drain by <actor> would now hand it something to acknowledge: a
+# queued row it owns, or an unacknowledged recovery episode (main only; the
+# branch drains rows alone). This is the one predicate a delivery path asks
+# before injecting a wake headline, so an injected headline always names work
+# the durable record still owes. Read without locks, like the count above.
+# Anything that cannot be read counts as owed: a stale headline costs one idle
+# turn, but a wake nobody can prove was drained must never be dropped.
+fm_wake_owed() {  # <actor>
+  local actor=${1:-main} marker="$STATE/.watcher-down"
+  [ "$(fm_wake_actor_pending_count "$actor" 2>/dev/null)" = 0 ] || return 0
+  [ "$actor" != branch ] || return 1
+  [ -e "$marker" ] || [ -L "$marker" ] || return 1
+  fm_recovery_marker_read "$marker" || return 0
+  case "$FM_RECOVERY_MARKER_TOKEN" in
+    pending:*|announced:*) return 0 ;;
+  esac
+  return 1
+}
+
 # Print which of the given sequence numbers are still queued, one per line.
 # Read without the queue lock, like the count above, so it answers for a
 # caller that asks only after the actor that could consume those rows is done.
