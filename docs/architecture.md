@@ -151,9 +151,11 @@ Each home atomically publishes that bounded home summary with freshness epoch me
 Session start, spawn, and teardown start that refresh detached and never wait for state initialization or publication.
 Detached contenders leave a pending marker rather than wait for an in-flight refresh; successful runs keep draining that marker until no newer trigger remains.
 The deadline owner retains the refresh lock through successful streak reset or bounded failure accounting, including wake appends, before a newer refresh may publish.
+The existing refresh steal mutex fences lock handoff, pending-marker consumption, publication, streak changes, wake accounting, and release against stale-owner recovery; each critical section checks the deadline owner's liveness and lock ownership while holding that mutex.
 Three consecutive failures of attempts that acquired that lock raise one `check: home-summary-refresh` wake; this threshold is fixed.
 The wake names the reason and measured attempt duration, repeats only for a changed reason or after success ends the streak, and cannot restore an older streak after a newer success.
 Initialization and lock-contention failures are logged but do not alter the streak without refresh ownership; a skipped detached contender is not a failure.
+Failure logging, streak accounting, and lock release run under independent deadlines, so unavailable or blocked diagnostics cannot suppress escalation or leave the lock held.
 The fleet snapshot and Bearings paths use the concurrent remote-ledger collection, cache, unreadable-home disclosure, and remote-liveness boundary owned by `bin/fm-fleet-snapshot.sh`'s header.
 `bin/fm-fleet-view.sh` renders that snapshot as Markdown for humans, while `bin/fm-bearings-snapshot.sh` provides the bounded bearings projection, so both views consume one structured contract instead of reparsing raw fleet files.
 The script header owns the exact JSON schema.

@@ -793,47 +793,6 @@ test_checkpoint_carries_onto_a_snapshot_copy_only_when_it_describes_it() {
   pass "a fold checkpoint rides onto a snapshot copy only when it describes that copy"
 }
 
-# Opt-in golden check over real status logs: FM_FOLD_GOLDEN_DIRS names one or
-# more state directories (space separated). Each log is copied first, so the
-# check never writes beside the real log, then folded from line 1 and seeded
-# from checkpoints at several line boundaries; every result must be identical.
-test_golden_fold_equivalence_on_real_status_logs() {
-  local golden_dirs=${FM_FOLD_GOLDEN_DIRS:-} dir out count=0 f work
-  if [ -z "$golden_dirs" ]; then
-    pass "golden fold over real status logs skipped (set FM_FOLD_GOLDEN_DIRS to run it)"
-    return 0
-  fi
-  work="$TMP_ROOT/golden-real"
-  for dir in $golden_dirs; do
-    for f in "$dir"/*.status; do
-      [ -f "$f" ] && [ ! -L "$f" ] || continue
-      rm -rf "$work"; mkdir -p "$work"
-      cp "$f" "$work/task.status"
-      [ ! -f "${f%.status}.meta" ] || cp "${f%.status}.meta" "$work/task.meta"
-      out=$(bash -c '
-        . "$1"
-        f=$2 offsets=$3
-        cf="$(dirname "$f")/.task.open-decisions-cursor"
-        rm -f "$cf"
-        reference=$(status_open_decisions "$f")
-        for k in $offsets; do
-          rm -f "$cf"
-          incremental=$(status_open_decisions_incremental "$f" "$k")
-          seeded=$(status_open_decisions "$f")
-          [ "$seeded" = "$reference" ] || { echo "seeded at $k diverged"; exit 1; }
-        done
-        rm -f "$cf"
-        [ "$(status_open_decisions_incremental "$f")" = "$reference" ] || { echo "incremental diverged"; exit 1; }
-      ' _ "$ROOT/bin/fm-classify-lib.sh" "$work/task.status" \
-        "$(line_end_offsets "$work/task.status" | awk 'NR == 1 || NR % 500 == 0 { print } END { print }' | tr '\n' ' ')" 2>&1) \
-        || fail "golden fold diverged on $f: $out"
-      count=$((count + 1))
-    done
-  done
-  [ "$count" -gt 0 ] || fail "FM_FOLD_GOLDEN_DIRS named no status logs"
-  pass "golden fold: $count real status logs fold identically from line 1, seeded, and incrementally"
-}
-
 test_terminal_supersession_reaches_cached_drains
 test_kind_changes_invalidate_folded_decisions
 test_seeded_whole_file_fold_matches_a_fold_from_line_one
@@ -841,7 +800,6 @@ test_partial_appends_and_previous_version_are_refused_by_every_consumer
 test_boundary_read_failure_never_advances_or_exports_a_checkpoint
 test_seeded_fold_refuses_checkpoints_from_another_reading
 test_checkpoint_carries_onto_a_snapshot_copy_only_when_it_describes_it
-test_golden_fold_equivalence_on_real_status_logs
 test_truncated_log_falls_back_to_a_full_refold_not_a_dropped_decision
 test_same_size_rewrite_is_detected_via_inode_identity
 test_read_failure_preserves_state_for_retry

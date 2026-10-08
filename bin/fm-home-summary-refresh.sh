@@ -65,6 +65,7 @@ HOME_SUMMARY_FAILURE_STAMP=
 HOME_SUMMARY_TMP=
 HOME_SUMMARY_ERR_TMP=
 HOME_SUMMARY_LOCK_HELD=0
+HOME_SUMMARY_FENCE_HELD=0
 HOME_SUMMARY_SKIPPED_STATUS=75
 
 # shellcheck source=bin/fm-timeout-lib.sh
@@ -114,6 +115,7 @@ home_summary_cleanup() {
     fm_lock_release "$REFRESH_LOCK" || true
     HOME_SUMMARY_LOCK_HELD=0
   fi
+  home_summary_unfence
 }
 
 home_summary_fail() {
@@ -122,7 +124,7 @@ home_summary_fail() {
 }
 
 home_summary_refresh_once() {
-  local producer_rc producer_error
+  local producer_rc producer_error worker_pid
   if ! mkdir -p "$STATE" 2>/dev/null; then
     home_summary_fail "state directory is unavailable: $STATE"
     return 1
@@ -136,23 +138,19 @@ home_summary_refresh_once() {
     # an in-flight run is seen by that run's parent when it finishes.
     : > "$PENDING_MARK" 2>/dev/null || true
     fm_lock_try_acquire "$REFRESH_LOCK" || return "$HOME_SUMMARY_SKIPPED_STATUS"
-    HOME_SUMMARY_LOCK_HELD=1
-    if ! printf '%s\n' "$FM_HOME_SUMMARY_PARENT_PID" > "$REFRESH_LOCK/pid" 2>/dev/null; then
-      home_summary_fail "could not hand the refresh lock to its timeout owner"
-      return 1
-    fi
-    HOME_SUMMARY_LOCK_HELD=0
   else
-    if ! _fm_lock_acquire_wait_handoff "$REFRESH_LOCK" "$FM_HOME_SUMMARY_PARENT_PID"; then
-      home_summary_fail "could not hand the refresh lock to its timeout owner"
-      return 1
-    fi
+    fm_lock_acquire_wait "$REFRESH_LOCK" || return 1
   fi
-  trap 'exit 129' HUP
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
-  # Every trigger written before this point is covered by the snapshot taken now.
+  HOME_SUMMARY_LOCK_HELD=1
+  fm_current_pid worker_pid || return 1
+  home_summary_fence "$worker_pid" || return 1
+  if ! printf '%s\n' "$FM_HOME_SUMMARY_PARENT_PID" > "$REFRESH_LOCK/pid" 2>/dev/null; then
+    home_summary_fail "could not hand the refresh lock to its timeout owner"
+    return 1
+  fi
+  HOME_SUMMARY_LOCK_HELD=0
   rm -f -- "$PENDING_MARK" 2>/dev/null || true
+  home_summary_unfence
   HOME_SUMMARY_TMP=$(umask 077; mktemp "$STATE/.home-summary.json.XXXXXX") || {
     home_summary_fail "could not create an atomic publication file in $STATE"
     return 1
@@ -215,12 +213,14 @@ home_summary_refresh_once() {
     home_summary_fail "could not set the publication file mode"
     return 1
   fi
+  home_summary_fence || return 1
   if ! mv -f -- "$HOME_SUMMARY_TMP" "$LEDGER" 2>/dev/null; then
     home_summary_fail "atomic ledger replacement failed: $LEDGER"
     return 1
   fi
   HOME_SUMMARY_TMP=
   rm -f -- "$STREAK_FILE" 2>/dev/null || true
+  home_summary_unfence
   trap - EXIT HUP INT TERM
   return 0
 }
@@ -285,11 +285,26 @@ home_summary_log_failure() {
   fi
 }
 
-home_summary_parent_owns_lock() {
-  local parent_pid=${FM_HOME_SUMMARY_PARENT_PID:-}
+home_summary_unfence() {
+  if [ "$HOME_SUMMARY_FENCE_HELD" -eq 1 ]; then
+    fm_lock_release "$REFRESH_LOCK.steal" || true
+    HOME_SUMMARY_FENCE_HELD=0
+  fi
+}
+
+home_summary_fence() {
+  local parent_pid=${FM_HOME_SUMMARY_PARENT_PID:-} owner_pid=${1:-${FM_HOME_SUMMARY_PARENT_PID:-}}
   case "$parent_pid" in ''|*[!0-9]*|0) return 1 ;; esac
-  fm_pid_alive "$parent_pid" \
-    && [ "$(cat "$REFRESH_LOCK/pid" 2>/dev/null)" = "$parent_pid" ]
+  while ! fm_lock_try_acquire_steal_mutex "$REFRESH_LOCK.steal"; do
+    sleep 0.1
+  done
+  HOME_SUMMARY_FENCE_HELD=1
+  if ! fm_pid_alive "$parent_pid" \
+    || [ "$(cat "$REFRESH_LOCK/pid" 2>/dev/null)" != "$owner_pid" ]; then
+    home_summary_unfence
+    home_summary_fail "refresh lock ownership was lost"
+    return 1
+  fi
 }
 
 home_summary_release_parent_lock() {
@@ -305,7 +320,9 @@ if [ "$HOME_SUMMARY_MODE" = log-failure ]; then
 fi
 
 if [ "$HOME_SUMMARY_MODE" = note-failure ]; then
-  home_summary_parent_owns_lock || exit 0
+  trap home_summary_cleanup EXIT
+  trap 'exit 143' HUP INT TERM
+  home_summary_fence || exit 0
   home_summary_note_failure "${FM_HOME_SUMMARY_PARENT_ERROR:-refresh worker failed}" \
     "${FM_HOME_SUMMARY_PARENT_STAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" \
     "${FM_HOME_SUMMARY_PARENT_SECONDS:-0}"
@@ -313,7 +330,9 @@ if [ "$HOME_SUMMARY_MODE" = note-failure ]; then
 fi
 
 if [ "$HOME_SUMMARY_MODE" = release-lock ]; then
-  home_summary_parent_owns_lock || exit 0
+  trap home_summary_cleanup EXIT
+  trap 'exit 143' HUP INT TERM
+  home_summary_fence || exit 0
   fm_lock_remove_path "$REFRESH_LOCK"
   exit "$?"
 fi
@@ -362,18 +381,17 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
       parent_error="refresh worker failed with exit $refresh_rc"
     fi
     attempt_seconds=$((SECONDS - attempt_start))
-    if fm_run_timed 4 env \
+    fm_run_timed 4 env \
       FM_HOME_SUMMARY_PARENT_ERROR="$parent_error" \
       FM_HOME_SUMMARY_PARENT_STAMP="$attempt_stamp" \
-      "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_log-failure >/dev/null; then
-      fm_run_timed 10 env \
-        FM_HOME_SUMMARY_PARENT_ERROR="$parent_error" \
-        FM_HOME_SUMMARY_PARENT_STAMP="$attempt_stamp" \
-        FM_HOME_SUMMARY_PARENT_SECONDS="$attempt_seconds" \
-        FM_HOME_SUMMARY_PARENT_PID="$$" \
-        "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_note-failure >/dev/null || true
-      home_summary_release_parent_lock || true
-    fi
+      "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_log-failure >/dev/null || true
+    fm_run_timed 10 env \
+      FM_HOME_SUMMARY_PARENT_ERROR="$parent_error" \
+      FM_HOME_SUMMARY_PARENT_STAMP="$attempt_stamp" \
+      FM_HOME_SUMMARY_PARENT_SECONDS="$attempt_seconds" \
+      FM_HOME_SUMMARY_PARENT_PID="$$" \
+      "$SCRIPT_DIR/fm-home-summary-refresh.sh" --_note-failure >/dev/null || true
+    home_summary_release_parent_lock || true
     exit 0
   fi
   home_summary_release_parent_lock || true
