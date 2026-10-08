@@ -816,8 +816,15 @@ EOF
 
 test_task_session_proof_tracks_active_session() {
   local case_dir="$TMP_ROOT/task-session-proof" status
-  mkdir -p "$case_dir"
-  FM_PROOF_CASE="$case_dir" EXT="$ROOT/.omp/extensions/lib/fm-task-session.ts" node --input-type=module <<'EOF'
+  mkdir -p "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$case_dir/extension/"
+  printf '{"type":"module","exports":{"./registry/agent-registry":"./registry.js"}}\n' > "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent/package.json"
+  cat > "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent/registry.js" <<'EOF'
+export class AgentRegistry {
+  static global() { return { get(id) { return id === "Main" ? { session: globalThis.proofSession } : undefined; } }; }
+}
+EOF
+  FM_PROOF_CASE="$case_dir" EXT="$case_dir/extension/fm-task-session.ts" node --input-type=module <<'EOF'
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, existsSync, realpathSync, mkdirSync, symlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -836,12 +843,23 @@ const handlers = new Map(), warnings = [];
 const pi = { on(event, handler) { handlers.set(event, handler); } };
 installTaskSessionProof(pi, state, "demo");
 let file = task;
-const ctx = { agent: { kind: "main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
+const ctx = { agent: { kind: "main", id: "Main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
+let transitionSettled = Promise.resolve();
+globalThis.proofSession = { sessionManager: ctx.sessionManager, waitForSessionTransition() { globalThis.proofWaitStarted?.(); return transitionSettled; } };
+const flush = () => new Promise(resolve => setImmediate(resolve));
 const start = () => handlers.get("session_start")({}, ctx);
 const stop = () => handlers.get("session_shutdown")({}, ctx);
 const beforeSwitch = () => handlers.get("session_before_switch")({ targetSessionFile: personal, reason: "resume" }, ctx);
 const afterSwitch = () => handlers.get("session_switch")({ previousSessionFile: task, reason: "resume" }, ctx);
 const record = () => JSON.parse(readFileSync(`${state}/demo.omp-session.json`, "utf8"));
+const begin = event => {
+  let settle, started;
+  transitionSettled = new Promise(resolve => { settle = resolve; });
+  const waiting = new Promise(resolve => { started = resolve; });
+  globalThis.proofWaitStarted = started;
+  handlers.get(event)({}, ctx);
+  return { settle, waiting };
+};
 assert.equal(existsSync(task), false);
 start();
 assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: canonicalTask, current_session_file: canonicalTask });
@@ -857,6 +875,49 @@ for (const childFile of [personal, undefined]) {
     assert.deepEqual(record(), parentProof, `${event} from ${childFile ? "persisted" : "in-memory"} child must preserve parent proof`);
   }
 }
+for (const event of ["session_before_switch", "session_before_branch"]) {
+  for (const outcome of ["cancel", "rollback", "rollback-after-activation"]) {
+    for (const predecessor of [task, personal]) {
+      file = predecessor; start();
+      const prior = record();
+      const { settle, waiting } = begin(event);
+      assert.equal(record().current_session_file, "");
+      await waiting;
+      assert.equal(record().current_session_file, "", `${event} must remain unproven while pending`);
+      if (outcome !== "cancel") {
+        file = predecessor === task ? personal : task;
+        if (outcome === "rollback-after-activation") {
+          handlers.get(event === "session_before_switch" ? "session_switch" : "session_branch")({}, ctx);
+          assert.equal(record().current_session_file, realpathSync(file));
+        }
+        await flush();
+        assert.equal(record().current_session_file, outcome === "rollback" ? "" : realpathSync(file));
+        file = predecessor;
+      }
+      settle();
+      await flush();
+      assert.deepEqual(record(), prior, `${event} ${outcome} must restore only the settled predecessor`);
+    }
+  }
+}
+file = task; start();
+for (const event of ["session_before_switch", "session_before_branch"]) {
+  let transition = begin(event);
+  await transition.waiting;
+  file = personal;
+  transition.settle();
+  await flush();
+  assert.equal(record().current_session_file, "", `${event} must not restore after an unannounced identity change`);
+  file = task; start();
+  transition = begin(event);
+  await transition.waiting;
+  stop();
+  transition.settle();
+  await flush();
+  assert.equal(record().current_session_file, "", `${event} must not restore after shutdown`);
+  start();
+}
+transitionSettled = Promise.resolve();
 stop();
 assert.equal(record().current_session_file, "");
 assert.equal(record().task_session_file, realpathSync(task));

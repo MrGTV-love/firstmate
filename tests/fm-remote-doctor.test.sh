@@ -77,6 +77,7 @@ new_case() {
   unset CASE_SECOND_LOGIN_SHELL
   unset CASE_ENV_SHELL
   unset CASE_RESOLVE_DSCL
+  unset CASE_LAUNCH_PATH
   CASE_N=$((CASE_N + 1))
   CASE_LOGIN_SHELL=${4:-/bin/sh}
   CASE_DIR="$TMP_ROOT/case$CASE_N"
@@ -124,7 +125,10 @@ case "${1:-}" in
         printf 'interactive default job\n'
         ;;
       */*/*) [ -f "$loaded" ] || exit 113; cat "$loaded" ;;
-      *) [ -f "$FM_FAKE_STATE/gui-session" ] || exit 113 ;;
+      *)
+        [ -f "$FM_FAKE_STATE/gui-session" ] || exit 113
+        printf 'environment = {\n\tPATH => %s\n}\n' "$FM_FAKE_LAUNCH_PATH"
+        ;;
     esac
     exit 0
     ;;
@@ -306,6 +310,7 @@ doctor() {
     FM_FAKE_STATE="$CASE_STATE" \
     FM_FAKE_LAUNCHCTL_LOG="$CASE_LAUNCHCTL_LOG" \
     FM_FAKE_FORBIDDEN_LOG="$CASE_FORBIDDEN_LOG" \
+    FM_FAKE_LAUNCH_PATH="${CASE_LAUNCH_PATH:-$BASE_PATH}" \
     FM_FAKE_HERDR_RUNNING="$CASE_HERDR_RUNNING" \
     FM_FAKE_HERDR_BIN="$CASE_BIN/herdr" \
     FM_FAKE_HERDR_SOCKET="$CASE_STATE/herdr.sock" \
@@ -641,6 +646,78 @@ doctor
 expect_code 0 "$DOCTOR_RC" "restoring Python did not restore Aqua ownership proof"
 pass "missing Python is a prerequisite rather than a server repair"
 
+for repair_state in absent drift scope loaded unloaded stopped foreign ready; do
+  new_case Darwin with-herdr gui
+  CASE_LOGIN_SHELL="$CASE_DIR/login-shell"
+  CASE_LAUNCH_PATH=$NO_PYTHON_TOOLS
+  printf '%s\n' "$TOOLS:$NO_PYTHON_TOOLS" > "$CASE_DIR/login-path"
+  cat > "$CASE_LOGIN_SHELL" <<SH
+#!/bin/sh
+[ "\$1" = -l ] && [ "\$2" = -c ] || exit 90
+[ "\$PATH" = '$NO_PYTHON_TOOLS' ] || exit 91
+[ -z "\${FM_REMOTE_JOB_ACTIVE-}" ] || exit 92
+PATH=\$(/bin/cat '$CASE_DIR/login-path')
+export PATH
+exec /bin/sh -c "\$3"
+SH
+  chmod +x "$CASE_LOGIN_SHELL"
+  doctor --fix
+  expect_code 0 "$DOCTOR_RC" "login-shell Python did not permit the launch-agent repair"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=ok:' "login-shell Python was not accepted"
+  case "$repair_state" in
+    absent) rm -f "$CASE_PLIST" "$CASE_STATE/loaded-$LABEL" ;;
+    drift) printf 'stale plist\n' > "$CASE_PLIST" ;;
+    scope)
+      cat > "$CASE_PLIST" <<XML
+<plist version="1.0"><dict><key>LimitLoadToSessionType</key><string>Background</string></dict></plist>
+XML
+      ;;
+    loaded) write_loaded_contract /obsolete/bin/herdr ;;
+    unloaded) rm -f "$CASE_STATE/loaded-$LABEL" ;;
+    stopped) printf 'false\n' > "$CASE_HERDR_RUNNING" ;;
+    foreign) printf '%s\n' "$SSH_HOLDER_PID" > "$CASE_STATE/socket-owner" ;;
+  esac
+  if [ -f "$CASE_PLIST" ]; then
+    cp "$CASE_PLIST" "$CASE_STATE/plist-before"
+  fi
+  if [ -f "$CASE_STATE/loaded-$LABEL" ]; then
+    cp "$CASE_STATE/loaded-$LABEL" "$CASE_STATE/loaded-before"
+  fi
+  printf '%s\n' "$NO_PYTHON_TOOLS" > "$CASE_DIR/login-path"
+  : > "$CASE_LAUNCHCTL_LOG"
+  doctor
+  expect_code 1 "$DOCTOR_RC" "$repair_state accepted doctor-only Python"
+  assert_contains "$DOCTOR_OUT" 'required python3=' "doctor Python was not reported"
+  assert_not_contains "$DOCTOR_OUT" 'required python3=MISSING' "the fixture removed doctor Python"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite does not execute in the Aqua launch-agent login-shell environment' \
+    "$repair_state did not diagnose the login-shell prerequisite"
+  doctor --fix
+  expect_code 1 "$DOCTOR_RC" "$repair_state --fix accepted doctor-only Python"
+  assert_not_contains "$DOCTOR_OUT" 'fix launchagent' "$repair_state attempted launch-agent repair"
+  assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "$repair_state attempted server repair"
+  for operation in bootout bootstrap kickstart; do
+    assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" "$operation" "$repair_state attempted $operation"
+  done
+  if [ -f "$CASE_STATE/plist-before" ]; then
+    cmp -s "$CASE_STATE/plist-before" "$CASE_PLIST" || fail "$repair_state replaced the plist"
+  else
+    assert_absent "$CASE_PLIST" "$repair_state installed a plist without launch Python"
+  fi
+  if [ -f "$CASE_STATE/loaded-before" ]; then
+    cmp -s "$CASE_STATE/loaded-before" "$CASE_STATE/loaded-$LABEL" || fail "$repair_state changed the loaded job"
+  else
+    assert_absent "$CASE_STATE/loaded-$LABEL" "$repair_state loaded a job without launch Python"
+  fi
+  printf '%s\n' "$TOOLS:$NO_PYTHON_TOOLS" > "$CASE_DIR/login-path"
+  doctor --fix
+  expect_code 0 "$DOCTOR_RC" "$repair_state did not recover with login-shell Python"
+done
+pass "launch-agent Python gates plist, loaded-job, and server repairs independently of doctor Python"
+
+new_case Darwin with-herdr gui
+doctor --fix
+expect_code 0 "$DOCTOR_RC" "the ownership fixture could not be restored after launch-shell cases"
+
 READINESS_BIN="$TMP_ROOT/readiness-bin"
 mkdir -p "$READINESS_BIN"
 cat > "$READINESS_BIN/fm-on.sh" <<'SH'
@@ -751,7 +828,7 @@ pass "a bash Directory Services login shell is rendered with -l -c"
 new_case Darwin with-herdr gui
 CASE_LOGIN_SHELL="$CASE_DIR/My Shell/fish&dev"
 mkdir -p "$(dirname "$CASE_LOGIN_SHELL")"
-printf '#!/bin/sh\nexit 0\n' > "$CASE_LOGIN_SHELL"
+printf '#!/bin/sh\nexec /bin/sh -c "$3"\n' > "$CASE_LOGIN_SHELL"
 chmod +x "$CASE_LOGIN_SHELL"
 CASE_RESOLVE_DSCL=1
 doctor --fix

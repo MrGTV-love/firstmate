@@ -657,12 +657,45 @@ check_launch_agent_loaded() { # <resolved-login-shell>
     "close the login-session gap first; a launch agent can only be bootstrapped into an existing GUI session"
 }
 
+launch_agent_owner_reader_available() {
+  local shell=$1 user domain_env line name value probe
+  local -a launch_env
+  user=$(id -un 2>/dev/null) || return 1
+  launch_env=("HOME=${HOME:-}" "USER=$user" "LOGNAME=$user" "SHELL=$shell" "PATH=/usr/bin:/bin:/usr/sbin:/sbin")
+  domain_env=$(launchctl print "gui/$UID_NUM" 2>/dev/null | awk '
+    /^[[:space:]]*environment = \{$/ { inside=1; next }
+    inside && /^[[:space:]]*\}/ { exit }
+    inside {
+      sub(/^[[:space:]]*/, "")
+      if ($0 ~ /^[A-Za-z_][A-Za-z_0-9]* => /) {
+        sub(/ => /, "=")
+        print
+      }
+    }
+  ')
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    name=${line%%=*}
+    value=${line#*=}
+    launch_env+=("$name=$value")
+  done <<< "$domain_env"
+  launch_env+=("XPC_SERVICE_NAME=$LAUNCH_AGENT_LABEL")
+  probe=$(cd / && /usr/bin/env -i "${launch_env[@]}" "$shell" -l -c \
+    'command -v python3 >/dev/null 2>&1 && exec python3 -c "import sys; sys.version_info.major == 3 and print(\"firstmate-python3-ready\")"' \
+    </dev/null 2>/dev/null) || return 1
+  [ "${probe##*$'\n'}" = firstmate-python3-ready ]
+}
+
 check_herdr_owner_reader() {
-  if fm_remote_herdr_owner_reader_available; then
-    record herdr-owner-reader "ok: python3 resolves on the runtime PATH"
-  else
+  local shell=$1
+  if ! fm_remote_herdr_owner_reader_available; then
     record herdr-owner-reader "human: python3 prerequisite does not resolve on the runtime PATH" \
       "install Python 3 on that account and expose python3 on the remote runtime PATH; server reload cannot repair a missing ownership reader"
+  elif [ "$PLATFORM" = darwin ] && ! launch_agent_owner_reader_available "$shell"; then
+    record herdr-owner-reader "human: python3 prerequisite does not execute in the Aqua launch-agent login-shell environment" \
+      "install Python 3 on that account and expose python3 through $shell -l -c under the GUI launchd environment; the worker-composed PATH is not inherited by the launch agent, and server reload cannot repair this prerequisite"
+  else
+    record herdr-owner-reader "ok: python3 resolves on the runtime PATH"
   fi
 }
 
@@ -741,7 +774,7 @@ run_checks() { # <resolved-login-shell>
   check_gui_session
   check_remote_job_worker
   check_launch_agent "$shell"
-  check_herdr_owner_reader
+  check_herdr_owner_reader "$shell"
   check_herdr_server
   check_entrypoint_link
 }

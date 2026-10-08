@@ -155,6 +155,7 @@ The omp task record binds its initial session pathname once per launch generatio
 The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation; missing, invalid, or personal-session proof refuses lifecycle action.
 - The composer scanner family "pasted omp frame inside a draft / unsafe Enter variants" is a documented known limit tracked by follow-up fm-omp-composer-pasted-frame-variants.
 Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
+Cancelled or rolled-back switches and branches restore the predecessor proof only after omp's session transition settles and only if no newer transition or shutdown intervened.
 This inspection does not change Herdr's session-wide auto-resume setting.
 The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
 

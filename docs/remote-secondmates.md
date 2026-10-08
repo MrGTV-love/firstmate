@@ -300,6 +300,10 @@ A file at `~/.local/bin/fm-remote-entrypoint.sh` that is not Firstmate's own sym
 
 [`bin/fm-remote-doctor.sh`](../bin/fm-remote-doctor.sh) owns the required-tool list, at-least-one harness requirement, and platform-specific checks.
 The [runtime backend prerequisites](configuration.md#runtime-backend-configbackend--fm_backend) define where Herdr requires `python3`, including the remote runtime and macOS Aqua launch agent PATHs.
+On macOS, the doctor checks both its own ownership-reader PATH and that Python 3 executes through the resolved launch-agent shell with `-l -c`.
+The launch-shell probe starts with the GUI launchd environment (or the system launchd PATH when no PATH is configured), not the worker's filesystem-composed PATH.
+Expose `python3` through that account's login-shell startup or GUI launchd environment; seeing it in the worker's required-tool report alone is not sufficient.
+A missing launch-shell Python prerequisite blocks Herdr plist installation/replacement, loaded-job reload, and server repair, including automatic readiness repair.
 
 ## Provision a route
 
