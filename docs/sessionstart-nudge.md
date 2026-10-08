@@ -151,6 +151,9 @@ Each per-task endpoint liveness read runs serially in its own crash-isolated chi
 So a read that hangs or dies becomes that task's own `endpoint: error` line and the digest continues.
 With a wedged backend the stage's ceiling is tasks times that per-read bound and can itself reach the digest bound.
 
+Bootstrap reconciliation reads backlog row states once so nonqueued worker records need no individual row probe.
+It releases each worker's metadata and lifecycle locks before advancing, including the nonqueued fast path, so later startup work does not block concurrent lifecycle actions.
+
 The per-item backlog row reads inside bootstrap's reconcile and close-replay sweeps are the exception.
 Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/fm-backlog-transition-lib.sh`.
 The first bound hit latches the sweep.

@@ -2009,6 +2009,37 @@ SH
   pass "session start batches quoted task IDs and comma-containing home paths while healing queued records"
 }
 
+test_recovery_releases_nonqueued_worker_locks() {
+  local case_dir home id out
+  case_dir=$(make_home heal-nonqueued-locks)
+  home=$(home_of "$case_dir")
+  for id in atomic-running-lock atomic-done-lock; do
+    add_item "$case_dir" "$id"
+    start_item "$case_dir" "$id"
+    write_task_meta "$case_dir" "$id" ship no-mistakes
+  done
+  tasks-axi done atomic-done-lock --file "$(backlog_of "$case_dir")" >/dev/null
+  cat > "$case_dir/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --version ] || exit 0
+. "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+for meta in "$FM_HOME/state"/*.meta; do
+  id=${meta##*/}
+  id=${id%.meta}
+  for lock in "$FM_HOME/state/.control-$id.lock" "$FM_HOME/state/.meta-$id.lock"; do
+    fm_lock_try_acquire "$lock" || exit 1
+    fm_lock_release "$lock"
+  done
+done
+touch "$FM_HOME/state/reconciliation-locks-released"
+SH
+  chmod +x "$case_dir/fakebin/no-mistakes"
+  out=$(run_bootstrap "$case_dir") || fail "nonqueued reconciliation failed: $out"
+  assert_present "$home/state/reconciliation-locks-released" \
+    "reconciliation retained a worker lock while bootstrap was still running: $out"
+  pass "bootstrap releases both locks for nonqueued workers before local diagnostics"
+}
+
 test_recovery_rejects_an_internal_worker_record_symlink() {
   local case_dir home id target_id out rc=0
   id=atomic-heal-internal-symlink-b8
@@ -3383,6 +3414,7 @@ test_recovery_reports_an_owned_row_read_failure
 test_orca_cleanup_recovery_never_transitions_the_backlog
 test_recovery_marks_an_owned_record_in_flight
 test_recovery_reads_the_backlog_once_for_many_owned_records
+test_recovery_releases_nonqueued_worker_locks
 test_recovery_rejects_an_internal_worker_record_symlink
 test_recovery_ignores_a_symlinked_worker_record
 test_recovery_replays_a_close_an_interrupted_cleanup_left_open

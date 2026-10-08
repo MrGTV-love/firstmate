@@ -1321,7 +1321,11 @@ backlog_record_reconcile() {
       if [ "$have_row_states" = 1 ]; then
         case "$row_states" in
           *$'\n'"$id:queued"$'\n'*) ;;
-          *$'\n'"$id:"*) fm_lock_release "$meta_lock"; continue ;;
+          *$'\n'"$id:"*)
+            fm_lock_release "$meta_lock"
+            fm_lock_release "$control_lock"
+            continue
+            ;;
         esac
       fi
       if fm_backlog_row_probe "$DATA" "$id"; then

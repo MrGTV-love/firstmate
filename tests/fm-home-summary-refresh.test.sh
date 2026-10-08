@@ -1467,8 +1467,7 @@ pass "a successful publication ends the streak so a later streak wakes again"
 # line 1 at several milliseconds a line. The fold now starts from the checkpoint
 # the wake drain keeps beside each log, so a refresh costs what was appended
 # since, not what the log has ever held. Assert that through the bytes the folds
-# read (a timing assertion would pass or fail with the host's load), and check
-# that the checkpoint-seeded answer is the answer a fold from line 1 gives.
+# read (a timing assertion would pass or fail with the host's load).
 BIG_HOME=$(new_bare_home big-history-home)
 printf '## In flight\n' > "$BIG_HOME/data/backlog.md"
 for big in 1 2; do
@@ -1525,11 +1524,10 @@ big_longest=$(awk '{ if ($2 > max) max = $2 } END { print max + 0 }' "$BIG_SPANS
 [ "$big_longest" -lt 4096 ] \
   || fail "a fold re-read $big_longest bytes of a $big_size-byte log instead of only what was appended"
 for big in 1 2; do
-  expected=$(bash -c '. "$1/bin/fm-classify-lib.sh"; status_open_decisions "$2" ship | cut -f1 | sort' \
-    _ "$ROOT" "$BIG_HOME/state/big-task-$big.status")
+  expected=$(printf 'late-%s\nstill-open-%s\n' "$big" "$big")
   published=$(jq -r --arg id "big-task-$big" '.decisions_open[] | select(.id == $id) | .key' \
     "$BIG_HOME/state/home-summary.json" | sort)
   [ "$expected" = "$published" ] \
-    || fail "the checkpoint-seeded summary of big-task-$big disagrees with a fold from line 1: published [$published], expected [$expected]"
+    || fail "the checkpoint-seeded summary of big-task-$big lost or added decisions: published [$published], expected [$expected]"
 done
-pass "publication on a large history reads only what was appended and publishes the same decisions as a full fold"
+pass "publication on a large history reads only what was appended and retains decisions from before and after the checkpoint"
