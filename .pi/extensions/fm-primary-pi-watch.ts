@@ -16,10 +16,11 @@
 // FM_PI_SUCCESSOR_GRACE_MS (15s) while this process still owns the home lock,
 // the extension binds a fresh generation itself, exactly as session_start
 // would, and an arm call on that stopped generation does the same at once. A
-// terminal quit never heals. Only the latest factory bind in this process owns
-// the home (.pi/extensions/lib/fm-watch-lifecycle.ts owns the registry): an
-// earlier instance ignores session events and its arm tool keeps the stale
-// refusal. Every lifecycle transition is recorded in
+// terminal quit never heals. Duplicate factories in one Pi loader runtime are
+// ignored before registration, preserving one tool and one watcher. A reload
+// removes the loader-owned discovery subscription and binds a new instance;
+// the latest bound instance owns the home, and earlier instances refuse arms.
+// Every lifecycle transition is recorded in
 // state/extensions/pi-primary-watch/lifecycle.log (same owner).
 //
 // Delivery versus consumption (stated once here):
@@ -648,8 +649,23 @@ type PiWatchInstanceApi = {
 };
 
 export default function (pi: ExtensionAPI) {
+  // Pi rejects duplicate tools before session_start. Discover an existing
+  // factory through the loader-owned bus before claiming its process slot or
+  // registering anything. Pi removes this subscription on reload, so a fresh
+  // runtime still binds and registers its own successor normally.
+  let alreadyLoaded = false;
+  const discovery = { home: state, claim: () => { alreadyLoaded = true; } };
+  pi.events?.emit?.("firstmate:pi-primary-watch-instance", discovery);
+  if (alreadyLoaded) return;
   const instance = bindWatchInstance<PiWatchInstanceApi>("__firstmatePiWatchInstances", state);
   const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
+  pi.events?.on?.("firstmate:pi-primary-watch-instance", (request: unknown) => {
+    const candidate = request as typeof discovery | undefined;
+    if (instance.isCurrent() && candidate?.home === state && typeof candidate.claim === "function") {
+      candidate.claim();
+      lifecycle("duplicate-load-ignored");
+    }
+  });
   let generation = createGeneration();
   lifecycle("generation-create", { generation: generation.id, cause: "factory-bind" });
   activateGeneration(generation);
