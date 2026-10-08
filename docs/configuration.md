@@ -1606,7 +1606,7 @@ Firstmate passes its profile line unless it states a reason to override, such as
 **Key handling and fixed settings**
 
 - The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
-- The resolver and skill picker send the key to `curl` only as a header read from a file descriptor, never on argv, and neither prints, logs, or writes it.
+- The resolver sends its key to `curl` only as a header read from a file descriptor, never on argv. The skill picker pipes its keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; they never enter Node's environment or arguments. Neither tool prints, logs, or writes keys to files.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
