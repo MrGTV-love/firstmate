@@ -1705,9 +1705,10 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
 # 1 when the micro-mutex is contended, the mandatory identity cannot be
 # computed, or the write failed.
 fm_autoarm_claim_next() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock epoch pid gen identity tmp
+  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock epoch pid gen identity tmp queue_lock
   lock="$state/.claude-autoarm.lock"
   epoch="$state/.claude-autoarm-epoch"
+  queue_lock="$state/.wake-queue.lock"
   FM_AUTOARM_MY_GEN=
   # Resolve the pid into a variable FIRST: expanding ${BASHPID:-$$} inside a
   # command substitution would resolve it in that subshell, recording the
@@ -1715,9 +1716,14 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
   pid=${BASHPID:-$$}
   identity=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
   [ -n "$identity" ] || return 1
-  fm_lock_try_acquire "$lock" || return 1
+  fm_lock_try_acquire "$queue_lock" || return 1
+  if ! fm_lock_try_acquire "$lock"; then
+    fm_lock_release "$queue_lock"
+    return 1
+  fi
   if fm_autoarm_claim_open "$state" "$grace"; then
     fm_lock_release "$lock"
+    fm_lock_release "$queue_lock"
     return 2
   fi
   gen=$(_fm_autoarm_epoch_field "$epoch" epoch 2>/dev/null || true)
@@ -1731,9 +1737,11 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
     || ! mv -f "$tmp" "$epoch" 2>/dev/null; then
     rm -f "$tmp" 2>/dev/null || true
     fm_lock_release "$lock"
+    fm_lock_release "$queue_lock"
     return 1
   fi
   fm_lock_release "$lock"
+  fm_lock_release "$queue_lock"
   # shellcheck disable=SC2034 # Read by callers after the claim succeeds.
   FM_AUTOARM_MY_GEN=$gen
   return 0

@@ -780,18 +780,6 @@ if [ "$READ_ONLY" -eq 1 ]; then
   printf 'skipped (read-only session) - %s record(s) remain queued because this session lacks verified fleet-lock ownership.\n' "$QLEN"
   GUARD_OUT=$(FM_GUARD_READ_ONLY=1 "$SCRIPT_DIR/fm-guard.sh" 2>&1)
   [ -n "$GUARD_OUT" ] && printf '%s\n' "$GUARD_OUT"
-elif [ "$REEMIT" -eq 1 ] && fm_autoarm_claim_open "$STATE" "${FM_GUARD_GRACE:-$(fm_poll_derived_grace)}"; then
-  # An open Stop-hook claim means the Stop hook is the only deliverer of queued
-  # wakes between turns. A drain here would move the recovery marker to
-  # handling, and the hook's rewake commit refuses any marker that is not
-  # downtime, so the hook would drop the wake in silence and nothing would
-  # follow (2026-10-08). Report the queue and leave the marker alone; the next
-  # drain happens in the handling turn the hook starts.
-  QLEN=0
-  [ -s "$STATE/.wake-queue" ] && QLEN=$(grep -c . "$STATE/.wake-queue" 2>/dev/null || printf '0')
-  printf 'deferred (context re-emit while the Stop hook owns wake delivery) - %s record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.\n' "$QLEN"
-  GUARD_OUT=$(FM_GUARD_READ_ONLY=1 "$SCRIPT_DIR/fm-guard.sh" 2>&1)
-  [ -n "$GUARD_OUT" ] && printf '%s\n' "$GUARD_OUT"
 else
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-branch-outcome.sh" seed-tail >/dev/null 2>&1 || true
   # Pi supervision-branch recovery, locked path only: clear leases whose
@@ -807,7 +795,11 @@ else
       printf '%s\n' "$BRANCH_REPLAY_OUT"
     fi
   fi
-  DRAIN_OUT=$("$SCRIPT_DIR/fm-wake-drain.sh" 2>&1)
+  if [ "$REEMIT" -eq 1 ]; then
+    DRAIN_OUT=$("$SCRIPT_DIR/fm-wake-drain.sh" --reemit 2>&1)
+  else
+    DRAIN_OUT=$("$SCRIPT_DIR/fm-wake-drain.sh" 2>&1)
+  fi
   if [ -n "$DRAIN_OUT" ]; then
     printf '%s\n' "$DRAIN_OUT"
   else

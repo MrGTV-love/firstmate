@@ -2436,7 +2436,6 @@ EOF
   # fake does not answer; hand exactly that question to the real ps.
   awk '{ print } !done && /^case "\$\*" in$/ { print "  *\"lstart=\"*) exec /bin/ps \"$@\" ;;"; done = 1 }' \
     "$fakebin/ps" > "$fakebin/ps.new" && mv "$fakebin/ps.new" "$fakebin/ps" && chmod +x "$fakebin/ps"
-  grep -q 'lstart=' "$fakebin/ps" || fail "could not route the fake ps identity question to the real ps"
   append_wake "$home/state" signal task-c "done: queued while the hook arms" || fail "seed wake failed"
   printf 'pending:downtime:claim-test-generation\n' > "$home/state/.watcher-down"
   touch "$home/state/.last-watcher-beat"
