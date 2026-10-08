@@ -1453,6 +1453,174 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   pass "coverage guard reports and bounds the unmeasured portable serial share"
 }
 
+# The serial shard lists are computed again for every shard and for the whole
+# lane inside one coverage-guard process. macOS /bin/bash 3.2 loses lines from
+# later reads once one long-lived shell has run enough per-script process
+# substitutions, so a lane past a size threshold used to land the same script in
+# two shards inside the guard while every standalone --list was correct. Build a
+# fixture runner with extra scripts and require the guard and the shard lists to
+# stay a disjoint cover of the serial lane whatever the lane size is.
+#
+# The corruption depends on the process environment's memory layout, so the
+# guard runs under a scrubbed environment here: the exported variables the test
+# harness adds are enough to hide it, and a regression test that cannot fail on
+# the old code proves nothing.
+shard_fixture_init() {
+  local dir=$1 name
+  mkdir -p "$dir/bin" "$dir/tests"
+  cp "$RUNNER" "$dir/bin/fm-test-run.sh"
+  chmod +x "$dir/bin/fm-test-run.sh"
+  for name in "$ROOT"/tests/*.test.sh; do
+    : >"$dir/tests/${name##*/}"
+  done
+}
+
+# Grow the fixture's extra scripts to <count> (never shrinks).
+shard_fixture_grow() {
+  local dir=$1 count=$2 i=1
+  while [ "$i" -le "$count" ]; do
+    : >"$dir/tests/zz-shard-dummy-$i.test.sh"
+    i=$((i + 1))
+  done
+}
+
+shard_fixture_guard() {
+  env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$1/bin/fm-test-run.sh" --check-coverage 2>&1
+}
+
+assert_serial_shards_are_a_disjoint_cover() {
+  local runner=$1 label=$2 shards shard serial union dups listed
+  shards=$(env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$runner" --list-lanes | grep -c '^portable-serial-[0-9]*of[0-9]*$')
+  serial=$(env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$runner" --list --lane portable-serial | LC_ALL=C sort)
+  union=""
+  shard=1
+  while [ "$shard" -le "$shards" ]; do
+    listed=$(env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+      "$runner" --list --lane "portable-serial-${shard}of${shards}") \
+      || fail "$label: serial shard $shard listing failed"
+    union=$(printf '%s\n%s' "$union" "$listed")
+    shard=$((shard + 1))
+  done
+  union=$(printf '%s\n' "$union" | grep -v '^$' || true)
+  dups=$(printf '%s\n' "$union" | LC_ALL=C sort | uniq -d || true)
+  [ -z "$dups" ] || fail "$label: a script runs in two serial shards: $dups"
+  [ "$(printf '%s\n' "$union" | LC_ALL=C sort)" = "$serial" ] \
+    || fail "$label: serial shards must exactly cover the serial lane"
+}
+
+test_serial_shard_guard_holds_at_every_lane_size() {
+  local tmp dir count out rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-shard-sizes.XXXXXX")
+  dir="$tmp/fixture"
+  shard_fixture_init "$dir"
+  # 5 and 6 extra scripts are the lane sizes that failed in the coverage guard;
+  # 20 proves the result does not depend on one particular size.
+  for count in 5 6 20; do
+    shard_fixture_grow "$dir" "$count"
+    set +e
+    out=$(shard_fixture_guard "$dir")
+    rc=$?
+    set -e
+    assert_not_contains "$out" "serial shards share scripts" \
+      "$count extra scripts: the guard put one script in two serial shards"
+    assert_not_contains "$out" "serial shards must equal" \
+      "$count extra scripts: serial shards no longer cover the serial lane"
+    # The only other refusal an unmeasured new script may cause is the bounded
+    # unmeasured share, which is the guard working as intended.
+    if [ "$rc" -ne 0 ]; then
+      assert_contains "$out" "have no measured duration hint" \
+        "$count extra scripts: the guard refused for an unexpected reason"
+    fi
+    assert_serial_shards_are_a_disjoint_cover "$dir/bin/fm-test-run.sh" "$count extra scripts"
+  done
+  rm -rf "$tmp"
+  pass "serial shards stay a disjoint cover of the serial lane with 5, 6, and 20 extra scripts"
+}
+
+test_serial_shard_generation_failure_is_not_a_partial_success() {
+  local tmp dir real_sort rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-shard-failure.XXXXXX")
+  dir="$tmp/fixture"
+  shard_fixture_init "$dir"
+  shard_fixture_grow "$dir" 5
+  real_sort=$(command -v sort)
+  mkdir -p "$tmp/fakebin"
+  cat >"$tmp/fakebin/sort" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [ "$arg" = "-k1,1nr" ]; then
+    "$REAL_SORT" "$@" | awk 'NR == 1'
+    exit 1
+  fi
+done
+exec "$REAL_SORT" "$@"
+SH
+  chmod +x "$tmp/fakebin/sort"
+  set +e
+  env -i PATH="$tmp/fakebin:$PATH" REAL_SORT="$real_sort" \
+    HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$dir/bin/fm-test-run.sh" --list --lane portable-serial-1of9 \
+    >"$tmp/out" 2>"$tmp/err"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "failed shard generation returned successful partial coverage"
+  [ ! -s "$tmp/out" ] || fail "failed shard generation published a partial script list"
+  rm -rf "$tmp"
+  pass "serial shard generation failures refuse rather than publish partial coverage"
+}
+
+test_coverage_guard_passes_with_extra_scripts() {
+  local tmp dir out unmeasured script
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-guard-pass.XXXXXX")
+  dir="$tmp/fixture"
+  shard_fixture_init "$dir"
+  shard_fixture_grow "$dir" 5
+  # Drop the scripts that have no measured duration hint so the five new ones
+  # stay inside the guard's unmeasured-share bound; the guard then has nothing
+  # left to refuse except a shard conflict.
+  set +e
+  out=$(shard_fixture_guard "$dir")
+  set -e
+  unmeasured=$(printf '%s\n' "$out" | grep '^tests/.*\.test\.sh$' | grep -v 'zz-shard-dummy' || true)
+  for script in $unmeasured; do
+    rm -f "$dir/$script"
+  done
+  out=$(shard_fixture_guard "$dir") \
+    || fail "coverage guard refused a lane with five extra scripts: $out"
+  assert_contains "$out" "FM_TEST_COVERAGE ok" "coverage guard success marker with five extra scripts"
+  rm -rf "$tmp"
+  pass "coverage guard passes with five extra scripts and no script in two shards"
+}
+
+test_coverage_guard_still_refuses_a_true_duplicate() {
+  local tmp dir out rc dup
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-guard-dup.XXXXXX")
+  dir="$tmp/fixture"
+  shard_fixture_init "$dir"
+  # Put one script in both portable parallel shards, which is a real duplicate
+  # the guard must keep refusing whatever the shard-assignment code does.
+  dup=$("$dir/bin/fm-test-run.sh" --list --lane portable-parallel-1 | head -n 1)
+  awk -v dup="$dup" '
+    /^list_portable_parallel_2\(\) \{/ { inside = 1 }
+    { print }
+    inside && /^  cat <<.EOF.$/ { print dup; inside = 0 }
+  ' "$dir/bin/fm-test-run.sh" >"$dir/bin/fm-test-run.sh.new"
+  mv "$dir/bin/fm-test-run.sh.new" "$dir/bin/fm-test-run.sh"
+  chmod +x "$dir/bin/fm-test-run.sh"
+  set +e
+  out=$(shard_fixture_guard "$dir")
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "coverage guard accepted a script that sits in two shards: $out"
+  assert_contains "$out" "shards share scripts" "duplicate refusal names the shared scripts"
+  assert_contains "$out" "$dup" "duplicate refusal names the duplicated script"
+  rm -rf "$tmp"
+  pass "coverage guard still refuses a script that sits in two shards"
+}
+
 test_portable_serial_shard_lane_refusals() {
   local tmp count rc other
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-shard-lane.XXXXXX")
@@ -2080,6 +2248,10 @@ test_portable_shard_union_and_coverage_guard
 test_portable_parallel_lanes_stay_duration_balanced
 test_portable_serial_shards_partition_the_serial_lane
 test_portable_serial_hint_coverage_is_reported_and_bounded
+test_serial_shard_guard_holds_at_every_lane_size
+test_serial_shard_generation_failure_is_not_a_partial_success
+test_coverage_guard_passes_with_extra_scripts
+test_coverage_guard_still_refuses_a_true_duplicate
 test_portable_serial_shard_lane_refusals
 test_jobs_requires_proven_isolated
 test_jobs_admits_a_concurrent_safe_family
