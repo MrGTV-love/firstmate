@@ -36,7 +36,7 @@ argv=$6
 command=$(printf '%s' "$argv" | base64 --decode 2>/dev/null | tr '\000' '\n' | head -1)
 case "${FM_FAKE_SSH_MODE:-normal}" in
   unreachable) exit 255 ;;
-  hang) sleep 45; exit 0 ;;
+  hang) sleep 25; exit 0 ;;
 esac
 case "$command" in
   fm-startup-memory-budget.sh)

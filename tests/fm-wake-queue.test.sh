@@ -2504,7 +2504,11 @@ SH
     . "$1"
     fm_lock_acquire_wait "$2" || exit 10
     printf "ready\n" > "$3"
-    while [ ! -e "$4" ]; do sleep 0.05; done
+    stub_ticks=0
+    while [ ! -e "$4" ] && [ "$stub_ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      stub_ticks=$((stub_ticks + 1))
+    done
     fm_lock_release "$2"
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/holder.ready" "$dir/release-holder" &
   holder_pid=$!
@@ -2522,7 +2526,11 @@ SH
     fm_lock_acquire_wait_bounded "$2" 5 || exit 11
     current=${BASHPID:-$$}
     printf "%s\n" "$current" > "$3"
-    while [ ! -e "$4" ]; do sleep 0.05; done
+    stub_ticks=0
+    while [ ! -e "$4" ] && [ "$stub_ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      stub_ticks=$((stub_ticks + 1))
+    done
     [ "$(cat "$2/pid" 2>/dev/null || true)" = "$current" ] || exit 12
     fm_lock_release "$2"
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/waiter.ready" "$dir/release-waiter" &

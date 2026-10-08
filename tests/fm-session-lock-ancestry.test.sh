@@ -617,28 +617,28 @@ CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$FM_HOME/bin/fm-lock.sh" > "$FM_HOME/st
 printf '%s\n' "$?" > "$FM_HOME/state/frontend-lock.rc"
 "$FM_FIXTURE_CLAUDE" "$FM_HOME/daemon.sh" &
 disown
-while [ ! -e "$FM_HOME/state/stop-frontend" ]; do sleep 0.05; done
+while [ ! -e "$FM_HOME/state/stop-frontend" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
 exit 0
 SH
   cat > "$dir/daemon.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FM_HOME/state/daemon-pid"
 exec -a 'claude bg-pty-host' "$FM_FIXTURE_CLAUDE" "$FM_HOME/ptyhost.sh" &
-while :; do sleep 0.1; done
+while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.1; done
 exit 0
 SH
   cat > "$dir/ptyhost.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FM_HOME/state/ptyhost-pid"
 exec -a 'claude bg-spare' "$FM_FIXTURE_CLAUDE" "$FM_HOME/spare.sh" &
-while [ ! -e "$FM_HOME/state/stop-spare" ]; do sleep 0.1; done
+while [ ! -e "$FM_HOME/state/stop-spare" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.1; done
 exit 0
 SH
   cat > "$dir/spare.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FM_HOME/state/spare-pid"
 n=1
-while [ ! -e "$FM_HOME/state/stop-spare" ]; do
+while [ ! -e "$FM_HOME/state/stop-spare" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
   req="$FM_HOME/state/fire-$n"
   if [ -f "$req" ]; then
     out="$FM_HOME/state/phase-$n"

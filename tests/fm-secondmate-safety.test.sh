@@ -2576,7 +2576,7 @@ EOF
 set -u
 if [ "${1:-}" = sweep-home ] && [ "${2:-}" = --preflight ]; then
   : > "$FM_TASK_SET_TEST_READY"
-  while [ ! -e "$FM_TASK_SET_TEST_RELEASE" ]; do sleep 0.05; done
+  while [ ! -e "$FM_TASK_SET_TEST_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
   exit 1
 fi
 exit 1

@@ -145,6 +145,10 @@ hold_publish_lock() {  # <home>
     fm_lock_try_acquire "$2" || exit 1
     exec sleep 120' _ "$ROOT/bin" "$lock" >/dev/null 2>&1 </dev/null &
   holder=$!
+  # The caller captures this function in a command substitution, so the holder
+  # is not a job of the test shell: register it for the shared reap instead.
+  printf '%s\n' "$holder" > "$1/.publish-holder.$holder.pid"
+  fm_test_track_process "$1/.publish-holder.$holder.pid" "sleep 120"
   while [ "$(cat "$lock/pid" 2>/dev/null || true)" != "$holder" ] && [ "$waited" -lt 50 ]; do
     sleep 0.1
     waited=$((waited + 1))

@@ -39,6 +39,11 @@ cleanup() {
     kill "$watch_pid" 2>/dev/null || true
     wait "$watch_pid" 2>/dev/null || true
   fi
+  # The liveness-lock holder is otherwise stopped only by an inline kill.
+  if [ -n "${liveness_holder_pid:-}" ]; then
+    kill "$liveness_holder_pid" 2>/dev/null || true
+    wait "$liveness_holder_pid" 2>/dev/null || true
+  fi
   FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
     "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true
   if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then
@@ -1621,6 +1626,7 @@ assert_grep '- ios ' "$PARENT/data/secondmates.md" "a liveness-busy retirement r
   || fail "a liveness-busy retirement removed or took the episode's lock"
 kill "$liveness_holder_pid" 2>/dev/null || true
 wait "$liveness_holder_pid" 2>/dev/null || true
+liveness_holder_pid=
 handoff_lock="$PARENT/state/.backlog-handoff-ios.lock"
 FM_HOME="$PARENT" /bin/bash -c '
   . "$1"

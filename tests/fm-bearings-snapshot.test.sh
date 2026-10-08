@@ -285,7 +285,7 @@ if [ -f "$remote_home/state/slow-ledger-read" ]; then
   active_marker="$FM_TEST_LEDGER_ACTIVE_DIR/collector-$$"
   : > "$active_marker"
   trap 'rm -f "$active_marker"' EXIT
-  while [ ! -f "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved" ]; do
+  while [ ! -f "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     set -- "$FM_TEST_LEDGER_ACTIVE_DIR"/collector-*
     if [ "$#" -ge 5 ] && [ -e "$1" ]; then
       : > "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved"
@@ -2939,7 +2939,7 @@ for arg in "$@"; do
   case "$arg" in
     */a-hold.meta)
       : > "$FAKE_CP_STARTED"
-      while [ ! -e "$FAKE_CP_RELEASE" ]; do sleep 0.01; done
+      while [ ! -e "$FAKE_CP_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
       break
       ;;
   esac

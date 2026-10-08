@@ -131,7 +131,7 @@ case "${1:-}" in
         'export GOTMPDIR='*)
           if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
             : > "$FM_FAKE_TRACE_PREPARE"
-            while [ ! -e "$FM_FAKE_TRACE_RELEASE" ]; do /bin/sleep 0.01; done
+            while [ ! -e "$FM_FAKE_TRACE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do /bin/sleep 0.01; done
           fi
           ;;
         'export TRACEPARENT='*)
@@ -398,7 +398,7 @@ if [ -n "${FM_FAKE_META_WRITER_TARGET:-}" ] \
    && [ "$target_path" = "$FM_FAKE_META_WRITER_TARGET" ] \
    && grep -q '^x_request=' "$source_path" 2>/dev/null; then
   : > "$FM_FAKE_META_WRITER_READY"
-  while [ ! -e "$FM_FAKE_META_WRITER_RELEASE" ]; do /bin/sleep 0.01; done
+  while [ ! -e "$FM_FAKE_META_WRITER_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do /bin/sleep 0.01; done
 fi
 exec "$FM_REAL_MV" "$@"
 SH
@@ -559,7 +559,7 @@ pause_continuation_admission() {
 #!/usr/bin/env bash
 if [ "\${1:-}" = show ] && [ -n "\${FM_FAKE_ADMISSION_READY:-}" ]; then
   : > "\$FM_FAKE_ADMISSION_READY"
-  while [ ! -e "\$FM_FAKE_ADMISSION_RELEASE" ]; do /bin/sleep 0.01; done
+  while [ ! -e "\$FM_FAKE_ADMISSION_RELEASE" ] && [ "\$SECONDS" -lt "\${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do /bin/sleep 0.01; done
 fi
 exec "$real" "\$@"
 SH

@@ -183,7 +183,7 @@ fm_test_track_watcher_state() {  # <state-dir>
 }
 
 fm_test_reap_watchers() {
-  local state lock_home seen=$'\n'
+  local state lock_home lock_pid seen=$'\n'
   [ -f "$FM_TEST_WATCHER_REGISTRY" ] || return 0
   while IFS= read -r state; do
     [ -n "$state" ] || continue
@@ -197,10 +197,63 @@ fm_test_reap_watchers() {
     [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" != "$$" ] || continue
     lock_home=$(cat "$state/.watch.lock/fm-home" 2>/dev/null || true)
     [ -n "$lock_home" ] || continue
+    # A test that SIGSTOPs the watcher and fails before it resumes leaves TERM
+    # pending forever; continue it so the --stop below can end it.
+    lock_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+    case "$lock_pid" in '' | *[!0-9]*) ;; *) kill -CONT "$lock_pid" 2>/dev/null || true ;; esac
     FM_HOME="$lock_home" FM_STATE_OVERRIDE="$state" \
       "$ROOT/bin/fm-watch-arm.sh" --stop >/dev/null 2>&1 || true
   done < "$FM_TEST_WATCHER_REGISTRY"
   rm -f "$FM_TEST_WATCHER_REGISTRY"
+}
+
+# --- stub process reaping ---------------------------------------------------
+#
+# A fake binary that blocks or loops until killed is the one fixture a temp-root
+# removal cannot stop, and a bound that runs it in a process group of its own
+# (every perl bound does) puts it out of reach of a group-kill aimed at the test
+# run. Left behind by a failed or interrupted test, such a stub spins on as an
+# orphan, and many suites in parallel turned that into a host-wide CPU storm.
+#
+# The stub records its own pid (`echo $$ > "$pidfile"`) and the test registers
+# the pidfile with a needle that appears in the stub's command line, normally
+# the stub's own path. Registration goes through a `$$`-keyed registry file for
+# the same reason the runners above do. The reap kills the recorded process
+# group only while the pid still shows that needle, so a recycled pid is never
+# signalled, and it never matches on a process name alone.
+
+FM_TEST_PROCESS_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-process.$$.XXXXXX") || return 1
+
+fm_test_track_process() {  # <pidfile> <command-needle>
+  [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
+  printf '%s\t%s\n' "$1" "$2" >> "$FM_TEST_PROCESS_REGISTRY"
+}
+
+# 0 iff the pid recorded in <pidfile> is alive and its command line holds <needle>.
+fm_test_process_alive() {  # <pidfile> <command-needle>
+  local pid command
+  pid=$(cat "$1" 2>/dev/null) || return 1
+  case "$pid" in '' | *[!0-9]*) return 1 ;; esac
+  command=$(ps -o command= -p "$pid" 2>/dev/null) || return 1
+  case "$command" in *"$2"*) return 0 ;; esac
+  return 1
+}
+
+fm_test_reap_processes() {
+  local pidfile needle pid pgid
+  [ -f "$FM_TEST_PROCESS_REGISTRY" ] || return 0
+  while IFS=$'\t' read -r pidfile needle; do
+    fm_test_process_alive "$pidfile" "$needle" || continue
+    pid=$(cat "$pidfile")
+    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+    # Only a group the stub leads is its own to take down; a stub that shares
+    # the test's group is signalled alone.
+    if [ -n "$pgid" ] && [ "$pgid" = "$pid" ]; then
+      kill -KILL -- "-$pgid" 2>/dev/null || true
+    fi
+    kill -KILL "$pid" 2>/dev/null || true
+  done < "$FM_TEST_PROCESS_REGISTRY"
+  rm -f "$FM_TEST_PROCESS_REGISTRY"
 }
 
 # Ceiling on how long a fixture's blocking stub may keep polling. A stub that
@@ -223,8 +276,24 @@ fm_test_remove_tree() {
   rm -rf "$dir"
 }
 
+# A fixture started with `cmd &` in the test shell and killed inline after its
+# assertions is left running when an assertion fails or the run is interrupted,
+# because `fail` only exits. Cleanup takes down the shell's own background jobs
+# and their direct children (a `bash -c '... sleep N'` job leaves the sleep).
+# This cannot cover a SIGKILLed test, so a stub that waits still bounds itself.
+fm_test_reap_jobs() {
+  local pid
+  for pid in $(jobs -p 2>/dev/null); do
+    kill -CONT "$pid" 2>/dev/null || true
+    pkill -KILL -P "$pid" 2>/dev/null || true
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+}
+
 fm_test_cleanup() {
   local d
+  fm_test_reap_jobs
+  fm_test_reap_processes
   fm_test_reap_watchers
   fm_test_reap_procevent_homes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do

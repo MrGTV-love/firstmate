@@ -307,7 +307,7 @@ if [ "\${1:-}" = start ]; then
     kill -TERM "\$spawn_pid"
     exit 0
   fi
-  sleep 300
+  sleep "\${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
 fi
 exec "$real" "\$@"
 SH
@@ -347,8 +347,9 @@ run_bounded_fm_tasks_axi() {  # <fallback-bin> <bound> [args...]
 test_fm_tasks_axi_fallback_bounds_the_call_without_a_timeout_binary() {
   local case_dir fb out rc=0 started
   case_dir=$(make_home fm-tasks-axi-fallback)
+  # shellcheck disable=SC2016 # The stub expands its own block ceiling.
   fb=$(make_fallback_bin "$case_dir" '#!/bin/bash
-exec sleep 300')
+exec sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"')
   started=$SECONDS
   out=$(run_bounded_fm_tasks_axi "$fb" 2 show never-answers) || rc=$?
   [ "$rc" -eq 124 ] \
@@ -404,7 +405,8 @@ test_fm_tasks_axi_gnu_timeout_forces_termination_of_a_sigterm_ignoring_child() {
   mkdir -p "$fb"
   ln -s "$(command -v timeout)" "$fb/timeout"
   ln -s "$(command -v sleep)" "$fb/sleep"
-  printf '#!/bin/bash\ntrap "" TERM\nexec sleep 300\n' > "$fb/tasks-axi"
+  # shellcheck disable=SC2016 # The stub expands its own block ceiling.
+  printf '#!/bin/bash\ntrap "" TERM\nexec sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"\n' > "$fb/tasks-axi"
   chmod +x "$fb/tasks-axi"
   started=$SECONDS
   out=$(run_bounded_fm_tasks_axi "$fb" 2 show never-answers) || rc=$?

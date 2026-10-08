@@ -877,7 +877,11 @@ test_wait_poll_cycle_ignores_slow_check_beats() {
   cat > "$state/slow.check.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-started"
-while [ ! -e "$FM_STATE_OVERRIDE/check-release" ]; do sleep 0.1; done
+n=0
+while [ ! -e "$FM_STATE_OVERRIDE/check-release" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 10 )) ]; do
+  sleep 0.1
+  n=$((n + 1))
+done
 SH
   chmod 0700 "$state/slow.check.sh"
   FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null \
@@ -6067,7 +6071,11 @@ case "$dest" in
     case "${FM_MARKER_MV_MODE:-}" in
       pause)
         printf '1\n' > "$FM_MARKER_MV_READY"
-        while [ ! -e "$FM_MARKER_MV_RELEASE" ]; do sleep 0.02; done
+        n=0
+        while [ ! -e "$FM_MARKER_MV_RELEASE" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 50 )) ]; do
+          sleep 0.02
+          n=$((n + 1))
+        done
         ;;
       kill-before) kill -KILL "$PPID"; exit 1 ;;
       kill-after) "$REAL_MV" "$@" || exit; kill -KILL "$PPID"; exit 1 ;;

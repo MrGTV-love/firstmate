@@ -58,7 +58,7 @@ case "${1:-}" in
       exit 1
     fi
     # The wedge under test: a read that never returns.
-    sleep 300
+    sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
     exit 0
     ;;
   hold)
@@ -290,7 +290,7 @@ case "${1:-}" in
     [ -z "${2:-}" ] && { printf 'code: NOT_FOUND\n' >&2; exit 1; }
     # Only the prefixed migrated candidates wedge; the exact and legacy ids
     # answer NOT_FOUND promptly, the concrete path the prefix scan exists for.
-    case "$2" in $FM_TEST_PREFIXED_GLOB) sleep 300; exit 0 ;; esac
+    case "$2" in $FM_TEST_PREFIXED_GLOB) sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"; exit 0 ;; esac
     printf 'code: NOT_FOUND\n' >&2
     exit 1
     ;;

@@ -164,7 +164,8 @@ if [ "${FM_TEST_REUSE_TEARDOWN:-}" = 1 ] \
     && [ ! -e "${FM_TEST_REUSE_TEARDOWN_ONCE:-}" ]; then
   : > "$FM_TEST_REUSE_TEARDOWN_ONCE"
   : > "$FM_TEST_REUSE_TEARDOWN_READY"
-  while [ ! -e "$FM_TEST_REUSE_TEARDOWN_RELEASE" ]; do
+  while [ ! -e "$FM_TEST_REUSE_TEARDOWN_RELEASE" ] \
+      && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     "$FM_TEST_REAL_SLEEP" 0.01
   done
 fi
@@ -176,7 +177,8 @@ if [ "${FM_TEST_REUSE_MERGE:-}" = 1 ] && [ "${1:-}" = 0.1 ] \
     && [ ! -e "${FM_TEST_REUSE_MERGE_ONCE:-}" ]; then
   : > "$FM_TEST_REUSE_MERGE_ONCE"
   : > "$FM_TEST_REUSE_MERGE_READY"
-  while [ ! -e "$FM_TEST_REUSE_MERGE_RELEASE" ]; do
+  while [ ! -e "$FM_TEST_REUSE_MERGE_RELEASE" ] \
+      && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     "$FM_TEST_REAL_SLEEP" 0.01
   done
 fi
@@ -3684,7 +3686,7 @@ if [ "${1:-}" = -qxF ] && [ "${2:-}" = "pr=${FM_TEST_RACE_PR_URL:-}" ] \
     && [ "${3:-}" = "${FM_TEST_RACE_PR_META:-}" ]; then
   "$FM_TEST_REAL_GREP" "$@" || exit $?
   : > "$FM_TEST_RACE_READY"
-  while [ ! -e "$FM_TEST_RACE_RELEASE" ]; do sleep 0.01; done
+  while [ ! -e "$FM_TEST_RACE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
   exit 0
 fi
 exec "$FM_TEST_REAL_GREP" "$@"
@@ -3762,7 +3764,7 @@ SH
 if [ "$*" = "-C ${FM_TEST_RACE_REPO:-} rev-parse --short main" ]; then
   output=$("$FM_TEST_REAL_GIT" "$@") || exit $?
   : > "$FM_TEST_RACE_READY"
-  while [ ! -e "$FM_TEST_RACE_RELEASE" ]; do sleep 0.01; done
+  while [ ! -e "$FM_TEST_RACE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
   printf '%s\n' "$output"
   exit 0
 fi
