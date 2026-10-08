@@ -17,10 +17,6 @@
 # to the ordinary re-read nudge instead of being stopped for a launch that must
 # be refused.
 #
-# Placement is resolved from the same remote_host= signal bin/fm-send.sh routes
-# on, and it changes only the transport: the restart itself is bin/fm-control.sh
-# <id> relaunch either way, run here for a local mate and run on the host over
-# bin/fm-on.sh for a remote one.
 
 _FM_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-backend.sh disable=SC1091
@@ -37,24 +33,14 @@ _FM_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # correlated answer, never the wall clock, is what releases the restart.
 FM_SECONDMATE_PERSIST_REQUEST='Firstmate was updated and I am about to restart your agent so it comes up on the current instructions and launch-time settings, which drops your conversation but keeps every durable record. Before that, persist the open work you are holding only in this conversation, following the /stow skill'"'"'s "Open-record persistence" section and nothing else from that skill: file a task for each open record that exists only in this conversation, including any captain call you had formed but never registered, and correct any task whose status no longer reflects what you now know. Do NOT run the memory, learnings, or captain-preference sweeps. Then reply on your parent channel saying it is done, or saying what you deliberately left alone and why.'
 
-# Resolve one mate's restart capability from its durable record alone.
 # Publishes, on success:
-#   FM_SECONDMATE_RESTART_PLACEMENT  local|remote
-#   FM_SECONDMATE_RESTART_BACKEND    the backend whose classifier must prove the stop
 #   FM_SECONDMATE_RESTART_HARNESS    the verified control adapter it runs on
-#   FM_SECONDMATE_RESTART_HOST       the configured host (remote placement only)
 # and on failure sets FM_SECONDMATE_RESTART_REASON to one operator-readable line.
-FM_SECONDMATE_RESTART_PLACEMENT=""
-FM_SECONDMATE_RESTART_BACKEND=""
 FM_SECONDMATE_RESTART_HARNESS=""
-FM_SECONDMATE_RESTART_HOST=""
 FM_SECONDMATE_RESTART_REASON=""
 fm_secondmate_restart_capable() {  # <meta-file>
-  local meta=$1 kind window remote_host backend harness family
-  FM_SECONDMATE_RESTART_PLACEMENT=""
-  FM_SECONDMATE_RESTART_BACKEND=""
+  local meta=$1 kind window remote_host backend harness family state id record source
   FM_SECONDMATE_RESTART_HARNESS=""
-  FM_SECONDMATE_RESTART_HOST=""
   FM_SECONDMATE_RESTART_REASON=""
 
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
@@ -74,18 +60,10 @@ fm_secondmate_restart_capable() {  # <meta-file>
   harness=$(fm_meta_get "$meta" harness)
   remote_host=$(fm_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
-    FM_SECONDMATE_RESTART_PLACEMENT=remote
-    FM_SECONDMATE_RESTART_HOST=$remote_host
-    # A remote mate's endpoint record lives on its host; the parent's own record
-    # names the backend that launch established there, and the remote route
-    # accepts nothing but herdr.
-    backend=$(fm_meta_get "$meta" remote_backend)
-    [ -n "$backend" ] || backend=herdr
-  else
-    FM_SECONDMATE_RESTART_PLACEMENT=local
-    backend=$(fm_backend_of_meta "$meta")
+    FM_SECONDMATE_RESTART_REASON="remote placement has no reachable affirmative turn-end producer for its current launch"
+    return 1
   fi
-  FM_SECONDMATE_RESTART_BACKEND=$backend
+  backend=$(fm_backend_of_meta "$meta")
   if ! fm_control_backend_state_verified "$backend"; then
     FM_SECONDMATE_RESTART_REASON="its runtime cannot prove an agent stopped and came back (backend $backend)"
     return 1
@@ -97,6 +75,34 @@ fm_secondmate_restart_capable() {  # <meta-file>
     return 1
   fi
   FM_SECONDMATE_RESTART_HARNESS=$family
+  if ! command -v fm_busy_record_read >/dev/null 2>&1; then
+    . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-busy-lib.sh" || return 1
+  fi
+  state=${meta%/*}
+  id=${meta##*/}
+  id=${id%.meta}
+  if [ "$family" = cursor ]; then
+    if [ -n "$(fm_busy_cursor_binding_field "$state" "$id" projects_root)" ] \
+      && [ -n "$(fm_busy_cursor_binding_field "$state" "$id" workspace_root)" ]; then
+      return 0
+    fi
+    FM_SECONDMATE_RESTART_REASON="its current launch has no bound Cursor transcript turn-end producer"
+    return 1
+  fi
+  if [ -z "$(fm_busy_sources_for_harness "$harness")" ]; then
+    FM_SECONDMATE_RESTART_REASON="its worker runtime '$harness' has no verified affirmative turn-end producer"
+    return 1
+  fi
+  if ! record=$(fm_busy_record_read "$state" "$id"); then
+    FM_SECONDMATE_RESTART_REASON="its current launch has no valid armed busy record for affirmative turn-end evidence ($record)"
+    return 1
+  fi
+  source=${record#* }
+  source=${source%% *}
+  if ! fm_busy_source_trusted "$harness" "$source"; then
+    FM_SECONDMATE_RESTART_REASON="its current launch's busy record has no trusted turn-end source ($source)"
+    return 1
+  fi
   return 0
 }
 
@@ -205,30 +211,16 @@ fm_secondmate_restart_first_line() {  # <text>
   printf '%s\n' "$1" | sed -n '/./{s/^error: //;s/[[:space:]]\{1,\}/ /g;p;q;}'
 }
 
-# Run the restart itself and print exactly one outcome line: `restarted: ...`
-# or `unreached: ...`. Placement changes only the transport (see
-# bin/fm-secondmate-restart.sh). Needs FM_HOME and the caller's STATE.
-fm_secondmate_restart_run() {  # <state> <id> <placement> <host> <harness> <model> <effort>
-  local state=$1 id=$2 placement=$3 host=$4 harness=$5 model=$6 effort=$7
+fm_secondmate_restart_run() {
+  local state=$1 id=$2 harness=$3
   local out rc ran_on reason
-  if [ "$placement" = remote ]; then
-    out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$state" \
-      "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-remote-secondmate-relaunch.sh" \
-      "$id" "$harness" "${model:-default}" "${effort:-default}" < /dev/null 2>&1)
-    rc=$?
-  else
-    out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$state" \
-      "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-control.sh" "$id" relaunch 2>&1)
-    rc=$?
-  fi
+  out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$state" \
+    "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-control.sh" "$id" relaunch 2>&1)
+  rc=$?
   if [ "$rc" -eq 0 ]; then
     ran_on=$(printf '%s\n' "$out" | sed -n 's/^relaunched .* harness=\([^ ]*\).*/\1/p' | tail -1)
     [ -n "$ran_on" ] || ran_on=$harness
-    if [ "$placement" = remote ]; then
-      printf 'restarted: %s on %s (%s)\n' "$id" "$host" "$ran_on"
-    else
-      printf 'restarted: %s (%s)\n' "$id" "$ran_on"
-    fi
+    printf 'restarted: %s (%s)\n' "$id" "$ran_on"
     return 0
   fi
   reason=$(fm_secondmate_restart_first_line "$out")
@@ -284,11 +276,7 @@ fm_secondmate_restart_service_locked() {
       return 1
     fi
     line=$(fm_secondmate_restart_run "$state" "$id" \
-      "$(fm_secondmate_restart_request_get "$request" placement)" \
-      "$(fm_secondmate_restart_request_get "$request" host)" \
-      "$(fm_secondmate_restart_request_get "$request" harness)" \
-      "$(fm_secondmate_restart_request_get "$request" model)" \
-      "$(fm_secondmate_restart_request_get "$request" effort)")
+      "$(fm_secondmate_restart_request_get "$request" harness)")
     if ! fm_secondmate_restart_request_finish "$state" "$id" "$line"; then
       printf 'unreached: %s: its restart completion could not be recorded: %s\n' "$id" "$line"
       printf 'error: secondmate %s restart completion could not be recorded: %s\n' "$id" "$line" >&2

@@ -16,9 +16,6 @@
 #   4. Every unsafe case says what is known: pre-restart capability and persist
 #      failures use the nudge path, while a failed relaunch is reported as an
 #      unknown outcome; none is reported as a clean reload.
-#   5. A remote mate restarts by running the SAME local control-plane relaunch on
-#      its host, over the fm-on transport, with the profile resolved from the
-#      PARENT's own pin rather than the remote home's copy of it.
 #   6. End to end with bin/fm-update.sh: a live mate whose home needed no
 #      fast-forward is still named for restart and genuinely restarted, and one
 #      whose runtime cannot prove a restart keeps the honest re-read path with
@@ -162,7 +159,7 @@ new_case() {
 # A live LOCAL second mate: a real git worktree for its home, plus the durable
 # record this home keeps for it.
 add_local_mate() {
-  local dir=$1 id=$2 harness=${3:-claude} backend=${4:-}
+  local dir=$1 id=$2 harness=${3:-claude} backend=${4:-} evidence=${5:-armed}
   local home="$dir/home" smhome="$dir/$id-home"
   fm_git_worktree "$dir/$id-repo" "$smhome" "sm-$id"
   mkdir -p "$smhome/state" "$smhome/data" "$smhome/bin" "$home/data/$id"
@@ -183,9 +180,11 @@ add_local_mate() {
     echo "home=$smhome"
     [ -z "$backend" ] || echo "backend=$backend"
   } > "$home/state/$id.meta"
-  "$ROOT/bin/fm-busy-event.sh" arm "$home/state" "$id" \
-    --state idle --source claude-hook --event stop >/dev/null \
-    || fail "could not arm the local mate's idle evidence"
+  if [ "$evidence" = armed ]; then
+    "$ROOT/bin/fm-busy-event.sh" arm "$home/state" "$id" \
+      --state idle --source claude-hook --event stop >/dev/null \
+      || fail "could not arm the local mate's idle evidence"
+  fi
   printf '%s\n' "fm-$id" >> "$dir/fake/windows"
   printf '%s' "$smhome" > "$dir/fake/cwd"
 }
@@ -196,7 +195,7 @@ add_local_mate() {
 # mate's home as a DETACHED worktree of that repo already sitting on origin's tip.
 # That "already current" home is the shape the old classifier skipped entirely.
 add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
-  local dir=$1 id=$2 harness=${3:-claude} backend=${4:-}
+  local dir=$1 id=$2 harness=${3:-claude} backend=${4:-} evidence=${5:-armed}
   local home="$dir/home" repo="$dir/fmrepo" smhome="$dir/$id-home"
   if [ ! -d "$repo" ]; then
     git init -q --bare "$dir/origin.git"
@@ -235,9 +234,11 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
     echo "home=$smhome"
     [ -z "$backend" ] || echo "backend=$backend"
   } > "$home/state/$id.meta"
-  "$ROOT/bin/fm-busy-event.sh" arm "$home/state" "$id" \
-    --state idle --source claude-hook --event stop >/dev/null \
-    || fail "could not arm the local mate's idle evidence"
+  if [ "$evidence" = armed ]; then
+    "$ROOT/bin/fm-busy-event.sh" arm "$home/state" "$id" \
+      --state idle --source claude-hook --event stop >/dev/null \
+      || fail "could not arm the local mate's idle evidence"
+  fi
   printf '%s\n' "fm-$id" >> "$dir/fake/windows"
   printf '%s' "$smhome" > "$dir/fake/cwd"
 }
@@ -269,24 +270,6 @@ run_restart() {  # <case-dir> <args...>
     "$RESTART" "$@" 2>&1
 }
 
-run_recorded_restart_transaction() {  # <case-dir> <id>
-  local dir=$1 id=$2
-  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
-    FM_ROOT_OVERRIDE="$dir/code" \
-    FM_CONFIG_OVERRIDE="$dir/home/config" FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
-    bash -c '
-      . "$1/bin/fm-secondmate-restart-lib.sh"
-      request=$(fm_secondmate_restart_request_path "$FM_HOME/state" "$2")
-      line=$(fm_secondmate_restart_run "$FM_HOME/state" "$2" \
-        "$(fm_secondmate_restart_request_get "$request" placement)" \
-        "$(fm_secondmate_restart_request_get "$request" host)" \
-        "$(fm_secondmate_restart_request_get "$request" harness)" \
-        "$(fm_secondmate_restart_request_get "$request" model)" \
-        "$(fm_secondmate_restart_request_get "$request" effort)")
-      printf "%s\n" "$line"
-      case "$line" in restarted:*) exit 0 ;; *) exit 3 ;; esac
-    ' _ "$ROOT" "$id" 2>&1
-}
 
 # assert_line / assert_no_line <line> <file> <msg>: a whole line is (not) present.
 assert_line() {
@@ -504,11 +487,6 @@ test_refused_restart_falls_back_without_claiming_a_reload() {
   pass "T5 a refused restart leaves the mate running and reports an unknown outcome"
 }
 
-# --- T6: a remote mate restarts over the fm-on hop, on the parent's pin -------
-# The seam decodes what fm-on.sh actually put on the wire, so this pins the
-# host-local command and the profile the PARENT resolved, not a local shortcut.
-# The far side also models the live mate: it answers the persist request that
-# crossed the same hop, on the parent channel, with that request's own token.
 setup_remote_case() {  # <case-dir> <id> <ssh-mode>
   local dir=$1 id=$2 mode=$3
   local fb="$dir/fakebin"
@@ -534,11 +512,7 @@ setup_remote_case() {  # <case-dir> <id> <ssh-mode>
   cat > "$fb/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 set -u
-if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ]; then
-  cat > "$FM_FAKE_DIR/ssh-input"
-else
-  cat > /dev/null
-fi
+cat > /dev/null
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
 done
@@ -548,67 +522,8 @@ decode() { printf '%s' "$1" | base64 --decode 2>/dev/null || printf '%s' "$1" | 
 rargs=()
 while IFS= read -r -d '' a; do rargs+=("$a"); done < <(decode "$argv_b64")
 printf '%s\n' "${rargs[*]}" >> "$FM_FAKE_SSH_LOG"
-if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ] && [ "${rargs[0]}" = fm-remote-inherit.sh ]; then
-  remote_root=$(decode "$2")
-  remote_home=$(decode "$3")
-  FM_HOME="$remote_home" FM_CONFIG_OVERRIDE="$remote_home/config" FM_STATE_OVERRIDE="$remote_home/state" \
-    exec "$remote_root/bin/${rargs[0]}" "${rargs[@]:1}" < "$FM_FAKE_DIR/ssh-input"
-fi
 case "${FM_FAKE_SSH_MODE:-ok}" in
   unreachable) exit 255 ;;
-esac
-case "${rargs[1]:-}" in
-  send)
-    # Model the live remote mate: act on the instruction and report back on the
-    # parent channel, carrying the correlation token the request embedded.
-    if [ -n "${FM_FAKE_ANSWER_STATUS:-}" ]; then
-      corr=$(printf '%s' "${rargs[3]:-}" | grep -oE 'corr=[0-9a-f]{16}' | head -1)
-      if [ -n "$corr" ] && [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ] && [ ! -e "$FM_FAKE_DIR/persist-mutated" ]; then
-        cp "$FM_FAKE_DIR/later-index.json" "$FM_HOME/config/model-index.json"
-        cp "$FM_FAKE_DIR/later-dispatch.json" "$FM_HOME/config/crew-dispatch.json"
-        : > "$FM_FAKE_DIR/persist-mutated"
-      fi
-      [ -z "$corr" ] || printf 'done [%s]: open records written down\n' "$corr" \
-        >> "$FM_FAKE_ANSWER_STATUS"
-    fi
-    ;;
-  relaunch)
-    if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ]; then
-      remote_root=$(decode "$2")
-      remote_home=$(decode "$3")
-      FM_HOME="$remote_home" FM_CONFIG_OVERRIDE="$remote_home/config" FM_STATE_OVERRIDE="$remote_home/state" FM_MODEL_CATALOG_DIR='' \
-        "$remote_root/bin/fm-model-index.sh" check "${rargs[3]}" "${rargs[4]}" || exit 93
-    fi
-    case "${FM_FAKE_SSH_MODE:-ok}" in
-      slow-relaunch)
-        : > "$FM_FAKE_DIR/remote-relaunch-start"
-        /bin/sleep 2
-        if [ -e "$FM_FAKE_DIR/local-relaunch-seen" ]; then
-          : > "$FM_FAKE_DIR/local-relaunch-during-remote"
-        fi
-        : > "$FM_FAKE_DIR/remote-relaunch-end"
-        ;;
-      coordinated-relaunch)
-        : > "$FM_FAKE_DIR/remote-relaunch-start"
-        # Wait for independent local progress, including progress before SSH started.
-        # A serial consumer reaches the bound and cannot publish the overlap marker.
-        for ((i = 0; i < 100; i++)); do
-          [ ! -e "$FM_FAKE_DIR/local-relaunch-before-remote-end" ] || break
-          /bin/sleep 0.1
-        done
-        : > "$FM_FAKE_DIR/remote-relaunch-end"
-        ;;
-    esac
-    printf 'relaunched %s harness=%s from=claude model=%s effort=%s backend=herdr endpoint=fm-remote:2ndmate-%s worktree=/srv/fm\n' \
-      "${rargs[2]}" "${rargs[3]}" "${rargs[4]}" "${rargs[5]}" "${rargs[2]}"
-    printf 'schema=fm-remote-secondmate-control.v1\n'
-    printf 'backend=herdr\n'
-    printf 'target=fm-remote:2ndmate-%s\n' "${rargs[2]}"
-    printf 'herdr_session=fm-remote\n'
-    printf 'harness=%s\n' "${rargs[3]}"
-    printf 'model=%s\n' "${rargs[4]}"
-    printf 'effort=%s\n' "${rargs[5]}"
-    ;;
 esac
 exit 0
 SH
@@ -617,109 +532,6 @@ SH
   export FM_FAKE_SSH_LOG="$dir/ssh.log"
   export FM_FAKE_SSH_MODE="$mode"
   export FM_TEST_SSH_BIN="$fb/fake-ssh"
-}
-
-test_remote_mate_restarts_over_the_transport_hop() {
-  local dir out rc relaunch_line
-  dir=$(new_case remote)
-  setup_remote_case "$dir" sm2 ok
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
-  # The parent's own pin is what the replacement must run on; the remote home's
-  # copy of config/secondmate-harness is a different home's file.
-  printf 'codex big-model high\n' > "$dir/home/config/secondmate-harness"
-
-  out=$(run_restart "$dir" fm-sm2); rc=$?
-  expect_code 0 "$rc" "a remote request should be queued"$'\n'"$out"
-  assert_contains "$out" "queued: sm2" "a remote request restarted without turn-end evidence"
-  assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "the shared service restarted without remote turn evidence"
-  out=$(run_recorded_restart_transaction "$dir" sm2); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
-
-  expect_code 0 "$rc" "a remote mate should restart over its transport hop"$'\n'"$out"
-  assert_contains "$out" "restarted: sm2 on remote-mac (codex)" \
-    "a remote restart should be reported with its host and the parent's pinned runtime"
-  relaunch_line=$(grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
-  [ -n "$relaunch_line" ] || fail "no relaunch crossed the transport hop"$'\n'"$(cat "$dir/ssh.log")"
-  [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 codex big-model high" ] \
-    || fail "the host-local relaunch did not carry the parent's resolved profile: $relaunch_line"
-  # The persist request crossed the SAME hop before the restart did.
-  [ "$(grep -n '^fm-remote-secondmate-control.sh send' "$dir/ssh.log" | head -1 | cut -d: -f1)" \
-     -lt "$(grep -n '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
-    || fail "the remote mate was restarted before it was asked to persist"$'\n'"$(cat "$dir/ssh.log")"
-  pass "T6 a remote mate restarts through the host-local control plane over the fm-on hop"
-}
-
-test_remote_fleet_restart_obeys_initiating_policy() {
-  local dir out rc
-  dir=$(new_case remote-policy)
-  setup_remote_case "$dir" sm2 ok
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
-  printf 'codex explicit-model high\n' > "$dir/home/config/secondmate-harness"
-  printf 'omp-or-tc\n' > "$dir/home/config/session-launch-policy"
-  cp "$dir/home/state/sm2.meta" "$dir/meta-before"
-
-  out=$(run_restart "$dir" sm2); rc=$?
-  expect_code 0 "$rc" "the remote persist request should be queued"$'\n'"$out"
-  assert_contains "$out" "queued: sm2" "a remote request bypassed the turn-end gate"
-  out=$(run_recorded_restart_transaction "$dir" sm2); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
-
-  expect_code 3 "$rc" "fleet restart misreported a refused remote profile"$'\n'"$out"
-  assert_contains "$out" "config/session-launch-policy" "fleet restart lost the initiating policy reason"
-  assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
-    "fleet restart transported a forbidden replacement"
-  cmp -s "$dir/meta-before" "$dir/home/state/sm2.meta" || fail "fleet refusal changed route metadata"
-  pass "remote fleet restart retains its route without transporting a forbidden replacement"
-}
-
-test_remote_role_restart_resolves_the_pair_selected_after_persist() {
-  local dir out rc selector expected before stand_in relaunch_line selected
-  for selector in role:routine stand-in:routine; do
-    dir=$(new_case remote-role-persist)
-    setup_remote_case "$dir" sm2 mutate-persist
-    mkdir -p "$dir/sm2-home/config" "$dir/sm2-home/state" "$dir/codex"
-    printf -- '- sm2 - remote domain (host: remote-mac; root: %s; home: %s; scope: things; projects: p; added 2026-09-03)\n' \
-      "$ROOT" "$dir/sm2-home" > "$dir/home/data/secondmates.md"
-    printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"before-model","stand_in":"before-stand-in"}}},"retired":[]}' \
-      > "$dir/home/config/model-index.json"
-    printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"after-model","stand_in":"after-stand-in"}}},"retired":[]}' \
-      > "$dir/fake/later-index.json"
-    case "$selector" in
-      role:routine) before='before-model'; expected='after-model'; stand_in=false ;;
-      stand-in:routine) before='before-stand-in'; expected='after-stand-in'; stand_in=true ;;
-    esac
-    printf '{"default":{"harness":"codex","role":"routine","stand_in":%s}}\n' "$stand_in" \
-      > "$dir/home/config/crew-dispatch.json"
-    cp "$dir/home/config/crew-dispatch.json" "$dir/fake/later-dispatch.json"
-    printf '%s\n' '{"models":[{"slug":"before-model"},{"slug":"before-stand-in"},{"slug":"after-model"},{"slug":"after-stand-in"}]}' \
-      > "$dir/codex/models_cache.json"
-    printf 'codex %s high\n' "$selector" > "$dir/home/config/secondmate-harness"
-    selected=$(FM_HOME="$dir/home" FM_CONFIG_OVERRIDE="$dir/home/config" FM_MODEL_CATALOG_DIR='' "$ROOT/bin/fm-model-index.sh" model codex "$selector")
-    [ "$selected" = "$before" ] || fail "initial $selector did not select the early model: $selected"
-    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
-    out=$(FM_CONFIG_OVERRIDE="$dir/home/config" FM_MODEL_CATALOG_DIR='' CODEX_HOME="$dir/codex" run_restart "$dir" sm2); rc=$?
-    expect_code 0 "$rc" "the remote persist request should be queued: $out"
-    assert_contains "$out" "queued: sm2" "a remote role request bypassed the turn-end gate"
-    out=$(FM_MODEL_CATALOG_DIR='' CODEX_HOME="$dir/codex" run_recorded_restart_transaction "$dir" sm2); rc=$?
-    unset FM_FAKE_ANSWER_STATUS
-    expect_code 0 "$rc" "remote $selector restart did not accept the changed pair: $out"
-    assert_present "$dir/fake/persist-mutated" "the persist request did not mutate the parent index"
-    assert_contains "$out" "restarted: sm2 on remote-mac (codex)" \
-      "remote $selector was not reported restarted"
-    selected=$(FM_HOME="$dir/sm2-home" FM_CONFIG_OVERRIDE="$dir/sm2-home/config" FM_MODEL_CATALOG_DIR='' "$ROOT/bin/fm-model-index.sh" model codex "$selector")
-    [ "$selected" = "$expected" ] || fail "published destination $selector selected $selected instead of $expected"
-    selected=$(FM_HOME="$dir/sm2-home" FM_CONFIG_OVERRIDE="$dir/sm2-home/config" FM_MODEL_CATALOG_DIR='' "$ROOT/bin/fm-model-index.sh" profiles "$dir/sm2-home/config/crew-dispatch.json" | jq -r '.default.model')
-    [ "$selected" = "$expected" ] || fail "published dispatch selected $selected instead of $expected"
-    relaunch_line=$(grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
-    [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 codex $expected high" ] \
-      || fail "relaunch froze the early $selector model: $relaunch_line"
-    grep -Fx "model=$expected" "$dir/home/state/sm2.meta" >/dev/null \
-      || fail "parent route did not publish the relaunched model"
-    [ "$(grep -n '^fm-remote-inherit.sh put config/model-index.json ' "$dir/ssh.log" | head -1 | cut -d: -f1)" \
-       -lt "$(grep -n '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
-      || fail "relaunch preceded publication of the selected index"
-  done
-  pass "remote role and stand-in restart resolve the published pair selected after persistence"
 }
 
 # --- T7: an unreachable host is unknown, never a claimed reload --------------
@@ -733,7 +545,7 @@ test_unreachable_host_is_reported_unknown() {
   expect_code 3 "$rc" "an unreachable host must not be reported as a reload"$'\n'"$out"
   assert_not_contains "$out" "restarted: sm3" "an unreachable host must not be claimed as restarted"
   assert_contains "$out" "sm3:" "the unreachable mate must still be named"
-  assert_contains "$out" "could not be delivered" "an unreachable host must be reported as undelivered, not as reloaded"
+  assert_contains "$out" "re-read message could not be delivered" "an unreachable host must be reported as undelivered, not as reloaded"
   pass "T7 an unreachable host is reported honestly instead of claimed as reloaded"
 }
 
@@ -756,8 +568,8 @@ test_local_restart_uses_the_home_pin_and_reports_what_ran() {
   pass "T8 a local restart re-resolves this home's pin and reports the runtime that came up"
 }
 
-test_native_ultra_restart_keeps_local_and_remote_profiles() {
-  local dir out rc relaunch_line
+test_native_ultra_restart_keeps_local_profile() {
+  local dir out rc
   dir=$(new_case native-local)
   add_local_mate "$dir" sm1
   arm_answer "$dir" sm1
@@ -771,20 +583,7 @@ test_native_ultra_restart_keeps_local_and_remote_profiles() {
   assert_contains "$(cat "$dir/home/state/sm1.meta")" "effort=ultra" "local restart dropped native effort"
   assert_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "local restart dropped native launch flag"
 
-  dir=$(new_case native-remote)
-  setup_remote_case "$dir" sm2 ok
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
-  printf 'pi-signed codex-native/gpt-6-astra ultra\n' > "$dir/home/config/secondmate-harness"
-  out=$(run_restart "$dir" sm2); rc=$?
-  expect_code 0 "$rc" "the remote persist request should be queued: $out"
-  assert_contains "$out" "queued: sm2" "a remote native request bypassed the turn-end gate"
-  out=$(run_recorded_restart_transaction "$dir" sm2); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
-  expect_code 0 "$rc" "native remote restart failed: $out"
-  relaunch_line=$(grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
-  [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 pi-signed codex-native/gpt-6-astra ultra" ] \
-    || fail "remote restart dropped native profile: $relaunch_line"
-  pass "native Ultra survives local restart and the remote restart transport"
+  pass "native Ultra survives local restart"
 }
 
 # --- T9: an unrelated concurrent reply cannot release the persist gate -------
@@ -862,22 +661,21 @@ test_post_stop_failure_is_reported_unreached() {
 test_relaunches_do_not_block_persist_polling() {
   local dir out rc
   dir=$(new_case relaunch-polling)
-  setup_remote_case "$dir" sm1 coordinated-relaunch
+  setup_remote_case "$dir" sm1 ok
   add_local_mate "$dir" sm2
   printf -- '- sm2 - local domain (home: %s; scope: things; projects: p; added 2026-09-03)\n' \
     "$dir/sm2-home" >> "$dir/home/data/secondmates.md"
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
   arm_answer "$dir" sm2
 
   out=$(run_restart "$dir" sm1 sm2); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
 
-  expect_code 0 "$rc" "both confirmed mates should restart independently"$'\n'"$out"
-  assert_contains "$out" "summary: 1 of 2 restarted, 1 queued, 0 nudged, 0 unreached" \
-    "the remote wait blocked the independently idle local mate"
+  expect_code 3 "$rc" "the unsupported remote mate must be accounted for"$'\n'"$out"
+  assert_contains "$out" "summary: 1 of 2 restarted, 0 queued, 1 nudged, 0 unreached" \
+    "the remote nudge blocked the independently idle local mate"
+  assert_absent "$dir/home/state/.secondmate-restart-sm1.request" "the remote mate was queued"
   assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
-    "the remote wait bypassed the turn-end gate"
-  pass "T12 a remote turn-evidence wait does not block an independently idle local mate"
+    "the remote nudge bypassed the turn-end gate"
+  pass "T12 a remote nudge does not block an independently idle local mate"
 }
 
 # --- T13: a worker that cannot publish its result cannot hang the pass -------
@@ -1241,25 +1039,81 @@ test_inconclusive_turn_evidence_stays_queued() {
   pass "inconclusive and failed turn classifiers retain the restart until affirmative idle"
 }
 
-test_remote_answer_without_turn_evidence_stays_queued() {
-  local dir out rc state
-  dir=$(new_case remote-turn-wait)
+test_unwired_launches_are_nudged_without_queueing() {
+  local dir out rc harness evidence
+  for harness in claude pi pi-signed omp; do
+    for evidence in missing malformed generation source; do
+      dir=$(new_case "unwired-$harness-$evidence")
+      add_local_mate "$dir" sm1 "$harness" '' unarmed
+      case "$evidence" in
+        malformed) printf 'invalid\n' > "$dir/home/state/sm1.busy-state" ;;
+        generation)
+          "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" sm1 >/dev/null || fail "could not arm busy"
+          printf 'other-launch\n' > "$dir/home/state/sm1.busy-gen"
+          ;;
+        source)
+          "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" sm1 --source alien >/dev/null || fail "could not arm source mismatch"
+          ;;
+      esac
+      out=$(run_restart "$dir" sm1); rc=$?
+      expect_code 3 "$rc" "unwired $harness/$evidence must be nudged: $out"
+      assert_contains "$out" "nudged: sm1:" "unwired launch was not nudged"
+      assert_contains "$out" "its current launch" "the nudge did not identify the missing launch wiring"
+      assert_absent "$dir/home/state/.secondmate-restart-sm1.request" "unwired launch queued a restart"
+      assert_absent "$dir/home/state/.secondmate-restart-sm1.outcome" "unwired launch reported a restart completion"
+      assert_no_grep 'Open-record persistence' "$dir/home/state/sm1.inbox/001.msg" "unwired launch asked for a persist answer"
+      assert_grep 're-read your AGENTS.md' "$dir/home/state/sm1.inbox/001.msg" "unwired launch did not receive the re-read steer"
+      assert_no_line '/exit' "$dir/fake/literal" "unwired launch was stopped"
+    done
+  done
+  pass "unwired current launches receive only a nudge and never queue a restart"
+}
+
+test_unverified_adapters_are_nudged_without_queueing() {
+  local dir out rc harness
+  for harness in codex kimi grok; do
+    dir=$(new_case "unverified-$harness")
+    add_local_mate "$dir" sm1 "$harness" '' unarmed
+    out=$(run_restart "$dir" sm1); rc=$?
+    expect_code 3 "$rc" "unverified $harness must be nudged: $out"
+    assert_contains "$out" "nudged: sm1:" "unverified adapter was not nudged"
+    assert_contains "$out" "'$harness' has no verified affirmative turn-end producer" "the nudge omitted its adapter limit"
+    assert_absent "$dir/home/state/.secondmate-restart-sm1.request" "unverified adapter queued a restart"
+    assert_no_grep 'Open-record persistence' "$dir/home/state/sm1.inbox/001.msg" "unverified adapter asked for a persist answer"
+    assert_grep 're-read your AGENTS.md' "$dir/home/state/sm1.inbox/001.msg" "unverified adapter did not receive the re-read steer"
+    assert_no_line '/exit' "$dir/fake/literal" "unverified adapter was stopped"
+  done
+  pass "Codex, Kimi and Grok receive only a nudge and never queue a restart"
+}
+
+test_remote_mates_are_nudged_without_queueing() {
+  local dir out rc
+  dir=$(new_case remote-nudge)
   setup_remote_case "$dir" sm1 ok
-  state="$dir/home/state"
-  export FM_FAKE_ANSWER_STATUS="$state/sm1.status"
-  "$ROOT/bin/fm-busy-event.sh" arm "$state" sm1 --state idle --source claude-hook --event stop >/dev/null \
-    || fail "could not arm unrelated parent-side idle"
-  touch "$state/sm1.turn-ended"
   out=$(run_restart "$dir" sm1); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
-  expect_code 0 "$rc" "a remote turn-evidence wait must remain queued: $out"
-  assert_contains "$out" "queued: sm1" "the remote answer was mistaken for turn completion"
-  assert_contains "$out" "affirmative turn-end evidence" "the remote wait did not name missing evidence"
-  out=$(process_requests "$dir") || fail "remote supervision failed: $out"
-  assert_present "$state/.secondmate-restart-sm1.request" "remote wait lost the restart request"
-  assert_absent "$state/.secondmate-restart-sm1.outcome" "remote answer published a completion outcome"
-  assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "remote answer or parent notification authorized relaunch"
-  pass "remote answers and parent-side notifications never substitute for remote turn-end evidence"
+  expect_code 3 "$rc" "remote placement must be nudged: $out"
+  assert_contains "$out" "nudged: sm1:" "remote mate was not nudged"
+  assert_contains "$out" "remote placement has no reachable affirmative turn-end producer" "the nudge omitted the remote limit"
+  assert_absent "$dir/home/state/.secondmate-restart-sm1.request" "remote mate queued a restart"
+  assert_absent "$dir/home/state/.secondmate-restart-sm1.outcome" "remote mate reported restart completion"
+  assert_no_grep 'Open-record persistence' "$dir/ssh.log" "remote mate asked for a persist answer"
+  assert_grep 'fm-remote-secondmate-control.sh send sm1 ' "$dir/ssh.log" "remote mate did not receive the re-read steer"
+  assert_grep 're-read your AGENTS.md' "$dir/ssh.log" "remote steer did not carry the re-read message"
+  assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" "remote nudge restarted the mate"
+  pass "remote mates receive only a nudge and never queue a restart"
+}
+
+test_updater_routes_unwired_mates_to_nudges() {
+  local dir out harness
+  for harness in claude pi omp codex kimi grok; do
+    dir=$(new_case "update-unwired-$harness")
+    add_repo_backed_mate "$dir" sm1 "$harness" '' unarmed
+    out=$(run_update_in_case "$dir") || fail "updater failed: $out"
+    assert_contains "$out" "restart-secondmates: none" "updater admitted an unwired launch"
+    assert_contains "$out" "nudge-secondmates: fm-sm1" "updater omitted the fallback steer"
+    assert_absent "$dir/home/state/.secondmate-restart-sm1.request" "updater queued an unwired launch"
+  done
+  pass "updater routes unwired and unverified mates to the re-read list"
 }
 
 test_completed_outcome_is_replayed_without_relaunch() {
@@ -1747,10 +1601,7 @@ test_unprovable_runtime_falls_back
 test_unknown_mate_is_accounted_for
 test_refused_restart_falls_back_without_claiming_a_reload
 test_local_restart_uses_the_home_pin_and_reports_what_ran
-test_native_ultra_restart_keeps_local_and_remote_profiles
-test_remote_mate_restarts_over_the_transport_hop
-test_remote_fleet_restart_obeys_initiating_policy
-test_remote_role_restart_resolves_the_pair_selected_after_persist
+test_native_ultra_restart_keeps_local_profile
 test_unreachable_host_is_reported_unknown
 test_concurrent_reply_cannot_release_persist_gate
 test_persist_waits_are_polled_together
@@ -1766,7 +1617,10 @@ test_answered_mate_mid_turn_waits_for_turn_end
 test_restart_and_auto_relaunch_share_one_lock
 test_second_pass_reuses_the_recorded_request
 test_inconclusive_turn_evidence_stays_queued
-test_remote_answer_without_turn_evidence_stays_queued
+test_unwired_launches_are_nudged_without_queueing
+test_unverified_adapters_are_nudged_without_queueing
+test_remote_mates_are_nudged_without_queueing
+test_updater_routes_unwired_mates_to_nudges
 test_completed_outcome_is_replayed_without_relaunch
 test_outcome_consumers_hold_lock_and_preserve_failed_retirement
 test_completion_publication_failures_are_visible
