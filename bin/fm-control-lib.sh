@@ -341,7 +341,9 @@ fm_control_worktree_agent_holder() {  # <worktree>
   wt=$(fm_control_lsof_path "$wt") || { printf 'unknown'; return 0; }
   wt_real=$(fm_control_lsof_path "$wt_real") || { printf 'unknown'; return 0; }
   command -v lsof >/dev/null 2>&1 || { printf 'unknown'; return 0; }
-  records=$(LC_ALL=C sh -c 'exec lsof -w +c 0 -d cwd -F pn -p "^$$"' 2>/dev/null)
+  # Move the command-substitution shell as well as lsof out of the worktree:
+  # either can disappear before the subsequent holder identity reads.
+  records=$(cd / && LC_ALL=C lsof -w +c 0 -d cwd -F pn 2>/dev/null)
   rc=$?
   [ "$rc" -eq 0 ] || { printf 'unknown'; return 0; }
   while IFS= read -r line; do

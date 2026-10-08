@@ -2466,6 +2466,61 @@ test_tmux_gone_endpoint_is_proven_despite_unrelated_servers() {
   pass "tmux: a gone recorded endpoint is proven and reclaimed while unrelated tmux servers run"
 }
 
+# Keep the real process snapshot: a canned lsof table cannot expose a vanished
+# command-substitution shell inheriting the recovery caller's working directory.
+test_tmux_worktree_local_recovery_with_real_lsof() {
+  local dir id entry location wt out rc head_before
+  command -v lsof >/dev/null 2>&1 || { echo 'skip - worktree-local recovery needs lsof'; return; }
+  command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
+  for entry in relaunch reconcile-only direct; do
+    if [ "$entry" = reconcile-only ] && ! fm_tasks_axi_compatible; then
+      echo 'skip - reconciliation-only recovery needs compatible tasks-axi'
+      continue
+    fi
+    for location in root descendant; do
+      id="rlprobe-$entry-$location"
+      dir=$(new_case "$id" "$id")
+      wt="$dir/wt-café\\lane"
+      add_ship_task "$dir" "$id" claude fmses "$wt"
+      stage_gone "$dir" "$id" window-absent
+      prepare_herdr_reclaim "$dir"
+      rm "$dir/fakebin/lsof"
+      mkdir -p "$wt/sub"
+      head_before=$(git -C "$wt" rev-parse HEAD)
+      printf 'unlanded content\n' > "$wt/dirty.txt"
+      [ "$entry" != reconcile-only ] || seed_backlog "$dir" "$id" in_flight
+      [ "$location" != descendant ] || wt="$wt/sub"
+
+      out=$(cd "$wt" && run_control "$dir" "$id" exit); rc=$?
+      expect_code 0 "$rc" "real lsof must prove exit from the worktree $location"$'\n'"$out"
+      assert_contains "$out" endpoint-gone "exit must prove the recorded endpoint gone"
+      case "$entry" in
+        relaunch)
+          out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+          ;;
+        reconcile-only)
+          out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --reconcile-only --note "restore instruction owner"); rc=$?
+          ;;
+        direct)
+          out=$(cd "$wt" && HERDR_SESSION=fmlab run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
+          ;;
+      esac
+      expect_code 0 "$rc" "real lsof must permit $entry from the worktree $location"$'\n'"$out"
+      wt=$(meta_field "$dir" "$id" worktree)
+      [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "$entry did not reclaim on Herdr"
+      [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] || fail "$entry moved the branch head"
+      [ "$(cat "$wt/dirty.txt")" = "unlanded content" ] || fail "$entry lost uncommitted work"
+      if [ "$entry" = reconcile-only ]; then
+        [ "$(meta_field "$dir" "$id" recovery)" = reconcile-only ] || fail "recovery lost its reconciliation-only scope"
+        [ "$(backlog_state "$dir" "$id")" = in_flight ] || fail "recovery changed the backlog state"
+      fi
+      assert_present "$dir/fake/herdr-created-tabs" "$entry did not create the replacement endpoint"
+      assert_absent "$dir/fake/created-windows" "$entry created a tmux endpoint"
+    done
+  done
+  pass "tmux: real lsof permits worktree-local exit, relaunch, reconciliation and direct replacement"
+}
+
 # (b) The recorded endpoint may still be live: the window answers, or an agent
 # still holds the worktree (its window can sit on a socket this process does
 # not address). Either refuses both verbs.
@@ -4044,6 +4099,7 @@ test_spawn_relaunch_refuses_contradicting_flags
 test_spawn_relaunch_refuses_an_unrecorded_task
 test_spawn_relaunch_refuses_a_pane_outside_the_worktree
 test_tmux_gone_endpoint_is_proven_despite_unrelated_servers
+test_tmux_worktree_local_recovery_with_real_lsof
 test_tmux_refuses_while_the_recorded_endpoint_may_be_live
 test_tmux_unreadable_evidence_refuses
 test_tmux_no_server_reclaim_keeps_work_and_task

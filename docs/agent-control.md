@@ -134,7 +134,8 @@ An unreachable endpoint can still hold the live agent a rebind would duplicate, 
   The addressed server must answer definitively, on two reads, that the whole server or the exact session is absent, or list the session without the recorded window.
   A window that answers on either read is never absent.
   Between the reads, one scan of the machine's process working directories must find no harness agent holding the recorded worktree or a directory under it, because a window on a socket this process does not address still leaves its agent running in that worktree.
-  Logical and physical worktree roots are compared in `lsof`'s escaped NAME representation, including non-ASCII bytes and literal backslashes. The scan explicitly excludes its own PID, so invoking recovery from the worktree or a descendant does not create an unreadable holder after the probe exits.
+  Logical and physical worktree roots are compared in `lsof`'s escaped NAME representation, including non-ASCII bytes and literal backslashes.
+  The scan runs from `/`, so neither `lsof` nor its transient command-substitution shell becomes a worktree holder when recovery is invoked from the worktree or a descendant.
   Positively identified idle shells do not block the proof; an unattributed worktree holder does.
   Other tmux servers owned by the same uid, and their clients, say nothing about this endpoint and no longer block it; this proof never queries or lists them.
   Every harness counts as an agent here, including node-bundle harnesses such as Gemini, because each holder is classified from its name, its first argument and its full command line. A readable identity that cannot be attributed, including an ambiguous flattened script path, is not proof of a non-agent.
