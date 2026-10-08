@@ -216,11 +216,11 @@ fm_test_reap_watchers() {
 
 # --- stub process reaping ---------------------------------------------------
 #
-# A fake binary that blocks or loops until killed is the one fixture a temp-root
-# removal cannot stop, and a bound that runs it in a process group of its own
-# (every perl bound does) puts it out of reach of a group-kill aimed at the test
-# run. Left behind by a failed or interrupted test, such a stub spins on as an
-# orphan, and many suites in parallel turned that into a host-wide CPU storm.
+# Removing a temp root does not terminate a blocking process. Register fixtures
+# outside the test shell's job table with fm_test_track_process, and publish
+# their PID and start time with fm_test_record_process before blocking.
+# Reaping requires that birth identity and the registered command needle to
+# match, so a reused PID cannot authorize killing an unrelated process.
 
 FM_TEST_PROCESS_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-process.$$.XXXXXX") || return 1
 
@@ -277,13 +277,11 @@ fm_test_reap_processes() {
   rm -f "$FM_TEST_PROCESS_REGISTRY"
 }
 
-# Ceiling on how long a fixture's blocking stub may keep polling. A stub that
-# waits for a trigger file by re-running `sleep` is a high-frequency source of
-# process spawns, and one that outlives its test - because the test was killed
-# before any cleanup ran - is what turned leftover fixtures into a host-wide
-# process storm. Every blocking stub this suite writes stops itself at this
-# bound, so an escaped one is bounded in duration and cost on its own, before
-# its owner's guard reaps it.
+# Default ceiling for blocking fixtures that use this exported setting.
+# Polling stubs must sleep between probes and stop themselves at a finite bound:
+# SIGKILL can bypass the test's traps, and removing a fixture root cannot stop
+# its processes. Choose a ceiling longer than the deadline under test, so the
+# stub's natural exit cannot masquerade as successful timeout enforcement.
 FM_TEST_STUB_MAX_BLOCK_SECONDS=${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}
 export FM_TEST_STUB_MAX_BLOCK_SECONDS
 
@@ -313,6 +311,8 @@ fm_test_reap_jobs() {
 
 fm_test_cleanup() {
   local d
+  # Stop watchers gracefully before forced job reaping: watcher_cleanup owns
+  # check groups that are outside the test shell's job tree.
   fm_test_reap_watchers
   fm_test_reap_jobs
   fm_test_reap_processes

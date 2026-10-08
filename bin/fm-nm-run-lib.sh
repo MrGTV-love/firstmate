@@ -16,14 +16,12 @@
 # direction is unsafe: a false negative hides a genuinely parked run, and a
 # false positive lets teardown act on a run it does not own.
 #
-#
 # Bounded call to an arbitrary command in dir $1, timeout $2 seconds, and its
 # `no-mistakes "$@"` specialization. The bounded
 # form preserves stdout, stderr, and exit status; the checked form discards
 # stderr, while fm_nm_run keeps the fail-open query contract for read-only callers.
-# The perl arm (a host with no timeout or gtimeout) is fm-timeout-lib.sh's
-# fm_timeout_perl_bound, the single owner of the perl bound, so a timed-out
-# no-mistakes call stops its whole process group there too.
+# The Perl fallback's process-group, signal, and owner-death contract is owned
+# by fm_timeout_perl_bound in fm-timeout-lib.sh's header.
 if ! declare -F fm_timeout_perl_bound >/dev/null 2>&1; then
   # shellcheck source=bin/fm-timeout-lib.sh
   . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-timeout-lib.sh"

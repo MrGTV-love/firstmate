@@ -65,19 +65,24 @@
 #       The perl hard bound itself, with fm_run_timed's status contract and its
 #       stdin, stdout, and stderr passed straight through to the command. Both
 #       fm_run_timed's perl arm and fm-nm-run-lib.sh's fm_nm_bounded call it, so
-#       the perl bound has exactly one owner. It stops the whole process group
-#       on the bound and on a TERM, INT, or HUP aimed at the bounding process.
+#       the perl bound has exactly one owner. It stops the command group with
+#       TERM then KILL after 0.2 seconds on expiry (124), or on TERM (143),
+#       INT (130), or HUP (129) delivered to the bounding process.
+#       The watchdog occupies a separate group from both caller and command;
+#       loss of the calling shell (${BASHPID:-$$}) or a changed parent starts
+#       the same cleanup with status 143. This lets an inner watchdog finish
+#       cleanup even when an outer bound KILLs the caller's group.
 #
 # A non-positive bound is not a bound: `timeout 0` and the perl fallback's
 # `alarm 0` both disable the deadline, so callers must reject 0 before calling.
 #
 # All four fm_run_timed mechanisms terminate the whole process GROUP, not just
-# the direct child, so a hung grandchild (a vendor CLI spawned by a wrapper
-# script, a git fetch spawned by a sweep) cannot outlive the bound. GNU/BSD
-# `timeout` does this by default because it does not run the command in the
-# foreground process group; the perl fallback does it explicitly with setpgrp
-# plus a negative pid, and the bash fallback uses monitor mode to give the
-# bounded child its own process group before signaling its negative pid.
+# the direct child, so descendants that stay in that group cannot outlive its
+# cleanup. GNU/BSD `timeout` does this by default because it does not run the
+# command in the foreground process group; the perl fallback does it explicitly
+# with setpgrp plus a negative pid, and the bash fallback uses monitor mode.
+# A descendant that creates another group needs its own owner-death cleanup
+# (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
 fm_timeout_mechanism() {
@@ -185,19 +190,15 @@ fm_run_external_timeout() {
   esac
 }
 
-# The one perl hard bound, shared by fm_run_timed's perl arm and by every
-# caller that must bound a command on a host with no timeout variant (see
-# fm_nm_bounded in fm-nm-run-lib.sh), so the two cannot drift apart again.
-# Same contract as fm_run_timed: 124 at the bound, 128+n for a command killed
-# by signal n, the command's own status otherwise, and 127 when it cannot run.
+# See the header for fm_timeout_perl_bound's shared status and cleanup contract.
 # The command runs in a process group of its own. BOTH sides call setpgrp
 # before anything can signal that group: a child that is slow to be scheduled
 # (a loaded host) has not yet created it when a short bound fires, the TERM
 # and KILL then reach nothing, and the child would run on, orphaned, in a group
 # the bound can no longer find. The parent's call fails harmlessly with EACCES
 # once the child has exec'd, which only happens after the child's own call.
-# A TERM, INT, or HUP delivered to the bounding process stops the group the
-# same way, so an owner torn down by a group-kill does not strand the command.
+# Signal handlers record pending cleanup before the fork, so an interruption
+# during startup cannot bypass group creation and leave the child unowned.
 fm_timeout_perl_bound() {  # <seconds> <command...>
   local owner=${BASHPID:-$$}
   # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.

@@ -222,13 +222,12 @@ These guarantees are process semantics, not vendor-emitted signals, so no live-h
 
 ### Nested command bounds
 
-The shared Perl runner in `bin/fm-timeout-lib.sh` serves both `fm_run_timed` and `fm_nm_bounded`.
-It installs deferred signal handlers before forking and isolates its watchdog from the caller's process group.
-If an outer bound kills the caller, the watchdog detects owner death and completes TERM-to-KILL cleanup of its command group without being killed by the outer escalation.
-`tests/fm-timeout-lib.test.sh` exercises an outer deadline expiring before an inner bound, with a TERM-resistant child and delayed inner cleanup; it checks that captured stdout closes promptly and no child survives.
+[`bin/fm-timeout-lib.sh`](../../bin/fm-timeout-lib.sh)'s header owns the shared Perl bound's process-group, signal, and owner-death contract.
+[`tests/fm-timeout-lib.test.sh`](../../tests/fm-timeout-lib.test.sh) exercises delayed child process-group creation through both `fm_run_timed` and `fm_nm_bounded`, TERM forwarding, and an outer deadline expiring before an inner bound with a TERM-resistant child and delayed inner cleanup.
+The nested-bound case checks that captured stdout closes promptly and the child is no longer running.
+[`tests/fm-crew-state.test.sh`](../../tests/fm-crew-state.test.sh)'s no-timeout case checks that the fake no-mistakes call actually ran and did not survive its bound before asserting the pane-state fallback.
 
-Blocking test fixtures publish their PID and birth identity before waiting; shared cleanup checks that identity and a fixture-specific command needle before signalling the process or its group.
-Watcher cleanup also verifies the lock's recorded identity before resuming a stopped watcher.
+[`tests/lib.sh`](../../tests/lib.sh) owns registered fixture identity checks, stopped-watcher resumption, cleanup ordering, and the default blocking-stub ceiling.
 
 ## Semantic busy state
 
