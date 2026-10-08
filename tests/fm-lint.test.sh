@@ -22,6 +22,8 @@ INSTALLER="$ROOT/bin/fm-install-shellcheck.sh"
 REQUIRED=$("$LINT" --required-version)
 # Ordinary regressions must not read or populate the operator's shared cache.
 export FM_LINT_CACHE_DIR=off
+# Nor may they queue on the operator's shared host-wide ShellCheck slots.
+export FM_LINT_SLOT_DIR=off
 
 # Official GitHub release asset sha256 values for shellcheck v0.11.0 .tar.xz
 # archives (https://github.com/koalaman/shellcheck/releases/tag/v0.11.0). Tests
@@ -1086,6 +1088,106 @@ SH
   [ -z "$(find "$cleanup_tmp" -mindepth 1 -maxdepth 1 -name 'fm-lint.*' -print -quit)" ] \
     || fail "bounded lint left temporary worker state behind"
   pass "jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry"
+}
+
+# fm_lint_stub_counting_shellcheck <fakebin> <activity-dir> <peak-file>: a
+# ShellCheck stand-in that holds each check for half a second and records the
+# most checks alive at once across every fm-lint.sh run sharing the directory.
+fm_lint_stub_counting_shellcheck() {
+  local fakebin=$1 activity=$2 peak=$3
+  mkdir -p "$activity"
+  : > "$peak"
+  cat > "$fakebin/shellcheck" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+touch "$activity/\$\$"
+ls "$activity" | wc -l | tr -d ' ' >> "$peak"
+sleep 0.5
+rm -f "$activity/\$\$"
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+}
+
+# fm_lint_concurrent_runs <runs> <tmp> <fakebin>: start <runs> simultaneous
+# fm-lint.sh runs of four roots each, wait for all, and print the peak number
+# of live ShellCheck processes. Extra environment is read from the caller.
+fm_lint_concurrent_runs() {
+  local runs=$1 tmp=$2 fakebin=$3 run pid rc=0
+  local -a pids roots
+  roots=("$tmp/a.sh" "$tmp/b.sh" "$tmp/c.sh" "$tmp/d.sh")
+  for run in $(seq 1 "$runs"); do
+    PATH="$fakebin:$PATH" "$LINT" "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do
+    wait "$pid" || rc=$?
+  done
+  [ "$rc" -eq 0 ] || fail "a concurrent fm-lint.sh run failed (rc=$rc)"$'\n'"$(cat "$tmp"/run.*.out)"
+  sort -n "$tmp/peak" | tail -1
+}
+
+fm_lint_slot_fixture() {  # <name> -> prints the tmp dir
+  local tmp root
+  tmp=$(fm_test_tmproot "$1")
+  mkdir -p "$tmp/bin"
+  for root in a b c d; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"
+  done
+  fm_lint_stub_counting_shellcheck "$tmp/bin" "$tmp/active" "$tmp/peak"
+  printf '%s\n' "$tmp"
+}
+
+test_host_slots_bound_concurrent_runs() {
+  local tmp peak lone
+  tmp=$(fm_lint_slot_fixture fm-lint-slots)
+  # One run keeps its two workers: the host-wide bound never throttles a lone run.
+  lone=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
+    fm_lint_concurrent_runs 1 "$tmp" "$tmp/bin")
+  [ "$lone" -eq 2 ] || fail "a lone run peaked at $lone live ShellCheck processes, expected its two workers"
+  : > "$tmp/peak"
+  # Six runs would start twelve ShellCheck processes if each bounded only itself.
+  peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
+    fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin")
+  [ "$peak" -le 3 ] || fail "six concurrent runs reached $peak live ShellCheck processes, expected at most 3 host-wide"
+  [ "$peak" -ge 3 ] || fail "six concurrent runs peaked at $peak, so the slots were not used in parallel"
+  pass "concurrent fm-lint.sh runs share a host-wide ShellCheck slot bound"
+}
+
+test_host_load_shrinks_slots_to_the_floor() {
+  local tmp peak
+  tmp=$(fm_lint_slot_fixture fm-lint-slots-load)
+  # Load far past two times the cores leaves only the two-slot floor, so the
+  # runs queue instead of failing or timing out.
+  peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=6 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=100000 \
+    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin")
+  [ "$peak" -le 2 ] || fail "under heavy load four runs reached $peak live ShellCheck processes, expected at most 2"
+  : > "$tmp/peak"
+  peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=6 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
+    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin")
+  [ "$peak" -gt 2 ] || fail "with an idle host four runs peaked at $peak, so the load never widened the slots"
+  pass "host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them"
+}
+
+test_slot_pool_can_be_disabled_or_misconfigured() {
+  local tmp rc out
+  tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
+  rc=0
+  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR=off "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a run with the slot pool off failed"$'\n'"$out"
+  rc=0
+  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=zero "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "a non-numeric FM_LINT_HOST_SLOTS exited $rc, expected 2"
+  assert_contains "$out" "FM_LINT_HOST_SLOTS" "the refusal did not name the setting"
+  [ ! -d "$tmp/slots" ] || fail "a refused run still created the slot directory"
+  rc=0
+  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/a.sh/blocked" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "an unusable slot directory must not fail lint"$'\n'"$out"
+  assert_contains "$out" "running without the host-wide ShellCheck bound" "an unusable slot directory was not reported"
+  pass "the slot pool can be disabled, rejects bad settings, and never fails lint when unusable"
 }
 
 test_worker_trees_stop_on_signal() {
@@ -2785,6 +2887,9 @@ test_rejects_direct_beads_cli_in_explicit_core_path
 test_ignores_ambient_shellcheck_opts
 test_clean_fixture_passes
 test_jobs_are_deterministic_and_complete
+test_host_slots_bound_concurrent_runs
+test_host_load_shrinks_slots_to_the_floor
+test_slot_pool_can_be_disabled_or_misconfigured
 test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree
 test_root_memory_limit_reports_a_named_death

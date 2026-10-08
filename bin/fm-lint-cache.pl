@@ -13,6 +13,97 @@ use Fcntl qw(:flock);
 use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
 
+# gate mode: hold one host-wide ShellCheck slot while the command runs, so many
+# concurrent fm-lint.sh runs queue instead of each adding its own workers.
+# Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <wait-file> -- <command...>
+# Slots are flock files, so the kernel frees one when its holder dies. The slot
+# count is FM_LINT_HOST_SLOTS, else half the cores, but never below two (one
+# run's default workers); while 1-minute load is within two times the cores,
+# all slots may be taken, and each point of load past that takes one away, down
+# to the two-slot floor. A slot directory that cannot be used lets the command
+# run ungated. The wait is written in milliseconds to <wait-file> so the caller
+# can keep queue time out of its own timings.
+if (($ARGV[0] // '') eq 'gate') {
+    require POSIX;
+    require Time::HiRes;
+    my (undef, $slot_dir, $ncpu, $wait_file, $dashes, @command) = @ARGV;
+    die "fm-lint-gate: invalid private invocation\n"
+        unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/;
+    my ($child, $caught);
+    my %signal_number = (HUP => 1, INT => 2, TERM => 15);
+    for my $name (keys %signal_number) {
+        $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; };
+    }
+    my $floor = 2;
+    my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
+        : ($ncpu >> 1) > $floor ? ($ncpu >> 1) : $floor;
+    $floor = $cap if $cap < $floor;
+    my $slot_load = sub {
+        return $ENV{FM_LINT_SLOT_LOAD} + 0
+            if ($ENV{FM_TEST_SEAM} // '') eq '1' && ($ENV{FM_LINT_SLOT_LOAD} // '') =~ /\A[0-9]+(?:\.[0-9]+)?\z/;
+        if (open(my $fh, '<', '/proc/loadavg')) {
+            my $line = <$fh>;
+            return $1 + 0 if defined $line && $line =~ /\A([0-9]+(?:\.[0-9]+)?)/;
+        }
+        if (open(my $pipe, '-|', 'sysctl', '-n', 'vm.loadavg')) {
+            my $line = <$pipe>;
+            close $pipe;
+            return $1 + 0 if defined $line && $line =~ /([0-9]+(?:\.[0-9]+)?)/;
+        }
+        return 0;
+    };
+    my ($slot, $waited_from);
+    if (eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ }) {
+        $waited_from = Time::HiRes::time();
+        while (!$slot) {
+            exit 128 + $signal_number{$caught} if $caught;
+            my $allowed = int(2 * $ncpu - $slot_load->() + 0.5);
+            $allowed = $floor if $allowed < $floor;
+            $allowed = $cap if $allowed > $cap;
+            for my $index (0 .. $allowed - 1) {
+                open(my $fh, '>>', "$slot_dir/slot.$index") or next;
+                if (flock($fh, LOCK_EX | LOCK_NB)) { $slot = $fh; last; }
+                close $fh;
+            }
+            next if $slot || $caught;
+            # Every allowed slot is busy: block on one so a freed slot wakes this
+            # waiter at once, and re-read the load every two seconds.
+            if (open(my $fh, '>>', "$slot_dir/slot.@{[ int(rand($allowed)) ]}")) {
+                my $locked = eval {
+                    local $SIG{ALRM} = sub { die "gate-recheck\n" };
+                    alarm 2;
+                    my $got = flock($fh, LOCK_EX);
+                    alarm 0;
+                    $got;
+                };
+                alarm 0;
+                if ($locked) { $slot = $fh; } else { close $fh; }
+            } else {
+                Time::HiRes::sleep(1);
+            }
+        }
+    } else {
+        warn "fm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n";
+    }
+    if (open(my $fh, '>', $wait_file)) {
+        printf {$fh} "%d\n", $waited_from ? (Time::HiRes::time() - $waited_from) * 1000 : 0;
+        close $fh;
+    }
+    exit 128 + $signal_number{$caught} if $caught;
+    $child = fork();
+    die "fm-lint-gate: fork: $!\n" unless defined $child;
+    if (!$child) {
+        exec {$command[0]} @command;
+        warn "fm-lint-gate: exec $command[0]: $!\n";
+        POSIX::_exit(127);
+    }
+    kill 'TERM', $child if $caught;
+    my $reaped;
+    while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
+    my $status = $reaped == $child ? $? : 127 << 8;
+    exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
+}
+
 my ($mode, $root, @args) = @ARGV;
 my $cache;
 if (defined $mode && $mode eq 'check') {
