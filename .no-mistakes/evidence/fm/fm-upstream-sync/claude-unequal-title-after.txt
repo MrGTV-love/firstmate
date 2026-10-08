@@ -18,6 +18,8 @@ te sync safety' --dangerously-skip-permissions
 
 
 ─────────────────────────────────────────────────────────────────────────────────────────────── Firstmate sync safety ─
-❯
+❯ keep this unsent text
+  ──────── pasted title ─
+   ❯
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents                                     ◐ medium · /effort
+  ⏵⏵ bypass permissions on (shift+tab to cycle)                                                 ctrl+g to edit in Vim

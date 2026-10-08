@@ -1,0 +1,79 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+trusted: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/worktree
+trusted (project root): /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/project
+Claude idle: composer=empty agent=alive
+plain: composer=pending
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+error: task titled's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+unequal-title: composer=unknown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+error: task titled's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+nonascii-title: composer=unknown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+error: task titled's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+
+--- real inbox delivery ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Inbox: instructed file exists and 001.msg acknowledged in handled/
+
+--- real busy deferral ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+stale: fm-lab-sync-runtime-71676-19396:w1:p1 (unread firstmate instruction: stuck-busy after 2 consecutive busy-deferred due doorbells; /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/titled.inbox/002.msg stays unhandled and no doorbell was typed; inspect the worker)
+1791454123	1	stale	fm-lab-sync-runtime-71676-19396:w1:p1	stale: fm-lab-sync-runtime-71676-19396:w1:p1 (unread firstmate instruction: stuck-busy after 2 consecutive busy-deferred due doorbells; /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/titled.inbox/002.msg stays unhandled and no doorbell was typed; inspect the worker)
+Busy escalation: queued stuck-busy while foreground command remained running; no doorbell typed by watcher
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+stopped titled harness=claude backend=herdr endpoint=fm-lab-sync-runtime-71676-19396:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/worktree
+Exit: idle worker stopped and endpoint preserved
+
+--- Bash 3.2 named-base scaffold and real spawn ---
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/data/named-base/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/data/bad-base/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+warn: no registry at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/data/projects.md; defaulting baseproject to no-mistakes off
+error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/data/bad-base/brief.md must record Base branch: main and no other Base branch line to spawn with --base-branch main; scaffold it with bin/fm-brief.sh --base-branch main
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home
+WARNING: watcher still down (same stale episode; last beat: 5s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+warn: no registry at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/data/projects.md; defaulting baseproject to no-mistakes off
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned named-base harness=claude kind=scout window=fm-lab-sync-runtime-71676-19396:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/pool/.treehouse/baseproject-93df31/1/baseproject
+Named base: expected feature/hub=54ab1d0a68a5572a813ae65aeed2ad2accf64a50 actual HEAD=54ab1d0a68a5572a813ae65aeed2ad2accf64a50
+only on feature/hub
+Named-base real worker: alive in isolated pool worktree containing feature-only.txt
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state/named-base.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home/state: Directory not empty
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe/home: Directory not empty
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.aEy9Pe: Directory not empty

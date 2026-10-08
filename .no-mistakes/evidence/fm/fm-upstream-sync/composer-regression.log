@@ -1,60 +1,69 @@
-ok - fm_composer_classify_content: a bare shell prompt glyph (>/$/%/#) reads unknown, never empty
-ok - fm_composer_classify_content: stripped unbordered content is unknown except verified agent glyphs
-ok - fm_composer_classify_content: a bare shell prompt carrying a command is not empty
-ok - fm_composer_classify_content: a bare prompt glyph inside a bordered composer box reads empty (claude's own idle composer)
-ok - fm_composer_classify_content: agent prompt glyphs (❯ claude, › codex, ⟩ muse) read empty bordered or bare
-ok - fm_composer_classify_content: an empty composer reads empty
-ok - fm_composer_classify_content: idle matching is limited to proven placeholder positions
-ok - fm_composer_classify_content: idle matching preserves the caller's case mode
-ok - fm_composer_classify_content: real unsubmitted text reads pending (including a popup argument-hint fill)
-ok - matrix: claude's ❯+NBSP row reads empty on every profile in both locales (#1988)
-ok - matrix: claude's arrow statusline is footer furniture, not a composer holding text
-ok - matrix: claude's titled top border reads empty when idle and pending when typed on every profile
-ok - equally indented plain and titled rule pairs classify and extract while mismatched closers refuse
-ok - historical ambiguity does not poison live rule pairs and selected ambiguity still refuses
-ok - glyphs outside a closed pair do not poison a live titled composer or its extracted draft
-ok - multiline rule pairs retain every interior row and strip only the proving prompt glyph
-ok - rule-like continuations refuse proof and literal side characters remain draft content
-ok - rejected titled rule pairs refuse fallback without poisoning newer composers
-ok - rule pairs retain pasted boxes and leftbars while newer genuine candidates win
-ok - rule pairs preserve Braille prompt content and empty singletons stay empty
-ok - matrix: a titled rule opens a composer pair only with an exact shape and an agent glyph row inside
-ok - fm_composer_classify_screen: footer demotion needs a contiguous, glyph-proven pair
-ok - fm_composer_classify_screen: the footer zone holds for boxes, not only separator pairs
-ok - fm_composer_classify_screen: the footer zone only ever refuses, never allows
-ok - matrix: codex's dim hint is empty when styling proves it, unknown (never pending) when it cannot
-ok - matrix: muse's ⟩ reads empty everywhere and survives losing the styled-glyph signal
-ok - matrix: cursor's reverse-video placeholder remnant reads empty; real typed text stays pending
-ok - matrix: herdr half-block rules bound a bare composer's wrap region
-ok - matrix: omp's status row bounds the bare composer's wrap region
-ok - omp effort hint needs styling proof; drafts, activity, and popups keep refusing
-ok - matrix: omp's box composer (status in the top border, folded last row) reads empty, pending, and never a typed glyph as empty
-ok - matrix: an omp box needs omp's status identity and a complete shape; every other variant reads unknown
-ok - matrix: codex 0.154's starfield rows are furniture; typed, mixed, and unanchored rows keep their verdicts
-ok - matrix: pi's separated composer needs identity + structure; the blank row alone never proves it
-ok - matrix: a dollar-first pi status footer reads empty; dead shells still refuse
-ok - matrix: opencode's left-bar composer reads empty everywhere and scans the full active run
-ok - matrix: grok's real oversized titled bottom is empty while typed and unproved panes stay safe
-ok - matrix: claude's titled top rule proves an idle composer empty and a draft pending (#5601, #5558)
-ok - matrix: kimi's bordered shell-glyph box reads empty through the shared owner (spawn's fourth copy retired)
-ok - matrix: the real claude-in-zellij --ansi dump reads empty in both locales
-ok - strict posture: blank and unidentified rows are unknown, never injectable empty
-ok - fm_composer_classify_screen: the bare composer's wrap region stays identified; structure breaks it
-ok - fm_composer_classify_screen: a row-leading agent glyph reanchors the live composer
-ok - fm_composer_classify_screen: a lower dead shell invalidates only cursorless stale composers
-ok - fm_composer_classify_screen: cursorless bare wrap regions participate in verdicts
-ok - fm_composer_classify_screen: cursorless containers reject only contiguous unclaimed activity
-ok - fm_composer_classify_screen: the bottom-most candidate wins; stale banners cannot
-ok - fm_composer_classify_screen: incomplete lower structure invalidates stale boxes
-ok - fm_composer_classify_screen: titled bottoms retain full box geometry
-ok - fm_composer_classify_screen: a proven box tolerates a bottom-border cursor
-ok - fm_composer_extract_selected_content: scopes user content and excludes furniture
-ok - Claude selected slash-menu rows do not replace the actual command or prefix
-ok - slash-menu demotion cannot select an empty parent or replace a real lower draft or shell
-ok - fm_composer_queued_enter_verdict: pending + busy returns empty (queued Enter)
-ok - fm_composer_queued_enter_verdict: pending + idle/unknown stays pending
-ok - fm_composer_queued_enter_verdict: only proven pending is converted
-ok - the Claude background-task exit picker stays pending and receives no confirming Enter
-ok - a buried heading or a different last line is not the exit picker
-ok - a dialog note without a sink skips the match, and release leaves a caller RETURN trap
-ok - picker text quoted above a normal composer is not read as a live picker
+BEFORE R1 FIX
+tmux unequal UTF-8: empty
+tmux unequal C: empty
+tmux nonascii UTF-8: empty
+tmux nonascii C: empty
+tmux pasted-unequal UTF-8: empty
+tmux pasted-unequal C: empty
+tmux pasted-equal UTF-8: unknown
+tmux pasted-equal C: unknown
+herdr unequal UTF-8: unknown
+herdr unequal C: unknown
+herdr nonascii UTF-8: unknown
+herdr nonascii C: unknown
+herdr pasted-unequal UTF-8: unknown
+herdr pasted-unequal C: unknown
+herdr pasted-equal UTF-8: unknown
+herdr pasted-equal C: unknown
+zellij unequal UTF-8: unknown
+zellij unequal C: unknown
+zellij nonascii UTF-8: unknown
+zellij nonascii C: unknown
+zellij pasted-unequal UTF-8: unknown
+zellij pasted-unequal C: unknown
+zellij pasted-equal UTF-8: unknown
+zellij pasted-equal C: unknown
+plain unequal UTF-8: unknown
+plain unequal C: unknown
+plain nonascii UTF-8: unknown
+plain nonascii C: unknown
+plain pasted-unequal UTF-8: unknown
+plain pasted-unequal C: unknown
+plain pasted-equal UTF-8: unknown
+plain pasted-equal C: unknown
+exit=1
+
+AFTER R1 FIX
+tmux unequal UTF-8: unknown
+tmux unequal C: unknown
+tmux nonascii UTF-8: unknown
+tmux nonascii C: unknown
+tmux pasted-unequal UTF-8: unknown
+tmux pasted-unequal C: unknown
+tmux pasted-equal UTF-8: unknown
+tmux pasted-equal C: unknown
+herdr unequal UTF-8: unknown
+herdr unequal C: unknown
+herdr nonascii UTF-8: unknown
+herdr nonascii C: unknown
+herdr pasted-unequal UTF-8: unknown
+herdr pasted-unequal C: unknown
+herdr pasted-equal UTF-8: unknown
+herdr pasted-equal C: unknown
+zellij unequal UTF-8: unknown
+zellij unequal C: unknown
+zellij nonascii UTF-8: unknown
+zellij nonascii C: unknown
+zellij pasted-unequal UTF-8: unknown
+zellij pasted-unequal C: unknown
+zellij pasted-equal UTF-8: unknown
+zellij pasted-equal C: unknown
+plain unequal UTF-8: unknown
+plain unequal C: unknown
+plain nonascii UTF-8: unknown
+plain nonascii C: unknown
+plain pasted-unequal UTF-8: unknown
+plain pasted-unequal C: unknown
+plain pasted-equal UTF-8: unknown
+plain pasted-equal C: unknown
+exit=0

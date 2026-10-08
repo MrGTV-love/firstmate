@@ -1,0 +1,36 @@
+treehouse get
+pyenv: cannot rehash: /Users/charlesabrooker/.pyenv/shims/.pyenv-shim exists
+charlesabrooker@Mac-Studio baseproject % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.
+XBM2JP/pool/.treehouse/baseproject-0059da/1/baseproject. Type 'exit' to return.
+charlesabrooker@Mac-Studio baseproject % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA
+66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/pool/.treehouse/baseproject-0059da/1/baseproject'
+charlesabrooker@Mac-Studio baseproject % export GOTMPDIR=/tmp/fm-named-base/gotmp
+charlesabrooker@Mac-Studio baseproject % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio baseproject % export FM_TASK_ID=named-base
+charlesabrooker@Mac-Studio baseproject % . '/tmp/fm-named-base+3ef81780b958054fc12312b359e6253d8eb0346441519f05729f76cdc
+29f444e/launch.s1791456506.19965.4971.sh'
+ ▐▛███▛█   Claude Code v2.1.294
+▝▜██████▀  Sonnet 5.5 · Claude API
+ ▝▝   ▝▝   ~/…/.no-mistakes/test-tmp/sync-live.XBM2JP/pool/.treehouse/baseproject-0059da/1/baseproject
+
+⚠ Remote managed settings failed to load (unexpected error) · no remote policy applied · /status for details
+
+❯ : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'named-base.inbox' steering inbox, read and act
+  on each in numeric order, then mv each into its handled/.
+
+⏺ API Error: Unable to connect to API: SSL certificate verification failed (UNABLE_TO_VERIFY_LEAF_SIGNATURE).
+  The certificate comes from an authority Claude Code doesn't trust, usually a TLS-inspecting corporate proxy or
+  a gateway signed by a private CA: set NODE_EXTRA_CA_CERTS to that CA bundle, or add it to the system
+  certificate store · see https://code.claude.com/docs/en/network-config
+
+✻ Baked for 0s · done 5:48 AM
+
+──────────────────────────────────────────────────────────────────────────────────────────────── Named base live check ─
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

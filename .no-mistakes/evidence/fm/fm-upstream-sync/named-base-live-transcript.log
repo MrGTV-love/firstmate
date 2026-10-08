@@ -1,0 +1,22 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home
+
+--- Bash 3.2 named-base scaffold and real spawn ---
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home/data/named-base/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home/data/bad-base/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home
+warn: no registry at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home/data/projects.md; defaulting baseproject to no-mistakes off
+error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home/data/bad-base/brief.md must record Base branch: main and no other Base branch line to spawn with --base-branch main; scaffold it with bin/fm-brief.sh --base-branch main
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home
+warn: no registry at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home/data/projects.md; defaulting baseproject to no-mistakes off
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned named-base harness=claude kind=scout window=fm-lab-sync-runtime-93249-21482:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/pool/.treehouse/baseproject-0059da/1/baseproject
+Named base: expected feature/hub=4e85df931b4f761e878e02c839a3b05bfb9d88a1 actual HEAD=4e85df931b4f761e878e02c839a3b05bfb9d88a1
+only on feature/hub
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 98s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

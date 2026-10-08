@@ -1,0 +1,17 @@
+window=fm-lab-sync-runtime-93249-21482:w1:p2
+endpoint_task_id=named-base
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/pool/.treehouse/baseproject-0059da/1/baseproject
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/sync-live.XBM2JP/baseproject
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-named-base
+base_branch=feature/hub
+model=default
+effort=default
+busy_gen=g1791456505.79876.9428
+spawn_gen=s1791456506.19965.4971
+backend=herdr
+herdr_session=fm-lab-sync-runtime-93249-21482
+herdr_workspace_id=w1
+herdr_tab_id=w1:t2
+herdr_pane_id=w1:p2

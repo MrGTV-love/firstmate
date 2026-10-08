@@ -18,6 +18,6 @@ te sync safety' --dangerously-skip-permissions
 
 
 ─────────────────────────────────────────────────────────────────────────────────────────────── Firstmate sync safety ─
-❯
+❯ unsent draft text
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents                                     ◐ medium · /effort
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
