@@ -9,11 +9,13 @@
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
+# --reemit is the context-refresh presentation mode; the same document's
+# "Who presents queued wakes between turns" section owns its delivery exclusion.
 # Every scratch file this script mints (.main-eligible-rows.tmp.*,
 # .wake-rows.consume.*, .wake-queue.retire.*, .wake-queue.ack.*,
 # .wake-queue.actor-view.*) is created and removed under the queue lock, so one
 # found while taking that lock was left by a drain that died mid-write; each
-# locked drain rotates such leftovers away before doing anything else.
+# non-deferred presentation or acknowledgement rotates such leftovers away.
 # FM_STATUS_PRESENTATION_LOCK_TIMEOUT sets the positive whole-second wait for
 # presentation-path locks (default 10); queue mutation locks remain blocking.
 set -u
@@ -42,6 +44,7 @@ RECOVERY_ACK_REQUIRED=false
 RECOVERY_ACK_MOVED=false
 ACK_THROUGH=
 ACK_GENERATION=
+REEMIT=false
 ACK_REMOVED=0
 PRESENTED_MAX=0
 ACK_FINGERPRINTS=
@@ -217,6 +220,10 @@ presented_max_row() { # <rows-file>
 
 case "${1:-}" in
   '') ;;
+  --reemit)
+    [ "$#" -eq 1 ] || { echo "wake drain: unexpected re-emit arguments" >&2; exit 2; }
+    REEMIT=true
+    ;;
   --ack-through)
     ACK_THROUGH=${2:-}
     case "$ACK_THROUGH" in ''|*[!0-9]*) echo "wake drain: invalid acknowledgement sequence" >&2; exit 2 ;; esac
@@ -226,7 +233,7 @@ case "${1:-}" in
     case "$ACK_GENERATION" in ''|*[!A-Za-z0-9._-]*) echo "wake drain: invalid recovery generation" >&2; exit 2 ;; esac
     [ "$#" -eq 4 ] || { echo "wake drain: unexpected acknowledgement arguments" >&2; exit 2; }
     ;;
-  *) echo "usage: fm-wake-drain.sh [--ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
+  *) echo "usage: fm-wake-drain.sh [--reemit | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
 esac
 
 [ "$ACTOR" != branch ] || require_branch_eligible_rows || exit 1
@@ -809,6 +816,7 @@ print_status_presentation() {  # [<deduped-raw-rows>]
 # shellcheck disable=SC2317,SC2329 # Invoked by trap handlers below.
 cleanup() {
   local status=$?
+  fm_lock_release "$STATE/.claude-autoarm.lock"
   [ -z "$DRAIN_TMP" ] || rm -f -- "$DRAIN_TMP" 2>/dev/null || true
   [ -z "$DRAIN_VIEW_TMP" ] || rm -f -- "$DRAIN_VIEW_TMP" 2>/dev/null || true
   if [ "$DRAIN_LOCK_HELD" = true ]; then
@@ -836,6 +844,24 @@ else
   exit 1
 fi
 DRAIN_LOCK_HELD=true
+if [ "$REEMIT" = true ]; then
+  DEFER=
+  if ! fm_lock_try_acquire "$STATE/.claude-autoarm.lock"; then
+    DEFER='context re-emit while wake delivery ownership is being decided'
+  elif fm_autoarm_claim_open "$STATE" "${FM_GUARD_GRACE:-$(fm_poll_derived_grace)}"; then
+    DEFER='context re-emit while the Stop hook owns wake delivery'
+  fi
+  fm_lock_release "$STATE/.claude-autoarm.lock"
+  if [ -n "$DEFER" ]; then
+    QLEN=0
+    [ ! -s "$FM_WAKE_QUEUE" ] || QLEN=$(awk 'NF { n++ } END { print n + 0 }' "$FM_WAKE_QUEUE")
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    DRAIN_LOCK_HELD=false
+    printf 'deferred (%s) - %s record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.\n' "$DEFER" "$QLEN"
+    FM_GUARD_DELIVERY_DEFERRED=1 "$SCRIPT_DIR/fm-guard.sh" || true
+    exit 0
+  fi
+fi
 rotate_scratch_locked
 reclaim_stale_branch_grant_locked || exit 1
 [ "$ACTOR" != main ] || retire_unconsumable_rows_locked

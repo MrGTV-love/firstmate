@@ -1548,10 +1548,10 @@ fm_failure_episode_reset() {
 #     identityless entry, or no claim at all - lets the next firing take
 #     generation N+1 (fm_autoarm_claim_next). Taking a newer generation IS the
 #     reclaim: a steady-state predecessor is never signalled or revoked.
-#   - NO mutex is ever held across a blocking step. The owner lock
-#     state/.claude-autoarm.lock survives only as a micro-mutex serializing
-#     individual ledger reads-then-writes (a few non-blocking file
-#     operations); a holder that dies inside the hold is reclaimed by
+#   - The owner lock state/.claude-autoarm.lock is a micro-mutex for ledger
+#     updates and re-emit delivery decisions; it is never held across a lock
+#     wait, arming, or output. docs/watcher-continuity.md owns the delivery
+#     exclusion. A holder that dies inside the hold is reclaimed by
 #     fm_lock_try_acquire's ordinary dead-owner steal.
 #   - A superseded owner goes COMPLETELY silent - cleanup only. Ownership is
 #     re-verified before every side effect: each arm invocation, each
@@ -1699,15 +1699,18 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
   [ "$epoch_mtime" -ge "$beacon_mtime" ]
 }
 
-# Atomically publish this process as the owner of generation N+1, under one
-# short micro-mutex hold. Returns 0 with FM_AUTOARM_MY_GEN set on success, 2
-# when a competing claimant won the race (the ledger holds an open claim), and
-# 1 when the micro-mutex is contended, the mandatory identity cannot be
+# Atomically publish this process as the owner of generation N+1.
+# Wait at most ten seconds for the queue lock before taking the ownership
+# micro-mutex, so claim publication cannot race a re-emit drain's mutations.
+# Returns 0 with FM_AUTOARM_MY_GEN set on success, 2 when a competing claimant
+# won the race (the ledger holds an open claim), and 1 when the queue-lock wait
+# expires, the micro-mutex is contended, the mandatory identity cannot be
 # computed, or the write failed.
 fm_autoarm_claim_next() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock epoch pid gen identity tmp
+  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock epoch pid gen identity tmp queue_lock
   lock="$state/.claude-autoarm.lock"
   epoch="$state/.claude-autoarm-epoch"
+  queue_lock="$state/.wake-queue.lock"
   FM_AUTOARM_MY_GEN=
   # Resolve the pid into a variable FIRST: expanding ${BASHPID:-$$} inside a
   # command substitution would resolve it in that subshell, recording the
@@ -1715,9 +1718,14 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
   pid=${BASHPID:-$$}
   identity=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
   [ -n "$identity" ] || return 1
-  fm_lock_try_acquire "$lock" || return 1
+  fm_lock_acquire_wait_max "$queue_lock" 10 || return 1
+  if ! fm_lock_try_acquire "$lock"; then
+    fm_lock_release "$queue_lock"
+    return 1
+  fi
   if fm_autoarm_claim_open "$state" "$grace"; then
     fm_lock_release "$lock"
+    fm_lock_release "$queue_lock"
     return 2
   fi
   gen=$(_fm_autoarm_epoch_field "$epoch" epoch 2>/dev/null || true)
@@ -1731,9 +1739,11 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
     || ! mv -f "$tmp" "$epoch" 2>/dev/null; then
     rm -f "$tmp" 2>/dev/null || true
     fm_lock_release "$lock"
+    fm_lock_release "$queue_lock"
     return 1
   fi
   fm_lock_release "$lock"
+  fm_lock_release "$queue_lock"
   # shellcheck disable=SC2034 # Read by callers after the claim succeeds.
   FM_AUTOARM_MY_GEN=$gen
   return 0

@@ -119,6 +119,7 @@ The requested session start remains idempotent.
 - Its supported stale-instruction refresh pairs.
 
 The `bin/fm-session-start.sh` header is the single owner of those mechanics.
+[`watcher-continuity.md`](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns the re-emit's wake-delivery exclusion and recovery safety boundary.
 
 ## Runtime bound
 

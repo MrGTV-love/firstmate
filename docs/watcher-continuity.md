@@ -258,6 +258,21 @@ A concurrently appended wake has a higher sequence, remains queued, and keeps th
 Consequently, a watcher close during handling republishes the same generation as pending and forces one recovery turn even when no queue row remains, while the outstanding generation-bound acknowledgement stays valid.
 An acknowledged episode does not freeze the generation, because the next downtime after it opens an episode of its own.
 
+### Who presents queued wakes between turns
+
+While an auto-arm claim is open ([claim predicate](turnend-guard.md#auto-arm-generation-claim)), the Claude Stop hook is the only deliverer of queued wakes between turns.
+Its rewake commit accepts only a downtime marker, so a drain that moves the marker to handling makes the hook drop its wake in silence.
+The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.
+When the claim is open, the re-emit reports how many records are queued and leaves both the queue and the marker alone.
+The drain takes the queue lock before checking the claim under the ownership micro-mutex; ownership-mutex contention also defers presentation without mutation.
+Deferred guard checks leave supervision episode state untouched without treating the verified fleet-lock owner as read-only or instructing it to drain from the re-emit; watcher-liveness and worktree-tangle diagnostics still run.
+Claim publication waits up to ten seconds for the queue lock before attempting the ownership micro-mutex without waiting, and releases both before arming, so transient queue writers do not abandon delivery and a new claim cannot appear between the drain's check and its queue/marker mutations.
+The ownership micro-mutex is never held across a lock wait or output.
+The handling turn the hook starts then runs the ordinary presentation drain, which enters handling, and uses the emitted `--ack-through` command only after handling completes.
+Once the claim is finished or absent and the ownership micro-mutex is available, the re-emit drains as before; homes without a Claude epoch ledger retain their ordinary drain behavior.
+A refused rewake commit (including a non-downtime marker or lost session-lock ownership) exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
+`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, and refusal cleanup.
+
 ## Per-actor acknowledgement
 
 `bin/fm-wake-drain.sh` consumes the queue per actor, not per whole-queue cutoff.

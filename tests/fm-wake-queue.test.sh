@@ -19,6 +19,86 @@ GUARD="$ROOT/bin/fm-guard.sh"
 TMP_ROOT=$(fm_test_tmproot fm-wake-tests)
 
 
+test_reemit_serializes_delivery_ownership() {
+  local dir state phase records expected out identity claimant i real_sleep
+  dir=$(make_case reemit-delivery-ownership)
+  state="$dir/state"
+  identity=$(fm_test_pid_identity "$$") || fail "could not identify the claim owner"
+  mkdir "$state/.wake-queue.lock"
+  printf '%s\n' "$$" > "$state/.wake-queue.lock/pid"
+  real_sleep=$(command -v sleep) || fail "sleep is unavailable for the claim fixture"
+  cat > "$dir/fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >> "$FM_CLAIM_SLEEP_LOG"
+exec "$FM_CLAIM_REAL_SLEEP" "$@"
+SH
+  chmod +x "$dir/fakebin/sleep"
+  PATH="$dir/fakebin:$PATH" FM_CLAIM_SLEEP_LOG="$dir/claim-sleeps" FM_CLAIM_REAL_SLEEP="$real_sleep" \
+    FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_autoarm_claim_next "$STATE" 300 || exit 10
+    [ "$FM_AUTOARM_MY_GEN" = 1 ] || exit 11
+    fm_autoarm_ledger_read "$STATE" || exit 12
+    [ "$FM_AUTOARM_OWNER" = "${BASHPID:-$$}" ] && [ "$FM_AUTOARM_OUTCOME" = arming ] || exit 13
+  ' _ "$ROOT/bin/fm-wake-lib.sh" &
+  claimant=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$dir/claim-sleeps" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  [ -s "$dir/claim-sleeps" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claimant did not wait for the queue writer"; }
+  [ ! -e "$state/.claude-autoarm-epoch" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claim publication bypassed the queue mutation boundary"; }
+  [ ! -e "$state/.claude-autoarm.lock" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claimant held the ownership mutex while waiting for the queue"; }
+  rm -rf "$state/.wake-queue.lock"
+  wait "$claimant" || fail "claimant abandoned delivery after transient queue contention"
+  [ ! -e "$state/.wake-queue.lock" ] && [ ! -e "$state/.claude-autoarm.lock" ] \
+    || fail "claim publication left a lock held"
+
+  for phase in pending announced; do
+    for records in 0 1; do
+      : > "$state/.wake-queue"
+      if [ "$records" -eq 1 ]; then
+        append_wake "$state" signal task "done: delivery ownership fixture" || fail "seed wake failed"
+      fi
+      cp "$state/.wake-queue" "$dir/queue.before"
+      expected="$phase:downtime:ownership-$phase-$records"
+      printf '%s\n' "$expected" > "$state/.watcher-down"
+      printf 'epoch=3 owner_pid=%s outcome=clean updated_at=%s\n%s\n' "$$" "$(date +%s)" "$identity" \
+        > "$state/.claude-autoarm-epoch"
+      mkdir "$state/.claude-autoarm.lock"
+      printf '%s\n' "$$" > "$state/.claude-autoarm.lock/pid"
+      out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --reemit 2>&1) || fail "contended re-emit failed"
+      assert_contains "$out" "deferred (context re-emit while wake delivery ownership is being decided)" "ownership contention did not defer"
+      [ "$(cat "$state/.watcher-down")" = "$expected" ] || fail "contended re-emit changed recovery state"
+      cmp -s "$dir/queue.before" "$state/.wake-queue" || fail "contended re-emit changed the queue"
+      rm -rf "$state/.claude-autoarm.lock"
+
+      printf 'epoch=3 owner_pid=%s outcome=arming updated_at=%s\n%s\n' "$$" "$(date +%s)" "$identity" \
+        > "$state/.claude-autoarm-epoch"
+      out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --reemit 2>&1) || fail "open-claim re-emit failed"
+      assert_contains "$out" "deferred (context re-emit while the Stop hook owns wake delivery) - $records record(s)" "open claim did not defer"
+      assert_not_contains "$out" 'WAKE_ACK_REQUIRED: after handling' "deferred wakes demanded acknowledgement"
+      [ "$(cat "$state/.watcher-down")" = "$expected" ] || fail "open-claim re-emit changed recovery state"
+      cmp -s "$dir/queue.before" "$state/.wake-queue" || fail "open-claim re-emit changed the queue"
+
+      printf 'epoch=3 owner_pid=%s outcome=rewake updated_at=%s\n%s\n' "$$" "$(date +%s)" "$identity" \
+        > "$state/.claude-autoarm-epoch"
+      out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --reemit 2>&1) || fail "finished-claim re-emit failed"
+      assert_contains "$out" 'WAKE_ACK_REQUIRED: after handling' "finished claim prevented handling"
+      [ "$(cat "$state/.watcher-down")" = "$phase:handling:ownership-$phase-$records" ] \
+        || fail "finished-claim re-emit did not enter handling"
+      if [ "$records" -eq 1 ]; then
+        assert_contains "$out" "done: delivery ownership fixture" "finished-claim re-emit lost its wake"
+      fi
+    done
+  done
+  pass "re-emit serializes claim publication and preserves queued and empty downtime episodes"
+}
+
 test_concurrent_append_and_drain() {
   local dir state out1 out2 pids i pid count unique malformed sequence generation
   dir=$(make_case concurrent)
@@ -3480,6 +3560,7 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
+test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
