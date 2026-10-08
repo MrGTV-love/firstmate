@@ -535,8 +535,8 @@ fm_backlog_mutate() {  # <data-dir> <verb> <id> [flag...]
 }
 
 fm_backlog_new_work_transition() {
-  local data=$1 id=$2 out status tmp saved_error
-  shift 2
+  local data=$1 id=$2 target_state=$3 out status tmp saved_error prior_row prior_state
+  shift 3
   FM_BACKLOG_TRANSITION_ERROR=
   out=$(fm_backlog_row_show "$data" "$id" --full)
   status=$?
@@ -544,6 +544,17 @@ fm_backlog_new_work_transition() {
     FM_BACKLOG_TRANSITION_ERROR=${out%%$'\n'*}
     return "$status"
   fi
+  prior_row=$(printf '%s\n' "$out" | awk '
+    /^  state: / { state=$2 }
+    /^  held: / { held=$2 }
+    /^  blocked: / { blocked=$2 }
+    /^  hold_kind: / { kind=$2 }
+    END {
+      if (kind == "-" || kind == "\"-\"") kind=""
+      printf "%s %s %s %s", state, held ? held : "no", blocked ? blocked : "no", kind
+    }
+  ')
+  prior_state=${prior_row%% *}
   tmp=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-backlog-new-work.XXXXXX") || {
     FM_BACKLOG_TRANSITION_ERROR="cannot stage the task body of $id"
     return 1
@@ -584,10 +595,19 @@ fm_backlog_new_work_transition() {
   status=$?
   if [ "$status" -ne 0 ]; then
     saved_error=$FM_BACKLOG_TRANSITION_ERROR
-    if fm_backlog_mutate "$data" update "$id" --body-file "$tmp/prior"; then
-      FM_BACKLOG_TRANSITION_ERROR=$saved_error
+    if fm_backlog_row_probe "$data" "$id"; then
+      if [ -n "$prior_state" ] && [ "$prior_state" != "$target_state" ] \
+        && [ "$FM_BACKLOG_ROW_STATE $FM_BACKLOG_ROW_HOLD_KIND" = "$prior_row" ]; then
+        if fm_backlog_mutate "$data" update "$id" --body-file "$tmp/prior"; then
+          FM_BACKLOG_TRANSITION_ERROR=$saved_error
+        else
+          FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }could not restore prior drop provenance: $FM_BACKLOG_TRANSITION_ERROR"
+        fi
+      else
+        FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }prior drop provenance was not restored: new work applied or the row changed"
+      fi
     else
-      FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }could not restore prior drop provenance: $FM_BACKLOG_TRANSITION_ERROR"
+      FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }prior drop provenance was not restored: restart outcome could not be verified (${FM_BACKLOG_ROW_ERROR:-$FM_BACKLOG_ROW_RESULT})"
     fi
   fi
   rm -rf -- "$tmp"
@@ -595,7 +615,7 @@ fm_backlog_new_work_transition() {
 }
 
 fm_backlog_start() {  # <data-dir> <id>
-  fm_backlog_new_work_transition "$1" "$2" fm_backlog_mutate "$1" start "$2"
+  fm_backlog_new_work_transition "$1" "$2" in_flight fm_backlog_mutate "$1" start "$2"
 }
 
 fm_backlog_done() {  # <data-dir> <id> [flag...]
@@ -912,7 +932,7 @@ fm_backlog_dispatch_transition() {
     return 1
   fi
   case "$row" in
-    in_flight\ no\ no) fm_backlog_new_work_transition "$data" "$id" : ;;
+    in_flight\ no\ no) fm_backlog_new_work_transition "$data" "$id" in_flight : ;;
     queued\ no\ no) fm_backlog_start "$data" "$id" ;;
   esac
 }

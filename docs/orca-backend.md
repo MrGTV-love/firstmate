@@ -58,10 +58,9 @@ The watcher has no native Orca busy signal, so each harness adapter's semantic l
 Grok alone retains its isolated rendered-tail fallback.
 
 Cleanup keeps all shared Firstmate safety checks.
-A scout still requires its report and completed decision inventory.
-A ship still refuses dirty or unlanded work.
-When the recorded worktree path exists, cleanup resolves the recorded Orca worktree id and verifies its path strictly matches that inspected copy before mutations.
-An unreadable or mismatched backend identity preserves metadata and stops rather than deleting anything.
+A non-forced scout still requires its report and completed decision inventory.
+A non-forced ship with an existing copy still refuses dirty or unlanded work.
+Cleanup validates the recorded endpoint identity and removal target metadata; it does not resolve the backend worktree id to prove path equality with the inspected copy.
 When the recorded path is absent, cleanup closes the recorded terminal and retires task records without issuing an Orca worktree removal: the id may now identify a different, uninspected copy. This rule also applies to scouts, authorized forced drops, and recursive descendant cleanup.
 After the existing-copy checks, Firstmate closes the exact terminal and releases the exact worktree with Orca's worktree command.
 It never raw-deletes an Orca worktree.

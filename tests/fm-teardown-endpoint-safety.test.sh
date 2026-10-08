@@ -13,7 +13,9 @@ make_case() {  # <name>
   local dir=$1
   mkdir -p "$TMP_ROOT/$dir/home/state" "$TMP_ROOT/$dir/home/data" \
     "$TMP_ROOT/$dir/home/config" "$TMP_ROOT/$dir/fakebin" \
-    "$TMP_ROOT/$dir/worktree" "$TMP_ROOT/$dir/project"
+    "$TMP_ROOT/$dir/worktree" "$TMP_ROOT/$dir/project" \
+    "$TMP_ROOT/$dir/code-root"
+  ln -s "$ROOT/bin" "$TMP_ROOT/$dir/code-root/bin"
   git init -q "$TMP_ROOT/$dir/project"
   : > "$TMP_ROOT/$dir/worktree/sentinel"
   : > "$TMP_ROOT/$dir/runtime.log"
@@ -33,19 +35,6 @@ exit 0
 SH
   chmod +x "$TMP_ROOT/$dir/fakebin/tmux" "$TMP_ROOT/$dir/fakebin/treehouse"
   printf '%s\n' "$TMP_ROOT/$dir"
-}
-
-record_merged_pr() {
-  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$1/home/state/$2.meta"
-  cat > "$1/fakebin/gh" <<'SH'
-#!/usr/bin/env bash
-if [ "$1 $2 $3" = "pr view https://github.com/example/repo/pull/7" ]; then
-  printf '%s\n' MERGED
-  exit 0
-fi
-exit 1
-SH
-  chmod +x "$1/fakebin/gh"
 }
 
 mark_case_as_treehouse_pool() {  # <case>
@@ -68,7 +57,7 @@ claim_pool_slot() {  # <case> <task-id> [home]
 
 run_case() {  # <case> <id>
   local dir=$1 id=$2
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" \
   FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
     "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)"
 }
@@ -410,7 +399,7 @@ SH
     "window=" "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   set +e
   env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" invalid --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/invalid.out" 2> "$dir/invalid.err"
   rc=$?
@@ -446,7 +435,7 @@ SH
     "worktree=$dir/nonexistent-worktree" "project=$dir/nonexistent-project" \
     "kind=scout" "mode=no-mistakes"
   env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$target_id" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/valid.out" 2> "$dir/valid.err" \
     || fail "isolated valid endpoint teardown failed: $(cat "$dir/valid.err")"
@@ -950,13 +939,12 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=ship"
-  record_merged_pr "$dir" "$id"
   claim_pool_slot "$dir" "$other" "$dir/other-home"
   ( cd "$dir/worktree" && exec sleep 30 ) &
   worker=$!
 
   set +e
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" \
   FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
     "$TEARDOWN" "$id" > "$dir/stdout" 2> "$dir/stderr"
   rc=$?
@@ -1070,7 +1058,6 @@ write_endpoint_close_meta() {  # <case-dir> <id> <window>
     "window=$3" "endpoint_task_id=$2" \
     "worktree=$1/nonexistent-worktree" "project=$1/nonexistent-project" \
     "kind=ship" "mode=no-mistakes"
-  record_merged_pr "$1" "$2"
 }
 
 test_failed_endpoint_close_refuses_before_removing_the_record() {
@@ -1088,7 +1075,7 @@ test_failed_endpoint_close_refuses_before_removing_the_record() {
 
   set +e
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/failed.out" 2> "$dir/failed.err"
   rc=$?
@@ -1119,7 +1106,7 @@ test_failed_endpoint_close_refuses_before_removing_the_record() {
   # Same task, same records, with the close working again: the retained record
   # is what lets the rerun finish, so the refusal is recoverable, not terminal.
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/rerun.out" 2> "$dir/rerun.err" \
     || fail "the rerun after a recovered close still failed: $(cat "$dir/rerun.err")"
@@ -1148,7 +1135,7 @@ test_forced_teardown_continues_past_a_close_it_could_not_make() {
   # an override rather than the absence of a gate.
   set +e
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/unforced.out" 2> "$dir/unforced.err"
   rc=$?
@@ -1159,7 +1146,7 @@ test_forced_teardown_continues_past_a_close_it_could_not_make() {
     || fail "the refusal did not name the override that lets an operator through"
 
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/forced.out" 2> "$dir/forced.err" \
     || fail "--force did not get past a close that failed: $(cat "$dir/forced.err")"
@@ -1196,7 +1183,7 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
 
   set +e
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 FM_TEST_UNREADABLE_LIST=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/unreadable.out" 2> "$dir/unreadable.err"
   rc=$?
@@ -1220,7 +1207,7 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   write_close_failing_tmux_shim "$dir" "$socket" "$REAL_TMUX"
   write_endpoint_close_meta "$dir" "$id" "gone session:fm-$id"
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/missing-session.out" 2> "$dir/missing-session.err" \
     || fail "a definitively absent session refused its own cleanup: $(cat "$dir/missing-session.err")"
@@ -1238,7 +1225,7 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   write_close_failing_tmux_shim "$dir" "$socket" "$REAL_TMUX"
   write_endpoint_close_meta "$dir" "$id" "$session:fm-$id"
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/missing-server.out" 2> "$dir/missing-server.err" \
     || fail "a definitively absent server refused its own cleanup: $(cat "$dir/missing-server.err")"
@@ -1277,7 +1264,7 @@ test_forced_secondmate_child_close_failure_still_refuses() {
   # endpoint is still live.
   set +e
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$parent" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/child.out" 2> "$dir/child.err"
   rc=$?
@@ -1333,7 +1320,7 @@ fi
 SH
   chmod +x "$dir/fakebin/orca"
   rc=0
-  env -u TMUX -u TMUX_PANE FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$parent" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/child.out" 2> "$dir/child.err" || rc=$?
   expect_code 0 "$rc" "absent nested Orca record cleanup refused: $(cat "$dir/child.err")"
@@ -1360,7 +1347,7 @@ test_orca_close_failure_refuses_even_under_force() {
 
   set +e
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$dir/orca-forced.out" 2> "$dir/orca-forced.err"
   rc=$?
@@ -1382,7 +1369,7 @@ test_orca_close_failure_refuses_even_under_force() {
   # same operator authority does get through.
   set +e
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" \
     > "$dir/orca-unforced.out" 2> "$dir/orca-unforced.err"
   rc=$?
@@ -1409,7 +1396,7 @@ test_already_gone_endpoint_still_completes_without_a_refusal() {
   write_endpoint_close_meta "$dir" "$id" "$session:fm-$id"
 
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/gone.out" 2> "$dir/gone.err" \
     || fail "an already-exited endpoint refused cleanup: $(cat "$dir/gone.err")"
@@ -1435,6 +1422,18 @@ test_already_gone_endpoint_still_completes_without_a_refusal() {
 
   pass "fm-teardown: an already-exited endpoint, and a server that is already gone, still complete cleanup silently"
 }
+
+# Optional positional test function names select cases without changing the default suite.
+if [ "$#" -gt 0 ]; then
+  for selected_test in "$@"; do
+    case "$selected_test" in test_*) ;; *) fail "unknown test: $selected_test" ;; esac
+    declare -F "$selected_test" >/dev/null || fail "unknown test: $selected_test"
+  done
+  for selected_test in "$@"; do
+    "$selected_test" || exit "$?"
+  done
+  exit 0
+fi
 
 test_invalid_endpoint_records_refuse_before_mutation
 test_control_lock_contention_refuses_before_mutation

@@ -3082,6 +3082,199 @@ test_spawn_retires_queued_and_inflight_drop_provenance() {
   pass "actual queued and in-flight spawn retire old drop provenance"
 }
 
+test_failed_restart_preserves_uncertain_drop_provenance() (
+  local outcome case_dir home id real rc stored error expected
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  real=$(command -v tasks-axi)
+  for outcome in committed unreadable; do
+    id="restart-drop-$outcome"
+    case_dir=$(make_home "$id" "$id")
+    home=$(home_of "$case_dir")
+    add_item "$case_dir" "$id"
+    printf '%s\n' 'Body café 航海' ' dropped ' ' Deliverable of the finished work: dropped ' \
+      'Question: keep this?' 'dropped later' > "$case_dir/body"
+    tasks-axi update "$id" --body-file "$case_dir/body" --file "$(backlog_of "$case_dir")" >/dev/null \
+      || fail "could not prepare failed restart provenance"
+    printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+    cp "$home/data/$id/captain-drop.md" "$case_dir/captain-before"
+    stored=$("$real" show "$id" --full --file "$(backlog_of "$case_dir")") \
+      || fail "could not read failed restart fixture body"
+    expected=$(printf '%s\n' "$stored" | sed -n 's/^  body: //p')
+    [ -n "$expected" ] || fail "failed restart fixture exposed no complete body"
+    expected=${expected//'\n dropped \n'/'\n Historical captain disposition: dropped \n'}
+    expected=${expected//'\n Deliverable of the finished work: dropped \n'/'\n Historical deliverable of the finished work: dropped \n'}
+    printf 'spawn_gen=fixture\n' > "$home/state/$id.meta"
+    cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/tasks-axi-calls"
+if [ "\${1:-}" = start ]; then
+  if [ "$outcome" = committed ]; then
+    "$real" "\$@" >/dev/null || exit \$?
+  fi
+  : > "$case_dir/start-returned"
+  printf '%s\n' 'error: distinctive restart failure' >&2
+  exit 47
+fi
+if [ "\${1:-}" = show ] && [ "$outcome" = unreadable ] && [ -f "$case_dir/start-returned" ]; then
+  printf '%s\n' 'error: distinctive post-start read failure' >&2
+  exit 53
+fi
+exec "$real" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/tasks-axi"
+    rc=0
+    if [ "$outcome" = committed ]; then
+      PATH="$case_dir/fakebin:$PATH" fm_backlog_dispatch_transition \
+        "$home/state/$id.meta" "$home/data" "$id" "$home/state" || rc=$?
+    else
+      PATH="$case_dir/fakebin:$PATH" fm_backlog_start "$home/data" "$id" || rc=$?
+    fi
+    error=$FM_BACKLOG_TRANSITION_ERROR
+    assert_equals 47 "$rc" "$outcome restart replaced the original command status"
+    assert_contains "$error" 'error: distinctive restart failure' \
+      "$outcome restart replaced the original command error"
+    assert_present "$case_dir/start-returned" "$outcome restart never attempted start"
+    stored=$("$real" show "$id" --full --file "$(backlog_of "$case_dir")") \
+      || fail "$outcome restart row disappeared"
+    if [ "$outcome" = committed ]; then
+      assert_contains "$stored" 'state: in_flight' "committed start was rolled back"
+    else
+      assert_contains "$stored" 'state: queued' "failed start unexpectedly mutated the row state"
+      assert_contains "$error" 'restart outcome could not be verified' \
+        "unreadable readback did not explain preservation"
+      assert_contains "$error" 'distinctive post-start read failure' \
+        "unreadable readback did not retain its read error"
+    fi
+    assert_equals "$expected" "$(printf '%s\n' "$stored" | sed -n 's/^  body: //p')" \
+      "$outcome restart restored active provenance or changed unrelated body bytes"
+    cmp -s "$case_dir/captain-before" "$home/data/$id/captain-drop.md" \
+      || fail "$outcome restart changed retained captain words"
+    assert_present "$home/state/$id.meta" "$outcome restart removed the paired record"
+  done
+  pass "committed and unreadable failed starts retain historical provenance and original failures"
+)
+
+observe_tasks_axi_mutations() {
+  local case_dir=$1 real
+  real=$(command -v tasks-axi)
+  cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  start|update|reopen|done|mv|rm|hold|release)
+    case "\${2:-}" in
+      --help|-h) ;;
+      *) : > "$case_dir/tasks-mutation-attempted" ;;
+    esac
+    ;;
+esac
+exec "$real" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/tasks-axi"
+}
+
+test_fresh_spawn_respects_task_control_custody() (
+  local case_dir home id lock out rc=0
+  id=atomic-fresh-control-custody
+  case_dir=$(make_home fresh-control-custody "$id")
+  home=$(home_of "$case_dir")
+  add_item "$case_dir" "$id"
+  observe_tasks_axi_mutations "$case_dir"
+  cp "$(backlog_of "$case_dir")" "$case_dir/backlog-before"
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *new-window*) : > "$case_dir/task-endpoint-created" ;;
+  *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
+  *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+esac
+case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  FM_HOME=$home
+  FM_STATE_OVERRIDE=$home/state
+  . "$ROOT/bin/fm-wake-lib.sh"
+  lock="$home/state/.control-$id.lock"
+  fm_lock_try_acquire "$lock" || fail "could not hold fresh task control custody"
+  trap 'fm_lock_release "$lock"' EXIT
+  out=$(run_ship_spawn "$case_dir" "$id") || rc=$?
+  [ "$rc" -ne 0 ] || fail "fresh spawn ignored another process's task control custody"
+  cmp -s "$case_dir/backlog-before" "$(backlog_of "$case_dir")" \
+    || fail "control-refused fresh spawn mutated backlog bytes"
+  assert_absent "$case_dir/tasks-mutation-attempted" \
+    "control-refused fresh spawn attempted a tasks mutation"
+  assert_absent "$home/state/$id.meta" "control-refused fresh spawn published a worker record"
+  assert_absent "$home/state/$id.busy-state" "control-refused fresh spawn published busy state"
+  assert_absent "$home/state/$id.busy-gen" "control-refused fresh spawn published a busy generation"
+  assert_absent "$case_dir/task-endpoint-created" "control-refused fresh spawn created an endpoint"
+  assert_absent "$case_dir/local-copy-requested" "control-refused fresh spawn requested a local copy"
+  assert_present "$lock" "control-refused fresh spawn removed foreign custody"
+  fm_lock_release "$lock"
+  out=$(run_ship_spawn "$case_dir" "$id") || fail "fresh spawn failed after control release: $out"
+  assert_contains "$out" "spawned $id" "released fresh spawn did not report success"
+  assert_equals in_flight "$(row_state "$case_dir" "$id")" "released fresh spawn did not start the row"
+  assert_present "$home/state/$id.meta" "released fresh spawn did not publish its worker record"
+  assert_present "$case_dir/tasks-mutation-attempted" "released fresh spawn bypassed the mutation observer"
+  assert_present "$case_dir/task-endpoint-created" "released fresh spawn did not create its endpoint"
+  pass "fresh spawn refuses task control contention without mutation or publication, then succeeds"
+)
+
+test_bootstrap_healing_respects_task_control_custody() (
+  local case_dir home id lock out stored
+  id=atomic-heal-control-custody
+  case_dir=$(make_home heal-control-custody "$id")
+  home=$(home_of "$case_dir")
+  add_item "$case_dir" "$id"
+  printf '%s\n' 'dropped' 'Deliverable of the finished work: dropped' 'Body café 航海' > "$case_dir/body"
+  tasks-axi update "$id" --body-file "$case_dir/body" --file "$(backlog_of "$case_dir")" >/dev/null \
+    || fail "could not prepare queued healing provenance"
+  printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+  cp "$home/data/$id/captain-drop.md" "$case_dir/captain-before"
+  write_task_meta "$case_dir" "$id" ship no-mistakes
+  cp "$home/state/$id.meta" "$case_dir/meta-before"
+  cp "$(backlog_of "$case_dir")" "$case_dir/backlog-before"
+  observe_tasks_axi_mutations "$case_dir"
+  FM_HOME=$home
+  FM_STATE_OVERRIDE=$home/state
+  . "$ROOT/bin/fm-wake-lib.sh"
+  lock="$home/state/.control-$id.lock"
+  fm_lock_try_acquire "$lock" || fail "could not hold queued worker control custody"
+  trap 'fm_lock_release "$lock"' EXIT
+  out=$(run_bootstrap "$case_dir") || fail "control-contended healing failed: $out"
+  cmp -s "$case_dir/backlog-before" "$(backlog_of "$case_dir")" \
+    || fail "control-contended healing mutated or retired the queued body"
+  cmp -s "$case_dir/meta-before" "$home/state/$id.meta" \
+    || fail "control-contended healing changed its worker record"
+  assert_absent "$case_dir/tasks-mutation-attempted" \
+    "control-contended healing attempted a tasks mutation"
+  assert_present "$lock" "control-contended healing removed foreign custody"
+  fm_lock_release "$lock"
+  out=$(run_bootstrap "$case_dir") || fail "healing failed after control release: $out"
+  stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
+    || fail "released healing lost the row"
+  assert_contains "$stored" 'state: in_flight' "released healing did not start the queued worker row"
+  assert_contains "$stored" 'Historical captain disposition: dropped' "released healing did not retire disposition"
+  assert_contains "$stored" 'Historical deliverable of the finished work: dropped' "released healing did not retire deliverable"
+  assert_contains "$stored" 'Body café 航海' "released healing changed unrelated body bytes"
+  cmp -s "$case_dir/captain-before" "$home/data/$id/captain-drop.md" \
+    || fail "healing changed retained captain words"
+  assert_present "$home/state/$id.meta" "released healing removed the worker record"
+  assert_present "$case_dir/tasks-mutation-attempted" "released healing bypassed the mutation observer"
+  pass "bootstrap skips control-held queued workers and heals their historical provenance after release"
+)
+
+if [ "$#" -gt 0 ]; then
+  for test_name in "$@"; do
+    case "$test_name" in
+      test_*) declare -F "$test_name" >/dev/null || fail "unknown test: $test_name" ;;
+      *) fail "expected a test function name: $test_name" ;;
+    esac
+    "$test_name" || exit $?
+  done
+  exit 0
+fi
+
 test_spawn_retires_queued_and_inflight_drop_provenance
 test_backend_resolution_preserves_config_errors
 test_backend_resolution_preserves_precedence_and_defaults
@@ -3089,6 +3282,9 @@ test_backlog_callers_refuse_unreadable_backend_config
 test_captain_hold_preserves_relocated_backlog_on_backend_error
 test_dispatch_moves_the_item_in_flight_in_the_same_run
 test_dispatch_retires_drop_only_after_commit
+test_failed_restart_preserves_uncertain_drop_provenance || exit $?
+test_fresh_spawn_respects_task_control_custody || exit $?
+test_bootstrap_healing_respects_task_control_custody || exit $?
 test_dispatch_omits_the_file_for_a_beads_show
 test_a_leftover_markdown_symlink_does_not_brick_a_beads_home
 test_completion_omits_the_file_for_a_beads_done

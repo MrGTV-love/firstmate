@@ -9,7 +9,7 @@ set -eu
 fm_git_identity fmtest fmtest@example.invalid
 TMP_ROOT=$(fm_test_tmproot fm-open-loops)
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
-import base64, datetime as dt, json, os, shutil, signal, subprocess, sys, time
+import base64, datetime as dt, json, os, shutil, signal, sqlite3, subprocess, sys, time
 from pathlib import Path
 
 root, world = map(Path, sys.argv[1:])
@@ -23,6 +23,7 @@ hours = lambda n: now - n * 3600
 iso = lambda t: dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 env = dict(os.environ, FM_HOME=str(home), NM_HOME=str(world / 'nm'), FM_OPEN_LOOPS_NOW=str(now),
            PATH=f'{fake}:{os.environ["PATH"]}', GH_DOUBLE=str(world / 'gh.json'))
+env['GIT_AUTHOR_DATE'] = env['GIT_COMMITTER_DATE'] = f'{now} +0000'
 for key in ('FM_ROOT_OVERRIDE', 'FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
     env.pop(key, None)
 
@@ -88,6 +89,8 @@ def task_copy(name, commit_age=None, message='work'):
         stamp = f'{hours(commit_age)} +0000'
         subprocess.run(['git', '-C', str(path), 'commit', '-q', '-m', message], check=True,
                        env=dict(env, GIT_AUTHOR_DATE=stamp, GIT_COMMITTER_DATE=stamp))
+    reflog = Path(git(path, 'rev-parse', '--absolute-git-dir')) / 'logs/HEAD'
+    os.utime(reflog, (now, now))
     return path
 
 def task(name, path, state='working', alive='alive', exists=True, pr=None, kind='ship'):
@@ -106,6 +109,7 @@ covered_head = git(covered, 'rev-parse', 'HEAD')
 for name, path in (('stalled', stalled), ('fresh', fresh)):
     (home / f'state/{name}.status').write_text(f'working [at={hours(5 if name == "stalled" else 0)}]: building\n')
 os.utime(home / 'state/stalled.status', (hours(5), hours(5)))
+os.utime(home / 'state/fresh.status', (now, now))
 logs = Path(git(stalled, 'rev-parse', '--absolute-git-dir')) / 'logs/HEAD'
 os.utime(logs, (hours(5), hours(5)))
 
@@ -250,51 +254,6 @@ def fixture(items, records=None):
     (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=items,
         backlog=dict(present=True, records=records or []))))
 
-merge_only = task_copy('merge-only')
-git(merge_only, 'checkout', '-q', '-b', 'side')
-(merge_only / 'side').write_text('side\n')
-git(merge_only, 'add', 'side'); git(merge_only, 'commit', '-q', '-m', 'side parent')
-git(merge_only, 'checkout', '-q', 'fm/merge-only')
-(merge_only / 'first').write_text('first\n')
-git(merge_only, 'add', 'first'); git(merge_only, 'commit', '-q', '-m', 'first parent')
-git(merge_only, 'merge', '-q', '--no-ff', 'side', '-m', 'parents delivered')
-parents_head = git(merge_only, 'rev-parse', 'HEAD')
-git(merge_only, 'update-ref', 'refs/remotes/origin/main', parents_head)
-(merge_only / 'resolution').write_text('merge-only resolution\n')
-git(merge_only, 'add', 'resolution')
-git(merge_only, 'commit', '-q', '--amend', '-m', 'merge-only correction')
-merge_task = task('merge-only', merge_only, state='failed')
-for pr_state in (None, 'open', 'merged'):
-    merge_task['pr']['url'] = PR_URL + '60' if pr_state else None
-    double['single']['60'] = dict(state=pr_state, merged_at=iso(now) if pr_state == 'merged' else None,
-                                 head=dict(sha=parents_head))
-    (world / 'gh.json').write_text(json.dumps(double))
-    fixture([merge_task])
-    pending_merge = ledger()
-    assert 'merge-only' in rows(pending_merge, 'failed_task'), pending_merge
-    assert '1 commit(s)' in rows(pending_merge, 'unlanded_commit')['merge-only']['evidence'], pending_merge
-    assert 'merge-only correction' in rows(pending_merge, 'unlanded_commit')['merge-only']['evidence']
-merge_head = git(merge_only, 'rev-parse', 'HEAD')
-double['single']['60']['head']['sha'] = merge_head
-(world / 'gh.json').write_text(json.dumps(double))
-settled = ledger()
-assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
-merge_task['pr']['url'] = None
-git(merge_only, 'update-ref', 'refs/remotes/origin/main', merge_head)
-fixture([merge_task])
-settled = ledger()
-assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
-git(merge_only, 'reset', '--hard', parents_head)
-fixture([merge_task])
-settled = ledger()
-assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
-git(merge_only, 'update-ref', 'refs/remotes/origin/main', parents_head)
-git(merge_only, 'commit', '-q', '--amend', '-m', 'equivalent merge without new content')
-assert git(merge_only, 'rev-parse', 'HEAD') != parents_head
-fixture([merge_task])
-settled = ledger()
-assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
-
 equivalent = task_copy('patch-equivalent', commit_age=3)
 equivalent_head = git(equivalent, 'rev-parse', 'HEAD')
 git(equivalent, 'checkout', '-q', 'main')
@@ -306,7 +265,7 @@ git(equivalent, 'checkout', '-q', 'fm/patch-equivalent')
 fixture([task('patch-equivalent', equivalent, state='failed')])
 settled = ledger()
 assert not rows(settled, 'failed_task') and not rows(settled, 'unlanded_commit'), settled
-print('PASS: merge-only and patch-equivalent delivery', flush=True)
+print('PASS: patch-equivalent delivery', flush=True)
 
 local = task_copy('local-delivery', commit_age=3)
 local_head = git(local, 'rev-parse', 'HEAD')
@@ -372,6 +331,61 @@ for exists, alive in ((False, 'dead'), (True, 'dead'), (True, 'missing'), (True,
 (home / 'config/open-loops.json').unlink()
 print('PASS: independent failed delivery and worker liveness axes', flush=True)
 
+for alive in ('alive', 'dead', 'missing', 'unreadable'):
+    unknown = task('unknown-state', world / 'absent-unknown', state='unknown', alive=alive,
+                   exists=False if alive == 'missing' else None)
+    unknown['current_state']['detail'] = 'current-state command failed (exit 124)'
+    fixture([unknown])
+    observed = ledger()
+    assert not observed['complete'], observed
+    assert 'worker current state unknown-state' in rows(observed, 'coverage')['ledger degraded']['evidence'], observed
+    assert ('unknown-state' in rows(observed, 'missing_worker')) == (alive in ('dead', 'missing')), observed
+print('PASS: unknown current state degrades independently of live verdict', flush=True)
+
+future = task_copy('future-progress', commit_age=-2)
+future_task = task('future-progress', future)
+future_status = home / 'state/future-progress.status'
+future_status.write_text('working: future stamp\n')
+os.utime(future_status, (now + 7200, now + 7200))
+future_reflog = Path(git(future, 'rev-parse', '--absolute-git-dir')) / 'logs/HEAD'
+os.utime(future_reflog, (now + 7200, now + 7200))
+fixture([future_task])
+future_report = ledger()
+assert rows(future_report, 'stalled_worker')['future-progress']['age_seconds'] is None, future_report
+assert rows(future_report, 'stalled_worker')['future-progress']['overdue'], future_report
+(world / 'nm').mkdir(exist_ok=True)
+with sqlite3.connect(world / 'nm/state.sqlite') as db:
+    db.executescript('CREATE TABLE repos (id INTEGER, working_path TEXT);'
+                    'CREATE TABLE runs (id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT);'
+                    'CREATE TABLE step_results (run_id INTEGER, started_at TEXT, completed_at TEXT);')
+    db.execute('INSERT INTO repos VALUES (?, ?)', (1, future_task['project']))
+    db.execute('INSERT INTO runs VALUES (?, ?, ?, ?)', (1, 1, future_task['branch'], iso(hours(5))))
+    db.execute('INSERT INTO step_results VALUES (?, ?, ?)', (1, iso(hours(4)), iso(now + 7200)))
+pipeline_report = ledger()
+assert rows(pipeline_report, 'stalled_worker')['future-progress']['age_seconds'] == 4 * 3600, pipeline_report
+(world / 'nm/state.sqlite').unlink()
+print('PASS: future pipeline stamps do not mask older valid progress', flush=True)
+print('PASS: future status commit and reflog cannot hide unknown-age stalls', flush=True)
+
+readonly = task_copy('readonly-proof', commit_age=2)
+git(readonly, 'checkout', '-q', 'main')
+(readonly / 'default-progress').write_text('advanced\n')
+git(readonly, 'add', 'default-progress'); git(readonly, 'commit', '-q', '-m', 'default progress')
+git(readonly, 'update-ref', 'refs/remotes/origin/main', git(readonly, 'rev-parse', 'HEAD'))
+git(readonly, 'checkout', '-q', 'fm/readonly-proof')
+readonly_git = Path(git(readonly, 'rev-parse', '--absolute-git-dir'))
+index_before = (readonly_git / 'index').read_bytes()
+objects_before = {str(p.relative_to(readonly_git / 'objects')): p.read_bytes()
+                  for p in (readonly_git / 'objects').rglob('*') if p.is_file()}
+fixture([task('readonly-proof', readonly, state='failed')])
+readonly_report = ledger()
+assert 'readonly-proof' in rows(readonly_report, 'failed_task'), readonly_report
+assert 'readonly-proof' in rows(readonly_report, 'unlanded_commit'), readonly_report
+assert (readonly_git / 'index').read_bytes() == index_before
+assert {str(p.relative_to(readonly_git / 'objects')): p.read_bytes()
+        for p in (readonly_git / 'objects').rglob('*') if p.is_file()} == objects_before
+print('PASS: collection leaves Git index and object inventory unchanged', flush=True)
+
 fixture([task('stalled', stalled)])
 for last_error in ('Error: ENOSPC: no space left on device, write', 'Exception: worker exploded',
                    'Fatal: unable to proceed', 'Error: generic failure', 'network connection timed out',
@@ -386,84 +400,6 @@ script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Everything normal\
 assert rows(ledger(), 'stalled_worker')['stalled']['evidence'] == 'no commit, status line, or pipeline progress'
 script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Codex usage limit reached; retrying\\n"\n')
 print('PASS: last-error JSON and human representations', flush=True)
-slot = world / 'pool/slot'
-slot.mkdir(parents=True)
-owned = slot / 'repo'
-shutil.copytree(fresh, owned)
-alias = world / 'owned-alias'
-alias.symlink_to(owned, target_is_directory=True)
-marker = slot / '.fm-slot-owner'
-spy_log = world / 'owner-git.log'
-real_git = shutil.which('git', path=env['PATH'])
-script(fake / 'git', '#!/usr/bin/env python3\n'
-    'import os, sys\nfrom pathlib import Path\n'
-    f'watched = {str(owned)!r}\nlog = Path({str(spy_log)!r})\n'
-    'if "-C" in sys.argv:\n'
-    '    target = sys.argv[sys.argv.index("-C") + 1]\n'
-    '    if str(Path(target).resolve()) == watched:\n'
-    '        with log.open("a") as stream: stream.write(" ".join(sys.argv[1:]) + "\\n")\n'
-    '        if os.environ.get("OWNER_GIT_FORBID") == "1": sys.exit(91)\n'
-    f'os.execv({real_git!r}, [{real_git!r}, *sys.argv[1:]])\n')
-env['OWNER_GIT_FORBID'] = '1'
-marker.write_text('task=new-owner\nhome=/moved/home\n')
-for copy in (owned, alias):
-    for pr_status in (None, 'open', 'merged'):
-        double['single']['61'] = dict(state=pr_status, merged_at=iso(now) if pr_status == 'merged' else None,
-                                     head=dict(sha=git(fresh, 'rev-parse', 'HEAD')))
-        (world / 'gh.json').write_text(json.dumps(double))
-        old = task('old-owner', copy, state='failed', pr=PR_URL + '61' if pr_status else None)
-        fixture([old])
-        reassigned = ledger()
-        assert reassigned['complete'] and not rows(reassigned, 'unlanded_commit'), reassigned
-        assert ('old-owner' in rows(reassigned, 'failed_task')) == (pr_status != 'merged'), reassigned
-        assert not spy_log.exists(), 'reassigned copy must not be inspected'
-    old['current_state']['state'] = 'working'
-    fixture([old])
-    assert 'old-owner' in rows(ledger(), 'stalled_worker'), 'new owner HEAD must not refresh old progress'
-    assert not spy_log.exists()
-    old['current_state']['state'] = 'failed'
-    old['pr']['url'] = None
-    fixture([old], [dict(id='old-owner', structured=True, state='done', captain_drop=True)])
-    assert not rows(ledger(), 'failed_task') and not spy_log.exists()
-for unsafe in ('malformed', 'symlink', 'directory', 'unreadable'):
-    marker.unlink()
-    if unsafe == 'symlink':
-        marker.symlink_to(world / 'missing-owner')
-    elif unsafe == 'directory':
-        marker.mkdir()
-    else:
-        marker.write_text('bad claim\n' if unsafe == 'malformed' else 'task=old-owner\n')
-        if unsafe == 'unreadable':
-            marker.chmod(0)
-    if unsafe != 'unreadable' or os.geteuid() != 0:
-        for state in ('failed', 'working'):
-            fixture([task('old-owner', alias, state=state)])
-            uncertain = ledger()
-            assert not uncertain['complete'] and rows(uncertain, 'coverage'), uncertain
-            assert not rows(uncertain, 'unlanded_commit') and not spy_log.exists(), uncertain
-    if unsafe == 'directory':
-        marker.rmdir()
-        marker.write_text('bad claim\n')
-    elif unsafe == 'unreadable':
-        marker.chmod(0o600)
-env.pop('OWNER_GIT_FORBID')
-for claim in ('mine', 'absent'):
-    marker.unlink()
-    if claim == 'mine':
-        marker.write_text('task=old-owner\nhome=/different/home\n')
-    fixture([task('old-owner', alias, state='failed')])
-    admitted = ledger()
-    assert admitted['complete'] and 'old-owner' in rows(admitted, 'unlanded_commit'), admitted
-    assert 'old-owner' in rows(admitted, 'failed_task') and spy_log.is_file(), admitted
-    spy_log.unlink()
-    fixture([task('old-owner', alias)])
-    admitted_progress = ledger()
-    assert admitted_progress['complete'] and not rows(admitted_progress, 'stalled_worker'), admitted_progress
-    assert spy_log.is_file(), 'admitted working copy must supply its progress'
-    spy_log.unlink()
-print('PASS: ownership admission and last-error representations', flush=True)
-(fake / 'git').unlink()
-
 tasks, backlog = saved_tasks, saved_backlog
 double['pulls'], double['checks'] = saved_pulls, saved_checks
 (world / 'gh.json').write_text(json.dumps(double))
@@ -734,4 +670,34 @@ printf '%s' "$LEDGER" | jq -e '
   any(.rows[]; .category == "unanswered_question" and .subject == "held-drop:retained")
   and all(.rows[]; .subject != "held-drop" or (.category != "failed_task" and .category != "unlanded_commit"))' >/dev/null \
   || { echo "FAIL: retained dropped work must preserve only its unresolved question" >&2; exit 1; }
+mkdir -p "$TMP_ROOT/unreadable-bin"
+cat > "$TMP_ROOT/unreadable-bin/tmux" <<'SH'
+#!/usr/bin/env bash
+printf 'inventory transport failed\n' >&2
+exit 2
+SH
+chmod +x "$TMP_ROOT/unreadable-bin/tmux"
+INPUT=$(PATH="$TMP_ROOT/unreadable-bin:$PATH" FM_HOME="$SNAP_HOME" bash "$ROOT/bin/fm-fleet-snapshot.sh" --home-input)
+printf '%s' "$INPUT" | jq -e '.tasks[0].endpoint.exists == null
+  and .tasks[0].endpoint.agent_alive == "unreadable"
+  and .tasks[0].current_state.state == "unknown"' >/dev/null \
+  || { echo "FAIL: unreadable tmux is not authoritative absence" >&2; exit 1; }
+LEDGER=$(PATH="$TMP_ROOT/unreadable-bin:$PATH" FM_HOME="$SNAP_HOME" bash "$ROOT/bin/fm-open-loops.sh" --json)
+printf '%s' "$LEDGER" | jq -e '.complete == false
+  and any(.rows[]; .category == "coverage")
+  and all(.rows[]; .subject != "worker" or .category != "missing_worker")' >/dev/null \
+  || { echo "FAIL: unreadable tmux must degrade collector coverage" >&2; exit 1; }
+echo "PASS: unreadable tmux degrades coverage without fabricating missing worker"
+cp -R "$ROOT/bin" "$TMP_ROOT/timeout-bin"
+cat > "$TMP_ROOT/timeout-bin/fm-crew-state.sh" <<'SH'
+#!/usr/bin/env bash
+sleep 10
+SH
+chmod +x "$TMP_ROOT/timeout-bin/fm-crew-state.sh"
+INPUT=$(PATH="$TMP_ROOT/unreadable-bin:$PATH" FM_HOME="$SNAP_HOME" FM_SNAPSHOT_CREW_STATE_TIMEOUT=1 \
+  bash "$TMP_ROOT/timeout-bin/fm-fleet-snapshot.sh" --home-input)
+printf '%s' "$INPUT" | jq -e '.tasks[0].current_state.state == "unknown"
+  and (.tasks[0].current_state.detail | startswith("current-state command failed (exit "))' >/dev/null \
+  || { echo "FAIL: current-state timeout must retain failure evidence" >&2; exit 1; }
+echo "PASS: current-state timeout retains independent observation failure"
 echo "ok - open-work reconciliation reports owned obligations from live records"

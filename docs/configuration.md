@@ -571,7 +571,7 @@ See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, 
 ## Open-work ledger (config/open-loops.json)
 
 `bin/fm-open-loops.sh` reconciles what this home owes against its live records, so assigned work cannot be lost without a row saying so.
-`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog.
+`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
 Every row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 An unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
 
@@ -588,9 +588,10 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
-For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof.
+For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
 Registered non-GitHub origins are disclosed as degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
+Unreadable or unknown current task state adds degraded coverage independently of liveness, and only nonfuture progress timestamps count as work evidence.
 The ledger covers this home only; each secondmate home runs its own watcher and reports through its own parent channel.
 
 The watcher runs the reconciler as a detached helper every `FM_OPEN_LOOPS_INTERVAL` seconds (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
@@ -598,7 +599,7 @@ The helper's `--heartbeat` mode atomically publishes the dated result to `state/
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
 A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
-Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults. Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication clears stale suppression even if the watcher misses the recovery, without resetting the unchanged-overdue-set cooldown.
+Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults. Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
 Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
 The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors. Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
@@ -617,17 +618,19 @@ Age limits are non-negative integer seconds for the categories above.
 `command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
 A malformed configuration is reported as an error rather than ignored.
 
-A work item reaches Done only with its deliverable, or with the captain's own words.
+A recorded work item reaches Done with its deliverable or the captain's own words, subject to the live-teardown limitations below.
 `bin/fm-tasks-axi.sh done|close` of a ship or scout row requires a written non-empty report (scout), a GitHub PR the forge reports merged (ship), or `--drop-file` holding the captain's words.
 A retained captain-held question must be resolved through `bin/fm-captain-hold.sh answer` or `reconcile close`; delivery evidence or drop authority cannot answer it.
 A live task record completes only through `bin/fm-teardown.sh`, whose landed-work test treats a pushed branch as recoverable work, not a delivered result.
-In local-only mode, an owned, clean ship copy whose `HEAD` is contained in `refs/heads/<default>` is landed regardless of remote reachability or pushed status. A genuinely merged GitHub PR or default-content proof remains an alternative, including fork delivery. Normal and forced teardown use the same landing predicate.
-If a ship's copy is missing or its pool slot has been reassigned, teardown refuses unless the recorded GitHub PR is forge-confirmed merged, or `--force --drop-file` authorizes dropping the work; it never inspects the reassigned copy or infers a local merge.
+In local-only mode, a clean existing ship copy whose `HEAD` is contained in `refs/heads/<default>` is landed regardless of remote reachability or pushed status. A genuinely merged GitHub PR whose actual head contains the current work or default-content proof remains an alternative, including fork delivery, for non-forced teardown.
+An absent copy skips teardown's worktree safety inspection rather than requiring recorded-PR-only proof.
+The collector's slot-owner admission is outside this scope, so a reassigned slot is not detected; see the follow-up `fm-open-loops-teardown-proof`.
+The collector's nonmerge patch comparison does not establish merge-commit delivery, so merge-only content is not proved; see the follow-up `fm-open-loops-teardown-proof`.
 If a recorded Orca copy path is missing, record-only cleanup never removes a backend copy by ID.
 `bin/fm-teardown.sh --force` on ordinary work additionally requires `--drop-file`; the words (1..8192 bytes) are retained at `data/<id>/captain-drop.md` before anything is discarded.
-A delivered PR, report, or local merge keeps its normal completion label even when forced cleanup discards additional work; only an undelivered work item records the fixed note `dropped`.
+A forced ship with `--drop-file` always records the fixed note `dropped` without a landing probe; a scout with a regular, nonsymlink, nonempty report keeps report completion, and both retain the captain's exact words.
 Dropped work is never presented as recently landed. A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
-Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`. A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`. Completion and new-work entry points, including supported command-first `--backend` forms, retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions. A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status. A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 

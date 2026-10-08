@@ -130,33 +130,55 @@ done
 
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/fm-bootstrap.sh for the install command"
 
-# The completion guard reads the actual argument tokens: a value (a note that happens to
-# read "--help") is never a flag, and the optional `task` noun is normalized away.
-guard_completion() {
-  local tokens=("$@") i=0 command='' id='' expect='' token pr='' report='' drop='' help=0 note=0
+parse_task_mutation() {
+  local tokens=("$@") i=0 expect='' token
+  TASK_COMMAND=
+  TASK_ID=
+  TASK_HELP=0
+  TASK_PR=
+  TASK_REPORT=
+  TASK_DROP=
+  TASK_NOTE=0
   [ "${tokens[0]:-}" != task ] || i=1
-  command=${tokens[i]:-}
-  case "$command" in done|close) ;; *) return 0 ;; esac
+  TASK_COMMAND=${tokens[i]:-}
+  case "$TASK_COMMAND" in done|close|start|reopen|hold|unhold|update|edit) ;; *) return 0 ;; esac
   for token in "${tokens[@]:$((i + 1))}"; do
     if [ -n "$expect" ]; then
       case "$expect" in
-        --pr) pr=$token ;; --report) report=$token ;; --drop-file) drop=$token ;; --note) note=1 ;;
-        --keep|--backend) ;;
+        --pr) TASK_PR=$token ;; --report) TASK_REPORT=$token ;;
+        --drop-file) TASK_DROP=$token ;; --note) TASK_NOTE=1 ;;
       esac
       expect=''
       continue
     fi
     case "$token" in
-      -h|--help) help=1 ;;
-      --pr|--report|--drop-file|--note|--keep|--backend) expect=$token ;;
-      --pr=*) pr=${token#*=} ;; --report=*) report=${token#*=} ;;
-      --drop-file=*) drop=${token#*=} ;; --note=*) note=1 ;;
+      -h|--help) TASK_HELP=1 ;;
+      --pr|--report|--drop-file|--note|--keep|--backend|--reason|--until|--kind|--title|--body|--body-file|--repo|--priority) expect=$token ;;
+      --pr=*) TASK_PR=${token#*=} ;; --report=*) TASK_REPORT=${token#*=} ;;
+      --drop-file=*) TASK_DROP=${token#*=} ;; --note=*) TASK_NOTE=1 ;;
       -*) ;;
-      *) [ -n "$id" ] || id=$token ;;
+      *) [ -n "$TASK_ID" ] || TASK_ID=$token ;;
     esac
   done
-  [ "$help" = 0 ] || return 0
-  case "$id" in ''|*[!A-Za-z0-9._-]*) return 0 ;; esac
+}
+
+TASK_CONTROL_LOCK_HELD=0
+TASK_META_LOCK_HELD=0
+task_mutation_cleanup() {
+  if [ "$TASK_META_LOCK_HELD" = 1 ]; then
+    fm_lock_release "$TASK_META_LOCK" || true
+    TASK_META_LOCK_HELD=0
+  fi
+  if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
+    fm_lock_release "$TASK_CONTROL_LOCK" || true
+    TASK_CONTROL_LOCK_HELD=0
+  fi
+}
+
+guard_completion() {
+  local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop=$TASK_DROP note=$TASK_NOTE
+  case "$TASK_COMMAND" in done|close) ;; *) return 0 ;; esac
+  [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || return 0
   fm_backlog_row_probe "$DATA" "$id" || {
     [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && return 0
     fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
@@ -207,7 +229,19 @@ fi
 
 GUARD_ARGS=()
 GUARD_STRIP_DROP=0
-guard_completion ${ARGS[@]+"${ARGS[@]}"}
+parse_task_mutation ${ARGS[@]+"${ARGS[@]}"}
+if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  . "$SCRIPT_DIR/fm-wake-lib.sh"
+  trap task_mutation_cleanup EXIT
+  case "$STATE" in /*) task_state=$STATE ;; *) task_state="$CALLER_DIR/$STATE" ;; esac
+  TASK_CONTROL_LOCK="$task_state/.control-$TASK_ID.lock"
+  TASK_META_LOCK=$(fm_meta_lock_path "$task_state/$TASK_ID.meta") || fail "cannot resolve the task record lock for $TASK_ID"
+  fm_lock_acquire_wait "$TASK_CONTROL_LOCK"
+  TASK_CONTROL_LOCK_HELD=1
+  fm_lock_acquire_wait "$TASK_META_LOCK"
+  TASK_META_LOCK_HELD=1
+fi
+guard_completion
 if [ "$GUARD_STRIP_DROP" = 1 ]; then
   # The drop words stay in the retained file; tasks-axi receives only the fixed note.
   kept=()
@@ -221,31 +255,11 @@ if [ "$GUARD_STRIP_DROP" = 1 ]; then
 fi
 
 cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI_ROOT"
-new_work_command=${ARGS[0]:-}
-new_work_offset=1
-if [ "$new_work_command" = task ]; then
-  new_work_command=${ARGS[1]:-}
-  new_work_offset=2
-fi
-case "$new_work_command" in
+case "$TASK_COMMAND" in
   reopen|start)
-    new_work_id=''
-    new_work_help=0
-    new_work_backend_next=0
-    for arg in "${ARGS[@]:$new_work_offset}"; do
-      if [ "$new_work_backend_next" = 1 ]; then
-        new_work_backend_next=0
-        continue
-      fi
-      case "$arg" in
-        -h|--help) new_work_help=1 ;;
-        --backend) new_work_backend_next=1 ;;
-        -*) ;;
-        *) [ -n "$new_work_id" ] || new_work_id=$arg ;;
-      esac
-    done
-    if [ "$new_work_help" = 0 ] && [[ "$new_work_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
-      fm_backlog_new_work_transition "$DATA" "$new_work_id" tasks-axi "${ARGS[@]}"
+    if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
+      if [ "$TASK_COMMAND" = start ]; then target_state=in_flight; else target_state=queued; fi
+      fm_backlog_new_work_transition "$DATA" "$TASK_ID" "$target_state" tasks-axi "${ARGS[@]}"
       result=$?
       if [ "$result" -ne 0 ] && [ -n "$FM_BACKLOG_TRANSITION_ERROR" ]; then
         printf 'fm-tasks-axi: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2
@@ -254,4 +268,8 @@ case "$new_work_command" in
     fi
     ;;
 esac
+if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
+  tasks-axi ${ARGS[@]+"${ARGS[@]}"}
+  exit "$?"
+fi
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

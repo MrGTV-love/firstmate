@@ -70,7 +70,7 @@ class Collector:
         self.load_config()
         self.env = dict(os.environ, FM_HOME=str(self.home), FM_STATE_OVERRIDE=str(self.state),
                         FM_DATA_OVERRIDE=str(self.data), FM_CONFIG_OVERRIDE=str(self.config),
-                        FM_SNAPSHOT_NOW_EPOCH=str(now), GIT_TERMINAL_PROMPT="0")
+                        FM_SNAPSHOT_NOW_EPOCH=str(now), GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
         self.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.rows = {}
         self.degraded = []
@@ -95,8 +95,8 @@ class Collector:
         if type(self.timeout) is not int or not 1 <= self.timeout <= 300:
             raise ValueError("command_timeout_seconds must be 1..300")
 
-    def run(self, args, cwd=None, missing_ok=False):
-        done = subprocess.run([str(a) for a in args], cwd=cwd, env=self.env, capture_output=True,
+    def run(self, args, cwd=None, missing_ok=False, env=None):
+        done = subprocess.run([str(a) for a in args], cwd=cwd, env=self.env if env is None else env, capture_output=True,
                               text=True, stdin=subprocess.DEVNULL, timeout=self.timeout)
         if missing_ok and done.returncode == 1 and not done.stderr:
             return ""
@@ -172,6 +172,11 @@ class Collector:
         runs = self.source("no-mistakes run store", self.pipeline_progress) or {}
         for task in self.tasks:
             alive = self.source("worker liveness " + task["id"], self.liveness, task)
+            if (task["current_state"].get("state") == "unknown"
+                    and not (alive in ("dead", "missing")
+                             and task["current_state"].get("detail", "").startswith("backend target gone:"))):
+                self.degraded.append("worker current state " + task["id"] + ": "
+                                     + (task["current_state"].get("detail") or "observation unavailable"))
             if task["endpoint"].get("exists") is False or alive in ("dead", "missing"):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
@@ -203,19 +208,21 @@ class Collector:
             for row in db.execute(query):
                 stamps = [epoch(row["created_at"])] + [epoch(row[f]) for f in fields]
                 key = (str(Path(row["working_path"]).resolve()), row["branch"])
-                out[key] = max([out.get(key, 0)] + [s for s in stamps if s is not None])
+                valid = [s for s in stamps if s is not None and s <= self.now]
+                if valid:
+                    out[key] = max([out[key]] + valid) if key in out else max(valid)
         return out
 
     def stalled(self, task, runs):
         stamps = [mtime(self.state / (task["id"] + ".status"))]
-        worktree = self.admitted_worktree(task)
+        worktree = self.task_worktree(task)
         if worktree:
             stamps.append(int(self.git(worktree, "show", "-s", "--format=%ct", "HEAD")))
             # The reflog stamps when a commit was observed, not when it was authored.
             stamps.append(mtime(Path(self.git(worktree, "rev-parse", "--absolute-git-dir")) / "logs/HEAD"))
         if task.get("project") and task.get("branch"):
             stamps.append(runs.get((str(Path(task["project"]).resolve()), task["branch"])))
-        since = max((s for s in stamps if s is not None), default=None)
+        since = max((s for s in stamps if s is not None and s <= self.now), default=None)
         if since is not None and self.now - since < self.ages["stalled_worker"]:
             return
         pane = self.run([BIN / "fm-peek.sh", task["id"], "80"])
@@ -223,20 +230,9 @@ class Collector:
         self.add("stalled_worker", task["id"], "inspect and recover the stalled-but-alive worker", since,
                  evidence=signatures[-1][:300] if signatures else "no commit, status line, or pipeline progress")
 
-    def admitted_worktree(self, task):
+    def task_worktree(self, task):
         worktree = task["paths"]["worktree"].get("path")
-        if not worktree:
-            return None
-        owner = self.bash('. "$1"; fm_treehouse_slot_owner_state "$2" "$3"; '
-                          'printf "%s" "$FM_TREEHOUSE_SLOT_OWNER"',
-                          BIN / "fm-wake-lib.sh", worktree, task["id"]).strip()
-        if owner == "other":
-            return None
-        if not Path(worktree).is_dir():
-            return None
-        if owner not in ("mine", "absent"):
-            raise ValueError("worktree ownership is inconclusive")
-        return worktree
+        return worktree if worktree and Path(worktree).is_dir() else None
 
     def default_ref(self, worktree, mode=None):
         refs = ("refs/remotes/origin/HEAD", "refs/remotes/origin/main", "refs/remotes/origin/master",
@@ -263,7 +259,7 @@ class Collector:
 
     def pending_commits(self, worktree, base):
         return self.git(worktree, "rev-list", "--reverse", "--cherry-pick", "--right-only",
-                        base + "...HEAD").splitlines()
+                        "--no-merges", base + "...HEAD").splitlines()
 
     def pr_pending(self, worktree, pending, pr):
         head = pr["head"]["sha"]
@@ -277,7 +273,12 @@ class Collector:
     def content_in_default(self, worktree, base):
         default_tree = self.git(worktree, "rev-parse", base + "^{tree}")
         try:
-            merged_tree = self.git(worktree, "merge-tree", "--write-tree", base, "HEAD").splitlines()[0]
+            objects = self.git(worktree, "rev-parse", "--path-format=absolute", "--git-path", "objects")
+            with tempfile.TemporaryDirectory(prefix="fm-open-loops-objects-") as temporary:
+                env = dict(self.env, GIT_OBJECT_DIRECTORY=temporary,
+                           GIT_ALTERNATE_OBJECT_DIRECTORIES=objects)
+                merged_tree = self.run(["git", "-C", worktree, "merge-tree", "--write-tree",
+                                        base, "HEAD"], env=env).splitlines()[0]
         except RuntimeError:
             return False
         return merged_tree == default_tree
@@ -291,7 +292,7 @@ class Collector:
         if task["kind"] == "scout":
             report = self.data / task["id"] / "report.md"
             return report.is_file() and not report.is_symlink() and report.stat().st_size > 0
-        worktree = self.admitted_worktree(task)
+        worktree = self.task_worktree(task)
         pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
         if not worktree:
             return bool(pr and pr.get("merged_at"))
@@ -308,7 +309,7 @@ class Collector:
     def unlanded(self, task):
         if task["kind"] != "ship" or self.captain_dropped(task):
             return
-        worktree = self.admitted_worktree(task)
+        worktree = self.task_worktree(task)
         if not worktree:
             return
         base = self.default_ref(worktree, task.get("mode"))

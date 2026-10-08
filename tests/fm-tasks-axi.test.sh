@@ -453,6 +453,314 @@ SH
   pass "restart handles sole dropped bodies and refuses failed retirement updates without changing the row"
 }
 
+wait_mutation_fixture() {
+  local path=$1 label=$2 child=${3:-} result=${4:-} status=0 out=''
+  local deadline=$((SECONDS + ${FM_BACKLOG_ROW_TIMEOUT_SECS:-10} + ${FM_TASKS_AXI_TIMEOUT:-30} + 10))
+  while [ ! -e "$path" ]; do
+    if [ -n "$child" ] && ! kill -0 "$child" 2>/dev/null; then
+      wait "$child" || status=$?
+      [ -z "$result" ] || out=$(cat "$result")
+      fail "$label exited before its synchronization point (status $status): $out"
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      [ -z "$result" ] || out=$(cat "$result")
+      fail "$label did not reach its synchronization point within the read/mutation grace: $out"
+    fi
+    sleep 0.05
+  done
+}
+
+make_mutation_wait_sleep() {
+  local fakebin=$1 real
+  real=$(command -v sleep)
+  cat > "$fakebin/sleep" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = 0.1 ] && [ -n "\${FAKE_LOCK_WAIT:-}" ]; then
+  : > "\$FAKE_LOCK_WAIT"
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/sleep"
+}
+
+test_unsupported_leading_backend_preserves_the_row() {
+  local dir verb form out rc before
+  local args=()
+  dir=$(make_split leading-backend)
+  wrapper_from_code "$dir" add leading-drop "unsupported leading backend" --kind scout >/dev/null \
+    || fail "could not create leading backend fixture"
+  printf 'Keep the original drop.\n' > "$dir/words"
+  wrapper_from_code "$dir" done leading-drop --drop-file "$dir/words" >/dev/null \
+    || fail "could not drop leading backend fixture"
+  before=$(cat "$dir/home/data/backlog.md")
+  for verb in done close start reopen; do
+    for form in prefix-split prefix-equals noun-split noun-equals; do
+      case "$form" in
+        prefix-split) args=(--backend markdown "$verb" leading-drop) ;;
+        prefix-equals) args=(--backend=markdown task "$verb" leading-drop) ;;
+        noun-split) args=(task --backend markdown "$verb" leading-drop) ;;
+        noun-equals) args=(task --backend=markdown "$verb" leading-drop) ;;
+      esac
+      rc=0
+      out=$(wrapper_from_code "$dir" "${args[@]}" 2>&1) || rc=$?
+      expect_code 2 "$rc" "$form $verb"
+      assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" \
+        "$form $verb changed provenance before tasks-axi rejected its leading flag"
+      cmp -s "$dir/words" "$dir/home/data/leading-drop/captain-drop.md" \
+        || fail "$form $verb changed retained captain words"
+    done
+  done
+  pass "unsupported leading backend forms retain tasks-axi's refusal without changing the task"
+}
+
+test_task_mutations_wait_for_lifecycle_custody() (
+  local dir fakebin real lock_kind verb child='' holder='' out rc
+  local args=()
+  dir=$(make_split mutation-custody)
+  fakebin=$(fm_fakebin "$dir")
+  real=$(command -v tasks-axi)
+  make_mutation_wait_sleep "$fakebin"
+  wrapper_from_code "$dir" add custody "custody fixture" --kind scout >/dev/null || fail "could not add custody row"
+  mkdir -p "$dir/home/data/custody"
+  printf '# findings\n' > "$dir/home/data/custody/report.md"
+  printf 'dropped\n' > "$dir/body"
+  wrapper_from_code "$dir" update custody --body-file "$dir/body" >/dev/null || fail "could not set custody body"
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+: > "$dir/tasks-called"
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  trap 'touch "$dir/unlock"; [ -z "$child" ] || kill "$child" 2>/dev/null || true; [ -z "$holder" ] || kill "$holder" 2>/dev/null || true' EXIT
+  for lock_kind in control meta; do
+    for verb in done close start reopen; do
+      rm -f "$dir/locked" "$dir/unlock" "$dir/lock-wait" "$dir/tasks-called"
+      FM_HOME="$dir/home" bash -c '
+        . "$1"
+        lock="$STATE/.$2-custody.lock"
+        fm_lock_acquire_wait "$lock"
+        trap '\''fm_lock_release "$lock"'\'' EXIT
+        : > "$3/locked"
+        while [ ! -e "$3/unlock" ]; do sleep 0.05; done
+      ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock_kind" "$dir" &
+      holder=$!
+      wait_mutation_fixture "$dir/locked" "$lock_kind holder" "$holder"
+      case "$verb" in
+        done) args=(done --backend markdown custody --report data/custody/report.md) ;;
+        close) args=(task close custody --backend=markdown --report data/custody/report.md) ;;
+        start) args=(task start --backend=markdown custody) ;;
+        reopen) args=(reopen custody --backend markdown) ;;
+      esac
+      PATH="$fakebin:$PATH" FAKE_LOCK_WAIT="$dir/lock-wait" \
+        wrapper_from_code "$dir" "${args[@]}" > "$dir/result" 2>&1 &
+      child=$!
+      wait_mutation_fixture "$dir/lock-wait" "$lock_kind $verb contention" "$child" "$dir/result"
+      assert_absent "$dir/tasks-called" "$verb read or changed the task before $lock_kind custody"
+      : > "$dir/unlock"
+      wait "$holder" || fail "$lock_kind holder failed"
+      holder=''
+      rc=0
+      wait "$child" || rc=$?
+      child=''
+      out=$(cat "$dir/result")
+      [ "$rc" -eq 0 ] || fail "$verb failed after $lock_kind custody was released: $out"
+      assert_present "$dir/tasks-called" "$verb did not resume after $lock_kind custody was released"
+      assert_absent "$dir/home/state/.control-custody.lock" "$verb leaked control custody"
+      assert_absent "$dir/home/state/.meta-custody.lock" "$verb leaked metadata custody"
+    done
+  done
+  FM_STATE_OVERRIDE=relative-state wrapper_from_code "$dir" start custody >/dev/null \
+    || fail "restart with caller-relative state directory failed"
+  assert_absent "$dir/code/relative-state/.control-custody.lock" "backlog-root change leaked caller-relative control custody"
+  assert_absent "$dir/code/relative-state/.meta-custody.lock" "backlog-root change leaked caller-relative metadata custody"
+  pass "completion and restart spellings wait for control then metadata custody before authoritative reads"
+)
+
+test_completion_serializes_with_a_concurrent_hold() (
+  local dir fakebin real completion='' holding='' rc out
+  dir=$(make_split completion-hold-race)
+  fakebin=$(fm_fakebin "$dir")
+  real=$(command -v tasks-axi)
+  make_mutation_wait_sleep "$fakebin"
+  wrapper_from_code "$dir" add hold-first "hold before completion" --kind ship >/dev/null || fail "could not add held row"
+  wrapper_from_code "$dir" add completion-first "completion before hold" --kind ship >/dev/null || fail "could not add completion row"
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = show ] && [ "\${2:-}" = hold-first ]; then
+  : > "$dir/held-row-read"
+fi
+if [ "\${1:-}" = hold ] && [ "\${2:-}" != hold-first ]; then
+  : > "$dir/concurrent-hold-entered"
+fi
+if [ "\${1:-}" = hold ] && [ "\${2:-}" = hold-first ]; then
+  : > "$dir/hold-entered"
+  while [ ! -e "$dir/release-hold" ]; do sleep 0.05; done
+fi
+exec "$real" "\$@"
+SH
+  cat > "$fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+: > "$dir/forge-entered"
+while [ ! -e "$dir/release-forge" ]; do sleep 0.05; done
+printf 'api_response:\n  body: merged=true\n'
+SH
+  chmod +x "$fakebin/tasks-axi" "$fakebin/gh-axi"
+  trap 'touch "$dir/release-hold" "$dir/release-forge"; [ -z "$completion" ] || kill "$completion" 2>/dev/null || true; [ -z "$holding" ] || kill "$holding" 2>/dev/null || true' EXIT
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" hold hold-first --reason "captain decides" --kind captain \
+    > "$dir/hold-result" 2>&1 &
+  holding=$!
+  wait_mutation_fixture "$dir/hold-entered" "hold mutation" "$holding" "$dir/hold-result"
+  PATH="$fakebin:$PATH" FAKE_LOCK_WAIT="$dir/completion-wait" \
+    wrapper_from_code "$dir" task close --backend markdown hold-first --pr https://github.com/o/r/pull/9 \
+    > "$dir/completion-result" 2>&1 &
+  completion=$!
+  wait_mutation_fixture "$dir/completion-wait" "completion behind hold" "$completion" "$dir/completion-result"
+  assert_absent "$dir/held-row-read" "completion read the row before its hold committed"
+  assert_absent "$dir/forge-entered" "completion checked evidence while a hold was committing"
+  : > "$dir/release-hold"
+  wait "$holding" || fail "concurrent hold failed"
+  holding=''
+  rc=0
+  wait "$completion" || rc=$?
+  completion=''
+  expect_code 2 "$rc" "completion after captain hold"
+  out=$(cat "$dir/completion-result")
+  assert_contains "$out" "open captain call" "completion did not re-read the committed captain hold"
+  [ "$(row_state "$dir" hold-first)" = " " ] || fail "completion closed a concurrently held task"
+  assert_absent "$dir/forge-entered" "held completion reached its evidence check"
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" done completion-first --pr https://github.com/o/r/pull/9 \
+    > "$dir/completion-result" 2>&1 &
+  completion=$!
+  wait_mutation_fixture "$dir/forge-entered" "completion evidence" "$completion" "$dir/completion-result"
+  PATH="$fakebin:$PATH" FAKE_LOCK_WAIT="$dir/hold-wait" \
+    wrapper_from_code "$dir" hold --reason "captain decides" --kind captain completion-first \
+    > "$dir/hold-result" 2>&1 &
+  holding=$!
+  wait_mutation_fixture "$dir/hold-wait" "hold behind completion" "$holding" "$dir/hold-result"
+  assert_absent "$dir/concurrent-hold-entered" "hold mutated the row during completion evidence"
+  : > "$dir/release-forge"
+  wait "$completion" || fail "completion failed after its evidence was released"
+  completion=''
+  wait "$holding" || fail "hold failed after completion released custody"
+  holding=''
+  [ "$(row_state "$dir" completion-first)" = x ] || fail "concurrent hold interrupted proved completion"
+  assert_contains "$(wrapper_from_code "$dir" show completion-first --full)" \
+    "hold_kind: captain" "hold did not resume after completion released custody"
+  assert_absent "$dir/home/state/.control-completion-first.lock" "completion/hold leaked control custody"
+  pass "a concurrent hold serializes before admission or after proved completion, never inside its evidence-to-mutation window"
+)
+
+test_restart_serializes_with_a_concurrent_body_change() (
+  local dir fakebin real verb restart='' updating='' rc stored
+  dir=$(make_split restart-body-race)
+  fakebin=$(fm_fakebin "$dir")
+  real=$(command -v tasks-axi)
+  make_mutation_wait_sleep "$fakebin"
+  printf 'Drop the previous work.\n' > "$dir/words"
+  printf 'Captain body update must survive.\n' > "$dir/replacement"
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = "\$FAKE_RESTART_VERB" ]; then
+  : > "$dir/restart-entered"
+  while [ ! -e "$dir/release-restart" ]; do sleep 0.05; done
+  printf 'restart failed before mutation\n' >&2
+  exit 47
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  trap 'touch "$dir/release-restart"; [ -z "$restart" ] || kill "$restart" 2>/dev/null || true; [ -z "$updating" ] || kill "$updating" 2>/dev/null || true' EXIT
+  for verb in start reopen; do
+    wrapper_from_code "$dir" add "body-$verb" "body $verb" --kind scout >/dev/null || fail "could not add body race row"
+    wrapper_from_code "$dir" done "body-$verb" --drop-file "$dir/words" >/dev/null || fail "could not drop body race row"
+    rm -f "$dir/restart-entered" "$dir/release-restart" "$dir/update-wait"
+    PATH="$fakebin:$PATH" FAKE_RESTART_VERB="$verb" FM_TASKS_AXI_TIMEOUT=30 \
+      wrapper_from_code "$dir" "$verb" "body-$verb" > "$dir/restart-result" 2>&1 &
+    restart=$!
+    wait_mutation_fixture "$dir/restart-entered" "$verb mutation" "$restart" "$dir/restart-result"
+    PATH="$fakebin:$PATH" FAKE_RESTART_VERB="$verb" FAKE_LOCK_WAIT="$dir/update-wait" \
+      wrapper_from_code "$dir" task edit --body-file "$dir/replacement" --backend markdown "body-$verb" \
+      > "$dir/update-result" 2>&1 &
+    updating=$!
+    wait_mutation_fixture "$dir/update-wait" "$verb competing body update" "$updating" "$dir/update-result"
+    stored=$(wrapper_from_code "$dir" show "body-$verb" --full) || fail "could not read paused restart"
+    assert_contains "$stored" "Historical captain disposition: dropped" "$verb did not retire provenance before mutation"
+    assert_not_contains "$stored" "Captain body update must survive." "$verb let a body change enter its rollback window"
+    : > "$dir/release-restart"
+    rc=0
+    wait "$restart" || rc=$?
+    restart=''
+    expect_code 47 "$rc" "$verb failure"
+    wait "$updating" || fail "body update did not resume after $verb"
+    updating=''
+    stored=$(wrapper_from_code "$dir" show "body-$verb" --full) || fail "could not read updated body"
+    assert_contains "$stored" "Captain body update must survive." "$verb rollback overwrote a concurrent body change"
+    assert_not_contains "$stored" "Historical captain disposition:" "$verb rollback overwrote the final replacement body"
+    cmp -s "$dir/words" "$dir/home/data/body-$verb/captain-drop.md" || fail "$verb changed retained captain words"
+  done
+  pass "start and reopen keep body updates outside retirement, failed-command readback, and rollback custody"
+)
+
+test_failed_restart_reads_back_before_restoring_drop() {
+  local dir fakebin real verb outcome id out rc stored
+  dir=$(make_split failed-restart-readback)
+  fakebin=$(fm_fakebin "$dir")
+  real=$(command -v tasks-axi)
+  printf 'Exact drop words café 航海.\n' > "$dir/words"
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = show ] && [ "\$FAKE_RESTART_OUTCOME" = unreadable ] && [ -e "$dir/restart-failed" ]; then
+  printf 'readback unavailable\n' >&2
+  exit 46
+fi
+if [ "\${1:-}" = "\$FAKE_RESTART_VERB" ]; then
+  if [ "\$FAKE_RESTART_OUTCOME" = committed ]; then
+    "$real" "\$@" || exit \$?
+  fi
+  : > "$dir/restart-failed"
+  printf 'restart command failed\n' >&2
+  exit 47
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  for verb in start reopen; do
+    for outcome in before committed unreadable; do
+      id="$verb-$outcome"
+      wrapper_from_code "$dir" add "$id" "$id" --kind scout >/dev/null || fail "could not add restart failure fixture"
+      wrapper_from_code "$dir" done "$id" --drop-file "$dir/words" >/dev/null || fail "could not drop restart failure fixture"
+      rm -f "$dir/restart-failed"
+      rc=0
+      out=$(PATH="$fakebin:$PATH" FAKE_RESTART_VERB="$verb" FAKE_RESTART_OUTCOME="$outcome" \
+        wrapper_from_code "$dir" "$verb" --backend=markdown "$id" 2>&1) || rc=$?
+      expect_code 47 "$rc" "$verb $outcome failure"
+      assert_contains "$out" "restart command failed" "$verb $outcome lost the original command error"
+      stored=$(wrapper_from_code "$dir" show "$id" --full) || fail "could not read failed restart row"
+      if [ "$outcome" = before ]; then
+        assert_contains "$stored" "state: done" "$verb failed-before-mutation changed state"
+        assert_not_contains "$stored" "Historical captain disposition:" "$verb did not roll back proved unchanged disposition"
+      else
+        assert_contains "$stored" "Historical captain disposition: dropped" "$verb $outcome restored active drop provenance"
+        assert_contains "$out" "prior drop provenance was not restored" "$verb $outcome did not describe withheld rollback"
+        if [ "$outcome" = committed ]; then
+          if [ "$verb" = start ]; then
+            assert_contains "$stored" "state: in_flight" "failed committed start was not applied"
+          else
+            assert_contains "$stored" "state: queued" "failed committed reopen was not applied"
+          fi
+        else
+          assert_contains "$stored" "state: done" "$verb unreadable fixture unexpectedly mutated state"
+          assert_contains "$out" "restart outcome could not be verified" "$verb unreadable failure was not reported"
+        fi
+      fi
+      cmp -s "$dir/words" "$dir/home/data/$id/captain-drop.md" || fail "$verb $outcome changed retained captain words"
+      assert_absent "$dir/home/state/.control-$id.lock" "$verb $outcome leaked control custody"
+      assert_absent "$dir/home/state/.meta-$id.lock" "$verb $outcome leaked metadata custody"
+    done
+  done
+  pass "failed start and reopen restore active drop only after readback proves no restart was applied"
+}
+
 test_resumed_deliveries_reach_landed_output() {
   local dir fakebin id kind json out
   command -v jq >/dev/null 2>&1 || { printf 'skip: jq not found for resumed landed output\n'; return; }
@@ -497,6 +805,15 @@ SH
   pass "real snapshot and landed projection distinguish resumed deliveries from untouched captain drops"
 }
 
+if [ "$#" -gt 0 ]; then
+  for selected_test in "$@"; do
+    case "$selected_test" in test_*) ;; *) fail "unknown test: $selected_test" ;; esac
+    declare -F "$selected_test" >/dev/null || fail "unknown test: $selected_test"
+    "$selected_test" || exit "$?"
+  done
+  exit 0
+fi
+
 test_guard_reports_regular_code_root_backlog
 test_guard_reports_foreign_link_and_archive
 test_guard_silent_for_single_home
@@ -513,6 +830,11 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_public_restart_retires_drop_provenance
   test_resumed_deliveries_reach_landed_output
   test_restart_handles_sole_drop_and_failed_body_update
+  test_unsupported_leading_backend_preserves_the_row
+  test_task_mutations_wait_for_lifecycle_custody || exit "$?"
+  test_completion_serializes_with_a_concurrent_hold || exit "$?"
+  test_restart_serializes_with_a_concurrent_body_change || exit "$?"
+  test_failed_restart_reads_back_before_restoring_drop
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi

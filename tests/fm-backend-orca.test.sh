@@ -3,6 +3,10 @@
 # terminal adapter primitives in bin/backends/orca.sh.
 set -u
 
+# Cases choose their own home explicitly or through FM_ROOT_OVERRIDE; never
+# let the invoking session's active home override those isolated fixtures.
+unset FM_HOME
+
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -406,18 +410,6 @@ test_remove_worktree_rejects_orca_error_json() {
   [ "$status" -ne 0 ] || fail "remove_worktree should fail on Orca ok:false JSON"
   assert_contains "$out" "worktree not found" "remove_worktree should surface the Orca removal error"
   pass "fm_backend_orca_remove_worktree: fails closed on ok:false JSON"
-}
-
-test_worktree_path_resolves_id() {
-  local out
-  orca_case path-resolve
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-123::/orca/wt-123","path":"/tmp/orca-wt"}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
-    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_path wt-123::/orca/wt-123' "$ROOT" )
-  [ "$out" = /tmp/orca-wt ] || fail "worktree path helper should print the resolved path, got '$out'"
-  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''show'$'\x1f''--worktree'$'\x1f''id:wt-123::/orca/wt-123'$'\x1f''--json' \
-    "worktree path helper did not call orca worktree show"
-  pass "fm_backend_orca_worktree_path: resolves an Orca worktree id to its path"
 }
 
 test_json_get_ignores_undocumented_terminal_id_shapes() {
@@ -892,7 +884,6 @@ test_scout_teardown_removes_orca_worktree_via_helper() {
     "backend=orca" "orca_worktree_id=wt-teardown::/orca/wt-teardown" \
     "decisions_reviewed=1" "decision_keys="
   orca_case teardown
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-teardown::/orca/wt-teardown","path":"%s"}}}\n' "$wt" > "$RESP/1.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
   out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
@@ -907,45 +898,6 @@ test_scout_teardown_removes_orca_worktree_via_helper() {
     "teardown did not remove the Orca worktree through orca worktree rm"
   assert_absent "$state/$id.meta" "teardown should remove task metadata"
   pass "fm-teardown.sh backend=orca: scout report gate then helper-backed worktree removal"
-}
-
-test_scout_teardown_refuses_orca_id_path_mismatch() {
-  local proj wt other_wt data state config id out rc neutral
-  id="orcascoutmismatchz5"
-  proj="$TMP_ROOT/scout-mismatch-project"
-  wt="$TMP_ROOT/scout-mismatch-wt"
-  other_wt="$TMP_ROOT/scout-mismatch-other-wt"
-  data="$TMP_ROOT/scout-mismatch-data"
-  state="$TMP_ROOT/scout-mismatch-state"
-  config="$TMP_ROOT/scout-mismatch-config"
-  fm_git_worktree "$proj" "$wt" "fm/$id"
-  git -C "$proj" worktree add --quiet -b "fm/$id-other" "$other_wt"
-  mkdir -p "$data/$id" "$state" "$config"
-  printf 'report\n' > "$data/$id/report.md"
-  touch "$state/.last-watcher-beat"
-  fm_write_meta "$state/$id.meta" \
-    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-scout-mismatch" "worktree=$wt" "project=$proj" \
-    "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
-    "backend=orca" "orca_worktree_id=wt-scout-mismatch::/orca/wt-scout-mismatch" \
-    "decisions_reviewed=1" "decision_keys="
-  orca_case scout-mismatch
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-scout-mismatch::/orca/wt-scout-mismatch","path":"%s"}}}\n' "$other_wt" > "$RESP/1.out"
-  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
-  set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
-    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "Orca scout teardown should refuse when id path differs from worktree="
-  assert_contains "$out" "not inspected worktree" \
-    "mismatched Orca scout worktree path refusal should name the mismatch"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close' \
-    "refused mismatched Orca scout teardown should not close terminals"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
-    "refused mismatched Orca scout teardown should not remove worktrees"
-  assert_present "$state/$id.meta" "refused mismatched scout teardown should preserve metadata"
-  pass "fm-teardown.sh backend=orca: scout teardown refuses id/path mismatches"
 }
 
 test_teardown_skips_orca_worktree_when_path_missing() {
@@ -1008,9 +960,8 @@ test_teardown_preserves_metadata_when_orca_remove_error_json() {
     "backend=orca" "orca_worktree_id=wt-remove-error::/orca/wt-remove-error" \
     "decisions_reviewed=1" "decision_keys="
   orca_case remove-error-teardown
-  printf '{"ok":true,"result":{"worktree":{"path":"%s"}}}\n' "$wt" > "$RESP/1.out"
-  printf '{"ok":true,"result":{}}\n' > "$RESP/2.out"
-  printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/3.out"
+  printf '{"ok":true,"result":{}}\n' > "$RESP/1.out"
+  printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/2.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
   out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
@@ -1053,7 +1004,7 @@ test_scout_teardown_refuses_orca_missing_report_when_path_missing() {
   pass "fm-teardown.sh backend=orca: scout report gate precedes pathless helper cleanup"
 }
 
-test_ship_teardown_refuses_orca_missing_worktree_path() {
+test_ship_teardown_cleans_up_orca_missing_worktree_path() {
   local proj wt data state config id out rc neutral
   id="orcashipmissingz8"
   proj="$TMP_ROOT/missing-ship-project"
@@ -1076,15 +1027,16 @@ test_ship_teardown_refuses_orca_missing_worktree_path() {
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "Orca ship teardown should refuse a missing worktree path"
-  assert_contains "$out" "no inspectable git worktree" \
-    "Orca ship teardown should explain the fail-closed worktree requirement"
-  [ ! -s "$LOG" ] || fail "refused Orca ship teardown should not close terminals or remove worktrees"
-  assert_present "$state/$id.meta" "refused Orca ship teardown should preserve metadata"
-  pass "fm-teardown.sh backend=orca: ship teardown fails closed when worktree path is missing"
+  expect_code 0 "$rc" "Orca ship teardown should succeed when the recorded worktree path is absent"$'\n'"$out"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-missing-ship'$'\x1f''--json' \
+    "teardown did not close the recorded Orca terminal when the ship path was absent"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "teardown removed an Orca worktree when the recorded ship path was absent"
+  assert_absent "$state/$id.meta" "successful ship helper cleanup should remove task metadata"
+  pass "fm-teardown.sh backend=orca: absent ship path releases terminal without removing a backend copy"
 }
 
-test_ship_teardown_removes_orca_worktree_when_id_path_matches() {
+test_ship_teardown_removes_orca_worktree_via_helper() {
   local proj wt data state config id out rc neutral
   id="orcashipmatchz2"
   proj="$TMP_ROOT/ship-match-project"
@@ -1100,7 +1052,6 @@ test_ship_teardown_removes_orca_worktree_when_id_path_matches() {
     "harness=claude" "kind=ship" "mode=local-only" "yolo=off" \
     "backend=orca" "orca_worktree_id=wt-ship-match::/orca/wt-ship-match"
   orca_case ship-match
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-ship-match::/orca/wt-ship-match","path":"%s"}}}\n' "$wt" > "$RESP/1.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
   out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
@@ -1108,91 +1059,13 @@ test_ship_teardown_removes_orca_worktree_when_id_path_matches() {
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
   set -e
-  expect_code 0 "$rc" "Orca ship teardown should succeed when the id path matches the inspected worktree"$'\n'"$out"
-  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''show'$'\x1f''--worktree'$'\x1f''id:wt-ship-match::/orca/wt-ship-match'$'\x1f''--json' \
-    "teardown did not resolve the Orca worktree id before removal"
+  expect_code 0 "$rc" "Orca ship teardown should succeed for landed work"$'\n'"$out"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-ship-match'$'\x1f''--json' \
-    "teardown did not close the matched Orca terminal"
+    "teardown did not close the recorded Orca terminal"
   assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:wt-ship-match::/orca/wt-ship-match'$'\x1f''--force'$'\x1f''--json' \
-    "teardown did not remove the matched Orca worktree"
-  assert_absent "$state/$id.meta" "successful matched teardown should remove task metadata"
-  pass "fm-teardown.sh backend=orca: ship teardown requires a matching Orca id path"
-}
-
-test_ship_teardown_refuses_orca_unresolvable_worktree_id() {
-  local proj wt data state config id out rc neutral
-  id="orcashipunresolvedz1"
-  proj="$TMP_ROOT/ship-unresolved-project"
-  wt="$TMP_ROOT/ship-unresolved-wt"
-  data="$TMP_ROOT/ship-unresolved-data"
-  state="$TMP_ROOT/ship-unresolved-state"
-  config="$TMP_ROOT/ship-unresolved-config"
-  fm_git_worktree "$proj" "$wt" "fm/$id"
-  mkdir -p "$data/$id" "$state" "$config"
-  touch "$state/.last-watcher-beat"
-  fm_write_meta "$state/$id.meta" \
-    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-ship-unresolved" "worktree=$wt" "project=$proj" \
-    "harness=claude" "kind=ship" "mode=local-only" "yolo=off" \
-    "backend=orca" "orca_worktree_id=wt-ship-unresolved::/orca/wt-ship-unresolved"
-  orca_case ship-unresolved
-  printf '1\n' > "$RESP/1.exit"
-  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
-  set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
-    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "Orca ship teardown should refuse when the worktree id cannot be resolved"
-  assert_contains "$out" "cannot resolve Orca worktree id wt-ship-unresolved::/orca/wt-ship-unresolved" \
-    "unresolvable Orca worktree id refusal should explain the fail-closed check"
-  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''show'$'\x1f''--worktree'$'\x1f''id:wt-ship-unresolved::/orca/wt-ship-unresolved'$'\x1f''--json' \
-    "teardown did not attempt to resolve the Orca worktree id"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close' \
-    "refused unresolved Orca ship teardown should not close terminals"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
-    "refused unresolved Orca ship teardown should not remove worktrees"
-  assert_present "$state/$id.meta" "refused unresolved Orca ship teardown should preserve metadata"
-  pass "fm-teardown.sh backend=orca: ship teardown fails closed when id resolution fails"
-}
-
-test_ship_teardown_refuses_orca_id_path_mismatch() {
-  local proj wt other_wt data state config id out rc neutral
-  id="orcashipmismatchz9"
-  proj="$TMP_ROOT/ship-mismatch-project"
-  wt="$TMP_ROOT/ship-mismatch-wt"
-  other_wt="$TMP_ROOT/ship-mismatch-other-wt"
-  data="$TMP_ROOT/ship-mismatch-data"
-  state="$TMP_ROOT/ship-mismatch-state"
-  config="$TMP_ROOT/ship-mismatch-config"
-  fm_git_worktree "$proj" "$wt" "fm/$id"
-  git -C "$proj" worktree add --quiet -b "fm/$id-other" "$other_wt"
-  mkdir -p "$data/$id" "$state" "$config"
-  touch "$state/.last-watcher-beat"
-  fm_write_meta "$state/$id.meta" \
-    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-ship-mismatch" "worktree=$wt" "project=$proj" \
-    "harness=claude" "kind=ship" "mode=local-only" "yolo=off" \
-    "backend=orca" "orca_worktree_id=wt-ship-mismatch::/orca/wt-ship-mismatch"
-  orca_case ship-mismatch
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-ship-mismatch::/orca/wt-ship-mismatch","path":"%s"}}}\n' "$other_wt" > "$RESP/1.out"
-  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
-  set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
-    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "Orca ship teardown should refuse when the id path differs from worktree="
-  assert_contains "$out" "not inspected worktree" \
-    "mismatched Orca worktree path refusal should name the mismatch"
-  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''show'$'\x1f''--worktree'$'\x1f''id:wt-ship-mismatch::/orca/wt-ship-mismatch'$'\x1f''--json' \
-    "teardown did not resolve the mismatched Orca worktree id"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close' \
-    "refused mismatched Orca ship teardown should not close terminals"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
-    "refused mismatched Orca ship teardown should not remove worktrees"
-  assert_present "$state/$id.meta" "refused mismatched Orca ship teardown should preserve metadata"
-  pass "fm-teardown.sh backend=orca: ship teardown refuses id/path mismatches"
+    "teardown did not remove the Orca worktree through orca worktree rm"
+  assert_absent "$state/$id.meta" "successful ship teardown should remove task metadata"
+  pass "fm-teardown.sh backend=orca: ship teardown uses helper-backed worktree removal"
 }
 
 test_teardown_refuses_orca_missing_worktree_id() {
@@ -1280,12 +1153,8 @@ test_secondmate_force_teardown_removes_orca_child_via_orca() {
     "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
     "backend=orca" "orca_worktree_id=wt-child-cleanup::/orca/wt-child-cleanup"
   orca_case secondmate-child-cleanup
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/1.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/2.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/3.out"
-  printf '{"ok":true,"result":{}}\n' > "$RESP/4.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/5.out"
-  printf '{"ok":true,"result":{}}\n' > "$RESP/6.out"
+  printf '{"ok":true,"result":{}}\n' > "$RESP/1.out"
+  printf '{"ok":true,"result":{}}\n' > "$RESP/2.out"
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
@@ -1302,49 +1171,6 @@ test_secondmate_force_teardown_removes_orca_child_via_orca() {
     "child cleanup closed the stable alias instead of the Orca terminal"
   assert_absent "$home/state/domain.meta" "parent metadata should be removed after forced teardown"
   pass "fm-teardown.sh --force: removes Orca secondmate children through Orca"
-}
-
-test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch() {
-  local home subhome childproj childwt other_wt child_id neutral out rc
-  home="$TMP_ROOT/orca-child-mismatch-parent"
-  subhome="$TMP_ROOT/orca-child-mismatch-secondmate"
-  childproj="$subhome/projects/alpha"
-  childwt="$TMP_ROOT/orca-child-mismatch-worktree"
-  other_wt="$TMP_ROOT/orca-child-mismatch-other-worktree"
-  child_id="orcachildmismatchz1"
-  mkdir -p "$home/state" "$home/data" "$subhome/state" "$subhome/projects"
-  printf 'domain\n' > "$subhome/.fm-secondmate-home"
-  fm_git_worktree "$childproj" "$childwt" "fm/$child_id"
-  git -C "$childproj" worktree add --quiet -b "fm/$child_id-other" "$other_wt"
-  fm_write_meta "$home/state/domain.meta" \
-    "window=firstmate:fm-domain" "worktree=$subhome" "project=$subhome" \
-    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
-    "home=$subhome" "projects=alpha"
-  printf '%s\n' "- domain - Orca child cleanup (home: $subhome; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
-    > "$home/data/secondmates.md"
-  fm_write_meta "$subhome/state/$child_id.meta" \
-    "window=fm-$child_id" "endpoint_task_id=$child_id" \
-    "terminal=term-child-mismatch" "worktree=$childwt" "project=$childproj" \
-    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
-    "backend=orca" "orca_worktree_id=wt-child-mismatch::/orca/wt-child-mismatch"
-  orca_case secondmate-child-mismatch
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-child-mismatch::/orca/wt-child-mismatch","path":"%s"}}}\n' "$other_wt" > "$RESP/1.out"
-  add_tmux_fake "$FB"
-  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
-  set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
-    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" 2>&1 )
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "forced secondmate teardown should refuse mismatched Orca child id/path"
-  assert_contains "$out" "not inspected worktree" \
-    "mismatched Orca child worktree path refusal should name the mismatch"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close' \
-    "refused mismatched Orca child cleanup should not close terminals"
-  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
-    "refused mismatched Orca child cleanup should not remove worktrees"
-  assert_present "$home/state/domain.meta" "refused forced secondmate teardown should preserve parent metadata"
-  pass "fm-teardown.sh --force: refuses Orca child id/path mismatches"
 }
 
 test_secondmate_force_teardown_refuses_partial_orca_child() {
@@ -1394,6 +1220,18 @@ test_dispatcher_sources_orca_and_routes_primitives() {
   pass "fm-backend dispatcher: accepts orca and routes capture through bin/backends/orca.sh"
 }
 
+# Optional positional test function names select cases without changing the default suite.
+if [ "$#" -gt 0 ]; then
+  for selected_test in "$@"; do
+    case "$selected_test" in test_*) ;; *) fail "unknown test: $selected_test" ;; esac
+    declare -F "$selected_test" >/dev/null || fail "unknown test: $selected_test"
+  done
+  for selected_test in "$@"; do
+    "$selected_test" || exit "$?"
+  done
+  exit 0
+fi
+
 test_capture_reads_terminal_tail_json
 test_capture_falls_back_to_text_fields
 test_capture_fails_on_orca_error_json
@@ -1416,7 +1254,6 @@ test_kill_is_best_effort_close
 test_kill_refuses_when_the_orca_cli_is_absent
 test_remove_worktree_refuses_empty_id
 test_remove_worktree_rejects_orca_error_json
-test_worktree_path_resolves_id
 test_dispatcher_sources_orca_and_routes_primitives
 test_json_get_ignores_undocumented_terminal_id_shapes
 test_worktree_and_terminal_helpers_parse_json
@@ -1433,16 +1270,12 @@ test_peek_send_and_crew_state_route_through_orca_meta
 test_peek_and_crew_state_fail_closed_on_orca_error_json
 test_target_exists_rejects_orca_error_json
 test_scout_teardown_removes_orca_worktree_via_helper
-test_scout_teardown_refuses_orca_id_path_mismatch
 test_teardown_skips_orca_worktree_when_path_missing
 test_teardown_preserves_metadata_when_orca_remove_error_json
 test_scout_teardown_refuses_orca_missing_report_when_path_missing
-test_ship_teardown_refuses_orca_missing_worktree_path
-test_ship_teardown_removes_orca_worktree_when_id_path_matches
-test_ship_teardown_refuses_orca_unresolvable_worktree_id
-test_ship_teardown_refuses_orca_id_path_mismatch
+test_ship_teardown_cleans_up_orca_missing_worktree_path
+test_ship_teardown_removes_orca_worktree_via_helper
 test_teardown_refuses_orca_missing_worktree_id
 test_teardown_refuses_orca_worktree_without_terminal_handle
 test_secondmate_force_teardown_removes_orca_child_via_orca
-test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch
 test_secondmate_force_teardown_refuses_partial_orca_child

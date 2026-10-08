@@ -2570,7 +2570,21 @@ open_loops_surface() {
       || open_loops_stale_wake "$ledger"
     return 0
   fi
-  ids=$(jq -r '[.rows[]? | select(.overdue) | .id] | sort | .[]' "$ledger" 2>/dev/null) || return 0
+  ids=$(jq -rs '
+    if length == 1 then .[0] else error("expected one open-loop ledger") end
+    | if type == "object" and .schema == "fm-open-loops.v1"
+        and (.generated_epoch | type) == "number"
+        and (.home | type) == "string" and (.home | length) > 0
+        and (.complete | type) == "boolean" and (.rows | type) == "array"
+        and all(.rows[]; type == "object" and (.id | type) == "string"
+          and (.id | length) > 0 and (.overdue | type) == "boolean")
+      then [.rows[] | select(.overdue) | .id] | sort | .[]
+      else error("invalid open-loop ledger") end
+  ' "$ledger" 2>/dev/null) || return 0
+  if [ -f "$ledger" ] && [ ! -L "$ledger" ] \
+    && [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ]; then
+    rm -f "$STATE/.open-loops-stale-surfaced"
+  fi
   [ -n "$ids" ] || { rm -f "$marker"; return 0; }
   digest=$(printf '%s\n' "$ids" | cksum | awk '{print $1 "-" $2}')
   previous=$(cat "$marker" 2>/dev/null || true)
