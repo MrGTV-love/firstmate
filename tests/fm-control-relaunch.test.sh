@@ -2736,6 +2736,338 @@ test_reclaim_refuses_an_unreadable_endpoint() {
   pass "reclaim: an unclassifiable endpoint is still refused, so two agents cannot share one"
 }
 
+# --- 8. relocating a task whose recorded worktree is gone -------------------
+#
+# A pool slot can vanish (pool reset, a quarantined slot destroyed, a disk
+# cleanup) while the task's branch and every commit on it survive in the shared
+# repository. Before `--worktree`, relaunch refused that task for good: its
+# record named a path nothing could re-create, and the only way out was to
+# hand-edit the durable record. These tests pin the supported way out and every
+# case it must still refuse.
+
+git_commit_file() {  # <worktree> <file> <message>
+  printf '%s\n' "$3" > "$1/$2"
+  git -C "$1" add "$2"
+  git -C "$1" -c user.name=t -c user.email=t@example.com commit -qm "$3"
+}
+
+set_case_meta_field() {  # <case-dir> <id> <key> <value>
+  local meta="$1/home/state/$2.meta"
+  awk -F= -v key="$3" -v value="$4" '
+    $1 != key { print }
+    END { printf "%s=%s\n", key, value }
+  ' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+}
+
+# make_relocation_case <case-dir> <id> [keep-registration]: a ship task with one
+# commit made in its copy, then the copy vanishes. A fresh copy of the same
+# branch exists at <case-dir>/dest, and the endpoint holds an idle shell in it.
+# <case-dir>/first-head and committed-head hold the branch's two commits.
+make_relocation_case() {
+  local dir=$1 id=$2 keep=${3:-}
+  add_ship_task "$dir" "$id" claude
+  printf 'branch=task-%s\n' "$id" >> "$dir/home/state/$id.meta"
+  git -C "$dir/wt" rev-parse HEAD > "$dir/first-head"
+  git_commit_file "$dir/wt" committed.txt "committed before the copy vanished"
+  git -C "$dir/wt" rev-parse HEAD > "$dir/committed-head"
+  rm -rf "$dir/wt"
+  if [ "$keep" = keep-registration ]; then
+    git -C "$dir/proj" worktree add -q -f "$dir/dest" "task-$id"
+  else
+    git -C "$dir/proj" worktree prune
+    git -C "$dir/proj" worktree add -q "$dir/dest" "task-$id"
+  fi
+  printf zsh > "$dir/fake/command"
+  printf '%s' "$dir/dest" > "$dir/fake/cwd"
+  printf 'working: preserved history\n' > "$dir/home/state/$id.status"
+}
+
+# run_relocation_refusal <case-dir> <id> <fragment> <what> [destination]: the
+# relocation must refuse before anything is stopped, journaled or edited.
+run_relocation_refusal() {
+  local dir=$1 id=$2 fragment=$3 what=$4 dest=${5:-$1/dest} out rc meta_before brief_before
+  meta_before=$(cat "$dir/home/state/$id.meta")
+  brief_before=$(cat "$dir/home/data/$id/brief.md")
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dest" --note "resume"); rc=$?
+  expect_code 1 "$rc" "relocation must refuse ($what)"$'\n'"$out"
+  assert_contains "$out" "$fragment" "relocation refused for the wrong reason ($what)"
+  [ "$(cat "$dir/home/state/$id.meta")" = "$meta_before" ] \
+    || fail "a refused relocation changed the durable record ($what)"
+  [ "$(cat "$dir/home/data/$id/brief.md")" = "$brief_before" ] \
+    || fail "a refused relocation edited the instructions ($what)"
+  assert_absent "$dir/home/state/$id.control-relaunch" "a refused relocation wrote a journal ($what)"
+  assert_absent "$dir/fake/created-windows" "a refused relocation created an endpoint ($what)"
+  [ ! -s "$dir/fake/literal" ] || fail "a refused relocation sent input to the endpoint ($what)"
+}
+
+test_relocation_rebinds_a_vanished_worktree_to_a_fresh_copy() {
+  local dir out rc id=rl100
+  dir=$(new_case relocate-valid "$id")
+  make_relocation_case "$dir" "$id"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "the old copy vanished"); rc=$?
+  expect_code 0 "$rc" "a vanished copy must relocate onto a fresh copy of its branch"$'\n'"$out"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "the record was not rebound to the fresh copy"
+  [ "$(meta_field "$dir" "$id" branch)" = "task-$id" ] || fail "relocation changed the recorded branch"
+  [ "$(meta_field "$dir" "$id" endpoint_task_id)" = "$id" ] || fail "relocation changed the task identity"
+  [ "$(meta_field "$dir" "$id" window)" = "fmses:fm-$id" ] || fail "relocation moved the endpoint"
+  [ "$(git -C "$dir/dest" rev-parse HEAD)" = "$(cat "$dir/committed-head")" ] || fail "the fresh copy lost committed work"
+  [ -z "$(git -C "$dir/dest" status --porcelain)" ] || fail "relocation left the fresh copy dirty"
+  assert_present "$dir/dest/.claude/settings.local.json" "the replacement was not wired in the fresh copy"
+  assert_grep "cd -- '$dir/dest'" "$dir/fake/keys" "the replacement launched outside the fresh copy"
+  assert_contains "$(cat "$dir/home/state/$id.status")" "preserved history" "relocation truncated the status log"
+  assert_grep "the old copy vanished" "$dir/home/data/$id/brief.md" "relocation dropped the progress note"
+  assert_grep "proven absent" "$dir/home/data/$id/brief.md" "the note must tell the worker its copy was replaced"
+  [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "relocation did not complete its journal"
+  [ "$(journal_field "$dir" "$id" relocation_from)" = "$dir/wt" ] || fail "the journal lost the vanished path"
+  [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/dest" ] || fail "the journal lost the fresh copy"
+  [ "$(journal_field "$dir" "$id" relocation_head)" = "$(cat "$dir/committed-head")" ] || fail "the journal lost the recorded head"
+  [ "$(journal_field "$dir" "$id" relocation_head_source)" = branch-tip ] || fail "the journal must name the weakest evidence it used"
+  pass "relocation: a vanished copy rebinds to a fresh copy of its branch, keeping identity, endpoint, status and note"
+}
+
+test_relocation_uses_the_strongest_recorded_head_and_requires_it() {
+  local dir id out rc variant source
+  for variant in meta-head registered journal pr-head; do
+    id="rl101$variant"
+    dir=$(new_case "relocate-evidence-$variant" "$id")
+    if [ "$variant" = registered ]; then
+      make_relocation_case "$dir" "$id" keep-registration
+    else
+      make_relocation_case "$dir" "$id"
+    fi
+    case "$variant" in
+      meta-head) printf 'worktree_head=%s\n' "$(cat "$dir/first-head")" >> "$dir/home/state/$id.meta"; source=meta-worktree_head ;;
+      registered) source=registered-worktree ;;
+      journal)
+        printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/first-head")" > "$dir/home/state/$id.control-relaunch"
+        source=journal
+        ;;
+      pr-head) printf 'pr_head=%s\n' "$(cat "$dir/first-head")" >> "$dir/home/state/$id.meta"; source=meta-pr_head ;;
+    esac
+    out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+    expect_code 0 "$rc" "a copy containing the recorded head must relocate ($variant)"$'\n'"$out"
+    [ "$(journal_field "$dir" "$id" relocation_head_source)" = "$source" ] \
+      || fail "the journal named '$(journal_field "$dir" "$id" relocation_head_source)', not $source ($variant)"
+  done
+
+  # A branch moved BACK to an older commit (a reset while recreating the copy)
+  # silently drops the task's commits. Every recorded head must catch that.
+  for variant in meta-head registered; do
+    id="rl102$variant"
+    dir=$(new_case "relocate-reset-$variant" "$id")
+    if [ "$variant" = registered ]; then
+      make_relocation_case "$dir" "$id" keep-registration
+    else
+      make_relocation_case "$dir" "$id"
+      printf 'worktree_head=%s\n' "$(cat "$dir/committed-head")" >> "$dir/home/state/$id.meta"
+    fi
+    git -C "$dir/dest" reset -q --hard "$(cat "$dir/first-head")"
+    run_relocation_refusal "$dir" "$id" "does not contain" "branch reset behind the recorded head ($variant)"
+  done
+  pass "relocation: the copy must contain the strongest recorded head, so a reset branch is refused"
+}
+
+test_relocation_refuses_every_unsafe_destination() {
+  local dir id variant fragment root_uid foreign
+  root_uid=$(id -u)
+  for variant in present dangling-symlink unreadable-ancestry branch detached head-unrelated head-missing head-malformed \
+      owned owned-alias other-repo primary subdir dirty scout secondmate relative missing-dest same-as-recorded; do
+    id="rl103${variant//-/}"
+    dir=$(new_case "relocate-refuse-$variant" "$id")
+    make_relocation_case "$dir" "$id"
+    fragment=
+    case "$variant" in
+      present) mkdir "$dir/wt"; fragment="still exists" ;;
+      dangling-symlink) ln -s "$dir/nowhere" "$dir/wt"; fragment="still exists" ;;
+      unreadable-ancestry)
+        [ "$root_uid" != 0 ] || { echo "skip - unreadable ancestry needs a non-root user"; continue; }
+        mkdir -p "$dir/locked"
+        set_case_meta_field "$dir" "$id" worktree "$dir/locked/wt"
+        chmod 000 "$dir/locked"
+        fragment="cannot be proven"
+        ;;
+      branch) git -C "$dir/dest" checkout -q -b elsewhere; fragment="does not equal the recorded branch" ;;
+      detached) git -C "$dir/dest" checkout -q --detach; fragment="does not equal the recorded branch" ;;
+      head-unrelated)
+        foreign=$(printf 'unrelated\n' | git -C "$dir/proj" -c user.name=t -c user.email=t@example.com commit-tree "$(git -C "$dir/proj" rev-parse 'HEAD^{tree}')")
+        printf 'worktree_head=%s\n' "$foreign" >> "$dir/home/state/$id.meta"
+        fragment="does not contain"
+        ;;
+      head-missing)
+        printf 'worktree_head=%s\n' 0123456789abcdef0123456789abcdef01234567 >> "$dir/home/state/$id.meta"
+        fragment="not in the repository"
+        ;;
+      head-malformed) printf 'worktree_head=not-a-commit\n' >> "$dir/home/state/$id.meta"; fragment="full commit id" ;;
+      owned) printf 'worktree=%s\n' "$dir/dest" > "$dir/home/state/other.meta"; fragment="recorded by another task" ;;
+      owned-alias)
+        ln -s "$dir/dest" "$dir/alias"
+        printf 'worktree=%s\n' "$dir/alias" > "$dir/home/state/other.meta"
+        fragment="recorded by another task"
+        ;;
+      other-repo)
+        fm_git_worktree "$dir/foreign-proj" "$dir/foreign-wt" "task-$id"
+        fragment="same repository"
+        ;;
+      primary) fragment="isolated worktree" ;;
+      subdir) mkdir "$dir/dest/subdir"; fragment="not a worktree root" ;;
+      dirty) printf 'someone else\n' > "$dir/dest/stray.txt"; fragment="uncommitted changes" ;;
+      scout) set_case_meta_field "$dir" "$id" kind scout; fragment="ships only" ;;
+      secondmate) set_case_meta_field "$dir" "$id" kind secondmate; fragment="ships only" ;;
+      relative) fragment="absolute path" ;;
+      missing-dest) fragment="not a readable directory" ;;
+      same-as-recorded) fragment="still exists" ;;
+    esac
+    case "$variant" in
+      other-repo) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/foreign-wt" ;;
+      primary) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/proj" ;;
+      subdir) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/dest/subdir" ;;
+      relative) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "dest" ;;
+      missing-dest) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/nope" ;;
+      same-as-recorded) mkdir "$dir/wt"; run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/wt" ;;
+      *) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" ;;
+    esac
+    chmod 755 "$dir/locked" 2>/dev/null || true
+  done
+  pass "relocation: a present copy, a wrong branch, unaccounted heads, a shared or foreign copy and every other unsafe destination refuse"
+}
+
+test_relocation_never_overwrites_or_deletes_a_foreign_harness_file() {
+  local dir id rel before out rc n=0
+  for rel in .claude/settings.local.json .opencode/plugins/fm-busy-state.js .fm-grok-turnend .fm-kimi-turnend; do
+    n=$((n + 1))
+    id="rl104$n"
+    dir=$(new_case "relocate-wiring-$n" "$id")
+    make_relocation_case "$dir" "$id"
+    mkdir -p "$(dirname "$dir/dest/$rel")"
+    printf 'the project owns this file: %s\n' "$rel" > "$dir/dest/$rel"
+    # A project commonly ignores these local files, which is exactly when the
+    # clean-copy check cannot see them and the harness-file check must.
+    printf '%s\n' "$rel" >> "$(git -C "$dir/dest" rev-parse --path-format=absolute --git-path info/exclude)"
+    before=$(cat "$dir/dest/$rel")
+    run_relocation_refusal "$dir" "$id" "harness file" "foreign $rel"
+    [ "$(cat "$dir/dest/$rel")" = "$before" ] || fail "a refused relocation changed $rel"
+    # The launch owner repeats the check where it overwrites and deletes, so a
+    # file that appears after the control plane looked is protected as well.
+    out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+    expect_code 1 "$rc" "the launch owner must refuse a foreign $rel"$'\n'"$out"
+    assert_contains "$out" "harness file" "the launch owner refused for the wrong reason ($rel)"
+    [ "$(cat "$dir/dest/$rel")" = "$before" ] || fail "the launch owner changed $rel"
+    [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "a refused launch rebound the record ($rel)"
+  done
+  pass "relocation: a destination's own harness files are never overwritten or deleted"
+}
+
+test_relocation_proof_survives_every_failure_journal_rewrite() {
+  local dir id variant out rc phase expect_meta
+  for variant in launch-refused stop-transport publish-failed complete-journal; do
+    id="rl105${variant//-/}"
+    dir=$(new_case "relocate-journal-$variant" "$id")
+    make_relocation_case "$dir" "$id"
+    expect_meta=$(cat "$dir/home/state/$id.meta")
+    case "$variant" in
+      launch-refused)
+        printf '%s' "$dir/proj" > "$dir/fake/cwd"
+        out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+        phase=failed:launching
+        ;;
+      stop-transport)
+        printf claude > "$dir/fake/command"
+        out=$(FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP=1 \
+          run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+        phase=failed:stopping
+        ;;
+      publish-failed)
+        make_mv_failure_stub "$dir"
+        out=$(FM_REAL_MV="$(command -v mv)" FM_FAKE_META_PUBLISH_MV_FAIL="$dir/home/state/$id.meta" \
+          run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+        phase=failed:launching
+        ;;
+      complete-journal)
+        printf codex > "$dir/fake/becomes"
+        make_mv_failure_stub "$dir"
+        out=$(FM_REAL_MV="$(command -v mv)" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL=1 \
+          run_control "$dir" "$id" relaunch --harness codex --worktree "$dir/dest" --note "resume"); rc=$?
+        phase=failed:launching
+        ;;
+    esac
+    expect_code 1 "$rc" "the staged failure must fail closed ($variant)"$'\n'"$out"
+    [ "$(journal_field "$dir" "$id" phase)" = "$phase" ] \
+      || fail "the journal phase was '$(journal_field "$dir" "$id" phase)', not $phase ($variant)"
+    [ "$(journal_field "$dir" "$id" relocation_from)" = "$dir/wt" ] || fail "the failure journal lost relocation_from ($variant)"
+    [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/dest" ] || fail "the failure journal lost relocation_to ($variant)"
+    [ "$(journal_field "$dir" "$id" relocation_head)" = "$(cat "$dir/committed-head")" ] \
+      || fail "the failure journal lost relocation_head ($variant)"
+    if [ "$variant" != complete-journal ]; then
+      [ "$(cat "$dir/home/state/$id.meta")" = "$expect_meta" ] || fail "an unpublished failure changed the record ($variant)"
+    fi
+  done
+
+  # The proof is what lets the identical command run again after a failure: the
+  # vanished path is still the recorded one, and the journal still vouches for it.
+  id=rl105retry
+  dir=$(new_case relocate-retry "$id")
+  make_relocation_case "$dir" "$id"
+  printf '%s' "$dir/proj" > "$dir/fake/cwd"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "first attempt"); rc=$?
+  expect_code 1 "$rc" "the first attempt must fail after the stop"$'\n'"$out"
+  git -C "$dir/dest" reset -q --hard "$(cat "$dir/first-head")"
+  printf '%s' "$dir/dest" > "$dir/fake/cwd"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "second attempt"); rc=$?
+  expect_code 1 "$rc" "a copy that lost the journaled head must still be refused on retry"$'\n'"$out"
+  assert_contains "$out" "does not contain" "the retry must be judged against the journaled head"
+  git -C "$dir/dest" reset -q --hard "$(cat "$dir/committed-head")"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "third attempt"); rc=$?
+  expect_code 0 "$rc" "the identical relocation must succeed once the copy is right"$'\n'"$out"
+  [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal ] \
+    || fail "the retry must be judged by the journaled proof, got '$(journal_field "$dir" "$id" relocation_head_source)'"
+  pass "relocation: the vanished path and recorded head survive every failure journal rewrite and judge the retry"
+}
+
+test_relocation_claims_and_respects_pool_slot_ownership() {
+  local dir id pool marker out rc
+  for id in rl106claimed rl106free; do
+    dir=$(new_case "relocate-pool-$id" "$id")
+    make_relocation_case "$dir" "$id"
+    pool="$dir/pool"
+    git -C "$dir/proj" worktree remove --force "$dir/dest"
+    mkdir -p "$pool/1"
+    printf '{}\n' > "$pool/treehouse-state.json"
+    git -C "$dir/proj" worktree add -q "$pool/1/repo" "task-$id"
+    printf '%s' "$pool/1/repo" > "$dir/fake/cwd"
+    marker="$pool/1/.fm-slot-owner"
+    if [ "$id" = rl106claimed ]; then
+      printf 'task=someone-else\nhome=/elsewhere\n' > "$marker"
+      run_relocation_refusal "$dir" "$id" "claimed by task someone-else" "slot claimed by another task" "$pool/1/repo"
+      [ "$(cat "$marker")" = $'task=someone-else\nhome=/elsewhere' ] || fail "a refused relocation changed another task's claim"
+    else
+      out=$(run_control "$dir" "$id" relaunch --worktree "$pool/1/repo" --note "resume"); rc=$?
+      expect_code 0 "$rc" "an unclaimed pool slot must relocate"$'\n'"$out"
+      assert_grep "task=$id" "$marker" "relocation did not claim the pool slot for its task"
+      assert_grep "home=$dir/home" "$marker" "the slot claim must name the owning home"
+    fi
+  done
+  pass "relocation: a pool slot claimed by another task refuses, and an unclaimed one is claimed for the task"
+}
+
+test_relocation_flag_is_scoped_to_relaunch() {
+  local dir out rc id=rl107
+  dir=$(new_case relocate-flags "$id")
+  make_relocation_case "$dir" "$id"
+  out=$(run_control "$dir" "$id" exit --worktree "$dir/dest"); rc=$?
+  expect_code 1 "$rc" "--worktree must not apply to exit"$'\n'"$out"
+  assert_contains "$out" "apply to 'relaunch' only" "the exit refusal must name the verb restriction"
+  out=$(run_control "$dir" "$id" relaunch --worktree); rc=$?
+  expect_code 1 "$rc" "--worktree needs a value"$'\n'"$out"
+  assert_contains "$out" "--worktree requires a value" "the refusal must name the missing value"
+  out=$(run_spawn "$dir" "$id" --worktree "$dir/dest"); rc=$?
+  expect_code 1 "$rc" "a fresh spawn must refuse --worktree"$'\n'"$out"
+  assert_contains "$out" "applies to --relaunch only" "the spawn refusal must name relaunch"
+  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+  expect_code 0 "$rc" "the launch owner must accept a validated relocation on its own"$'\n'"$out"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "the launch owner did not rebind the record"
+  pass "relocation: --worktree belongs to relaunch only, and the launch owner repeats the proof itself"
+}
+
 # --- herdr: a stopped server is not a destroyed endpoint --------------------
 #
 # Stopping and restarting a named Herdr server preserves workspace, tab, pane
@@ -4211,6 +4543,13 @@ test_tmux_unreadable_evidence_refuses
 test_tmux_no_server_reclaim_keeps_work_and_task
 test_tmux_reclaim_refuses_other_configured_backends
 test_reclaim_refuses_an_unreadable_endpoint
+test_relocation_rebinds_a_vanished_worktree_to_a_fresh_copy
+test_relocation_uses_the_strongest_recorded_head_and_requires_it
+test_relocation_refuses_every_unsafe_destination
+test_relocation_never_overwrites_or_deletes_a_foreign_harness_file
+test_relocation_proof_survives_every_failure_journal_rewrite
+test_relocation_claims_and_respects_pool_slot_ownership
+test_relocation_flag_is_scoped_to_relaunch
 test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server
 test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server

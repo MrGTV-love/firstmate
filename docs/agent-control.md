@@ -85,6 +85,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    The control plane checks the launch owner's read-only backlog admission before appending a note or stopping the old agent, so a predictable held or dependency-blocked replacement refusal leaves that owner intact.
    [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns the shared rule; both control and direct replacement launch recheck it.
    The recorded worktree must exist and be a worktree root; its head and dirty state are recorded.
+   A ship whose recorded worktree is gone is the one exception, and only through [Relocating a task whose worktree is gone](#relocating-a-task-whose-worktree-is-gone).
    For a `kind=secondmate` task, the home's identity marker must match and its child records must be readable, so a relaunch can never strand child work behind an unreadable home.
    A secondmate's own crewmates run in their own endpoints and outlive its relaunch; the relaunched secondmate reconciles them from its home's durable records at startup.
 3. **Record the note.**
@@ -182,6 +183,45 @@ The rebind registers no abort cleanup, so a refusal in the window between the ne
 The stray pane holds a bare shell - the harness is not delivered until after publication - so the next reclaim cleans up after it: the re-created tab carries the same `fm-<id>` label, `tab create` finds it, classifies it a husk, and closes and replaces it.
 That self-heals only when the retry resolves the *same* workspace, which the placement rule above does not guarantee.
 The worktree and the task's records are unaffected either way.
+
+### Relocating a task whose worktree is gone
+
+A pool slot can vanish while its task's branch and every commit on it survive in the shared repository.
+Plain `relaunch` refuses that task, because its record names a path nothing can re-create and it will not lose track of work it cannot account for.
+`fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh isolated copy of the same branch that the caller has already prepared.
+A scout has no branch to match and a secondmate's home is not a task copy, so both refuse.
+
+[`bin/fm-control-worktree-lib.sh`](../bin/fm-control-worktree-lib.sh) owns the proof, and both `fm-control` and `fm-spawn --relaunch --worktree` run it, so the two cannot disagree.
+It accepts the relocation only when all of these hold, and it refuses every other case before anything is stopped, journaled, edited, or created:
+
+- **The recorded path is proven absent.**
+  Absence is shown from a readable, searchable ancestor.
+  A path that exists, a dangling symlink, or an unreadable ancestry is "cannot say", never "gone".
+  An unmounted volume looks like a deleted copy, so do not relocate while one is offline.
+- **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
+- **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
+- **Its HEAD contains the recorded head.**
+  The strongest evidence that exists is used, in this order: the record's own `worktree_head`, the last head in git's own reflog for the vanished copy (it survives only until the stale registration is pruned), this task's prior control journal for that same path, the record's `pr_head`, and finally the branch tip in the shared repository.
+  The journal names the evidence used as `relocation_head_source`.
+  A `branch-tip` source is the weakest: a copy on the branch contains the tip by construction, so it proves the copy is on the branch's current line and nothing earlier.
+  Recreating the copy with a reset (`checkout -B`) moves the branch behind the task's commits, and every stronger source catches that.
+- **No other task of this home records it**, by path or by alias, and a Treehouse pool slot is not claimed by another task.
+  A slot that is free is claimed for this task under the shared project lock, as a fresh spawn does.
+- **It holds none of the harness files the launch overwrites or deletes** (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`).
+  The control plane checks, and the launch owner checks again at the moment it would write.
+  A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
+
+The journal keeps `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, the failure phases included, and the identical command is judged against that proof when it is run again after a failure.
+Only the record's `worktree=` moves, and only at the launch owner's single atomic publication.
+The task id, endpoint, brief, status log, and armed poll are untouched, and the `--note` requirement still applies.
+Uncommitted changes in the vanished copy are not recoverable, and the progress note says so.
+
+**Why the caller prepares the copy.**
+The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
+It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration or force the checkout, and both change repository administration that every lane's worktrees share.
+It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a 60-second isolation poll and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
+Validating a copy the caller prepared reads that state and changes none of it: one new library, no new process, and every refusal above before the first side effect.
+Editing the record by hand has none of those checks, no journal, and no lock against a concurrent launch.
 
 ### Failure and rollback
 
