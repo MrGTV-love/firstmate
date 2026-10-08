@@ -368,6 +368,18 @@ fleet_sync() {
   rm -f "$tmp"
 }
 
+# Focused config push reports successful enqueues; bootstrap reports only
+# actionable reread diagnostics, including partial-batch delivery failures.
+print_config_reread_diagnostics() {
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      ''|'  config-reread: sent') ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done <<< "$1"
+}
+
 secondmate_sync() {
   # shellcheck source=bin/fm-wake-lib.sh disable=SC1091
   . "$SCRIPT_DIR/fm-wake-lib.sh"
@@ -557,7 +569,8 @@ secondmate_sync() {
     esac
     if [ "$reread_skip_pending" -eq 0 ] \
       && fm_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
-      fm_config_reread_retry_pending "$id" "$home_real" || true
+      reread_out=$(fm_config_reread_retry_pending "$id" "$home_real" 2>&1) || true
+      print_config_reread_diagnostics "$reread_out"
       if fm_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
         echo "CONFIG_REREAD: secondmate $id: send failed: retry instruction queue is full"
         fm_lock_release "$home_lock" || true
@@ -580,12 +593,12 @@ secondmate_sync() {
       FM_CONFIG_REREAD_SKIP_PENDING="$reread_skip_pending" \
       fm_config_send_reread_nudge "$id" "$home_real" "$report" 2>&1); then
       if [ -n "$reread_out" ]; then
-        printf '%s\n' "$reread_out"
+        print_config_reread_diagnostics "$reread_out"
       else
         echo "CONFIG_REREAD: secondmate $id: send failed: unknown error"
       fi
     elif [ -n "$reread_out" ]; then
-      printf '%s\n' "$reread_out"
+      print_config_reread_diagnostics "$reread_out"
     fi
     rm -f "$report"
     fm_lock_release "$home_lock" || true
