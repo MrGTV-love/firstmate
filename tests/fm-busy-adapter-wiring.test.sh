@@ -249,6 +249,16 @@ test_claude_hooks_semantic_lifecycle() {
   done
   jq -e '.hooks.Stop | length == 1 and (.[0].hooks | length == 1 and .[0].timeout == 25)' \
     "$settings" >/dev/null || fail "Stop must have one combined command with its timeout"
+  jq -e '.hooks.PreToolUse[0].matcher == "^(Bash|Write|Edit)$" and .hooks.PostToolUse[0].matcher == "^(Bash|Read)$"
+    and .hooks.PreToolUse[0].hooks[0].command == .hooks.PostToolUse[0].hooks[0].command' "$settings" >/dev/null \
+    || fail "claude hook settings lack the jev-guard tool hooks"
+  out=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")
+  assert_contains "$out" "/bin/fm-jev-guard-hook.sh' '$HOME_DIR' " "jev-guard hook is not pinned to the owning home"
+  assert_contains "$out" "'$id' '$WT_DIR' '$HOME_DIR/data/$id'" "jev-guard hook lacks the task, worktree and task data directory"
+  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
+    | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE sh -c "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")" 2>&1) \
+    || fail "the generated jev-guard hook must exit 0 without a key"
+  [ -z "$out" ] || fail "the generated jev-guard hook must allow silently without a key: $out"
 
   out=$(classify claude "$id" "$state")
   [ "$out" = "busy fm-spawn" ] || fail "seed after spawn must be 'busy fm-spawn', got '$out'"

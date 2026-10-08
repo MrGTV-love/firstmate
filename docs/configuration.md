@@ -1260,56 +1260,6 @@ Report raw counts and outcomes, not estimated savings from a single synthetic sm
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the delivery mechanics, with focused regression coverage in [`tests/fm-spawn-compact-adviser-disable.test.sh`](../tests/fm-spawn-compact-adviser-disable.test.sh) and [`tests/fm-spawn-compact-adviser-disable-remote.test.sh`](../tests/fm-spawn-compact-adviser-disable-remote.test.sh).
 
-#### Experimental omp-native Jev bake-off
-
-The fork includes an opt-in timing-only comparison arm in [`extensions/omp-jev-pipeline.mjs`](../extensions/omp-jev-pipeline.mjs).
-Jev judges a successful, genuinely settled turn; a qualifying judgment requests omp's own compaction, leaving summary generation, retention and persistence to omp.
-Judging requires no queued messages or editor draft, context usage at least `minContextTokens`, and a snapshot with more than 20,000 conversation tokens and complete automatic coverage (`autoCoverage`).
-The adviser's own snapshot uses a 512-byte limit for each recent tool result and a 14,000-byte cumulative recent-text budget, marking clipped windows incomplete.
-For an otherwise eligible snapshot, the controller replaces each successful `read` body clipped by either limit with its exact byte count, line count and SHA-256 over the full sanitized text.
-Recovery preserves every assistant and tool-result entry in the adviser's original recent window without clipped text, within the same cumulative recent-text budget; it does not send the attested bodies or reconstruct the entire conversation.
-Clipped assistant or user text, errored or non-`read` tool results that would require clipping, redaction, images, unknown context and an unrecoverable transcript remain ineligible.
-Missing reconstruction helpers or a rebuilt window that does not match the adviser's original window cannot restore eligibility.
-A checkpoint rejected for conversation size or incomplete coverage records `coverage-ineligible` with categorical `reasons`; each judge request records `attestedResults` and `attestedBytes` (the full sanitized body bytes, not bytes transmitted) on `judge-start`.
-A completed judgment that marks work unfinished can defer an eligible automatic threshold or idle attempt once per agent loop; busy work can also defer once when Jev has returned a successful judgment within the last 60 seconds.
-Manual compaction, overflow recovery, incomplete-turn recovery, usage at or above 90% of the context window and unavailable Jev retain native precedence.
-This does not alter Firstmate's launch policy or enable the experiment by default in unattended workers.
-
-With omp 18.6.3, the extension API cannot override native `keepRecentTokens` or the cut point without replacing the compaction result.
-This arm therefore compares timing policy, not Jev-selected retention.
-Registering `session_before_compact` also prevents omp from reusing an armed speculative summary, so compare observed latency and cost rather than assuming an identical preparation cost.
-
-Install the dependency-complete, omp-compatible compact-adviser fork package into an ignored local root, then copy the static entry template into that root:
-
-```sh
-npm install --prefix .fm-adviser-root /absolute/path/to/omp-compatible-compact-adviser.tgz
-cp extensions/omp-jev-entry.mjs .fm-adviser-root/omp-jev-entry.mjs
-COMPACT_ADVISER_DISABLE=1 FM_JEV_OMP_PIPELINE=1 \
-  FM_JEV_PIPELINE_AGENT_DIR=/absolute/path/to/isolated-adviser-config \
-  FM_JEV_PIPELINE_METRICS=/absolute/path/to/private-metrics.jsonl \
-  omp --no-extensions -e "$PWD/.fm-adviser-root/omp-jev-entry.mjs"
-```
-
-The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and exported redaction and recent-window helpers, with its full dependency tree and `@earendil-works/pi-coding-agent` resolvable from the copied static entry; the unadapted registry package is not a substitute.
-The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
-Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
-The controller reuses that package's request format, profile parsing and snapshot/redaction without creating another credential store.
-The [compact-adviser setting](#compact-adviser-setting-configcompact-adviser) owns the pending compaction key-delivery contract.
-`FM_JEV_PIPELINE_AGENT_DIR` selects the adviser configuration directory; when omitted, the controller uses omp's public `getAgentDir()` and reads that configuration without modifying it.
-`TYPESAFE_BASE` follows compact-adviser's HTTPS-or-loopback-only endpoint policy.
-Neither installation nor loading changes global plugins or settings.
-
-`FM_JEV_OMP_PIPELINE=1` is required even when the extension is explicitly loaded; `COMPACT_ADVISER_DISABLE=1` disables the original adviser factory, not this separate opt-in controller.
-The optional metrics file contains event names, categorical reasons and methods, boolean outcomes, numeric timings, token counts, sanitized Jev model versions and an input-only cost estimate at USD 0.042 per million tokens, not requests, summaries, keys or task text.
-Fixture responses produce fixture usage, not paid Jev costs; keep those observations separate from real API runs.
-Pending requests and decisions are invalidated on new input, turns, navigation, compaction and shutdown.
-omp does not notify extensions of native model changes, so a managed identity check runs only while a request is pending; a completed decision can defer native compaction only for its original session, leaf and model identity.
-
-Native idle compaction requires the interactive TUI and the host's idle settings; an RPC session alone does not exercise that path.
-Native recovery also requires a runnable method for the selected model: a remote-only configuration does not make a custom provider support remote compaction.
-The portable boundary regressions run through [`tests/fm-omp-jev-pipeline.test.sh`](../tests/fm-omp-jev-pipeline.test.sh).
-Set `FM_JEV_ADVISER_DIR` to the installed dependency-complete adviser package directory to include the real helper's structured secret-redaction and snapshot/attestation/request-cap integration regressions under Bun.
-
 ### Commit attribution
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
@@ -1588,7 +1538,7 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, worker skill-selection, or [belay Stop-hook](#jev-belay-stop-hook) requests, and keeps marked brief regions out of dispatch-resolution and worker skill-selection requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, worker skill-selection, [Jev guard](#jev-guard), or [belay Stop-hook](#jev-belay-stop-hook) requests, and keeps marked brief regions out of dispatch-resolution and worker skill-selection requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
 Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so all consumers there withhold the same values.
 
@@ -1629,7 +1579,7 @@ A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
 On 2026-10-07, the captain authorized worker skill selection to send the same sanitized, never-send-filtered task text used by `bin/fm-dispatch-resolve.sh` to TypeSafe and its OpenRouter fallback, ruling “I asked for A already.”
 This authorization does not widen any other sending boundary.
-Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
+Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
 Before each request is sent, every remaining string in it is checked for literal matches through `bin/fm-typesafe-lib.sh`: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; belay checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
@@ -1727,68 +1677,30 @@ Firstmate passes its profile line unless it states a reason to override, such as
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
 
-## Jev command screening (shadow only)
+## Jev guard
 
-`bin/fm-jev-guardrail.mjs` measures risky operations on Claude's native `PreToolUse` and omp's native `tool_call` surfaces without returning a permission decision, changing input, or replacing any deterministic guard.
-The tracked project registrations screen native `Bash`/`Read` on Claude and `bash`/`read` on omp in primary and secondmate sessions; tracked callers skip `FM_TASK_ID` task contexts, and the Claude registration also skips Grok compatibility hooks.
-`fm-spawn.sh` installs the generated task caller for new Claude and omp fleet workers, including Firstmate task worktrees, so the tracked copy does not screen a task twice.
-Existing sessions need a normal authorized relaunch to load a new caller; installing files does not prove activation.
-Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERRIDE` to the owning Firstmate home so environment filtering cannot redirect its key, never-send policy or ledger; tracked secondmate callers retain their own-home launch context.
-The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
-Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
+Claude and omp ship and scout workers run the level 6 jev-guard from disler's ten-levels-of-jev, vendored unchanged under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
+[`SOURCE.md`](../bin/ten-levels/SOURCE.md) there owns the upstream commit, the license, and every Firstmate change with its reason.
+`fm-spawn.sh` installs it at launch: omp loads it through the generated worker extension, and Claude runs it through `bin/fm-jev-guard-hook.sh` on `PreToolUse` for `Bash`, `Write` and `Edit` and on `PostToolUse` for `Bash` and `Read`.
+Existing sessions need a normal authorized relaunch to load it.
+Primary and secondmate sessions and other harnesses do not run it.
 
-The screen uses the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
-Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
-It does not grant account, billing, egress, command, or secret-access authority.
-No key means `missing_key`, not a synthetic judgment.
-Timeouts, HTTP errors, transport errors and malformed answers record their concrete unavailable result while leaving the existing command decision unchanged.
+The guard asks Jev three things, exactly as upstream does:
 
-Selection reuses Firstmate's read-only shell parser, with shadow-only parsing extensions kept inside the Jev hook; deterministic guard policies and their parser behavior remain unchanged.
-Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access candidates call Jev; ordinary reader arguments without sensitive-looking tokens and printed command examples do not.
-For delete/deploy operations, production scope takes precedence over a secret-shaped target.
-Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
-Native `Read`/`read` paths select secret-shaped targets without opening the file.
-Selection policy cohort 8 conservatively checks every argument token of `cat`, `head`, `tail`, `less`, `more`, `ls`, `find`, `jq`, `grep`, `rg`, `sed`, `awk`, `base64` and `xxd` for sensitive-looking evidence: `.env`, `.ssh`/`.aws`/`.gnupg`, `.pem`/`.key`, `id_*`, keychain, credentials/secrets, `~/.config/vernant` and `auth.json`.
-This is token evidence, not a claim that a file is read: patterns, programs and attached or separate option values intentionally qualify, including `rg --max-columns 120 '.env' README.md` and `rg -C 2 --context-separator .env needle README.md`.
-The `secret_read` operation enum therefore also denotes a sensitive-token candidate; native `Read`/`read` remains path-specific.
-Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
-Wrapper parsing preserves ordered `env -S` child arguments and literal env quoting/escapes, including trailing argv and `env -P` search paths; unsupported or environment-dependent split strings remain uncertain without expanding variables.
-`command -v`/`command -V` look up a candidate without executing it; only descendants of that query are inert, while substitutions and redirections retain their own effects.
-Shell payload selection distinguishes command, script and stdin invocation, preserves known fd-0 input through literal descriptor duplication and aliases, and screens unquoted-heredoc substitutions independently of whether the shell consumes that input.
-SSH remote argv is selected after its options and destination; explicit production destinations retain production delete/deploy scope.
-Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags; executable operands after `--` remain eligible, including mixed and comma-separated kubectl secret resources, while object names such as `pods secrets` do not imply Secret access.
-Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl bundles advance only through known no-value flags and stop at value-taking or unresolved options.
-Ordinary file reads, literal form data, timestamp-only `-z` values and output-only paths remain excluded.
-`printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
-Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
-This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.
+- Before a shell command runs, what it does to the machine and whether it aims to destroy something; an irreversible or destructive answer blocks the command.
+- Before a write or edit, a path outside the allowed roots blocks without a Jev call; inside them, Jev judges whether the content holds a real credential, which blocks the write.
+- After a shell command or file read, whether the output holds instructions aimed at the agent; flagged output reaches the agent with a warning banner.
 
-Only closed structural operation/scope enums and booleans enter Jev state.
-Arbitrary arguments, paths, URLs, command text, customer content, environment values, file bodies and tool-result bodies are never sent or logged.
-The existing `config/dispatch-never-send` list additionally withholds matching native inputs locally; unreadable or non-regular lists withhold rather than send.
-The key is removed from child environments and passed to `curl` through its stdin header pipe (`-H @-`), not argv or a reopened `/dev/fd` path.
-Only the closed structural JSON request body is passed in `--data-binary` argv; this transport works with Node's socket-backed stdio on Linux as well as macOS.
+The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
+A block tells the agent the block is final and to report it rather than work around it.
+On Claude the banner arrives as added context next to the unchanged output, because Claude hooks cannot replace a built-in tool's output.
 
-The private `state/jev-guardrail.jsonl` ledger records selection outcomes, every HTTP attempt before it starts, and verdict/confidence, monotonic latency, returned token usage and estimated cost when available.
-An interrupted attempt or unavailable usage remains unknown, not zero.
-Records require a private regular file and a complete UTF-8 row write; if attempt accounting cannot be fully written, no model request starts.
-The current integration screens pre-tool inputs only; it does not register completion hooks or correlate native success, failure or denial outcomes.
-The script header and `--help` own invocation mechanics.
-
-`metrics` reports descriptive counts, p95 selected-command overhead and all-attempt known/unknown spend.
-Labelled counts, risky recall and routine would-block rates appear only in separate `historical_september30` and `synthetic` objects, never as pooled or duplicated top-level quality fields.
-The top-level `unclassified_labelled` count reports old labelled records without a recognized dataset; those labels cannot contribute to either dataset's quality.
-`evaluate` consumes labelled native inputs without executing their commands; every new case requires `dataset: "historical_september30"` or `dataset: "synthetic"`, and provenance and independent labels remain the evaluator's responsibility.
-If any case result or required attempt cannot be fully persisted, evaluation stops with an explicit error and nonzero exit instead of printing success metrics.
-Existing bytes remain intact without retries or ledger repair; a partial row can prevent `metrics` from parsing the ledger.
-Only authentic September 30 command/decision receipts may be labelled `historical_september30`; proposal examples, later synthetic observations and reconstructed commands belong to neither historical evidence nor its counts.
-The supplied reports do not provide those receipts; [the retained-source limitation](verification/runtime-backends.md#jev-shadow-native-tool-hooks) records the precise gap.
-The shipped `tests/fixtures/jev-guardrail-new-cases.json` contains only explicitly marked synthetic rows, with no placeholder historical cases.
-Until real receipts are available, the historical labelled count remains zero and historical quality rates remain `null`, even when synthetic quality is measurable.
-Historical labels and attempt records retain their original meaning; cohort 8 does not relabel prior evaluations or turn synthetic examples into historical receipts.
-Evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
-The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
-This implementation cannot enable blocking or reset that date.
+The guard sends the command, the written content (first 4,000 characters) and the tool output (first 6,000 characters) to TypeSafe.
+Only TypeSafe direct is used, with the single primary-home `TYPESAFE_API_KEY` resolved at call time through `fm_typesafe_key`; the key never enters the worker environment.
+A request whose text matches the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key) is withheld.
+A withheld request, a missing key, an exhausted upstream retry budget of 30 seconds, or any other failure lets the tool call proceed, as upstream does.
+Each decision appends one line to the owning home's private `state/jev-guard.jsonl`, with answers, usage, model and latency but without the request body.
+[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) is the portable regression, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) holds the live host evidence.
 
 ## Jev belay Stop hook
 

@@ -487,6 +487,22 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" add .agents/skills/hyper-jev
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-skill-change
 
+  mkdir -p "$repo/bin/ten-levels/extensions" "$repo/tests/assets"
+  : >"$repo/bin/ten-levels/extensions/report.ts"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-jev-guard.test.sh"
+  chmod +x "$repo/tests/fm-jev-guard.test.sh"
+  : >"$repo/tests/assets/retired-asset.mjs"
+  git -C "$repo" add tests/fm-jev-guard.test.sh tests/assets/retired-asset.mjs
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm guard-fixture
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
+  assert_contains "$listed" "tests/fm-jev-guard.test.sh" "vendored jev-guard files select the jev-guard suite"
+  git -C "$repo" add bin/ten-levels
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-guard-change
+  git -C "$repo" rm -q tests/assets/retired-asset.mjs
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a retired test asset was refused as an unmapped changed source"
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm retired-asset-change
+
   printf '\n' >>"$repo/bin/fm-procevent-quota.sh"
   printf '\n' >>"$repo/bin/fm-quota-choose.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)

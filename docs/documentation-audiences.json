@@ -373,6 +373,10 @@
       "audience": "public-product"
     },
     {
+      "path": "bin/ten-levels/SOURCE.md",
+      "audience": "maintainer-architecture"
+    },
+    {
       "path": "docs/agent-control.md",
       "audience": "maintainer-architecture"
     },

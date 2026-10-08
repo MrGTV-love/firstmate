@@ -310,7 +310,6 @@ family_for_basename() {
     fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|fm-omp-harness.test.sh|fm-herdr-lab.test.sh|fm-lint.test.sh|\
     fm-lint-workflows.test.sh|\
     fm-operational-input.test.sh|fm-pi-primary-types.test.sh|\
-    fm-omp-jev-pipeline.test.sh|\
     fm-calm-claude-mod.test.sh|\
     fm-harness-adapter-references.test.sh|\
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
@@ -1472,8 +1471,10 @@ families_for_changed_path() {
       # resolution in the caller; emit a marker family of __script__
       printf '%s\n' "__script__:$(basename "$path")"
       ;;
-    extensions/omp-jev-*.mjs|tests/assets/omp-jev-pipeline.test.mjs)
-      printf '%s\n' "__script__:fm-omp-jev-pipeline.test.sh"
+    bin/ten-levels/*)
+      # Vendored upstream jev-guard (see SOURCE.md there) and its Firstmate
+      # report.ts are exercised only through the jev-guard behavior suite.
+      printf '%s\n' "__script__:fm-jev-guard.test.sh"
       ;;
     bin/fm-test-run.sh)
       # Deliberately the WHOLE family, not just the two contract tests. This
@@ -1847,7 +1848,9 @@ families_for_changed_path() {
       fi
       ;;
     tests/*)
-      printf '%s\n' "__unmapped__:$path"
+      # A deleted test asset has no consuming suite left to select, the same
+      # retirement rule the bin/* arm above applies.
+      [ ! -e "$path" ] || printf '%s\n' "__unmapped__:$path"
       ;;
     README.md|LICENSE|assets/*|docs/*|.gitignore)
       ;;
