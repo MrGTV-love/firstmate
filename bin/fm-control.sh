@@ -315,7 +315,7 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
-    --dispatch-rule) control_want_value=dispatch-rule ;;
+    --dispatch-rule) control_want_value="dispatch-rule" ;;
     --dispatch-rule=*) NEW_DISPATCH_RULE=${control_arg#--dispatch-rule=}; DISPATCH_RULE_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;

@@ -843,7 +843,7 @@ for a in "$@"; do
     TRACEPARENT_SET=1
   ;;
   --claude-debug) CLAUDE_DEBUG=1 ;;
-  --dispatch-rule) want_value=dispatch-rule ;;
+  --dispatch-rule) want_value="dispatch-rule" ;;
   --dispatch-rule=*) DISPATCH_RULE=${a#--dispatch-rule=} ;;
   *) POS+=("$a") ;;
   esac
@@ -2542,7 +2542,7 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
 fi
 
 spawn_launch_env_wrap() {
-  local command=$1 prefix='/usr/bin/env -i' name arg
+  local command=$1 launch_env_prefix='/usr/bin/env -i' name arg
   if [ "$LAUNCH_ENV_ENABLED" != 1 ]; then
     printf '%s\n' "$command"
     return
@@ -2550,14 +2550,14 @@ spawn_launch_env_wrap() {
   for name in $FM_LAUNCH_ENV_FLOOR $LAUNCH_ENV_NAMES; do
     # shellcheck disable=SC2016
     printf -v arg '${%s+"%s=$%s"}' "$name" "$name" "$name"
-    prefix="$prefix $arg"
+    launch_env_prefix="$launch_env_prefix $arg"
   done
-  prefix="$prefix COMPACT_ADVISER_DISABLE=${COMPACT_ADVISER_SWITCH:-1}"
+  launch_env_prefix="$launch_env_prefix COMPACT_ADVISER_DISABLE=${COMPACT_ADVISER_SWITCH:-1}"
   if [ -n "${SPAWN_TRACEPARENT:-}" ]; then
     # shellcheck disable=SC2016
-    prefix="$prefix "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
+    launch_env_prefix="$launch_env_prefix "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
   fi
-  printf '%s /bin/sh -c %s\n' "$prefix" "$(shell_quote "$command")"
+  printf '%s /bin/sh -c %s\n' "$launch_env_prefix" "$(shell_quote "$command")"
 }
 
 spawn_claude_boundary_wrap() {
