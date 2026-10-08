@@ -13,7 +13,7 @@ set -u
 RUNNER="$ROOT/bin/fm-test-run.sh"
 
 POOL_TMP=$(fm_test_tmproot fm-test-run-pool)
-REAL_PYTHON=$(command -v python3)
+REAL_PYTHON=$(python3 -c 'import sys; print(sys.executable)')
 mkdir -p "$POOL_TMP/bin"
 printf '#!%s\n' "$REAL_PYTHON" >"$POOL_TMP/bin/python3"
 cat >>"$POOL_TMP/bin/python3" <<'PY'
@@ -1677,11 +1677,12 @@ test_serial_shard_guard_holds_at_every_lane_size() {
 }
 
 test_serial_shard_generation_failure_is_not_a_partial_success() {
-  local tmp dir real_sort rc
+  local tmp dir real_sort rc shard_lane
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-shard-failure.XXXXXX")
   dir="$tmp/fixture"
   shard_fixture_init "$dir"
   shard_fixture_grow "$dir" 5
+  shard_lane=$("$dir/bin/fm-test-run.sh" --list-lanes | grep -m1 '^portable-serial-[0-9]*of[0-9]*$')
   real_sort=$(command -v sort)
   mkdir -p "$tmp/fakebin"
   cat >"$tmp/fakebin/sort" <<'SH'
@@ -1698,7 +1699,7 @@ SH
   set +e
   env -i PATH="$tmp/fakebin:$PATH" REAL_SORT="$real_sort" \
     HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
-    "$dir/bin/fm-test-run.sh" --list --lane portable-serial-1of9 \
+    "$dir/bin/fm-test-run.sh" --list --lane "$shard_lane" \
     >"$tmp/out" 2>"$tmp/err"
   rc=$?
   set -e
