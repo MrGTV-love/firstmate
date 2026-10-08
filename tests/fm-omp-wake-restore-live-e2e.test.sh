@@ -242,14 +242,54 @@ wake_is_queued() {
       "$PROJECT/state/.wake-queue" 2>/dev/null
 }
 
+wake_is_restored() {
+  local content
+  composer_is pending || return 1
+  content=$(fm_backend_herdr_composer_content "$TARGET" '') || return 1
+  content=$(printf '%s' "$content" | tr -d '[:space:]')
+  case "$content" in
+    *"FIRSTMATEWATCHERWAKE:"*"$WAKE_TASK.status"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+interrupt_queued_wake() {
+  local draft=${1:-} attempt poll content
+  for attempt in 1 2 3; do
+    busy_turn
+    if [ -n "$draft" ]; then
+      send_text "$draft"
+      sleep 1
+    fi
+    queue_wake
+    send_key Escape
+    for ((poll = 0; poll < 50; poll++)); do
+      wake_is_restored && return 0
+      sleep 0.1
+    done
+    [ "$attempt" -lt 3 ] || break
+    wait_for 90 queue_drained \
+      || { screen >&2; fail "$SUBJECT: unobserved $WAKE_TASK did not drain before a fresh restoration attempt"; }
+    wait_for 120 is_idle || fail "$SUBJECT: the lane did not settle before a fresh restoration attempt"
+    content=$(fm_backend_herdr_composer_content "$TARGET" '') \
+      || fail "$SUBJECT: could not read the composer before a fresh restoration attempt"
+    [ "$content" = "$draft" ] \
+      || fail "$SUBJECT: unexpected composer text before a fresh restoration attempt: '$content'"
+    if [ -n "$draft" ]; then
+      send_key C-u
+    fi
+    wait_for 20 composer_is empty || fail "$SUBJECT: the composer was not empty before a fresh restoration attempt"
+  done
+  screen >&2
+  fail "$SUBJECT: no fresh wake was observed restored into a pending composer after Escape in 3 attempts"
+}
+
 # ---------------------------------------------------------------------------
 # Session A: the extension recovers a restored wake by itself.
 # ---------------------------------------------------------------------------
 start_omp wake-ext
 
-busy_turn
-queue_wake
-send_key Escape
+interrupt_queued_wake
 wait_for 90 queue_drained \
   || { screen >&2; fail "$SUBJECT: a wake restored to the composer by Esc was never submitted again (queue rows: $(queue_rows))"; }
 wait_for 60 composer_is empty \
@@ -258,11 +298,7 @@ pass "live omp wake restore: $SUBJECT re-submitted a wake that Esc restored to t
 
 # An operator draft typed while the wake was queued survives the recovery.
 wait_for 120 is_idle || fail "the lane did not settle after handling the wake"
-busy_turn
-send_text 'operator draft kept'
-sleep 1
-queue_wake
-send_key Escape
+interrupt_queued_wake 'operator draft kept'
 wait_for 90 queue_drained \
   || { screen >&2; fail "$SUBJECT: the wake restored next to an operator draft was never submitted again"; }
 draft=$(fm_backend_herdr_composer_content "$TARGET" '')
