@@ -328,7 +328,7 @@ JSON
     expected_root=$destination_root
     expected_profile=$destination_profile
     expected_config="$CASE_DIR/pane-config"
-    expected_bash_env=unset
+    expected_bash_env='unset'
     case "$scenario" in
       destination-healthy|destination-exhausted)
         expected_bash_env="$CASE_DIR/bash-env.sh"
@@ -348,7 +348,7 @@ SH
       printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist"
       expected_root=
       expected_profile='unset'
-      expected_config=unset
+      expected_config='unset'
     else
       printf '%s\n' PATH PI_CODING_AGENT_DIR OMP_PROFILE PI_PROFILE PI_CONFIG_DIR BASH_ENV \
         XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME > "$HOME_DIR/config/launch-env-allowlist"
@@ -410,7 +410,7 @@ test_spawn_without_fallback_uses_destination_project_capacity() {
     printf '.env\n' >> "$PROJ_DIR/.git/info/exclude"
     printf 'OMP_PROFILE=%s\n' "$destination_profile" > "$WT_DIR/.env"
     out=$(cd "$CASE_DIR/caller" && \
-      FM_FAKE_TMUX_ENV_PI_CODING_AGENT_DIR= FM_FAKE_TMUX_ENV_OMP_PROFILE=- FM_FAKE_TMUX_ENV_PI_PROFILE=- \
+      FM_FAKE_TMUX_ENV_PI_CODING_AGENT_DIR='' FM_FAKE_TMUX_ENV_OMP_PROFILE=- FM_FAKE_TMUX_ENV_PI_PROFILE=- \
       run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
         "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high)
     status=$?

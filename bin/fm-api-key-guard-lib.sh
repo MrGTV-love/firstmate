@@ -21,6 +21,7 @@ fm_api_key_guard_launch_env_config() {
   FM_API_KEY_LAUNCH_ENV_ENABLED=$(fm_config_source_present "$config/launch-env-allowlist") || return 1
   FM_API_KEY_LAUNCH_ENV_NAMES=
   if [ "$FM_API_KEY_LAUNCH_ENV_ENABLED" = 1 ]; then
+    # shellcheck disable=SC2034 # Output global read by sourcing callers.
     FM_API_KEY_LAUNCH_ENV_NAMES=$(fm_config_launch_env_names "$config") || return 1
   fi
 }

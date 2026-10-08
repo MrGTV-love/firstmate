@@ -418,6 +418,7 @@ fm_dispatch_endpoint_query() {
   shift 5
   { [ "$harness" = omp ] || [ "$harness" = claude ]; } && [ -z "$session" ] && [ -d "$cwd" ] || return 125
   [ "$harness" != claude ] || executable=true
+  # shellcheck disable=SC2016 # Variables expand in the isolated endpoint shell.
   env -i HOME="$HOME" PATH="$PATH" FM_HOME="$TMP_ROOT" \
     bash --noprofile --norc -c '
       cd "$1" || exit 125

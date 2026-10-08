@@ -293,6 +293,7 @@ SH
 
 fm_test_consume_pane_launch() {
   local fakebin=$1 launch=$2
+  # shellcheck disable=SC2016 # Variables expand in the isolated pane shell.
   env -i /bin/bash -c '
     . "$1/pane-state/env.sh" || exit
     IFS= read -r pane_cwd < "$1/pane-state/cwd"

@@ -2599,6 +2599,7 @@ fm_dispatch_endpoint_query() {
       ;;
     claude)
       case "${HOME:-}" in /*) ;; *) return 125 ;; esac
+      # shellcheck disable=SC2016 # Variables expand in the initialized destination shell.
       command="$(shell_quote "$runner") -p -c $(shell_quote '[ "${HOME-}" = "$1" ] || exit 125; set +p; . "$2" || exit 125; if fm_worker_account_claude_quota_unbound; then exit 125; fi') _ $(shell_quote "$HOME") $(shell_quote "$SCRIPT_DIR/fm-worker-account-lib.sh")"
       command=$(spawn_claude_boundary_wrap "$command" "${WORKER_ACCOUNT:-}" "${WORKER_ACCOUNT_ROOT:-}")
       ;;
@@ -2606,6 +2607,7 @@ fm_dispatch_endpoint_query() {
   esac
   # shellcheck disable=SC2016
   command='[ "$(pwd -P)" = '"$(shell_quote "$(real_path_or_raw "$WT")")"' ] || exit 125; '"$command"
+  # shellcheck disable=SC2016 # Positional arguments belong to the child shell.
   command="$(shell_quote "$runner") -p -c $(shell_quote 'set +p; . "$1"; shift; fm_run_timed 20 /bin/sh -c "$1"') _ $(shell_quote "$SCRIPT_DIR/fm-timeout-lib.sh") $(shell_quote "$command")"
   command=$(spawn_launch_env_wrap "$command")
   query_dir=$(mktemp -d "$STATE/.dispatch-query.XXXXXX") || return 125

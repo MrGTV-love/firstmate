@@ -84,6 +84,7 @@ fm_worker_account_claude_quota_unbound() {
   done
   cwd=$(pwd -P) || return 0
   project=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || project=$cwd
+  # shellcheck disable=SC2086 # Pass each name in the fixed credential list as a separate argument.
   perl -MJSON::PP -MErrno=ENOENT -e '
     my ($home, $cwd, $project, @shed) = @ARGV;
     my %selectors = map { $_ => 1 } (@shed, qw(HOME CLAUDE_CONFIG_DIR ANTHROPIC_ORGANIZATION_ID ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR));
