@@ -12,6 +12,8 @@ FM_WAKE_QUEUE_LOCK="${FM_WAKE_QUEUE_LOCK:-$STATE/.wake-queue.lock}"
 FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 # shellcheck source=bin/fm-path-lib.sh
 . "$FM_WAKE_LIB_DIR/fm-path-lib.sh"
+# shellcheck source=bin/fm-secondmate-parent-lib.sh
+. "$FM_WAKE_LIB_DIR/fm-secondmate-parent-lib.sh"
 # Resolved once at source time: fm_pid_identity and fm_path_mtime run inside 0.2s
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
@@ -1418,45 +1420,6 @@ fm_task_set_lock_path() {  # <state-dir>
   printf '%s/.task-set.lock\n' "$state"
 }
 
-# The top-most firstmate home reachable from this one on THIS machine, used as
-# the single anchor every local home agrees on for machine-local shared state.
-#
-# A local parent binding is followed upward. A remote parent binding terminates
-# the walk at the current home, which is the correct answer rather than an
-# error: the parent lives on another machine, so its filesystem can neither hold
-# nor be observed by a lock taken here, and a remote-seeded home is itself the
-# top of the local tree that fm_local_firstmate_state_dirs below enumerates
-# (that walk already skips remote registry entries for the same reason).
-# Refusing a remote binding instead made every operation anchored here fail
-# closed inside a remote secondmate home and its local descendants.
-#
-# Everything else still fails closed: an unreadable or malformed binding, an
-# unreachable local parent, a cycle, and a chain deeper than the bound.
-fm_firstmate_root_home() {
-  local home=${1:-$FM_HOME} marker parent seen="|" depth=0
-  home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 1
-  while [ -e "$home/.fm-secondmate-parent" ] || [ -L "$home/.fm-secondmate-parent" ]; do
-    marker="$home/.fm-secondmate-parent"
-    if ! command -v fm_secondmate_parent_record_parse >/dev/null 2>&1; then
-      # shellcheck source=bin/fm-secondmate-parent-lib.sh
-      . "$FM_WAKE_LIB_DIR/fm-secondmate-parent-lib.sh"
-    fi
-    fm_secondmate_parent_record_parse "$marker" || return 1
-    case "$FM_SECONDMATE_PARENT_ROUTE" in
-      local) ;;
-      remote) break ;;
-      *) return 1 ;;
-    esac
-    parent=$(CDPATH='' cd -- "$FM_SECONDMATE_PARENT_HOME" 2>/dev/null && pwd -P) || return 1
-    case "$seen" in *"|$parent|"*) return 1 ;; esac
-    seen="$seen$home|"
-    home=$parent
-    depth=$((depth + 1))
-    [ "$depth" -le 64 ] || return 1
-  done
-  printf '%s\n' "$home"
-}
-
 # Every Firstmate state directory on THIS machine whose task records can share a
 # machine-local resource with <first-state>: <first-state> itself, then the local
 # root home and each local secondmate home registered below it, walked through
@@ -1732,10 +1695,10 @@ fm_failure_episode_reset() {
 #     identityless entry, or no claim at all - lets the next firing take
 #     generation N+1 (fm_autoarm_claim_next). Taking a newer generation IS the
 #     reclaim: a steady-state predecessor is never signalled or revoked.
-#   - NO mutex is ever held across a blocking step. The owner lock
-#     state/.claude-autoarm.lock survives only as a micro-mutex serializing
-#     individual ledger reads-then-writes (a few non-blocking file
-#     operations); a holder that dies inside the hold is reclaimed by
+#   - The owner lock state/.claude-autoarm.lock is a micro-mutex for ledger
+#     updates and re-emit delivery decisions; it is never held across a lock
+#     wait, arming, or output. docs/watcher-continuity.md owns the delivery
+#     exclusion. A holder that dies inside the hold is reclaimed by
 #     fm_lock_try_acquire's ordinary dead-owner steal.
 #   - A superseded owner goes COMPLETELY silent - cleanup only. Ownership is
 #     re-verified before every side effect: each arm invocation, each
@@ -1883,15 +1846,18 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
   [ "$epoch_mtime" -ge "$beacon_mtime" ]
 }
 
-# Atomically publish this process as the owner of generation N+1, under one
-# short micro-mutex hold. Returns 0 with FM_AUTOARM_MY_GEN set on success, 2
-# when a competing claimant won the race (the ledger holds an open claim), and
-# 1 when the micro-mutex is contended, the mandatory identity cannot be
+# Atomically publish this process as the owner of generation N+1.
+# Wait at most ten seconds for the queue lock before taking the ownership
+# micro-mutex, so claim publication cannot race a re-emit drain's mutations.
+# Returns 0 with FM_AUTOARM_MY_GEN set on success, 2 when a competing claimant
+# won the race (the ledger holds an open claim), and 1 when the queue-lock wait
+# expires, the micro-mutex is contended, the mandatory identity cannot be
 # computed, or the write failed.
 fm_autoarm_claim_next() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock epoch pid gen identity tmp
+  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock epoch pid gen identity tmp queue_lock
   lock="$state/.claude-autoarm.lock"
   epoch="$state/.claude-autoarm-epoch"
+  queue_lock="$state/.wake-queue.lock"
   FM_AUTOARM_MY_GEN=
   # Resolve the pid into a variable FIRST: expanding ${BASHPID:-$$} inside a
   # command substitution would resolve it in that subshell, recording the
@@ -1899,9 +1865,14 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
   pid=${BASHPID:-$$}
   identity=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
   [ -n "$identity" ] || return 1
-  fm_lock_try_acquire "$lock" || return 1
+  fm_lock_acquire_wait_max "$queue_lock" 10 || return 1
+  if ! fm_lock_try_acquire "$lock"; then
+    fm_lock_release "$queue_lock"
+    return 1
+  fi
   if fm_autoarm_claim_open "$state" "$grace"; then
     fm_lock_release "$lock"
+    fm_lock_release "$queue_lock"
     return 2
   fi
   gen=$(_fm_autoarm_epoch_field "$epoch" epoch 2>/dev/null || true)
@@ -1915,9 +1886,11 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
     || ! mv -f "$tmp" "$epoch" 2>/dev/null; then
     rm -f "$tmp" 2>/dev/null || true
     fm_lock_release "$lock"
+    fm_lock_release "$queue_lock"
     return 1
   fi
   fm_lock_release "$lock"
+  fm_lock_release "$queue_lock"
   # shellcheck disable=SC2034 # Read by callers after the claim succeeds.
   FM_AUTOARM_MY_GEN=$gen
   return 0

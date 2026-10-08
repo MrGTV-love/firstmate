@@ -152,6 +152,9 @@ It accepts either the Pi pair (`fm_pi_extension_owns_supervision`) or the omp pa
 The proof requires all of these:
 
 - Both primary extensions of one family must be recorded in their state markers at their current on-disk builds by the process named in `state/.lock`.
+  On omp, a live lock holder permits only that exact process to record itself or arm a watcher; descendant sessions cannot borrow ancestry.
+  A marker may also be written before a live session claims the lock, but arming still requires exact ownership.
+  The turn-end guard re-asserts its marker at turn boundaries after the session-start hook claims the lock.
 - That process must still be alive.
 - Pi's watcher marker must additionally name an active generation rather than a retiring handoff.
 
@@ -346,7 +349,7 @@ That covers a finished outcome, a dead or identity-mismatched owner, a stuck own
 Taking a newer generation is the reclaim, and a steady-state predecessor is never signalled or revoked.
 
 No mutex is held across arming or output.
-`state/.claude-autoarm.lock` survives only as a micro-mutex serializing individual ledger writes.
+`state/.claude-autoarm.lock` is the micro-mutex for ledger updates and the [re-emit delivery decision](watcher-continuity.md#who-presents-queued-wakes-between-turns).
 A superseded owner goes completely silent.
 Ownership is re-verified before every arm invocation, episode-state mutation, ledger write, and continuation.
 
@@ -360,6 +363,8 @@ An owned terminal commit therefore decides the exit:
 
 A generation whose required marker cannot be created is refused and exits 0 silently even after printing.
 Its terminal ledger entry is superseded by a later firing, which retries the notice.
+
+[`watcher-continuity.md`](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns rewake refusal and its best-effort ledger trace.
 
 #### Why the claim boundaries exist
 

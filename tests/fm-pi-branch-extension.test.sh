@@ -1739,7 +1739,7 @@ test_branch_default_on_heartbeat_afk_and_fallback() {
     "$ROOT/bin/fm-status-decision-lib.sh" "$ROOT/bin/fm-status-event-lib.sh" \
     "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-utc-lib.sh" \
     "$ROOT/bin/fm-lease.sh" "$ROOT/bin/fm-lease-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" \
-    "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-path-lib.sh" "$ROOT/bin/fm-wake-grant.sh" "$broken/bin/"
+    "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-path-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$ROOT/bin/fm-wake-grant.sh" "$broken/bin/"
   cat > "$broken/bin/fm-branch-prompt.sh" <<'SH'
 #!/usr/bin/env bash
 echo "synthetic generator failure" >&2

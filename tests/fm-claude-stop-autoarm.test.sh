@@ -31,6 +31,7 @@ install_autoarm_scripts() {
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
+  cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
   cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
   cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
   cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
@@ -107,7 +108,7 @@ if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
     exit 1
   fi
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
-  while [ -e "$FM_HOME/state/successor-park" ]; do sleep 0.05; done
+  while [ -e "$FM_HOME/state/successor-park" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
   exit 0
 fi
 echo "$$" >> "$FM_HOME/state/arm-ran"
@@ -152,7 +153,7 @@ SH
     reset-boundary)
       cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
 : > "$FM_HOME/state/arm-waiting"
-while [ ! -e "$FM_HOME/state/arm-release" ]; do sleep 0.02; done
+while [ ! -e "$FM_HOME/state/arm-release" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
 printf 'watcher: FAILED - cycle ended without an actionable reason\n'
 exit 1
 SH
@@ -216,6 +217,16 @@ SH
       cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
 printf 'watcher: attached pid=%s (beacon 2s)\n' "$$"
 printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
+printf 'signal: task.status done: fixture peer cycle ended\n'
+exit 0
+SH
+      ;;
+    attached-handling)
+      # A wake drain (the SessionStart:compact re-emit digest) moved the marker
+      # to handling while this hook was still arming.
+      cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
+printf 'watcher: attached pid=%s (beacon 2s)\n' "$$"
+printf 'pending:handling:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
 printf 'signal: task.status done: fixture peer cycle ended\n'
 exit 0
 SH
@@ -554,6 +565,25 @@ test_unconfirmed_handling_successor_still_rewakes() {
   assert_contains "$out" "watcher: FAILED - no live watcher with a fresh beacon" "the rewake must carry the successor's own failure line"
   [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 1 ] || fail "the failed successor must not be retried inside the rewake path"
   pass "auto-arm: an unconfirmed handling successor is reported in the rewake instead of blocking it"
+}
+
+# 2026-10-08: a compaction at Stop made the re-emit digest drain the queue, which
+# moved the recovery marker to handling. The hook's rewake commit refuses any
+# marker that is not downtime, so it dropped the wake with exit 0 and the session
+# went blind. The hook cannot recover the wake then, but it must leave a trace.
+test_rewake_refused_when_marker_left_downtime_records_refused() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/refused-handling")
+  : > "$dir/state/task.meta"
+  write_arm_fixture "$dir" attached-handling
+  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  expect_code 0 "$status" "a rewake whose marker is already handling must be dropped, not delivered"
+  [ "$(epoch_outcome "$dir")" = refused ] \
+    || fail "a refused rewake must leave outcome=refused in the ledger, got: $(epoch_outcome "$dir")"
+  [ "$(printf '%s\n' "$(ls -A "$dir/state")" | grep -c '^\.claude-autoarm-output\.')" -eq 0 ] \
+    || fail "a refused rewake must not leave its output file behind"
+  [ ! -e "$dir/state/.claude-autoarm-failure-notified" ] || fail "a refused rewake is not a failure episode"
+  pass "auto-arm: a rewake refused for a non-downtime marker exits 0 and records outcome=refused"
 }
 
 test_failed_close_rewakes_with_failure_banner() {
@@ -1720,6 +1750,7 @@ test_actionable_close_rewakes_with_reason
 test_actionable_close_with_live_successor_rewakes_once
 test_attached_cycle_end_starts_handling_successor
 test_unconfirmed_handling_successor_still_rewakes
+test_rewake_refused_when_marker_left_downtime_records_refused
 test_failed_close_rewakes_with_failure_banner
 test_failed_cycles_notify_once_and_keep_retrying
 test_failure_notice_marker_write_refuses_delivery_and_retries

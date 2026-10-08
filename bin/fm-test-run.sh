@@ -147,7 +147,7 @@
 # recorded family-level coupling still expands to the whole family.
 # The vendored-skill arm for .agents/skills/hyper-jev/ is another exception: it
 # selects no suite except for SKILL.md, which retains its earlier family-selection
-# rule.
+# rule, and the starter's src/core/ client, which bin/fm-skill-pick.mjs imports.
 # tests/lib.sh, tests/fixtures.sh, tests/*-helpers.sh and tests/*-fixture.sh are
 # shared files that map to the suites naming them; a fixture under
 # tests/fixtures/<dir>/ is mapped by that directory instead. Curated family arms
@@ -319,7 +319,7 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -376,7 +376,7 @@ family_for_basename() {
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|\
-    fm-omp-composer-box-live-e2e.test.sh|\
+    fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\
@@ -408,7 +408,7 @@ family_for_basename() {
       ;;
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|\
     fm-pr-merge.test.sh|fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
-    fm-review-diff.test.sh|fm-teardown.test.sh|fm-x-mode.test.sh)
+    fm-review-diff.test.sh|fm-teardown.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -431,7 +431,7 @@ family_for_basename() {
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
-    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-suggest.test.sh|\
+    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-pick.test.sh|fm-typesafe-key-source.test.sh|\
     fm-extension-binding.test.sh|fm-gitignore-config.test.sh|\
     fm-no-mistakes-required.test.sh|fm-peek-remote.test.sh|\
     fm-pending-reply.test.sh|fm-pi-branch-extension.test.sh|\
@@ -630,12 +630,20 @@ standalone
 EOF
 }
 
-family_is_concurrent_safe() {
-  local want=$1 line
-  while IFS= read -r line; do
-    [ "$line" = "$want" ] && return 0
-  done < <(list_concurrent_safe_families)
+# Exact whole-line membership of <want> in the newline-separated <list>, with no
+# process substitution. macOS /bin/bash 3.2 loses lines from later reads once one
+# long-lived shell has run enough per-item "while read ... done < <(cmd)" loops
+# (see list_portable_serial), so per-item membership tests must not use them.
+list_has_line() {
+  local want=$1 list=$2
+  case $'\n'"$list"$'\n' in
+    *$'\n'"$want"$'\n'*) return 0 ;;
+  esac
   return 1
+}
+
+family_is_concurrent_safe() {
+  list_has_line "$1" "$(list_concurrent_safe_families)"
 }
 
 concurrent_safe_family_jobs_max() {
@@ -649,22 +657,15 @@ concurrent_safe_family_jobs_max() {
 # A script may run under --jobs when it is individually proven isolated or is
 # an exact repository member of a family carrying a recorded concurrent proof.
 script_allows_concurrency() {
-  local s=$1 family repo_script
+  local s=$1 family
   is_proven_isolated_script "$s" && return 0
   family=$(family_for_basename "$(basename "$s")")
   family_is_concurrent_safe "$family" || return 1
-  while IFS= read -r repo_script; do
-    [ "$repo_script" = "$s" ] && return 0
-  done < <(all_repo_tests)
-  return 1
+  list_has_line "$s" "$(all_repo_tests)"
 }
 
 is_proven_isolated_script() {
-  local want=$1 line
-  while IFS= read -r line; do
-    [ "$line" = "$want" ] && return 0
-  done < <(list_proven_isolated)
-  return 1
+  list_has_line "$1" "$(list_proven_isolated)"
 }
 
 # The portable serial remainder: every tests/*.test.sh that is neither
@@ -673,19 +674,21 @@ is_proven_isolated_script() {
 # and other unproven work stays here. Derived rather than enumerated so a newly added test
 # lands here by default instead of falling out of every lane.
 list_portable_serial() {
-  local s base fam
+  local s base fam proven_set all
+  proven_set=$(list_proven_isolated)
+  all=$(all_repo_tests) || return 1
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    base=$(basename "$s")
+    base=${s##*/}
     fam=$(family_for_basename "$base")
     if [ "$fam" = "real-herdr-gated" ]; then
       continue
     fi
-    if is_proven_isolated_script "$s"; then
+    if list_has_line "$s" "$proven_set"; then
       continue
     fi
-    printf '%s\n' "$s"
-  done < <(all_repo_tests)
+    printf '%s\n' "$s" || return 1
+  done <<<"$all"
 }
 
 # Measured portable-serial script durations in milliseconds, from the CI timing
@@ -794,7 +797,9 @@ tests/fm-nm-test-contract.test.sh 853
 tests/fm-no-mistakes-required.test.sh 270
 tests/fm-omp-harness.test.sh 63796
 tests/fm-omp-primary-live-e2e.test.sh 74
+tests/fm-omp-wake-restore-live-e2e.test.sh 51
 tests/fm-on.test.sh 11473
+tests/fm-open-loops.test.sh 12000
 tests/fm-opencode-primary-live-e2e.test.sh 47
 tests/fm-operational-input.test.sh 2404
 tests/fm-peek-remote.test.sh 1082
@@ -882,6 +887,7 @@ tests/fm-trace-context-lib.test.sh 221
 tests/fm-trace-context-spawn.test.sh 57488
 tests/fm-turnend-foreign-owner-arm-fix.test.sh 5575
 tests/fm-turnend-guard.test.sh 34727
+tests/fm-typesafe-key-source.test.sh 6000
 tests/fm-update.test.sh 11894
 tests/fm-vendor-auth-probe.test.sh 43278
 tests/fm-voice-relay.test.sh 28917
@@ -901,6 +907,7 @@ tests/fm-worker-account.test.sh 37445
 tests/fm-session-launch-policy-inherit.test.sh 16144
 tests/fm-session-launch-policy-receipt.test.sh 2166
 tests/fm-session-launch-policy.test.sh 229671
+tests/fm-watch-open-loops.test.sh 30000
 EOF
 }
 
@@ -936,49 +943,40 @@ portable_parallel_weight_for() {
 }
 
 portable_serial_weight_for() {
-  local want=$1 path ms
-  while read -r path ms; do
-    if [ "$path" = "$want" ]; then
-      printf '%s\n' "$ms"
-      return 0
-    fi
-  done < <(portable_serial_weight_hints)
-  printf '%s\n' "$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS"
+  local want=$1
+  portable_serial_weight_hints | awk -v want="$want" -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+    $1 == want { print $2; found = 1; exit }
+    END { if (!found) print def }
+  '
 }
 
 # Longest-processing-time assignment of the serial remainder to
 # PORTABLE_SERIAL_SHARDS bins, printing "<shard>\t<script>" for every script.
 # Deterministic: candidates are ordered by hint descending then path, and ties
 # between equally loaded bins always take the lowest bin index.
-portable_serial_assignments() {
-  local ms script i best best_load
-  local -a loads=()
-  i=1
-  while [ "$i" -le "$PORTABLE_SERIAL_SHARDS" ]; do
-    loads[i]=0
-    i=$((i + 1))
-  done
-  while IFS=$'\t' read -r ms script; do
-    [ -n "$script" ] || continue
-    best=1
-    best_load=${loads[1]}
-    i=2
-    while [ "$i" -le "$PORTABLE_SERIAL_SHARDS" ]; do
-      if [ "${loads[i]}" -lt "$best_load" ]; then
-        best_load=${loads[i]}
-        best=$i
-      fi
-      i=$((i + 1))
-    done
-    loads[best]=$((best_load + ms))
-    printf '%s\t%s\n' "$best" "$script"
-  done < <(
-    while IFS= read -r script; do
-      [ -n "$script" ] || continue
-      printf '%s\t%s\n' "$(portable_serial_weight_for "$script")" "$script"
-    done < <(list_portable_serial) | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2
-  )
-}
+portable_serial_assignments() (
+  # Keep pipeline failures visible without changing the caller's shell options.
+  # Bash 3.2 builtin writes to an asynchronous pipe can fail with EINTR; let awk
+  # own assignment output and require the complete producer to succeed.
+  set -o pipefail
+  { portable_serial_weight_hints || return 1; printf '%s\n' '--' || return 1; list_portable_serial; } \
+    | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+        $0 == "--" { scripts = 1; next }
+        !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
+        NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
+      ' \
+    | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2 \
+    | awk -F '\t' -v shards="$PORTABLE_SERIAL_SHARDS" '
+        BEGIN { for (i = 1; i <= shards; i++) loads[i] = 0 }
+        {
+          best = 1
+          for (i = 2; i <= shards; i++)
+            if (loads[i] < loads[best]) best = i
+          loads[best] += $1
+          printf "%s\t%s\n", best, $2
+        }
+      '
+)
 
 # Parse "<k>of<n>" from a portable-serial shard lane and echo <k>, refusing when
 # <n> disagrees with this script's configured count so a CI matrix built for a
@@ -1016,7 +1014,7 @@ select_proven_isolated() {
 }
 
 select_lane() {
-  local want=$1 s shard idx found=0
+  local want=$1 s shard idx assignments found=0
   case "$want" in
     portable-parallel-1)
       while IFS= read -r s; do
@@ -1042,13 +1040,15 @@ select_lane() {
     portable-serial-*)
       # One separate-runner shard of the same remainder, still serial in itself.
       shard=$(portable_serial_shard_index "$want")
+      assignments=$(portable_serial_assignments) \
+        || die "could not generate complete portable serial shard assignments"
       while IFS=$'\t' read -r idx s; do
         [ -n "$s" ] || continue
         if [ "$idx" = "$shard" ]; then
           add_script "$s"
           found=1
         fi
-      done < <(portable_serial_assignments)
+      done <<<"$assignments"
       ;;
     real-herdr-gated)
       select_family real-herdr-gated
@@ -1292,7 +1292,7 @@ all_repo_tests() {
   # shellcheck disable=SC2035
   for f in tests/*.test.sh; do
     [ -f "$f" ] || continue
-    printf '%s\n' "$f"
+    printf '%s\n' "$f" || return 1
   done | LC_ALL=C sort
 }
 
@@ -1505,6 +1505,10 @@ families_for_changed_path() {
         printf '%s\n' "__script__:fm-afk-launch.test.sh"
       fi
       ;;
+    bin/fm-open-loops.sh|bin/fm_open_loops.py)
+      printf '%s\n' "__script__:fm-open-loops.test.sh"
+      printf '%s\n' "__script__:fm-watch-open-loops.test.sh"
+      ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)
       printf '%s\n' watcher-wake-lock
@@ -1567,10 +1571,17 @@ families_for_changed_path() {
       ;;
     bin/fm-typesafe-lib.sh)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
-      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
+      printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
       ;;
-    bin/fm-skill-suggest.sh|bin/fm-skill-catalog.jq)
-      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+    bin/fm-jev-belay-hook.sh|bin/fm-jev-belay-policy.mjs)
+      printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
+      printf '%s\n' "__script__:fm-busy-adapter-wiring.test.sh"
+      ;;
+    bin/fm-skill-pick.sh|bin/fm-skill-pick.mjs|\
+    .agents/skills/hyper-jev/templates/starter/src/core/*.ts)
+      # The picker imports the vendored hyper-jev client unchanged.
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     bin/fm-model-index.sh)
       printf '%s\n' "__script__:fm-model-index.test.sh"
@@ -1583,10 +1594,10 @@ families_for_changed_path() {
       ;;
     bin/fm-env-lib.sh)
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and
-      # bin/fm-typesafe-lib.sh (dispatch and skill-advice TYPESAFE_API_KEY).
+      # bin/fm-typesafe-lib.sh (dispatch and skill-pick TypeSafe and OpenRouter keys).
       printf '%s\n' pr-forge
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
-      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     .pi/extensions/fm-branch-supervision.ts|.pi/extensions/lib/fm-async-exec.ts|\
     .pi/extensions/lib/fm-branch-dispatch.ts|.pi/extensions/lib/fm-native-contract.ts)
@@ -1681,8 +1692,12 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       printf '%s\n' live-harness-optin
       ;;
-    bin/fm-spawn.sh|bin/fm-send.sh|bin/fm-harness.sh|\
-    bin/fm-peek.sh|bin/fm-composer*)
+    bin/fm-spawn.sh)
+      printf '%s\n' backend-dispatch
+      printf '%s\n' pure-contract-unit
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
+      ;;
+    bin/fm-send.sh|bin/fm-harness.sh|bin/fm-peek.sh|bin/fm-composer*)
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
       ;;
@@ -1703,6 +1718,9 @@ families_for_changed_path() {
     bin/fm-bearings-snapshot.sh|bin/fm-fleet-snapshot.sh|bin/fm-fleet-view.sh|bin/fm-contributions.sh|bin/fm-contributions.jq|\
     bin/fm-home-summary-refresh.sh)
       printf '%s\n' snapshot-bearings
+      if [ "$path" = bin/fm-fleet-snapshot.sh ]; then
+        printf '%s\n' __script__:fm-open-loops.test.sh
+      fi
       ;;
     bin/fm-install-herdr.sh|bin/fm-install-treehouse.sh|bin/fm-herdr-ci-cleanup.sh)
       printf '%s\n' pure-contract-unit
@@ -1732,8 +1750,9 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     .agents/skills/hyper-jev/*)
-      # Vendored upstream skill files (see SOURCE.md there) have no firstmate
-      # test consumer, so they select no suite instead of refusing as unmapped.
+      # Other vendored upstream skill files (see SOURCE.md there) have no
+      # firstmate test consumer, so they select no suite instead of refusing
+      # as unmapped.
       ;;
     .github/workflows/ci.yml|.no-mistakes.yaml)
       printf '%s\n' pure-contract-unit

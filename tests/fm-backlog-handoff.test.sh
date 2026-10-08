@@ -213,7 +213,7 @@ EOF
 #!/usr/bin/env bash
 if [ "${1:-}" = send-keys ]; then
   touch "$FM_RECONCILE_RACE_ENTERED"
-  while [ ! -f "$FM_RECONCILE_RACE_RELEASE" ]; do sleep 0.02; done
+  while [ ! -f "$FM_RECONCILE_RACE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
   exit 1
 fi
 exec "$FM_BASE_TMUX" "$@"
@@ -562,7 +562,7 @@ case "$*" in
   *"Firstmate instruction waiting:"*)
     if mkdir "$FM_BLOCK_WAKE_ONCE" 2>/dev/null; then
       touch "$FM_BLOCK_WAKE_ENTERED"
-      while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
+      while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
     fi
     ;;
 esac
@@ -635,7 +635,7 @@ EOF
 case "$*" in
   *"Firstmate instruction waiting:"*)
     touch "$FM_BLOCK_WAKE_ENTERED"
-    while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
+    while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
     ;;
 esac
 exec "$FM_BASE_TMUX" "$@"
@@ -660,7 +660,7 @@ SH
     FM_FAKE_TMUX_WINDOW='firstmate:fm-design' \
     FM_FAKE_TMUX_LOG="$TMP_ROOT/teardown-race-tmux.log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-race-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" design --force > "$TMP_ROOT/teardown-race-teardown.out" 2>&1 &
+    "$ROOT/bin/fm-teardown.sh" design --force --drop-file "$(fm_test_drop_file)" > "$TMP_ROOT/teardown-race-teardown.out" 2>&1 &
   teardown=$!
   sleep 0.3
   kill -0 "$teardown" 2>/dev/null \
@@ -711,7 +711,7 @@ SH
     FM_FAKE_TMUX_WINDOW='firstmate:fm-design' \
     FM_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" design --force > "$TMP_ROOT/teardown-home-fail.out" 2>&1
+    "$ROOT/bin/fm-teardown.sh" design --force --drop-file "$(fm_test_drop_file)" > "$TMP_ROOT/teardown-home-fail.out" 2>&1
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "teardown ignored the receiver-home removal failure"
@@ -728,7 +728,7 @@ SH
     FM_FAKE_TMUX_WINDOW='firstmate:fm-design' \
     FM_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" design --force > "$TMP_ROOT/teardown-home-retry.out" 2>&1 \
+    "$ROOT/bin/fm-teardown.sh" design --force --drop-file "$(fm_test_drop_file)" > "$TMP_ROOT/teardown-home-retry.out" 2>&1 \
     || fail "teardown retry did not retire the preserved wake: $(cat "$TMP_ROOT/teardown-home-retry.out")"
   assert_absent "$sub" "teardown retry left the receiver home"
   assert_absent "$marker" "teardown retry left the pending wake marker"

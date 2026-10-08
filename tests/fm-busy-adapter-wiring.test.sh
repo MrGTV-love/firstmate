@@ -247,6 +247,8 @@ test_claude_hooks_semantic_lifecycle() {
   for ev in UserPromptSubmit Stop StopFailure SessionEnd; do
     jq -e ".hooks[\"$ev\"]" "$settings" >/dev/null || fail "claude hook settings lack $ev"
   done
+  jq -e '.hooks.Stop | length == 1 and (.[0].hooks | length == 1 and .[0].timeout == 25)' \
+    "$settings" >/dev/null || fail "Stop must have one combined command with its timeout"
 
   out=$(classify claude "$id" "$state")
   [ "$out" = "busy fm-spawn" ] || fail "seed after spawn must be 'busy fm-spawn', got '$out'"
@@ -270,6 +272,90 @@ test_claude_hooks_semantic_lifecycle() {
   out=$(classify claude "$id" "$state")
   [ "$out" = "idle claude-hook" ] || fail "SessionEnd must classify idle, got '$out'"
   pass "claude hooks open on UserPromptSubmit and close on Stop, StopFailure, and SessionEnd"
+}
+
+test_claude_stop_belay_rejection_keeps_turn_open() {
+  local rec id=busy-cl-belay out rc state settings belay blob seen payload status started elapsed
+  rec=$(make_spawn_case claude-belay claude "$id")
+  read_case_record "$rec"
+  belay="$HOME_DIR/data/vendor/jev-belay/belay.mjs"
+  mkdir -p "$(dirname "$belay")"
+  printf 'TYPESAFE_API_KEY=busy-lifecycle-key\n' >"$HOME_DIR/.env"
+  cat >"$belay" <<'EOF'
+import { appendFileSync, existsSync } from "node:fs";
+const status = process.env.FM_TEST_BELAY_EXIT;
+appendFileSync(process.env.FM_TEST_BELAY_SEEN, JSON.stringify({
+  turnEnded: existsSync(process.env.FM_TEST_TURNEND),
+}) + "\n");
+if (status === "timeout") Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Number(process.env.JEV_BELAY_TIMEOUT_MS));
+if (status === "2") process.stderr.write("continue this turn\n");
+process.exit(status === "timeout" ? 0 : Number(status));
+EOF
+  blob=$(git hash-object -- "$belay") || fail "could not pin the synthetic belay hook"
+  seen="$CASE_DIR/belay-seen.jsonl"
+  payload='{"hook_event_name":"Stop","stop_hook_active":false}'
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+  expect_code 0 $? "claude spawn should succeed: $out"
+  state="$HOME_DIR/state"
+  settings="$WT_DIR/.claude/settings.local.json"
+
+  run_claude_hook "$settings" UserPromptSubmit || fail "UserPromptSubmit hook command failed"
+  out=$(classify claude "$id" "$state")
+  [ "$out" = "busy claude-hook" ] || fail "submitted turn must be busy before belay, got '$out'"
+  rm -f "$state/$id.turn-ended"
+
+  out=$(
+    unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE
+    printf '%s' "$payload" |
+      FM_TEST_SEAM=1 FM_JEV_BELAY_BLOB="$blob" FM_TEST_BELAY_SEEN="$seen" \
+      FM_TEST_BELAY_EXIT=2 FM_TEST_TURNEND="$state/$id.turn-ended" \
+      run_claude_hook "$settings" Stop 2>&1
+  )
+  rc=$?
+  expect_code 2 "$rc" "a rejected Stop must propagate belay's exit status"
+  assert_contains "$out" 'continue this turn' "Stop lost belay's rejection output"
+  [ ! -e "$state/$id.turn-ended" ] || fail "a rejected Stop published a turn-ended notification"
+  out=$(classify claude "$id" "$state")
+  [ "$out" = "busy claude-hook" ] || fail "a rejected Stop must leave the same turn busy, got '$out'"
+  jq -e '.turnEnded == false' "$seen" >/dev/null \
+    || fail "the pinned vendor hook ran after turn-ended publication"
+
+  out=$(
+    unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE
+    printf '%s' "$payload" |
+      FM_TEST_SEAM=1 FM_JEV_BELAY_BLOB="$blob" FM_TEST_BELAY_SEEN="$seen" \
+      FM_TEST_BELAY_EXIT=0 FM_TEST_TURNEND="$state/$id.turn-ended" \
+      run_claude_hook "$settings" Stop 2>&1
+  )
+  rc=$?
+  expect_code 0 "$rc" "a later accepted Stop must succeed without another submit"
+  [ -f "$state/$id.turn-ended" ] || fail "an accepted Stop did not publish the turn-ended notification"
+  out=$(classify claude "$id" "$state")
+  [ "$out" = "idle claude-hook" ] || fail "an accepted Stop must close the still-open turn, got '$out'"
+  jq -se 'length == 2 and all(.[]; .turnEnded == false)' "$seen" >/dev/null \
+    || fail "the later Stop did not run belay before closing the same turn"
+  for status in 1 3 127 timeout; do
+    run_claude_hook "$settings" UserPromptSubmit || fail "UserPromptSubmit hook command failed"
+    rm -f "$state/$id.turn-ended"
+    started=$SECONDS
+    out=$(
+      unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE
+      printf '%s' "$payload" |
+        FM_TEST_SEAM=1 FM_JEV_BELAY_BLOB="$blob" FM_TEST_BELAY_SEEN="$seen" \
+        FM_TEST_BELAY_EXIT="$status" JEV_BELAY_TIMEOUT_MS=60000 \
+        FM_TEST_TURNEND="$state/$id.turn-ended" run_claude_hook "$settings" Stop 2>&1
+    )
+    rc=$?
+    elapsed=$((SECONDS - started))
+    expect_code 0 "$rc" "nonblocking belay result $status must allow Stop"
+    [ "$elapsed" -lt 25 ] || fail "belay result $status exceeded Claude's 25-second deadline"
+    [ -f "$state/$id.turn-ended" ] || fail "belay result $status did not publish completion"
+    out=$(classify claude "$id" "$state")
+    [ "$out" = "idle claude-hook" ] || fail "belay result $status stranded the ended turn: $out"
+  done
+  jq -se 'length == 6 and all(.[]; .turnEnded == false)' "$seen" >/dev/null \
+    || fail "nonblocking Stops did not run belay before publishing completion"
+  pass "claude Stop rejects only exit 2 and closes accepted, failed, and timed-out turns before the host deadline"
 }
 
 test_claude_hooks_stale_incarnation_harmless() {
@@ -428,6 +514,7 @@ test_pi_extension_stale_incarnation_rejected
 test_kimi_and_grok_install_no_unverified_wiring
 test_opencode_plugin_semantic_lifecycle
 test_claude_hooks_semantic_lifecycle
+test_claude_stop_belay_rejection_keeps_turn_open
 test_claude_hooks_stale_incarnation_harmless
 test_gemini_hooks_semantic_lifecycle
 test_gemini_hooks_stale_incarnation_harmless

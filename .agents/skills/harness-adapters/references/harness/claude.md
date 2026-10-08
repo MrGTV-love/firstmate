@@ -6,7 +6,7 @@ Busy hooks verified 2026-07-28 on Claude Code 2.1.220.
 
 | Fact | Value |
 |---|---|
-| Busy | Owned hooks: `UserPromptSubmit` opens while `Stop`, `StopFailure`, and `SessionEnd` close; manual interrupt emits no hook, so control reports delivered keys and live endpoint only, publishes no idle event or cancellation claim, and usually leaves `claude-hook` busy. |
+| Busy | Owned hooks: `UserPromptSubmit` opens while `StopFailure` and `SessionEnd` close; worker `Stop` follows the [belay completion contract](../../../docs/configuration.md#jev-belay-stop-hook); manual interrupt emits no hook, so control reports delivered keys and live endpoint only, publishes no idle event or cancellation claim, and usually leaves `claude-hook` busy. |
 | Exit | `/exit`. |
 | Interrupt | Single Escape. |
 | Skill | `/<skill>`, for example `/no-mistakes`. |
@@ -71,7 +71,7 @@ A `--secondmate` launch omits the statement because a secondmate operates under 
 ## Primary integration
 
 [`../../../docs/verification/supervision.md`](../../../docs/verification/supervision.md#turn-end-guard) records the current primary and Stop auto-arm live evidence.
-This differs from the worker Stop hook in `.claude/settings.local.json`, which records idle state and touches a task marker.
+The separate worker Stop hook in `.claude/settings.local.json` follows the [belay completion contract](../../../docs/configuration.md#jev-belay-stop-hook).
 
 Primary `.claude/settings.json` registers `../../../bin/fm-turnend-guard.sh --claude` and `../../../bin/fm-claude-stop-autoarm.sh` with `asyncRewake: true` and `timeout: 28800`.
 Guard exit 2 plus stderr forces continuation.

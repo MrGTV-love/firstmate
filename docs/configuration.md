@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
-| Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -90,6 +90,7 @@ Each effective `FM_HOME` contains private operational directories.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
+- The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -367,6 +368,7 @@ When a spawn is interrupted after launch delivery began, its exit path re-reads 
 ### Which backlog receives a transition
 
 Automatic transitions run from the configured data directory's parent, letting that home's effective tasks-axi configuration address its selected adapter while keeping relative scout-report links rooted there.
+The wrapper resolves the data directory against the caller's working directory before entering that parent, and uses the same absolute path for restart provenance updates, failed-transition readback, and rollback.
 A markdown backlog is additionally addressed by an explicit `--file` at `<data>/backlog.md`, so the change lands in the home that owns the task regardless of the caller's working directory.
 
 Any other configured adapter is addressed by that root alone, because `--file` would override the adapter's own workspace path.
@@ -586,6 +588,86 @@ The flag is a home-local preference and is not inherited by secondmate homes.
 The optional local, gitignored `config/pipeline-spend` presence flag opts this home into recording per-task no-mistakes pipeline spend in `data/pipeline-spend.jsonl` during teardown.
 When the flag is absent, teardown skips recording and the recorder exits before reading task metadata, no-mistakes state, or the spend ledger.
 An existing ledger is left untouched while recording is disabled.
+
+## Open-work ledger (config/open-loops.json)
+
+`bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
+`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
+Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
+Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
+An unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
+
+| Category | A row exists when | Default limit |
+| --- | --- | --- |
+| `missing_worker` | an In flight item requiring child metadata lacks a task record or endpoint, or an ordinary task has a confirmed missing or dead worker | 600 s |
+| `ready_not_started` | a Queued item has no hold kind or unresolved blocker, and its optional hold date is absent or due | 1800 s |
+| `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
+| `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
+| `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
+| `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
+| `open_pr` | an open PR discovered from this home's project origins or recorded task PR URLs waits on checks, a reviewer, or firstmate's review routing | 3600 s |
+| `red_check` | the latest run of a check on an open PR failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
+| `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
+
+A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
+The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.
+Status questions age from their stamped opening.
+Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata.
+Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
+For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
+GitHub repositories are discovered from recorded local task PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits.
+Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
+An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
+Unreadable or unknown current task state adds degraded coverage independently of liveness, and only nonfuture progress timestamps count as work evidence.
+Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
+Progress remains scoped to that resolved store and the task's project and branch.
+The ledger covers this home's current backlog, ordinary task records, status questions, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
+The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
+
+The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
+The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
+A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
+When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
+A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
+Both durable payloads are identical to their printed wake reasons, including the canonical `check:` prefix.
+Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
+Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
+Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
+Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
+The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors.
+Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
+No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
+
+Create the optional local `config/open-loops.json` to override the limits:
+
+```json
+{
+  "age_limits_seconds": { "stalled_worker": 3600, "unlanded_commit": 86400 },
+  "command_timeout_seconds": 60
+}
+```
+
+Age limits are non-negative integer seconds for the categories above.
+`command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
+On either deadline, cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run.
+It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
+An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
+A malformed configuration is reported as an error rather than ignored.
+
+### Completion and discard
+
+Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
+[`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
+[`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
+A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
+[`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.
+Dropped work is never presented as recently landed.
+A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
+Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`.
+Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
+A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
+A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 
@@ -1122,9 +1204,10 @@ It applies to fresh launches, relaunches, raw launch commands with an identifiab
 For an unidentifiable raw command, the adviser stays off.
 
 Auto allows the installed plugin to act; it does not install the plugin or supply a credential.
-Use the plugin's supported saved settings to select `mode: auto`, acknowledge experimental automatic mode, and save the TypeSafe key without adding `TYPESAFE_API_KEY` to launch text or the worker environment.
-For omp's Pi plugin, these fields are `mode`, `autoAcknowledged`, and `typesafeApiKey` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
-Claude stores mode and saved key in its plugin options and acknowledgement in the plugin's own preferences store.
+Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
+Use the plugin's supported settings to select `mode: auto` and acknowledge experimental automatic mode.
+For omp's Pi plugin, these fields are `mode` and `autoAcknowledged` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
+Claude stores mode in its plugin options and acknowledgement in the plugin's own preferences store.
 Claude auto launches enable `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without changing the global function-hook setting, unless a leading raw-command assignment explicitly supplies the flag's value.
 When automatic activation supplies that flag rather than preserving a captain's opt-in, the launch also sets `FM_COMPACT_ADVISER_HOOKS=1`, which keeps the [firstmate-calm mod](calm.md#enabling-function-hooks) inert, so enabling the adviser does not enable Calm.
 Every launch first drops a flag that an earlier launch in the same pane marked this way, so an off or emergency-off relaunch runs without it.
@@ -1196,7 +1279,8 @@ COMPACT_ADVISER_DISABLE=1 FM_JEV_OMP_PIPELINE=1 \
 The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and exported redaction and recent-window helpers, with its full dependency tree and `@earendil-works/pi-coding-agent` resolvable from the copied static entry; the unadapted registry package is not a substitute.
 The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
 Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
-The controller reuses that package's request format, profile parsing, snapshot/redaction and environment/saved/`.env` key resolution without creating another credential store.
+The controller reuses that package's request format, profile parsing and snapshot/redaction without creating another credential store.
+The [compact-adviser setting](#compact-adviser-setting-configcompact-adviser) owns the pending compaction key-delivery contract.
 `FM_JEV_PIPELINE_AGENT_DIR` selects the adviser configuration directory; when omitted, the controller uses omp's public `getAgentDir()` and reads that configuration without modifying it.
 `TYPESAFE_BASE` follows compact-adviser's HTTPS-or-loopback-only endpoint policy.
 Neither installation nor loading changes global plugins or settings.
@@ -1223,7 +1307,7 @@ When keeping trailers, Git uses the repository's configured hooks unless the wor
 `bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs when stripping is enabled.
 A repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
 When stripping is enabled, the hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the strip; install a project's hooks from outside the pane, where the wrappers chain them.
-The flag is a home-wide attribution choice, so it is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract and a secondmate's own workers keep AI trailers too.
+The flag is a home-wide attribution choice, independently owned by each home and not inherited into secondmate homes; the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract leaves each home's presence or absence unchanged.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Firstmate, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh).
 
@@ -1464,7 +1548,9 @@ Secondmate homes inherit this file from the primary, so a secondmate's own crewm
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
 `bin/fm-dispatch-resolve.sh` resolves one concrete crewmate or scout profile from a written brief with typesafe.ai's System One model (Jev), so the rule match that firstmate otherwise reasons out in its own context becomes one short tool turn.
-It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or the home's gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the shared accessor in `bin/fm-env-lib.sh` reads the line.
+It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or a gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the shared accessor in `bin/fm-env-lib.sh` reads the line.
+The `.env` consulted is the home's own, then the top-most local home reached through the home's `.fm-secondmate-parent` record, so a secondmate home and its crews share the primary home's single key without a copy (`fm_typesafe_key` in `bin/fm-typesafe-lib.sh` owns the order).
+A home bound to a remote parent has no local primary and stops at its own `.env`.
 
 Off means one `dispatch-resolve: off` line on stderr, nothing on stdout, exit 0, and no network call, so firstmate dispatches exactly as it does without the tool.
 This section is the single owner of the tool's operator contract; the script header owns its exact flags and output lines, and "Crew dispatch profiles" above owns the declared rule and profile fields it applies.
@@ -1484,6 +1570,7 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state and asks one Choice question whose options are every rule's `when` plus the fixed neutral option for no matching rule; the model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
 The task-specific text is the brief's `## Captain's intent` and `## Firstmate spec` sections under `# Task` that `bin/fm-brief.sh` scaffolds, read by the same parser that feeds `fm-spawn.sh` validation and the no-mistakes `--intent` contract; a brief with neither section is sent whole.
 Section extraction and the whole-brief fallback both read the brief after any enabled never-send marked regions are removed (see the never-send list below).
+Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
 
 When the sections are sent from a scout brief, the line `Brief kind: scout (report only)` comes first, taken from the scaffold's scout contract line; ship briefs and briefs sent whole get no kind line.
 A ship brief's delivery mode is deliberately not sent, because in live runs naming it pushed a routine ship brief toward the hardest tier (see [the verification record](verification/dispatch-resolve.md)).
@@ -1492,9 +1579,9 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution or advisory skill-selection requests, and keeps marked brief regions out of Jev resolver requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, worker skill-selection, or [belay Stop-hook](#jev-belay-stop-hook) requests, and keeps marked brief regions out of dispatch-resolution and worker skill-selection requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so both tools there withhold the same values.
+Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so all consumers there withhold the same values.
 
 Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
@@ -1510,7 +1597,7 @@ Example Client Ltd
 # dispatch-never-send marked-sections
 ```
 
-The following marked-region rules apply only to dispatch resolution; advisory skill selection neither removes nor validates these markers.
+The following marked-region rules apply to dispatch resolution and to worker skill selection, which share `fm_typesafe_brief_task` in `bin/fm-typesafe-lib.sh`; belay neither removes nor validates these markers.
 
 Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
 
@@ -1531,9 +1618,11 @@ A brief containing `<!--` followed by optional whitespace and the reserved `disp
 With the directive present, every such line must be exactly one of the two canonical markers above after trimming surrounding whitespace: nested, unmatched, inline, malformed suffixes (`<!-- dispatch-never-send:star -->`), unspaced (`<!--dispatch-never-send:start-->`), or differently cased (`<!-- Dispatch-Never-Send:start -->`) markers stop the entire request rather than being corrected.
 A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
-Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
+On 2026-10-07, the captain authorized worker skill selection to send the same sanitized, never-send-filtered task text used by `bin/fm-dispatch-resolve.sh` to TypeSafe and its OpenRouter fallback, ruling “I asked for A already.”
+This authorization does not widen any other sending boundary.
+Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
 
-Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; advisory skill selection checks every request string through `bin/fm-typesafe-lib.sh`.
+Before each request is sent, every remaining string in it is checked for literal matches through `bin/fm-typesafe-lib.sh`: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; belay checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -1622,7 +1711,9 @@ Firstmate passes its profile line unless it states a reason to override, such as
 **Key handling and fixed settings**
 
 - The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
-- The resolver and skill picker send the key to `curl` only as a header read from a file descriptor, never on argv, and neither prints, logs, or writes it.
+- The resolver sends its key to `curl` only as a header read from a file descriptor, never on argv.
+  The skill picker pipes its resolved keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; the picker does not export the resolved key variables or put their values on argv.
+  Neither tool prints, logs, or writes keys to files.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
@@ -1637,7 +1728,7 @@ Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERR
 The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
 Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
 
-The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+The screen uses the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
 Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
 It does not grant account, billing, egress, command, or secret-access authority.
 No key means `missing_key`, not a synthetic judgment.
@@ -1690,48 +1781,72 @@ Evaluation calls are not proof that a native hook loaded or that fleet sample vo
 The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
 This implementation cannot enable blocking or reset that date.
 
-## Advisory skill selection
+## Jev belay Stop hook
 
-`bin/fm-skill-suggest.sh` uses Jev to suggest which optional skill bodies to inspect first, without replacing the full skill index, required trigger rules, or agent judgment.
-The existing TypeSafe key opt-in and dispatch-never-send literal policy also apply here through the shared `bin/fm-typesafe-lib.sh` boundary; see [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) for setup and directive validation.
-The tool's header and help own exact flags, size limits, probability policy, deadlines, and output.
+Firstmate-launched Claude ship and scout workers run the published [jev-belay](https://github.com/valentynkit/jev-belay) Stop hook, which blocks a turn that reports work as done when nothing verified it.
+`bin/fm-spawn.sh` installs one combined Stop command in the worker's gitignored `.claude/settings.local.json`, running `bin/fm-jev-belay-hook.sh` before publishing completion; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
+Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event; every other exit, including nonblocking failure or timeout, clears busy and publishes completion.
+Secondmate sessions and other harnesses do not run it.
 
-Provide a minimal permitted task summary, not a transcript, secret, customer excerpt, or pasted source report.
-An explicitly supplied task file is the ordinary tool input for primary, secondmate, or worker agents at intake and when intent materially changes.
-For worker launch integration, the supervisor puts that same minimal summary and any explicitly named skill IDs in `# Skill selection input`, outside `# Task`, before spawning.
-`fm-spawn.sh` appends advice to its existing worker launch overlay when that section exists, including on relaunch; it never rewrites source intent or a secondmate charter.
-The private launch overlay retains the advice and is regenerated on relaunch.
-Absent input preserves ordinary selection and does not send the whole brief instead.
+The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
+The wrapper therefore resolves the key at call time through the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and sets it for the one upstream `node` process.
+The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
+Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
+Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
+The shared timeout runner bounds the wrapper's preflight and upstream process group to 20 seconds plus a 0.2-second termination grace, regardless of `JEV_BELAY_TIMEOUT_MS`, leaving time to publish completion before Claude's 25-second Stop deadline.
 
-All existing mandatory explicit/named and safety triggers run first and cannot be suppressed by this advisory result.
-Caller-supplied required IDs and locally resolvable named IDs are reported separately from optional suggestions and survive invalid or unavailable catalogs, with unresolved paths left for ordinary skill-index lookup; conditional safety triggers remain governed by their existing index and role instructions, not by a learned relevance score.
-Agents read selected bodies through ordinary tools and may reject suggestions, add necessary skills, or proceed without optional skills when none fits.
-LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening excerpts.
-Supported name scalars ignore surrounding syntax spaces and tabs without altering quoted contents.
+The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs), leaving the pinned upstream `belay.mjs` unchanged.
+Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.
+The policy comes from the resolved `FM_CONFIG_OVERRIDE` or `FM_HOME/config`, and each policy-check child runs without credentials; only the upstream Node process receives the resolved TypeSafe key.
+A forbidden value, invalid policy, or policy-check refusal withholds the entire request without network egress, and upstream catches the withheld-request error and allows the stop.
+Each policy check uses the shared three-second process-group deadline and a five-second synchronous-child ceiling, allowing shell startup and cleanup headroom while bounding stalled policy work and its descendants.
 
-Stage one evaluates each public optional skill in the selected catalog independently using its stable ID and full description, plus a no-fit need signal.
-Blank-separated paragraphs in supported block descriptions are retained in both stages; unsupported scalar continuations restore ordinary selection rather than sending a shortened description.
-Ambiguous shortlists receive a second evaluation using bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
-Paths remain local; the judge does not receive the catalog's full instruction bodies.
-TypeSafe key consent covers only Git-tracked catalog entries whose child skill directories and `SKILL.md` files are not symlinks; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
-Local discovery and required-trigger handling include private skills from both the selected catalog and the active Firstmate home, even when that home differs from the code root; if the task summary names one, the request is withheld rather than rewriting that summary.
-Incomplete local identity discovery, including inaccessible catalog ancestors, catalogs or skill children that cannot be enumerated or searched, unreadable skill bodies, and present catalog, child, or body symlinks whose targets cannot be inspected, withholds requests while preserving caller-required IDs and other recognized named requirements.
-Git-tracked, non-symlink home entries are classified as public independently of the selected remote catalog; home-only entries do not enlarge that catalog.
-Byte-identical public copies across the selected catalog and a distinct active home resolve to the selected catalog's path, while differing or private copies remain ambiguous.
-Catalogs without verifiable Git tracking remain local.
-Missing keys, timeouts, withheld content, unsupported metadata, and malformed answers restore ordinary selection without a mock answer.
-When requests are permitted, each invocation evaluates the current task and public catalog with fresh, bounded requests; results are not cached or reused across invocations.
+`belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
+Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
+The wrapper runs the file only when its git blob id matches the pin in `bin/fm-jev-belay-hook.sh`, so a changed file never receives the key.
+A missing clone, key, or `node`, or a pin mismatch, makes the hook exit 0 silently and never delays a stop.
+To move to a newer upstream version, review it, update the pinned commit in this section and the blob id in the wrapper together, and refresh the clone.
 
-Coverage is role- and input-specific:
+## Worker skill selection
 
-- Primary and secondmate agents have the ordinary task/turn tool path; there is no automatic every-turn native interception or transcript capture.
-- Firstmate-launched ship and scout workers receive additive advice through the supported launch-brief input, including Pi and omp's existing positional brief input; later advice can use the existing steering path.
-- No-mistakes vendor-managed reviewers, fixers, and other internal agents are not instrumented by this integration; no closed-source injection surface is assumed.
-- Other native harnesses retain their existing input mechanics and skill loaders; availability of the shared wrapper alone is not proof of a live suggestion or body load on each harness.
+Every ship and scout launch and relaunch with brief delivery runs `bin/fm-skill-pick.sh` once its task copy exists, to select a project skill for the task.
+Secondmate charters are not judged.
+The picker reads the task copy's `.agents/skills` and `.claude/skills`; a firstmate task's copy holds firstmate's own skills.
+It runs the [TypeSafe skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) recipe on the vendored [hyper-jev](../.agents/skills/hyper-jev/SOURCE.md) client; the [picker header](../bin/fm-skill-pick.mjs) owns recipe mechanics, large-roster chunking, and roster rules.
 
-[`tests/fm-skill-suggest.test.sh`](../tests/fm-skill-suggest.test.sh) exercises the advisory selection and recovery boundaries through the public tool.
-The TypeSafe [skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) is external design context, not validated performance evidence for this caller; published rates and earlier evaluation conclusions do not establish local recall, fewer failed tasks, reduced agent context, or completed-task cost savings.
-This integration retains the index, so any local context saving is limited to avoiding unnecessary optional body loads and is not guaranteed.
+**Named cookbook deviation - highest-fit delivery:** the captain chose a highest-fit pick that workers must read and follow, rather than the cookbook's ignorable advisory suggestion.
+The picker header owns the precise selection rule and thresholds.
+
+The pick is added to the launch instructions as a skill to read in full and follow.
+The launch instructions take precedence over a conflicting picked skill.
+Existing mandatory skill triggers and the worker's own skill index still apply first and unchanged.
+A skill the picker could not send, such as one that is not a Git-tracked file in the task copy or a linked skill directory containing `SKILL.md`, is listed by its local name for the worker to check; linked skill contents are never read or sent.
+Links without `SKILL.md` are not skills: they reserve no name and produce no manual-check instruction.
+No-fit outcomes apply only to judged skills; when every discovered skill is excluded, selection is unavailable with the exclusion reasons, not a finding that no skill fits.
+A genuinely empty catalog reports that there are no skills to judge.
+When the picker cannot run, the launch continues and the instructions say why.
+The task record carries `skill_selection=` (picked, none, unavailable, or undelivered), `skill_selection_reason=`, and `skill_selection_picked=` when a pick is delivered.
+Raw commands receive the selection when they contain `__BRIEF__` or `__BRIEFDOORBELL__`, or when their detected harness is Kimi or Rovo, which receives a brief-file pointer.
+Without any supported brief transport, selection is recorded as undelivered with its reason, no pick is claimed, and the command is unchanged.
+Failure to publish the selection overlay also records undelivered and clears the pick.
+If launch delivery fails, any retained record for that launch is marked undelivered with the failure reason and no claimed pick; an abort before replacement-record publication preserves the prior record.
+`bin/fm-spawn.sh` stops the picker after 30 seconds.
+
+Only the brief text dispatch resolution may send is sent, after the same never-send checks; see the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key).
+For a promoted scout's ship relaunch, skill selection retains the original Captain's intent or provenance-marked legacy Task words and uses the recorded ship kind and current ship Firstmate spec rather than the superseded scout spec; ordinary dispatch extraction is unchanged.
+Legacy provenance uses the same fence and indentation exclusions as promotion.
+Privacy-hidden promotion instructions never revive the superseded spec.
+The picker uses the shared [TypeSafe key lookup](#typed-dispatch-resolution-env-typesafe_api_key), including the local primary-home fallback, and asks TypeSafe directly first when that key is available.
+When the TypeSafe key is absent or a direct request fails and `OPENROUTER_API_KEY` is set in the calling home's `.env`, the same request and the rest of that pick go through OpenRouter.
+Privacy refusals, question-validation failures, and expiry of the picker's overall deadline stop selection without triggering provider fallback.
+Unlike the TypeSafe key, the OpenRouter key is read only from that home's `.env`, with no primary-home or ambient-environment fallback.
+This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
+Fallback provenance is retained for picked, no-selection, and unavailable outcomes.
+Missing optional catalog directories are skipped; failures inspecting existing catalogs are unavailable with their actionable reason, not successful no-selection results.
+The shared [key-handling contract](#typed-dispatch-resolution-env-typesafe_api_key) owns credential transport and secrecy.
+
+[`tests/fm-skill-pick.test.sh`](../tests/fm-skill-pick.test.sh) exercises selection, both thresholds, the fallback, the never-send boundary, and chunking through the public tool.
+The cookbook's published rates are external design context, not validated performance evidence for this caller.
 
 
 ## Toolchain
@@ -1745,7 +1860,8 @@ Required tools come in two parts: a universal toolchain every home needs regardl
 
 Every home requires:
 
-- node and git.
+- Node 24+ with native TypeScript loading enabled, and git.
+  Worker skill selection capability-checks imports of its vendored TypeScript client; unsupported TypeScript loading is a runtime prerequisite, while other import failures report a client-loading error.
 - gh, with GitHub authentication through `gh auth login`.
 - no-mistakes v1.46.0 or newer.
 - Compatible gh-axi.
@@ -1828,11 +1944,12 @@ Local routes use direct guarded filesystem operations, while remote routes deleg
 **Push inherited configuration during a session**
 
 For a mid-session inherited local-material edit where tracked-file sync is not needed, run `bin/fm-config-push.sh`.
-It uses the same live secondmate discovery and propagation helper as bootstrap; its [help](../bin/fm-config-push.sh) owns reporting and exit semantics, and [`fm_config_inherit_items`](../bin/fm-config-inherit-lib.sh) declares the inherited items.
+It uses the same live secondmate discovery and propagation helper as bootstrap; its [header and help](../bin/fm-config-push.sh) own reporting and exit semantics, and [`fm_config_inherit_items`](../bin/fm-config-inherit-lib.sh) declares the inherited items.
 
 - When an allowlisted config item changes for an already-running local home, it sends the literal-content reread pointer described in [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); unchanged allowlisted config sends no pointer unless a previous delivery is pending.
+- Retained reread recovery, including obsolete `keep-ai-trailers` sections, shared-data report rows, and temporarily excluded config items, follows the [`secondmate-provisioning` retry contract](../.agents/skills/secondmate-provisioning/SKILL.md#charter-and-seed).
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
-- The locked bootstrap inheritance pass uses the same placement-specific behavior; see `secondmate-provisioning` for the single contract owner.
+- The locked bootstrap inheritance pass uses the same placement-specific behavior; see `secondmate-provisioning` for the single contract owner. Successful config-reread enqueues, including retry-queue recovery, stay silent in bootstrap; local reread failures remain visible as `CONFIG_REREAD:` diagnostics. Focused config push reports actual successful enqueues as `config-reread: sent`, not agent acknowledgments.
 - That live discovery starts from `state/*.meta` records with `kind=secondmate`; `data/secondmates.md` only backfills `home=` for older or incomplete meta records.
 - Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures unless the [session launch policy](#session-launch-policy-configsession-launch-policy) cannot be verified.
 
@@ -2778,6 +2895,8 @@ The two read files use different parsing rules:
 
 Runtime tuning via environment variables (defaults shown):
 
+`FM_BACKLOG_ROW_TIMEOUT_SECS` covers lightweight and full-body reads, including start/reopen and dispatch; the first timeout prevents later backend reads in the same process.
+
 ```sh
 FM_HOME=                 # optional operational home for most scripts, unset means this repo root; fm-send requires it explicitly
 FM_ROOT_OVERRIDE=        # override firstmate repo root, tangle-guard target, and zellij/cmux home-title hash; also legacy whole-root override when FM_HOME is unset
@@ -2808,6 +2927,9 @@ FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppres
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
 FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
+FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
+FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
+FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding the complete best-effort home-summary refresh, including lock acquisition, validation, atomic publication, and worker-side failure logging; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2
@@ -2858,7 +2980,8 @@ FMX_RELAY_URL=https://myfirstmate.io   # optional Relay endpoint override, mainl
 FMX_ENV_FILE=           # optional alternate .env file for direct Relay client invocations; bootstrap still checks $FM_HOME/.env
 FMX_DRY_RUN=            # truthy previews Relay replies and dismissals to state/x-outbox/ without posting or requiring a token
 FMX_X_REPLY_MAX_CHARS=280   # X reply per-message split budget; values below 50 clamp to 50
-TYPESAFE_API_KEY=       # TypeSafe opt-in; see "Typed dispatch resolution" and "Advisory skill selection" above
+TYPESAFE_API_KEY=       # TypeSafe opt-in; see "Typed dispatch resolution" and "Worker skill selection" above
+OPENROUTER_API_KEY=     # optional OpenRouter fallback for worker skill selection; read from this file only
 FMX_DISCORD_REPLY_MAX_CHARS=1900   # Discord reply per-message split budget; values below 50 clamp to 50, values above 2000 reset to 1900
 FMX_X_THREAD_MAX=25     # maximum messages in one auto-split reply thread
 FMX_FOLLOWUP_MAX_AGE_SECS=604800   # local window for posting Relay completion follow-ups (7 days)
@@ -2891,7 +3014,7 @@ FM_CLASSIFY_PAUSED_VERB=paused     # leading declared-wait status verb; bin/fm-s
 FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stale pane escalates, unless that pane's own worker declared a wait that has not elapsed, or, where config/wedge-defer-parked-gate arms it, that pane's crew is parked at a validation gate awaiting the supervisor's decision on it that the crew raised under that run's key and nobody has answered yet, either of which takes the FM_PAUSE_RESURFACE_SECS recheck below instead; stale panes whose crew is not provably working surface immediately unless admitted directly to the declared-wait cadence, while a live idle declared wait still surfaces once before that cadence bounds repeats; at that same escalation moment a recovery-grade agent-state probe (docs/architecture.md owns that dead-record contract) reports a pane whose endpoint is proven `dead` or `missing` once and stops re-escalating it while it stays that way
 FM_BUSY_TURN_MAX_SECS=3600         # maximum age without a completed turn or explicit native-harness progress (bin/fm-watch.sh owns marker selection), before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait, an attended verified captain-held transfer, or - where config/wedge-defer-parked-gate arms it - a validation gate of the crew's own awaiting the supervisor's still-unanswered decision takes the FM_PAUSE_RESURFACE_SECS recheck below instead
 FM_PAUSE_RESURFACE_SECS=14400      # four hours between bounded rechecks of a declared external wait or verified captain-held transfer, and between repeated new-hash stale alarms for an ordinary crew task with an open backlog captain call; a structured until time can make an external-wait recheck occur sooner but cannot extend this bound; this includes a live idle pane after its first inconclusive stale wake, a provably-working pane whose own unelapsed declared wait or, where config/wedge-defer-parked-gate arms it, unanswered supervisor-owed validation gate defers its FM_STALE_ESCALATE_SECS escalation, and a live busy pane past FM_BUSY_TURN_MAX_SECS, while the away-mode daemon uses the same setting and ages its window against the crew's own latest status line rather than pane busy state; a captain-held transfer is never rechecked while the away-posture record exists, while an armed validation gate awaiting the supervisor's decision keeps this recheck in either posture
-FM_SECONDMATE_WAKE_STALL_SECS=180  # minimum interval with no change of the oldest actionable foreign wake-queue row (it advances as the mate drains, and a queue reprovisioned under the same task id starts a fresh interval at whatever sequence it restarts) before an endpoint-recorded local secondmate produces one durable parent wake-loop-stall notification for that no-progress episode; a mate that is provably inside an active turn (an exact busy verdict) does not escalate until that same no-progress interval reaches FM_BUSY_TURN_MAX_SECS above; a mate whose busy class is exactly idle, whose agent is alive, and whose composer is not pending is rung once so its own home can drain, and the parent notification is withheld until that same row stays frozen for another stall interval; unknown or ring-unsafe panes keep the parent alarm; declared external-wait pause rows are excluded, and zero or invalid values use 180
+FM_SECONDMATE_WAKE_STALL_SECS=180  # no-progress interval before a durable parent wake-loop-stall notification; docs/architecture.md "Event-driven supervision" owns queue observation, busy bounds, idle-ring eligibility, and episode deduplication; zero or invalid values use 180
 FM_SECONDMATE_LIVENESS_SECS=60   # seconds between watcher probes of each registered secondmate's recorded endpoint through bin/fm-secondmate-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded fm-spawn.sh --secondmate path and emits exactly one check wake per relaunch; zero or invalid values use 60
 FM_SECONDMATE_LIVENESS_TIMEOUT=120   # seconds bounding one watcher-driven relaunch, so a wedged spawn cannot stall the poll; zero or invalid values use 120
 FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.secondmate-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3

@@ -210,7 +210,7 @@ bash bin/fm-test-run.sh tests/fm-control-relaunch.test.sh
 ```
 
 The suite exercises the production control and launch commands but does not start or stop a real tmux server or Herdr session.
-Its process seam also separates a current-user server on another socket from a server owned by another uid.
+Its working-directory fixtures cover escaped paths, live and unattributed holders, and inconclusive reads; the real-`lsof` cases exercise exit, ordinary relaunch, reconciliation-only recovery, and direct replacement from the worktree root and a descendant when their tool prerequisites are available.
 The reclaim cases cover two missing tmux tasks in one home, recovered sequentially onto configured Herdr while preserving work, task identity, status, armed polls, and progress notes, plus refusal of every other configured backend.
 
 ### Agent liveness name sources
@@ -459,7 +459,7 @@ A forced run still prints the full diagnosis naming the backend, the target, and
 It states what `--force` authorizes rather than what will have happened, because a later refusal in the same run - the Herdr confirmed-gone gate, or the inactive-reconcile delivery gate - can still stop it with every record retained.
 
 The Orca close refuses under `--force` too.
-The step immediately after it removes the Orca worktree through the same CLI whose absence is the only thing that arm ever reports, so a forced continue would die there having removed nothing while claiming the records were already gone.
+Without its CLI, Orca cannot attempt the recorded terminal close, even when no worktree removal is due; [`orca-backend.md`](../orca-backend.md#current-lifecycle-and-safety) owns the missing-copy cleanup limit.
 The two child close sites inside forced secondmate cleanup also keep refusing: that path is only ever reached under `--force`, so honoring force there would delete the refusal rather than override it, and would contradict the adjacent Herdr child gate that stops forced cleanup for the same hazard.
 
 The retained record is this run's, not a durable guarantee.
@@ -471,7 +471,7 @@ Both directions are proven non-vacuous.
 Restoring the swallowed status makes the refusal case report `teardown <id> complete`, delete the endpoint record, and leave the window live.
 Keeping the refusal but dropping the exact re-read makes an already-exited endpoint refuse its own cleanup, and also fails the cleanup identity case above.
 Letting an unreadable inventory pass for absence makes the unreadable case complete and remove the record while the window is still there.
-Removing the `--force` arm makes the forced generic case refuse; honoring `--force` at the child sites makes forced secondmate cleanup continue past a child endpoint it could not close, and honoring it at the Orca site makes that forced cleanup abort on the missing CLI after announcing that it was continuing.
+Removing the `--force` arm makes the forced generic case refuse; honoring `--force` at the child sites makes forced secondmate cleanup continue past a child endpoint it could not close, and honoring it at the Orca site would retire records naming a terminal the missing CLI never closed.
 Restoring `fm_backend_orca_kill`'s swallowed tool check makes the CLI-absent adapter case report success.
 Dropping the retention-is-not-durable line makes the refusal claim a retention teardown does not own.
 
@@ -1231,6 +1231,52 @@ ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm
 
 With the classifier change reverted, the same run stopped at `an idle empty titled-border composer read 'unknown', not empty`.
 
+### 2026-10-06 omp injected text through Herdr
+
+Verified on 2026-10-06 on macOS arm64 against omp 18.6.3 (reproduction) and omp 18.7.0 (guard run) in isolated Herdr 0.9.1 lab sessions, with the box composer shape pinned and the omp watch extension loaded from a lab checkout.
+Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a lane's composer; each is vendor behavior, so this entry records what omp does and the guard that keeps the handling honest.
+
+- **Interrupt restores a queued wake.**
+  A watcher wake the extension delivered with `sendUserMessage(..., { deliverAs: "followUp" })` while a turn was running was shown as a queued message.
+  One Escape (the key `bin/fm-control.sh <id> interrupt` sends) put the wake text back into the composer instead of delivering it, and no turn consumed it.
+  The composer then read `pending`, the lane read idle, and a bare Enter submitted the wake, which the lane then handled.
+  omp joins restored messages and any operator draft with a blank line (`<wake>` blank line `<draft>`).
+  [Watcher continuity](../watcher-continuity.md#omp-restored-wake-recovery) owns current recovery behavior and known limits; [architecture](../architecture.md#event-driven-supervision) owns parent alarm and idle-ring eligibility.
+- **A working lane's box composer is readable.**
+  While a turn runs, the box top border carries a braille spinner frame and the elapsed time (`╭── ⠦ 13s > ◔ GPT-6-Astra …`) instead of the idle `π >` identity.
+  The shared classifier used to read that border as `unknown`, so a doorbell typed into a working lane could not be seen as unsubmitted and the adapter's submit never retried a dropped Enter.
+  The border is now an omp identity, an empty working composer reads `empty`, and typed text reads `pending`, wrapped or not.
+  A second Enter on an empty composer while queued messages exist aborts the running omp turn (omp's empty-submit rule), so the adapter re-reads a pending verdict once before it may retry.
+- **A descendant omp must not take the markers.**
+  An `omp --print` child that a turn ran loaded the same `.omp/extensions` from the same directory, wrote its own pid into `state/.omp-turnend-extension-loaded`, and died, leaving the supervision proof reading `not loaded` under a healthy session.
+  [Extension supervision proof](../turnend-guard.md#extension-model) owns exact-lock marker and watcher ownership, including load-time marker writes before a live lock exists.
+  The current live guard requires a fresh lab-local success record written only after the child command succeeds and both marker PIDs match the session lock PID, before the parent can repair them at its next turn boundary.
+  It checks both markers again after the parent resumes and brackets busy-composer observations with agent liveness and Herdr's process-validated native busy state, checking that evidence immediately before adapter submission.
+  Rendered delivery-busy readers recognize both the spinner-bearing box border and the `⎋ Waiting …` row, including when no harness identity is available.
+  An empty working editor remains readable as `empty`, but the away-mode daemon defers injection until the turn is idle.
+
+`tests/fm-omp-harness.test.sh` carries restored-wake editor recovery, descendant sessions, and marker self-repair; `tests/fm-composer-lib.test.sh` carries working-box fixtures captured during this verification; backend submit regressions carry dropped-Enter and stale-frame reread protections, and `tests/fm-wake-queue.test.sh` carries the ordinary stalled-loop alarm and idle-ring boundaries.
+
+The live guard that refreshes this entry submits real prompts and stays opt-in.
+Both recovery probes require the fresh queued wake to be observed in a pending composer after Escape before queue drainage or draft preservation can count as recovery proof.
+If restoration is not observed, the probe retries from a fresh busy turn at most three times, then fails rather than accepting ordinary queued delivery as recovery.
+
+```sh
+FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
+```
+
+The current live guard has not been rerun for this change.
+Historical output below predates its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
+These results do not establish the current recovery contract; output for the removed parent Enter recovery is omitted.
+
+```text
+ok - live omp wake restore: omp (omp/18.7.0) on herdr 0.9.1 re-submitted a wake that Esc restored to the composer, and the lane handled it
+ok - live omp wake restore: omp (omp/18.7.0) on herdr 0.9.1 left the operator's draft exactly as typed while it re-submitted the wake
+ok - live omp markers: omp (omp/18.7.0) on herdr 0.9.1 kept both loaded markers on the session pid 34771 after a descendant omp ran
+ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 reads empty and pending while a turn runs
+ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
+```
+
 ## Steering-inbox doorbell
 
 The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).
@@ -1627,7 +1673,8 @@ Measured 2026-08-19 against Herdr 0.8.0 and Claude Code 2.1.236 in an isolated `
 
 `herdr agent get` reported `agent_status=idle` on every sample across a landed one-word turn and an 8-second `sleep` tool call, while the pane rendered `Pontificating…` then `Sock-hopping… (11s · ↓ 234 tokens)`.
 `fm_backend_herdr_send_text_submit` therefore cannot treat native idle as proof of a swallow.
-The portable regressions in `tests/fm-backend-herdr.test.sh` and `tests/fm-composer-lib.test.sh` pin the verdicts: native idle plus a cleared composer is delivery, proven pending plus idle is a swallow, and proven pending plus a generating busy signal is a queued Enter.
+The portable regressions in `tests/fm-backend-herdr.test.sh` and `tests/fm-composer-lib.test.sh` cover the current [submit confirmation](../herdr-backend.md#submit-confirmation) contract.
+Pending-composer retry rereads are covered by the backend submit regressions, including `tests/fm-tmux-submit-busy.test.sh`; a newly empty composer receives no retry Enter.
 Refresh the live Claude proof with:
 
 ```sh

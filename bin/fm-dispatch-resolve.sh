@@ -5,11 +5,11 @@
 # Usage:
 #   fm-dispatch-resolve.sh <brief-file> [--project <name>]
 #
-# Opt-in gate: TYPESAFE_API_KEY non-empty in this process environment, else a
-#   TYPESAFE_API_KEY= line in $FM_HOME/.env read with fmx_env_get, the same
-#   accessor as FMX_PAIRING_TOKEN (bin/fm-env-lib.sh). The environment wins.
-#   Absent in both: one "dispatch-resolve: off" line on stderr, nothing on
-#   stdout, exit 0, no network call, so firstmate dispatches exactly as today.
+# Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
+#   resolution and precedence.
+#   With no key from any source: one "dispatch-resolve: off" line on stderr,
+#   nothing on stdout, exit 0, no network call, so firstmate dispatches exactly
+#   as today.
 #   The key lives in one shell variable and reaches curl as a header read from
 #   a file descriptor, never on argv; nothing logs or writes it.
 #
@@ -139,7 +139,7 @@ done
 
 # ---- opt-in gate ---------------------------------------------------------------
 if ! fm_typesafe_key "$FM_HOME"; then
-  echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env)" >&2
+  echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env or the primary home .env)" >&2
   exit 0
 fi
 
@@ -312,63 +312,13 @@ never_send_off() {
 }
 
 # Snapshot and validate privacy policy before reading any outgoing brief text.
-NEVER_SEND_LIST='' MARKED_SECTIONS=0
+NEVER_SEND_LIST=''
 never_send_load() {
-  local value n=0
-  fm_typesafe_policy_inspect "$NEVER_SEND_PATH" \
+  fm_typesafe_policy_marked_sections "$NEVER_SEND_PATH" \
     || never_send_off "$FM_TYPESAFE_WITHHELD_REASON"
   [ -e "$NEVER_SEND_PATH" ] || [ -L "$NEVER_SEND_PATH" ] || return 0
   NEVER_SEND_LIST=$(jq -Rr 'gsub("\\s+"; " ")' "$NEVER_SEND_PATH" 2>/dev/null) \
     || never_send_off "could not read $NEVER_SEND_PATH"
-  while IFS= read -r value; do
-    n=$((n + 1))
-    value=${value# }
-    value=${value% }
-    case "$value" in
-      '# dispatch-never-send marked-sections') MARKED_SECTIONS=1 ;;
-      '#'*)
-        case "$(printf '%s' "${value#'#'}" | tr '[:upper:]' '[:lower:]')" in
-          dispatch-never-send*|' dispatch-never-send'*)
-            never_send_off "invalid privacy directive in $NEVER_SEND_PATH line $n" ;;
-        esac
-        ;;
-    esac
-  done <<<"$NEVER_SEND_LIST"
-}
-
-# Markers are interpreted on the original brief, even inside Markdown fences,
-# so protected headings cannot change extraction or cause a whole-brief fallback.
-never_send_brief() {
-  local rc=0
-  grep -qiE -e '<!--[[:space:]]*dispatch-never-send' "$BRIEF" 2>/dev/null || rc=$?
-  case "$rc" in
-    0) [ "$MARKED_SECTIONS" -eq 1 ] \
-         || never_send_off "never-send markers need the marked-sections directive" ;;
-    1) cp "$BRIEF" "$SEND_TEXT" || never_send_off "could not read the brief"
-       return ;;
-    *) never_send_off "could not read the brief" ;;
-  esac
-  awk '
-    {
-      marker = $0
-      sub(/^[[:space:]]+/, "", marker)
-      sub(/[[:space:]]+$/, "", marker)
-      if (marker == "<!-- dispatch-never-send:start -->") {
-        if (hidden) exit 1
-        hidden = 1
-        next
-      }
-      if (marker == "<!-- dispatch-never-send:end -->") {
-        if (!hidden) exit 1
-        hidden = 0
-        next
-      }
-      if (tolower($0) ~ /<!--[[:space:]]*dispatch-never-send/) exit 1
-      if (!hidden) print
-    }
-    END { if (hidden) exit 1 }
-  ' "$BRIEF" > "$SEND_TEXT" 2>/dev/null \
-    || never_send_off "invalid never-send markers or unreadable brief"
 }
 
 # Checks every string the request carries. grep stderr can echo the pattern.
@@ -393,31 +343,11 @@ never_send_check() {
   done <<<"$NEVER_SEND_LIST"
 }
 
-# Send Jev only the task-specific sections bin/fm-brief.sh scaffolds, plus a
-# scout tag from the scout contract line; the rest of a scaffolded brief is
-# standard boilerplate whose safety language reads as high stakes on every task.
-# A brief with neither section goes whole. Ship delivery mode is deliberately
-# not sent: live runs showed it pushing routine ship briefs to the top tier.
-brief_kind() {
-  if grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$SEND_TEXT"; then
-    printf 'Brief kind: scout (report only)\n\n'
-  fi
-}
-task_sections() {
-  local heading
-  for heading in "## Captain's intent" "## Firstmate spec"; do
-    fm_brief_task_heading_present "$SEND_TEXT" "$heading" || continue
-    printf '%s\n%s\n\n' "$heading" "$(fm_brief_task_heading_body "$SEND_TEXT" "$heading")"
-  done
-}
+# fm_typesafe_brief_task owns marker removal and the task-section extraction
+# shared with worker skill selection.
 never_send_load
-never_send_brief
-SECTIONS=$(task_sections)
-if [ -n "$SECTIONS" ]; then
-  { brief_kind; printf '%s\n' "$SECTIONS"; } > "$TASK_TEXT" || die "could not read brief: $BRIEF"
-else
-  cp "$SEND_TEXT" "$TASK_TEXT" || die "could not read brief: $BRIEF"
-fi
+fm_typesafe_brief_task "$BRIEF" "$NEVER_SEND_PATH" "$TASK_TEXT" \
+  || never_send_off "$FM_TYPESAFE_WITHHELD_REASON"
 command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
   REQUEST=$(jq -n --rawfile brief "$TASK_TEXT" --arg project "$PROJECT" --arg model "$TS_MODEL" \
     --arg none_criterion "$DEFAULT_WHEN" --slurpfile rules "$RULES" '

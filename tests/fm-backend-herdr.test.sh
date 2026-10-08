@@ -4430,10 +4430,10 @@ test_send_text_submit_detects_swallowed_enter() {
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/2.out"
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/4.out"
   printf '  \xe2\x9d\xaf hello captain\n' > "$resp/5.out"
-  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/7.out"
-  printf '  \xe2\x9d\xaf hello captain\n' > "$resp/8.out"
-  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/9.out"
-  printf '  ready\n' > "$resp/10.out"
+  printf '  \xe2\x9d\xaf hello captain\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/8.out"
+  printf '  \xe2\x9d\xaf hello captain\n' > "$resp/9.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/10.out"
   herdr_submit_identity_prefix "$resp" codex
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
@@ -4480,9 +4480,8 @@ test_send_text_submit_popup_autocomplete_requires_second_enter() {
   # 5: composer still holds the placeholder fill; native idle falls through
   #    to the shared composer verdict, which retries rather than confirming.
   printf '  \xe2\x9d\xaf /compact\n' > "$resp/5.out"
-  # 6: send-keys enter (#2) - actually submits
-  # 7: agent get -> working (submitted)
-  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
+  printf '  \xe2\x9d\xaf /compact\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/8.out"
   herdr_submit_identity_prefix "$resp" codex
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
@@ -4570,6 +4569,81 @@ test_send_text_submit_confirms_blocked_after_enter() {
   pass "fm_backend_herdr_send_text_submit: a post-Enter blocked state confirms delivery without retrying into the prompt"
 }
 
+# An omp box composer draws its status line in the top border, and while a turn
+# runs that border carries a spinner and the elapsed time instead of the idle
+# identity glyph. It used to read `unknown` mid-turn, so a doorbell whose Enter
+# was dropped stayed in a working lane's composer and the submit reported
+# success. These are the real omp 18.6.3 shapes (the lane was running a tool).
+omp_busy_box_screen() {  # <editor text>
+  printf '  %s\n\n' '⎋ Waiting requested sixty seconds'
+  printf '%s\n' '╭── ⠦ 13s > ◔ GPT-6-Astra 👁 > 🗑 …lab.m13m2O/project > ⑂ fm/fm-omp-lane-wake-unsubmitted *7 > S0.27 + 👁 0.05 ▶─7%─┃272K───╮'
+  printf '╰─ %-100s ─╯\n' "$1"
+}
+
+test_send_text_submit_retries_a_dropped_enter_in_a_busy_omp_box() {
+  local dir log resp fb out enter_count
+  dir="$TMP_ROOT/submit-omp-busy-dropped"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # 2: agent get - working. 3: footer baseline. 4: send-keys enter (dropped).
+  # 5 and 6: the composer still holds the typed line on both reads, so the
+  # retried Enter is allowed. 7: send-keys enter. 8: the composer is empty.
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/2.out"
+  printf '  ready\n' > "$resp/3.out"
+  omp_busy_box_screen 'hello captain' > "$resp/5.out"
+  omp_busy_box_screen 'hello captain' > "$resp/6.out"
+  omp_busy_box_screen '' > "$resp/8.out"
+  herdr_submit_identity_prefix "$resp" omp
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a busy omp box whose first Enter was dropped must be retried until the composer is empty, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 2 ] || fail "the dropped Enter must be retried exactly once, sent $enter_count Enter(s)"
+  pass "fm_backend_herdr_send_text_submit: a busy omp box that still holds the typed line is retried until it reads empty"
+}
+
+test_send_text_submit_never_double_presses_on_a_stale_busy_omp_frame() {
+  local dir log resp fb out enter_count
+  dir="$TMP_ROOT/submit-omp-busy-stale"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # The first composer read still shows the typed line (a frame drawn before omp
+  # consumed the Enter); the re-read shows it queued and the composer empty. A
+  # second Enter here would hit an empty composer mid-turn, which omp treats as
+  # an abort of the running turn.
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/2.out"
+  printf '  ready\n' > "$resp/3.out"
+  omp_busy_box_screen 'hello captain' > "$resp/5.out"
+  omp_busy_box_screen '' > "$resp/6.out"
+  herdr_submit_identity_prefix "$resp" omp
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a stale busy omp frame that clears on the re-read must report empty, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 1 ] || fail "a stale frame must not provoke a second Enter into an empty composer, sent $enter_count Enter(s)"
+  pass "fm_backend_herdr_send_text_submit: a stale pending frame in a busy omp box never earns a second Enter"
+}
+
+test_send_text_submit_exhausted_busy_omp_payload_stays_pending() {
+  local dir log resp fb out enter_count status
+  for status in working blocked; do
+  dir="$TMP_ROOT/submit-omp-busy-held-$status"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/2.out"
+  printf '  ready\n' > "$resp/3.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/5.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/6.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/8.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/9.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/10.out"
+  herdr_submit_identity_prefix "$resp" omp
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
+  [ "$out" = pending ] || fail "omp holding the payload after both Enter attempts must stay pending, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 2 ] || fail "held omp payload must consume exactly two Enter attempts, got $enter_count"
+  pass "fm_backend_herdr_send_text_submit: exhausted busy omp payload remains pending"
+  done
+}
+
 test_send_text_submit_preexisting_working_pending_is_queued_enter() {
   local dir log resp fb out enter_count
   dir="$TMP_ROOT/submit-preexisting-working-queued"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -4579,9 +4653,11 @@ test_send_text_submit_preexisting_working_pending_is_queued_enter() {
   # because the pre-Enter native status is already working.
   printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/2.out"
   printf '  ready\n' > "$resp/3.out"
-  printf '  \xe2\x9d\xaf hello captain\n' > "$resp/5.out"
-  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/6.out"
-  herdr_submit_identity_prefix "$resp" codex
+  printf '┃ hello captain\n┃ Build model\n' > "$resp/5.out"
+  # The pending read is repeated once before any retry may press Enter again.
+  printf '┃ hello captain\n┃ Build model\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
+  herdr_submit_identity_prefix "$resp" opencode
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 1 0.01 0.01' "$ROOT" )
@@ -4645,11 +4721,9 @@ test_send_text_submit_idle_native_empty_composer_confirms_delivery() {
   pass "fm_backend_herdr_send_text_submit: idle native agent-state plus empty composer reports empty (landed Claude turn)"
 }
 
-test_send_text_submit_idle_native_pending_plus_rendered_busy_is_queued() {
+test_send_text_submit_idle_native_retained_payload_stays_pending() {
   local dir log resp fb out
   dir="$TMP_ROOT/submit-idle-native-rendered-busy-queued"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  # Idle native baseline (Claude never leaves idle) with proven pending text
-  # and a generating footer after retries is a queued follow-up Enter.
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/2.out"
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/4.out"
   printf '  \xe2\x9d\xaf hello captain\n' > "$resp/5.out"
@@ -4659,8 +4733,8 @@ test_send_text_submit_idle_native_pending_plus_rendered_busy_is_queued() {
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 1 0.01 0.01' "$ROOT" )
-  [ "$out" = empty ] || fail "idle native + proven pending + rendered busy after retries is a queued Enter, got '$out'"
-  pass "fm_backend_herdr_send_text_submit: idle native baseline uses a rendered busy footer to confirm a queued Enter"
+  [ "$out" = pending ] || fail "an unsupported harness with retained payload must stay pending despite rendered busy, got '$out'"
+  pass "fm_backend_herdr_send_text_submit: unsupported retained payload does not borrow rendered busy as queue proof"
 }
 
 # --- the never-idle-native-state harness (real cursor on herdr) --------------
@@ -4743,7 +4817,7 @@ test_send_text_submit_confirms_never_idle_native_state_via_footer_transition() {
   herdr_cursor_idle_plain > "$resp/3.out"
   herdr_cursor_midturn_ansi > "$resp/5.out"
   herdr_cursor_midturn_plain > "$resp/6.out"
-  herdr_submit_identity_prefix "$resp" codex
+  herdr_submit_identity_prefix "$resp" cursor
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0.01 0.01' "$ROOT" )
@@ -4761,9 +4835,13 @@ test_send_text_submit_never_idle_native_state_keeps_pending_without_a_transition
   # borrowing someone else's turn as proof of our delivery.
   printf '{"result":{"agent":{"agent_status":"blocked"}}}\n' > "$resp/2.out"
   herdr_cursor_midturn_plain > "$resp/3.out"
+  # Each pending composer read is repeated once before a retry may press Enter
+  # again (reads 5 and 6, then 8 and 9 after the retried Enter at 7).
   herdr_cursor_midturn_ansi > "$resp/5.out"
-  herdr_cursor_midturn_ansi > "$resp/7.out"
-  herdr_submit_identity_prefix "$resp" codex
+  herdr_cursor_midturn_ansi > "$resp/6.out"
+  herdr_cursor_midturn_ansi > "$resp/8.out"
+  herdr_cursor_midturn_ansi > "$resp/9.out"
+  herdr_submit_identity_prefix "$resp" cursor
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
@@ -5180,14 +5258,9 @@ test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry() {
   printf '❯ \033[38;2;51;102;255m%s\033[0m\n' "$text" > "$resp/4.out"
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/7.out"
-  # First Enter fills the popup without submitting. The colored command
-  # must still read pending so the second Enter, and only it, lands. That
-  # state read keeps the identity the submit already proved: the native probe
-  # is unavailable by then (call 9 answers any re-probe with an error), and a
-  # re-probe would strip the command and report a false delivery.
   cp "$resp/4.out" "$resp/8.out"
-  printf '{"error":{"code":"timeout","message":"agent get timed out"}}\n' > "$resp/9.out"
-  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/10.out"
+  cp "$resp/4.out" "$resp/9.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/11.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
@@ -5195,7 +5268,7 @@ test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry() {
   enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
   [ "$enter_count" -eq 2 ] || fail "colored $text must retry swallowed Enter, sent $enter_count"
   [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "colored $text must not be cleared"
-  pass "Claude colored slash commands survive payload proof and a swallowed first Enter while the native probe is unavailable"
+  pass "Claude colored slash commands survive payload proof and fresh pending confirmation before retry"
 }
 
 # A loaded host rendered a typed /compact seconds after the settle. The proof
@@ -5457,14 +5530,19 @@ test_send_text_submit_non_claude_skips_the_payload_proof() {
     printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/5.out"
     if [ "$agent" = missing ]; then
       printf '1\n' > "$resp/1.exit"
+      omp_busy_box_screen '' > "$resp/6.out"
     else
       printf '{"result":{"agent":{"agent":"%s","agent_status":"idle"}}}\n' "$agent" > "$resp/1.out"
     fi
     fb=$(make_herdr_fakebin "$dir")
     out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
       bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
-    [ "$out" = empty ] || fail "a $agent pane should keep the type-then-Enter path and confirm from agent_status, got '$out'"
-    [ "$(grep -c $'\x1f''pane'$'\x1f''read' "$log")" -eq 0 ] || fail "a $agent pane must not have its composer read before Enter"
+    [ "$out" = empty ] || fail "a $agent pane should keep the type-then-Enter path and confirm delivery, got '$out'"
+    if [ "$agent" = codex ]; then
+      [ "$(grep -c $'\x1fpane\x1fread' "$log")" -eq 0 ] || fail "identified native transition needs no composer read"
+    else
+      [ "$(grep -c $'\x1fpane\x1fread' "$log")" -eq 1 ] || fail "missing identity must read cleared composer after Enter"
+    fi
     enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
     [ "$enter_count" -eq 1 ] || fail "a $agent pane should be submitted once, sent $enter_count Enter(s)"
   done
@@ -6253,11 +6331,14 @@ test_send_text_submit_popup_autocomplete_requires_second_enter
 test_send_text_submit_refuses_confirming_enter_on_exit_picker
 test_blocked_submit_leaves_the_exit_picker_to_the_next_composer_read
 test_send_text_submit_confirms_blocked_after_enter
+test_send_text_submit_retries_a_dropped_enter_in_a_busy_omp_box
+test_send_text_submit_never_double_presses_on_a_stale_busy_omp_frame
+test_send_text_submit_exhausted_busy_omp_payload_stays_pending
 test_send_text_submit_preexisting_working_pending_is_queued_enter
 test_send_text_submit_preexisting_working_does_not_confirm_failed_enter
 test_send_text_submit_idle_baseline_does_not_confirm_failed_enter
 test_send_text_submit_idle_native_empty_composer_confirms_delivery
-test_send_text_submit_idle_native_pending_plus_rendered_busy_is_queued
+test_send_text_submit_idle_native_retained_payload_stays_pending
 test_composer_state_cursor_midturn_row_reads_pending
 test_rendered_busy_state_reads_the_cursor_busy_token
 test_send_text_submit_confirms_never_idle_native_state_via_footer_transition
@@ -6314,3 +6395,232 @@ test_wait_transition_stream_absorb_clears_then_timeout
 test_wait_transition_reader_failure_returns_2
 test_wait_transition_bad_ack_returns_2_and_cleans_up
 test_wait_transition_clean_timeout_returns_1
+
+test_submit_missing_identity_does_not_borrow_footer_transition() {
+  local dir log resp fb out identity
+  for identity in failed absent unknown; do
+    dir="$TMP_ROOT/submit-identity-$identity"; mkdir -p "$dir/responses"
+    log="$dir/log"; resp="$dir/responses"; : > "$log"
+    case "$identity" in
+      failed) printf '1\n' > "$resp/1.exit" ;;
+      absent) printf '{"result":{"agent":{}}}\n' > "$resp/1.out" ;;
+      unknown) printf '{"result":{"agent":{"agent":"unknown"}}}\n' > "$resp/1.out" ;;
+    esac
+    printf '{"result":{"agent":{"agent_status":"blocked"}}}\n' > "$resp/3.out"
+    herdr_cursor_idle_plain > "$resp/4.out"
+    herdr_cursor_midturn_ansi > "$resp/6.out"
+    herdr_cursor_midturn_ansi > "$resp/7.out"
+    printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/8.out"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 1 0 0' "$ROOT")
+    [ "$out" = pending ] || fail "$identity identity must preserve retained payload, got '$out'"
+    [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+      || fail "$identity identity must send only the configured Enter"
+  done
+  pass "herdr missing or unsupported identity cannot borrow rendered busy delivery proof"
+}
+test_submit_missing_identity_does_not_borrow_footer_transition
+
+test_submit_idle_pending_then_empty_never_retries() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/submit-idle-stale"; mkdir -p "$dir/responses"
+  log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/2.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/4.out"
+  omp_busy_box_screen 'hello captain' > "$resp/5.out"
+  omp_busy_box_screen '' > "$resp/6.out"
+  herdr_submit_identity_prefix "$resp" omp
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+  [ "$out" = empty ] || fail "fresh cleared idle composer must confirm delivery, got '$out'"
+  [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+    || fail "fresh empty idle composer must not receive another Enter"
+  pass "herdr native-idle stale pending frame is refreshed before retry"
+}
+test_submit_idle_pending_then_empty_never_retries
+
+test_submit_native_busy_does_not_borrow_unrelated_turn() {
+  local dir log resp fb out identity content expected
+  for identity in omp failed absent unknown; do
+    for content in held cleared; do
+      dir="$TMP_ROOT/native-busy-$identity-$content"; mkdir -p "$dir/responses"
+      log="$dir/log"; resp="$dir/responses"; : > "$log"
+      case "$identity" in
+        failed) printf '1\n' > "$resp/1.exit" ;;
+        absent) printf '{"result":{"agent":{}}}\n' > "$resp/1.out" ;;
+        *) printf '{"result":{"agent":{"agent":"%s","agent_status":"idle"}}}\n' "$identity" > "$resp/1.out" ;;
+      esac
+      printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+      printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/5.out"
+      expected=pending
+      if [ "$content" = held ]; then
+        omp_busy_box_screen 'hello captain' > "$resp/6.out"
+        printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
+      else
+        expected=empty
+        omp_busy_box_screen '' > "$resp/6.out"
+      fi
+      fb=$(make_herdr_fakebin "$dir")
+      out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+        bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 1 0 0' "$ROOT")
+      [ "$out" = "$expected" ] || fail "$identity native busy with $content composer must return $expected, got '$out'"
+      [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+        || fail "$identity native busy must honor single Enter budget"
+    done
+  done
+  pass "omp and unavailable identities require composer clearance despite native busy transition"
+}
+test_submit_native_busy_does_not_borrow_unrelated_turn
+
+test_submit_idle_pi_native_transition_confirms() {
+  local dir log resp fb out status
+  for status in working blocked; do
+    dir="$TMP_ROOT/native-pi-$status"; mkdir -p "$dir/responses"
+    log="$dir/log"; resp="$dir/responses"; : > "$log"
+    printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/1.out"
+    printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+    printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/5.out"
+    printf 'Pi is processing without a composer\n' > "$resp/6.out"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+    [ "$out" = empty ] || fail "identified idle Pi transition to $status must confirm delivery, got '$out'"
+    [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+      || fail "Pi native transition must not retry Enter"
+    [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq 0 ] \
+      || fail "Pi native transition must not require a mid-turn composer"
+  done
+  pass "identified idle Pi retains native turn-start delivery proof"
+}
+test_submit_idle_pi_native_transition_confirms
+
+test_submit_recovers_pi_identity_from_baseline() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/native-pi-recovered"; mkdir -p "$dir/responses"
+  log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '1\n' > "$resp/1.exit"
+  printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/3.out"
+  printf '{"result":{"agent":{"agent":"pi","agent_status":"working"}}}\n' > "$resp/5.out"
+  printf 'Pi is processing without a composer\n' > "$resp/6.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+  [ "$out" = empty ] || fail "recovered Pi identity must confirm the landed native transition, got '$out'"
+  [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
+    || fail "recovered Pi submission must type the payload only once"
+  [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+    || fail "recovered Pi submission must not retry Enter"
+  [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq 0 ] \
+    || fail "recovered Pi submission must not require a mid-turn composer"
+  pass "Pi identity recovered from the pre-Enter baseline confirms a landed submission"
+}
+test_submit_recovers_pi_identity_from_baseline
+
+test_submit_idle_pi_delayed_native_transition_confirms() {
+  local dir log resp fb out phase status cleared
+  cleared=$'─────────────────────────────────────────────────────\n\n─────────────────────────────────────────────────────\n$0.000 (sub) 5.4%/272k (auto)'
+  for phase in initial refresh; do
+    for status in working blocked; do
+      dir="$TMP_ROOT/native-pi-delayed-$phase-$status"; mkdir -p "$dir/responses"
+      log="$dir/log"; resp="$dir/responses"; : > "$log"
+      printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/1.out"
+      printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+      printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+      if [ "$phase" = initial ]; then
+        printf '%s\n' "$cleared" > "$resp/6.out"
+        printf '{"result":{"agent":{"agent":"pi","agent_status":"%s"}}}\n' "$status" > "$resp/7.out"
+        printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/8.out"
+      else
+        printf '%s\n' '❯ hello captain' > "$resp/6.out"
+        printf '%s\n' "$cleared" > "$resp/7.out"
+        printf '{"result":{"agent":{"agent":"pi","agent_status":"%s"}}}\n' "$status" > "$resp/8.out"
+        printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/9.out"
+      fi
+      fb=$(make_herdr_fakebin "$dir")
+      out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+        bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+      [ "$out" = empty ] || fail "Pi transition to $status after $phase composer read must confirm delivery, got '$out'"
+      [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+        || fail "delayed Pi transition must not provoke another Enter"
+    done
+  done
+  pass "identified idle Pi confirms delayed native transitions after initial and refreshed composer reads"
+}
+test_submit_idle_pi_delayed_native_transition_confirms
+
+test_submit_idle_agy_native_transitions_confirm() {
+  local dir log resp fb out phase status screen reads transition_call
+  screen=$'─────────────────────────────────────────────────────\n> \n─────────────────────────────────────────────────────\nesc to cancel    gemini-3.8-flash'
+  for phase in immediate initial refresh; do
+    for status in working blocked idle; do
+      dir="$TMP_ROOT/native-agy-$phase-$status"; mkdir -p "$dir/responses"
+      log="$dir/log"; resp="$dir/responses"; : > "$log"
+      printf '{"result":{"agent":{"agent":"agy","agent_status":"idle"}}}\n' > "$resp/1.out"
+      printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+      case "$phase" in
+        immediate)
+          transition_call=5
+          reads=0
+          printf '%s\n' "$screen" > "$resp/6.out"
+          printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/7.out"
+          ;;
+        initial)
+          printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+          printf '%s\n' "$screen" > "$resp/6.out"
+          transition_call=7
+          reads=1
+          ;;
+        refresh)
+          printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+          printf '%s\n' '❯ hello captain' > "$resp/6.out"
+          printf '%s\n' "$screen" > "$resp/7.out"
+          transition_call=8
+          reads=2
+          ;;
+      esac
+      printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/$transition_call.out"
+      fb=$(make_herdr_fakebin "$dir")
+      out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+        bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+      if [ "$status" = idle ]; then
+        [ "$out" = unknown ] || fail "agy without a native transition after $phase must remain unknown, got '$out'"
+      else
+        [ "$out" = empty ] || fail "agy transition to $status after $phase must confirm delivery, got '$out'"
+        [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq "$reads" ] \
+          || fail "agy $phase transition must require exactly $reads composer reads"
+      fi
+      [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
+        || fail "agy $phase transition must type the payload only once"
+      [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+        || fail "agy $phase transition must not provoke another Enter"
+    done
+  done
+  pass "agy confirms immediate and delayed native transitions without treating unknown composer alone as delivery"
+}
+test_submit_idle_agy_native_transitions_confirm
+
+test_submit_idle_devin_native_transition_confirms_unknown_composer() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/native-devin-unknown"; mkdir -p "$dir/responses"
+  log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '{"result":{"agent":{"agent":"devin","agent_status":"idle"}}}\n' > "$resp/1.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/3.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+  printf '%s\n' '❭ Ask Devin to build features, fix bugs, or work on your code' \
+    '─────────────────────────────────────────────────────' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "/no-mistakes" 3 0 0' "$ROOT")
+  [ "$out" = empty ] || fail "Devin idle-to-working transition with an unknown composer must confirm delivery, got '$out'"
+  [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq 1 ] \
+    || fail "Devin delayed native transition must confirm after the initial unknown composer read"
+  [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
+    || fail "Devin delayed native transition must type the command only once"
+  [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+    || fail "Devin delayed native transition must not provoke another Enter"
+  pass "Devin idle-to-working transition confirms delivery despite an unknown composer"
+}
+test_submit_idle_devin_native_transition_confirms_unknown_composer

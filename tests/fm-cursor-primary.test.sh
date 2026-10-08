@@ -72,7 +72,7 @@ install_scripts() {
   for f in fm-turnend-guard-cursor.sh fm-turnend-guard.sh fm-sessionstart-cursor.sh \
            fm-sessionstart-run.sh fm-sessionstart-nudge.sh fm-arm-pretool-check.sh \
            fm-cd-pretool-check.sh fm-claude-stop-autoarm.sh fm-hook-host-lib.sh \
-           fm-primary-scope-lib.sh fm-supervision-lib.sh fm-wake-lib.sh fm-path-lib.sh \
+           fm-primary-scope-lib.sh fm-supervision-lib.sh fm-wake-lib.sh fm-path-lib.sh fm-secondmate-parent-lib.sh \
            fm-session-lock-lib.sh fm-cursor-lib.sh fm-operational-input.sh \
            fm-supervision-instructions.sh fm-harness.sh fm-lock.sh \
            fm-gate-refuse-lib.sh fm-afk-contract.sh fm-classify-lib.sh fm-timeout-lib.sh \
@@ -398,7 +398,8 @@ fm_operational_input_encode() {
   local kind=${1-} body=${2-} result_var=${3-}
   [ -n "$result_var" ] && fm_operational_kind_is_current "$kind" && [ -n "$body" ] || return 2
   if ( set -C; : > "$FM_HOME/state/commit-entered" ) 2>/dev/null; then
-    while [ ! -e "$FM_HOME/state/commit-release" ]; do sleep 0.05; done
+    local stub_deadline=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
+    while [ ! -e "$FM_HOME/state/commit-release" ] && [ "$SECONDS" -lt "$stub_deadline" ]; do sleep 0.05; done
   fi
   printf -v "$result_var" '%s%s: %s' "$FM_OPERATIONAL_HEADER_PREFIX" "$kind" "$body"
 }
@@ -433,7 +434,7 @@ test_superseded_park_does_not_consume_nag_budget() {
   cat > "$dir/bin/fm-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
 if ( set -C; : > "$FM_HOME/state/first-guard-entered" ) 2>/dev/null; then
-  while [ ! -e "$FM_HOME/state/first-guard-release" ]; do sleep 0.05; done
+  while [ ! -e "$FM_HOME/state/first-guard-release" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
 fi
 printf 'fixture supervision failure\n' >&2
 exit 2
@@ -638,8 +639,9 @@ test_park_stands_down_when_away_mode_activates_before_commit() {
 fm_operational_input_encode() {
   local kind=${1-} body=${2-} result_var=${3-}
   [ -n "$result_var" ] && fm_operational_kind_is_current "$kind" && [ -n "$body" ] || return 2
+  local stub_deadline=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
   : > "$FM_HOME/state/afk-commit-entered"
-  while [ ! -e "$FM_HOME/state/afk-commit-release" ]; do sleep 0.05; done
+  while [ ! -e "$FM_HOME/state/afk-commit-release" ] && [ "$SECONDS" -lt "$stub_deadline" ]; do sleep 0.05; done
   printf -v "$result_var" '%s%s: %s' "$FM_OPERATIONAL_HEADER_PREFIX" "$kind" "$body"
 }
 SH

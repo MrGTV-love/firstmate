@@ -193,6 +193,7 @@ install_guard_scripts() {
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
+  cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
   cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
   cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
   cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
@@ -1402,6 +1403,7 @@ install_integrated_autoarm() {
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
+  cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
   cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
   cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
   cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
@@ -1554,8 +1556,12 @@ test_hook_claude_mode_terminal_boundary_excludes_starting_owner() {
 if [ "$1" = "$FM_TERMINAL_ROLE_PATH" ] \
   && [ "$(/bin/cat "$1" 2>/dev/null || true)" = terminal-check ] \
   && (set -C; : > "$FM_TERMINAL_ONCE") 2>/dev/null; then
-  printf 'ready\n' > "$FM_TERMINAL_READY"
-  IFS= read -r _ < "$FM_TERMINAL_RELEASE"
+  # Opening a FIFO blocks with no timeout of its own, so a SIGALRM bound keeps a
+  # stub whose test died from waiting on the other end forever.
+  perl -e 'alarm shift; open(my $f, ">", shift) or exit 1; print $f "ready\n"' \
+    "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" "$FM_TERMINAL_READY"
+  perl -e 'alarm shift; open(my $f, "<", shift) or exit 1; <$f>' \
+    "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" "$FM_TERMINAL_RELEASE"
 fi
 exec /bin/cat "$@"
 SH

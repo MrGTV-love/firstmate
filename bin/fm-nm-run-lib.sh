@@ -20,6 +20,12 @@
 # `no-mistakes "$@"` specialization. The bounded
 # form preserves stdout, stderr, and exit status; the checked form discards
 # stderr, while fm_nm_run keeps the fail-open query contract for read-only callers.
+# The Perl fallback's process-group, signal, and owner-death contract is owned
+# by fm_timeout_perl_bound in fm-timeout-lib.sh's header.
+if ! declare -F fm_timeout_perl_bound >/dev/null 2>&1; then
+  # shellcheck source=bin/fm-timeout-lib.sh
+  . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-timeout-lib.sh"
+fi
 fm_nm_bounded() {  # <dir> <timeout_secs> <command> <args...>
   local dir=$1 timeout_secs=$2 have_timeout=none
   shift 2
@@ -30,7 +36,7 @@ fm_nm_bounded() {  # <dir> <timeout_secs> <command> <args...>
   case "$have_timeout" in
     timeout)  ( cd "$dir" && timeout "$timeout_secs" "$@" ) ;;
     gtimeout) ( cd "$dir" && gtimeout "$timeout_secs" "$@" ) ;;
-    perl)     ( cd "$dir" && perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$timeout_secs" "$@" ) ;;
+    perl)     ( cd "$dir" && fm_timeout_perl_bound "$timeout_secs" "$@" ) ;;
     *)        return 1 ;;
   esac
 }

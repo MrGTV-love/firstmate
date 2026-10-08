@@ -533,7 +533,7 @@ test_teardown_cannot_leave_its_replacement_in_cooldown() {
 set -u
 if [ "${1:-}" = send-keys ]; then
   : > "$FM_FAKE_TMUX_SEND_SIGNAL"
-  while [ ! -f "$FM_FAKE_TMUX_SEND_RELEASE" ]; do sleep 0.01; done
+  while [ ! -f "$FM_FAKE_TMUX_SEND_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
 fi
 exec "$(dirname "$0")/tmux-real" "$@"
 SH
@@ -652,7 +652,7 @@ set -u
 case "${1:-}" in
   */fm-send.sh)
     : > "$FM_RECONCILE_RACE_SIGNAL"
-    while [ ! -f "$FM_RECONCILE_RACE_RELEASE" ]; do sleep 0.01; done
+    while [ ! -f "$FM_RECONCILE_RACE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
     ;;
 esac
 case "${1:-}" in

@@ -60,7 +60,9 @@ cleanup() {
     "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true
   if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then
     worker_pid=$(cat "$TMP_ROOT/remote-jobs/worker.pid")
-    kill "$worker_pid" 2>/dev/null || true
+    # The recorded pid is the serving child; its restart supervisor would respawn
+    # it, so stop the whole worker tree.
+    ( . "$ROOT/bin/fm-remote-job-lib.sh"; fm_remote_job_stop_worker_tree "$worker_pid" ) || true
   fi
   rm -rf -- "$TMP_ROOT"
 }

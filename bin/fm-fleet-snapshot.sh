@@ -114,6 +114,9 @@
 #
 # --contribution-input prints only the canonical backlog/tasks ownership pair,
 # without worker observations or cross-home collection, for the home-local poll.
+# --home-input emits the same uncapped local backlog and ordinary task records,
+# including worker observations, without contribution or cross-home projections.
+# Its schema is fm-fleet-home-input.v1; the open-work reconciler consumes it.
 # Compatibility: JSON is the primary machine-readable surface.
 # Human views must render this output instead of parsing state files again.
 set -u
@@ -243,6 +246,8 @@ refreshes only its parent-side remote-summary cache as an observational side eff
 
 --contribution-input emits the canonical local backlog/tasks ownership pair only,
 without worker observations or cross-home collection.
+--home-input emits uncapped local backlog and ordinary tasks with worker observations,
+without contribution polling or cross-home summaries (fm-fleet-home-input.v1).
 
 --secondmate-home-summary emits the bounded structured summary used after a
 validated registered-home handoff. It is local-only, skips nested secondmate
@@ -293,6 +298,7 @@ case "${1:---json}" in
   --json) ;;
   --secondmate-home-summary) OUTPUT_MODE=secondmate-home-summary ;;
   --contribution-input) OUTPUT_MODE=contribution-input ;;
+  --home-input) OUTPUT_MODE="home-input" ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
@@ -323,7 +329,7 @@ last_nonempty_line() {  # <file>
 # snapshot without limit. Remote secondmate endpoint liveness is never read here.
 # A local read that hits the bound folds to state unknown.
 crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
-  local id=$1 captured_meta=${2:-} captured_status=${3:-} raw rest state source detail sep
+  local id=$1 captured_meta=${2:-} captured_status=${3:-} raw rest state source detail sep rc=0
   raw=$(
     fm_run_timed "$FM_SNAPSHOT_CREW_STATE_TIMEOUT" \
       env FM_ROOT_OVERRIDE="$FM_ROOT" \
@@ -334,8 +340,8 @@ crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
       FM_DATA_OVERRIDE="$DATA" \
       FM_PROJECTS_OVERRIDE="$PROJECTS" \
       FM_CONFIG_OVERRIDE="$CONFIG" \
-      "$SCRIPT_DIR/fm-crew-state.sh" "$id" 2>/dev/null || true
-  )
+      "$SCRIPT_DIR/fm-crew-state.sh" "$id" 2>/dev/null
+  ) || rc=$?
   raw=$(printf '%s\n' "$raw" | head -1)
   sep=' · '
   state=unknown
@@ -352,6 +358,11 @@ crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
       esac
       ;;
   esac
+  if [ "$rc" != 0 ]; then
+    state=unknown
+    source=none
+    detail="current-state command failed (exit $rc)"
+  fi
   jq -n --arg raw "$raw" --arg state "$state" --arg source "$source" --arg detail "$detail" \
     '{state:$state,source:$source,detail:$detail,raw:$raw}'
 }
@@ -544,6 +555,10 @@ backlog_json() (  # [<backlog-path>] - defaults to this home's $BACKLOG
                   end))
           | .body_excerpt = ((.body_lines | join(" "))[:240])
         else . end)
+    | .records |= map(
+        if .structured then
+          .captain_drop = any(.body_lines[]?; . == "dropped" or . == "Deliverable of the finished work: dropped")
+        else . end)
     | .records as $records
     | (reduce ($records[] | select(.structured)) as $record ({};
          .[$record.id] = ((.[$record.id] // true) and ($record.state == "done")))) as $resolved_ids
@@ -633,7 +648,7 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
 prefetch_task_observations() {  # <meta> <id>
   local meta=$1 id=$2 remote_host current_file endpoint_file current_pid='' current_rc=0
   local status_log status_capture report_path report_capture
-  local kind backend target endpoint_exists=null agent_alive=not_checked generation_current=1
+  local backend target endpoint_exists=null agent_alive=not_checked generation_current=1
   remote_host=$(meta_value "$meta" remote_host)
   current_file="$SNAPSHOT_TASK_DIR/$id.json"
   endpoint_file="$SNAPSHOT_TASK_DIR/$id.endpoint"
@@ -655,18 +670,20 @@ prefetch_task_observations() {  # <meta> <id>
   elif [ "$generation_current" = 1 ]; then
     crew_state_json "$id" "$meta" "$status_capture" > "$current_file" &
     current_pid=$!
-    kind=$(meta_value "$meta" kind)
     backend=$(fm_backend_of_meta "$meta")
     target=$(fm_backend_target_of_meta "$meta")
     if [ -n "$target" ]; then
-      if fm_backend_target_exists "$backend" "$target" "fm-$id" >/dev/null 2>&1; then
-        endpoint_exists=true
-      else
-        endpoint_exists=false
-      fi
-      if [ "$kind" = secondmate ]; then
-        agent_alive=$(fm_backend_agent_alive "$backend" "$target" 2>/dev/null || printf unknown)
-      fi
+      agent_alive=$(fm_backend_agent_state "$backend" "$target" 2>/dev/null || printf unreadable)
+      case "$agent_alive" in
+        alive|dead|ambiguous) endpoint_exists=true ;;
+        missing) endpoint_exists=false ;;
+        unverified)
+          if fm_backend_target_exists "$backend" "$target" "fm-$id" >/dev/null 2>&1; then
+            endpoint_exists=true
+          fi
+          ;;
+        *) endpoint_exists=null ;;
+      esac
     fi
   else
     jq -n '{state:"unknown",source:"none",detail:"task generation changed during snapshot",raw:""}' \
@@ -702,6 +719,10 @@ prefetch_task_current_states() {
   # composition one coherent task manifest even if publication or teardown races it.
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
+    # A persistent secondmate has its own home and ledger, not an ordinary task.
+    if [ "$OUTPUT_MODE" = home-input ] && [ "$(meta_value "$meta" kind)" = secondmate ]; then
+      continue
+    fi
     id=$(basename "$meta" .meta)
     captured_meta="$SNAPSHOT_TASK_DIR/$id.meta"
     if ! cp -- "$meta" "$captured_meta" 2>"$captured_meta.copy-error"; then
@@ -1502,6 +1523,7 @@ snapshot_cleanup() {
   cleanup_json_files
 }
 trap snapshot_cleanup EXIT
+trap 'exit 143' TERM
 
 bounded_parent_activities_json() {  # <status-file>
   local f=$1 out rc reason script
@@ -2002,6 +2024,21 @@ TASKS_JSON=$(task_json_lines) || { echo "fm-fleet-snapshot: task snapshot failed
 
 JSON_TRANSPORT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-fleet-snapshot.XXXXXX") \
   || { echo "fm-fleet-snapshot: temporary transport directory creation failed" >&2; exit 1; }
+if [ "$OUTPUT_MODE" = home-input ]; then
+  # File-backed transport: a large valid inventory must not ride in argv.
+  if ! printf '%s\n' "$BACKLOG_JSON" > "$JSON_TRANSPORT_DIR/backlog.json" \
+      || ! printf '%s\n' "$TASKS_JSON" > "$JSON_TRANSPORT_DIR/tasks.json"; then
+    echo "fm-fleet-snapshot: home input staging failed" >&2
+    exit 1
+  fi
+  if ! jq -n --arg home "$FM_HOME" --slurpfile backlog "$JSON_TRANSPORT_DIR/backlog.json" \
+      --slurpfile tasks "$JSON_TRANSPORT_DIR/tasks.json" \
+      '{schema:"fm-fleet-home-input.v1",fm_home:$home,backlog:$backlog[0],tasks:$tasks[0]}'; then
+    echo "fm-fleet-snapshot: home input failed" >&2
+    exit 1
+  fi
+  exit 0
+fi
 BACKLOG_JSON_FILE="$JSON_TRANSPORT_DIR/backlog.json"
 TASKS_JSON_FILE="$JSON_TRANSPORT_DIR/tasks.json"
 MAIN_INVENTORY_JSON_FILE="$JSON_TRANSPORT_DIR/main-inventory.json"

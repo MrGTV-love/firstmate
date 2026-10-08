@@ -17,6 +17,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-fleet-snapshot.sh`   | Print structured fleet snapshot JSON and refresh only its parent-side remote-ledger cache (schema `fm-fleet-snapshot.v1`) |
 | `fm-home-summary-refresh.sh` | Atomically publish this home's structured summary ledger                         |
 | `fm-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
+| [`fm-open-loops.sh`](../bin/fm-open-loops.sh) | Reconcile this home's recorded obligations ([ledger contract](configuration.md#open-work-ledger-configopen-loopsjson)) |
 | `fm-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
 | `fm-bearings-snapshot.sh` | Project the bounded remote-ledger fleet snapshot to compact TOON; `--include-prs` adds live GitHub enrichment |
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
@@ -35,9 +36,11 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto fm-captain-hold.sh |
 | `fm-brief.sh`            | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), scout, secondmate-charter, and Herdr-lab briefs, with Captain's intent and Firstmate spec subsections on ship/scout |
 | [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |
-| [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section reader |
-| [`fm-skill-suggest.sh`](../bin/fm-skill-suggest.sh) | Suggest optional skill bodies to inspect ([operator contract](configuration.md#advisory-skill-selection)) |
-| [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe boundary for dispatch resolution and advisory skill selection |
+| [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section and legacy captain-provenance reader |
+| [`fm-skill-pick.sh`](../bin/fm-skill-pick.sh) | Pick the project skill a ship or scout worker loads at launch ([operator contract](configuration.md#worker-skill-selection)) |
+| [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
+| [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker wrapper for the pinned upstream belay Stop hook ([contract](configuration.md#jev-belay-stop-hook)) |
+| [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload enforcing the [belay egress policy](configuration.md#jev-belay-stop-hook) |
 | [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index and resolve dispatch model roles |
 | `fm-herdr-lab.sh`        | Provision and guardedly operate an isolated, never-default Herdr lab session         |
 | `fm-herdr-lab-viewer.py` | The pty engine behind `fm-herdr-lab.sh viewer`: one real foreground Herdr client on a non-zero window grid |

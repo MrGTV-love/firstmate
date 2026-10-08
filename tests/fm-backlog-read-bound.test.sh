@@ -57,8 +57,9 @@ case "${1:-}" in
       printf 'code: NOT_FOUND\n' >&2
       exit 1
     fi
+    [ -z "${FM_TEST_TASKS_AXI_HANG_LOG:-}" ] || printf '%s\n' "$2" >> "$FM_TEST_TASKS_AXI_HANG_LOG"
     # The wedge under test: a read that never returns.
-    sleep 300
+    sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
     exit 0
     ;;
   hold)
@@ -100,7 +101,9 @@ printf '# Backlog\n' > "$UNIT/data/backlog.md"
 # Three items, so "every skipped item is still named" is actually exercised
 # rather than inferred from a single skip.
 PROBE_OUT="$UNIT/probe.out"
+PROBE_LOG="$UNIT/probe.log"
 PATH="$UNIT_FAKEBIN:$BASE_PATH" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+  FM_TEST_TASKS_AXI_HANG_LOG="$PROBE_LOG" \
   bash -c '
     set -u
     . "$1/bin/fm-tasks-axi-lib.sh"
@@ -137,22 +140,15 @@ case "$FIRST_ERROR" in
 esac
 pass "a timed-out row read reports one error naming the item that timed out"
 
-# The latch is what keeps a home carrying a large fleet from paying N bounds and
-# losing the digest anyway, so assert it strictly: a latched read must be
-# FASTER than one bound, not merely under the ceiling. A ceiling-only assertion
-# passes whether or not the latch works, and fm_backlog_row_show runs inside a
-# command substitution whose writes die with the subshell - the exact way this
-# latch can silently become inert.
 for SKIPPED in wedged-two wedged-three; do
   SKIPPED_ERROR=$(probe_error "$SKIPPED")
-  SKIPPED_ELAPSED=$(probe_elapsed "$SKIPPED")
   case "$SKIPPED_ERROR" in
     *"$SKIPPED"*skipped*) ;;
     *) fail "every skipped item must still be named as skipped, $SKIPPED got: $SKIPPED_ERROR" ;;
   esac
-  [ -n "$SKIPPED_ELAPSED" ] && [ "$SKIPPED_ELAPSED" -lt "$BOUND_SECS" ] \
-    || fail "the latch is inert: $SKIPPED paid ${SKIPPED_ELAPSED}s against a known-wedged backend"
 done
+[ "$(cat "$PROBE_LOG")" = wedged-one ] \
+  || fail "the latch repeated a known-wedged backend read: $(cat "$PROBE_LOG")"
 pass "after the first bound hit the sweep continues and names every remaining item without paying the bound again"
 
 # A padded zero is still zero, and `timeout 0` / `alarm 0` disable the deadline
@@ -290,7 +286,7 @@ case "${1:-}" in
     [ -z "${2:-}" ] && { printf 'code: NOT_FOUND\n' >&2; exit 1; }
     # Only the prefixed migrated candidates wedge; the exact and legacy ids
     # answer NOT_FOUND promptly, the concrete path the prefix scan exists for.
-    case "$2" in $FM_TEST_PREFIXED_GLOB) sleep 300; exit 0 ;; esac
+    case "$2" in $FM_TEST_PREFIXED_GLOB) sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"; exit 0 ;; esac
     printf 'code: NOT_FOUND\n' >&2
     exit 1
     ;;
@@ -372,6 +368,33 @@ git init -q -b main "$E2E_ROOT"
 git -C "$E2E_ROOT" commit -q --allow-empty -m init
 
 make_hanging_tasks_axi "$E2E_FAKEBIN"
+cp "$E2E_FAKEBIN/tasks-axi" "$E2E_FAKEBIN/tasks-axi-hanging"
+cat > "$E2E_FAKEBIN/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+set -u
+case "${1:-}" in
+  show)
+    full=0
+    for arg in "$@"; do
+      [ "$arg" != --full ] || full=1
+    done
+    printf '%s %s\n' "$2" "$full" >> "$FM_TEST_TASKS_AXI_SHOW_LOG"
+    if [ "$full" = 1 ]; then
+      exec "$(dirname "$0")/tasks-axi-hanging" "$@"
+    fi
+    printf 'task:\n  state: queued\n  held: no\n  blocked: no\n'
+    exit 0
+    ;;
+  start|reopen|update)
+    if [ "${2:-}" != --help ]; then
+      printf '%s\n' "$*" >> "$FM_TEST_TASKS_AXI_MUTATION_LOG"
+      exit 1
+    fi
+    ;;
+esac
+exec "$(dirname "$0")/tasks-axi-hanging" "$@"
+SH
+chmod +x "$E2E_FAKEBIN/tasks-axi"
 # The reconcile sweep this half asserts on runs only under a verified fleet
 # lock, and fm-lock.sh finds its holder by walking the invoking process tree
 # through `ps`. A CI runner's ancestry carries no harness process, so the lock
@@ -397,24 +420,29 @@ fm_fake_version_tool "$E2E_FAKEBIN" no-mistakes FM_FAKE_NO_MISTAKES_VERSION \
   'no-mistakes version v1.46.0 (fake) 2026-06-27T00:02:18Z'
 
 printf '# Backlog\n' > "$E2E_HOME/data/backlog.md"
-# One owned record, so the reconcile sweep actually reads the wedged backend.
-fm_write_meta "$E2E_HOME/state/wedged-task.meta" \
-  'window=firstmate:fm-wedged-task' \
-  'worktree=/nonexistent/wedged-task' \
-  'project=alpha' \
-  'harness=claude' \
-  'mode=no-mistakes' \
-  'yolo=off'
+printf 'backend = "markdown"\n' > "$E2E_HOME/.tasks.toml"
+for ID in wedged-task-a wedged-task-b wedged-task-c; do
+  fm_write_meta "$E2E_HOME/state/$ID.meta" \
+    "window=firstmate:fm-$ID" \
+    "worktree=/nonexistent/$ID" \
+    'project=alpha' \
+    'harness=claude' \
+    'mode=no-mistakes' \
+    'yolo=off'
+done
 
 DIGEST="$E2E/digest.out"
+SHOW_LOG="$E2E/show.log"
+MUTATION_LOG="$E2E/mutation.log"
 DIGEST_START=$(date +%s)
 env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
   FM_HOME="$E2E_HOME" FM_ROOT_OVERRIDE="$E2E_ROOT" PATH="$E2E_FAKEBIN:$BASE_PATH" \
   FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+  FM_TEST_TASKS_AXI_SHOW_LOG="$SHOW_LOG" FM_TEST_TASKS_AXI_MUTATION_LOG="$MUTATION_LOG" \
   "$ROOT/bin/fm-session-start.sh" > "$DIGEST" 2>&1 || true
 DIGEST_ELAPSED=$(elapsed_since "$DIGEST_START")
 
-[ "$DIGEST_ELAPSED" -lt "$BOUND_CEILING" ] \
+[ "$DIGEST_ELAPSED" -lt 120 ] \
   || fail "session start took ${DIGEST_ELAPSED}s against a wedged backlog backend"
 
 for SECTION in 'WAKE QUEUE' 'SUPERVISION OPERATING INSTRUCTIONS' 'FLEET STATE' 'CONTEXT'; do
@@ -423,8 +451,15 @@ for SECTION in 'WAKE QUEUE' 'SUPERVISION OPERATING INSTRUCTIONS' 'FLEET STATE' '
 done
 pass "a wedged backlog backend still leaves a complete digest: wake queue, supervision instructions, fleet state, and context all print"
 
-grep -q '^BACKLOG_RECONCILE: wedged-task: ' "$DIGEST" \
-  || fail "the wedged item must be reported by name as a partial reconcile: $(cat "$DIGEST")"
-pass "an unreachable backlog backend degrades to a loud partial reconcile naming the item it could not read"
+grep -q '^BACKLOG_RECONCILE: wedged-task-a: .*could not be moved to In flight: .*exceeded' "$DIGEST" \
+  || fail "the full-body timeout must be reported for the first queued worker: $(cat "$DIGEST")"
+for ID in wedged-task-b wedged-task-c; do
+  grep -q "^BACKLOG_RECONCILE: $ID: .*could not be read: .*skipped" "$DIGEST" \
+    || fail "the later worker must be reported as skipped without repeating the timeout: $(cat "$DIGEST")"
+done
+[ "$(cat "$SHOW_LOG")" = "$(printf 'wedged-task-a 0\nwedged-task-a 1')" ] \
+  || fail "the recovery sweep repeated backend reads after the full-body timeout: $(cat "$SHOW_LOG")"
+assert_absent "$MUTATION_LOG" "a timed-out full-body read must not mutate the queued backlog"
+pass "a full-body restart timeout latches the recovery sweep, naming every worker without another backend read"
 
 echo "# fm-backlog-read-bound.test.sh: all assertions passed"

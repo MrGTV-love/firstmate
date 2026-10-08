@@ -19,6 +19,86 @@ GUARD="$ROOT/bin/fm-guard.sh"
 TMP_ROOT=$(fm_test_tmproot fm-wake-tests)
 
 
+test_reemit_serializes_delivery_ownership() {
+  local dir state phase records expected out identity claimant i real_sleep
+  dir=$(make_case reemit-delivery-ownership)
+  state="$dir/state"
+  identity=$(fm_test_pid_identity "$$") || fail "could not identify the claim owner"
+  mkdir "$state/.wake-queue.lock"
+  printf '%s\n' "$$" > "$state/.wake-queue.lock/pid"
+  real_sleep=$(command -v sleep) || fail "sleep is unavailable for the claim fixture"
+  cat > "$dir/fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >> "$FM_CLAIM_SLEEP_LOG"
+exec "$FM_CLAIM_REAL_SLEEP" "$@"
+SH
+  chmod +x "$dir/fakebin/sleep"
+  PATH="$dir/fakebin:$PATH" FM_CLAIM_SLEEP_LOG="$dir/claim-sleeps" FM_CLAIM_REAL_SLEEP="$real_sleep" \
+    FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_autoarm_claim_next "$STATE" 300 || exit 10
+    [ "$FM_AUTOARM_MY_GEN" = 1 ] || exit 11
+    fm_autoarm_ledger_read "$STATE" || exit 12
+    [ "$FM_AUTOARM_OWNER" = "${BASHPID:-$$}" ] && [ "$FM_AUTOARM_OUTCOME" = arming ] || exit 13
+  ' _ "$ROOT/bin/fm-wake-lib.sh" &
+  claimant=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$dir/claim-sleeps" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  [ -s "$dir/claim-sleeps" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claimant did not wait for the queue writer"; }
+  [ ! -e "$state/.claude-autoarm-epoch" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claim publication bypassed the queue mutation boundary"; }
+  [ ! -e "$state/.claude-autoarm.lock" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claimant held the ownership mutex while waiting for the queue"; }
+  rm -rf "$state/.wake-queue.lock"
+  wait "$claimant" || fail "claimant abandoned delivery after transient queue contention"
+  [ ! -e "$state/.wake-queue.lock" ] && [ ! -e "$state/.claude-autoarm.lock" ] \
+    || fail "claim publication left a lock held"
+
+  for phase in pending announced; do
+    for records in 0 1; do
+      : > "$state/.wake-queue"
+      if [ "$records" -eq 1 ]; then
+        append_wake "$state" signal task "done: delivery ownership fixture" || fail "seed wake failed"
+      fi
+      cp "$state/.wake-queue" "$dir/queue.before"
+      expected="$phase:downtime:ownership-$phase-$records"
+      printf '%s\n' "$expected" > "$state/.watcher-down"
+      printf 'epoch=3 owner_pid=%s outcome=clean updated_at=%s\n%s\n' "$$" "$(date +%s)" "$identity" \
+        > "$state/.claude-autoarm-epoch"
+      mkdir "$state/.claude-autoarm.lock"
+      printf '%s\n' "$$" > "$state/.claude-autoarm.lock/pid"
+      out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --reemit 2>&1) || fail "contended re-emit failed"
+      assert_contains "$out" "deferred (context re-emit while wake delivery ownership is being decided)" "ownership contention did not defer"
+      [ "$(cat "$state/.watcher-down")" = "$expected" ] || fail "contended re-emit changed recovery state"
+      cmp -s "$dir/queue.before" "$state/.wake-queue" || fail "contended re-emit changed the queue"
+      rm -rf "$state/.claude-autoarm.lock"
+
+      printf 'epoch=3 owner_pid=%s outcome=arming updated_at=%s\n%s\n' "$$" "$(date +%s)" "$identity" \
+        > "$state/.claude-autoarm-epoch"
+      out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --reemit 2>&1) || fail "open-claim re-emit failed"
+      assert_contains "$out" "deferred (context re-emit while the Stop hook owns wake delivery) - $records record(s)" "open claim did not defer"
+      assert_not_contains "$out" 'WAKE_ACK_REQUIRED: after handling' "deferred wakes demanded acknowledgement"
+      [ "$(cat "$state/.watcher-down")" = "$expected" ] || fail "open-claim re-emit changed recovery state"
+      cmp -s "$dir/queue.before" "$state/.wake-queue" || fail "open-claim re-emit changed the queue"
+
+      printf 'epoch=3 owner_pid=%s outcome=rewake updated_at=%s\n%s\n' "$$" "$(date +%s)" "$identity" \
+        > "$state/.claude-autoarm-epoch"
+      out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --reemit 2>&1) || fail "finished-claim re-emit failed"
+      assert_contains "$out" 'WAKE_ACK_REQUIRED: after handling' "finished claim prevented handling"
+      [ "$(cat "$state/.watcher-down")" = "$phase:handling:ownership-$phase-$records" ] \
+        || fail "finished-claim re-emit did not enter handling"
+      if [ "$records" -eq 1 ]; then
+        assert_contains "$out" "done: delivery ownership fixture" "finished-claim re-emit lost its wake"
+      fi
+    done
+  done
+  pass "re-emit serializes claim publication and preserves queued and empty downtime episodes"
+}
+
 test_concurrent_append_and_drain() {
   local dir state out1 out2 pids i pid count unique malformed sequence generation
   dir=$(make_case concurrent)
@@ -809,7 +889,7 @@ install_secondmate_alive_tmux() {  # <fakebin>
 set -u
 case "${1:-}" in
   list-windows) printf '%s\n' 'fm-mate' ;;
-  capture-pane) exit 0 ;;
+  capture-pane) printf '❯\n' ;;
   display-message)
     case "$*" in
       *pane_current_command*) printf 'claude\n' ;;
@@ -1056,6 +1136,77 @@ test_secondmate_busy_and_unknown_panes_are_not_rung() {
   [ ! -s "$dir/sent-unknown" ] || fail "an unknown pane was rung: $(cat "$dir/sent-unknown")"
   [ ! -e "$state/mate.inbox" ] || fail "an unknown pane received a drain steer"
   pass "busy panes defer without a ring and unknown panes keep the parent alarm"
+}
+
+install_secondmate_idle_omp_herdr() {  # <fakebin>
+  local fakebin=$1
+  cat > "$fakebin/herdr" <<'SH'
+#!/usr/bin/env bash
+set -u
+case "${1:-} ${2:-}" in
+  'status --json')
+    printf '{"client":{"version":"0.9.1","protocol":22},"server":{"running":true}}\n'
+    ;;
+  'pane get')
+    printf '{"result":{"pane":{"pane_id":"w1:p1","tab_id":"t1","workspace_id":"w1"}}}\n'
+    ;;
+  'pane process-info')
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p1","shell_pid":10,"foreground_processes":[{"pid":11,"name":"omp","argv":["omp"],"cmdline":"omp"}]}}}\n'
+    ;;
+  'agent get')
+    printf '{"result":{"agent":{"agent":"omp","agent_status":"idle"}}}\n'
+    ;;
+  'pane read') printf '❯\n' ;;
+  'pane send-text'|'pane send-keys')
+    printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}"
+    ;;
+  *) exit 0 ;;
+esac
+SH
+  chmod +x "$fakebin/herdr"
+}
+
+test_secondmate_idle_omp_alarms_without_input() {
+  local dir state sub fakebin
+  dir=$(make_case secondmate-idle-omp)
+  state="$dir/state"
+  sub="$dir/secondmate"
+  fakebin="$dir/fakebin"
+  mkdir -p "$sub/state"
+  printf 'mate\n' > "$sub/.fm-secondmate-home"
+  printf 'window=firstmate:w1:p1\nkind=secondmate\nharness=omp\nbackend=herdr\nherdr_session=firstmate\nhome=%s\n' \
+    "$sub" > "$state/mate.meta"
+  printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
+  install_secondmate_idle_omp_herdr "$fakebin"
+  install_secondmate_stall_date "$fakebin"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
+    || fail "could not arm the mate's busy contract"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
+    --source omp-ext --event agent-end >/dev/null \
+    || fail "could not mark the mate idle"
+  printf '1000\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" first progress mate "$(printf '1000\t100-7')"
+  [ ! -s "$state/.wake-queue" ] || fail "idle omp alerted before the stall interval"
+  [ ! -e "$dir/sent" ] || fail "idle omp received input before the stall interval"
+  printf '1002\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" stall alert
+  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+    || fail "idle omp did not retain the parent alarm"
+  [ ! -e "$dir/sent" ] || fail "idle omp received automatic input: $(cat "$dir/sent")"
+  [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
+    || fail "idle omp foreign queue changed"
+  [ -s "$state/.wake-queue" ] || fail "idle omp lost the durable parent alarm"
+  [ ! -e "$state/mate.inbox" ] || fail "idle omp received a drain steer"
+  [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "idle omp recorded a ring"
+  pass "idle omp retains the bounded durable parent alarm without input or foreign queue changes"
 }
 
 # After a proven-idle ring, the same leftover row is a genuine stall if the
@@ -2639,7 +2790,11 @@ SH
     . "$1"
     fm_lock_acquire_wait "$2" || exit 10
     printf "ready\n" > "$3"
-    while [ ! -e "$4" ]; do sleep 0.05; done
+    stub_ticks=0
+    while [ ! -e "$4" ] && [ "$stub_ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      stub_ticks=$((stub_ticks + 1))
+    done
     fm_lock_release "$2"
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/holder.ready" "$dir/release-holder" &
   holder_pid=$!
@@ -2657,7 +2812,11 @@ SH
     fm_lock_acquire_wait_bounded "$2" 5 || exit 11
     current=${BASHPID:-$$}
     printf "%s\n" "$current" > "$3"
-    while [ ! -e "$4" ]; do sleep 0.05; done
+    stub_ticks=0
+    while [ ! -e "$4" ] && [ "$stub_ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      stub_ticks=$((stub_ticks + 1))
+    done
     [ "$(cat "$2/pid" 2>/dev/null || true)" = "$current" ] || exit 12
     fm_lock_release "$2"
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/waiter.ready" "$dir/release-waiter" &
@@ -3536,6 +3695,7 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
+test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
@@ -3550,6 +3710,7 @@ test_secondmate_proven_idle_ring_lets_the_child_drain
 test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture
 test_secondmate_busy_and_unknown_panes_are_not_rung
 test_secondmate_genuine_stall_after_idle_ring_still_alarms
+test_secondmate_idle_omp_alarms_without_input
 test_secondmate_stall_marker_rejects_symlink
 test_acknowledged_stall_publication_survives_pre_marker_crash
 test_empty_prefix_mate_preserves_other_mate_receipt

@@ -74,6 +74,23 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 - It retires the predecessor arm at replacement shutdown instead of retaining it across the handoff.
 - It reports no shutdown reason, so every shutdown with a pending actionable close persists the handoff for the next owning `session_start` to replay.
 
+### omp restored-wake recovery
+
+omp restores queued user follow-ups to the composer when a run is interrupted with Escape or a message is dequeued with Alt+Up, so accepting a wake as a follow-up does not prove a turn consumed it.
+Before recording or sending a wake, `.omp/extensions/fm-primary-omp-watch.ts` normalizes CRLF and CR to LF, expands each tab to three spaces, and strips other C0 controls to match omp's editor restoration.
+Consumption still matches the emitted text exactly.
+Only an accepted user `message_start` carrying the exact emitted text consumes one pending token. `before_agent_start` records context and the loaded build but does not consume a wake: preparation can still be cancelled by Escape. A second identical wake therefore remains recoverable and eligible for replacement handoff, and shutdown during cancelled preparation retains the pending record until the replacement accepts its user message.
+While a wake remains unconsumed, `agent_end` schedules one editor check after two seconds; this is not continuous polling.
+The check requires the current generation to be live, a UI editor, positive idle state, and no pending messages.
+Recovery accepts only a complete unchanged emitted wake segment bounded by editor edges or omp's blank-line joins, with only its leading invisible transport mark allowed to be present or absent.
+Direct prefix, suffix, or internal edits are left untouched and not submitted.
+The extension removes only the wake and one transport blank-line separator, preserves operator draft bytes including invisible marks and leading/trailing newlines, and resends the wake alone through omp's prompt-starting message API.
+Recovery is bounded to three resubmission attempts per wake; another `agent_end` is needed to schedule another check.
+A wake restored by Alt+Up while idle without `agent_end` is not resubmitted, and rare credential loss during recovery can reject resubmission after the editable copy is removed; the durable queue and shutdown handoff retain the wake, the existing parent stalled-loop alarm reports either stall for endpoint-recorded local secondmates, and consumption-confirmed removal remains follow-up `fm-omp-wake-recovery-rollback`.
+[Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
+`tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, pending-wake retention across cancelled preparation without `agent_end`, later completed draft turns, and replacement handoff until accepted user `message_start`, plus identical wakes across preparation plus accepted-message callbacks, streaming delivery, and session replacement.
+The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
+
 ### Cursor stop hook
 
 Cursor's `.cursor/hooks.json` `stop` hook (`bin/fm-turnend-guard-cursor.sh`) owns routine tokenless re-arm for a Cursor primary.
@@ -250,6 +267,21 @@ The acknowledgement retires the marker only when no rows remain after sequence-b
 A concurrently appended wake has a higher sequence, remains queued, and keeps the episode pending for presentation.
 Consequently, a watcher close during handling republishes the same generation as pending and forces one recovery turn even when no queue row remains, while the outstanding generation-bound acknowledgement stays valid.
 An acknowledged episode does not freeze the generation, because the next downtime after it opens an episode of its own.
+
+### Who presents queued wakes between turns
+
+While an auto-arm claim is open ([claim predicate](turnend-guard.md#auto-arm-generation-claim)), the Claude Stop hook is the only deliverer of queued wakes between turns.
+Its rewake commit accepts only a downtime marker, so a drain that moves the marker to handling makes the hook drop its wake in silence.
+The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.
+When the claim is open, the re-emit reports how many records are queued and leaves both the queue and the marker alone.
+The drain takes the queue lock before checking the claim under the ownership micro-mutex; ownership-mutex contention also defers presentation without mutation.
+Deferred guard checks leave supervision episode state untouched without treating the verified fleet-lock owner as read-only or instructing it to drain from the re-emit; watcher-liveness and worktree-tangle diagnostics still run.
+Claim publication waits up to ten seconds for the queue lock before attempting the ownership micro-mutex without waiting, and releases both before arming, so transient queue writers do not abandon delivery and a new claim cannot appear between the drain's check and its queue/marker mutations.
+The ownership micro-mutex is never held across a lock wait or output.
+The handling turn the hook starts then runs the ordinary presentation drain, which enters handling, and uses the emitted `--ack-through` command only after handling completes.
+Once the claim is finished or absent and the ownership micro-mutex is available, the re-emit drains as before; homes without a Claude epoch ledger retain their ordinary drain behavior.
+A refused rewake commit (including a non-downtime marker or lost session-lock ownership) exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
+`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, and refusal cleanup.
 
 ## Per-actor acknowledgement
 

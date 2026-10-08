@@ -15,11 +15,16 @@ All artifact records were cross-checked against the corresponding job's markers.
 This covers all 24 parallel and 201 serial members; an existing live-capability skip is a portable-runner measurement, not a timing claim for the unavailable live integration.
 Observed maxima provide conservative packing weights, not an upper bound on future durations.
 
+The earlier 2026-09-17 serial baseline covered all 176 serial scripts at refresh time, using successful per-script records in the `fm-test-timing-portable-serial-*` artifacts of the complete green [run 35279383618](https://github.com/kunchenguid/firstmate/actions/runs/35279383618) and the available completed shards of [run 35282466441](https://github.com/kunchenguid/firstmate/actions/runs/35282466441), retaining the slower successful sample where both existed.
+The 2026-09-30 refresh supersedes those shared entries.
+
 Two serial-5 jobs were cancelled at their 30-minute cap and uploaded no artifact.
 Their completed log markers supplement the complete runs, but a cancelled job's wall time is only a lower bound and its unfinished or never-started scripts have no completed sample.
 A failed script's duration is excluded even when its lane uploaded an artifact.
 Three supplemental hints come from completed successful shards of the partial [run 37654991238](https://github.com/MrGTV-love/firstmate/actions/runs/37654991238) on 2026-10-07: `tests/fm-session-launch-policy-inherit.test.sh` measured 16144 ms on shard 4, `tests/fm-session-launch-policy-receipt.test.sh` measured 2166 ms on shard 9, and `tests/fm-session-launch-policy.test.sh` measured 229671 ms on shard 7.
 All three shard summaries report `failed=0`, and each measured row reports `exit=0` and `gate_skip=false`.
+The new `tests/fm-omp-wake-restore-live-e2e.test.sh` hint is its successful 51 ms record from portable serial shard 3 of [run 37663635202](https://github.com/MrGTV-love/firstmate/actions/runs/37663635202) on 2026-10-07.
+That shard completed with zero failures; the live test took its opt-in capability skip, so this hint models ordinary portable CI gate evaluation, not live wake-recovery runtime.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
 
@@ -61,6 +66,8 @@ Assignment is longest-processing-time bin packing over per-script duration hints
 [Verification inputs](#verification-inputs) owns the measurement provenance and exceptions.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.
+Shard selection checks the complete assignment generator before consuming its output; a generation failure refuses the lane instead of returning a successful partial list.
+Runner regressions check standalone shard unions with five, six, and twenty added scripts, and require a failed producer to refuse without publishing a partial list.
 Balance is still worth keeping current, because enough unmeasured scripts let one shard carry more than twice another shard's real work and reach the job cap while another runner sits idle.
 `bin/fm-test-run.sh --check-coverage` reports the unmeasured share as `serial_unhinted=` and refuses past `PORTABLE_SERIAL_MAX_UNHINTED_PERCENT`.
 That catches missing hints, not stale existing hints: the host suite still had a 41512 ms hint after growing to over 1000 seconds in CI, so the old split placed it beside another 12 minutes of work while passing the guard.
@@ -116,6 +123,8 @@ No fast mode, path skips, or paid runner provisioning is part of this layout.
 The [lint script header](../bin/fm-lint.sh) owns local dependency discovery, conservative unresolved-import selection, and successful-result cache controls; these do not replace full joint source analysis.
 Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
 Spawn, control, and remote secondmate relaunch obtain configuration inheritance through their shared launch-policy import rather than importing it again.
+The shared Claude-launcher library uses that caller-provided configuration dependency rather than importing it a second time.
+Spawn also obtains classification and PR helpers through its definition-of-done import, and timeout helpers through its backlog-transition import, instead of duplicating those source graphs with direct imports.
 The policy library's lazy wake import uses the existing canonical-owner analysis boundary, while the wake owner remains in the complete lint inventory.
 `tests/fm-test-run.test.sh` verifies changed status and UTC owners through the runner's authoritative consuming-family map.
 

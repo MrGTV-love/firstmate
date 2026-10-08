@@ -56,12 +56,6 @@ const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
 const marker = `${state}/.omp-turnend-extension-loaded`;
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
 
-function parentPid(pid: string): string {
-  const result = spawnSync("ps", ["-o", "ppid=", "-p", pid], { encoding: "utf8" });
-  if (result.status !== 0) return "";
-  return result.stdout.trim();
-}
-
 function pidAlive(pid: string): boolean {
   try {
     process.kill(Number(pid), 0);
@@ -71,6 +65,13 @@ function pidAlive(pid: string): boolean {
   }
 }
 
+// The lock records the omp process that runs the extensions, and omp loads them
+// in that same process (verified live, omp 18.6.3: the recorded pid equals
+// process.pid). Only that process may own the home. A descendant omp that
+// auto-discovers these files from the same working directory - an `omp -p`
+// child a turn runs, for example - is another session: it must not record
+// itself as the loaded session, and it dies soon after, which would leave its
+// dead pid in the marker.
 function lockOwnership(): LockOwnership {
   let lockPid = "";
   try {
@@ -79,18 +80,25 @@ function lockOwnership(): LockOwnership {
     return "missing";
   }
   if (!/^[0-9]+$/.test(lockPid) || lockPid === "1") return "other";
-  let pid = String(process.pid);
-  for (let i = 0; i < 8; i += 1) {
-    if (pid === lockPid) return "owned";
-    pid = parentPid(pid);
-    if (!pid || pid === "1") break;
-  }
+  if (lockPid === String(process.pid)) return "owned";
   return pidAlive(lockPid) ? "other" : "missing";
 }
 
+// Record this build and this session pid. Runs at load, at session start, and
+// again at every turn boundary below: the lock is first claimed by the
+// session-start hook after the load-time write, and a marker that the lock
+// owner finds stale or foreign is rewritten here instead of waiting for the
+// next restart. Writes only on a change, and only for the lock owner or while
+// no live session holds the lock.
 function markLoaded(): void {
   if (!existsSync(state) || lockOwnership() === "other") return;
-  writeFileSync(marker, `${extensionVersion}\n${process.pid}\n`);
+  const record = `${extensionVersion}\n${process.pid}\n`;
+  try {
+    if (readFileSync(marker, "utf8") === record) return;
+  } catch {
+    // Absent or unreadable: write it below.
+  }
+  writeFileSync(marker, record);
 }
 
 const sessionstartDeliveryBytes = 512 * 1024;
@@ -549,8 +557,15 @@ export default function (pi: ExtensionAPI) {
 
   pi.on?.("before_agent_start", async (_event, ctx) => {
     const generation = sessionstartGeneration;
-    if (!generation) return undefined;
+    if (!generation) {
+      markLoaded();
+      return undefined;
+    }
     const message = await claimSessionstartMessage(generation, ctx);
+    // The session-start hook has just claimed the lock for this process, so
+    // this is the first point where a lock that was foreign or absent at load
+    // time can be recorded under the live session.
+    markLoaded();
     return message ? { message } : undefined;
   });
 
@@ -597,6 +612,7 @@ export default function (pi: ExtensionAPI) {
   // returning { continue: true, additionalContext } compels one more agent
   // loop with the guard text attached (verified on omp 18.1.2 and 18.1.11).
   pi.on?.("session_stop", async (event) => {
+    markLoaded();
     const stopHookActive = Boolean(event && (event as { stop_hook_active?: unknown }).stop_hook_active === true);
     const result = await runGuard(stopHookActive);
     if (result.code !== 2) return undefined;

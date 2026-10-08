@@ -289,7 +289,7 @@ pass 'native Codex, Claude initialization with a context-suffixed alias, omp sel
 
 # The inherited file is consumed in the destination home, proving policy
 # convergence rather than just allowlist membership or copied text.
-export FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json dispatch-never-send crew-harness trace-context keep-ai-trailers'
+export FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json dispatch-never-send crew-harness trace-context'
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$ROOT/bin/fm-config-inherit-lib.sh"
 SECOND="$TMP_ROOT/second"

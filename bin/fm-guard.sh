@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Watcher liveness and worktree-tangle guard, called by supervision scripts, by
-# fm-wake-drain.sh after it empties queued wakes, and by fm-session-start.sh in
-# read-only advisory mode whenever session-lock ownership was not verified.
+# fm-wake-drain.sh during wake presentation or delivery deferral, and by
+# fm-session-start.sh in read-only advisory mode when ownership was not verified.
+# FM_GUARD_DELIVERY_DEFERRED=1 selects the delivery-deferral diagnostics owned by
+# docs/watcher-continuity.md's "Who presents queued wakes between turns" section.
 # First, always warn if the firstmate primary checkout (FM_ROOT) is on a named
 # non-default branch, because that means firstmate-on-itself work landed in the
 # primary instead of an isolated worktree.
@@ -58,6 +60,8 @@ queue_pending=false
 queue_branch_held=false
 READ_ONLY=${FM_GUARD_READ_ONLY:-0}
 case "$READ_ONLY" in 1|true|TRUE|yes|YES) READ_ONLY=1 ;; *) READ_ONLY=0 ;; esac
+DELIVERY_DEFERRED=${FM_GUARD_DELIVERY_DEFERRED:-0}
+case "$DELIVERY_DEFERRED" in 1|true|TRUE|yes|YES) DELIVERY_DEFERRED=1 ;; *) DELIVERY_DEFERRED=0 ;; esac
 CONTINUE_LINE=${FM_GUARD_CONTINUE_LINE:-This is a supervision warning only; the guarded operation WILL still run.}
 
 # Volatile, home-scoped episode marker: one line = the current stale-episode key.
@@ -188,7 +192,7 @@ if [ "$needed" = false ]; then
   # Leave the unhealthy state (nothing riding on the watcher): clear so a later
   # work or X-mode need + stale combination is a fresh episode even if the
   # beacon is still absent with the same key string.
-  [ "$READ_ONLY" -eq 1 ] || fm_guard_clear_stale_banner
+  [ "$READ_ONLY" -eq 1 ] || [ "$DELIVERY_DEFERRED" -eq 1 ] || fm_guard_clear_stale_banner
   exit 0
 fi
 
@@ -215,7 +219,7 @@ elif [ "$watcher_healthy" = false ]; then
   episode_key=$(fm_guard_stale_episode_key "$watcher_down_reason")
   episode_key=${episode_key%$'\n'}
   print_full_banner=0
-  if [ "$READ_ONLY" -eq 1 ]; then
+  if [ "$READ_ONLY" -eq 1 ] || [ "$DELIVERY_DEFERRED" -eq 1 ]; then
     fm_guard_stale_banner_seen "$STATE" "$episode_key" || print_full_banner=1
   elif fm_guard_claim_stale_banner "$STATE" "$episode_key"; then
     print_full_banner=1
@@ -224,7 +228,7 @@ elif [ "$watcher_healthy" = false ]; then
     afk=0
     [ -e "$STATE/.afk" ] && afk=1
     queue_arg=0
-    "$queue_pending" && queue_arg=1
+    if [ "$DELIVERY_DEFERRED" -eq 0 ] && "$queue_pending"; then queue_arg=1; fi
     x_mode=0
     [ -f "$CONFIG/x-mode.env" ] && x_mode=1
     fix=$("$SCRIPT_DIR/fm-supervision-instructions.sh" \
@@ -268,13 +272,14 @@ elif [ "$watcher_healthy" = false ]; then
 else
   # Healthy again while work is still in flight: end the episode so a later
   # restale re-prints the full banner.
-  [ "$READ_ONLY" -eq 1 ] || fm_guard_clear_stale_banner
+  [ "$READ_ONLY" -eq 1 ] || [ "$DELIVERY_DEFERRED" -eq 1 ] || fm_guard_clear_stale_banner
 fi
 
 # Queued wakes are an independent hazard; warn whenever they are pending, even if
 # a watcher is alive. Kept after the banner so the no-watcher alarm reads first.
 # Dedup of the watcher-down banner never suppresses this warning.
-# The supervision branch is the exception: it runs guarded commands (fm-peek,
+# Delivery deferral follows the exclusion referenced in the header.
+# The supervision branch is also an exception: it runs guarded commands (fm-peek,
 # fm-crew-state) in the middle of handling the very rows that are queued, and
 # "drain them before anything else" mid-handling reads as "an earlier wake is
 # still pending", which is what made it re-run a previous acknowledgement in a
@@ -283,7 +288,7 @@ fi
 if "$queue_pending"; then
   if [ "$READ_ONLY" -eq 1 ]; then
     echo "WARNING: queued wakes pending - left untouched because this session lacks verified fleet-lock ownership." >&2
-  elif [ "$GUARD_ACTOR" != branch ]; then
+  elif [ "$DELIVERY_DEFERRED" -eq 0 ] && [ "$GUARD_ACTOR" != branch ]; then
     echo "WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else." >&2
   fi
 elif "$queue_branch_held"; then

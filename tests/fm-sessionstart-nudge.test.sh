@@ -493,7 +493,7 @@ case "$behavior" in
   slow|timeout)
     (
       trap '' TERM INT
-      while :; do sleep 30; done
+      while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
     ) </dev/null >/dev/null 2>&1 &
     grandchild=$!
     printf '%s\n' "$grandchild" > "$state/grandchild-$count"
@@ -803,7 +803,7 @@ index=$(( $(wc -l < "$state/launches" 2>/dev/null || printf '0') + 1 ))
 printf '%s:%s:%s\n' "$index" "$$" "${FM_SESSIONSTART_SUPERVISOR_PID:-}" >> "$state/launches"
 (
   trap '' TERM INT HUP
-  while :; do sleep 30; done
+  while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
 ) </dev/null >/dev/null 2>&1 &
 grandchild=$!
 printf '%s\n' "$grandchild" > "$state/grandchild-$index"
@@ -812,7 +812,7 @@ if [ "$index" -eq 3 ]; then
   exit 0
 fi
 trap 'exit 143' TERM INT
-while :; do sleep 30; done
+while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
 SH
   chmod +x "$fixture/bin/"*.sh
   : > "$fixture/state/launches"

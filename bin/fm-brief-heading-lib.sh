@@ -3,8 +3,8 @@
 # Usage: . bin/fm-brief-heading-lib.sh
 #
 # This file is the single owner of brief-section parsing for intent,
-# validation, dispatch resolution, and advisory skill selection.
-# Every consumer shares parsing semantics; resolver-only privacy preprocessing
+# validation, dispatch resolution, and worker skill selection.
+# Every consumer shares parsing semantics; never-send privacy preprocessing
 # is owned by docs/configuration.md "Never-send list".
 
 # Parse an exact ATX heading outside fenced blocks. Body mode prints through
@@ -92,3 +92,40 @@ fm_brief_task_heading_present() {  # <file> <heading>
   fm_brief_heading_parse - "$2" present >/dev/null <<<"$task"
 }
 
+# Print the words of every provenance-marked line in a legacy `# Task` body.
+# The marker is read the way bin/fm-brief-heading-lib.sh reads a heading: a
+# line inside a ``` or ~~~ fenced block, or indented four spaces or a tab as an
+# indented example, is never a marked line, so a fenced `Captain:` sample cannot
+# pass the provenance gate as the ship contract's intent (issue 3608).
+fm_brief_marked_captain_words() {  # <task-body>
+  printf '%s\n' "$1" | awk '
+    {
+      scan = $0
+      spaces = 0
+      while (spaces < 3 && substr(scan, 1, 1) == " ") {
+        scan = substr(scan, 2)
+        spaces++
+      }
+      marker = substr(scan, 1, 1)
+      marker_len = 0
+      if (marker == "`" || marker == "~") {
+        while (substr(scan, marker_len + 1, 1) == marker) marker_len++
+      }
+      if (marker_len >= 3) {
+        if (!fenced) {
+          fenced = 1
+          fence_marker = marker
+          fence_len = marker_len
+        } else if (marker == fence_marker && marker_len >= fence_len && substr(scan, marker_len + 1) ~ /^[[:space:]]*$/) {
+          fenced = 0
+        }
+        next
+      }
+      if (fenced || substr(scan, 1, 1) ~ /^[ \t]$/) next
+      if (match(scan, /^(\[captain\]|Captain('\''s (words|ask|intent))?:)[[:space:]]*/)) {
+        words = substr(scan, RLENGTH + 1)
+        if (words ~ /[^[:space:]]/) print words
+      }
+    }
+  '
+}

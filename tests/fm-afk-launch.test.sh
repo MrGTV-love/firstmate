@@ -50,7 +50,14 @@ TRACK_TMUX_SESSIONS=""
 GLOBAL_CLEANUP() {
   rm -f "$SLEEPER" 2>/dev/null || true
   rm -rf "$OFF_CONFIG" 2>/dev/null || true
-  local s
+  local s p
+  # Reap this shell's own background fixtures (fake daemons, sleepers) so a
+  # failed or interrupted case cannot leave one running.
+  for p in $(jobs -p 2>/dev/null); do
+    kill -CONT "$p" 2>/dev/null || true
+    pkill -KILL -P "$p" 2>/dev/null || true
+    kill -KILL "$p" 2>/dev/null || true
+  done
   for s in $TRACK_TMUX_SESSIONS; do
     tmux kill-session -t "$s" 2>/dev/null || true
   done
@@ -347,7 +354,7 @@ unit_fresh_vs_refresh() {
   : > "$st/state/.subsuper-unknown-acked"
   # A live "daemon": a real process whose identity the lock records, so
   # daemon_lock_held_by_live_daemon returns true (a refresh).
-  sleep 600 &
+  sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" &
   sleep_pid=$!
   lock="$st/state/.supervise-daemon.lock"
   mkdir -p "$lock"
@@ -413,7 +420,7 @@ unit_mode_refresh_preserves_quiet() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-mode-preserve.XXXXXX")
   mkdir -p "$st/state"
   printf 'quiet\n%s\n' "$(date '+%s')" > "$st/state/.afk"
-  sleep 600 &
+  sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" &
   sleep_pid=$!
   lock="$st/state/.supervise-daemon.lock"
   mkdir -p "$lock"
@@ -444,7 +451,7 @@ unit_mode_quiet_daemon_to_away() {
     FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_MODE=quiet "$LAUNCH" enter >/dev/null 2>&1 \
       || fail "$command: could not enter quiet mode"
     printf 'quiet\n%s\n' "$(date '+%s')" > "$st/state/.afk"
-    sleep 600 &
+    sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" &
     # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
     sleep_pid=$!
     lock="$st/state/.supervise-daemon.lock"
@@ -534,7 +541,7 @@ unit_stop_ordering() {
   # A fake daemon: on SIGTERM, record whether .afk was still present, then exit.
   bash -c '
     trap "if [ -f \"$1/state/.afk\" ]; then echo present > \"$2\"; else echo absent > \"$2\"; fi; exit 0" TERM
-    while :; do sleep 0.2; done
+    while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.2; done
   ' _ "$st" "$marker" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   daemon_pid=$!
@@ -571,7 +578,7 @@ unit_stop_rejects_reused_pid() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-pid-reuse.XXXXXX")
   mkdir -p "$st/state"
   date '+%s' > "$st/state/.afk"
-  sleep 600 &
+  sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   sleeper_pid=$!
   lock="$st/state/.supervise-daemon.lock"
@@ -1496,7 +1503,7 @@ unit_stop_confirms_daemon_exit() {
   mkdir -p "$st/state/.supervise-daemon.lock"
   : > "$st/state/.afk"
   printf 'none\t-\tnative\n' > "$st/state/.afk-daemon-terminal"
-  bash -c 'trap "" TERM; while :; do sleep 1; done' &
+  bash -c 'trap "" TERM; while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done' &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   daemon_pid=$!
   printf '%s' "$daemon_pid" > "$st/state/.supervise-daemon.lock/pid"

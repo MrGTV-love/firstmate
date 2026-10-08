@@ -26,7 +26,7 @@
 #   it also carries the current `--intent` contract and the extracted captain
 #   intent. A legacy mixed Task is accepted there only under bin/fm-dod-lib.sh's
 #   provenance-marking rules; unmarked legacy Tasks stop for migration rather
-#   than becoming intent. That library owns the parsing and intent rules. When
+#   than becoming intent. That library owns the intent rules. When
 #   the explicit mode carries less rigor than the project's standing posture, a
 #   loud one-line deviation notice is printed and the spawn continues.
 #   no-mistakes-prod-only is a registry policy rather than a task mode and is
@@ -52,10 +52,10 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
-#   A # Skill selection input section opts a worker into Jev advisory suggestions
-#   from bin/fm-skill-suggest.sh in that same overlay; source intent and mandatory
-#   skill triggers remain unchanged. The section contains only permitted minimal
-#   task text, not transcripts or private excerpts.
+#   Ship/scout launches and relaunches integrate bin/fm-skill-pick.sh through
+#   that overlay. docs/configuration.md "Worker skill selection" owns selection,
+#   supported brief transports, and recorded outcomes. The picker is bounded
+#   at 30 seconds and never stops a launch.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
@@ -81,9 +81,10 @@
 #   worktree and the republished record rebinds the task to it. That proof is
 #   its own step, because a backend's `missing` also covers an endpoint that is
 #   merely unreachable from here. fm_control_endpoint_absence_verdict owns the
-#   proof for Herdr and the tmux no-user-server case. Herdr keeps its recorded
-#   session; a gone tmux endpoint requires the home's current configured spawn
-#   backend to resolve to Herdr and pass spawn validation.
+#   proof for Herdr and for a tmux endpoint scoped to the recorded session and
+#   worktree. Herdr keeps its recorded session; a gone tmux endpoint requires
+#   the home's current configured spawn backend to resolve to Herdr and pass
+#   spawn validation.
 #   The validated worktree is reused untouched either way;
 #   a rebind is a recovery, never a teardown. Only a crewmate or scout rebinds: a
 #   secondmate whose endpoint is gone is respawned by its own owner
@@ -394,7 +395,7 @@
 #   CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 unless a leading raw-command assignment
 #   supplies the flag; automatic activation adds FM_COMPACT_ADVISER_HOOKS=1
 #   unless the worker shell already opted in, keeping firstmate-calm inert.
-#   No TypeSafe credential is read or embedded here; use plugin saved keys.
+#   Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where TYPESAFE_API_KEY is in the process environment or ./.env.
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
 #   secondmate, and relaunch) carries. Absent or `bypass` keeps today's
@@ -731,8 +732,6 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
-# shellcheck source=bin/fm-classify-lib.sh
-. "$SCRIPT_DIR/fm-classify-lib.sh"
 fm_backlog_directory_present "$STATE" "state directory" || {
   echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
@@ -749,16 +748,13 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-cursor-lib.sh
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
-# shellcheck source=bin/fm-pr-lib.sh
-. "$SCRIPT_DIR/fm-pr-lib.sh"
+# fm-dod-lib.sh also owns the PR and classification imports needed below.
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
 # shellcheck source=bin/fm-trace-context-lib.sh
 . "$SCRIPT_DIR/fm-trace-context-lib.sh"
 # shellcheck source=bin/fm-remote-readiness-lib.sh
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
-# shellcheck source=bin/fm-timeout-lib.sh
-. "$SCRIPT_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-project-capacity-lib.sh
 . "$SCRIPT_DIR/fm-project-capacity-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
@@ -1444,6 +1440,8 @@ CONFIG_INHERIT_LOCK=
 CONFIG_INHERIT_LOCK_HELD=0
 GIT_HOOKS_DIR=
 SPAWN_LAUNCH_SENT=0
+SPAWN_BRIEF_DELIVERED=0
+SPAWN_BRIEF_FAILURE_REASON=
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_TREEHOUSE_ABORT_TARGET=
 SPAWN_ROUTING_PAIR=
@@ -1476,7 +1474,7 @@ parse_orca_worktree_result() {
 }
 
 spawn_abort_cleanup() {
-  local status=$?
+  local status=$? skill_meta_tmp
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ] &&
     [ "$SPAWN_META_PUBLISH_STARTED" = 1 ] &&
     [ -n "$SPAWN_META_TMP" ] &&
@@ -1594,6 +1592,24 @@ spawn_abort_cleanup() {
     if ! spawn_fresh_commit_rollback; then
       status=1
     fi
+  fi
+  if [ "$status" -ne 0 ] && [ "$SPAWN_BRIEF_DELIVERED" = 0 ] &&
+    [ "$SPAWN_META_LOCK_HELD" = 1 ] && [ -n "${SKILL_SELECTION_STATUS:-}" ] &&
+    [ -n "${SPAWN_GEN:-}" ] &&
+    grep -Fqx "spawn_gen=$SPAWN_GEN" "$STATE/$ID.meta" 2>/dev/null; then
+    skill_meta_tmp=$(mktemp "$STATE/.$ID.meta.skill-selection.XXXXXX") || skill_meta_tmp=
+    if [ -n "$skill_meta_tmp" ] &&
+      awk -F= '$1 != "skill_selection" && $1 != "skill_selection_reason" && $1 != "skill_selection_picked"' \
+        "$STATE/$ID.meta" >"$skill_meta_tmp" &&
+      printf 'skill_selection=undelivered\nskill_selection_reason=%s\n' \
+        "${SPAWN_BRIEF_FAILURE_REASON:-launch aborted before brief delivery (exit status $status)}" >>"$skill_meta_tmp" &&
+      fm_backlog_atomic_transition publish "$skill_meta_tmp" "$STATE/$ID.meta" "task record" "$STATE"; then
+      :
+    else
+      echo "error: could not record undelivered skill selection for $ID" >&2
+      status=1
+    fi
+    [ -z "$skill_meta_tmp" ] || rm -f "$skill_meta_tmp"
   fi
   if [ "$SPAWN_META_LOCK_HELD" = 1 ]; then
     SPAWN_META_LOCK_HELD=0
@@ -1913,6 +1929,12 @@ if [ "$RELAUNCH" -eq 0 ]; then
     exit 1
   fi
   SPAWN_TASK_SET_LOCK_HELD=1
+  SPAWN_CONTROL_LOCK="$STATE/.control-$ID.lock"
+  if ! fm_lock_try_acquire "$SPAWN_CONTROL_LOCK"; then
+    echo "error: another lifecycle action is already running for task $ID" >&2
+    exit 1
+  fi
+  SPAWN_CONTROL_LOCK_HELD=1
   spawn_refuse_if_away_spend_cap
   spawn_require_relocated_queued_work
 fi
@@ -2010,7 +2032,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # which proven-gone endpoints may be replaced.
   RELAUNCH_STATE=$(fm_backend_agent_state "$BACKEND" "$RELAUNCH_TARGET")
   if [ "$RELAUNCH_STATE" = missing ]; then
-    RELAUNCH_ABSENCE=$(fm_control_endpoint_absence_verdict "$BACKEND" "$RELAUNCH_TARGET")
+    RELAUNCH_ABSENCE=$(fm_control_endpoint_absence_verdict "$BACKEND" "$RELAUNCH_TARGET" "$(fm_meta_get "$RELAUNCH_META" worktree)")
     case "${RELAUNCH_ABSENCE%%$'\t'*}" in
       gone) RELAUNCH_STATE=missing ;;
       dead) RELAUNCH_STATE=dead ;;
@@ -2351,10 +2373,7 @@ launch_template() {
   # against the fresh-profile provider wizard, --auto-approve so no approval
   # prompt can park an unattended worker, the tracked posture overlay so a
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
-  # pinned to the worktree because omp's extension discovery is cwd-only. A
-  # secondmate loads its two primary extensions by that discovery alone:
-  # naming them with -e as well loads each twice (verified), doubling every
-  # session_stop continuation.
+  # pinned to the worktree because omp's extension discovery is cwd-only.
   omp)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
@@ -3485,31 +3504,34 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   fi
   # Use the existing launch-brief overlay for every worker kind, including
   # pre-scope briefs and relaunches. Charters never enter this worker path.
+  # It is rendered here so a contract problem refuses before any endpoint
+  # exists, then rendered again with the skill selection once the task copy
+  # whose skills form the catalog is in place.
   SOURCE_BRIEF=$BRIEF
   BRIEF="$DATA/$ID/launch-brief.md"
-  BRIEF_TMP="$DATA/$ID/.launch-brief.md.${BASHPID:-$$}"
-  {
-    fm_brief_worker_role "$STATE" "$ID" "$FM_ROOT" &&
-      printf '\n' &&
-      { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
-      cat "$SOURCE_BRIEF" &&
-      if fm_brief_heading_present "$SOURCE_BRIEF" "# Skill selection input"; then
-        FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG" \
-          bash "$SCRIPT_DIR/fm-skill-suggest.sh" --brief "$SOURCE_BRIEF" --format brief || true
-      fi &&
-      if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
-        fm_brief_intent_overlay "$CAPTAIN_INTENT"
-      fi
-  } >"$BRIEF_TMP" || {
-    rm -f -- "$BRIEF_TMP"
-    echo "error: could not render current launch contract for $SOURCE_BRIEF" >&2
-    exit 1
+  render_launch_brief() { # [skill-selection-section-file]
+    local tmp="$DATA/$ID/.launch-brief.md.${BASHPID:-$$}"
+    {
+      fm_brief_worker_role "$STATE" "$ID" "$FM_ROOT" &&
+        printf '\n' &&
+        { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
+        cat "$SOURCE_BRIEF" &&
+        { [ -z "${1:-}" ] || cat "$1"; } &&
+        if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
+          fm_brief_intent_overlay "$CAPTAIN_INTENT"
+        fi
+    } >"$tmp" || {
+      rm -f -- "$tmp"
+      echo "error: could not render current launch contract for $SOURCE_BRIEF" >&2
+      return 1
+    }
+    if ! mv "$tmp" "$BRIEF"; then
+      rm -f -- "$tmp"
+      echo "error: could not publish current launch contract for $SOURCE_BRIEF" >&2
+      return 1
+    fi
   }
-  if ! mv "$BRIEF_TMP" "$BRIEF"; then
-    rm -f -- "$BRIEF_TMP"
-    echo "error: could not publish current launch contract for $SOURCE_BRIEF" >&2
-    exit 1
-  fi
+  render_launch_brief || exit 1
 fi
 
 delivery_rigor_rank() { # <mode> -> 3 (most rigor) .. 1 (least); 0 = not a task mode
@@ -4527,6 +4549,7 @@ kimi_wait_for_delivery() {
 }
 
 kimi_spawn_fail() { # <detail>
+  SPAWN_BRIEF_FAILURE_REASON=$1
   printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
   echo "error: $1; inspect window $T" >&2
 }
@@ -4595,6 +4618,7 @@ rovo_wait_for_delivery() {
 }
 
 rovo_spawn_fail() { # <detail>
+  SPAWN_BRIEF_FAILURE_REASON=$1
   printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
@@ -4801,6 +4825,53 @@ fi
 spawn_enter_recorded_worktree
 spawn_assert_agent_worktree
 
+# Judge only after entering the task copy so skill paths target the worker's
+# actual files. Raw commands without supported brief transport stay untouched.
+SKILL_SELECTION_BOUND=30
+SKILL_SELECTION_STATUS='' SKILL_SELECTION_REASON='' SKILL_SELECTION_PICKED=''
+if { [ "$KIND" = ship ] || [ "$KIND" = scout ]; } && [ "$RAW_LAUNCH" = 1 ] && [[ "$LAUNCH" != *'__BRIEF__'* ]] && [[ "$LAUNCH" != *'__BRIEFDOORBELL__'* ]] && [ "$HARNESS" != kimi ] && [ "$HARNESS" != rovo ]; then
+  SKILL_SELECTION_STATUS=undelivered
+  SKILL_SELECTION_REASON="raw launch command has no supported brief transport"
+  echo "skill selection for $ID: $SKILL_SELECTION_STATUS - $SKILL_SELECTION_REASON" >&2
+elif [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
+  skill_section="$DATA/$ID/.skill-selection.md.${BASHPID:-$$}"
+  skill_record="$DATA/$ID/.skill-selection.record.${BASHPID:-$$}"
+  rm -f -- "$skill_section" "$skill_record"
+  skill_rc=0
+  fm_run_timed "$SKILL_SELECTION_BOUND" env FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG" \
+    bash "$SCRIPT_DIR/fm-skill-pick.sh" --brief "$SOURCE_BRIEF" --kind "$KIND" \
+    --catalog "$WT/.agents/skills" --catalog "$WT/.claude/skills" \
+    --record "$skill_record" </dev/null >"$skill_section" 2>/dev/null || skill_rc=$?
+  if [ "$skill_rc" -eq 0 ] && [ -s "$skill_record" ] && [ -s "$skill_section" ]; then
+    SKILL_SELECTION_STATUS=$(sed -n 's/^status=//p' "$skill_record" | head -n 1)
+    SKILL_SELECTION_REASON=$(sed -n 's/^reason=//p' "$skill_record" | head -n 1)
+    SKILL_SELECTION_PICKED=$(sed -n 's/^picked=//p' "$skill_record" | head -n 1)
+    case "$SKILL_SELECTION_STATUS" in
+      picked | none) ;;
+      *) SKILL_SELECTION_STATUS=unavailable ;;
+    esac
+  else
+    SKILL_SELECTION_STATUS=unavailable
+    if fm_timed_out "$skill_rc"; then
+      SKILL_SELECTION_REASON="skill picker timed out after ${SKILL_SELECTION_BOUND}s"
+    else
+      SKILL_SELECTION_REASON="skill picker exited with status $skill_rc"
+    fi
+    {
+      printf '\n# Skill selection\n\n'
+      printf '%s\n' 'Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.'
+      printf 'Skill selection was unavailable for this task (%s). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.\n' "$SKILL_SELECTION_REASON"
+    } >"$skill_section" || true
+  fi
+  if ! render_launch_brief "$skill_section"; then
+    SKILL_SELECTION_STATUS=undelivered
+    SKILL_SELECTION_REASON="the selection could not be added to the launch instructions"
+    SKILL_SELECTION_PICKED=''
+  fi
+  rm -f -- "$skill_section" "$skill_record"
+  echo "skill selection for $ID: $SKILL_SELECTION_STATUS${SKILL_SELECTION_PICKED:+ ($SKILL_SELECTION_PICKED)}${SKILL_SELECTION_REASON:+ - $SKILL_SELECTION_REASON}" >&2
+fi
+
 # Pre-register Claude's workspace trust for the directory this launch starts in,
 # at the first point that directory is known and before any per-task state is
 # created below. The dialog gates the pane before the brief is ever read, and it
@@ -4958,24 +5029,23 @@ if [ "$KIND" != secondmate ]; then
   case "$HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
-    # a turn; Stop (normal completion), StopFailure (API-error turn end),
-    # and SessionEnd (process shutdown) all close it, so an abnormal end can
-    # never leave a stale busy record. Claude fires no hook for a manual
+    # a turn; accepted Stop, StopFailure (API-error turn end), and SessionEnd
+    # (process shutdown) close it. docs/configuration.md "Jev belay Stop hook"
+    # owns Stop acceptance and completion. Claude fires no hook for a manual
     # interrupt: fm-control preserves the adapter-owned state, while the
-    # legacy fm-send --key Escape path records idle/fm-interrupt. Stop keeps
-    # the turn-ended NOTIFICATION touch for the watcher. Every
-    # hook command tolerates a refused event (|| true) so a stale-gen writer
-    # can never break Claude's own lifecycle.
+    # legacy fm-send --key Escape path records idle/fm-interrupt.
+    # Busy-event publication tolerates a refused event (|| true) so a stale-gen
+    # writer can never break Claude's own lifecycle.
     mkdir -p "$WT/.claude"
     busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
     busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source claude-hook"
     j_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
-    j_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
+    j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guardrail_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
     j_guardrail=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guardrail_config") FM_STATE_OVERRIDE=$(shell_quote "$STATE_REAL") node $(shell_quote "$FM_ROOT/bin/fm-jev-guardrail.mjs") hook --host claude")
     cat >"$WT/.claude/settings.local.json" <<EOF
-{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guardrail","timeout":5}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop"}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guardrail","timeout":5}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop","timeout":25}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
 EOF
     exclude_path '.claude/settings.local.json'
     ;;
@@ -5142,7 +5212,7 @@ EOF
     guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
       '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
-// Firstmate semantic busy-state events + turn-end notification for omp (Oh My
+// Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
 // Semantic state: "agent_start" -> busy when a low-level agent run begins;
 // "agent_end" -> idle only when event.willContinue is not true. omp has no
@@ -5152,9 +5222,7 @@ EOF
 // queued follow-ups, and a session_stop-forced continuation. ctx.isIdle() is
 // deliberately NOT consulted: at a natural TUI agent_end it still reads false
 // because session_stop is awaited before the session settles, so gating on it
-// would leave every completed turn recorded busy. "turn_end" fires at every
-// inner turn boundary and stays a wake NOTIFICATION touch for the watcher,
-// never current-state truth.
+// would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
 const busyEvent = (state: string, event: string) =>
@@ -5383,7 +5451,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider api_key busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5404,6 +5472,9 @@ preserve_relaunch_meta() {
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
+  [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
+  [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
+  [ -z "$SKILL_SELECTION_PICKED" ] || echo "skill_selection_picked=$SKILL_SELECTION_PICKED"
   # The worker account pin, only when this home declares one, so an unpinned
   # task record stays byte-identical.
   [ -z "$WORKER_ACCOUNT" ] || echo "account=$WORKER_ACCOUNT_DECLARED"
@@ -5630,6 +5701,7 @@ case "$LAUNCH" in
     *) brief_opstate=$STATE ;;
   esac
   brief_doorbell=$(FM_STATE_OVERRIDE="$brief_opstate" "$FM_ROOT/bin/fm-operational-input.sh" record launch-brief <"$BRIEF") || {
+    SPAWN_BRIEF_FAILURE_REASON="could not publish the launch brief as an operational-inbox record"
     echo "error: could not publish the launch brief for $ID as an operational-inbox record under $brief_opstate; $HARNESS strips the typed operational marker, so the worker was not launched" >&2
     exit 1
   }
@@ -5982,6 +6054,7 @@ if [ "$HARNESS" = agy ]; then
     exit 1
   fi
 fi
+SPAWN_BRIEF_DELIVERED=1
 
 if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
   if ! fm_config_reread_discard_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then

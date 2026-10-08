@@ -211,10 +211,12 @@
 #             sync, same-home backlog reconciliation, secondmate convergence and
 #             liveness, pending remote handoff retry, X-mode
 #             artifact writes) - and
-#             re-emit the rest. Wake-queue presentation is NOT skipped: queued
-#             records are this turn's work queue, they arrived after startup,
-#             and a session that owns the lock is exactly the session that must
-#             handle and acknowledge them. Lock acquisition still runs, because
+#             re-emit the rest. Wake-queue records normally still need presentation:
+#             they arrived after startup and are this turn's work queue.
+#             --reemit passes that presentation to fm-wake-drain.sh --reemit;
+#             docs/watcher-continuity.md's "Who presents queued wakes between
+#             turns" section owns the delivery exclusion.
+#             Lock acquisition still runs, because
 #             ownership must be re-verified rather than assumed: fm-lock.sh
 #             already treats a lock owned through shared ancestry or a trusted
 #             same-session Claude id as its own, so the re-emit proceeds, while
@@ -673,7 +675,7 @@ if [ "$REEMIT" -eq 1 ]; then
   printf 'reprinted, but the sweeps startup already reconciled - project clone refresh,\n'
   printf 'secondmate convergence and liveness, pending remote handoff\n'
   printf 'retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.\n'
-  printf 'Queued wakes ARE still drained: they arrived after startup and are this turn work.\n'
+  printf 'Queued wakes ARE still drained: they arrived after startup and are this turn work, unless an open Stop-hook claim owns their delivery (the WAKE QUEUE section says so).\n'
 else
   section "SESSION START - $FM_HOME"
 fi
@@ -791,7 +793,11 @@ else
       printf '%s\n' "$BRANCH_REPLAY_OUT"
     fi
   fi
-  DRAIN_OUT=$("$SCRIPT_DIR/fm-wake-drain.sh" 2>&1)
+  if [ "$REEMIT" -eq 1 ]; then
+    DRAIN_OUT=$("$SCRIPT_DIR/fm-wake-drain.sh" --reemit 2>&1)
+  else
+    DRAIN_OUT=$("$SCRIPT_DIR/fm-wake-drain.sh" 2>&1)
+  fi
   if [ -n "$DRAIN_OUT" ]; then
     printf '%s\n' "$DRAIN_OUT"
   else

@@ -61,16 +61,28 @@
 #   fm_timed_out <status>
 #       0 iff <status> is how fm_run_timed or fm_exec_timed reports the bound.
 #
+#   fm_timeout_perl_bound <seconds> <command> [args...]
+#       The perl hard bound itself, with fm_run_timed's status contract and its
+#       stdin, stdout, and stderr passed straight through to the command. Both
+#       fm_run_timed's perl arm and fm-nm-run-lib.sh's fm_nm_bounded call it, so
+#       the perl bound has exactly one owner. It stops the command group with
+#       TERM then KILL after 0.2 seconds on expiry (124), or on TERM (143),
+#       INT (130), or HUP (129) delivered to the bounding process.
+#       The watchdog occupies a separate group from both caller and command;
+#       loss of the calling shell (${BASHPID:-$$}) or a changed parent starts
+#       the same cleanup with status 143. This lets an inner watchdog finish
+#       cleanup even when an outer bound KILLs the caller's group.
+#
 # A non-positive bound is not a bound: `timeout 0` and the perl fallback's
 # `alarm 0` both disable the deadline, so callers must reject 0 before calling.
 #
 # All four fm_run_timed mechanisms terminate the whole process GROUP, not just
-# the direct child, so a hung grandchild (a vendor CLI spawned by a wrapper
-# script, a git fetch spawned by a sweep) cannot outlive the bound. GNU/BSD
-# `timeout` does this by default because it does not run the command in the
-# foreground process group; the perl fallback does it explicitly with setpgrp
-# plus a negative pid, and the bash fallback uses monitor mode to give the
-# bounded child its own process group before signaling its negative pid.
+# the direct child, so descendants that stay in that group cannot outlive its
+# cleanup. GNU/BSD `timeout` does this by default because it does not run the
+# command in the foreground process group; the perl fallback does it explicitly
+# with setpgrp plus a negative pid, and the bash fallback uses monitor mode.
+# A descendant that creates another group needs its own owner-death cleanup
+# (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
 fm_timeout_mechanism() {
@@ -178,16 +190,65 @@ fm_run_external_timeout() {
   esac
 }
 
+# See the header for fm_timeout_perl_bound's shared status and cleanup contract.
+# The command runs in a process group of its own. BOTH sides call setpgrp
+# before anything can signal that group: a child that is slow to be scheduled
+# (a loaded host) has not yet created it when a short bound fires, the TERM
+# and KILL then reach nothing, and the child would run on, orphaned, in a group
+# the bound can no longer find. The parent's call fails harmlessly with EACCES
+# once the child has exec'd, which only happens after the child's own call.
+# Signal handlers record pending cleanup before the fork, so an interruption
+# during startup cannot bypass group creation and leave the child unowned.
+fm_timeout_perl_bound() {  # <seconds> <command...>
+  local owner=${BASHPID:-$$}
+  # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
+  perl -MPOSIX=WNOHANG -e '
+    my ($owner, $t) = (shift, shift);
+    my $parent = getppid();
+    my $pending = 0;
+    $SIG{ALRM} = sub { $pending ||= 124 };
+    $SIG{TERM} = sub { $pending ||= 143 };
+    $SIG{INT} = sub { $pending ||= 130 };
+    $SIG{HUP} = sub { $pending ||= 129 };
+    setpgrp(0, 0) or die "setpgrp: $!";
+    my $pid = fork;
+    die "fork failed" unless defined $pid;
+    if (!$pid) {
+      $SIG{$_} = "DEFAULT" for qw(ALRM TERM INT HUP);
+      setpgrp(0, 0);
+      exec @ARGV;
+      exit 127;
+    }
+    setpgrp($pid, $pid);
+    my $stop = sub {
+      my $code = shift;
+      $SIG{ALRM} = $SIG{TERM} = $SIG{INT} = $SIG{HUP} = "IGNORE";
+      kill "TERM", -$pid;
+      select undef, undef, undef, 0.2;
+      kill "KILL", -$pid;
+      waitpid $pid, 0;
+      exit $code;
+    };
+    alarm $t;
+    while (1) {
+      $stop->($pending) if $pending;
+      my $done = waitpid $pid, WNOHANG;
+      exit(($? & 127) ? 128 + ($? & 127) : $? >> 8) if $done == $pid;
+      exit 127 if $done == -1;
+      $stop->(143) if getppid() != $parent || !kill(0, $owner);
+      select undef, undef, undef, 0.05;
+    }
+  ' "$owner" "$@"
+  return $?
+}
+
 fm_run_timed() {  # <seconds> <command...>
   local seconds=$1
   shift
   case "$(fm_timeout_mechanism)" in
     timeout) fm_run_external_timeout timeout "$seconds" "$@" ;;
     gtimeout) fm_run_external_timeout gtimeout "$seconds" "$@" ;;
-    perl)
-      perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit(($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
-        "$seconds" "$@"
-      ;;
+    perl) fm_timeout_perl_bound "$seconds" "$@" ;;
     bash) fm_run_bash_timeout "$seconds" "$@" ;;
     *) return 124 ;;
   esac
