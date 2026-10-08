@@ -1,0 +1,35 @@
+### state/lane4.inbox/006.msg
+schema=fm-task-inbox.v1
+at=2026-10-08T06:33:01Z
+--
+[fm-from-firstmate]⁣corr=deaf69664d22db0f CONFIG_REREAD: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4/state/.fm-inherited-config-reread.retained.tmp.exact
+### state/lane2.inbox/006.msg
+schema=fm-task-inbox.v1
+at=2026-10-08T06:32:56Z
+--
+[fm-from-firstmate]⁣corr=4315aba3340e82b3 CONFIG_REREAD: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2/state/.fm-inherited-config-reread.retained
+### state/lane5.inbox/006.msg
+schema=fm-task-inbox.v1
+at=2026-10-08T06:33:05Z
+--
+[fm-from-firstmate]⁣corr=25a27442989531bb CONFIG_REREAD: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5/state/.fm-inherited-config-reread.retained
+### state/lane3.inbox/006.msg
+schema=fm-task-inbox.v1
+at=2026-10-08T06:32:58Z
+--
+[fm-from-firstmate]⁣corr=55f19db762138222 CONFIG_REREAD: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3/state/.fm-inherited-config-reread.retained
+### state/lane1.inbox/006.msg
+schema=fm-task-inbox.v1
+at=2026-10-08T06:32:53Z
+--
+[fm-from-firstmate]⁣corr=c6f93c1808aacd70 CONFIG_REREAD: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1/state/.fm-inherited-config-reread.retained
+### state/lane8.inbox/007.msg
+schema=fm-task-inbox.v1
+at=2026-10-08T06:34:16Z
+--
+[fm-from-firstmate]⁣corr=b40171d5d623ff09 CONFIG_REREAD: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8/state/.fm-inherited-config-reread.deferred
+### state/lane8.inbox/006.msg
+schema=fm-task-inbox.v1
+at=2026-10-08T06:33:59Z
+--
+[fm-from-firstmate]⁣corr=0b53d42822b2d5ca CONFIG_REREAD: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8/state/.fm-inherited-config-reread.deferred

@@ -1,0 +1,63 @@
+### lane1 pending
+These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.
+
+config/crew-dispatch.json
+-----BEGIN config/crew-dispatch.json-----
+{
+ "default": {"harness": "recorded"},
+ "literal": "config/keep-ai-trailers",
+ "spacing": "keep  two spaces"
+}
+
+-----END config/crew-dispatch.json-----
+
+### lane2 staged
+These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.
+
+config/crew-dispatch.json
+-----BEGIN config/crew-dispatch.json-----
+{
+ "default": {"harness": "recorded"},
+ "literal": "config/keep-ai-trailers",
+ "spacing": "keep  two spaces"
+}
+
+-----END config/crew-dispatch.json-----
+
+### lane3 staged-pending
+These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.
+
+config/crew-dispatch.json
+-----BEGIN config/crew-dispatch.json-----
+{
+ "default": {"harness": "recorded"},
+ "literal": "config/keep-ai-trailers",
+ "spacing": "keep  two spaces"
+}
+
+-----END config/crew-dispatch.json-----
+
+### lane4 exact-temp
+These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.
+
+config/crew-dispatch.json
+-----BEGIN config/crew-dispatch.json-----
+{
+ "default": {"harness": "recorded"},
+ "literal": "config/keep-ai-trailers",
+ "spacing": "keep  two spaces"
+}
+
+-----END config/crew-dispatch.json-----
+
+### lane5 legacy-report
+These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.
+
+config/crew-harness
+-----BEGIN config/crew-harness-----
+codex
+-----END config/crew-harness-----
+
+### lane6 flag-only-pending: obsolete-only generation retired without sending.
+
+### lane7 flag-only-report: obsolete-only generation retired without sending.

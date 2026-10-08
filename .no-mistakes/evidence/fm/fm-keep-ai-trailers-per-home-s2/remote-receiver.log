@@ -1,0 +1,23 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-remote-inherit.sh put config/keep-ai-trailers 14 d2f516bda21528c7326fb8608cc984dd6c7e8a8837e1ebaecbcc84345894f677 1
+error: path is not inherited material: config/keep-ai-trailers
+exit=1; local flag unchanged
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-remote-inherit.sh absent config/keep-ai-trailers 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2
+error: path is not inherited material: config/keep-ai-trailers
+exit=1; local flag unchanged
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-remote-inherit.sh put config/keep-ai-trailers 14 d2f516bda21528c7326fb8608cc984dd6c7e8a8837e1ebaecbcc84345894f677 3
+error: path is not inherited material: config/keep-ai-trailers
+exit=1; local flag absent
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-remote-inherit.sh absent config/keep-ai-trailers 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 4
+error: path is not inherited material: config/keep-ai-trailers
+exit=1; local flag absent
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-remote-inherit.sh put config/crew-harness 6 243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8 5
+pushed: config/crew-harness
+exit=0; unrelated config converged
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-remote-inherit.sh absent config/crew-harness 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 6
+removed: config/crew-harness
+exit=0; unrelated config removed

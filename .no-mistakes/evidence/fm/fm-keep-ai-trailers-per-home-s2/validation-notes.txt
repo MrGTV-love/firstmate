@@ -1,0 +1,7 @@
+Targeted baseline: bash tests/fm-keep-ai-trailers-home-local.test.sh passed.
+Live product: exact target bin/ snapshot and copied existing AGENTS.md in a workspace-local disposable Git repo, marked lab home, eight seeded secondmate linked worktrees, real tmux server with 120x40 panes. No fake tool binaries or transport stubs. Supported raw-shell launch adapter used; no claims about model interpretation, Claude login, or Vernant publishing.
+No Herdr or operator fleet lifecycle was driven. Direct private tmux -S socket used to keep the Unix socket path within workspace and below the Unix path-length limit.
+Initial invalid shared-preference fixture and gate-context cwd were corrected and affected scenarios re-driven. Recovery verification checks exact persisted bytes and absence of pending pointers, while allowing delivered generations to remain.
+Before-fix reproduction used the base inheritance library only in the disposable snapshot; all seven flags were deleted and reread records contained ABSENT. Target library restored before passing after-fix check.
+Runtime evidence includes CLI transcripts, literal generated instructions, real durable inbox records, and final persisted lane choices. This is a CLI/state-only change, so no UI screenshot is required.
+Cleanup: only owned private tmux server killed; disposable workspace fixture and private socket removed, including read-only generated hook directories. No source or permanent test changes made.

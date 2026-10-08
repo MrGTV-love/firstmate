@@ -1,0 +1,69 @@
+{
+  "primary_flag_present": false,
+  "lanes": [
+    {
+      "lane": "lane1",
+      "flag_present": true,
+      "flag_bytes": "Lane 1 local choice\r\n",
+      "sha256": "de9ec49fef7d5ea1c3af11a1c0f6f65685266dcbe3a0a38bdb48d8098fac6d5c",
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    },
+    {
+      "lane": "lane2",
+      "flag_present": true,
+      "flag_bytes": "Lane 2 local choice\r\n",
+      "sha256": "f2e43ee1f6b9222783993e50ef90dbbce73f6e01b75f96ad21d0b025deb2f034",
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    },
+    {
+      "lane": "lane3",
+      "flag_present": true,
+      "flag_bytes": "Lane 3 local choice\r\n",
+      "sha256": "c952719c4ed4cc7d15e07b82ee7380678deb2fe4b7588fca5efbce8f1dc149dc",
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    },
+    {
+      "lane": "lane4",
+      "flag_present": true,
+      "flag_bytes": "Lane 4 local choice\r\n",
+      "sha256": "c5b77ecbc7fb2af9b9f7c9a6004e6de7d10b56d87235b1e77826ef672b5865f3",
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    },
+    {
+      "lane": "lane5",
+      "flag_present": true,
+      "flag_bytes": "Lane 5 local choice\r\n",
+      "sha256": "133e5b4a69e27918aac8755463b5b72e3cb54f8ad3f6e16084fcbf523ef41c0c",
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    },
+    {
+      "lane": "lane6",
+      "flag_present": true,
+      "flag_bytes": "Lane 6 local choice\r\n",
+      "sha256": "62d8ef7050d47f9498ba55f9f66166c69ba018a136bc625199f982b2477664d7",
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    },
+    {
+      "lane": "lane7",
+      "flag_present": true,
+      "flag_bytes": "Lane 7 local choice\r\n",
+      "sha256": "d13ca1c36e657d64b4f1ee26fb89aeb7e16e5ae4cce885b84c9da5bae14f531c",
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    },
+    {
+      "lane": "lane8",
+      "flag_present": false,
+      "flag_bytes": null,
+      "sha256": null,
+      "crew_harness": "codex",
+      "pending_reread_files": []
+    }
+  ]
+}

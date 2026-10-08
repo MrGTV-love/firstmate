@@ -1,0 +1,52 @@
+$ tmux -S "$SOCKET" list-windows -t fm-lab-trailers -F "#{window_name} #{window_width}x#{window_height}"
+bash 120x40
+fm-lane1 120x40
+fm-lane2 120x40
+fm-lane3 120x40
+fm-lane4 120x40
+fm-lane5 120x40
+fm-lane6 120x40
+fm-lane7 120x40
+fm-lane8 120x40
+
+$ tmux -S "$SOCKET" capture-pane -p -t fm-lab-trailers:fm-lane1
+charlesabrooker@Mac-Studio lane1 % export GOTMPDIR=/tmp/fm-lane1/gotmp
+charlesabrooker@Mac-Studio lane1 % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio lane1 % . '/tmp/fm-lane1+121465019be513b2cea297590ff35aded01480586b51d3bb6570b803746d855b/lau
+nch.s1791441300.68496.21723.sh'
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

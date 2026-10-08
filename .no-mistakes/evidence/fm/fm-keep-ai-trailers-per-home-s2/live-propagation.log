@@ -1,0 +1,1637 @@
+
+### Real secondmate spawn via supported raw-shell adapter
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1 /bin/bash --noprofile --norc --secondmate
+spawned lane1 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "main-authoritative" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane1 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1
+
+exit=0
+
+### Corrected shared-preference fixture: lane1 spawn
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1 /bin/bash --noprofile --norc --secondmate
+spawned lane1 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane1 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1
+
+exit=0
+
+### Spawn lane2
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane2 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2 /bin/bash --noprofile --norc --secondmate
+spawned lane2 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane2 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2
+
+exit=0
+
+### Spawn lane3
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3 /bin/bash --noprofile --norc --secondmate
+spawned lane3 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane3 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3
+
+exit=0
+
+### Spawn lane4
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4 /bin/bash --noprofile --norc --secondmate
+spawned lane4 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane4 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane4 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4
+
+exit=0
+
+### Spawn lane5
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane5 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5 /bin/bash --noprofile --norc --secondmate
+spawned lane5 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane5 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane5 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5
+
+exit=0
+
+### Spawn lane6
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane6 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6 /bin/bash --noprofile --norc --secondmate
+spawned lane6 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane6 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane6 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6
+
+exit=0
+
+### Spawn lane7
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane7 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7 /bin/bash --noprofile --norc --secondmate
+spawned lane7 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane7 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane7 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7
+
+exit=0
+
+### Spawn lane8
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8 /bin/bash --noprofile --norc --secondmate
+spawned lane8 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane8 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+warning: secondmate lane8 inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8
+
+exit=0
+
+spawn: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Focused push from flag-absent primary across seven opted-in lanes and one absent lane
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane1: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane2: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane3: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane4: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane5: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane6: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane7: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: error - primary source header missing required main-authoritative warning: missing "marked status" or "document pointer"
+CONFIG_REREAD: secondmate lane8: send failed: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+fm-config-inherit: error: primary source header missing required main-authoritative warning: missing "marked status" or "document pointer" data/captain-shared.md at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab/data/captain-shared.md
+
+exit=1
+
+### Corrected fixture focused push and retained-send recovery
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane1: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane2: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane3: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane4: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane5: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane6: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane7: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: pushed
+CONFIG_REREAD: secondmate lane8: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=1
+
+### Disposable snapshot cwd: focused push and retained-send recovery
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+focused push: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Adversarial present-primary push must not overwrite flags or opt absent lane in
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+present-primary focused push: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Network-half bootstrap secondmate convergence
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-bootstrap.sh
+SECONDMATE_LIVENESS: secondmate lane1: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane2: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane3: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane4: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane5: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane6: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane7: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane8: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+  config-reread: sent
+  config-reread: sent
+  config-reread: sent
+  config-reread: sent
+  config-reread: sent
+  config-reread: sent
+  config-reread: sent
+  config-reread: sent
+
+exit=0
+
+bootstrap: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Final valid-fixture spawn lane1
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1 /bin/bash --noprofile --norc --secondmate
+spawned lane1 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Final valid-fixture spawn lane2
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane2 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2 /bin/bash --noprofile --norc --secondmate
+spawned lane2 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Final valid-fixture spawn lane3
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3 /bin/bash --noprofile --norc --secondmate
+spawned lane3 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Final valid-fixture spawn lane4
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4 /bin/bash --noprofile --norc --secondmate
+spawned lane4 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane4 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Final valid-fixture spawn lane5
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane5 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5 /bin/bash --noprofile --norc --secondmate
+spawned lane5 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane5 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Final valid-fixture spawn lane6
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane6 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6 /bin/bash --noprofile --norc --secondmate
+spawned lane6 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane6 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Final valid-fixture spawn lane7
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane7 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7 /bin/bash --noprofile --norc --secondmate
+spawned lane7 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane7 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Final valid-fixture spawn lane8
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8 /bin/bash --noprofile --norc --secondmate
+spawned lane8 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane8 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+final valid-fixture spawn: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Before fix: base inheritance library reproduces lane flag removal
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: pushed - mirrored primary absence
+  data/captain-shared.md: unchanged
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: pushed - mirrored primary absence
+  data/captain-shared.md: unchanged
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: pushed - mirrored primary absence
+  data/captain-shared.md: unchanged
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: pushed - mirrored primary absence
+  data/captain-shared.md: unchanged
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: pushed - mirrored primary absence
+  data/captain-shared.md: unchanged
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: pushed - mirrored primary absence
+  data/captain-shared.md: unchanged
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: pushed - mirrored primary absence
+  data/captain-shared.md: unchanged
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+Before fix observed: all seven lane-owned flags deleted; generated generations explicitly record config/keep-ai-trailers ABSENT.
+
+### After fix: same focused push preserves all lane-local flags
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+after-fix focused push: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Recover retained mixed generations; silently retire flag-only generations and shared-data reports
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+retained recovery: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Defer excluded-config retained report (empty_stage=False)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Restore full allowlist and recover shared-data retained report (empty_stage=False)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+Deferred report preserved exactly with empty_stage=False; full allowlist restored: one real durable send of crew-harness codex, no retired or shared-data config sections.
+
+### Defer excluded-config retained report (empty_stage=True)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  backend: unchanged
+  data/captain-shared.md: unchanged
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Restore full allowlist and recover shared-data retained report (empty_stage=True)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-config-push.sh
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lab -> live secondmate homes
+secondmate lane1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane2 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane2):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane3 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane3):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane4 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane4):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane5 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane5):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane6 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane6):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane7 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane7):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+secondmate lane8 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8):
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  compact-adviser: unchanged
+  session-launch-policy: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  data/captain-shared.md: unchanged
+  config-reread: sent
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+Deferred report preserved exactly with empty_stage=True; full allowlist restored: one real durable send of crew-harness codex, no retired or shared-data config sections.
+
+allowlist retry: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Present-primary spawn boundary lane1
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1 /bin/bash --noprofile --norc --secondmate
+spawned lane1 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane1
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+### Present-primary spawn boundary lane8
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-spawn.sh lane8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8 /bin/bash --noprofile --norc --secondmate
+spawned lane8 harness=bash kind=secondmate mode=secondmate yolo=off window=fm-lab-trailers:fm-lane8 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/lane8
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+present-primary spawn boundary: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
+
+### Present-primary bootstrap and obsolete-only pending retirement
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23SC8D4Q4H9FJJDHAFRSY/.live-trailers/product/bin/fm-bootstrap.sh
+SECONDMATE_LIVENESS: secondmate lane1: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane2: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane3: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane4: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane5: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane6: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane7: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+SECONDMATE_LIVENESS: secondmate lane8: skipped: recorded harness 'bash' is unverified for recovery (backend=tmux)
+
+exit=0
+
+present-primary bootstrap: seven lane flags retained byte-for-byte; lane8 stays absent; crew-harness converged in all eight homes.
