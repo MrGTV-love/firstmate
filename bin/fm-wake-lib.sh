@@ -2168,6 +2168,30 @@ fm_wake_queued_keys_locked() {
     "$FM_WAKE_QUEUE" 2>/dev/null || true
 }
 
+fm_wake_require_secondmate_restart_handoffs() {
+  local cutoff=$1 rows=$2 keys key id corr outcome recorded_corr
+  keys=$(awk -F '\t' -v cutoff="$cutoff" -v rows="$rows" '
+    BEGIN { while ((getline line < rows) > 0) owned[line]=1 }
+    NF >= 5 && $2 <= cutoff && ($2 in owned) && $3 == "check" &&
+      $4 ~ /^secondmate-restart-.+-[0-9a-f]{16}$/ { print $4 }
+  ' "$FM_WAKE_QUEUE") || return 1
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    id=${key#secondmate-restart-}
+    corr=${id##*-}
+    id=${id%-$corr}
+    outcome="$STATE/.secondmate-restart-$id.outcome"
+    [ -f "$outcome" ] && [ ! -L "$outcome" ] || continue
+    recorded_corr=$(sed -n 's/^corr=//p' "$outcome") || return 1
+    if [ "$recorded_corr" = "$corr" ]; then
+      printf 'wake drain: secondmate %s restart completion handoff is not retired; acknowledgement leaves its notification queued\n' "$id" >&2
+      return 1
+    fi
+  done <<EOF
+$keys
+EOF
+}
+
 fm_wake_secondmate_progress_marker_write() { # <task> <observed-at> <oldest-row-key>
   local task=$1 observed_at=$2 oldest_row_key=$3 marker tmp
   case "$task" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac

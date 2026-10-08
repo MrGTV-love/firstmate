@@ -1228,21 +1228,31 @@ secondmate_restart_tick() {
       return 1
     fi
     reason="check: secondmate $id restart finished: $line"
-    notify_key="secondmate-restart-$id-$now"
-    queued=$(fm_wake_queued_keys check)
+    notify_key=$(fm_secondmate_restart_request_get "$outcome" corr) || notify_key=''
+    if [ -z "$notify_key" ]; then
+      fm_secondmate_liveness_unlock "$id"
+      echo "watcher: secondmate $id restart outcome has no completion identity" >&2
+      return 1
+    fi
+    notify_key="secondmate-restart-$id-$notify_key"
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    queued=$(fm_wake_queued_keys_locked check)
     if printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1 \
-      || fm_wake_append check "$notify_key" "$reason"; then
+      || fm_wake_append_locked check "$notify_key" "$reason"; then
       if ! fm_secondmate_restart_outcome_consume "$STATE" "$id"; then
+        fm_lock_release "$FM_WAKE_QUEUE_LOCK"
         fm_secondmate_liveness_unlock "$id"
         echo "watcher: secondmate $id restart outcome could not be consumed" >&2
         return 1
       fi
       [ -n "$first_reason" ] || first_reason=$reason
     else
+      fm_lock_release "$FM_WAKE_QUEUE_LOCK"
       fm_secondmate_liveness_unlock "$id"
       echo "watcher: secondmate $id restart outcome could not be queued" >&2
       return 1
     fi
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
     fm_secondmate_liveness_unlock "$id"
   done
   for request in "$STATE"/.secondmate-restart-*.request; do
