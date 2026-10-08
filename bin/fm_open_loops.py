@@ -250,6 +250,8 @@ class Collector:
     def recorded_stop(self, task):
         """True when the worker's own durable record says it stopped on purpose, so its endpoint
         being gone or its live state being unreadable is expected rather than a loss."""
+        if task["current_state"].get("detail") == "task generation changed during snapshot":
+            return False
         state = task["current_state"].get("state")
         if state in ("working", "blocked", "failed"):
             return False
@@ -500,7 +502,7 @@ class Collector:
     def owns_pr(self, pr):
         head = pr.get("head") or {}
         return pr["html_url"] in self.owned_urls or \
-            ((head.get("repo") or {}).get("full_name"), head.get("ref")) in self.owned_branches
+            (((head.get("repo") or {}).get("full_name") or "").casefold(), head.get("ref")) in self.owned_branches
 
     def repo_slugs(self):
         paths = {t["project"] for t in self.tasks if t.get("project")}
@@ -531,7 +533,7 @@ class Collector:
             match = GITHUB_ORIGIN.fullmatch(origin)
             if match:
                 slugs.add(match[1])
-                self.owned_branches.update((match[1], t["branch"]) for t in self.tasks
+                self.owned_branches.update((match[1].casefold(), t["branch"]) for t in self.tasks
                                            if t.get("project") == path and t.get("branch"))
         return sorted(slugs)
 

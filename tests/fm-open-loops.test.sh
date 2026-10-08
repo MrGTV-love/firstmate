@@ -714,7 +714,25 @@ try:
         assert set(rows(fork_owned, 'open_pr')) == {PR_URL + '31', PR_URL + '33', other_url + '41', other_url + '43'}, fork_owned
         assert set(rows(fork_owned, 'red_check')) == {PR_URL + '32', other_url + '42'}, fork_owned
         assert '3' * 40 in requests, requests
+    double['pulls'][2]['head']['repo']['full_name'] = 'Test/Project'
+    double['pulls_by_repo']['/repos/test/other'][1]['head']['repo']['full_name'] = 'Test/Other'
+    double['pulls'].extend([
+        scope_pr(44, '4' * 40, 'FM/branch-owned'),
+        dict(scope_pr(31, '5' * 40, 'fm/unrelated', head_repo='contributor/project'),
+             html_url='https://github.com/Test/Project/pull/31'),
+    ])
+    double['checks'].update({sha: greens(sha, conclusion='failure') for sha in ('4' * 40, '5' * 40)})
+    (world / 'gh.json').write_text(json.dumps(double))
+    for origin_slug in ('test/project', 'TEST/PROJECT'):
+        git(home / 'projects/project', 'remote', 'set-url', 'origin', f'https://github.com/{origin_slug}.git')
+        for lane in (False, True):
+            case_scope, requests = scoped(lane)
+            assert set(rows(case_scope, 'open_pr')) == {PR_URL + '31', PR_URL + '33', other_url + '41', other_url + '43'}, case_scope
+            assert set(rows(case_scope, 'red_check')) == {PR_URL + '32', other_url + '42'}, case_scope
+            assert all(sha in requests for sha in (shas[33], '1' * 40, '3' * 40)), requests
+            assert all(sha not in requests for sha in ('4' * 40, '5' * 40)), requests
 finally:
+    git(home / 'projects/project', 'remote', 'set-url', 'origin', 'https://github.com/test/project.git')
     marker_file.unlink(missing_ok=True)
     shutil.rmtree(other)
     double['pulls'], double['checks'] = scope_saved[0], scope_saved[1]
@@ -792,6 +810,33 @@ finally:
         (home / 'state' / (item['id'] + '.status')).unlink()
 fixture(tasks, backlog)
 print('PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them', flush=True)
+
+for event, status_text in (
+        ('done', 'done: delivered\n'),
+        ('paused', 'paused: waiting for CI\n'),
+        ('resolved', 'paused [key=ci]: waiting\nresolved [key=choice]: answered\n')):
+    item = stopped_task('generation-' + event, event, exists=None, alive='unknown',
+                        detail='task generation changed during snapshot', status_text=status_text)
+    item['current_state']['source'] = 'none'
+    records = [dict(id=item['id'], structured=True, state='in_flight', requires_child_metadata=True)]
+    try:
+        fixture([item], records)
+        invalidated = ledger('--heartbeat')
+        assert not invalidated['complete'], invalidated
+        evidence = rows(invalidated, 'coverage')['ledger degraded']['evidence']
+        assert 'worker liveness ' + item['id'] in evidence, invalidated
+        assert 'worker current state ' + item['id'] + ': task generation changed during snapshot' in evidence, invalidated
+        assert not rows(invalidated, 'missing_worker'), invalidated
+        assert json.loads((home / 'state/open-loops.json').read_text()) == invalidated
+        item['current_state']['detail'] = 'backend target gone: gone'
+        item['endpoint'].update(exists=False, agent_alive='missing')
+        fixture([item], records)
+        coherent_stop = ledger()
+        assert coherent_stop['complete'] and not rows(coherent_stop, 'missing_worker'), coherent_stop
+    finally:
+        (home / 'state' / (item['id'] + '.status')).unlink()
+fixture(tasks, backlog)
+print('PASS: generation-invalidated snapshots retain coverage failures despite live stop events', flush=True)
 
 # Unselected ready items are visible backlog, not overdue obligations; dispatched ones still are.
 (home / 'state/started-ready.status').write_text(f'working [at={hours(1)}]: spawned\n')
