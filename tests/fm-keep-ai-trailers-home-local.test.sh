@@ -221,8 +221,13 @@ EOF
   assert_no_reread_mentions_flag "$home/state" "$label"
   if [ "$point" != spawn ]; then
     assert_harness_reread_exists "$sm/state" "$label"
-    assert_contains "$(cat "$w/point.out")" '  config-reread: sent' \
-      "$label: successful reread enqueue was not reported"
+    [ -f "$home/state/sm.inbox/001.msg" ] || fail "$label: reread was not durably enqueued"
+    if [ "$point" = config_push ]; then
+      assert_contains "$(cat "$w/point.out")" '  config-reread: sent' \
+        "$label: successful reread enqueue was not reported"
+    else
+      [ ! -s "$w/point.out" ] || fail "$label: routine bootstrap delivery should be silent"
+    fi
   fi
   pass "$label preserves the lane's home-local choice while unrelated config converges"
 }
@@ -531,6 +536,39 @@ test_excluded_report_retry_case() (
   pass "$representation $contents report recovery waits for the complete allowlist before delivering destination bytes"
 )
 
+test_bootstrap_reread_failure_and_queue_recovery() (
+  local rec w root home sm status out
+  rec=$(new_world bootstrap-reread-recovery)
+  IFS='|' read -r w root home sm <<EOF
+$rec
+EOF
+  cp "$w/lane-flag.expected" "$sm/config/$FLAG"
+  # Refuse durable enqueue at the real inbox boundary, not the terminal doorbell.
+  : > "$home/state/sm.inbox" # A file where the inbox directory must go.
+  run_bootstrap "$w" "$root" "$home" "$sm" > "$w/failed.out" 2> "$w/failed.err"
+  status=$?
+  expect_code 0 "$status" 'bootstrap failure must keep its diagnostic-only exit contract'
+  out=$(cat "$w/failed.out")
+  assert_contains "$out" 'CONFIG_REREAD: secondmate sm: send failed:' \
+    'bootstrap suppressed the actionable enqueue failure'
+  fm_config_reread_has_pending "$sm" || fail 'failed bootstrap lost its pending reread'
+  fm_config_reread_has_staged "$home" sm || fail 'failed bootstrap lost its staged reread'
+  [ -f "$home/state/sm.inbox" ] || fail 'refused bootstrap replaced the blocking inbox file'
+  rm "$home/state/sm.inbox"
+  # The full queue must drain before unchanged inheritance can proceed.
+  FM_CONFIG_REREAD_MAX_PENDING=1 run_bootstrap "$w" "$root" "$home" "$sm" \
+    > "$w/recovered.out" 2> "$w/recovered.err"
+  status=$?
+  expect_code 0 "$status" 'bootstrap queue recovery failed'
+  [ ! -s "$w/recovered.out" ] || fail "successful bootstrap recovery should be silent: $(cat "$w/recovered.out")"
+  [ -f "$home/state/sm.inbox/001.msg" ] || fail 'bootstrap queue recovery did not durably enqueue'
+  [ ! -e "$home/state/sm.inbox/002.msg" ] || fail 'bootstrap queue recovery duplicated the reread'
+  assert_retry_retired "$sm" "$home" 'bootstrap queue recovery'
+  assert_harness_reread_exists "$sm/state" 'bootstrap queue recovery'
+  assert_flag_kept "$sm" "$w/lane-flag.expected" 'bootstrap queue recovery'
+  pass 'bootstrap preserves enqueue failures and silently drains a full reread retry queue'
+)
+
 test_retired_only_command() (
   local point=$1 rec w root home sm retained absent out status path
   rec=$(new_world "$point-retired-only")
@@ -566,6 +604,7 @@ EOF
   pass "$point silently retires retained-only instructions without enqueueing a reread"
 )
 
+test_bootstrap_reread_failure_and_queue_recovery || exit 1
 test_remote_receiver_refuses_home_local_flag
 for point in spawn bootstrap config_push; do
   for primary in absent present; do
