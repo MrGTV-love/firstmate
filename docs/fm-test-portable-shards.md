@@ -166,5 +166,10 @@ A lane that reaches its tier bound needs investigation and a distribution or run
 | Heavy | Herdr | family-run step 20 minutes under a 75-minute job-level last-resort backstop | Healthy runs finish in about 7-10 minutes, so the step tripwire fails a wedged suite while the `always()` cleanup and timing upload still run, and the job cap only catches a hang outside that step. |
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) holds the executable values and names each job's tier beside its `timeout-minutes`.
+
+Inside `tests/fm-remote-secondmate-lifecycle-e2e.test.sh`, the remote recovery watcher wait allows 150 seconds of polling: the watcher's 120-second relaunch bound plus startup and wake overhead.
+It still requires a successful relaunch, exactly one captain-facing wake, the durable wake and relaunch records, a fresh live remote endpoint, and the preserved host route.
+This fixes the former 30-second observation window, which could stop a healthy relaunch before its own deadline; it does not change production relaunch bounds or CI job timeouts.
+
 [`tests/fm-ci-workflow.test.sh`](../tests/fm-ci-workflow.test.sh) holds the policy against the parsed workflow: every job belongs to exactly one tier, the workflow carries exactly three distinct job-level values, the fast tier stays within 5-10 minutes, the normal jobs share one 30-minute budget, and the Herdr family-run step is the 20-minute tripwire below its job backstop with an `always()` teardown after it.
 A passing coverage guard does not establish a healthy job duration; refresh the healthy figures above from the lanes' uploaded timing artifacts.
