@@ -745,11 +745,13 @@ cmd_silent() {
 # quoted fields carry JSON-style escapes, so this reads the declared field ORDER
 # rather than assuming a fixed column, and takes only rows whose `tag` field is
 # `choice`. A freeform `message` row is captain prose and is deliberately never a
-# source of decision keys. A row that does not carry both a slug-shaped `question`
-# and the versioned `selection` and `note` fields inside its `Context data:` block
-# is skipped. A time-limited rollout branch accepts the old question/answer
-# shape only for ordinary answers and rejects its bare or annotated reconcile
-# values because old rows do not separate the selected option from its note.
+# source of decision keys. A versioned row (`schema` fm-bearings-answer.v1) must carry
+# a slug-shaped `question` and both `selection` and `note` inside its `Context data:`
+# block or it is skipped. An unversioned deck row (no `schema`, no `selection`) is accepted
+# on its slug-shaped `question` and one nonempty string `answer` (or `choice`),
+# whatever bookkeeping fields ride along, and a nonempty `note` is appended to
+# its label. Its bare or annotated reconcile values are rejected because such
+# rows do not separate the selected option from its note.
 # The question cap is 128 so any task id fits, including the long legacy
 # `<origin>-decision-<key>` identities pre-collapse decks still carry; the
 # security property is the slug SHAPE, which is unchanged.
@@ -811,17 +813,19 @@ cmd_choice_rows() {
         next unless length($selected) || length($note);
         $answer = length($selected) ? $selected : $note;
         $legacy = 0;
-      # Time-limited compatibility for captures from pre-change boards; remove
-      # once no board carrying the old question/answer context can remain armed.
-      } elsif (!exists($data->{schema}) && !exists($data->{selection})
-          && !exists($data->{note})) {
+      # An unversioned deck: any row with no `schema` and no `selection`. Deck
+      # composers add bookkeeping fields (`note`, `task`, `owner`, `recommended`,
+      # `decision_key`) and some name the picked option `choice`, so only the
+      # question and one nonempty string answer are required. A `note` is the
+      # captain words and rides in the label; it never picks the answer.
+      } elsif (!exists($data->{schema}) && !exists($data->{selection})) {
         $key = $data->{question};
-        $answer = $data->{answer};
-        next if !defined($key) || ref($key) || !defined($answer) || ref($answer);
+        $answer = exists($data->{answer}) ? $data->{answer} : $data->{choice};
+        $note = defined($data->{note}) ? $data->{note} : "";
+        next if !defined($key) || ref($key) || !defined($answer) || ref($answer) || ref($note);
         next unless length($answer) && length($answer) <= 512;
         next if $answer eq "reconcile" || index($answer, "reconcile - ") == 0;
         $selected = "";
-        $note = "";
         $legacy = 1;
       } else {
         next;
@@ -835,6 +839,9 @@ cmd_choice_rows() {
       }
       my $label = defined $f{text} ? $f{text} : "";
       s/[\x00-\x1f\x7f]/ /g for ($answer, $note, $label);
+      if ($legacy && length $note && index($label, $note) < 0) {
+        $label = length($label) ? "$label - $note" : $note;
+      }
       $label = substr($label, 0, 512);
       if (defined $seen{$key}) { $choices[$seen{$key}] = undef }
       $seen{$key} = scalar @choices;
