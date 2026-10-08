@@ -1,0 +1,15 @@
+Precondition: real Claude worker in its isolated Treehouse scratch tree; report is explicitly driver-seeded fixture input and captain-call inventory completed with --none. No model-produced report is claimed.
+$ bin/fm-captain-hold.sh complete live-scout --none
+$ FM_HOME=<marked lab> HERDR_SESSION=fm-lab-scout-detach-89679-24190 bin/fm-teardown.sh live-scout
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown live-scout complete (window fm-lab-scout-detach-89679-24190:w1:p2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/lifecycle/projects/lab-project/.treehouse/lab-project-877bff/1/lab-project)
+Backlog: live-scout just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/lifecycle/data/backlog.md - move live-scout to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/lifecycle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for live-scout: 20186 33429
+teardown: force-killing leaked worktree process(es) for live-scout: 20186
+
+exit=0 elapsed_seconds=19.152

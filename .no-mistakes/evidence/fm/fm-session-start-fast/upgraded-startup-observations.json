@@ -1,0 +1,15 @@
+{
+  "scenario": "First upgraded full startup with version-9 checkpoint and active summary writer",
+  "history_bytes": 878061,
+  "routine_lines": 24000,
+  "submit_to_completion_seconds_upper_bound": 15.639,
+  "buried_upgrade_gate_present": true,
+  "next_step_present": true,
+  "truncation_present": false,
+  "read_only_present": false,
+  "completion_record": "17703\n",
+  "fold_checkpoint": "version=10:ship\noffset=878061\nident=strong:16777232:129062435:1791459672.789363628\nupgrade-gate\tneeds-decision\tchoose the migration path",
+  "pending_summary_trigger": true,
+  "summary_published_while_lock_held": false,
+  "summary_failure_log_exists": false
+}

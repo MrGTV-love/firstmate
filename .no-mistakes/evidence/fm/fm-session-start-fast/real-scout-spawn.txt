@@ -1,0 +1,6 @@
+$ FM_HOME=<marked lab> HERDR_SESSION=fm-lab-scout-detach-89679-24190 bin/fm-spawn.sh live-scout <disposable project> --scout --harness claude --backend herdr
+spawned live-scout harness=claude kind=scout window=fm-lab-scout-detach-89679-24190:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/lifecycle/projects/lab-project/.treehouse/lab-project-877bff/1/lab-project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/lifecycle
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+
+exit=0 elapsed_seconds=9.777

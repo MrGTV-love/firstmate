@@ -1,0 +1,3 @@
+Command: bash tests/fm-wake-drain-open-decisions-cursor.test.sh
+Initial invocation: Python subprocess runner stopped after its external 300-second limit (TimeoutExpired); the product startup deadline was not changed.
+The focused script was subsequently relaunched with a 1800-second external runner deadline.

@@ -1,0 +1,11 @@
+{
+  "before_states": "ordinary:in_flight\nnull:in_flight\nfalse:in_flight\ntrue:in_flight\n123:in_flight\nz-queued:queued\n",
+  "after_states": "z-queued:in_flight\nordinary:in_flight\nnull:in_flight\nfalse:in_flight\ntrue:in_flight\n123:in_flight\n",
+  "bootstrap_exit": 0,
+  "bootstrap_output": "BOOTSTRAP_INFO: marked z-queued in flight to match the worker this home already owns\n",
+  "concurrent_lock_check": {
+    "bootstrap_still_running": true,
+    "lock_acquisition_exit": 0,
+    "stderr": ""
+  }
+}

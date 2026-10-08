@@ -1,0 +1,108 @@
+{
+  "startup": {
+    "scenario": "First upgraded full startup with version-9 checkpoint and active summary writer",
+    "history_bytes": 878061,
+    "routine_lines": 24000,
+    "submit_to_completion_seconds_upper_bound": 15.639,
+    "buried_upgrade_gate_present": true,
+    "next_step_present": true,
+    "truncation_present": false,
+    "read_only_present": false,
+    "completion_record": "17703\n",
+    "fold_checkpoint": "version=10:ship\noffset=878061\nident=strong:16777232:129062435:1791459672.789363628\nupgrade-gate\tneeds-decision\tchoose the migration path",
+    "pending_summary_trigger": true,
+    "summary_published_while_lock_held": false,
+    "summary_failure_log_exists": false
+  },
+  "warm_summary_seconds": 4.048,
+  "wide_accumulated_summary_seconds": 1.953,
+  "burst_triggers": [
+    {
+      "transition": 1,
+      "detach_exit": 0,
+      "detach_seconds": 0.03
+    },
+    {
+      "transition": 2,
+      "detach_exit": 0,
+      "detach_seconds": 0.023
+    },
+    {
+      "transition": 3,
+      "detach_exit": 0,
+      "detach_seconds": 0.016
+    },
+    {
+      "transition": 4,
+      "detach_exit": 0,
+      "detach_seconds": 0.038
+    },
+    {
+      "transition": 5,
+      "detach_exit": 0,
+      "detach_seconds": 0.065
+    },
+    {
+      "transition": 6,
+      "detach_exit": 0,
+      "detach_seconds": 0.04
+    }
+  ],
+  "native_lifecycle": {
+    "spawn_elapsed_seconds": 9.777,
+    "teardown_elapsed_seconds": 19.152,
+    "summary_lock_was_held_through_both_calls": true,
+    "no_summary_failure_log": true,
+    "pending_trigger_present": true,
+    "task_metadata_removed": true,
+    "completed_report_source": "driver-seeded disposable fixture",
+    "worker_state_before_teardown": "real Claude blocked on native external-import approval; approval not granted and user configuration not edited"
+  },
+  "regression_runs": [
+    {
+      "command": "bash tests/fm-home-summary-refresh-ownership.test.sh",
+      "exit": 0,
+      "elapsed_seconds": 53.962,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/fm-home-summary-refresh-ownership.test.log"
+    },
+    {
+      "command": "bash tests/fm-home-summary-refresh.test.sh",
+      "exit": 1,
+      "elapsed_seconds": 22.974,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/fm-home-summary-refresh.test.log"
+    },
+    {
+      "command": "bash tests/fm-home-summary-refresh.test.sh (expanded diagnostic)",
+      "exit": 1,
+      "elapsed_seconds": 17.039,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/fm-home-summary-refresh-diagnostic.log"
+    },
+    {
+      "command": "TMPDIR=/tmp/ bash tests/fm-home-summary-refresh.test.sh",
+      "exit": 0,
+      "elapsed_seconds": 190.096,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/fm-home-summary-refresh-isolated.log"
+    },
+    {
+      "command": "bash tests/fm-wake-drain-open-decisions-cursor.test.sh",
+      "exit": 0,
+      "elapsed_seconds": 469.16,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/fm-wake-drain-open-decisions-cursor.test.log"
+    }
+  ],
+  "corrected_setup_issues": [
+    "Native Claude background-session command did not preserve inherited FM_HOME; explicitly scoped the public startup command to the marked lab.",
+    "Repository-local TMPDIR made secondmate fixtures violate the product guard against homes inside the firstmate repo; reran the existing toolchain test with ephemeral /tmp fixtures.",
+    "The initial exhaustive checkpoint-script runner deadline was 300s; the unchanged focused script completed with a 1800s external runner deadline."
+  ],
+  "testing_limits": [
+    "The gate intentionally suppresses the automatic session-open wrapper; the real Claude primary drove bin/fm-session-start.sh directly without a gate bypass.",
+    "The scout worker remained at its native external-import approval screen; no global approval/configuration was changed. Teardown consumed an explicitly driver-seeded completed-report fixture."
+  ],
+  "cleanup": [
+    "Both named Herdr labs removed by bin/fm-herdr-lab.sh with default-session tripwire checks.",
+    "Only this run's generated root startup state was removed; the preexisting state directory was retained.",
+    "Disposable fixtures, pool, and timeout scratch files removed from the worktree."
+  ],
+  "intentional_test_change": "Expanded the failed large-child consumer assertion diagnostic to include its actual serialized current-state record; no assertion weakened."
+}

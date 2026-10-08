@@ -1,0 +1,3 @@
+bin/fm-herdr-lab.sh teardown fm-lab-start-fast-35778-30586
+exit=0
+Named lab removed; helper verified its default-session fleet-state tripwire.

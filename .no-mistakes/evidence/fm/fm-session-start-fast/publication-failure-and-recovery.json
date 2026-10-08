@@ -1,0 +1,116 @@
+[
+  {
+    "command": "bin/fm-home-summary-refresh.sh ",
+    "exit": 1,
+    "elapsed_seconds": 0.646,
+    "stdout": "",
+    "stderr": "fm-home-summary-refresh: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure/state/home-summary.json\n",
+    "streak": null,
+    "wakes": "",
+    "ledger_entries": [
+      "sentinel"
+    ]
+  },
+  {
+    "command": "bin/fm-home-summary-refresh.sh --best-effort",
+    "exit": 0,
+    "elapsed_seconds": 1.014,
+    "stdout": "",
+    "stderr": "",
+    "streak": "count=1\nfirst=2026-10-08T11:42:35Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+    "wakes": "",
+    "ledger_entries": [
+      "sentinel"
+    ]
+  },
+  {
+    "command": "bin/fm-home-summary-refresh.sh --best-effort",
+    "exit": 0,
+    "elapsed_seconds": 1.009,
+    "stdout": "",
+    "stderr": "",
+    "streak": "count=2\nfirst=2026-10-08T11:42:35Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+    "wakes": "",
+    "ledger_entries": [
+      "sentinel"
+    ]
+  },
+  {
+    "command": "bin/fm-home-summary-refresh.sh --best-effort",
+    "exit": 0,
+    "elapsed_seconds": 1.36,
+    "stdout": "",
+    "stderr": "",
+    "streak": "count=3\nfirst=2026-10-08T11:42:35Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\n",
+    "wakes": "1791459758\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T11:42:35Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n",
+    "ledger_entries": [
+      "sentinel"
+    ]
+  },
+  {
+    "command": "bin/fm-home-summary-refresh.sh --best-effort",
+    "exit": 0,
+    "elapsed_seconds": 0.99,
+    "stdout": "",
+    "stderr": "",
+    "streak": "count=4\nfirst=2026-10-08T11:42:35Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\n",
+    "wakes": "1791459758\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T11:42:35Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n",
+    "ledger_entries": [
+      "sentinel"
+    ]
+  },
+  {
+    "command": "bin/fm-home-summary-refresh.sh (after fixing destination)",
+    "exit": 0,
+    "elapsed_seconds": 0.815,
+    "ledger": {
+      "schema": "fm-secondmate-home-summary.v1",
+      "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+      "contributions": {
+        "known": 0,
+        "checked": 0,
+        "counts": {
+          "captain": 0,
+          "fleet": 0,
+          "maintainer": 0,
+          "nobody": 0
+        },
+        "unmeasured": 0,
+        "complete": true,
+        "proven_clear": true,
+        "stale_verdicts": 0,
+        "missing_verdicts": 0,
+        "unreadable_records": 0,
+        "valid_until": 900,
+        "captain": [],
+        "captain_omitted": 0
+      },
+      "generated": "2026-10-08T11:42:39Z",
+      "generated_epoch": 1791459759,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure",
+      "valid": true,
+      "reason": null,
+      "invalidity": {
+        "kind": null,
+        "ids": []
+      },
+      "state": "no_active_work",
+      "active_children": [],
+      "decisions_open": [],
+      "holds": [],
+      "queued": [],
+      "landed": [],
+      "endpoints": [],
+      "counts": {
+        "active_children": 0,
+        "decisions_open": 0,
+        "holds": 0,
+        "queued": 0,
+        "landed": 0,
+        "endpoints": 0
+      },
+      "omitted": []
+    },
+    "streak_exists": false
+  }
+]

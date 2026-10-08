@@ -1,0 +1,26 @@
+[
+  {
+    "attempt": 1,
+    "exit": 0,
+    "elapsed_seconds": 10.777,
+    "streak": "count=1\nfirst=2026-10-08T11:46:58Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+    "wake_queue": "1791459758\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T11:42:35Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n",
+    "lock_released": true
+  },
+  {
+    "attempt": 2,
+    "exit": 0,
+    "elapsed_seconds": 6.656,
+    "streak": "count=2\nfirst=2026-10-08T11:46:58Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+    "wake_queue": "1791459758\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T11:42:35Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n",
+    "lock_released": true
+  },
+  {
+    "attempt": 3,
+    "exit": 0,
+    "elapsed_seconds": 5.65,
+    "streak": "count=3\nfirst=2026-10-08T11:46:58Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\n",
+    "wake_queue": "1791459758\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T11:42:35Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n1791460040\t2\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T11:46:58Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-j9hf4ix3/publication-failure/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n",
+    "lock_released": true
+  }
+]

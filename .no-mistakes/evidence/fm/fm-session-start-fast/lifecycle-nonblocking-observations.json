@@ -1,0 +1,10 @@
+{
+  "spawn_elapsed_seconds": 9.777,
+  "teardown_elapsed_seconds": 19.152,
+  "summary_lock_was_held_through_both_calls": true,
+  "no_summary_failure_log": true,
+  "pending_trigger_present": true,
+  "task_metadata_removed": true,
+  "completed_report_source": "driver-seeded disposable fixture",
+  "worker_state_before_teardown": "real Claude blocked on native external-import approval; approval not granted and user configuration not edited"
+}
