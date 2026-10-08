@@ -902,8 +902,8 @@ SH
     || { reap "$pid"; fail "blocked check did not publish multiple intermediate beacon beats"; }
   [ ! -e "$state/.test-poll-completed-$pid" ] \
     || { reap "$pid"; fail "blocked check published a completed classification pass"; }
-  [ ! -e "$state/.seen-task_status" ] \
-    || { reap "$pid"; fail "signal classification ran before the blocked check completed"; }
+  [ -e "$state/.seen-task_status" ] \
+    || { reap "$pid"; fail "signal classification waited behind the blocked check"; }
   touch "$state/check-release"
   wait_poll_cycle "$state" "$pid" \
     || { reap "$pid"; fail "completed check never released the completed-cycle wait"; }
@@ -2009,6 +2009,157 @@ test_actionable_signal_surfaced() {
   grep "$(printf '\tsignal\t')" "$drain_out" | grep -F "$status_file" >/dev/null || fail "actionable signal was not queued"
   [ -s "$state/.hb-surfaced-task" ] || fail "actionable signal did not record the surfaced marker"
   pass "captain-relevant signal is surfaced (queue + exit) and marked surfaced"
+}
+
+# A signal that lands while the watcher is mid-cycle, a signal that landed while
+# no watcher ran, and a keyed decision all surface as a signal wake on the first
+# classification pass. These pin the two shapes the missed-done report named
+# (written between cycles, written during a cycle) plus the keyed lines, so a
+# regression in the baseline or the span classifier is caught where it starts.
+test_done_and_keyed_lines_surface_between_and_during_cycles() {
+  local dir state fakebin out status_file pid kind line
+  for kind in between during; do
+    for line in 'done [at=1791490597]: finished the triage' \
+      'needs-decision [key=pick-one] [at=1791488659]: choose A or B' \
+      'blocked [key=shared-prereq] [at=1791488660]: waiting on the shared service'; do
+      dir=$(make_case "late-signal-$kind-${line%% *}"); state="$dir/state"; fakebin="$dir/fakebin"
+      out="$dir/watch.out"; status_file="$state/task.status"
+      printf 'working: setup\n' > "$status_file"
+      prime_status_seen "$state" "$status_file"
+      if [ "$kind" = between ]; then
+        printf '%s\n' "$line" >> "$status_file"
+        watch_bg "$state" "$fakebin" "$out"
+        pid=$!
+      else
+        watch_bg "$state" "$fakebin" "$out"
+        pid=$!
+        wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "watcher never completed a quiet cycle ($kind/${line%% *})"; }
+        printf '%s\n' "$line" >> "$status_file"
+      fi
+      wait_for_exit "$pid" 100 || fail "watcher did not signal a ${line%% *} line written $kind cycles"
+      grep -F "signal: $status_file" "$out" >/dev/null \
+        || fail "watcher exited for ${line%% *} written $kind cycles without a signal reason: $(cat "$out")"
+    done
+  done
+  pass "done, keyed needs-decision, and keyed blocked lines surface whether written between cycles or during one"
+}
+
+# Mark <status-file> as already classified and reported at its current end, so a
+# test's own earlier lines are not an unreported signal.
+prime_status_seen() {  # <state> <status-file>
+  local base
+  base=$(basename "$2" | tr '.' '_')
+  printf '%s' "$(seen_sig "$2")" > "$1/.seen-$base" || fail "could not prime the seen marker for $2"
+}
+
+# The signal scan must not wait behind the cycle's other work. A due check that
+# blocks for its whole timeout used to hold every unreported status line behind
+# it, so a lane's done or decision line reached firstmate only after the check.
+test_signal_not_held_behind_a_blocked_check() {
+  local dir state fakebin out status_file pid
+  dir=$(make_case signal-before-blocked-check); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; status_file="$state/task.status"
+  printf 'working: setup\n' > "$status_file"
+  prime_status_seen "$state" "$status_file"
+  cat > "$state/slow.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-started"
+n=0
+while [ ! -e "$FM_STATE_OVERRIDE/check-release" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 10 )) ]; do
+  sleep 0.1
+  n=$((n + 1))
+done
+SH
+  chmod 0700 "$state/slow.check.sh"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null \
+    || fail "could not register the blocked check"
+  printf 'done [at=1791490597]: finished while the check is blocked\n' >> "$status_file"
+  watch_bg "$state" "$fakebin" "$out" env FM_CHECK_TIMEOUT=120 FM_CHECK_INTERVAL=1
+  pid=$!
+  if ! wait_for_exit "$pid" 100; then
+    touch "$state/check-release"
+    fail "a done line stayed unsignaled while a due check blocked the cycle"
+  fi
+  touch "$state/check-release"
+  grep -F "signal: $status_file" "$out" >/dev/null \
+    || fail "watcher exited without the done signal: $(cat "$out")"
+  pass "a done line is signaled before a blocked check is waited on"
+}
+
+# A low-priority wake used to pre-empt the signal scan: an overdue-ledger wake
+# exited the cycle first, so a done line waited for one more firstmate round trip.
+# The signal wake goes first; the ledger row still surfaces on the next cycle.
+test_signal_not_preempted_by_an_overdue_ledger() {
+  local dir state fakebin out status_file pid second_out
+  dir=$(make_case signal-before-ledger); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; second_out="$dir/watch2.out"; status_file="$state/task.status"
+  printf 'working: setup\n' > "$status_file"
+  prime_status_seen "$state" "$status_file"
+  write_overdue_ledger "$state"
+  printf 'done [at=1791490597]: finished behind an overdue ledger\n' >> "$status_file"
+  watch_bg "$state" "$fakebin" "$out" env FM_OPEN_LOOPS_INTERVAL=999999
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "watcher did not exit for a done line behind an overdue ledger"
+  grep -F "signal: $status_file" "$out" >/dev/null \
+    || fail "an overdue ledger pre-empted the done signal: $(cat "$out")"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the signal wake"
+  watch_bg "$state" "$fakebin" "$second_out" env FM_OPEN_LOOPS_INTERVAL=999999
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "the overdue ledger never surfaced after the signal wake"
+  grep -F 'check: open-loop-ledger' "$second_out" >/dev/null \
+    || fail "the ledger wake did not follow the signal wake: $(cat "$second_out")"
+  pass "the signal wake goes first and the overdue ledger surfaces on the next cycle"
+}
+
+# Signals-first is bounded: after FM_PRELUDE_MAX_DEFER consecutive signal wakes the
+# cycle's other work runs first once, so a chatty fleet cannot starve it forever.
+test_cycle_work_runs_after_bounded_signal_deferrals() {
+  local dir state fakebin status_file pid n out order=''
+  dir=$(make_case bounded-signal-deferral); state="$dir/state"; fakebin="$dir/fakebin"
+  status_file="$state/task.status"
+  printf 'working: setup\n' > "$status_file"
+  prime_status_seen "$state" "$status_file"
+  write_overdue_ledger "$state"
+  for n in 1 2 3 4; do
+    printf 'done [at=%s]: chatty finish %s\n' "$((1791490000 + n))" "$n" >> "$status_file"
+    out="$dir/watch-$n.out"
+    watch_bg "$state" "$fakebin" "$out" env FM_OPEN_LOOPS_INTERVAL=999999 FM_PRELUDE_MAX_DEFER=2
+    pid=$!
+    wait_for_exit "$pid" 100 || fail "watcher $n did not exit under a chatty fleet"
+    case "$(cat "$out")" in
+      signal:*) order="$order signal" ;;
+      'check: open-loop-ledger'*) order="$order ledger" ;;
+      *) order="$order other" ;;
+    esac
+    ack_stopped_cycle "$state" || fail "could not acknowledge wake $n"
+  done
+  [ "$order" = ' signal signal ledger signal' ] \
+    || fail "bounded deferral order was:$order (want: signal signal ledger signal)"
+  pass "the cycle's other work runs after two deferred cycles and signals resume first"
+}
+
+# A bad deferral marker must fall back to the previous order, never starve signals
+# or hide the cycle's other work.
+test_invalid_prelude_deferral_marker_restores_the_previous_order() {
+  local dir state fakebin out status_file pid
+  dir=$(make_case invalid-deferral-marker); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; status_file="$state/task.status"
+  printf 'working: setup\n' > "$status_file"
+  prime_status_seen "$state" "$status_file"
+  write_overdue_ledger "$state"
+  printf 'not-a-number\n' > "$state/.prelude-deferred"
+  printf 'done [at=1791490597]: finished\n' >> "$status_file"
+  watch_bg "$state" "$fakebin" "$out" env FM_OPEN_LOOPS_INTERVAL=999999
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "watcher did not exit with an invalid deferral marker"
+  grep -F 'check: open-loop-ledger' "$out" >/dev/null \
+    || fail "an invalid deferral marker did not restore the previous order: $(cat "$out")"
+  pass "an invalid deferral marker restores the previous cycle order"
+}
+
+write_overdue_ledger() {  # <state>
+  printf '{"schema":"fm-open-loops.v1","generated_epoch":%s,"home":"%s","complete":true,"rows":[{"id":"lost-launcher","category":"missing_worker","subject":"lost-launcher","owner":"firstmate","next_action":"recover","age_seconds":9999,"limit_seconds":600,"overdue":true}]}\n' \
+    "$(date +%s)" "${FM_HOME:-${FM_ROOT_OVERRIDE:-$ROOT}}" > "$1/open-loops.json"
 }
 
 # A needs-decision status append surfaced through this actionable signal path
@@ -6728,6 +6879,11 @@ test_separate_self_announced_answers_after_fold_wake_once
 test_self_announced_close_after_fold_still_surfaces_folded_worker_failure
 test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines
 test_actionable_signal_surfaced
+test_done_and_keyed_lines_surface_between_and_during_cycles
+test_signal_not_held_behind_a_blocked_check
+test_signal_not_preempted_by_an_overdue_ledger
+test_cycle_work_runs_after_bounded_signal_deferrals
+test_invalid_prelude_deferral_marker_restores_the_previous_order
 test_needs_decision_signal_payload_marked_for_branch_exclusion
 test_needs_decision_reconciliation_required_still_marked
 test_captain_held_signal_payload_marked_for_branch_exclusion

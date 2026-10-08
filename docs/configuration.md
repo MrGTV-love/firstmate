@@ -643,7 +643,8 @@ The ledger covers this home's current backlog, ordinary task records, status que
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
 
-The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
+The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a slow scan cannot stall the liveness beacon.
+The ledger wake itself follows the cycle's signal scan, and `FM_PRELUDE_MAX_DEFER` bounds how many signal wakes in a row may delay it, so a chatty fleet cannot starve it.
 The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
@@ -3016,6 +3017,7 @@ FM_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (stat
 FM_WATCHER_STALE_GRACE=300   # defaults to FM_GUARD_GRACE if set, else the poll-derived grace (docs/turnend-guard.md "Guard grace and the poll cadence"); seconds before a fresh arm refuses a live holder's stale beacon (attached arms: FM_WATCHER_STALL_BOUND); the session-end auto-relaunch is bounded to this grace minus a fixed margin and does not run when that leaves no room (bin/fm-session-end-relaunch-lib.sh header)
 FM_WATCHER_STALL_BOUND=       # live-holder stall bound; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"
 FM_SIGNAL_GRACE=30      # seconds to coalesce nearby status and turn-end signals into one wake
+FM_PRELUDE_MAX_DEFER=3   # consecutive signal wakes that may skip the cycle's other work (ledger wake, reconcile and liveness ticks, process-event and inactive scans, due checks) before the next cycle runs that work ahead of the signal scan; 0 always runs it first (bin/fm-watch.sh "Cycle order" owns the contract)
 FM_WATCHER_CLEANUP_LOCK_BOUND=   # optional watcher EXIT marker-lock wait; default and validation: docs/watcher-continuity.md
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present
 FM_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:|PR ready|checks green|ready in branch|merged'   # captain-relevant status regex; nonterminal progress verbs remain excluded even when their prose matches
