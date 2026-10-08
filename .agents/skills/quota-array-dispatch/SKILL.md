@@ -38,6 +38,8 @@ It never removes this skill's authority, and its `ambiguous`, `escalate`, and `e
 
 ## Read the default TOON
 
+Resolve configured candidates under the [fleet model-index contract](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson) before applying this procedure.
+
 Start each intake by running `quota-axi` once with no `--json`, and reuse that TOON for every candidate.
 Post-consolidation quota-axi (the floor owned by `bin/fm-quota-axi-lib.sh`) puts `spendPriority` in the default `quota[]` block beside `effectivePercentRemaining`, `runway`, `confidence`, `limitedBy`, and `resetsAt`.
 Sparse `exhaustion[]` carries finite-runway seconds only for `projected_exhaustion` and `exhausted_now`.
@@ -63,11 +65,13 @@ It cannot override a hard-gate failure, and it is never hidden inside a new comp
 
 ### 1. Eligibility
 
+Apply the [session launch policy](../../../docs/configuration.md#session-launch-policy-configsession-launch-policy) before evaluating catalog and credential eligibility.
+
 Outside those documented mappings, deterministic shell must not infer a provider family or credential store from a harness, model, or source name.
 You establish the remaining relations yourself, in the open, from the candidate's own authoritative catalog (`harness-adapters` owns the per-harness discovery surface) plus the one intake snapshot.
 
-Confirm the catalog lists the candidate's model and record the provider family it reports.
-A model the catalog does not list is concrete contradictory evidence: block that candidate and quote the catalog result.
+Read the candidate's model-support and provider evidence from its authoritative discovery surface, and record unavailable evidence as uncertainty.
+Apply the [fleet model-index catalog-evidence boundary](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson) before treating an omitted model as contradictory evidence; block a proven-unsupported candidate and quote the authoritative catalog result.
 Apply quota at the granularity the vendor actually supplies.
 A provider-level or `all_models`/`all_products` scope bounds every model you established in that family within the candidate's matched account, including one with no window of its own.
 A named-model or named-product scope is an additional bound for that model alone.
@@ -81,9 +85,9 @@ A Pi-hosted family may authenticate through the vendor's own store with no `pi:`
 Uncertainty and ineligibility are different findings:
 
 - No model-level window, no matching auth source, an unmeasurable or `unknown` scope, or a surface quota-axi does not model at all is disclosed uncertainty.
-  Keep the candidate eligible, state the unknown, and prefer known viable evidence when otherwise comparable.
+  These unknowns alone do not make the candidate ineligible; state the unknown and prefer known viable evidence when otherwise comparable.
 - An expired credential is a short-lived session token the owning vendor renews on next use, not a sign-out.
-- Only concrete contradictory evidence blocks: an authoritative catalog proving the model unsupported, or proof that the credential the candidate actually selects is unusable.
+- For catalog and authentication eligibility, only concrete contradictory evidence blocks: an authoritative catalog proving the model unsupported, or proof that the credential the candidate actually selects is unusable.
 - Reserve login wording for that proven-unusable case, and name the harness, model, surface, and evidence.
 
 When a credential's local classification is the only thing standing between a candidate and a block, get ground truth before blocking.

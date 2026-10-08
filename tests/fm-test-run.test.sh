@@ -402,6 +402,16 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" add .agents/skills/harness-adapters/SKILL.md
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm harness-adapter-router-change
 
+  mkdir -p "$repo/.agents/skills/hyper-jev/cookbook" "$repo/.agents/skills/hyper-jev/templates/starter/src/core"
+  : >"$repo/.agents/skills/hyper-jev/LICENSE"
+  : >"$repo/.agents/skills/hyper-jev/cookbook/README.md"
+  : >"$repo/.agents/skills/hyper-jev/templates/starter/src/core/client.ts"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "vendored skill files were refused as unmapped changed sources"
+  assert_not_contains "$listed" "tests/fm-ask-user-authority.test.sh" "vendored skill files select no suite"
+  git -C "$repo" add .agents/skills/hyper-jev
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-skill-change
+
   printf '\n' >>"$repo/bin/fm-procevent-quota.sh"
   printf '\n' >>"$repo/bin/fm-quota-choose.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
@@ -1031,6 +1041,121 @@ assert record["gate_skip_reason"] == "live: fmnosuchharness absent", record
 ' "$json" || { rm -rf "$tmp"; fail "the timing artifact must carry the skip reason"; }
   rm -rf "$tmp"
   pass "a gate skip records why it skipped"
+}
+
+test_model_index_live_guard_accounting() {
+  local tmp tools tool scenario expected_skip expected_failed rc out first
+  tmp=$(fm_test_tmproot fm-test-run-model-index-live)
+  tools="$tmp/tools"
+  mkdir -p "$tools" "$tmp/home"
+  for tool in bash jq awk dirname basename mkdir mktemp rm cat cp stat \
+    find chmod ps sed uname od tr sleep; do
+    ln -s "$(command -v "$tool")" "$tools/$tool" \
+      || fail "could not isolate live guard dependency $tool"
+  done
+  cat >"$tmp/codex" <<'SH'
+#!/usr/bin/env bash
+[ "$1" = --version ] || exit 90
+printf 'fixture-codex\n'
+SH
+  cat >"$tmp/opencode" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  --version) printf 'fixture-opencode\n' ;;
+  models)
+    printf 'models\n' >> "$FM_INDEX_GUARD_CALLS"
+    printf 'fixture/model\n'
+    ;;
+  *) exit 90 ;;
+esac
+SH
+  cat >"$tmp/guard.test.sh" <<'SH'
+#!/usr/bin/env bash
+unset FM_LIVE FM_MODEL_INDEX_LIVE_E2E FM_TEST_LIB_SOURCED
+export PATH="$FM_INDEX_GUARD_TOOLS"
+export HOME="$FM_INDEX_GUARD_HOME" CODEX_HOME="$FM_INDEX_GUARD_HOME/.codex"
+export FM_TEST_SKIP_ORPHAN_REAP=1 FM_TIMEOUT_MECHANISM_OVERRIDE=bash
+case "$FM_INDEX_GUARD_CASE" in forced-*) export FM_MODEL_INDEX_LIVE_E2E=1 ;; esac
+bash "$FM_INDEX_GUARD_ROOT/tests/fm-model-index-live-e2e.test.sh" >"$FM_INDEX_GUARD_OUTPUT" 2>&1
+rc=$?
+cat "$FM_INDEX_GUARD_OUTPUT"
+exit "$rc"
+SH
+  chmod +x "$tmp/codex" "$tmp/opencode" "$tmp/guard.test.sh"
+  for scenario in absent empty partial forced-absent forced-empty; do
+    rm -f "$tools/codex" "$tools/opencode" "$tmp/calls"
+    case "$scenario" in
+      empty|partial|forced-empty) ln -s "$tmp/codex" "$tools/codex" ;;
+    esac
+    [ "$scenario" != partial ] || ln -s "$tmp/opencode" "$tools/opencode"
+    expected_skip=1
+    expected_failed=0
+    case "$scenario" in
+      partial) expected_skip=0 ;;
+      forced-*) expected_skip=0; expected_failed=1 ;;
+    esac
+    FM_INDEX_GUARD_CASE="$scenario" FM_INDEX_GUARD_TOOLS="$tools" \
+      FM_INDEX_GUARD_HOME="$tmp/home" FM_INDEX_GUARD_ROOT="$ROOT" \
+      FM_INDEX_GUARD_OUTPUT="$tmp/guard.out" FM_INDEX_GUARD_CALLS="$tmp/calls" \
+      "$RUNNER" --json "$tmp/timing.json" "$tmp/guard.test.sh" >"$tmp/runner.out" 2>&1 \
+      && rc=0 || rc=$?
+    [ "$rc" -eq "$expected_failed" ] \
+      || fail "$scenario live guard runner exit was $rc: $(cat "$tmp/runner.out")"
+    python3 -c '
+import json, sys
+doc = json.load(open(sys.argv[1]))
+skipped, failed = map(int, sys.argv[2:])
+assert doc["summary"]["total"] == 1, doc
+assert doc["summary"]["skipped_gate"] == skipped, doc
+assert doc["summary"]["failed"] == failed, doc
+record = doc["scripts"][0]
+assert record["gate_skip"] is bool(skipped), record
+assert (record["exit"] != 0) is bool(failed), record
+assert record["gate_skip_reason"] == (
+    "live: no installed native adapter has an available catalog" if skipped else ""
+), record
+' "$tmp/timing.json" "$expected_skip" "$expected_failed" \
+      || fail "$scenario live guard accounting was wrong"
+    out=$(cat "$tmp/guard.out")
+    first=$(awk 'NF {print; exit}' "$tmp/guard.out")
+    case "$scenario" in
+      absent|empty)
+        [ "$first" = 'skip: live: no installed native adapter has an available catalog' ] \
+          || fail "$scenario guard did not begin with its aggregate skip marker: $out"
+        assert_contains "$out" 'skip - claude catalog adapter: executable absent' \
+          "$scenario guard lost missing-executable diagnostics"
+        ;;
+      partial)
+        [ "$first" = 'ok - opencode fixture-opencode: catalog id accepted; absent id refused' ] \
+          || fail "partial guard did not begin with checked coverage: $out"
+        assert_contains "$out" '# model-index live adapters checked: 1' \
+          "partial guard lost its coverage count"
+        assert_contains "$out" 'skip - claude catalog adapter: executable absent' \
+          "partial guard lost missing-executable diagnostics"
+        [ "$(cat "$tmp/calls")" = $'models\nmodels' ] \
+          || fail "partial coverage must exercise both the CLI listing and native adapter"
+        ;;
+      forced-absent)
+        assert_contains "$out" 'no installed native catalog adapter was checked' \
+          "forced absence must fail for lack of checked coverage"
+        ;;
+      forced-empty)
+        assert_contains "$out" 'its own listing named no model' \
+          "forced empty catalog must fail rather than skip"
+        ;;
+    esac
+    case "$scenario" in
+      empty|partial)
+        assert_contains "$out" 'skip - codex fixture-codex: no listed model (signed out or no catalog)' \
+          "$scenario guard lost no-listed-model diagnostics"
+        ;;
+    esac
+    case "$scenario" in
+      partial) ;;
+      *) assert_absent "$tmp/calls" "a wholly uncovered guard must not query a native catalog" ;;
+    esac
+  done
+  pass "live model-index coverage skips only when no adapter was checked"
 }
 
 test_a_run_that_ran_records_no_skip_reason() {
@@ -1954,6 +2079,7 @@ test_timing_markers_and_json
 test_aggregate_exit_behavior
 test_gate_skip_accounting
 test_gate_skip_reason_is_recorded
+test_model_index_live_guard_accounting
 test_a_run_that_ran_records_no_skip_reason
 test_live_guards_expect_a_capability_skip_class
 test_fail_on_gate_skip_token

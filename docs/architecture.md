@@ -71,9 +71,9 @@ Once that no-progress interval reaches `FM_SECONDMATE_WAKE_STALL_SECS` and the m
 The primary then appends one keyed `check` wake naming the mate, row sequence, and observed idle interval; parent receipts and queued-key deduplication suppress repeats across watcher and handling crashes, one notification covers a whole no-progress episode, and any move of that position - drain progress, or the fresh rows of a queue reprovisioned under the same task id, at whatever sequence it restarts - ends that episode and starts a fresh observation interval, while empty, advancing, and declared-wait queues remain silent.
 Endpointless registered mates remain outside this queue scan because its preconditions can never be met for them.
 Dead-or-missing endpoint recovery is instead shared by two drivers over one library, `bin/fm-secondmate-liveness-lib.sh`: the session-start sweep in `bin/fm-bootstrap.sh`, and the watcher's own `FM_SECONDMATE_LIVENESS_SECS`-cadence tick during ordinary supervision.
-Both relaunch only the recovery-grade `dead` and `missing` verdicts through the ordinary guarded `fm-spawn.sh --secondmate` path, a remote route is probed read-only across its host-local boundary and is never replaced by a local endpoint, and the per-mate liveness lock keeps a concurrent sweep and tick from killing or re-probing an endpoint the other is mid-relaunch on.
+Both relaunch only the recovery-grade `dead` and `missing` verdicts through the ordinary guarded `fm-spawn.sh --secondmate` path, subject to the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy); a remote route is probed read-only across its host-local boundary and is never replaced by a local endpoint, and the per-mate liveness lock keeps a concurrent sweep and tick from killing or re-probing an endpoint the other is mid-relaunch on.
 Each automatic relaunch surfaces as exactly one `check` wake plus a durable line in `state/.secondmate-relaunch-<id>`, and a mate that exceeds `FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS` ledgered attempts inside `FM_SECONDMATE_LIVENESS_WINDOW_SECS` is parked behind a bound marker and escalated once until a live probe rearms it with a full attempt budget.
-An in-flight ship or scout whose busy record is `event=session-end` and whose recovery-grade endpoint reads `dead` is relaunched by the watcher's session-end tick through `bin/fm-control.sh relaunch`, which keeps the recorded worktree.
+An in-flight ship or scout whose busy record is `event=session-end` and whose recovery-grade endpoint reads `dead` is eligible for relaunch by the watcher's session-end tick through `bin/fm-control.sh relaunch`, which keeps the recorded worktree and applies the [transactional relaunch contract](agent-control.md#transactional-relaunch).
 `bin/fm-session-end-relaunch-lib.sh` owns eligibility, the deliberate-exit skip, the pause and hold skip, and the attempt caps.
 One `check` wake reports each relaunch, failure, or cap.
 The dead-record stale report above does not relaunch, and this tick never discards uncommitted work.
@@ -199,7 +199,7 @@ Daemon-backed quiet mode writes the same record marked quiet, and the record own
 The record's mode distinguishes away from quiet on every harness; `bin/fm-afk-launch.sh` owns entry and exit, and `bin/fm-afk-return.sh` archives the record and owns the return brief's ordered sections, including landed live task records that still owe cleanup, rendered from durable state; persistent secondmates are excluded from that cleanup section even if an older record carries a child's merged PR.
 While the away record exists neither supervisor rechecks an item held for the captain, and a declared external wait names when it clears with `until` for a condition-aware recheck in both postures that occurs at the declared time or the hours-long `FM_PAUSE_RESURFACE_SECS` bound, whichever comes first.
 On Pi and pi-signed the away daemon is no longer launched: the ordinary supervision session continues under the record with main parked, so the supervision branch takes every actionable wake, captain outcomes accumulate for the return brief, and main's standing authority relocates to the branch through the guarded scripts, each keeping its own gate ([`pi-supervision-branch.md`](pi-supervision-branch.md#postures)); a wake the branch cannot take and a watcher failure still reach main.
-On an opted-in non-Pi home, the [supervision host](supervision-host.md) runs the away session instead of the daemon.
+On an opted-in non-Pi home, the [supervision host](supervision-host.md) runs the away session instead of the daemon; the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy) owns its engine session's scope.
 A presence-gated sub-supervisor (`bin/fm-supervise-daemon.sh`) still extends walk-away supervision on the remaining harnesses: the `/afk` skill starts it through the tracked foreground helper `bin/fm-afk-start.sh` once the record exists, after which the watcher reverts to daemon-managed one-shot mode and the daemon self-handles routine wakes in bash.
 The watcher and daemon share `bin/fm-classify-lib.sh` for captain-relevant status verbs, declared-wait vocabulary (a `paused:` external wait and a verified `captain-held` transfer alike, through one combined predicate), and status-scan primitives.
 Terminal verbs remain captain-relevant, while a nonterminal progress verb cannot become terminal merely because its prose contains a legacy free-text token such as `merged`; bare legacy free-text lines remain compatible.
@@ -315,9 +315,9 @@ The intake and authority contract in `AGENTS.md` owns when separate scout resear
 ## Dispatch profiles
 
 Crewmate and scout dispatch can stay on the static crewmate harness resolved by `config/crew-harness`, or it can use local dispatch profiles in `config/crew-dispatch.json`.
-Without typed dispatch resolution, firstmate follows the manual intake boundary in `AGENTS.md` section 4 and the `quota-array-dispatch` selection procedure, passing concrete launch axes to `fm-spawn.sh`.
+Without typed dispatch resolution, firstmate follows the manual intake boundary in `AGENTS.md` section 4 and the `quota-array-dispatch` selection procedure, passing the selected profile to `fm-spawn.sh` under the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson).
 Bootstrap and spawn validate configuration and verified harness/effort combinations; the optional [typed resolver](configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns its documented rule-matching and deterministic profile-selection boundary.
-The session-start bootstrap step keeps valid dispatch configuration silent unless verbose facts are enabled and surfaces a concise invalid-config line when validation fails.
+The [dispatch configuration owner](configuration.md#crew-dispatch-profiles-configcrew-dispatchjson) documents bootstrap validation and diagnostics.
 When the file exists, `fm-spawn.sh` refuses crewmate and scout launches without an explicit harness, so `config/crew-harness` is only automatic when no dispatch profile file is active.
 Secondmate launches are exempt because they resolve the secondmate harness and any optional secondmate model or effort tokens instead.
 Unsupported effort values are still recorded in task meta when passed to `fm-spawn.sh`, but the launch template omits any effort flag that the selected harness does not accept.
@@ -353,15 +353,7 @@ Secondmate homes converge conservatively to the primary's version and declared i
 The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns the full guarded sync, propagation, nudge, and mid-session local-material push contract.
 
 Secondmate agents can run on a different verified harness than crewmates.
-`config/secondmate-harness` controls the primary's secondmate launch harness and may also carry optional model and effort tokens as `<harness> [<model>] [<effort>]` on the first non-empty, non-comment line.
-A bare harness line remains harness-only, so existing `config/secondmate-harness` files keep their previous behavior.
-When the harness token is unset or `default`, launch falls back to `config/crew-harness`, then to the primary's own harness, and the model and effort tokens are ignored.
-Those optional tokens are re-read on every secondmate spawn or respawn and are overridden by explicit per-spawn `--model` or `--effort` flags.
-For a local route, an explicit per-spawn harness or raw launch command does not inherit model or effort tokens from `config/secondmate-harness`.
-Remote routes accept verified harness adapters only and reject raw launch commands.
-`config/crew-harness` remains the crewmate harness and is inherited into secondmate homes.
-`config/crew-dispatch.json` is inherited too; secondmates use the same natural-language dispatch profiles when spawning their own crewmates.
-The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns the inherited-local-material propagation contract and points to the implementation's item declaration.
+The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns secondmate harness/model/effort pins, launch overrides, and inherited-local-material propagation.
 
 The `data/secondmates.md` line contract is owned by the [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md#routing-table), and the secondmate environment variables are documented in [configuration.md](configuration.md).
 
@@ -506,7 +498,7 @@ The procedure and outcome vocabulary are owned by the [`/updatefirstmate` skill]
 
 Fleet state lives in each task's session-provider backend (tmux by hard default, herdr or cmux when selected or auto-detected, zellij/orca when explicitly selected), no-mistakes run records, status event logs, local markdown under `data/` including `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, and persistent secondmate homes.
 For herdr, respawning after a server-restored layout closes and replaces confirmed no-agent or dead task-tab husks instead of requiring manual tab cleanup.
-At session start and again on the watcher's bounded liveness cadence, confirmed-dead secondmate agent endpoints are closed and relaunched through the same secondmate spawn path, while ambiguous liveness reads are left untouched to avoid duplicate supervisors.
+Secondmate endpoint recovery follows the shared [`fm-secondmate-liveness-lib.sh` mechanism](../bin/fm-secondmate-liveness-lib.sh), subject to the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy).
 Use `/stow` before an intentional reset when the conversation may hold durable knowledge that has not yet been written to disk; after that, the next firstmate session can reconcile and carry on.
 
 ## Development notes

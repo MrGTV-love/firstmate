@@ -125,9 +125,8 @@ fm_cursor_list_models() {  # <path>
   fm_cursor_bounded_output "$1" --list-models
 }
 
-fm_cursor_catalog_has_model() {  # <model>
-  local wanted=$1
-  awk -v wanted="$wanted" '
+fm_cursor_catalog_ids() {  # stdin: --list-models output; stdout: one id per line
+  awk '
     BEGIN { ansi = sprintf("%c\\[[0-9;]*[A-Za-z]", 27) }
     {
       line = $0
@@ -137,10 +136,13 @@ fm_cursor_catalog_has_model() {  # <model>
       id = substr(line, 1, separator - 1)
       sub(/^[[:space:]]+/, "", id)
       sub(/[[:space:]]+$/, "", id)
-      if (id == wanted) found = 1
+      print id
     }
-    END { exit found ? 0 : 1 }
   '
+}
+
+fm_cursor_catalog_has_model() {  # <model>
+  fm_cursor_catalog_ids | awk -v wanted="$1" '$0 == wanted { found = 1 } END { exit found ? 0 : 1 }'
 }
 
 # Print the stable absolute launcher path for the Cursor executable, or return 1

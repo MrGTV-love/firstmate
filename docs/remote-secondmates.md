@@ -402,7 +402,7 @@ bin/fm-spawn.sh <id> --secondmate
 
 The primary then takes these steps:
 
-1. It resolves the verified secondmate harness and optional model and effort.
+1. It resolves the verified secondmate harness and optional model and effort, subject to the initiating home's [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy).
 2. It runs the same readiness gate the seed runs.
 3. It transfers the inherited-material allowlist.
 4. It asks the remote host to launch on Herdr in `fm-remote`.
@@ -420,13 +420,18 @@ All remote secondmates on one host share `fm-remote` and retain separate `2ndmat
 
 ### Liveness recovery
 
-Startup liveness recovery relaunches a dead or missing remote second mate through this same command.
+Startup liveness recovery relaunches an eligible dead or missing remote secondmate through this same command, subject to the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy).
 So recovery passes the same readiness gate rather than a weaker one.
+
+The startup probe admits the currently configured replacement harness under the initiating home's policy before running readiness repair, including `doctor --fix`, which can stop a foreign Herdr server and close its panes.
+When that policy denies the replacement or is malformed, startup still classifies the recorded endpoint read-only and preserves a live endpoint.
+A confirmed dead or missing endpoint reaches the shared relaunch boundary, which rechecks admission and retains the policy refusal diagnostic and generation-scoped receipt without repair or a recovery attempt.
+Probe admission never converges policy into a child home; an absent policy or an admitted `omp` replacement keeps the existing readiness behavior.
 
 The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/fm-secondmate-liveness-lib.sh`:
 
 - The remote endpoint is probed read-only once per cadence.
-- Only a positive `dead` or `missing` reply relaunches through that command.
+- Only a positive `dead` or `missing` reply permits a relaunch through that command, subject to the same launch checks.
 - An unreachable transport or inconclusive state is left untouched rather than replaced locally.
 
 ### Inventory reconcile for markerless routes
@@ -598,11 +603,7 @@ There is no two-phase journal and no additional tasks-axi release requirement.
 
 ### Inherited-material transfer
 
-Locked startup convergence and `bin/fm-config-push.sh` transfer only the declared inherited-material allowlist.
-Changed live routes receive a marked instruction to re-read the transferred files.
-The primary records that remote nudge before delivery and retries it during locked startup convergence after a failed send.
-Local secondmates retain their generation-specific local pointer contract.
-Remote transfers do not copy those primary-local instruction paths.
+The [`secondmate-provisioning` inherited-material contract](../.agents/skills/secondmate-provisioning/SKILL.md#charter-and-seed) owns allowlist transfer and the reread lifecycle for startup convergence, config push, and remote launch/relaunch, including retries after a refused or unconfirmed replacement.
 
 ### Relaunch a live remote second mate
 
@@ -613,6 +614,8 @@ So the transaction, its checkpoint, and its postconditions are the local ones.
 The primary passes `<harness> <model|default|-> <effort|default|->` explicitly, using `default` when an axis has no parent pin.
 It passes them explicitly because `config/secondmate-harness` is not inherited into a second mate's home, and the file on that host belongs to a different home.
 Letting the far side re-resolve it would silently move the mate onto another runtime.
+Before relaunch, the wrapper freezes and validates the primary's routing pair, resolves the model against that selection, and propagates those exact bytes under the remote inheritance transaction lock.
+The lock remains held through remote relaunch so pre-stop catalog validation and replacement launch use the same index; a propagation refusal leaves the running mate intact.
 SSH exit 255 leaves completion unknown and the route preserved, exactly as every other verb here.
 Move a live remote second mate onto a newly pinned harness, model, or effort with [`bin/fm-remote-secondmate-relaunch.sh`](../bin/fm-remote-secondmate-relaunch.sh) rather than calling `relaunch` through `fm-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.
 

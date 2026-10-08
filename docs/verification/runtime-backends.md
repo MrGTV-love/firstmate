@@ -43,6 +43,37 @@ Trace probes observe enabled and reused carriers, disabled-relaunch clearing, cl
 The private Bash/ksh tmux fixture also proves the allowlisted strip-to-keep transition clears the persistent pane's obsolete task override while preserving unrelated Git entries and operator routing.
 The relaunch suite emitted two non-fatal BSD `sed` diagnostics in its Pi-session case; this run is focused local evidence, not a rerun of the entire portable CI shard.
 
+## Fleet model-index catalog discovery
+
+The [configuration contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns role selection and retirement policy.
+The token-free live guard reads one id from each installed harness's own listing, then runs the public `check` once with that id and an intentionally absent id.
+The adapter must accept the listed id and refuse only the absent one, and that single run queries the catalog once instead of racing repeated account-catalog requests.
+The portable regression also exercises Claude SDK initialization through a timed runner whose background child does not inherit stdin.
+Run `bash bin/fm-test-run.sh --jobs 1 tests/fm-secondmate-harness.test.sh tests/fm-bootstrap.test.sh tests/fm-model-index.test.sh tests/fm-worker-account.test.sh` for portable inheritance and worker-account regression coverage alongside catalog discovery.
+
+Verified on 2026-09-30 with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-model-index.test.sh tests/fm-model-index-live-e2e.test.sh tests/fm-dispatch-resolve.test.sh
+```
+
+Live adapter output:
+
+```text
+ok - codex codex-cli 0.159.0: catalog id accepted; absent id refused
+ok - claude 2.1.285 (Claude Code): catalog id accepted; absent id refused
+ok - omp omp/18.4.4: catalog id accepted; absent id refused
+ok - pi 0.80.3: catalog id accepted; absent id refused
+skip - pi-signed catalog adapter: executable absent
+skip - opencode catalog adapter: executable absent
+skip - cursor catalog adapter: executable absent
+ok - agy 1.2.14: catalog id accepted; absent id refused
+# model-index live adapters checked: 5
+```
+
+Refresh with `bash bin/fm-test-run.sh tests/fm-model-index-live-e2e.test.sh` after a harness upgrade.
+An absent executable is reported explicitly; an adapter whose own listing yields no model is skipped by default but fails with its harness and version when the guard is explicitly enabled.
+Once a listed model is available, an unreadable adapter catalog or an accepted absent id fails with its harness and version.
 
 ## Harness detection precedence
 

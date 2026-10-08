@@ -72,6 +72,8 @@ REMOTE_HERDR_SESSION=fm-remote
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-task-inbox-lib.sh
 . "$SCRIPT_DIR/fm-task-inbox-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -192,6 +194,7 @@ cmd_launch() {
   # the GUI login session, so the endpoint survives every SSH disconnection that
   # a remote route depends on. bin/fm-remote-doctor.sh is the readiness owner.
   case "$selected_backend" in herdr) ;; *) die "a remote secondmate runs only on the herdr backend, not '$selected_backend'" ;; esac
+  fm_session_launch_policy_check "$TARGET_HOME/config" "$harness" || return 1
   mkdir -p "$CONTROL_STATE" "$CONTROL_DATA"
   meta=$(meta_path "$id")
   if [ -f "$meta" ]; then

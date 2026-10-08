@@ -20,7 +20,7 @@
 #   ONE Choice question whose options are every rule's `when` from
 #   config/crew-dispatch.json plus one fixed generic none option. Jev returns
 #   the matched rule, a probability per option, and a confidence. Everything
-#   after that is jq: the confidence floor (0.6 on the answer confidence, or a
+#   after that uses local policy: the confidence floor (0.6 on the answer confidence, or a
 #   rule's declared `min_confidence` on that rule's probability, falling to the
 #   most probable other option that clears its own floor), the rule's declared
 #   `approval` and `floor`, each profile's declared `provider` and `floor`, the
@@ -28,6 +28,8 @@
 #   the operator contract below. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
+#   The chosen profile also passes the selected-entry preflight owned by
+#   docs/configuration.md "Fleet model index" before publication.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
 #   "Typed dispatch resolution" owns this tool's operator contract.
 #
@@ -70,11 +72,12 @@
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, no candidate rankable, a genuine tie, or
 #                a winner whose established runway is shorter than the task horizon
-#   error     -> API, network, response, or quota-axi failure; decide as today
+#   error     -> API, network, response, quota-axi, or chosen-profile model-index
+#                preflight failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
-#   existing unreadable rules file, malformed rules, or missing jq), which is
-#   actionable, never selected around.
+#   existing unreadable rules file, malformed rules, model-index/profile
+#   resolution failure, or missing jq), which is actionable, never selected around.
 #
 # Environment:
 #   TYPESAFE_API_KEY is the only resolver-specific environment setting.
@@ -102,6 +105,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-timing-lib.sh"
 # shellcheck source=bin/fm-brief-heading-lib.sh
 . "$SCRIPT_DIR/fm-brief-heading-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$SCRIPT_DIR/fm-worker-account-lib.sh"
 
 CONFIDENCE_FLOOR=0.6
 TS_MODEL=jev-latest
@@ -149,7 +154,18 @@ LAT_MS=null QUOTA_MS=null RESPONSE_VALID=0
 command -v jq >/dev/null 2>&1 || die "jq required"
 RULES=$(mktemp) || die "mktemp failed"
 trap 'rm -f "$RULES"' EXIT
+MODEL_CONFIG=$(mktemp -d) || die "mktemp failed"
+trap 'rm -f "$RULES"; rm -rf "$MODEL_CONFIG"' EXIT
+if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
+  cp "$CONFIG/model-index.json" "$MODEL_CONFIG/model-index.json" || die "could not snapshot model index"
+fi
 cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
+jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not JSON)"
+# Resolve roles against the frozen index offline; only the chosen profile's
+# catalog is checked, after the never-send filter permits this intake to reach
+# the network.
+RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES") || die "model index/profile resolution failed"
+printf '%s\n' "$RESOLVED_RULES" > "$RULES" || die "could not write resolved rules snapshot"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
 
@@ -286,7 +302,7 @@ RESP_FILE=$(mktemp) || die "mktemp failed"
 QUOTA=$(mktemp) || { rm -f "$RESP_FILE"; die "mktemp failed"; }
 TASK_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA"; die "mktemp failed"; }
 SEND_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA" "$TASK_TEXT"; die "mktemp failed"; }
-trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"' EXIT
+trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"; rm -rf "$MODEL_CONFIG"' EXIT
 
 never_send_off() {
   echo "dispatch-resolve: off ($1; nothing sent)" >&2
@@ -622,6 +638,20 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       end
     end
   end') || emit_error "resolution failed"
+
+CHOSEN=$(jq -r '.chosen.profile | select(.model) | [.harness, .model] | @tsv' <<<"$RESULT") || emit_error "resolution failed"
+if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
+  IFS=$'\t' read -r chosen_harness chosen_model <<<"$CHOSEN"
+  chosen_account=$(fm_worker_account_resolve "$chosen_harness" "$CONFIG") \
+    || emit_error "worker account pin for $chosen_harness does not resolve"
+  chosen_context=selected
+  if [ "$chosen_harness" = claude ] && { [ -e "$CONFIG/claude-launcher" ] || [ -L "$CONFIG/claude-launcher" ]; }; then
+    chosen_context=unavailable
+  fi
+  FM_CONFIG_OVERRIDE="$MODEL_CONFIG" fm_worker_account_check_entry "$chosen_account" \
+    "$SCRIPT_DIR/fm-model-index.sh" "$chosen_harness" "$chosen_model" "$chosen_context" \
+    || emit_error "model index: chosen $chosen_harness model $chosen_model failed its catalog check"
+fi
 
 TEXT=$(jq -r '
   def flat: tostring | gsub("[\t\r\n]"; " ");

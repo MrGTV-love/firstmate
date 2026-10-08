@@ -31,6 +31,10 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-compact-adviser-lib.sh
 . "$SCRIPT_DIR/fm-compact-adviser-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-secondmate-nudge-lib.sh
+. "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -47,6 +51,39 @@ META="$STATE/$ID.meta"
 REMOTE_HOST=$(fm_meta_get "$META" remote_host)
 [ -n "$REMOTE_HOST" ] \
   || die "task $ID is not a remotely placed secondmate; use bin/fm-control.sh $ID relaunch instead"
+
+fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$HARNESS" || exit 1
+REMOTE_LOCK=$(fm_remote_inherit_transaction_lock_path "$STATE" "$ID") \
+  || die "cannot resolve the remote inheritance transaction lock"
+fm_lock_acquire_wait "$REMOTE_LOCK" || die "cannot lock the remote inheritance transaction"
+PAIR_DIR=
+trap 'fm_lock_release "$REMOTE_LOCK" || true; [ -z "$PAIR_DIR" ] || rm -rf -- "$PAIR_DIR"' EXIT
+PAIR_DIR=$(mktemp -d "$STATE/.remote-relaunch-pair.XXXXXX") \
+  || die "cannot stage the remote relaunch routing pair"
+fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$PAIR_DIR" 1 \
+  || die "cannot stage the remote relaunch routing pair"
+fm_config_inherit_pair_valid "$PAIR_DIR" || die "the remote relaunch routing pair is incoherent"
+case "$MODEL" in
+  -|default) ;;
+  *) MODEL=$(FM_CONFIG_OVERRIDE="$PAIR_DIR" \
+    "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit $? ;;
+esac
+GENERATION=$(fm_remote_inherit_generation_next "$STATE" "$ID") \
+  || die "cannot publish the remote inheritance generation"
+REMOTE_MARKER=$(fm_secondmate_nudge_marker_path "$STATE" "$ID") \
+  || die "cannot resolve the remote reread marker"
+fm_secondmate_nudge_write "$STATE" "$ID" "$(fm_meta_get "$META" home)" "" remote \
+  "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1 \
+  || die "cannot record the remote reread marker"
+if INHERIT_OUT=$(FM_CONFIG_INHERIT_PAIR_DIR="$PAIR_DIR" FM_CONFIG_INHERIT_LIVE=1 \
+  "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$ID" "$GENERATION" 2>&1); then
+  :
+else
+  rc=$?
+  printf '%s\n' "$INHERIT_OUT" >&2
+  printf 'error: remote inheritance refused; the running secondmate was not relaunched\n' >&2
+  exit "$rc"
+fi
 
 RELAUNCH_ARGS=("$ID" "$HARNESS" "$MODEL" "$EFFORT")
 if [ "$(fm_compact_adviser_force_off)" = 1 ]; then
@@ -99,3 +136,4 @@ done < "$META"
 chmod 0600 "$META_TMP"
 mv -f -- "$META_TMP" "$META"
 fm_lock_release "$META_LOCK"
+rm -f -- "$REMOTE_MARKER"

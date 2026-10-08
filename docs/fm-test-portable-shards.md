@@ -60,6 +60,8 @@ Assignment is longest-processing-time bin packing over per-script duration hints
 The serial hints were refreshed from successful per-script records in the `fm-test-timing-portable-serial-*` artifacts of the complete green [run 35279383618](https://github.com/kunchenguid/firstmate/actions/runs/35279383618) and the available completed shards of [run 35282466441](https://github.com/kunchenguid/firstmate/actions/runs/35282466441) on 2026-09-17.
 Together these cover all 176 serial scripts at refresh time; retain the slower successful sample where both exist.
 The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
+Three supplemental hints come from completed successful shards of the partial [run 37654991238](https://github.com/MrGTV-love/firstmate/actions/runs/37654991238) on 2026-10-07: `tests/fm-session-launch-policy-inherit.test.sh` measured 16144 ms on shard 4, `tests/fm-session-launch-policy-receipt.test.sh` measured 2166 ms on shard 9, and `tests/fm-session-launch-policy.test.sh` measured 229671 ms on shard 7.
+All three shard summaries report `failed=0`, and each measured row reports `exit=0` and `gate_skip=false`.
 An unfinished or failed invocation is not a healthy duration sample.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.
@@ -114,6 +116,8 @@ No fast mode, path skips, reduced checks, or paid runner provisioning is part of
 
 The [lint script header](../bin/fm-lint.sh) owns local dependency discovery, conservative unresolved-import selection, and successful-result cache controls; these do not replace full joint source analysis.
 Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
+Spawn, control, and remote secondmate relaunch obtain configuration inheritance through their shared launch-policy import rather than importing it again.
+The policy library's lazy wake import uses the existing canonical-owner analysis boundary, while the wake owner remains in the complete lint inventory.
 `tests/fm-test-run.test.sh` verifies changed status and UTC owners through the runner's authoritative consuming-family map.
 
 A same-host Darwin cold comparison on 2026-10-04 (UTC), using ShellCheck 0.11.0 with `/usr/bin/time -l "$SHELLCHECK" --norc --external-sources -- <root>`, recorded the following direct analyzer high-water RSS in bytes, wall seconds, and starting 1-minute load.

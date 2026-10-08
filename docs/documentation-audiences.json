@@ -229,6 +229,90 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/hyper-jev/FIRSTMATE.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/SOURCE.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/01-structure-and-setup.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/02-input-output.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/03-question-design.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/04-client-operations.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/05-production.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/README.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/01-single-decisions.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/02-fan-out.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/03-composite-scoring.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/04-confidence-gating.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/05-routing.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/06-interactive-decisions.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/07-guardrails.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/08-decision-loops.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/09-high-cardinality.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/10-dynamic-questions.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/cookbook/use-cases/README.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/hyper-jev/templates/starter/README.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/process-event-sources/SKILL.md",
       "audience": "agent-runtime"
     },
@@ -338,6 +422,10 @@
     },
     {
       "path": "docs/examples/crew-dispatch.json",
+      "audience": "operator-example"
+    },
+    {
+      "path": "docs/examples/model-index.json",
       "audience": "operator-example"
     },
     {

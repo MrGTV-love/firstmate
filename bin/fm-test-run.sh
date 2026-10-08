@@ -136,11 +136,14 @@
 # share a machine. This script owns <n>: a lane whose <n> disagrees with the
 # configured shard count is refused, so a CI matrix cannot silently drop a shard.
 # --changed is conservative: it over-selects related families rather than
-# under-selecting, and never expands to the complete suite unless --all. The one
+# under-selecting, and never expands to the complete suite unless --all. One
 # place it is deliberately narrow is a bin/ path with no curated family: a test
 # that names it is selected as that SCRIPT, because the reference is per-script
 # evidence. Consumer bin/ scripts still resolve through the curated map, so
 # recorded family-level coupling still expands to the whole family.
+# The vendored-skill arm for .agents/skills/hyper-jev/ is another exception: it
+# selects no suite except for SKILL.md, which retains its earlier family-selection
+# rule.
 # tests/lib.sh, tests/fixtures.sh, tests/*-helpers.sh and tests/*-fixture.sh are
 # shared files that map to the suites naming them; a fixture under
 # tests/fixtures/<dir>/ is mapped by that directory instead. Curated family arms
@@ -371,7 +374,7 @@ family_for_basename() {
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\
     fm-supervision-host-live-e2e.test.sh|fm-supervision-host-attended-live-e2e.test.sh|\
     fm-host-mirror-live-e2e.test.sh|\
-    fm-quota-array-dispatch-live-e2e.test.sh|fm-send-secondmate-marker-herdr-e2e.test.sh|\
+    fm-quota-array-dispatch-live-e2e.test.sh|fm-model-index-live-e2e.test.sh|fm-send-secondmate-marker-herdr-e2e.test.sh|\
     fm-send-inbox-doorbell-live-e2e.test.sh|\
     fm-calm-claude-mod-plugin.test.sh|fm-calm-claude-mod-live-e2e.test.sh|\
     fm-calm-pi-queue-retention-live-e2e.test.sh|\
@@ -382,6 +385,7 @@ family_for_basename() {
     fm-tmux-agent-liveness.test.sh|\
     fm-control.test.sh|fm-control-relaunch.test.sh|\
     fm-launch-proof.test.sh|\
+    fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
     fm-send-inbox.test.sh|fm-spawn-batch.test.sh|\
     fm-spawn-dispatch-profile.test.sh|fm-claude-trust.test.sh|\
@@ -420,7 +424,7 @@ family_for_basename() {
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
-    fm-dispatch-resolve.test.sh|fm-skill-suggest.test.sh|\
+    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-suggest.test.sh|\
     fm-extension-binding.test.sh|fm-gitignore-config.test.sh|\
     fm-no-mistakes-required.test.sh|fm-peek-remote.test.sh|\
     fm-pending-reply.test.sh|fm-pi-branch-extension.test.sh|\
@@ -819,6 +823,9 @@ tests/fm-send-remote-delivery.test.sh 27717
 tests/fm-send-resolve-key.test.sh 28685
 tests/fm-send-secondmate-marker-herdr-e2e.test.sh 52
 tests/fm-send-secondmate-marker.test.sh 5309
+tests/fm-session-launch-policy-inherit.test.sh 16144
+tests/fm-session-launch-policy-receipt.test.sh 2166
+tests/fm-session-launch-policy.test.sh 229671
 tests/fm-session-lock-ancestry.test.sh 2857
 tests/fm-session-start.test.sh 179350
 tests/fm-sessionstart-hook-live-e2e.test.sh 97
@@ -1475,9 +1482,13 @@ families_for_changed_path() {
       printf '%s\n' secondmate
       printf '%s\n' session-bootstrap
       ;;
+    bin/fm-config-inherit-lib.sh|bin/fm-remote-inherit-push.sh|bin/fm-config-push.sh)
+      printf '%s\n' secondmate
+      printf '%s\n' "__script__:fm-model-index.test.sh"
+      ;;
     bin/fm-secondmate*|bin/fm-remote*|bin/fm-on.sh|bin/fm-home-seed.sh|\
     bin/fm-backlog-handoff.sh|bin/fm-backlog-receive.sh|bin/fm-procevent-remote-reply.sh|\
-    bin/fm-config-inherit-lib.sh|bin/fm-config-push.sh|bin/fm-shared*|\
+    bin/fm-shared*|\
     bin/fm-stow-cascade.sh)
       printf '%s\n' secondmate
       ;;
@@ -1511,6 +1522,15 @@ families_for_changed_path() {
       ;;
     bin/fm-skill-suggest.sh|bin/fm-skill-catalog.jq)
       printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      ;;
+    bin/fm-model-index.sh)
+      printf '%s\n' "__script__:fm-model-index.test.sh"
+      printf '%s\n' "__script__:fm-model-index-live-e2e.test.sh"
+      printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
+      printf '%s\n' "__script__:fm-spawn-dispatch-profile.test.sh"
+      printf '%s\n' "__script__:fm-worker-account.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' session-bootstrap
       ;;
     bin/fm-env-lib.sh)
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and
@@ -1673,6 +1693,10 @@ families_for_changed_path() {
       ;;
     .agents/skills/*/SKILL.md)
       printf '%s\n' pure-contract-unit
+      ;;
+    .agents/skills/hyper-jev/*)
+      # Vendored upstream skill files (see SOURCE.md there) have no firstmate
+      # test consumer, so they select no suite instead of refusing as unmapped.
       ;;
     .github/workflows/ci.yml|.no-mistakes.yaml)
       printf '%s\n' pure-contract-unit

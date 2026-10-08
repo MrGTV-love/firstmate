@@ -50,7 +50,7 @@ Launching a supported harness inside it for your primary session instantiates yo
 - **Event-driven, zero-token supervision** - a bash watcher sleeps on the fleet and wakes the first mate only when something needs you; verified primary harnesses also get a turn-end backstop that blocks or follows up on a blind stop when work is under way and supervision is not live.
 - **Optional Relay** - opt in with one local `.env` pairing token so firstmate can answer your public mentions on X and Discord alike, act on normal reversible mention requests through the same lifecycle as chat requests, acknowledge spawned work, and post up to three public-safe completion follow-ups within seven days for genuine milestones and the final outcome without changing non-Relay behavior; a final reply promised in a thread becomes durable state that is reconciled from disk, so a restart or a compacted conversation cannot lose it; dry-run preview records would-be replies and dismissals locally before go-live.
 - **Strict project boundary** - the first mate is read-only over your projects except for the narrow guarded and captain-approved operations authorized by [hard rule 1](AGENTS.md#1-identity-and-prime-directives), including fleet sync's guarded safe branch pruning; crewmates make every other project change behind the configured merge authority.
-- **Restart-proof** - all state lives on disk and in the active session backend (tmux by hard default, herdr or cmux when selected or auto-detected, zellij/orca when explicitly selected); the next session reconciles after a restart, while ordinary supervision recovers confirmed-dead secondmate agents without waiting for one.
+- **Restart-proof** - all state lives on disk and in the active session backend (tmux by hard default, herdr or cmux when selected or auto-detected, zellij/orca when explicitly selected); the next session reconciles after a restart, while ordinary supervision recovers eligible confirmed-dead secondmate agents without waiting for one, subject to the [session launch policy](docs/configuration.md#session-launch-policy-configsession-launch-policy).
 
 Full detail on every feature lives in [docs/architecture.md](docs/architecture.md).
 
@@ -204,7 +204,10 @@ Agent-only reference skills live under `.agents/skills/` and are loaded by first
 
 Firstmate's skills live in two separate places with different audiences:
 
-- `.agents/skills/` - agent-loaded skills (this section's table, plus firstmate's agent-only reference skills). Every one of these assumes a live firstmate home and is meaningless, or actively misleading, installed anywhere else, so each carries `metadata.internal: true` in its frontmatter. That flag hides them from installer discovery (tools like the [skills.sh](https://skills.sh) `npx skills add` installer) without affecting how firstmate itself loads them - frontmatter metadata is inert to the agent's own skill loader.
+- `.agents/skills/` - agent-loaded skills (this section's table, plus firstmate's agent-only reference skills).
+  Firstmate-internal skills assume a live firstmate home and are meaningless, or actively misleading, installed anywhere else, so each carries `metadata.internal: true` in its frontmatter.
+  That flag hides them from installer discovery (tools like the [skills.sh](https://skills.sh) `npx skills add` installer) without affecting how firstmate itself loads them - frontmatter metadata is inert to the agent's own skill loader.
+  The portable, vendored [`hyper-jev`](.agents/skills/hyper-jev/SOURCE.md) is the exception: it is not firstmate-internal and carries no `metadata.internal`.
 - `skills/` - public, installer-facing skills meant to be installed standalone into any project, independent of firstmate.
   Each one is a self-contained skill with no dependency on firstmate's paths, tools, or vocabulary.
   Today that is `skills/stow`, a generic session-knowledge-sweep skill that routes findings by explicit instruction first, then existing local conventions, then a private `.stow-notes.md` fallback, and curates tiered entries through decay, local archival, and user-approved on-demand offload proposals.
