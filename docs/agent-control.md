@@ -23,7 +23,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
   `bin/fm-send.sh`'s `--key` path reads the composer-clear table from this owner too, rather than keeping a second copy of it.
 - **Per-backend capability**: which named keys a runtime backend can deliver, and whether it has a recovery-grade agent-state classifier able to prove an agent stopped.
 
-The [endpoint-absence proof](#reclaiming-a-task-whose-endpoint-is-gone) below is the only function here that runs backend reads; sourcing the file is still free.
+The [endpoint-absence proof](#reclaiming-a-task-whose-endpoint-is-gone) and its worktree-holder helper perform backend and process reads; the capability tables remain pure, and sourcing the file performs no probes.
 
 A recorded `harness=` is not always an exact adapter name: a task launched from a raw command records that command's basename instead.
 `fm_control_harness_family` is the one place that prefix rule is stated, and an unrecognized value resolves to no adapter rather than being guessed into one.
@@ -138,7 +138,8 @@ An unreachable endpoint can still hold the live agent a rebind would duplicate, 
   The scan runs from `/`, so neither `lsof` nor its transient command-substitution shell becomes a worktree holder when recovery is invoked from the worktree or a descendant.
   Positively identified idle shells do not block the proof; an unattributed worktree holder does.
   Other tmux servers owned by the same uid, and their clients, say nothing about this endpoint and no longer block it; this proof never queries or lists them.
-  Every harness counts as an agent here, including node-bundle harnesses such as Gemini, because each holder is classified from its name, its first argument and its full command line. A readable identity that cannot be attributed, including an ambiguous flattened script path, is not proof of a non-agent.
+  Every harness counts as an agent here, including node-bundle harnesses such as Gemini, because each holder is classified from its name, its first argument and its full command line.
+  A readable identity that cannot be attributed, including an ambiguous flattened script path, is not proof of a non-agent.
   An unreadable process table, a missing `lsof`, a scan that fails part way, a process record with no absolute working-directory path (including a CWD error returned as its NAME), a failed holder identity read, an empty or unattributed identity, or a tmux answer that is not definitive refuses.
   A renamed session or a window moved to another server still refuses while an agent holds the worktree.
 

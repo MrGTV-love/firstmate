@@ -95,14 +95,15 @@ while [ "$#" -gt 0 ]; do
   if [ "$1" = -p ]; then excluded=${2:-}; shift; fi
   shift
 done
+mode=$(cat "$D/lsof-mode" 2>/dev/null || printf none)
+[ "$mode" != empty ] || exit 0
 if [ "$excluded" != "^$$" ]; then
   printf 'p%s\nn%s\n' "$$" "$(encode_cwd "$(pwd -P)")"
 fi
-case "$(cat "$D/lsof-mode" 2>/dev/null || printf none)" in
+case "$mode" in
   broken) echo 'lsof: WARNING: could not read the process table' >&2; exit 1 ;;
   partial) printf 'p111\nn/\np222\nn/private/tmp\n'; echo 'lsof: WARNING: read timeout' >&2; exit 1 ;;
   nocwd) printf 'p111\nn/\np%s\n' "$(cat "$D/holder-pid")"; exit 0 ;;
-  empty) exit 0 ;;
   holder) printf 'p111\nn/\np222\nn/private/tmp\np%s\nn%s\n' "$(cat "$D/holder-pid")" "$(encode_cwd "$(cat "$D/holder-cwd")")"; exit 0 ;;
 esac
 printf 'p111\nn/\np222\nn/private/tmp\n'

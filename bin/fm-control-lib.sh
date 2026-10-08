@@ -12,12 +12,10 @@
 # verbs addressed to an exact task id, with the per-harness mechanics owned
 # here rather than improvised per harness in agent prose.
 #
-# This file owns three capability tables plus their pure artifact-path tables,
-# and ONE named exception to that purity - fm_control_endpoint_absence_verdict,
-# the single owner of the per-backend endpoint-absence proof, which does run
-# backend reads. Everything else has no side effects, runs no backend command,
-# and reads no state, so sourcing this file is still free and the tables can be
-# read by a test as a pure contract:
+# This file owns three capability tables plus their pure artifact-path tables.
+# fm_control_endpoint_absence_verdict and its worktree-holder helper perform
+# backend and process reads; the tables remain pure, and sourcing this file
+# performs no probes:
 #
 #   1. Verb allowlist. There is no arbitrary-text and no generic raw-key entry
 #      point on the control plane; a caller either names an allowlisted verb or
@@ -325,13 +323,10 @@ fm_control_lsof_path() (
 
 # fm_control_worktree_agent_holder: whether a harness agent process has the
 # recorded worktree (or a directory under it) as its working directory.
-# Prints `none`, `held`, or `unknown`; only `none` is evidence, and any read
-# that cannot be completed is `unknown`: a scan that exits non-zero, a process
-# record with no working directory, or a holder whose name or command line
-# cannot be read. Each holder is classified from every identity surface by
-# fm_agent_process_classify, so node-bundle harnesses count as agents too.
-# Reads the machine's process working-directory table once and touches no tmux
-# server.
+# Prints `none`, `held`, or `unknown`; only `none` is absence evidence.
+# Unresolved evidence must stay `unknown`, never become a negative finding.
+# docs/agent-control.md "Reclaiming a task whose endpoint is gone" owns the
+# proof requirements; fm_agent_process_classify owns holder attribution.
 fm_control_worktree_agent_holder() {  # <worktree>
   local wt=${1-} wt_real records rc line pid="" path root comm args argv0 holders="" seen=0 has_cwd=1
   case "$wt" in /*) ;; *) printf 'unknown'; return 0 ;; esac
@@ -408,27 +403,10 @@ HOLDERS
 # re-creating the endpoint - must come through here rather than trusting the
 # raw verdict.
 #
-# Whether absence is provable AT ALL is a property of the backend, not of the
-# reading:
-#   herdr CAN prove it. Every read goes through fm_backend_herdr_cli, which
-#     passes `--session <session>`, so the recheck starts and reads the session
-#     the RECORD names, through that session's own socket. The answer is about
-#     the task's endpoint and nothing else.
-#   tmux CAN prove it for the recorded endpoint. Its record carries a session
-#     and window name but no socket identity, so the proof is scoped to what
-#     the record does name: the exact recorded session on the server this
-#     process addresses, plus the recorded worktree. The addressed server must
-#     twice answer definitively that the session or the whole server is absent,
-#     or list the session without the recorded window; a window that answers
-#     is never absent. Between those reads, no process classified as a harness
-#     agent may hold the recorded worktree as its working directory, because a
-#     window that lives on another socket still leaves its agent running there.
-#     An unrelated tmux server owned by the same uid proves nothing about this
-#     endpoint and does not block the proof. An unreadable worktree, a missing
-#     lsof, an unreadable process, or a non-definitive tmux answer refuses.
-#
-# Both control-plane callers share this one implementation so the proof cannot
-# drift into two answers for the same endpoint.
+# docs/agent-control.md "Reclaiming a task whose endpoint is gone" owns the
+# backend proof requirements and reclaim policy. tmux callers must supply the
+# recorded worktree as well as the target; a socket-local read alone cannot
+# rule out a live owner on another socket.
 fm_control_endpoint_absence_verdict() {  # <backend> <target> [worktree]
   local backend=${1-} target=${2-} worktree=${3-} session window inventory status holder pass=0
   fm_backend_source "$backend" \
