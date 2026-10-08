@@ -76,7 +76,7 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 ### omp idle wake delivery
 
 omp starts no turn for an explicit follow-up that reaches an idle session unless its own auto-continue gate passes, and that gate refuses while the context tail is not an assistant or tool result, such as an advisor note posted after the turn ended.
-`.omp/extensions/fm-primary-omp-watch.ts` therefore sends a wake through omp's prompt-starting message API when the session positively reports itself idle, and otherwise queues it as a follow-up.
+`.omp/extensions/fm-primary-omp-watch.ts` sends a wake through omp's prompt-starting message API only when the latest extension context returns exactly `true` from `isIdle()`; busy, missing, or unreadable idle state keeps follow-up delivery.
 The prompt flow never touches the composer, so an operator draft stays unsent, and it also flushes any follow-up already stranded in omp's queue.
 `tests/fm-omp-harness.test.sh` covers idle delivery behind an advisor tail with an empty composer and with a draft, plus the follow-up fallback for an unreadable idle state; the live guard's idle step and its evidence are recorded in [omp idle wake behind an advisor note](verification/runtime-backends.md#2026-10-08-omp-idle-wake-behind-an-advisor-note).
 

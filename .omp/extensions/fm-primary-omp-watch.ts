@@ -6,9 +6,8 @@
 //   - omp auto-discovers this file from <cwd>/.omp/extensions with no trust
 //     gate, so an omp primary or secondmate started inside its home loads it
 //     without -e (naming it both ways loads it twice - verified, omp 18.1.11).
-//   - pi.sendUserMessage returns synchronously (no promise) in omp, so "Pi
-//     accepted the follow-up" collapses to "the call returned"; consumption is
-//     tracked only at the accepted user message_start.
+//   - pi.sendUserMessage returns synchronously (no promise) in omp, so accepting
+//     a wake means the call returned, not that a turn consumed it.
 //   - omp reports no session_shutdown reason, so EVERY shutdown with a pending
 //     actionable close persists the replacement handoff and the next owning
 //     session_start, in this process or a later one, replays it. Replaying a
@@ -49,9 +48,7 @@
 // Delivery versus consumption (stated once here):
 // A main wake is delivered once omp accepts it (sendUserMessage returns).
 // docs/watcher-continuity.md#omp-idle-wake-delivery owns idle delivery and
-// composer safety. An idle explicit follow-up may never start a turn behind a
-// custom context tail (verified, omp 18.8.1), so positive idle proof must use
-// the prompt flow.
+// composer safety.
 // The successor pipeline never waits for the model to read it: a follow-up
 // queued while main is streaming joins the running run without ever raising
 // before_agent_start, so waiting on that event stalls every later close.
