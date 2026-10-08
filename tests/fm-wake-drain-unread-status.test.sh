@@ -441,6 +441,74 @@ test_routine_working_and_covered_done_stay_silent_on_the_empty_queue() {
   pass "routine working and branch-covered done lines print nothing on an empty-queue drain"
 }
 
+# A fleet-sized drain must not fork once per status line or once per cursor row.
+# The incident: a drain over 25 status logs and a 25-row presentation cursor
+# created thousands of processes per run, because every cursor-row read, every
+# stat, and every routine `resolved` line each paid a command substitution, and
+# the cost grew with the fleet and with unread history. Production now takes
+# those values without a child process, so the subshells an empty-queue drain
+# enters over routine history must stay flat as history grows and must grow only
+# linearly, by a small fixed amount, as tasks are added.
+#
+# subshell_entries <state> <count-file> prints how many subshells the drain
+# entered (command substitutions, pipeline stages, and the like). The drain is
+# sourced under set -T so the DEBUG trap follows into every subshell, and each
+# process notes the first command it runs at a new subshell depth: a child
+# inherits its parent's last-seen depth, so its first command is the entry.
+subshell_entries() {
+  local state=$1 count=$2
+  : > "$count"
+  # The drain reads its own arguments, so the script path and the count file
+  # travel in the environment and the sourced script sees no arguments.
+  FM_STATE_OVERRIDE="$state" SUBSHELL_ENTRY_COUNT="$count" SUBSHELL_ENTRY_DRAIN="$DRAIN" bash -c '
+    set -T
+    seen_depth=0
+    trap '\''if [ "$BASH_SUBSHELL" != "$seen_depth" ]; then seen_depth=$BASH_SUBSHELL; printf x >> "$SUBSHELL_ENTRY_COUNT"; fi'\'' DEBUG
+    . "$SUBSHELL_ENTRY_DRAIN"
+  ' >/dev/null 2>&1 || fail "the instrumented drain exited non-zero"
+  wc -c < "$count" | tr -d '[:space:]'
+}
+
+# <state> <tasks> <history>: each task opens with a working line, then carries
+# <history> routine lines, half of them `resolved` closes under a non-reserved
+# key. Routine lines stay unread (and so are rescanned by every drain) until a
+# signal needs them, which makes this the steady state of a busy fleet.
+build_routine_fleet() {
+  local state=$1 tasks=$2 history=$3 t i
+  for ((t = 0; t < tasks; t++)); do
+    {
+      printf 'working: starting task %s\n' "$t"
+      for ((i = 0; i < history; i++)); do
+        printf 'resolved [key=side-%s]: routine close %s\n' "$i" "$i"
+        printf 'working: step %s\n' "$i"
+      done
+    } > "$state/fleet$t.status"
+  done
+  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>&1 \
+    || fail "priming drain failed over the routine fleet"
+}
+
+test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow() {
+  local dir small_hist large_hist few many per_task
+  dir=$(make_case drain-subshell-entries)
+  mkdir -p "$dir/h-small/state" "$dir/h-large/state" "$dir/f-few/state" "$dir/f-many/state"
+  build_routine_fleet "$dir/h-small/state" 3 3
+  build_routine_fleet "$dir/h-large/state" 3 60
+  small_hist=$(subshell_entries "$dir/h-small/state" "$dir/h-small.count")
+  large_hist=$(subshell_entries "$dir/h-large/state" "$dir/h-large.count")
+  [ "$large_hist" -le "$((small_hist + 40))" ] \
+    || fail "drain subshell entries grow with unread history: $small_hist for 3 routine lines per task, $large_hist for 60"
+
+  build_routine_fleet "$dir/f-few/state" 3 3
+  build_routine_fleet "$dir/f-many/state" 11 3
+  few=$(subshell_entries "$dir/f-few/state" "$dir/f-few.count")
+  many=$(subshell_entries "$dir/f-many/state" "$dir/f-many.count")
+  per_task=$(( (many - few) / 8 ))
+  [ "$per_task" -le 40 ] \
+    || fail "drain subshell entries grow too fast with the fleet: $few for 3 tasks, $many for 11 ($per_task per added task, limit 40)"
+  pass "drain subshell entries stay flat as unread history grows and linear in the fleet ($per_task per task)"
+}
+
 test_incident_note_answer_buried_under_routine_note_surfaces_both
 test_already_presented_notes_are_not_replayed
 test_brand_new_note_after_presentation_is_surfaced
@@ -455,3 +523,4 @@ test_snapshot_failure_is_visible
 test_open_decisions_fold_is_unchanged
 test_empty_queue_does_not_swallow_later_signal_annotation
 test_routine_working_and_covered_done_stay_silent_on_the_empty_queue
+test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow
