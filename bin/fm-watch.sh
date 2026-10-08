@@ -336,6 +336,17 @@ case "$OPEN_LOOPS_RESURFACE" in
 esac
 [ "$OPEN_LOOPS_RESURFACE" -gt 0 ] || OPEN_LOOPS_RESURFACE=21600
 OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-$SCRIPT_DIR/fm-open-loops.sh}
+# Finished-session cleanup (bin/fm-idle-session-reap.sh) runs detached at this cadence;
+# 0 disables it. The first sweep waits one full interval so a fresh watcher does not
+# add teardown work to a session start. The next-due time is held in memory, which
+# keeps the poll free of a stat per cycle; a restart only delays the next sweep.
+IDLE_REAP_INTERVAL=${FM_IDLE_REAP_INTERVAL:-900}
+case "$IDLE_REAP_INTERVAL" in
+  ''|*[!0-9]*) IDLE_REAP_INTERVAL=900 ;;
+  *) IDLE_REAP_INTERVAL=$((10#$IDLE_REAP_INTERVAL)) ;;
+esac
+IDLE_REAP_BIN=${FM_IDLE_REAP_BIN:-$SCRIPT_DIR/fm-idle-session-reap.sh}
+IDLE_REAP_NEXT=
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
@@ -2620,6 +2631,34 @@ open_loops_refresh_detached() {
   [ -e "$STATE/.open-loops-started" ] || : > "$STATE/.open-loops-started"
 }
 
+# Finished-session cleanup, detached for the same reason as the ledgers above: a
+# sweep that runs teardown can take minutes, and the poll must keep advancing the
+# beacon. The sweep is single-flight on its own lock, and it only ever asks
+# bin/fm-teardown.sh, which proves landing itself, so a missed or skipped tick
+# loses nothing.
+IDLE_REAP_PID=
+idle_reap_tick() {
+  local now
+  [ "$IDLE_REAP_INTERVAL" -gt 0 ] || return 0
+  fm_epoch_seconds_to now
+  if [ -z "$IDLE_REAP_NEXT" ]; then
+    IDLE_REAP_NEXT=$((now + IDLE_REAP_INTERVAL))
+    return 0
+  fi
+  [ "$now" -ge "$IDLE_REAP_NEXT" ] || return 0
+  IDLE_REAP_NEXT=$((now + IDLE_REAP_INTERVAL))
+  if [ -n "$IDLE_REAP_PID" ]; then
+    if kill -0 "$IDLE_REAP_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$IDLE_REAP_PID" 2>/dev/null || true
+    IDLE_REAP_PID=
+  fi
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$IDLE_REAP_BIN" reap </dev/null >/dev/null 2>&1 &
+  IDLE_REAP_PID=$!
+}
+
 # Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
 # wakes firstmate at once; an unchanged overdue set repeats only every
 # OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
@@ -2879,6 +2918,7 @@ while :; do
   fi
   open_loops_surface
   watcher_beat
+  idle_reap_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;
