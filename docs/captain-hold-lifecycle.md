@@ -494,11 +494,12 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 - Cleanup of a finished task whose own row is the captain call leaves that call open, queued, held, carrying its deliverable, and visible in Bearings' Captain's Call.
   That cleanup leaves no pending record behind.
-  The call survives a `--force` cleanup and closes only when `answer` records the captain's words.
+  The call survives a `--force --drop-file <captain-words>` cleanup and closes only when `answer` records the captain's words.
   An ordinary finished task in the same home still closes with its report link.
 - An interrupted cleanup leaves the row In flight and untouched with its pending record.
   When the row remains unanswered, the next session start retains it as queued and held with the deliverable recorded.
   An answer before replay preserves that record's completed report while closing the call, so the next session start retires the satisfied record without losing the delivery from Recently Landed.
+  The Gerrit answer-before-replay case uses ordinary cleanup of already-landed Git work, preserving the change URL rather than recording a forced ship discard as `dropped`.
 - A pending-close record that cannot be validated refuses the answer while naming the record and the reason.
 - A relocated data directory keeps the retention in its one configured backlog.
 

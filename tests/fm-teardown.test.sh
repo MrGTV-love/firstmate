@@ -2954,7 +2954,7 @@ run_herdr_lock_ns_teardown() {  # <case-dir> <fake-uid> [stat-spec]
   FM_FAKE_ACCOUNT_UID="$fake_uid" FM_FAKE_NS_STAT="$stat_spec" \
     FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
     FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
-    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   return "$rc"
 }
 

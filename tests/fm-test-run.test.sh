@@ -355,6 +355,42 @@ test_changed_spawn_selects_picker_without_broadening_siblings() {
   pass "spawn changes select picker coverage without broadening sibling commands"
 }
 
+test_supervision_groups_share_coverage_and_changed_selection() {
+  local tmp repo listed script owner
+  tmp=$(fm_test_tmproot fm-test-run-supervision-selection)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for script in fm-supervision-host.test.sh fm-supervision-host-hook.test.sh; do
+    printf '#!/usr/bin/env bash\n# fm-supervision-host-helpers.sh\n' >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  printf '# wake-helpers.sh\n' >"$repo/tests/fm-supervision-host-helpers.sh"
+  : >"$repo/tests/wake-helpers.sh"
+  : >"$repo/.pi/extensions/lib/fm-branch-dispatch.ts"
+  git -C "$repo" add tests .pi
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm supervision-selection-fixture
+
+  for owner in tests/fm-supervision-host-helpers.sh tests/wake-helpers.sh .pi/extensions/lib/fm-branch-dispatch.ts; do
+    printf '\n' >>"$repo/$owner"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$owner failed supervision selection"
+    for script in fm-supervision-host.test.sh fm-supervision-host-hook.test.sh; do
+      assert_contains "$listed" "tests/$script" "$owner selects $script"
+    done
+    assert_not_contains "$listed" "tests/fm-pr-merge.test.sh" "$owner must not widen to unrelated suites"
+    git -C "$repo" add "$owner"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm supervision-owner-change
+  done
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --family afk)
+  for script in fm-supervision-host.test.sh fm-supervision-host-hook.test.sh; do
+    assert_contains "$listed" "tests/$script" "AFK family includes $script"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list "tests/$script")
+    [ "$listed" = "tests/$script" ] || fail "$script must be independently selectable: $listed"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --family afk)
+  done
+  pass "both supervision groups retain family coverage and direct/transitive changed selection"
+}
+
 test_changed_dependency_selection_and_unmapped_failure() {
   local tmp repo listed rc
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-changed.XXXXXX")
@@ -1514,29 +1550,12 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
 }
 
 test_portable_serial_packing_budget_boundary() {
-  local tmp repo script weight out rc
+  local tmp repo weight out rc
   tmp=$(fm_test_tmproot fm-test-run-packing-boundary)
   repo="$tmp/repo"
-  mkdir -p "$repo/bin" "$repo/tests"
-  # Preserve the real inventory and packing policy without executing suites.
-  # Only the fixture's measured timing input changes at the boundary.
-  while IFS= read -r script; do
-    printf '#!/usr/bin/env bash\nexit 0\n' >"$repo/$script"
-  done < <("$RUNNER" --list --all)
 
   for weight in 1200000 1200001; do
-    cp "$RUNNER" "$repo/bin/fm-test-run.sh"
-    python3 - "$repo/bin/fm-test-run.sh" "$weight" <<'PY' \
-      || fail "could not seed the fixture's measured timing input"
-from pathlib import Path
-import re, sys
-runner = Path(sys.argv[1])
-runner.write_text(re.sub(
-    r"(?m)^tests/fm-watch-triage\.test\.sh [0-9]+$",
-    f"tests/fm-watch-triage.test.sh {sys.argv[2]}",
-    runner.read_text(),
-))
-PY
+    shard_fixture_init "$repo" "$weight"
     out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
     if [ "$weight" -eq 1200000 ]; then
       expect_code 0 "$rc" "packing exactly at the budget must be accepted"
@@ -1566,9 +1585,26 @@ PY
 # harness adds are enough to hide it, and a regression test that cannot fail on
 # the old code proves nothing.
 shard_fixture_init() {
-  local dir=$1 name
+  local dir=$1 name weight=${2:-1}
   mkdir -p "$dir/bin" "$dir/tests"
   cp "$RUNNER" "$dir/bin/fm-test-run.sh"
+  # Keep coverage fixtures independent of production duration growth. The
+  # optional boundary weight changes only the script tested at that boundary.
+  python3 - "$dir/bin/fm-test-run.sh" "$weight" <<'PY' \
+    || fail "could not seed the fixture's measured timing input"
+from pathlib import Path
+import re, sys
+runner = Path(sys.argv[1])
+text = runner.read_text()
+start = text.index("portable_serial_weight_hints() {")
+end = text.index("\nEOF", start)
+text = text[:start] + re.sub(
+    r"(?m)^(tests/[^ ]+\.test\.sh) [0-9]+$",
+    lambda match: f"{match[1]} {sys.argv[2] if match[1] == 'tests/fm-watch-triage.test.sh' else 1}",
+    text[start:end],
+) + text[end:]
+runner.write_text(text)
+PY
   chmod +x "$dir/bin/fm-test-run.sh"
   for name in "$ROOT"/tests/*.test.sh; do
     : >"$dir/tests/${name##*/}"
@@ -2326,6 +2362,7 @@ test_task_marker_refuses_the_primary_checkout
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
+test_supervision_groups_share_coverage_and_changed_selection
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests

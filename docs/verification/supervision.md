@@ -648,11 +648,15 @@ Deterministic entry points:
 
 ```sh
 tests/fm-supervision-host.test.sh
+tests/fm-supervision-host-hook.test.sh
 tests/fm-claude-stop-autoarm.test.sh
 tests/fm-afk-launch.test.sh
 tests/fm-supervision-instructions.test.sh
 tests/fm-watch-arm.test.sh
 ```
+
+Split-fixture smoke on 2026-10-08 (Darwin arm64): all 13 host+hook cases passed through the executable test runner in 362262 ms after registered-home process cleanup was moved to each case boundary. These cases run the real Firstmate host, hooks, watcher, and wake paths with fixture harnesses and an engine stub, not a live model.
+The host group passed its first 44 cases before a latch handoff assertion stopped the full run; a fresh-process smoke of the remaining 16 passed 10 and failed six watcher-freshness, successor-verification, or engine-timing assertions. No full-host pass or healthy new-head duration was established. Local `uptime` reported load averages of 58.20/90.01/99.79 during verification; load is a plausible cause, not a proved diagnosis. Production waits and CI job timeouts were not widened.
 
 
 ### Non-Pi primaries
@@ -701,6 +705,7 @@ Deterministic entry points:
 
 ```sh
 tests/fm-supervision-host.test.sh
+tests/fm-supervision-host-hook.test.sh
 tests/fm-wake-queue.test.sh
 tests/fm-cursor-primary.test.sh
 tests/fm-pi-watch-extension.test.sh
@@ -763,6 +768,7 @@ Deterministic entry points:
 
 ```sh
 tests/fm-supervision-host.test.sh
+tests/fm-supervision-host-hook.test.sh
 tests/fm-afk-return.test.sh
 tests/fm-branch-supervision.test.sh
 ```

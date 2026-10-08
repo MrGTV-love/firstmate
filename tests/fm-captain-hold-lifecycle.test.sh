@@ -3070,7 +3070,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e

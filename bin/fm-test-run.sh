@@ -423,7 +423,7 @@ family_for_basename() {
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
-    fm-supervision-host.test.sh|fm-host-mirror.test.sh)
+    fm-supervision-host.test.sh|fm-supervision-host-hook.test.sh|fm-host-mirror.test.sh)
       printf '%s\n' afk
       ;;
     fm-bearings-board-render.test.sh|fm-bearings-snapshot.test.sh|fm-contributions.test.sh|\
@@ -704,8 +704,8 @@ list_portable_serial() {
 
 # Measured portable-serial script durations in milliseconds, from the CI timing
 # artifacts recorded in docs/fm-test-portable-shards.md. Each value is the
-# slowest successful sample in the referenced complete/partial CI runs, with
-# the version-specific host and native-Windows exceptions documented there.
+# slowest successful sample in the referenced complete/partial runs, with the
+# version/platform and split-supervision baseline exceptions documented there.
 # These are balance hints only: the shard
 # partition stays complete and disjoint whatever they say, so a stale hint costs
 # balance rather than coverage. That doc owns the refresh procedure.
@@ -885,7 +885,8 @@ tests/fm-stow-cascade.test.sh 3058
 tests/fm-supervision-events.test.sh 673
 tests/fm-supervision-host-attended-live-e2e.test.sh 49
 tests/fm-supervision-host-live-e2e.test.sh 75
-tests/fm-supervision-host.test.sh 877426
+tests/fm-supervision-host-hook.test.sh 362262
+tests/fm-supervision-host.test.sh 850858
 tests/fm-tangle-guard.test.sh 8501
 tests/fm-task-delivery.test.sh 32789
 tests/fm-task-inbox.test.sh 31965
@@ -1625,6 +1626,7 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-wake-queue.test.sh
       printf '%s\n' __script__:fm-pi-primary-types.test.sh
       printf '%s\n' __script__:fm-supervision-host.test.sh
+      printf '%s\n' __script__:fm-supervision-host-hook.test.sh
       # Whether an arriving outcome still lets the captain type is a fact only
       # a real Pi TUI can answer, so the live guards are selected too.
       printf '%s\n' live-harness-optin
@@ -1795,6 +1797,11 @@ families_for_changed_path() {
         families_for_test_reference "fixtures/$fixture_ref" \
           || printf '%s\n' "__unmapped__:$path"
       fi
+      ;;
+    tests/wake-helpers.sh)
+      # The supervision groups inherit this helper through their shared fixture.
+      families_for_test_reference wake-helpers.sh fm-supervision-host-helpers.sh \
+        || printf '%s\n' "__unmapped__:$path"
       ;;
     tests/lib.sh|tests/*-helpers.sh|tests/fixtures.sh|tests/*-fixture.sh)
       # Shared top-level test files, selected by the suites that name them.

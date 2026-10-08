@@ -2052,6 +2052,11 @@ It completed with `exit=0`, `duration_ms=2617651`, and `gate_skip=false` (`faile
 An earlier invocation placing this suite's removable homes under checkout-local `TMPDIR` correctly reached the code-root removal refusal before the expected child-source refusal; no guard or assertion was changed to accommodate that placement.
 The suite's existing Darwin-specific index-lock mtime fault injection was not exercised.
 
+On 2026-10-08, nine focused teardown cases passed on macOS arm64 after the fork/upstream sync: authorized discard, lock contention and retry, ambiguous presence, prerequisite refusal, per-account namespace refusal, child preflight, and projection close/retention.
+The namespace fixture supplies the existing captain-words file so forced teardown reaches lock resolution instead of stopping at discard admission; production namespace and custody checks are unchanged.
+The foreign-owner arm executed; the existing other-account success and wrong-mode owner-shim arms require Linux and were skipped on Darwin.
+A separate throwaway smoke executed the adapter's Linux namespace-reader branch with Darwin metadata translated to the GNU `stat` interface: an account-owned mode-700 directory was accepted, while wrong mode, foreign owner, and symlink inputs were refused. This is reader-branch evidence, not Linux end-to-end teardown evidence.
+
 ### Workspace-removal focus safety
 
 The focus-flash regression ran on 2026-08-05 against both Herdr 0.7.5 protocol 17 and Herdr 0.8.0 protocol 19 on macOS aarch64, with the 0.7.5 run using the pinned upstream release binary first on `PATH`:
