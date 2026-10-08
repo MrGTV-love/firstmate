@@ -621,12 +621,20 @@ standalone
 EOF
 }
 
-family_is_concurrent_safe() {
-  local want=$1 line
-  while IFS= read -r line; do
-    [ "$line" = "$want" ] && return 0
-  done < <(list_concurrent_safe_families)
+# Exact whole-line membership of <want> in the newline-separated <list>, with no
+# process substitution. macOS /bin/bash 3.2 loses lines from later reads once one
+# long-lived shell has run enough per-item "while read ... done < <(cmd)" loops
+# (see list_portable_serial), so per-item membership tests must not use them.
+list_has_line() {
+  local want=$1 list=$2
+  case $'\n'"$list"$'\n' in
+    *$'\n'"$want"$'\n'*) return 0 ;;
+  esac
   return 1
+}
+
+family_is_concurrent_safe() {
+  list_has_line "$1" "$(list_concurrent_safe_families)"
 }
 
 concurrent_safe_family_jobs_max() {
@@ -640,22 +648,15 @@ concurrent_safe_family_jobs_max() {
 # A script may run under --jobs when it is individually proven isolated or is
 # an exact repository member of a family carrying a recorded concurrent proof.
 script_allows_concurrency() {
-  local s=$1 family repo_script
+  local s=$1 family
   is_proven_isolated_script "$s" && return 0
   family=$(family_for_basename "$(basename "$s")")
   family_is_concurrent_safe "$family" || return 1
-  while IFS= read -r repo_script; do
-    [ "$repo_script" = "$s" ] && return 0
-  done < <(all_repo_tests)
-  return 1
+  list_has_line "$s" "$(all_repo_tests)"
 }
 
 is_proven_isolated_script() {
-  local want=$1 line
-  while IFS= read -r line; do
-    [ "$line" = "$want" ] && return 0
-  done < <(list_proven_isolated)
-  return 1
+  list_has_line "$1" "$(list_proven_isolated)"
 }
 
 # The portable serial remainder: every tests/*.test.sh that is neither
@@ -664,15 +665,16 @@ is_proven_isolated_script() {
 # and other unproven work stays here. Derived rather than enumerated so a newly added test
 # lands here by default instead of falling out of every lane.
 list_portable_serial() {
-  local s base fam
+  local s base fam proven_set
+  proven_set=$(list_proven_isolated)
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    base=$(basename "$s")
+    base=${s##*/}
     fam=$(family_for_basename "$base")
     if [ "$fam" = "real-herdr-gated" ]; then
       continue
     fi
-    if is_proven_isolated_script "$s"; then
+    if list_has_line "$s" "$proven_set"; then
       continue
     fi
     printf '%s\n' "$s"
@@ -897,14 +899,11 @@ portable_parallel_weight_for() {
 }
 
 portable_serial_weight_for() {
-  local want=$1 path ms
-  while read -r path ms; do
-    if [ "$path" = "$want" ]; then
-      printf '%s\n' "$ms"
-      return 0
-    fi
-  done < <(portable_serial_weight_hints)
-  printf '%s\n' "$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS"
+  local want=$1
+  portable_serial_weight_hints | awk -v want="$want" -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+    $1 == want { print $2; found = 1; exit }
+    END { if (!found) print def }
+  '
 }
 
 # Longest-processing-time assignment of the serial remainder to
@@ -934,10 +933,15 @@ portable_serial_assignments() {
     loads[best]=$((best_load + ms))
     printf '%s\t%s\n' "$best" "$script"
   done < <(
-    while IFS= read -r script; do
-      [ -n "$script" ] || continue
-      printf '%s\t%s\n' "$(portable_serial_weight_for "$script")" "$script"
-    done < <(list_portable_serial) | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2
+    # One awk pass joins every script to its hint, so selecting a shard costs a
+    # fixed number of processes however many scripts the lane holds.
+    { portable_serial_weight_hints; printf '%s\n' '--'; list_portable_serial; } \
+      | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+          $0 == "--" { scripts = 1; next }
+          !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
+          NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
+        ' \
+      | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2
   )
 }
 
