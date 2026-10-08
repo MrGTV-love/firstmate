@@ -412,7 +412,7 @@ FM_DELIVERY_PI_BUSY_REGEX_DEFAULT='Working\.\.\.'
 # ("Invalid collation character"), so `[⠁-⣿]` compiled on macOS and failed
 # every omp busy and furniture read on Linux CI.
 FM_OMP_SPINNER_FRAMES_RE='(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|⣾|⣽|⣻|⢿|⡿|⣟|⣯|⣷)'
-FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]|^[[:space:]]*╭─+[[:space:]]+'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+([0-9]+[smh])+[[:space:]]+(>|·)[[:space:]]|^[[:space:]]*⎋[[:space:]]+Waiting([[:space:]]|$)'
+FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]|^[[:space:]]*╭(─)+[[:space:]]+'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+([0-9]+[smh])+[[:space:]]+(>|·)[[:space:]]|^[[:space:]]*⎋[[:space:]]+Waiting([[:space:]]|$)'
 FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT='Ctrl\+c:cancel'
 # cursor-agent's busy footer. The TOKEN is matched, not the spinner verb: the
 # same version rendered both `Working` and `Running` beside its braille spinner
