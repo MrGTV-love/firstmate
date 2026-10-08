@@ -1,0 +1,57 @@
+[
+  {
+    "name": "Size a test burst from the real logical CPU count",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Queue competing bursts and identify a partially collecting holder without blocking interactive work",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Kill a reservation wrapper without releasing the surviving workload passes",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Cancel a queued burst before its workload starts",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Request two nested runner workers under one pass and observe serialized execution without new reservations",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Reject invalid and oversized reservations and malformed inherited counts before starting work",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Wait outside the script deadline, preserve skip output, and still terminate an actual script overrun",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Announce no-Python degradation on the default stderr notice fd",
+    "result": "fail",
+    "live": true
+  },
+  {
+    "name": "Continue degraded work and preserve no-Python reservation validation",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Record and watch actual host load and pool utilization",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Report a stable first-ten tri-state convergence cohort and expose unsuccessful runs and excessive load without writing the database",
+    "result": "pass",
+    "live": true
+  }
+]

@@ -1,0 +1,96 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh size
+18
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes 18 --label finished-earlier -- /bin/true
+fm-cpu-pass: command not found: /bin/true
+exit=127
+
+$ [background] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes 17 --label active-holder -- /bin/bash -c touch "$1/started"; while [ ! -e "$1/release" ]; do sleep .05; done _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9
+
+$ [background] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes 2 --label current-collector -- /bin/bash -c echo "collector-started held=$FM_CPU_PASS_HELD"
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh status --json
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pool", "free": 0, "held": 18, "holders": [{"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 0}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 1}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 2}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 3}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 4}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 5}, {"holder": "pid=88674 passes=2 since=1791458082 label=current-collector", "slot": 6}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 7}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 8}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 9}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 10}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 11}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 12}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 13}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 14}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 15}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 16}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 17}], "size": 18}
+exit=0
+
+$ [background] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --label queued-waiter -- /bin/bash -c echo SHOULD-NOT-RUN
+
+collector stderr while waiting:
+fm-cpu-pass: waiting 2s for 2 CPU pass(es) for current-collector: all passes in use; pool size 18; holders: pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; and 13 more
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh status --json
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pool", "free": 0, "held": 18, "holders": [{"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 0}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 1}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 2}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 3}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 4}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 5}, {"holder": "pid=88674 passes=2 since=1791458082 label=current-collector", "slot": 6}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 7}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 8}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 9}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 10}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 11}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 12}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 13}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 14}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 15}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 16}, {"holder": "pid=87250 passes=17 since=1791458081 label=active-holder", "slot": 17}], "size": 18}
+exit=0
+
+collector stderr while waiting:
+fm-cpu-pass: waiting 2s for 2 CPU pass(es) for current-collector: all passes in use; pool size 18; holders: pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; and 13 more
+
+Driver correction: wait summaries show at most five slot records plus an omitted count; require no stale holder, and use status for exhaustive partial-holder attribution.
+
+collector stderr while waiting:
+fm-cpu-pass: waiting 2s for 2 CPU pass(es) for current-collector: all passes in use; pool size 18; holders: pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; and 13 more
+
+waiter stderr while waiting:
+fm-cpu-pass: waiting 2s for 1 CPU pass(es) for queued-waiter: another request is collecting passes; pool size 18; holders: pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; pid=87250 passes=17 since=1791458081 label=active-holder; and 13 more
+
+Cancelled waiter raw subprocess returncode=-15 (shell exit 143 for SIGTERM); work output=''
+
+collector stdout after release:
+collector-started held=2
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh status --json
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pool", "free": 18, "held": 0, "holders": [], "size": 18}
+exit=0
+
+$ [background] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --label surviving-child -- /bin/bash -c echo $$ > "$1/child.pid"; exec sleep 30 _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh status --json
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pool", "free": 17, "held": 1, "holders": [{"holder": "pid=68410 passes=1 since=1791458160 label=surviving-child", "slot": 5}], "size": 18}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh status --json
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pool", "free": 18, "held": 0, "holders": [], "size": 18}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes 0 -- /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/invalid-ran
+fm-cpu-pass: --passes must be between 1 and the pool size (18)
+exit=125
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes -1 -- /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/invalid-ran
+fm-cpu-pass: --passes must be between 1 and the pool size (18)
+exit=125
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes 19 -- /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/invalid-ran
+fm-cpu-pass: --passes must be between 1 and the pool size (18)
+exit=125
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes invalid -- /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/invalid-ran
+usage: fm-cpu-pass.sh run [-h] [--passes PASSES] [--label LABEL]
+                          [--log-fd LOG_FD]
+                          ...
+fm-cpu-pass.sh run: error: argument --passes: invalid int value: 'invalid'
+exit=125
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes 2 -- /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/invalid-ran
+fm-cpu-pass: --passes must not exceed FM_CPU_PASS_HELD (1)
+exit=125
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run -- /bin/bash -c echo "held=$FM_CPU_PASS_HELD"; exit 7
+held=0
+fm-cpu-pass: running bash without a CPU pass: pool directory /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/not-a-directory is unusable: [Errno 17] File exists: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/not-a-directory'
+exit=7
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run -- bash -c echo "held=$FM_CPU_PASS_HELD"; echo "child stderr" >&2; exit 5
+held=0
+fm-cpu-pass: running bash without a CPU pass: python3 not found
+child stderr
+exit=5
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run -- /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/invalid-ran
+fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer
+exit=125
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run -- /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/invalid-ran
+fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer
+exit=125

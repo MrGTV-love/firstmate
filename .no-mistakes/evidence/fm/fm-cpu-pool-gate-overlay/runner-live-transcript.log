@@ -1,0 +1,50 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/bin/fm-test-run.sh --jobs 2 tests/fm-brief.test.sh tests/fm-composer-lib.test.sh --json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/nested-timing.json
+FM_TEST_BEGIN 2026-10-08T11:16:38Z tests/fm-brief.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - held=1
+FM_TEST_END 2026-10-08T11:16:40Z tests/fm-brief.test.sh exit=0 duration_ms=1504 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T11:16:40Z tests/fm-composer-lib.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - held=1
+FM_TEST_END 2026-10-08T11:16:42Z tests/fm-composer-lib.test.sh exit=0 duration_ms=1405 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=3432
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=2909 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-brief.test.sh duration_ms=1504
+FM_TEST_SLOWEST rank=2 script=tests/fm-composer-lib.test.sh duration_ms=1405
+fm-test-run: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/nested-timing.json
+exit=0
+
+Persisted nested execution events:
+start tests/fm-brief.test.sh held=1
+end tests/fm-brief.test.sh
+start tests/fm-composer-lib.test.sh held=1
+end tests/fm-composer-lib.test.sh
+
+$ [background] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh run --passes 18 --label outside-burst -- /bin/bash -c touch "$1/full-started"; while [ ! -e "$1/full-release" ]; do sleep .05; done _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9
+
+$ [background] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/bin/fm-test-run.sh --per-script-timeout-secs 3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/tests/probe.test.sh
+
+Queued runner out:
+FM_TEST_BEGIN 2026-10-08T11:16:42Z /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/tests/probe.test.sh family=unclassified expected_gate_skip=none
+skip: disposable probe (held=1)
+FM_TEST_END 2026-10-08T11:16:49Z /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/tests/probe.test.sh exit=0 duration_ms=6358 gate_skip=true
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=1 duration_ms=6788
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=6358 failed=0
+FM_TEST_SLOWEST rank=1 script=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/tests/probe.test.sh duration_ms=6358
+
+Queued runner err:
+fm-cpu-pass: waiting 2s for 1 CPU pass(es) for fm-test-run /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/tests/probe.test.sh: all passes in use; pool size 18; holders: pid=35024 passes=18 since=1791458202 label=outside-burst; pid=35024 passes=18 since=1791458202 label=outside-burst; pid=35024 passes=18 since=1791458202 label=outside-burst; pid=35024 passes=18 since=1791458202 label=outside-burst; pid=35024 passes=18 since=1791458202 label=outside-burst; and 13 more
+fm-cpu-pass: got 1 CPU pass(es) for fm-test-run /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/tests/probe.test.sh after 4s
+fm-test-run: gate skip: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/tests/probe.test.sh: disposable probe (held=1)
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/runner-repo/bin/fm-test-run.sh --per-script-timeout-secs 1 tests/hang.test.sh
+FM_TEST_BEGIN 2026-10-08T11:16:49Z tests/hang.test.sh family=unclassified expected_gate_skip=none
+not ok - tests/hang.test.sh exceeded the per-script bound of 1s and was terminated
+FM_TEST_END 2026-10-08T11:16:50Z tests/hang.test.sh exit=124 duration_ms=1310 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=1706
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=1310 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/hang.test.sh duration_ms=1310
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh status --json
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pool", "free": 18, "held": 0, "holders": [], "size": 18}
+exit=0

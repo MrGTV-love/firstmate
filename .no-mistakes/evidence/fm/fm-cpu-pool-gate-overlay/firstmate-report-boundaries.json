@@ -1,0 +1,95 @@
+[
+  {
+    "label": "Ten successful first members with at most two fixes converge",
+    "commands": [
+      [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh",
+        "report",
+        "--samples",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/threshold-load.tsv",
+        "--since",
+        "1000",
+        "--nm-db",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/pipeline.sqlite",
+        "--json"
+      ],
+      [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh",
+        "report",
+        "--samples",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/threshold-load.tsv",
+        "--since",
+        "1000",
+        "--nm-db",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/pipeline.sqlite"
+      ]
+    ],
+    "stdout_json": "{\"load\": {\"cpus\": 4, \"first\": 1000, \"last\": 1000, \"load1_max\": 9.0, \"load1_p50\": 9.0, \"load1_p95\": 9.0, \"load_within_2x_cpus\": false, \"pool_held_max\": 0, \"pool_held_mean\": 0.0, \"samples\": 1, \"share_above_2x_cpus\": 1.0}, \"pipeline\": {\"agent_failures\": [], \"agent_minutes_by_purpose\": {\"review\": {\"count\": 12, \"minutes_p50\": 10.0, \"minutes_p95\": 10.0}, \"review-fix\": {\"count\": 9, \"minutes_p50\": 10.0, \"minutes_p95\": 10.0}}, \"cohort_runs\": [{\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1100, \"review_fix_rounds\": 0, \"run\": \"earlier\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1200, \"review_fix_rounds\": 0, \"run\": \"run-00\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1201, \"review_fix_rounds\": 1, \"run\": \"run-01\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1202, \"review_fix_rounds\": 2, \"run\": \"run-02\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1203, \"review_fix_rounds\": 0, \"run\": \"run-03\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1204, \"review_fix_rounds\": 1, \"run\": \"run-04\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1205, \"review_fix_rounds\": 2, \"run\": \"run-05\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1206, \"review_fix_rounds\": 0, \"run\": \"run-06\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1207, \"review_fix_rounds\": 1, \"run\": \"run-07\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1208, \"review_fix_rounds\": 2, \"run\": \"run-08\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}], \"converged_within_2_fix_rounds\": true, \"runs_considered\": 10, \"runs_wanted\": 10, \"timeout_class_run_errors\": []}, \"since\": 1000}\n",
+    "stdout_text": "window since 1000\nload: samples=1 cpus=4 load1 p50=9.0 p95=9.0 max=9.0 share>2x=100.0% pool_held max=0 mean=0.0 load_within_2x_cpus=False\npipeline: first eligible runs=10 of 10 converged_within_2_fix_rounds=True\n  run earlier completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-00 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-01 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-02 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  run run-03 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-04 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-05 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  run run-06 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-07 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-08 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  review: count=12 minutes p50=10.0 p95=10.0\n  review-fix: count=9 minutes p50=10.0 p95=10.0\n",
+    "database_unchanged": true
+  },
+  {
+    "label": "Three fixes fail acceptance despite later successful runs",
+    "commands": [
+      [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh",
+        "report",
+        "--samples",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/threshold-load.tsv",
+        "--since",
+        "1000",
+        "--nm-db",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/pipeline.sqlite",
+        "--json"
+      ],
+      [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh",
+        "report",
+        "--samples",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/threshold-load.tsv",
+        "--since",
+        "1000",
+        "--nm-db",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/pipeline.sqlite"
+      ]
+    ],
+    "stdout_json": "{\"load\": {\"cpus\": 4, \"first\": 1000, \"last\": 1000, \"load1_max\": 9.0, \"load1_p50\": 9.0, \"load1_p95\": 9.0, \"load_within_2x_cpus\": false, \"pool_held_max\": 0, \"pool_held_mean\": 0.0, \"samples\": 1, \"share_above_2x_cpus\": 1.0}, \"pipeline\": {\"agent_failures\": [], \"agent_minutes_by_purpose\": {\"review\": {\"count\": 12, \"minutes_p50\": 10.0, \"minutes_p95\": 10.0}, \"review-fix\": {\"count\": 12, \"minutes_p50\": 10.0, \"minutes_p95\": 10.0}}, \"cohort_runs\": [{\"agent_minutes\": 40.0, \"converged\": false, \"created_at\": 1100, \"review_fix_rounds\": 3, \"run\": \"earlier\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1200, \"review_fix_rounds\": 0, \"run\": \"run-00\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1201, \"review_fix_rounds\": 1, \"run\": \"run-01\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1202, \"review_fix_rounds\": 2, \"run\": \"run-02\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1203, \"review_fix_rounds\": 0, \"run\": \"run-03\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1204, \"review_fix_rounds\": 1, \"run\": \"run-04\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1205, \"review_fix_rounds\": 2, \"run\": \"run-05\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1206, \"review_fix_rounds\": 0, \"run\": \"run-06\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1207, \"review_fix_rounds\": 1, \"run\": \"run-07\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1208, \"review_fix_rounds\": 2, \"run\": \"run-08\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}], \"converged_within_2_fix_rounds\": false, \"runs_considered\": 10, \"runs_wanted\": 10, \"timeout_class_run_errors\": []}, \"since\": 1000}\n",
+    "stdout_text": "window since 1000\nload: samples=1 cpus=4 load1 p50=9.0 p95=9.0 max=9.0 share>2x=100.0% pool_held max=0 mean=0.0 load_within_2x_cpus=False\npipeline: first eligible runs=10 of 10 converged_within_2_fix_rounds=False\n  run earlier completed review_fix=3 test_fix=0 agent_minutes=40.0 converged=False\n  run run-00 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-01 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-02 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  run run-03 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-04 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-05 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  run run-06 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-07 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-08 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  review: count=12 minutes p50=10.0 p95=10.0\n  review-fix: count=12 minutes p50=10.0 p95=10.0\n",
+    "database_unchanged": true
+  },
+  {
+    "label": "Fewer than ten review-reaching runs remains pending",
+    "commands": [
+      [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh",
+        "report",
+        "--samples",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/threshold-load.tsv",
+        "--since",
+        "1000",
+        "--nm-db",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/pipeline.sqlite",
+        "--json"
+      ],
+      [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh",
+        "report",
+        "--samples",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/threshold-load.tsv",
+        "--since",
+        "1000",
+        "--nm-db",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/pipeline.sqlite"
+      ]
+    ],
+    "stdout_json": "{\"load\": {\"cpus\": 4, \"first\": 1000, \"last\": 1000, \"load1_max\": 9.0, \"load1_p50\": 9.0, \"load1_p95\": 9.0, \"load_within_2x_cpus\": false, \"pool_held_max\": 0, \"pool_held_mean\": 0.0, \"samples\": 1, \"share_above_2x_cpus\": 1.0}, \"pipeline\": {\"agent_failures\": [], \"agent_minutes_by_purpose\": {\"review\": {\"count\": 9, \"minutes_p50\": 10.0, \"minutes_p95\": 10.0}, \"review-fix\": {\"count\": 10, \"minutes_p50\": 10.0, \"minutes_p95\": 10.0}}, \"cohort_runs\": [{\"agent_minutes\": 40.0, \"converged\": false, \"created_at\": 1100, \"review_fix_rounds\": 3, \"run\": \"earlier\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1200, \"review_fix_rounds\": 0, \"run\": \"run-00\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1201, \"review_fix_rounds\": 1, \"run\": \"run-01\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1202, \"review_fix_rounds\": 2, \"run\": \"run-02\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1203, \"review_fix_rounds\": 0, \"run\": \"run-03\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1204, \"review_fix_rounds\": 1, \"run\": \"run-04\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 30.0, \"converged\": true, \"created_at\": 1205, \"review_fix_rounds\": 2, \"run\": \"run-05\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 10.0, \"converged\": true, \"created_at\": 1206, \"review_fix_rounds\": 0, \"run\": \"run-06\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}, {\"agent_minutes\": 20.0, \"converged\": true, \"created_at\": 1207, \"review_fix_rounds\": 1, \"run\": \"run-07\", \"status\": \"completed\", \"test_fix_rounds\": 0, \"timed_out\": false}], \"converged_within_2_fix_rounds\": null, \"runs_considered\": 9, \"runs_wanted\": 10, \"timeout_class_run_errors\": []}, \"since\": 1000}\n",
+    "stdout_text": "window since 1000\nload: samples=1 cpus=4 load1 p50=9.0 p95=9.0 max=9.0 share>2x=100.0% pool_held max=0 mean=0.0 load_within_2x_cpus=False\npipeline: first eligible runs=9 of 10 converged_within_2_fix_rounds=pending\n  run earlier completed review_fix=3 test_fix=0 agent_minutes=40.0 converged=False\n  run run-00 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-01 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-02 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  run run-03 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-04 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  run run-05 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True\n  run run-06 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True\n  run run-07 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True\n  review: count=9 minutes p50=10.0 p95=10.0\n  review-fix: count=10 minutes p50=10.0 p95=10.0\n",
+    "database_unchanged": true
+  },
+  {
+    "label": "Unreadable database fails without creating it and preserves load facts",
+    "exit": 1,
+    "stdout": "window since 1000\nload: samples=1 cpus=4 load1 p50=9.0 p95=9.0 max=9.0 share>2x=100.0% pool_held max=0 mean=0.0 load_within_2x_cpus=False\npipeline: unavailable (unable to open database file)\n",
+    "stderr": ""
+  }
+]

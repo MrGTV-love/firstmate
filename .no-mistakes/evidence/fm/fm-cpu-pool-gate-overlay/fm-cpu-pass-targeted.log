@@ -1,0 +1,15 @@
+ok - pool size follows the host CPU count
+ok - run returns the command's status and marks the child with its exact count
+ok - invalid reservations refuse work in both option forms, including nested calls
+ok - passes are exclusive, waiters queue, and notices stay off the command's output
+ok - a multi-pass request keeps collected passes and runs once it holds all
+ok - passes survive a killed wrapper and are freed when its work ends
+ok - failure cleanup terminates and reaps wrappers and their workloads
+ok - a TERM to the holder keeps the pass until the running command ends
+ok - a waiter ended while queued exits without running its command
+ok - nested runs execute under the outer reservation
+ok - an unusable pool or missing python3 runs the command without a pass and says so
+ok - no-Python execution rejects invalid counts and preserves valid degraded work
+ok - inherited markers are validated consistently while degraded work still runs
+ok - the runner takes each script's pass outside its bound and keeps notices off script output
+ok - nested runners take no new pass and limit scripts to the inherited reservation

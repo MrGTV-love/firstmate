@@ -1,0 +1,113 @@
+
+### Host-sized pool
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "size"], "exit": 0, "stderr": "", "stdout": "18\n"}
+
+### Partial collection reports current holders
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/live-pool", "free": 0, "held": 18, "holders": [{"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 0}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 1}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 2}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 3}, {"holder": "pid=72520 passes=1 since=1791457453 label=active-holder", "slot": 4}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 5}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 6}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 7}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 8}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 9}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 10}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 11}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 12}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 13}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 14}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 15}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 16}, {"holder": "pid=75659 passes=18 since=1791457454 label=current-collector", "slot": 17}], "size": 18}
+
+### Unreserved interactive work during a full pool
+{"command": ["bash", "-c", "echo interactive-work-runs-without-a-pass"], "exit": 0, "stderr": "", "stdout": "interactive-work-runs-without-a-pass\n"}
+
+### Active holder releases
+{"exit": 0, "stderr": "", "stdout": ""}
+
+### Full reservation starts only after acquisition
+{"exit": 0, "stderr": "fm-cpu-pass: waiting 2s for 18 CPU pass(es) for current-collector: all passes in use; pool size 18; holders: pid=75659 passes=18 since=1791457454 label=current-collector; pid=75659 passes=18 since=1791457454 label=current-collector; pid=75659 passes=18 since=1791457454 label=current-collector; pid=75659 passes=18 since=1791457454 label=current-collector; pid=72520 passes=1 since=1791457453 label=active-holder; and 13 more\nfm-cpu-pass: got 18 CPU pass(es) for current-collector after 4s\n", "stdout": "collector-held=18\n"}
+
+### Queued burst eventually runs
+{"exit": 0, "stderr": "fm-cpu-pass: waiting 2s for 1 CPU pass(es) for queued-behind-collector: another request is collecting passes; pool size 18; holders: pid=75659 passes=18 since=1791457454 label=current-collector; pid=75659 passes=18 since=1791457454 label=current-collector; pid=75659 passes=18 since=1791457454 label=current-collector; pid=75659 passes=18 since=1791457454 label=current-collector; pid=72520 passes=1 since=1791457453 label=active-holder; and 13 more\nfm-cpu-pass: got 1 CPU pass(es) for queued-behind-collector after 3s\n", "stdout": "waiter-held=1\n"}
+
+### Pool empty after queued bursts
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/live-pool", "free": 18, "held": 0, "holders": [], "size": 18}
+
+### Killed wrapper retains surviving workload reservation
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/live-pool", "free": 0, "held": 18, "holders": [{"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 0}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 1}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 2}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 3}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 4}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 5}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 6}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 7}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 8}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 9}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 10}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 11}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 12}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 13}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 14}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 15}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 16}, {"holder": "pid=3741 passes=18 since=1791457462 label=crash-proof", "slot": 17}], "size": 18}
+
+### Reservation released after surviving child exits
+{"available": true, "dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/live-pool", "free": 18, "held": 0, "holders": [], "size": 18}
+
+### Cancelled waiter never starts work
+{"exit": -15, "stderr": "", "stdout": ""}
+
+### Cancellation holder exits
+{"exit": 0, "stderr": "", "stdout": ""}
+
+### Nested runner explicit
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--passes", "1", "--label", "nested-outer", "--", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/runner-repo/bin/fm-test-run.sh", "--jobs", "2", "tests/fm-brief.test.sh", "tests/fm-composer-lib.test.sh", "--json", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/nested-timing.json"], "exit": 0, "stderr": "fm-test-run: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1\nfm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/nested-timing.json\n", "stdout": "FM_TEST_BEGIN 2026-10-08T11:04:26Z tests/fm-brief.test.sh family=pure-contract-unit expected_gate_skip=none\nok - held=1\nFM_TEST_END 2026-10-08T11:04:27Z tests/fm-brief.test.sh exit=0 duration_ms=775 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T11:04:27Z tests/fm-composer-lib.test.sh family=pure-contract-unit expected_gate_skip=none\nok - held=1\nFM_TEST_END 2026-10-08T11:04:28Z tests/fm-composer-lib.test.sh exit=0 duration_ms=1046 gate_skip=false\nFM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=3166\nFM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=1821 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/fm-composer-lib.test.sh duration_ms=1046\nFM_TEST_SLOWEST rank=2 script=tests/fm-brief.test.sh duration_ms=775\n"}
+
+### Nested worker events
+start held=1
+end
+start held=1
+end
+
+
+### Nested runner timing
+{"families": [{"count": 2, "duration_ms": 1821, "failed": 0, "name": "pure-contract-unit"}], "finished_at": "2026-10-08T11:04:28Z", "run_id": "fm-test-run-1791457465810-14810", "scripts": [{"duration_ms": 775, "exit": 0, "expected_gate_skip": "none", "family": "pure-contract-unit", "gate_skip": false, "gate_skip_reason": "", "path": "tests/fm-brief.test.sh"}, {"duration_ms": 1046, "exit": 0, "expected_gate_skip": "none", "family": "pure-contract-unit", "gate_skip": false, "gate_skip_reason": "", "path": "tests/fm-composer-lib.test.sh"}], "selection": "scripts;jobs=1", "started_at": "2026-10-08T11:04:25Z", "summary": {"duration_ms": 3166, "failed": 0, "skipped_gate": 0, "total": 2}}
+
+### Nested runner automatic
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--passes", "1", "--label", "nested-outer", "--", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/runner-repo/bin/fm-test-run.sh", "tests/fm-brief.test.sh", "tests/fm-composer-lib.test.sh", "--json", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/nested-timing.json"], "exit": 0, "stderr": "fm-test-run: reducing --jobs 4 to inherited FM_CPU_PASS_HELD=1\nfm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/nested-timing.json\n", "stdout": "FM_TEST_BEGIN 2026-10-08T11:04:30Z tests/fm-brief.test.sh family=pure-contract-unit expected_gate_skip=none\nok - held=1\nFM_TEST_END 2026-10-08T11:04:30Z tests/fm-brief.test.sh exit=0 duration_ms=570 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T11:04:30Z tests/fm-composer-lib.test.sh family=pure-contract-unit expected_gate_skip=none\nok - held=1\nFM_TEST_END 2026-10-08T11:04:31Z tests/fm-composer-lib.test.sh exit=0 duration_ms=540 gate_skip=false\nFM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=1493\nFM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=1110 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/fm-brief.test.sh duration_ms=570\nFM_TEST_SLOWEST rank=2 script=tests/fm-composer-lib.test.sh duration_ms=540\n"}
+
+### Nested worker events
+start held=1
+end
+start held=1
+end
+
+
+### Nested runner timing
+{"families": [{"count": 2, "duration_ms": 1110, "failed": 0, "name": "pure-contract-unit"}], "finished_at": "2026-10-08T11:04:31Z", "run_id": "fm-test-run-1791457470017-31474", "scripts": [{"duration_ms": 570, "exit": 0, "expected_gate_skip": "none", "family": "pure-contract-unit", "gate_skip": false, "gate_skip_reason": "", "path": "tests/fm-brief.test.sh"}, {"duration_ms": 540, "exit": 0, "expected_gate_skip": "none", "family": "pure-contract-unit", "gate_skip": false, "gate_skip_reason": "", "path": "tests/fm-composer-lib.test.sh"}], "selection": "scripts;jobs=1", "started_at": "2026-10-08T11:04:29Z", "summary": {"duration_ms": 1493, "failed": 0, "skipped_gate": 0, "total": 2}}
+
+### Other nested-test bursts release
+{"exit": 0, "stderr": "", "stdout": ""}
+
+### Nested pass over-request refused
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--passes", "2", "--", "touch", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/invalid-work-started"], "exit": 125, "stderr": "fm-cpu-pass: --passes must not exceed FM_CPU_PASS_HELD (1)\n", "stdout": ""}
+
+### Malformed engine inherited marker ''
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--", "touch", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/invalid-work-started"], "exit": 125, "stderr": "fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Malformed runner inherited marker ''
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/runner-repo/bin/fm-test-run.sh", "tests/fm-brief.test.sh"], "exit": 125, "stderr": "fm-test-run: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Malformed engine inherited marker '-1'
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--", "touch", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/invalid-work-started"], "exit": 125, "stderr": "fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Malformed runner inherited marker '-1'
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/runner-repo/bin/fm-test-run.sh", "tests/fm-brief.test.sh"], "exit": 125, "stderr": "fm-test-run: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Malformed engine inherited marker 'invalid'
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--", "touch", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/invalid-work-started"], "exit": 125, "stderr": "fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Malformed runner inherited marker 'invalid'
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/runner-repo/bin/fm-test-run.sh", "tests/fm-brief.test.sh"], "exit": 125, "stderr": "fm-test-run: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Malformed engine inherited marker '1.5'
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--", "touch", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/invalid-work-started"], "exit": 125, "stderr": "fm-cpu-pass: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Malformed runner inherited marker '1.5'
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/runner-repo/bin/fm-test-run.sh", "tests/fm-brief.test.sh"], "exit": 125, "stderr": "fm-test-run: FM_CPU_PASS_HELD must be a nonnegative decimal integer\n", "stdout": ""}
+
+### Invalid exact reservation 0
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--passes", "0", "--", "touch", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/invalid-work-started"], "exit": 125, "stderr": "fm-cpu-pass: --passes must be between 1 and the pool size (18)\n", "stdout": ""}
+
+### Invalid exact reservation 19
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--passes", "19", "--", "touch", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/invalid-work-started"], "exit": 125, "stderr": "fm-cpu-pass: --passes must be between 1 and the pool size (18)\n", "stdout": ""}
+
+### Timeout-test blocker releases
+{"exit": 0, "stderr": "", "stdout": ""}
+
+### Queued runner succeeds after waiting past its script bound
+{"exit": 0, "stderr": "fm-cpu-pass: waiting 2s for 1 CPU pass(es) for fm-test-run tests/probe.test.sh: all passes in use; pool size 18; holders: pid=42475 passes=18 since=1791457473 label=timeout-outside-burst; pid=42475 passes=18 since=1791457473 label=timeout-outside-burst; pid=42475 passes=18 since=1791457473 label=timeout-outside-burst; pid=42475 passes=18 since=1791457473 label=timeout-outside-burst; pid=42475 passes=18 since=1791457473 label=timeout-outside-burst; and 13 more\nfm-cpu-pass: got 1 CPU pass(es) for fm-test-run tests/probe.test.sh after 3s\nfm-test-run: gate skip: tests/probe.test.sh: disposable probe (held=1)\n", "stdout": "FM_TEST_BEGIN 2026-10-08T11:04:33Z tests/probe.test.sh family=unclassified expected_gate_skip=none\nskip: disposable probe (held=1)\nFM_TEST_END 2026-10-08T11:04:37Z tests/probe.test.sh exit=0 duration_ms=3963 gate_skip=true\nFM_TEST_SUMMARY total=1 failed=0 skipped_gate=1 duration_ms=4165\nFM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=3963 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/probe.test.sh duration_ms=3963\n"}
+
+### Actual script overrun remains bounded
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/runner-repo/bin/fm-test-run.sh", "--per-script-timeout-secs", "1", "tests/hang.test.sh"], "exit": 1, "stderr": "", "stdout": "FM_TEST_BEGIN 2026-10-08T11:04:38Z tests/hang.test.sh family=unclassified expected_gate_skip=none\nnot ok - tests/hang.test.sh exceeded the per-script bound of 1s and was terminated\nFM_TEST_END 2026-10-08T11:04:39Z tests/hang.test.sh exit=124 duration_ms=1517 gate_skip=false\nFM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=1742\nFM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=1517 failed=1\nFM_TEST_SLOWEST rank=1 script=tests/hang.test.sh duration_ms=1517\n"}
+
+### Unusable pool runs degraded with original command status
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--", "bash", "-c", "echo \"degraded-held=$FM_CPU_PASS_HELD\"; exit 7"], "exit": 7, "stderr": "fm-cpu-pass: running bash without a CPU pass: pool directory /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/not-a-directory is unusable: [Errno 17] File exists: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.live-validation/not-a-directory'\n", "stdout": "degraded-held=0\n"}
+
+### No-Python fallback uses the real shell
+{"command": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-cpu-pass.sh", "run", "--", "bash", "-c", "echo \"degraded-held=$FM_CPU_PASS_HELD\""], "exit": 0, "stderr": "", "stdout": "degraded-held=0\n"}
+
+### DRIVER FAILURE
+AssertionError()

@@ -1,0 +1,127 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh record --out /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/recorded.tsv
+exit=0
+
+$ [background] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh watch --interval .2 --out /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/recorded.tsv
+
+Actual host samples from record/watch:
+1791458258	63.99	60.81	53.03	18	18	0
+1791458259	63.99	60.81	53.03	18	18	0
+1791458259	63.99	60.81	53.03	18	18	0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite --json
+{"load": {"cpus": 4, "first": 1100, "last": 1200, "load1_max": 7.0, "load1_p50": 6.0, "load1_p95": 7.0, "load_within_2x_cpus": true, "pool_held_max": 3, "pool_held_mean": 2.5, "samples": 2, "share_above_2x_cpus": 0.0}, "pipeline": {"agent_failures": [], "agent_minutes_by_purpose": {"review": {"count": 10, "minutes_p50": 10.0, "minutes_p95": 10.0}, "review-fix": {"count": 9, "minutes_p50": 10.0, "minutes_p95": 10.0}}, "cohort_runs": [{"agent_minutes": 10.0, "converged": true, "created_at": 2000, "review_fix_rounds": 0, "run": "run-00", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2001, "review_fix_rounds": 1, "run": "run-01", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2002, "review_fix_rounds": 2, "run": "run-02", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2003, "review_fix_rounds": 0, "run": "run-03", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2004, "review_fix_rounds": 1, "run": "run-04", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2005, "review_fix_rounds": 2, "run": "run-05", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2006, "review_fix_rounds": 0, "run": "run-06", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2007, "review_fix_rounds": 1, "run": "run-07", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2008, "review_fix_rounds": 2, "run": "run-08", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2009, "review_fix_rounds": 0, "run": "run-09", "status": "completed", "test_fix_rounds": 0, "timed_out": false}], "converged_within_2_fix_rounds": null, "runs_considered": 10, "runs_wanted": 10, "timeout_class_run_errors": []}, "since": 1100}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite
+window since 1100
+load: samples=2 cpus=4 load1 p50=6.0 p95=7.0 max=7.0 share>2x=0.0% pool_held max=3 mean=2.5 load_within_2x_cpus=True
+pipeline: first eligible runs=10 of 10 converged_within_2_fix_rounds=pending
+  run run-00 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-01 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-02 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-03 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-04 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-05 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-06 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-07 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-08 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-09 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  review: count=10 minutes p50=10.0 p95=10.0
+  review-fix: count=9 minutes p50=10.0 p95=10.0
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite --json
+{"load": {"cpus": 4, "first": 1100, "last": 1200, "load1_max": 7.0, "load1_p50": 6.0, "load1_p95": 7.0, "load_within_2x_cpus": true, "pool_held_max": 3, "pool_held_mean": 2.5, "samples": 2, "share_above_2x_cpus": 0.0}, "pipeline": {"agent_failures": [{"category": "timeout", "count": 1, "exit_status": "error"}], "agent_minutes_by_purpose": {"review": {"count": 11, "minutes_p50": 10.0, "minutes_p95": 10.0}, "review-fix": {"count": 9, "minutes_p50": 10.0, "minutes_p95": 10.0}}, "cohort_runs": [{"agent_minutes": 10.0, "converged": false, "created_at": 1999, "review_fix_rounds": 0, "run": "older-live", "status": "failed", "test_fix_rounds": 0, "timed_out": true}, {"agent_minutes": 10.0, "converged": true, "created_at": 2000, "review_fix_rounds": 0, "run": "run-00", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2001, "review_fix_rounds": 1, "run": "run-01", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2002, "review_fix_rounds": 2, "run": "run-02", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2003, "review_fix_rounds": 0, "run": "run-03", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2004, "review_fix_rounds": 1, "run": "run-04", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2005, "review_fix_rounds": 2, "run": "run-05", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2006, "review_fix_rounds": 0, "run": "run-06", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2007, "review_fix_rounds": 1, "run": "run-07", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2008, "review_fix_rounds": 2, "run": "run-08", "status": "completed", "test_fix_rounds": 0, "timed_out": false}], "converged_within_2_fix_rounds": false, "runs_considered": 10, "runs_wanted": 10, "timeout_class_run_errors": [{"class": "timed out", "run": "older-live"}]}, "since": 1100}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite
+window since 1100
+load: samples=2 cpus=4 load1 p50=6.0 p95=7.0 max=7.0 share>2x=0.0% pool_held max=3 mean=2.5 load_within_2x_cpus=True
+pipeline: first eligible runs=10 of 10 converged_within_2_fix_rounds=False
+  run older-live failed review_fix=0 test_fix=0 agent_minutes=10.0 converged=False
+  run run-00 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-01 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-02 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-03 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-04 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-05 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-06 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-07 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-08 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  review: count=11 minutes p50=10.0 p95=10.0
+  review-fix: count=9 minutes p50=10.0 p95=10.0
+  agent failure error/timeout: 1
+  timeout-class run error older-live: timed out
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite --json
+{"load": {"cpus": 4, "first": 1100, "last": 1200, "load1_max": 7.0, "load1_p50": 6.0, "load1_p95": 7.0, "load_within_2x_cpus": true, "pool_held_max": 3, "pool_held_mean": 2.5, "samples": 2, "share_above_2x_cpus": 0.0}, "pipeline": {"agent_failures": [{"category": "timeout", "count": 1, "exit_status": "error"}], "agent_minutes_by_purpose": {"review": {"count": 21, "minutes_p50": 10.0, "minutes_p95": 10.0}, "review-fix": {"count": 9, "minutes_p50": 10.0, "minutes_p95": 10.0}}, "cohort_runs": [{"agent_minutes": 10.0, "converged": false, "created_at": 1999, "review_fix_rounds": 0, "run": "older-live", "status": "failed", "test_fix_rounds": 0, "timed_out": true}, {"agent_minutes": 10.0, "converged": true, "created_at": 2000, "review_fix_rounds": 0, "run": "run-00", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2001, "review_fix_rounds": 1, "run": "run-01", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2002, "review_fix_rounds": 2, "run": "run-02", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2003, "review_fix_rounds": 0, "run": "run-03", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2004, "review_fix_rounds": 1, "run": "run-04", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2005, "review_fix_rounds": 2, "run": "run-05", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2006, "review_fix_rounds": 0, "run": "run-06", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2007, "review_fix_rounds": 1, "run": "run-07", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2008, "review_fix_rounds": 2, "run": "run-08", "status": "completed", "test_fix_rounds": 0, "timed_out": false}], "converged_within_2_fix_rounds": false, "runs_considered": 10, "runs_wanted": 10, "timeout_class_run_errors": [{"class": "timed out", "run": "older-live"}]}, "since": 1100}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite
+window since 1100
+load: samples=2 cpus=4 load1 p50=6.0 p95=7.0 max=7.0 share>2x=0.0% pool_held max=3 mean=2.5 load_within_2x_cpus=True
+pipeline: first eligible runs=10 of 10 converged_within_2_fix_rounds=False
+  run older-live failed review_fix=0 test_fix=0 agent_minutes=10.0 converged=False
+  run run-00 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-01 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-02 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-03 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-04 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-05 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-06 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-07 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-08 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  review: count=21 minutes p50=10.0 p95=10.0
+  review-fix: count=9 minutes p50=10.0 p95=10.0
+  agent failure error/timeout: 1
+  timeout-class run error older-live: timed out
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 2000 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite --json
+{"load": {"load_within_2x_cpus": null, "samples": 0}, "pipeline": {"agent_failures": [], "agent_minutes_by_purpose": {"review": {"count": 20, "minutes_p50": 10.0, "minutes_p95": 10.0}, "review-fix": {"count": 9, "minutes_p50": 10.0, "minutes_p95": 10.0}}, "cohort_runs": [{"agent_minutes": 10.0, "converged": true, "created_at": 2000, "review_fix_rounds": 0, "run": "run-00", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2001, "review_fix_rounds": 1, "run": "run-01", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2002, "review_fix_rounds": 2, "run": "run-02", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2003, "review_fix_rounds": 0, "run": "run-03", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2004, "review_fix_rounds": 1, "run": "run-04", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2005, "review_fix_rounds": 2, "run": "run-05", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2006, "review_fix_rounds": 0, "run": "run-06", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2007, "review_fix_rounds": 1, "run": "run-07", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2008, "review_fix_rounds": 2, "run": "run-08", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2009, "review_fix_rounds": 0, "run": "run-09", "status": "completed", "test_fix_rounds": 0, "timed_out": false}], "converged_within_2_fix_rounds": true, "runs_considered": 10, "runs_wanted": 10, "timeout_class_run_errors": []}, "since": 2000}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 2000 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite --json
+{"load": {"load_within_2x_cpus": null, "samples": 0}, "pipeline": {"agent_failures": [], "agent_minutes_by_purpose": {"review": {"count": 20, "minutes_p50": 10.0, "minutes_p95": 10.0}, "review-fix": {"count": 12, "minutes_p50": 10.0, "minutes_p95": 10.0}}, "cohort_runs": [{"agent_minutes": 40.0, "converged": false, "created_at": 2000, "review_fix_rounds": 3, "run": "run-00", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2001, "review_fix_rounds": 1, "run": "run-01", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2002, "review_fix_rounds": 2, "run": "run-02", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2003, "review_fix_rounds": 0, "run": "run-03", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2004, "review_fix_rounds": 1, "run": "run-04", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2005, "review_fix_rounds": 2, "run": "run-05", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2006, "review_fix_rounds": 0, "run": "run-06", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2007, "review_fix_rounds": 1, "run": "run-07", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2008, "review_fix_rounds": 2, "run": "run-08", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2009, "review_fix_rounds": 0, "run": "run-09", "status": "completed", "test_fix_rounds": 0, "timed_out": false}], "converged_within_2_fix_rounds": false, "runs_considered": 10, "runs_wanted": 10, "timeout_class_run_errors": []}, "since": 2000}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite --json
+{"load": {"cpus": 4, "first": 1100, "last": 1300, "load1_max": 9.0, "load1_p50": 7.0, "load1_p95": 9.0, "load_within_2x_cpus": false, "pool_held_max": 3, "pool_held_mean": 1.67, "samples": 3, "share_above_2x_cpus": 0.3333}, "pipeline": {"agent_failures": [{"category": "timeout", "count": 1, "exit_status": "error"}], "agent_minutes_by_purpose": {"review": {"count": 21, "minutes_p50": 10.0, "minutes_p95": 10.0}, "review-fix": {"count": 12, "minutes_p50": 10.0, "minutes_p95": 10.0}}, "cohort_runs": [{"agent_minutes": 10.0, "converged": false, "created_at": 1999, "review_fix_rounds": 0, "run": "older-live", "status": "failed", "test_fix_rounds": 0, "timed_out": true}, {"agent_minutes": 40.0, "converged": false, "created_at": 2000, "review_fix_rounds": 3, "run": "run-00", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2001, "review_fix_rounds": 1, "run": "run-01", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2002, "review_fix_rounds": 2, "run": "run-02", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2003, "review_fix_rounds": 0, "run": "run-03", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2004, "review_fix_rounds": 1, "run": "run-04", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2005, "review_fix_rounds": 2, "run": "run-05", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 10.0, "converged": true, "created_at": 2006, "review_fix_rounds": 0, "run": "run-06", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 20.0, "converged": true, "created_at": 2007, "review_fix_rounds": 1, "run": "run-07", "status": "completed", "test_fix_rounds": 0, "timed_out": false}, {"agent_minutes": 30.0, "converged": true, "created_at": 2008, "review_fix_rounds": 2, "run": "run-08", "status": "completed", "test_fix_rounds": 0, "timed_out": false}], "converged_within_2_fix_rounds": false, "runs_considered": 10, "runs_wanted": 10, "timeout_class_run_errors": [{"class": "timed out", "run": "older-live"}]}, "since": 1100}
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --since 1100 --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/pipeline.sqlite
+window since 1100
+load: samples=3 cpus=4 load1 p50=7.0 p95=9.0 max=9.0 share>2x=33.3% pool_held max=3 mean=1.67 load_within_2x_cpus=False
+pipeline: first eligible runs=10 of 10 converged_within_2_fix_rounds=False
+  run older-live failed review_fix=0 test_fix=0 agent_minutes=10.0 converged=False
+  run run-00 completed review_fix=3 test_fix=0 agent_minutes=40.0 converged=False
+  run run-01 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-02 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-03 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-04 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-05 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  run run-06 completed review_fix=0 test_fix=0 agent_minutes=10.0 converged=True
+  run run-07 completed review_fix=1 test_fix=0 agent_minutes=20.0 converged=True
+  run run-08 completed review_fix=2 test_fix=0 agent_minutes=30.0 converged=True
+  review: count=21 minutes p50=10.0 p95=10.0
+  review-fix: count=12 minutes p50=10.0 p95=10.0
+  agent failure error/timeout: 1
+  timeout-class run error older-live: timed out
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --runs 1
+usage: fm-load-report.sh [-h] {record,watch,report} ...
+fm-load-report.sh: error: unrecognized arguments: --runs 1
+exit=2
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --runs=1
+usage: fm-load-report.sh [-h] {record,watch,report} ...
+fm-load-report.sh: error: unrecognized arguments: --runs=1
+exit=2
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/bin/fm-load-report.sh report --samples /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/controlled.tsv --nm-db /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DDA7E1CT1X3J8R87EWF7BN/.cpu-live-6osl5vs9/missing.sqlite
+window since 1000
+load: samples=4 cpus=4 load1 p50=9.0 p95=10.0 max=10.0 share>2x=50.0% pool_held max=3 mean=1.25 load_within_2x_cpus=False
+pipeline: unavailable (unable to open database file)
+exit=1

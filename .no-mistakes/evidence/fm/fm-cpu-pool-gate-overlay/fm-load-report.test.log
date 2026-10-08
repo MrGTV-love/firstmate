@@ -1,0 +1,10 @@
+$ TMPDIR=<worktree disposable tmp> bash tests/fm-load-report.test.sh
+ok - record appends one sample with load, cpus and pool use
+ok - report gives load and convergence verdicts over the window
+ok - failed and cancelled runs cannot produce successful convergence
+ok - earlier live runs block convergence until cohort membership is settled
+ok - nonreview terminal runs do not block a settled cohort
+ok - acceptance always requires the fixed ten-run cohort
+ok - an unreadable database still prints the load facts and exits 1
+
+exit=0
