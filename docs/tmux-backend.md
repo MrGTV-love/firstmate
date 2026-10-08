@@ -97,9 +97,9 @@ OpenCode 1.18.4 has one busy-queue exception.
 While OpenCode is mid-turn, Enter queues the message but leaves its text visible until the turn completes.
 After the normal retry budget, structurally proven pending text is accepted as queued only when tmux's foreground command positively identifies OpenCode and the pane is provably busy.
 omp, Claude, unknown harnesses, idle panes, and ambiguous pending text never receive this busy-queue conversion.
-A second, baseline-gated conversion covers harnesses whose mid-turn screen the classifier cannot identify (Pi replaces its separated composer while working): when and only when the pane was idle before the text was typed, an idle-to-busy transition across the submit's own Enter confirms delivery, the same turn-started signal Herdr reads natively.
-Without that baseline, an `unknown` verdict is preserved untouched, so a busy-looking pane can never convert an unread composer into a confirmation.
-`tests/fm-tmux-submit-busy.test.sh` covers busy and idle panes with proven, ambiguous, and cleared composers.
+A second, baseline-gated conversion covers positively identified non-omp harnesses whose mid-turn screen the classifier cannot identify (Pi replaces its separated composer while working): an idle baseline before typing and the identified harness's own busy signature after Enter confirm delivery.
+An `unknown` composer stays unknown for omp, unidentified foreground commands, absent idle baselines, or another harness's busy signature; an independent omp watcher turn cannot prove that Enter consumed the typed payload.
+`tests/fm-tmux-submit-busy.test.sh` covers busy and idle panes with proven, ambiguous, and cleared composers, including a dropped Enter followed by an independent omp watcher turn and a cursor/screen redraw race.
 
 ## Limits and regression entry points
 

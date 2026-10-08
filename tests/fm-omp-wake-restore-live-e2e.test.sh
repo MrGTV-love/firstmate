@@ -275,19 +275,19 @@ wait_for 20 composer_is empty || fail "$SUBJECT: could not clear the draft"
 # The descendant omp child must not take over the markers.
 wait_for 120 is_idle || fail "the lane did not settle before the child probe"
 rm -f "$LAB/child-omp.ok" "$LAB/child-omp.out"
-send_text "Run this exact bash command and then reply CHILD_DONE: env FM_HOME='$PROJECT' FM_ROOT_OVERRIDE='$PROJECT' FM_STATE_OVERRIDE='$PROJECT/state' FM_CONFIG_OVERRIDE='$PROJECT/config' FM_DATA_OVERRIDE='$PROJECT/data' omp --print 'reply with the word hi' --no-session --thinking low --model $MODEL > '$LAB/child-omp.out' 2>&1 && printf 'child-omp-ok\n' > '$LAB/child-omp.ok'"
+send_text "Run this exact bash command and then reply CHILD_DONE: env FM_HOME='$PROJECT' FM_ROOT_OVERRIDE='$PROJECT' FM_STATE_OVERRIDE='$PROJECT/state' FM_CONFIG_OVERRIDE='$PROJECT/config' FM_DATA_OVERRIDE='$PROJECT/data' omp --print 'reply with the word hi' --no-session --thinking low --model $MODEL > '$LAB/child-omp.out' 2>&1 && read -r lock_pid < '$PROJECT/state/.lock' && [ \"\$(sed -n 2p '$PROJECT/state/.omp-turnend-extension-loaded')\" = \"\$lock_pid\" ] && [ \"\$(sed -n 2p '$PROJECT/state/.omp-watch-extension-loaded')\" = \"\$lock_pid\" ] && printf 'child-omp-pre-parent-repair-owner-ok\n' > '$LAB/child-omp.ok'"
 sleep 1
 send_key Enter
 wait_for 60 is_busy || fail "the lane never showed a running turn for the child probe"
 wait_for 180 is_idle || fail "the lane did not settle after the child probe"
-[ "$(cat "$LAB/child-omp.ok" 2>/dev/null)" = child-omp-ok ] \
-  || { cat "$LAB/child-omp.out" >&2 2>/dev/null; fail "$SUBJECT: the descendant omp command did not produce successful execution evidence"; }
+[ "$(cat "$LAB/child-omp.ok" 2>/dev/null)" = child-omp-pre-parent-repair-owner-ok ] \
+  || { cat "$LAB/child-omp.out" >&2 2>/dev/null; fail "$SUBJECT: the descendant omp did not prove both loaded marker PIDs matched the session lock PID before parent repair"; }
 lock_pid=$(sed -n 1p "$PROJECT/state/.lock")
 for marker in .omp-turnend-extension-loaded .omp-watch-extension-loaded; do
   [ "$(sed -n 2p "$PROJECT/state/$marker")" = "$lock_pid" ] \
     || fail "$SUBJECT: a descendant omp left $marker naming '$(sed -n 2p "$PROJECT/state/$marker")' instead of the session pid $lock_pid"
 done
-pass "live omp markers: $SUBJECT kept both loaded markers on the session pid $lock_pid after a descendant omp ran"
+pass "live omp markers: $SUBJECT kept both loaded markers on the session pid $lock_pid before parent repair and after the parent resumed"
 
 # ---------------------------------------------------------------------------
 # A working lane's composer is readable, so injected text is detected and lands.

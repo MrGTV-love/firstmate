@@ -25,7 +25,16 @@ COMPOSER="${FM_FAKE_COMPOSER:?}"
 case "${1:-}" in
   display-message)
     for a in "$@"; do
-      case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; *pane_current_command*) printf '%s\n' "${FM_FAKE_HARNESS:-}"; exit 0 ;; esac
+      case "$a" in
+        *cursor_y*)
+          if [ "${FM_FAKE_WATCHER_TURN:-0}" = 1 ] && [ -f "$FM_FAKE_CAPTURE_COUNT" ] \
+            && [ "$(cat "$FM_FAKE_CAPTURE_COUNT")" -ge "${FM_FAKE_WATCHER_AFTER:-2}" ]; then
+            printf 'transcript\n\n  ⎋ Waiting independent watcher turn\n╭── ⠦ 13s > model ──╮\n╰─ %s ─╯\n' \
+              "$(cat "$COMPOSER.payload")" > "$COMPOSER"
+          fi
+          printf '1\n'; exit 0 ;;
+        *pane_current_command*) printf '%s\n' "${FM_FAKE_HARNESS:-}"; exit 0 ;;
+      esac
     done
     exit 0 ;;
   capture-pane)
@@ -38,7 +47,7 @@ case "${1:-}" in
         exit 1
       fi
       if [ "${FM_FAKE_REFRESH_UNKNOWN:-0}" = 1 ] && [ "$count" -ge 3 ]; then
-        printf 'Pi is processing\n✻ Working…\n'
+        printf 'Pi is processing\nWorking...\n'
         exit 0
       fi
     fi
@@ -46,7 +55,17 @@ case "${1:-}" in
   send-keys)
     shift; is_enter=0
     while [ "$#" -gt 0 ]; do
-      case "$1" in -t) shift ;; -l) ;; Enter) is_enter=1 ;; esac; shift
+      case "$1" in
+        -t) shift ;;
+        -l)
+          if [ "${FM_FAKE_WATCHER_TURN:-0}" = 1 ]; then
+            printf '%s' "$2" > "$COMPOSER.payload"
+            printf '╭── π > model ──╮\n╰─ %s ─╯\n' "$2" > "$COMPOSER"
+          fi
+          ;;
+        Enter) is_enter=1 ;;
+      esac
+      shift
     done
     if [ "$is_enter" = 1 ]; then
       [ -z "${FM_FAKE_SENT:-}" ] || printf 'Enter\n' >> "$FM_FAKE_SENT"
@@ -227,34 +246,72 @@ test_failed_baseline_capture_keeps_busy_unknown_unconfirmed() {
   pass "fm_tmux_submit_core: failed baseline capture disables busy unknown conversion"
 }
 
-test_refreshed_unknown_requires_idle_baseline() {
-  local dir fakebin composer sent out baseline expected
-  for baseline in idle busy failed; do
-    dir="$TMP_ROOT/refreshed-unknown-$baseline"
+test_refreshed_unknown_requires_eligible_identity_and_idle_baseline() {
+  local dir fakebin composer sent out baseline harness expected
+  for harness in pi pi-signed codex omp node ''; do
+    for baseline in idle busy failed; do
+      dir="$TMP_ROOT/refreshed-unknown-${harness:-absent}-$baseline"
+      fakebin=$(make_submit_mock "$dir")
+      composer="$dir/composer"; sent="$dir/sent"
+      printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
+      [ "$baseline" != busy ] || printf 'Working...\n' >> "$composer"
+      touch "$dir/.swallow"; : > "$sent"
+      expected=unknown
+      case "$harness:$baseline" in pi:idle|pi-signed:idle) expected=empty ;; esac
+      out=$(
+        # shellcheck disable=SC2329
+        fm_pane_is_busy() { [ "$(fm_pane_busy_state "$1" "${2:-}")" = busy ]; }
+        PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
+          FM_FAKE_HARNESS="$harness" \
+          FM_FAKE_CAPTURE_COUNT="$dir/captures" FM_FAKE_REFRESH_UNKNOWN=1 \
+          FM_FAKE_FAIL_FIRST_CAPTURE="$([ "$baseline" = failed ] && printf 1 || printf 0)" \
+          FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
+          fm_tmux_submit_core win fix 3 0 0
+      )
+      [ "$out" = "$expected" ] || fail "$harness/$baseline refreshed unknown must return $expected, got '$out'"
+      [ "$(grep -c '^Enter$' "$sent")" -eq 1 ] \
+        || fail "refreshed unknown must be dispatched without another Enter"
+      [ "$(cat "$dir/captures")" -ge 3 ] || fail "pending composer must be refreshed before unknown dispatch"
+    done
+  done
+  pass "tmux refreshed unknown requires eligible identity and idle-baseline turn-start proof"
+}
+test_refreshed_unknown_requires_eligible_identity_and_idle_baseline
+
+test_dropped_enter_independent_omp_turn_redraw_stays_unknown() {
+  local dir fakebin composer sent out after expected_enters
+  for after in 1 2 3; do
+    dir="$TMP_ROOT/omp-watcher-redraw-$after"
     fakebin=$(make_submit_mock "$dir")
     composer="$dir/composer"; sent="$dir/sent"
-    printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
-    [ "$baseline" != busy ] || printf '✻ Working…\n' >> "$composer"
+    printf '╭── π > model ──╮\n╰─ ─╯\n' > "$composer"
     touch "$dir/.swallow"; : > "$sent"
-    expected=unknown
-    [ "$baseline" != idle ] || expected=empty
     out=$(
       # shellcheck disable=SC2329
-      fm_pane_is_busy() { [ "$(fm_pane_busy_state "$1")" = busy ]; }
+      fm_pane_is_busy() { [ "$(fm_pane_busy_state "$1" "${2:-}")" = busy ]; }
       PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-        FM_FAKE_CAPTURE_COUNT="$dir/captures" FM_FAKE_REFRESH_UNKNOWN=1 \
-        FM_FAKE_FAIL_FIRST_CAPTURE="$([ "$baseline" = failed ] && printf 1 || printf 0)" \
+        FM_FAKE_HARNESS=omp FM_FAKE_CAPTURE_COUNT="$dir/captures" \
+        FM_FAKE_WATCHER_TURN=1 FM_FAKE_WATCHER_AFTER="$after" \
         FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
-        fm_tmux_submit_core win fix 3 0 0
+        fm_tmux_submit_core win 'unsubmitted watcher wake' 3 0 0
     )
-    [ "$out" = "$expected" ] || fail "$baseline baseline refreshed unknown must return $expected, got '$out'"
-    [ "$(grep -c '^Enter$' "$sent")" -eq 1 ] \
-      || fail "refreshed unknown must be dispatched without another Enter"
-    [ "$(cat "$dir/captures")" -ge 3 ] || fail "pending composer must be refreshed before unknown dispatch"
+    [ "$out" = unknown ] || fail "independent omp turn with redraw must not confirm held input, got '$out'"
+    expected_enters=1
+    [ "$after" -ne 3 ] || expected_enters=2
+    [ "$(grep -c '^Enter$' "$sent")" -eq "$expected_enters" ] \
+      || fail "omp must stop sending Enter at the unreadable redraw"
+    [ "$(fm_composer_classify_screen "$(fm_tmux_composer_caps)" "$(cat "$composer")" 1)" = unknown ] \
+      || fail "redraw must leave the saved cursor outside the omp box"
+    [ "$(fm_composer_classify_screen "$(fm_tmux_composer_caps)" "$(cat "$composer")" 4)" = pending ] \
+      || fail "repositioned omp box must still contain pending input"
+    [ "$(fm_composer_extract_selected_content "$(fm_tmux_composer_caps)" "$(cat "$composer")")" = 'unsubmitted watcher wake' ] \
+      || fail "independent watcher turn must leave the typed payload unconsumed"
+    printf '%s\n' "$(cat "$composer")" | fm_busy_lines_match omp \
+      || fail "independent watcher turn must supply the misleading busy signal"
   done
-  pass "tmux refreshed unknown uses idle-baseline-gated turn-start proof without another Enter"
+  pass "tmux dropped Enter plus independent omp turn and redraw never confirms held input"
 }
-test_refreshed_unknown_requires_idle_baseline
+test_dropped_enter_independent_omp_turn_redraw_stays_unknown
 
 test_busy_pane_ambiguous_pending_retries_without_conversion() {
   local dir fakebin composer sent vfile

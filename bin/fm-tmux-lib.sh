@@ -12,10 +12,6 @@
 # Styled captures remain internal; fm-peek and every human-facing capture stay
 # plain.
 #
-# OpenCode's busy-queued Enter conversion accepts only structurally proven
-# pending text after retries, while the separate turn-started conversion accepts
-# an unknown post-Enter composer only after this submit observed an idle baseline
-# become busy.
 # The queued-Enter policy itself lives in fm_composer_queued_enter_verdict
 # (bin/fm-composer-lib.sh); this file supplies tmux's pane-busy primitive.
 #
@@ -224,18 +220,6 @@ fm_pane_is_busy() {  # <target> [harness]
 # swallowed Enter leaves our text in the composer and retyping would duplicate
 # it. Echoes the final proof-carrying verdict on stdout so callers can require
 # exact `empty` before treating submission as confirmed.
-# Turn-started confirmation (the strict blank-row posture's counterpart): a
-# harness whose mid-turn screen the classifier cannot positively identify (pi
-# replaces its separated composer while working) reads `unknown` right after a
-# successful submit. When and only when the pane was IDLE before the text was
-# typed, an idle-to-busy transition across our Enter is proof the harness
-# accepted the submission - the same semantic signal herdr's native
-# agent-state confirmation uses, read from the pane's verified busy footer.
-# The busy read is polled across the remaining retry budget because the turn
-# takes a beat to render. Without the baseline (a direct
-# fm_tmux_submit_enter_core caller, or a pane already busy before typing) an
-# `unknown` verdict is preserved untouched: busy conversion without the
-# transition evidence could mark an undelivered message delivered.
 fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle]
   local target=$1 retries=$2 sleep_s=$3 baseline_idle=${4:-} i=0 j state busy_state harness
   tmux send-keys -t "$target" Enter 2>/dev/null || true
@@ -246,15 +230,21 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
       pending|pending-unproven) ;;
       unknown)
         if [ "$baseline_idle" = 1 ]; then
-          j=0
-          while [ "$j" -lt "$retries" ]; do
-            if fm_pane_is_busy "$target"; then
-              printf 'empty'
-              return 0
-            fi
-            j=$((j + 1))
-            [ "$j" -ge "$retries" ] || sleep "$sleep_s"
-          done
+          harness=$(tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null) || harness=
+          harness=${harness##*/}
+          case "$harness" in
+            claude|devin|codex|opencode|pi|pi-signed|grok|agy|kimi|cursor)
+              j=0
+              while [ "$j" -lt "$retries" ]; do
+                if fm_pane_is_busy "$target" "$harness"; then
+                  printf 'empty'
+                  return 0
+                fi
+                j=$((j + 1))
+                [ "$j" -ge "$retries" ] || sleep "$sleep_s"
+              done
+              ;;
+          esac
         fi
         printf 'unknown'
         return 0
