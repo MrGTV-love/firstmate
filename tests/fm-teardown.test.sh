@@ -300,6 +300,9 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/treehouse" "$fakebin/tmux" "$fakebin/gh-axi" "$fakebin/gh" "$fakebin/no-mistakes"
+  # Teardown now asks Docker which stacks the task owns. Shadow the host's real
+  # Docker with the fixture-store fake (empty by default) so no case reaches it.
+  fm_fake_docker "$fakebin"
 
   # Bare origin so the clone has an `origin` remote and origin/HEAD.
   git init -q --bare "$case_dir/origin.git"
@@ -5546,6 +5549,141 @@ EOF
   pass "the run abort and the leaked-process reap both complete before the destructive worktree return"
 }
 
+# Task-owned Docker stacks (bin/fm-task-docker-lib.sh owns the ownership rules).
+# docker_store_add <store> <kind> <field>...: append one fixture object.
+docker_store_add() {
+  local store=$1
+  shift
+  local IFS=$'\t'
+  printf '%s\n' "$*" >> "$store"
+}
+
+# docker_store_names <store> <kind>: the sorted names still in the store.
+docker_store_names() {
+  local store=$1 kind=$2 field=3
+  [ "$kind" = volume ] && field=2
+  awk -F'\t' -v k="$kind" -v f="$field" '$1 == k { print $f }' "$store" | LC_ALL=C sort | tr '\n' ' '
+}
+
+# One task-x1 teardown fixture with a store that mixes the task's own stacks
+# (one per ownership rule) with every kind of object it must leave alone.
+make_docker_case() {
+  local name=$1 case_dir store
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  store="$case_dir/docker-store"
+  : > "$store"
+  # The task's own: marker label, name, compose project name, compose working dir.
+  docker_store_add "$store" container c-name task-x1-test-pg "" ""
+  docker_store_add "$store" container c-label scratch-db "fm.task=task-x1" ""
+  docker_store_add "$store" container c-proj1 task-x1-web-1 "com.docker.compose.project=task-x1" task-x1_default
+  docker_store_add "$store" container c-proj2 task-x1-db-1 "com.docker.compose.project=task-x1" task-x1_default
+  docker_store_add "$store" container c-path firstmate-db-1 "com.docker.compose.project=firstmate;com.docker.compose.project.working_dir=$case_dir/wt" firstmate_default
+  # Not the task's: another task's marker, a near-miss name, a longer sibling
+  # task's name, the shared Supabase stack, a stack from elsewhere, an unmarked
+  # throwaway, and a name this task's id matches but another task's marker beats.
+  docker_store_add "$store" container d-other other-db "fm.task=task-x2" task-x1_shared
+  docker_store_add "$store" container d-near task-x10-pg "" ""
+  docker_store_add "$store" container d-sib task-x1-v2-pg "" ""
+  docker_store_add "$store" container d-supa supabase_db_vernant "com.docker.compose.project=vernant;com.supabase.cli.project=vernant" supabase_network_vernant
+  docker_store_add "$store" container d-else other-compose-1 "com.docker.compose.project=other;com.docker.compose.project.working_dir=$case_dir/elsewhere" other_default
+  docker_store_add "$store" container d-bare gre1675-throwaway-pg "" ""
+  docker_store_add "$store" container d-beat task-x1-cache "fm.task=task-x2" ""
+  docker_store_add "$store" network n-own task-x1_default "com.docker.compose.project=task-x1"
+  docker_store_add "$store" network n-path firstmate_default "com.docker.compose.project=firstmate"
+  docker_store_add "$store" network n-used task-x1_shared "com.docker.compose.project=task-x1"
+  docker_store_add "$store" network n-supa supabase_network_vernant "com.docker.compose.project=vernant;com.supabase.cli.project=vernant"
+  docker_store_add "$store" network n-else other_default "com.docker.compose.project=other"
+  docker_store_add "$store" volume task-x1-data "fm.task=task-x1"
+  docker_store_add "$store" volume task-x1_pgdata "com.docker.compose.project=task-x1"
+  docker_store_add "$store" volume other-data "fm.task=task-x2"
+  # A longer sibling task in the same home claims task-x1-v2-pg.
+  fm_write_meta "$case_dir/state/task-x1-v2.meta" "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1-v2"
+  printf '%s\n' "$case_dir"
+}
+
+test_teardown_removes_the_tasks_own_docker_stacks() {
+  local case_dir rc
+  case_dir=$(make_docker_case docker-own-stacks)
+  rc=0
+  FM_FAKE_DOCKER_STORE="$case_dir/docker-store" \
+  FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "docker-own-stacks: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_equals "gre1675-throwaway-pg other-compose-1 other-db supabase_db_vernant task-x1-cache task-x1-v2-pg task-x10-pg " \
+    "$(docker_store_names "$case_dir/docker-store" container)" \
+    "docker-own-stacks: wrong containers remained"
+  assert_equals "other_default supabase_network_vernant task-x1_shared " \
+    "$(docker_store_names "$case_dir/docker-store" network)" \
+    "docker-own-stacks: wrong networks remained"
+  assert_equals "other-data task-x1_pgdata " \
+    "$(docker_store_names "$case_dir/docker-store" volume)" \
+    "docker-own-stacks: wrong volumes remained"
+  assert_grep "removing Docker container(s) owned by task-x1" "$case_dir/stderr" \
+    "docker-own-stacks: teardown did not say which containers it removed"
+  pass "teardown removes the task's labelled, named, compose-project and worktree-compose stacks and leaves every other Docker object"
+}
+
+test_docker_removal_failure_keeps_the_task_records_until_a_rerun_succeeds() {
+  local case_dir rc
+  case_dir=$(make_docker_case docker-rm-fails)
+  cat > "$case_dir/fakebin/treehouse" <<EOF
+#!/usr/bin/env bash
+echo returned >> "$case_dir/treehouse.log"
+exit 0
+EOF
+  chmod +x "$case_dir/fakebin/treehouse"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$case_dir/docker-store" FM_FAKE_DOCKER_RM_FAIL=task-x1-test-pg \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "docker-rm-fails: an owned container that survives removal must stop teardown"
+  assert_grep "task-x1-test-pg" "$case_dir/stderr" "docker-rm-fails: the surviving container was not named"
+  assert_present "$case_dir/state/task-x1.meta" "docker-rm-fails: the task record was removed while a container survived"
+  assert_absent "$case_dir/treehouse.log" "docker-rm-fails: the worktree was returned while a container survived"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$case_dir/docker-store" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "docker-rm-fails: the rerun should finish: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "docker-rm-fails: the rerun left the task record"
+  pass "an owned container that cannot be removed stops teardown with the record kept, and a rerun finishes it"
+}
+
+test_forced_teardown_continues_past_a_docker_removal_failure() {
+  local case_dir rc
+  case_dir=$(make_docker_case docker-rm-fails-forced)
+  rc=0
+  FM_FAKE_DOCKER_STORE="$case_dir/docker-store" FM_FAKE_DOCKER_RM_FAIL=task-x1-test-pg \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "docker-rm-fails-forced: --force should continue: $(cat "$case_dir/stderr")"
+  assert_grep "task-x1-test-pg" "$case_dir/stderr" "docker-rm-fails-forced: the leftover container was not named"
+  pass "--force continues past a Docker container that cannot be removed and names it"
+}
+
+test_stopped_docker_daemon_does_not_block_teardown() {
+  local case_dir rc
+  case_dir=$(make_docker_case docker-daemon-down)
+  rc=0
+  FM_FAKE_DOCKER_STORE="$case_dir/docker-store" FM_FAKE_DOCKER_DOWN=1 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "docker-daemon-down: a stopped daemon must not strand teardown: $(cat "$case_dir/stderr")"
+  assert_grep "docker ps -a --filter label=fm.task=task-x1" "$case_dir/stderr" \
+    "docker-daemon-down: the warning did not name the manual command"
+  pass "a stopped Docker daemon is a warning that names the manual command, not a teardown refusal"
+}
+
+test_teardown_without_a_docker_binary_is_silent() {
+  local case_dir rc
+  case_dir=$(make_docker_case docker-absent)
+  rm -f "$case_dir/fakebin/docker"
+  rc=0
+  FM_TEARDOWN_TEST_PATH=$(fm_test_base_path_sans "$PATH" docker) \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "docker-absent: teardown without Docker should succeed: $(cat "$case_dir/stderr")"
+  assert_no_grep "ocker" "$case_dir/stderr" "docker-absent: teardown spoke about Docker though none is installed"
+  pass "a host without Docker tears down silently"
+}
+
 # Copy the public teardown script tree, then drop or blank one required file.
 # Symlinks keep the copy cheap; an unreadable case replaces one link with a
 # real mode-000 file so the probe is of the file itself.
@@ -5921,6 +6059,11 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
+test_teardown_removes_the_tasks_own_docker_stacks
+test_docker_removal_failure_keeps_the_task_records_until_a_rerun_succeeds
+test_forced_teardown_continues_past_a_docker_removal_failure
+test_stopped_docker_daemon_does_not_block_teardown
+test_teardown_without_a_docker_binary_is_silent
 )
 
 # Validate the complete selection before running any behavioral case.
