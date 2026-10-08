@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 
-type Context = { sessionManager?: { getSessionFile?: () => string | undefined }; ui?: { notify?: (message: string, level: string) => void } };
+type Context = { agent?: { kind: string }; sessionManager?: { getSessionFile?: () => string | undefined }; ui?: { notify?: (message: string, level: string) => void } };
 type Proof = { version: 1; spawn_gen: string; pid: number; task_session_file: string; current_session_file: string };
 type API = { on?: (event: string, handler: (event: unknown, ctx: Context) => void) => void };
 
@@ -75,7 +75,7 @@ export function createTaskSessionProof(state: string, id: string): { start: (ctx
   }
   return {
     start(ctx) {
-      if (!gen) return;
+      if (!gen || ctx?.agent?.kind === "sub") return;
       try {
         if (!matchesMetadata()) throw new Error("spawn generation does not match metadata");
         const old = previous();
@@ -103,7 +103,7 @@ export function createTaskSessionProof(state: string, id: string): { start: (ctx
       }
     },
     shutdown(ctx) {
-      if (!gen) return;
+      if (!gen || ctx?.agent?.kind === "sub") return;
       try { invalidate(); } catch (error) {
         try {
           const old = previous();

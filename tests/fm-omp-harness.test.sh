@@ -836,7 +836,7 @@ const handlers = new Map(), warnings = [];
 const pi = { on(event, handler) { handlers.set(event, handler); } };
 installTaskSessionProof(pi, state, "demo");
 let file = task;
-const ctx = { sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
+const ctx = { agent: { kind: "main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
 const start = () => handlers.get("session_start")({}, ctx);
 const stop = () => handlers.get("session_shutdown")({}, ctx);
 const beforeSwitch = () => handlers.get("session_before_switch")({ targetSessionFile: personal, reason: "resume" }, ctx);
@@ -849,6 +849,14 @@ assert.equal(existsSync(task), false);
 writeFileSync(task, "{}\n");
 start();
 assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: realpathSync(task), current_session_file: realpathSync(task) });
+const parentProof = record();
+for (const childFile of [personal, undefined]) {
+  const childCtx = { agent: { kind: "sub" }, sessionManager: { getSessionFile() { return childFile; } }, ui: ctx.ui };
+  for (const event of ["session_start", "session_switch", "session_branch", "session_before_switch", "session_before_branch", "session_shutdown"]) {
+    handlers.get(event)({}, childCtx);
+    assert.deepEqual(record(), parentProof, `${event} from ${childFile ? "persisted" : "in-memory"} child must preserve parent proof`);
+  }
+}
 stop();
 assert.equal(record().current_session_file, "");
 assert.equal(record().task_session_file, realpathSync(task));

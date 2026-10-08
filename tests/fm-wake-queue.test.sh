@@ -449,7 +449,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   # not suppress the first endpoint tick when its marker is absent; seed it so
   # every watcher launch and restart leaves the fixture endpoints untouched.
   touch "$dir/state/.secondmate-liveness-tick"
-  FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
+  FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
   pid=$!
   case "$mode" in
     alert)
@@ -459,7 +459,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
           if grep -F 'secondmate wake-loop stalled' "$out" >/dev/null 2>&1; then
             return 0
           fi
-          FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+          FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
           pid=$!
         fi
         sleep 0.1
@@ -555,7 +555,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
         break
       fi
       rm -f "$beat"
-      FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+      FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
       pid=$!
       first=0
       mark=0
@@ -854,9 +854,9 @@ SH
   chmod +x "$fakebin/date"
 }
 
-# A proven-idle, ring-safe mate with a leftover foreign row is rung so its
-# own home can drain. The parent alarm stays silent when that ring actually
-# empties the child's queue.
+# A proven-idle mate with an empty composer and a leftover foreign row is rung
+# so its own home can drain. The parent alarm stays silent when that ring
+# actually empties the child's queue.
 test_secondmate_proven_idle_ring_lets_the_child_drain() {
   local dir state sub fakebin inbox_body inbox_rec steer
   dir=$(make_case secondmate-proven-idle-drain)
@@ -870,11 +870,11 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
   install_secondmate_alive_tmux "$fakebin"
   install_secondmate_stall_date "$fakebin"
-  printf 'unrecognized idle prompt\n' > "$dir/composer"
+  printf '❯\n' > "$dir/composer"
   [ "$(PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$dir/composer" \
     bash -c '. "$1"; fm_backend_composer_state tmux firstmate:fm-mate fm-mate' \
-      _ "$ROOT/bin/fm-backend.sh")" = unknown ] \
-    || fail "the idle child-drain fixture must reach the real classifier's ordinary unknown verdict"
+      _ "$ROOT/bin/fm-backend.sh")" = empty ] \
+    || fail "the idle child-drain fixture must reach the real classifier's proven-empty verdict"
   "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
     || fail "could not arm the mate's busy contract"
   "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
@@ -920,7 +920,7 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
     || fail "the child-first ring wrote the wrong drain instruction: $steer"
   grep -F '[ENTER]' "$dir/sent" >/dev/null \
     || fail "the child-first ring did not submit the doorbell: $(cat "$dir/sent" 2>/dev/null)"
-  pass "a proven-idle mate with an ordinary unknown composer is rung so its child home drains without a parent alarm"
+  pass "a proven-idle mate with a proven-empty composer is rung so its child home drains without a parent alarm"
 }
 
 test_secondmate_unknown_draft_keeps_the_parent_alert() {
@@ -3541,6 +3541,12 @@ SH
   [ ! -s "$dir/tmux.log" ] || fail "an unreachable remote probe touched a local endpoint"
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
+  "$FM_TEST_ONLY"
+  exit $?
+fi
 
 test_self_held_lock_reclaims_instead_of_deadlocking
 test_subshell_lock_ownership_without_bashpid
