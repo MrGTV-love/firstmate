@@ -188,6 +188,7 @@ for harness in claude omp; do
   emit_spawn "$id" "$CASE/project" --mode no-mistakes --yolo off
   if [ "$harness" = claude ]; then
     artifact="$CASE/wt/.claude/settings.local.json"
+    ! grep -q 'synthetic-owner-key' "$artifact" || fail "claude worker settings hold the key"
   else
     artifact="$STATE_DIR/$id.omp-ext.ts"
   fi
