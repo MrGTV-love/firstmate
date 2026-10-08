@@ -2018,7 +2018,7 @@ test_recovery_releases_nonqueued_worker_locks() {
     start_item "$case_dir" "$id"
     write_task_meta "$case_dir" "$id" ship no-mistakes
   done
-  tasks-axi done atomic-done-lock --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi 'done' atomic-done-lock --file "$(backlog_of "$case_dir")" >/dev/null
   cat > "$case_dir/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --version ] || exit 0
