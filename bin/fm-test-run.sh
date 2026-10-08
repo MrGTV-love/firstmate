@@ -143,7 +143,7 @@
 # recorded family-level coupling still expands to the whole family.
 # The vendored-skill arm for .agents/skills/hyper-jev/ is another exception: it
 # selects no suite except for SKILL.md, which retains its earlier family-selection
-# rule.
+# rule, and the starter's src/core/ client, which bin/fm-skill-pick.mjs imports.
 # tests/lib.sh, tests/fixtures.sh, tests/*-helpers.sh and tests/*-fixture.sh are
 # shared files that map to the suites naming them; a fixture under
 # tests/fixtures/<dir>/ is mapped by that directory instead. Curated family arms
@@ -422,7 +422,7 @@ family_for_basename() {
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
-    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-suggest.test.sh|fm-typesafe-key-source.test.sh|\
+    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-pick.test.sh|fm-typesafe-key-source.test.sh|\
     fm-extension-binding.test.sh|fm-gitignore-config.test.sh|\
     fm-no-mistakes-required.test.sh|fm-peek-remote.test.sh|\
     fm-pending-reply.test.sh|fm-pi-branch-extension.test.sh|\
@@ -1520,15 +1520,17 @@ families_for_changed_path() {
       ;;
     bin/fm-typesafe-lib.sh)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
-      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
       printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
       ;;
     bin/fm-jev-belay-hook.sh|bin/fm-jev-belay-policy.mjs)
       printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
       printf '%s\n' "__script__:fm-busy-adapter-wiring.test.sh"
       ;;
-    bin/fm-skill-suggest.sh|bin/fm-skill-catalog.jq)
-      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+    bin/fm-skill-pick.sh|bin/fm-skill-pick.mjs|\
+    .agents/skills/hyper-jev/templates/starter/src/core/*.ts)
+      # The picker imports the vendored hyper-jev client unchanged.
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     bin/fm-model-index.sh)
       printf '%s\n' "__script__:fm-model-index.test.sh"
@@ -1541,10 +1543,10 @@ families_for_changed_path() {
       ;;
     bin/fm-env-lib.sh)
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and
-      # bin/fm-typesafe-lib.sh (dispatch and skill-advice TYPESAFE_API_KEY).
+      # bin/fm-typesafe-lib.sh (dispatch and skill-pick TypeSafe and OpenRouter keys).
       printf '%s\n' pr-forge
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
-      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     .pi/extensions/fm-branch-supervision.ts|.pi/extensions/lib/fm-async-exec.ts|\
     .pi/extensions/lib/fm-branch-dispatch.ts|.pi/extensions/lib/fm-native-contract.ts)
@@ -1639,8 +1641,12 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       printf '%s\n' live-harness-optin
       ;;
-    bin/fm-spawn.sh|bin/fm-send.sh|bin/fm-harness.sh|\
-    bin/fm-peek.sh|bin/fm-composer*)
+    bin/fm-spawn.sh)
+      printf '%s\n' backend-dispatch
+      printf '%s\n' pure-contract-unit
+      printf '%s\n' "__script__:fm-skill-pick.test.sh"
+      ;;
+    bin/fm-send.sh|bin/fm-harness.sh|bin/fm-peek.sh|bin/fm-composer*)
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
       ;;
@@ -1693,8 +1699,9 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     .agents/skills/hyper-jev/*)
-      # Vendored upstream skill files (see SOURCE.md there) have no firstmate
-      # test consumer, so they select no suite instead of refusing as unmapped.
+      # Other vendored upstream skill files (see SOURCE.md there) have no
+      # firstmate test consumer, so they select no suite instead of refusing
+      # as unmapped.
       ;;
     .github/workflows/ci.yml|.no-mistakes.yaml)
       printf '%s\n' pure-contract-unit

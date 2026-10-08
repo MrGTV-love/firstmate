@@ -305,6 +305,37 @@ test_shell_line_ending_policy_selects_runner_contract() {
   pass "shell line-ending policy selects runner coverage"
 }
 
+test_changed_spawn_selects_picker_without_broadening_siblings() {
+  local tmp repo listed source
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-spawn-selection.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-skill-pick.test.sh"
+  chmod +x "$repo/tests/fm-skill-pick.test.sh"
+  for source in fm-spawn.sh fm-send.sh fm-harness.sh fm-peek.sh fm-composer.sh fm-composer-lib.sh; do
+    : >"$repo/bin/$source"
+  done
+  git -C "$repo" add bin tests/fm-skill-pick.test.sh
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm spawn-selection-fixture
+
+  for source in fm-spawn.sh fm-send.sh fm-harness.sh fm-peek.sh fm-composer.sh fm-composer-lib.sh; do
+    printf '\n' >"$repo/bin/$source"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$source changed selection failed"
+    assert_contains "$listed" "tests/fm-backend.test.sh" "$source retains backend-dispatch coverage"
+    assert_contains "$listed" "tests/fm-brief.test.sh" "$source retains pure-contract-unit coverage"
+    if [ "$source" = fm-spawn.sh ]; then
+      assert_contains "$listed" "tests/fm-skill-pick.test.sh" "spawn selects worker picker coverage"
+    else
+      assert_not_contains "$listed" "tests/fm-skill-pick.test.sh" "$source does not select worker picker coverage"
+    fi
+    : >"$repo/bin/$source"
+  done
+
+  rm -rf "$tmp"
+  pass "spawn changes select picker coverage without broadening sibling commands"
+}
+
 test_changed_dependency_selection_and_unmapped_failure() {
   local tmp repo listed rc
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-changed.XXXXXX")
@@ -312,17 +343,17 @@ test_changed_dependency_selection_and_unmapped_failure() {
   init_changed_fixture_repo "$repo"
 
   : >"$repo/bin/fm-env-lib.sh"
-  for script in fm-dispatch-resolve.test.sh fm-skill-suggest.test.sh; do
+  for script in fm-dispatch-resolve.test.sh fm-skill-pick.test.sh; do
     printf '#!/usr/bin/env bash\n' >"$repo/tests/$script"
     chmod +x "$repo/tests/$script"
   done
-  git -C "$repo" add bin/fm-env-lib.sh tests/fm-dispatch-resolve.test.sh tests/fm-skill-suggest.test.sh
+  git -C "$repo" add bin/fm-env-lib.sh tests/fm-dispatch-resolve.test.sh tests/fm-skill-pick.test.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm typesafe-fixture
   printf '\n' >>"$repo/bin/fm-env-lib.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/fm-pr-merge.test.sh" "environment accessor retains pr-forge coverage"
   assert_contains "$listed" "tests/fm-dispatch-resolve.test.sh" "environment accessor selects dispatch coverage"
-  assert_contains "$listed" "tests/fm-skill-suggest.test.sh" "environment accessor selects picker coverage"
+  assert_contains "$listed" "tests/fm-skill-pick.test.sh" "environment accessor selects picker coverage"
   assert_not_contains "$listed" "tests/fm-daemon.test.sh" "environment accessor selection stays focused"
   git -C "$repo" add bin/fm-env-lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm environment-change
@@ -2226,6 +2257,7 @@ test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
+test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency

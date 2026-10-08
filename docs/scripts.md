@@ -36,8 +36,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto fm-captain-hold.sh |
 | `fm-brief.sh`            | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), scout, secondmate-charter, and Herdr-lab briefs, with Captain's intent and Firstmate spec subsections on ship/scout |
 | [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |
-| [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section reader |
-| [`fm-skill-suggest.sh`](../bin/fm-skill-suggest.sh) | Suggest optional skill bodies to inspect ([operator contract](configuration.md#advisory-skill-selection)) |
+| [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section and legacy captain-provenance reader |
+| [`fm-skill-pick.sh`](../bin/fm-skill-pick.sh) | Pick the project skill a ship or scout worker loads at launch ([operator contract](configuration.md#worker-skill-selection)) |
 | [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
 | [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker wrapper for the pinned upstream belay Stop hook ([contract](configuration.md#jev-belay-stop-hook)) |
 | [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload enforcing the [belay egress policy](configuration.md#jev-belay-stop-hook) |
