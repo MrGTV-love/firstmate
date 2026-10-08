@@ -4803,7 +4803,239 @@ test_internal_retention_preserves_active_drop_provenance() (
   pass "internal retention and read-only admission preserve active captain drop classification"
 )
 
+# A Lavish listener lives as long as its Lavish session, and a captain answers a
+# board with choice forms that never end the session, so every board ever armed
+# kept its resident processes until someone retired it by hand: 25 were live on
+# a host at load 102, most of them for boards eight days idle. The sweep retires
+# a listener only when its board is provably finished, and keeps everything that
+# could still carry a captain answer. Each scenario below is a board the sweep
+# must keep or retire for a different reason; the live-listener case proves the
+# retirement actually stops the resident poll, not just the registration.
+sweep_session() {  # <store-dir> <artifact> <status> <queued-prompts> <updated-at|->
+  mkdir -p "$1"
+  perl -MJSON::PP -MCwd=realpath -MDigest::SHA=sha256_hex -e '
+    my ($dir, $art, $status, $queued, $updated) = @ARGV;
+    my $path = "$dir/state.json";
+    my $doc = { sessions => {} };
+    if (-f $path) { open my $in, "<", $path or die $!; local $/; $doc = decode_json(<$in>); }
+    my $real = realpath($art) // die "missing artifact";
+    my $key = substr(sha256_hex($real), 0, 16);
+    my $session = {
+      key => $key, file => $real, url => "http://127.0.0.1:14387/session/$key",
+      status => $status, pending_prompts => $queued + 0,
+    };
+    $session->{updated_at} = $updated unless $updated eq "-";
+    $doc->{sessions}{$key} = $session;
+    open my $out, ">", $path or die $!;
+    print $out encode_json($doc);
+  ' "$@"
+}
+
+sweep_board() {  # <home> <name> <age: old|new> <card-key...>: write one board, print its path
+  local home=$1 name=$2 age=$3 file key
+  shift 3
+  mkdir -p "$home/boards"
+  file="$home/boards/$name.html"
+  {
+    printf '<h1>%s</h1>\n' "$name"
+    for key in "$@"; do
+      printf '<form data-lavish-question="%s"><button>go</button></form>\n' "$key"
+    done
+  } > "$file"
+  [ "$age" != old ] || touch -t 200001010000 "$file"
+  printf '%s\n' "$file"
+}
+
+sweep_register() {  # <home> <artifact>: register its listener without starting it, print the source id
+  local home=$1 artifact=$2 sid
+  sid=$(run_lavish "$home" source-id "$artifact") || fail "could not derive a source id"
+  run_procevent "$home" register lavish "$sid" -- \
+    "$ROOT/bin/fm-procevent-lavish.sh" poll "$artifact" >/dev/null \
+    || fail "could not register the board listener"
+  printf '%s\n' "$sid"
+}
+
+test_sweep_retires_only_finished_board_listeners() {
+  local home store out rc list before after unreadable unreadable_id
+  local gone ended nosession dormant closed openheld fresh queued owned standing pending
+  local gone_id ended_id nosession_id dormant_id closed_id openheld_id fresh_id queued_id owned_id standing_id pending_id
+  home=$(make_home board-sweep)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  fm_fake_exit0 "$home/fakebin" lavish-axi
+
+  run_captain "$home" hold sweep-open-call --title "Choose the sweep route" \
+    --reason "captain sweep route pending" --repo sample >/dev/null \
+    || fail "could not hold the open captain call"
+  run_captain "$home" hold sweep-closed-call --title "Choose the closed route" \
+    --reason "captain closed route pending" --repo sample >/dev/null \
+    || fail "could not hold the call that is answered below"
+  printf 'north\n' > "$home/answer.txt"
+  run_captain "$home" answer sweep-closed-call --decision-file "$home/answer.txt" >/dev/null \
+    || fail "could not answer the call"
+
+  gone=$(sweep_board "$home" gone old)
+  ended=$(sweep_board "$home" ended new)
+  nosession=$(sweep_board "$home" nosession new)
+  dormant=$(sweep_board "$home" dormant old sweep-absent-card)
+  closed=$(sweep_board "$home" closed old sweep-closed-call)
+  openheld=$(sweep_board "$home" openheld old sweep-open-call)
+  fresh=$(sweep_board "$home" fresh new)
+  queued=$(sweep_board "$home" queued old)
+  owned=$(sweep_board "$home" owned old)
+  standing="$home/.lavish/bearings-board.html"
+  mkdir -p "$home/.lavish"
+  printf '<h1>standing</h1>\n' > "$standing"
+  touch -t 200001010000 "$standing"
+  pending=$(sweep_board "$home" pending old)
+
+  gone_id=$(sweep_register "$home" "$gone")
+  ended_id=$(sweep_register "$home" "$ended")
+  nosession_id=$(sweep_register "$home" "$nosession")
+  dormant_id=$(sweep_register "$home" "$dormant")
+  closed_id=$(sweep_register "$home" "$closed")
+  openheld_id=$(sweep_register "$home" "$openheld")
+  fresh_id=$(sweep_register "$home" "$fresh")
+  queued_id=$(sweep_register "$home" "$queued")
+  standing_id=$(sweep_register "$home" "$standing")
+  pending_id=$(sweep_register "$home" "$pending")
+  owned_id=$(run_lavish "$home" source-id "$owned") || fail "could not derive the owned source id"
+  printf 'window=fmtest:fm-sweep-owner\nworktree=%s/worktree-sweep-owner\nproject=fmtest\n' "$home" \
+    > "$home/state/sweep-owner.meta"
+  run_procevent "$home" register-task lavish "$owned_id" sweep-owner -- \
+    "$ROOT/bin/fm-procevent-lavish.sh" poll "$owned" >/dev/null \
+    || fail "could not register the worker-owned board"
+
+  sweep_session "$store" "$gone" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$ended" ended 0 -
+  sweep_session "$store" "$dormant" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$closed" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$openheld" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$fresh" open 0 -
+  sweep_session "$store" "$queued" open 2 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$owned" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$standing" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$pending" open 0 2000-01-01T00:00:00.000Z
+  mkdir -p "$home/state/procevent-inbox"
+  printf 'session:\n  status: feedback\n' > "$home/state/procevent-inbox/$pending_id.1.result"
+  printf 'lavish\n' > "$home/state/procevent-inbox/$pending_id.1.adapter"
+  touch -t 200001010000 "$home/state/procevent-inbox/$pending_id.1.result" \
+    "$home/state/procevent-inbox/$pending_id.1.adapter"
+  rm -f "$gone"
+  before=$(cksum < "$store/state.json")
+
+  # A dry run reports the verdicts and changes nothing.
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
+    || fail "the dry-run sweep failed: $out"
+  assert_contains "$out" "would-retire: $gone_id" "the dry run missed a board whose file is gone"
+  assert_contains "$out" "sweep: would-retire=5 kept=6" "the dry run counted the wrong verdicts: $out"
+  list=$(run_procevent "$home" list)
+  assert_contains "$list" "$dormant_id" "a dry run retired a registration"
+
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+    || fail "the sweep failed: $out"
+  assert_contains "$out" "retired: $gone_id" "a board whose file is gone kept its listener"
+  assert_contains "$out" "retired: $ended_id" "an ended Lavish session kept its listener"
+  assert_contains "$out" "retired: $nosession_id" "a board Lavish has no session for kept its listener"
+  assert_contains "$out" "retired: $dormant_id" "an idle board with no open call kept its listener"
+  assert_contains "$out" "retired: $closed_id" "an idle board whose only call is answered kept its listener"
+  assert_contains "$out" "kept: $openheld_id" "an idle board with an open captain call lost its listener"
+  assert_contains "$out" "kept: $fresh_id" "a recently touched board lost its listener"
+  assert_contains "$out" "kept: $queued_id" "a board holding queued feedback lost its listener"
+  assert_contains "$out" "kept: $owned_id" "a worker-owned board lost its listener to a dormancy rule"
+  assert_contains "$out" "kept: $standing_id" "the standing Bearings board lost its listener"
+  assert_contains "$out" "kept: $pending_id" "a board with an unread captured answer lost its listener"
+  assert_contains "$out" "sweep: retired=5 kept=6" "the sweep counted the wrong verdicts: $out"
+
+  list=$(run_procevent "$home" list)
+  for after in "$gone_id" "$ended_id" "$nosession_id" "$dormant_id" "$closed_id"; do
+    assert_not_contains "$list" "$after" "a retired board is still registered"
+  done
+  for after in "$openheld_id" "$fresh_id" "$queued_id" "$owned_id" "$standing_id" "$pending_id"; do
+    assert_contains "$list" "$after" "a kept board lost its registration"
+  done
+  [ "$before" = "$(cksum < "$store/state.json")" ] \
+    || fail "the sweep changed the Lavish session store; retiring a listener must not end a board"
+
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the repeat sweep failed: $out"
+  assert_contains "$out" "sweep: retired=0 kept=6" "a repeat sweep retired more than the first"
+
+  # A store the sweep cannot read proves nothing about any board's session, so
+  # a board that would otherwise be retired keeps its listener.
+  unreadable=$(sweep_board "$home" unreadable old)
+  unreadable_id=$(sweep_register "$home" "$unreadable")
+  sweep_session "$store" "$unreadable" open 0 2000-01-01T00:00:00.000Z
+  cp "$store/state.json" "$home/state-good.json"
+  printf 'not json\n' > "$store/state.json"
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the unreadable-store sweep failed: $out"
+  assert_contains "$out" "kept: $unreadable_id" "an unreadable Lavish store retired a listener"
+  assert_contains "$out" "sweep: retired=0 kept=7" "an unreadable Lavish store changed the verdicts: $out"
+  cp "$home/state-good.json" "$store/state.json"
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the restored-store sweep failed: $out"
+  assert_contains "$out" "retired: $unreadable_id" "the same board was not retired once its session was readable"
+
+  set +e
+  out=$(FM_BOARD_LISTENER_IDLE_HOURS=0 LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an unusable idle window was accepted"
+  assert_contains "$out" "FM_BOARD_LISTENER_IDLE_HOURS" "the refusal did not name the setting"
+  pass "the sweep retires finished boards and keeps every board that could still carry an answer"
+}
+
+# The point of the sweep is the resident processes: a live listener's board is
+# finished, and after the sweep neither its runner nor its blocked poll remains.
+# Count of resident `lavish-axi poll` processes serving the live-idle board.
+live_idle_polls() {
+  pgrep -f "lavish-axi poll .*board-sweep-live/boards/live-idle.html" | wc -l | tr -d ' '
+}
+
+test_sweep_stops_a_live_listener_of_a_finished_board() {
+  local home store artifact sid out list tries
+  home=$(make_home board-sweep-live)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  artifact=$(sweep_board "$home" live-idle old)
+  cat > "$home/fakebin/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+# A poll that blocks until it is killed; bounded so an escaped stub cannot linger.
+for _ in $(seq 1 1800); do sleep 0.1; done
+SH
+  chmod +x "$home/fakebin/lavish-axi"
+  sweep_session "$store" "$artifact" open 0 2000-01-01T00:00:00.000Z
+  sid=$(run_lavish "$home" source-id "$artifact") || fail "could not derive the live source id"
+  out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60 LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" arm "$artifact") \
+    || fail "could not arm the live listener: $out"
+  list=$(run_procevent "$home" list)
+  assert_contains "$list" "$sid" "the armed listener is not registered"
+  assert_contains "$list" "live" "the armed listener is not running"
+  # Armed means claimed; the poll process follows the claim, so wait for it.
+  tries=0
+  while [ "$(live_idle_polls)" -eq 0 ] \
+    && [ "$tries" -lt 300 ]; do
+    tries=$((tries + 1))
+    sleep 0.1
+  done
+  [ "$(live_idle_polls)" -ge 1 ] \
+    || fail "the armed listener has no resident poll to retire"
+
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the sweep failed: $out"
+  assert_contains "$out" "retired: $sid" "the idle board's live listener was kept"
+  tries=0
+  while [ "$(live_idle_polls)" -ne 0 ] && [ "$tries" -lt 100 ]; do
+    tries=$((tries + 1))
+    sleep 0.1
+  done
+  [ "$(live_idle_polls)" -eq 0 ] \
+    || fail "the retired listener's poll is still resident"
+  list=$(run_procevent "$home" list)
+  assert_not_contains "$list" "$sid" "the retired listener is still registered"
+  pass "the sweep stops the resident poll of a finished board's live listener"
+}
+
 tests=(
+test_sweep_retires_only_finished_board_listeners
+test_sweep_stops_a_live_listener_of_a_finished_board
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair

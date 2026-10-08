@@ -11,6 +11,7 @@
 #   fm-procevent-lavish.sh read <result-file>
 #   fm-procevent-lavish.sh source-id <artifact.html>
 #   fm-procevent-lavish.sh retire <artifact.html>
+#   fm-procevent-lavish.sh sweep [--dry-run]
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
 #   fm-procevent-lavish.sh deliver-reply poll <artifact.html> --agent-reply-file <path>
 #   fm-procevent-lavish.sh check <artifact.html>
@@ -35,6 +36,36 @@
 #            Captain-supplied body lines are visibly prefixed so they cannot
 #            forge structural labels. Empty message and annotation sections
 #            are reported explicitly.
+# sweep      Retire this home's Lavish listeners whose boards are finished, and
+#            print one `retired:`, `kept:` or (with --dry-run) `would-retire:`
+#            line per registration plus a `sweep:` total. A listener lives as
+#            long as its Lavish session, and the captain answers a board with
+#            choice forms that never end the session, so without a sweep every
+#            board ever armed keeps its resident processes and its owner guard
+#            until the session is ended by hand. A board is FINISHED, in this
+#            order, when:
+#              1. its artifact file is gone, or Lavish holds no session or an
+#                 ended session for it, so the poll can never produce a result
+#                 (the exact case a task-owned source may also retire on); or
+#              2. it has been idle for FM_BOARD_LISTENER_IDLE_HOURS (default 48,
+#                 whole hours 1..8760) - no change to the artifact, the Lavish
+#                 session or a captured round - and carries no open captain call.
+#            A board is KEPT while any of these holds: it is the standing
+#            Bearings board; Lavish reports queued feedback for it; a captured
+#            round of it is unacknowledged; it is owned by a worker task (only
+#            rule 1 retires those); or one of its `data-lavish-question` card
+#            keys names a task `bin/fm-captain-hold.sh open` reports as an open
+#            captain call (exit 0) or cannot establish (exit 2). A card key that
+#            names no task in this home's backlog (exit 3) or a closed one
+#            (exit 1) is not an open call: the durable record of a captain call
+#            is its held task, and the standing board lists every held call.
+#            A call held in another home's backlog is invisible here, which is
+#            why dormancy is required as well as the absence of an open hold.
+#            Retiring stops the listener and releases its claim through the
+#            generic `retire`; it never ends the Lavish session, so the board
+#            stays readable and `arm` brings the listener back. Cost: one perl
+#            pass over every registration, plus one `fm-captain-hold.sh open`
+#            per distinct card key of an otherwise-finished board.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
 #            and prints its response verbatim, absorbing only the one exact
@@ -1008,9 +1039,216 @@ cmd_read() {
   ' "$file" "$lifecycle" "$session_ended"
 }
 
+# --- sweep: retire listeners whose boards are finished -----------------------
+# The header owns the rules. This section only reads facts and applies them; the
+# generic `retire` in bin/fm-procevent.sh stays the one place a registration and
+# its runner are actually removed.
+BOARD_IDLE_HOURS_DEFAULT=48
+BOARD_IDLE_HOURS_MAX=8760
+
+board_idle_seconds() {
+  local value=${FM_BOARD_LISTENER_IDLE_HOURS-$BOARD_IDLE_HOURS_DEFAULT}
+  case "$value" in ''|*[!0-9]*) return 1 ;; esac
+  value=$((10#$value))
+  [ "$value" -ge 1 ] && [ "$value" -le "$BOARD_IDLE_HOURS_MAX" ] || return 1
+  printf '%s\n' $((value * 3600))
+}
+
+# One perl pass for every registration: <source-id> TAB <artifact> lines on
+# stdin, one fact row per line out:
+#   id, artifact, real path ("-" when the file is gone), sessions (count, or
+#   "unknown"), status, queued prompts, last-activity epoch, card keys.
+# `sessions` is "unknown" when Lavish's store cannot be read, so an unreadable
+# store keeps every board instead of reading as "no session".
+sweep_facts() {  # <state-dir> <lavish-store>
+  perl -MJSON::PP -MCwd=realpath -MEncode=decode,FB_DEFAULT -MTime::Local=timegm -e '
+    use strict; use warnings;
+    my ($state, $store) = @ARGV;
+    my (%by, $store_ok);
+    if (open my $sf, "<", $store) {
+      local $/;
+      my $doc = eval { decode_json(<$sf>) };
+      if (ref($doc) eq "HASH" && ref($doc->{sessions}) eq "HASH") {
+        $store_ok = 1;
+        for my $s (values %{$doc->{sessions}}) {
+          push @{$by{$s->{file}}}, $s if ref($s) eq "HASH" && defined $s->{file} && !ref($s->{file});
+        }
+      }
+    }
+    my $newest = sub { my $m = 0; for (@_) { my $t = (stat $_)[9]; $m = $t if defined $t && $t > $m } $m };
+    while (my $line = <STDIN>) {
+      chomp $line;
+      my ($id, $art) = split /\t/, $line, 2;
+      next unless defined $art;
+      my $real = -f $art ? realpath($art) : undef;
+      my ($sessions, $status, $pending, @keys) = ("unknown", "", 0);
+      my $activity = $newest->(glob("$state/procevent-inbox/$id.*"));
+      if (defined $real) {
+        my $t = $newest->($real);
+        $activity = $t if $t > $activity;
+        if (open my $in, "<:raw", $real) {
+          local $/;
+          my $html = <$in>;
+          close $in;
+          my %seen;
+          while ($html =~ /\bdata-lavish-question\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27)/g) {
+            my $k = $1 // $2;
+            push @keys, $k if $k =~ /\A[A-Za-z0-9._-]{1,128}\z/ && !$seen{$k}++;
+          }
+        }
+      }
+      if ($store_ok) {
+        my $list = defined $real ? ($by{decode("UTF-8", $real, FB_DEFAULT)} // []) : [];
+        $sessions = scalar @$list;
+        if (@$list == 1) {
+          my $s = $list->[0];
+          $status = $s->{status} // "";
+          $pending = $s->{pending_prompts} // 0;
+          $pending = 0 unless $pending =~ /\A[0-9]+\z/;
+          if (($s->{updated_at} // "") =~ /\A(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)/) {
+            my $t = eval { timegm($6, $5, $4, $3, $2 - 1, $1) } // 0;
+            $activity = $t if $t > $activity;
+          }
+        }
+      }
+      print join("\t", $id, $art, defined $real ? $real : "-", $sessions, $status || "-", $pending, $activity, join(",", @keys) || "-"), "\n";
+    }
+  ' "$1" "$2"
+}
+
+cmd_sweep() {
+  local dry=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
+  local pending_ids facts real sessions status queued activity keys reason verdict key rc out
+  local open_cache=$'\n' retired=0 kept=0 idx saved_ifs
+  local -a ids=() kinds=()
+  case "${1-}" in
+    '') ;;
+    --dry-run) dry=1; shift ;;
+    *) usage ;;
+  esac
+  [ "$#" -eq 0 ] || usage
+  idle=$(board_idle_seconds) \
+    || die "FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to $BOARD_IDLE_HOURS_MAX"
+  state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
+  reg=$(fm_procevent_registry_dir "$state")
+  store=${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json
+  now=$(date +%s)
+  standing=$(perl -MCwd=realpath -e '$p = realpath($ARGV[0]); print $p if defined $p' \
+    "$FM_HOME/.lavish/bearings-board.html" 2>/dev/null || true)
+  pending_ids=$(fm_procevent_pending "$state" | sed -n 's|.*/\([^/.]*\)\.[0-9][0-9]*\.result$|\1|p')
+
+  # Read every registration first so one perl pass can answer for all of them.
+  facts=''
+  for rec in "$reg"/lavish-*.source; do
+    [ -f "$rec" ] && [ ! -L "$rec" ] || continue
+    id=${rec##*/}; id=${id%.source}
+    fm_procevent_source_id_valid "$id" || continue
+    adapter=''; kind=plain; argv_poll=''; artifact=''; n=0; in_argv=0
+    while IFS= read -r line || [ -n "$line" ]; do
+      if [ "$in_argv" = 1 ]; then
+        n=$((n + 1))
+        [ "$n" -ne 2 ] || argv_poll=$line
+        [ "$n" -ne 3 ] || artifact=$line
+        continue
+      fi
+      case "$line" in
+        adapter=*) adapter=${line#adapter=} ;;
+        kind=*) kind=${line#kind=} ;;
+        argv:) in_argv=1 ;;
+      esac
+    done < "$rec"
+    [ "$adapter" = lavish ] && [ "$argv_poll" = poll ] && [ -n "$artifact" ] || continue
+    ids+=("$id"); kinds+=("$kind")
+    facts="$facts$id"$'\t'"$artifact"$'\n'
+  done
+  if [ "${#ids[@]}" -eq 0 ]; then
+    printf 'sweep: retired=0 kept=0\n'
+    return 0
+  fi
+  facts=$(printf '%s' "$facts" | sweep_facts "$state" "$store") || die "cannot read the Lavish board facts"
+
+  while IFS=$'\t' read -r id artifact real sessions status queued activity keys; do
+    [ -n "$id" ] || continue
+    kind=plain
+    for idx in "${!ids[@]}"; do
+      [ "${ids[$idx]}" = "$id" ] && { kind=${kinds[$idx]}; break; }
+    done
+    verdict=keep
+    if [ "$real" = - ]; then
+      verdict=retire; reason='the board file is gone'
+    elif [ "$sessions" = 0 ]; then
+      verdict=retire; reason='Lavish holds no session for the board'
+    elif [ "$status" = ended ]; then
+      verdict=retire; reason='the Lavish session has ended'
+    elif [ -n "$standing" ] && [ "$real" = "$standing" ]; then
+      reason='the standing Bearings board'
+    elif [ "$sessions" = unknown ]; then
+      reason='the Lavish session store cannot be read'
+    elif [ "$status" = feedback ] || [ "$queued" -gt 0 ]; then
+      reason='Lavish holds queued feedback for the board'
+    elif [ "$kind" = task-owned ]; then
+      reason='owned by a worker task'
+    elif [ $((now - activity)) -lt "$idle" ]; then
+      reason="active within the last $((idle / 3600)) hours"
+    else
+      verdict=retire
+      reason="idle for $(((now - activity) / 3600)) hours with no open captain call"
+      saved_ifs=$IFS
+      IFS=,
+      for key in $keys; do
+        [ "$key" != - ] || continue
+        case "$open_cache" in
+          *$'\n'"$key="[0-3]$'\n'*) ;;
+          *)
+            FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open "$key" --distinguish-absent \
+              >/dev/null 2>&1 </dev/null
+            rc=$?
+            open_cache="$open_cache$key=$rc"$'\n'
+            ;;
+        esac
+        case "$open_cache" in
+          *$'\n'"$key=1"$'\n'*|*$'\n'"$key=3"$'\n'*) ;;
+          *) verdict=keep; reason="card $key is an open captain call or cannot be checked"; break ;;
+        esac
+      done
+      IFS=$saved_ifs
+    fi
+    if [ "$verdict" = retire ]; then
+      case $'\n'"$pending_ids"$'\n' in
+        *$'\n'"$id"$'\n'*) verdict=keep; reason='a captured round of the board is unacknowledged' ;;
+      esac
+    fi
+    if [ "$verdict" = retire ] && [ "$dry" = 0 ]; then
+      if ! out=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" retire "$id" 2>&1 </dev/null); then
+        verdict=keep
+        reason="retire refused: ${out%%$'\n'*}"
+      fi
+    fi
+    if [ "$verdict" = retire ]; then
+      retired=$((retired + 1))
+      if [ "$dry" = 1 ]; then
+        printf 'would-retire: %s %s - %s\n' "$id" "$artifact" "$reason"
+      else
+        printf 'retired: %s %s - %s\n' "$id" "$artifact" "$reason"
+      fi
+    else
+      kept=$((kept + 1))
+      printf 'kept: %s %s - %s\n' "$id" "$artifact" "$reason"
+    fi
+  done <<SWEEP_FACTS
+$facts
+SWEEP_FACTS
+  if [ "$dry" = 1 ]; then
+    printf 'sweep: would-retire=%s kept=%s\n' "$retired" "$kept"
+  else
+    printf 'sweep: retired=%s kept=%s\n' "$retired" "$kept"
+  fi
+}
+
 case "${1-}" in
   arm)       shift; cmd_arm "$@" ;;
   retire)    shift; cmd_retire "$@" ;;
+  sweep)     shift; cmd_sweep "$@" ;;
   poll)      shift; cmd_poll "$@" ;;
   deliver-reply) shift; cmd_deliver_reply "$@" ;;
   check)     shift; cmd_check "$@" ;;

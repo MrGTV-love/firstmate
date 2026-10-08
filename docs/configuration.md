@@ -2437,6 +2437,16 @@ This start-to-start governor is a no-op after a normally blocking poll but caps 
 Real feedback, ended and missing sessions, any other `SERVER_ERROR`, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
 An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
 
+**Retire finished Lavish listeners**
+
+`bin/fm-procevent-lavish.sh sweep [--dry-run]` retires the listeners of boards that are finished, and its header owns the rules.
+A listener otherwise lives as long as its Lavish session, and a captain's choice answers never end the session.
+`bin/fm-bearings-board.sh build` runs the sweep after every successful build, and it can be run by hand at any time.
+
+`FM_BOARD_LISTENER_IDLE_HOURS` (default 48, whole hours 1..8760) sets how long a board must sit untouched before the sweep may retire it.
+An unusable value makes the sweep refuse by name.
+Retiring a listener never ends the Lavish session, and `bin/fm-procevent-lavish.sh arm <artifact.html>` brings the listener back.
+
 ### Crew-hosted Lavish review boards
 
 **Arm and confirm a listener**
