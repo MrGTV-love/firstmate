@@ -33,6 +33,10 @@ GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
+# A worker that recorded its own stop is not missing: done or paused in its status log, or a
+# done, parked, or paused current state.
+STOP_EVENTS = {"done", "paused"}
+STOP_STATES = {"done", "parked", "paused"}
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
                        r"|timed? ?out|ECONN|ENOTFOUND|\b(?:error|failure|failed|exception|fatal)\b"
                        r"|\b(?-i:E[A-Z][A-Z0-9_]{2,})\b", re.I)
@@ -83,6 +87,22 @@ class Collector:
         self.backlog = []
         self.prs = {}
         self.state_files = []
+        self.owned_urls = set()
+        self.owned_branches = set()
+        self.unowned = {}
+        self.lane = self.is_secondmate_home()
+
+    def is_secondmate_home(self):
+        """A genuine secondmate-home marker: a regular file holding a valid id (fm-primary-scope-lib.sh)."""
+        marker = self.home / ".fm-secondmate-home"
+        try:
+            if marker.is_symlink() or not marker.is_file():
+                return False
+            first = marker.read_text().splitlines()[:1]
+        except (OSError, UnicodeDecodeError):
+            return False
+        ident = re.sub(r"\s", "", first[0]) if first else ""
+        return bool(ident) and re.fullmatch(r"[A-Za-z0-9._-]+", ident) is not None
 
     def load_config(self):
         path = self.config / "open-loops.json"
@@ -194,13 +214,17 @@ class Collector:
     def bash(self, script, *args):
         return self.run(["bash", "-c", script, "open-loops", *args])
 
-    def add(self, category, subject, action, since=None, owner="firstmate", evidence=""):
+    def add(self, category, subject, action, since=None, owner="firstmate", evidence="", informational=False):
+        """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
         limit = self.ages[category]
-        self.rows[identity] = dict(id=identity, category=category, subject=str(subject), owner=owner,
-                                   next_action=action, age_seconds=age, limit_seconds=limit,
-                                   overdue=age is None or age >= limit, evidence=str(evidence)[:400])
+        row = dict(id=identity, category=category, subject=str(subject), owner=owner,
+                   next_action=action, age_seconds=age, limit_seconds=limit,
+                   overdue=not informational and (age is None or age >= limit), evidence=str(evidence)[:400])
+        if informational:
+            row["informational"] = True
+        self.rows[identity] = row
 
     def source(self, name, reader, *args):
         """Run one reader; its failure marks the ledger partly blind and never aborts the others."""
@@ -227,20 +251,35 @@ class Collector:
             if not record.get("structured") and record.get("state") != "done":
                 self.degraded.append("unstructured backlog row: " + str(record.get("raw", ""))[:100])
 
+    def recorded_stop(self, task):
+        """True when the worker's own durable record says it stopped on purpose, so its endpoint
+        being gone or its live state being unreadable is expected rather than a loss."""
+        if task["current_state"].get("state") == "failed":
+            return False
+        last = ((task.get("paths") or {}).get("status_log") or {}).get("last_event") or {}
+        return task["current_state"].get("state") in STOP_STATES or last.get("state") in STOP_EVENTS
+
     def backlog_rows(self):
         by_id = {t["id"]: t for t in self.tasks}
+        dispatched = {p.name.rsplit(".", 1)[0] for p in self.state_files if p.name.endswith((".meta", ".status"))}
         today = dt.datetime.fromtimestamp(self.now, dt.timezone.utc).strftime("%Y-%m-%d")
         for record in self.backlog:
             since = epoch(record.get("since"))
             task = by_id.get(record["id"])
             if record["state"] == "in_flight" and record.get("requires_child_metadata"):
-                if not task or task["endpoint"].get("exists") is False:
+                if not task or (task["endpoint"].get("exists") is False and not self.recorded_stop(task)):
                     self.add("missing_worker", record["id"], "recover the assigned worker without discarding work",
                              since)
             elif (record["state"] == "queued" and not record.get("hold_kind")
                   and not record.get("unresolved_blocker_ids")
                   and (not record.get("hold_until") or record["hold_until"] <= today)):
-                self.add("ready_not_started", record["id"], "dispatch the dependency-cleared work", since)
+                # Only work whose dispatch began (a task record or status log exists) is an obligation;
+                # the rest of the queue is the captain's backlog, shown but never overdue.
+                selected = record["id"] in by_id or record["id"] in dispatched
+                self.add("ready_not_started", record["id"],
+                         "dispatch the dependency-cleared work" if selected
+                         else "informational: queued and not selected for dispatch",
+                         since, informational=not selected)
 
     def liveness(self, task):
         alive = task["endpoint"].get("agent_alive")
@@ -257,13 +296,20 @@ class Collector:
 
     def worker_rows(self):
         for task in self.tasks:
-            alive = self.source("worker liveness " + task["id"], self.liveness, task)
-            if (task["current_state"].get("state") == "unknown"
+            stopped = self.recorded_stop(task)
+            if stopped:  # a recorded stop explains an unreadable endpoint; it never degrades coverage
+                try:
+                    alive = self.liveness(task)
+                except SOURCE_ERRORS:
+                    alive = None
+            else:
+                alive = self.source("worker liveness " + task["id"], self.liveness, task)
+            if (task["current_state"].get("state") == "unknown" and not stopped
                     and not (alive in ("dead", "missing")
                              and task["current_state"].get("detail", "").startswith("backend target gone:"))):
                 self.degraded.append("worker current state " + task["id"] + ": "
                                      + (task["current_state"].get("detail") or "observation unavailable"))
-            if task["endpoint"].get("exists") is False or alive in ("dead", "missing"):
+            if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
                 self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
                          mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
             if task["current_state"].get("state") == "failed":
@@ -442,14 +488,31 @@ class Collector:
         self.prs[url] = pr
         return pr
 
+    def load_ownership(self):
+        """PRs this home owns: recorded on its tasks or backlog, or opened from a task's branch."""
+        self.owned_urls = {t["pr"]["url"] for t in self.tasks if t["pr"].get("url")}
+        self.owned_branches = {t["branch"] for t in self.tasks if t.get("branch")}
+        for record in self.backlog:
+            for link in [record.get("pr_url"), *(record.get("links") or [])]:
+                if isinstance(link, str) and GITHUB_PR.fullmatch(link):
+                    self.owned_urls.add(link)
+
+    def owns_pr(self, pr):
+        return pr["html_url"] in self.owned_urls or (pr.get("head") or {}).get("ref") in self.owned_branches
+
     def repo_slugs(self):
         paths = {t["project"] for t in self.tasks if t.get("project")}
-        if (self.home / ".git").exists():
-            paths.add(str(self.home))
-        if self.projects_dir.is_dir():
-            projects = self.source("projects inventory", lambda: list(self.projects_dir.iterdir())) or []
-            paths |= {str(p) for p in projects if (p / ".git").exists()}
+        if not self.lane:  # a lane's shared clones are not its obligations; only the main home surveys them
+            if (self.home / ".git").exists():
+                paths.add(str(self.home))
+            if self.projects_dir.is_dir():
+                projects = self.source("projects inventory", lambda: list(self.projects_dir.iterdir())) or []
+                paths |= {str(p) for p in projects if (p / ".git").exists()}
         slugs = set()
+        for url in self.owned_urls:
+            match = GITHUB_PR.fullmatch(url)
+            if match:
+                slugs.add(match[1])
         for task in self.tasks:
             url = task["pr"].get("url")
             if not url:
@@ -523,7 +586,20 @@ class Collector:
                 self.pr_state(url)
                 continue
             self.prs[url] = pr
-            self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
+            if self.owns_pr(pr):
+                self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
+            else:
+                self.unowned.setdefault(slug, []).append(pr.get("number", "?"))
+
+    def unowned_row(self):
+        """Project PRs with no fleet owner: one informational row in the main home, nothing in a lane."""
+        if self.lane or not self.unowned:
+            return
+        total = sum(len(numbers) for numbers in self.unowned.values())
+        listing = "; ".join(f"{slug}: " + " ".join("#" + str(n) for n in sorted(numbers, key=str))
+                            for slug, numbers in sorted(self.unowned.items()))
+        self.add("open_pr", "unowned project PRs", "informational: no fleet owner; route one only on the captain's word",
+                 None, "none", f"{total} open PR(s) with no task or backlog owner - {listing}", informational=True)
 
     def question_rows(self):
         for record in self.backlog:
@@ -553,9 +629,11 @@ class Collector:
         self.source("state inventory", self.read_state_inventory)
         self.source("fleet snapshot", self.read_snapshot)
         self.source("backlog", self.backlog_rows)
+        self.source("ownership", self.load_ownership)
         slugs = self.source("project origins", self.repo_slugs) or []
         for slug in slugs:
             self.source("open PRs " + slug, self.pr_rows, slug)
+        self.unowned_row()
         self.source("workers", self.worker_rows)
         self.source("questions", self.question_rows)
         if self.degraded:

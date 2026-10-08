@@ -579,15 +579,25 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 
 | Category | A row exists when | Default limit |
 | --- | --- | --- |
-| `missing_worker` | an In flight item requiring child metadata lacks a task record or endpoint, or an ordinary task has a confirmed missing or dead worker | 600 s |
-| `ready_not_started` | a Queued item has no hold kind or unresolved blocker, and its optional hold date is absent or due | 1800 s |
+| `missing_worker` | an In flight item requiring child metadata lacks a task record or endpoint, or an ordinary task has a confirmed missing or dead worker that did not record a stop | 600 s |
+| `ready_not_started` | a Queued item has no hold kind or unresolved blocker, and its optional hold date is absent or due; it is overdue only once dispatch has begun | 1800 s |
 | `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
 | `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
-| `open_pr` | an open PR discovered from this home's project origins or recorded task PR URLs waits on checks, a reviewer, or firstmate's review routing | 3600 s |
-| `red_check` | the latest run of a check on an open PR failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
+| `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing; the main home also carries one informational group row for project PRs nobody owns | 3600 s |
+| `red_check` | the latest run of a check on a PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
+
+Each home reports only what it owns.
+A PR is owned when one of this home's task records or backlog items names its URL, or when its head branch is a branch of one of this home's tasks.
+Every other open PR of the discovered repositories is unowned: it gets no `open_pr` or `red_check` row of its own, and its checks are not fetched.
+The main home lists its unowned PRs once, as the single `open_pr` row named `unowned project PRs`, with owner `none` and the PR numbers per repository in its evidence.
+A secondmate home, marked by a valid `.fm-secondmate-home` file, emits no such row and discovers repositories only from its own tasks and owned PR URLs, never from its shared `projects/` clones or its own checkout.
+An informational row carries `informational: true` and is never overdue at any age, so it neither wakes the watcher nor appears in Bearings.
+A queued item is selected for dispatch once it has a task record or a status log in this home; unselected ready items stay visible as informational rows, so the unprioritized backlog is not an overdue obligation.
+A worker whose current state is `done`, `parked`, or `paused`, or whose status log ends on a `done` or `paused` event, has recorded its own stop: a gone endpoint or an unreadable live state then adds neither a `missing_worker` row nor degraded coverage.
+A recorded stop never hides a `failed` task or its unlanded commits.
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
 The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.
@@ -595,7 +605,7 @@ Status questions age from their stamped opening.
 Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata.
 Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
-GitHub repositories are discovered from recorded local task PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits.
+GitHub repositories are discovered from recorded local task and backlog PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits.
 Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
 Unreadable or unknown current task state adds degraded coverage independently of liveness, and only nonfuture progress timestamps count as work evidence.

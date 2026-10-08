@@ -127,6 +127,8 @@ backlog = [
     dict(id='waiting', structured=True, state='queued', since=iso(hours(9)), unresolved_blocker_ids=['orphan']),
     dict(id='held', structured=True, state='queued', since=iso(hours(9)), hold_kind='captain'),
     dict(id='deferred', structured=True, state='queued', since=iso(hours(9)), hold_until='2999-01-01'),
+    dict(id='review-8', structured=True, state='done', links=[PR_URL + '8'], pr_url=PR_URL + '8'),
+    dict(id='route-9', structured=True, state='done', links=[PR_URL + '9'], pr_url=PR_URL + '9'),
 ]
 (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
                                                     backlog=dict(present=True, records=backlog))))
@@ -185,7 +187,8 @@ assert open_prs[PR_URL + '9']['age_seconds'] == 3600 and open_prs[PR_URL + '9'][
 # Every row names an owner, a next action and an age (or an unknown age that stays overdue).
 for row in report['rows']:
     assert row['owner'] and row['next_action'] and 'age_seconds' in row and row['id'], row
-    assert row['overdue'] == (row['age_seconds'] is None or row['age_seconds'] >= row['limit_seconds']), row
+    assert row['overdue'] == (not row.get('informational')
+                              and (row['age_seconds'] is None or row['age_seconds'] >= row['limit_seconds'])), row
 
 # Age limits live in config; the boundary is inclusive.
 (home / 'config/open-loops.json').write_text(json.dumps(dict(age_limits_seconds=dict(open_pr=3600, ready_not_started=9 * 3600 + 1))))
@@ -630,6 +633,108 @@ finally:
 assert ledger()['complete'], 'restored readable inventory must recover coverage'
 print('PASS: unreadable shared state inventory cannot publish complete empty coverage', flush=True)
 
+# Ownership scoping: a home is accountable only for work its own records name.
+def greens(sha, status='completed', conclusion='success'):
+    return [dict(id=1, name='unit', app=dict(id=3), status=status, conclusion=conclusion, completed_at=iso(hours(2)))]
+scope_saved = (double['pulls'], double['checks'], double.get('pulls_by_repo'))
+scope_pr = lambda number, sha, ref=None, **extra: dict(
+    number=number, html_url=PR_URL + str(number), head=dict(sha=sha, ref=ref), state='open', draft=False,
+    updated_at=iso(hours(3)), **extra)
+shas = {n: chr(ord('a') + n - 31) * 40 for n in range(31, 37)}
+double['pulls'] = [scope_pr(31, shas[31]), scope_pr(32, shas[32]), scope_pr(33, shas[33], 'fm/branch-owned'),
+                   scope_pr(34, shas[34]), scope_pr(35, shas[35], requested_teams=[dict(slug='reviewers')])]
+double['checks'] = {shas[31]: greens(shas[31]), shas[32]: greens(shas[32], conclusion='failure'),
+                    shas[33]: greens(shas[33]), shas[34]: greens(shas[34], conclusion='failure'),
+                    shas[35]: greens(shas[35])}
+other = home / 'projects/other'
+out(['git', 'init', '-q', '-b', 'main', other])
+git(other, 'remote', 'add', 'origin', 'https://github.com/test/other.git')
+double['pulls_by_repo'] = {'/repos/test/other': [dict(scope_pr(40, 'f' * 40), html_url='https://github.com/test/other/pull/40')]}
+double['checks']['f' * 40] = greens('f' * 40, conclusion='failure')
+(world / 'gh.json').write_text(json.dumps(double))
+scope_tasks = [task('owns-31', fresh, pr=PR_URL + '31'), task('owns-branch', fresh)]
+scope_tasks[1]['branch'] = 'fm/branch-owned'
+scope_backlog = [dict(id='owns-32', structured=True, state='done', links=[PR_URL + '32'], pr_url=None)]
+fixture(scope_tasks, scope_backlog)
+marker_file = home / '.fm-secondmate-home'
+def scoped(lane):
+    marker_file.unlink(missing_ok=True)
+    if lane:
+        marker_file.write_text('lane-1\n')
+    (world / 'gh-requests').write_text('')
+    return ledger(), (world / 'gh-requests').read_text()
+try:
+    # Main home: only owned PRs are obligations; the rest is one informational group, never overdue.
+    main_scope, main_requests = scoped(False)
+    assert set(rows(main_scope, 'red_check')) == {PR_URL + '32'}, main_scope
+    named = {s for s in rows(main_scope, 'open_pr') if s.startswith(PR_URL)}
+    assert named == {PR_URL + '31', PR_URL + '33'}, main_scope
+    group = rows(main_scope, 'open_pr')['unowned project PRs']
+    assert group['informational'] and group['overdue'] is False and group['owner'] == 'none', group
+    for token in ('test/project: #34 #35', 'test/other: #40'):
+        assert token in group['evidence'], group
+    assert [r['subject'] for r in main_scope['rows'] if r.get('informational') and r['category'] == 'open_pr'] \
+        == ['unowned project PRs'], main_scope
+    assert shas[34] not in main_requests and shas[35] not in main_requests, 'unowned PR checks are not fetched'
+    # A lane home shares the origin but lists no unowned PR, no group, and never reads the other repository.
+    lane_scope, lane_requests = scoped(True)
+    assert set(rows(lane_scope, 'red_check')) == {PR_URL + '32'}, lane_scope
+    assert {s for s in rows(lane_scope, 'open_pr')} == {PR_URL + '31', PR_URL + '33'}, lane_scope
+    assert not any(r.get('informational') for r in lane_scope['rows'] if r['category'] == 'open_pr'), lane_scope
+    assert '/repos/test/other' not in lane_requests, 'a lane does not survey repositories it has no task in'
+    marker_file.write_text('not a valid id!\n')
+    assert 'unowned project PRs' in rows(ledger(), 'open_pr'), 'a malformed marker is not a lane home'
+    marker_file.unlink()
+finally:
+    marker_file.unlink(missing_ok=True)
+    shutil.rmtree(other)
+    double['pulls'], double['checks'] = scope_saved[0], scope_saved[1]
+    double.pop('pulls_by_repo')
+    if scope_saved[2] is not None:
+        double['pulls_by_repo'] = scope_saved[2]
+    (world / 'gh.json').write_text(json.dumps(double))
+print('PASS: PR and red-check rows follow ownership; unowned PRs are one informational main-home group', flush=True)
+
+# A worker that recorded its own stop is not missing, and an unreadable live state does not degrade the ledger.
+def stopped_task(name, last_event, state='unknown', detail='backend target gone: gone', exists=False, alive='missing'):
+    item = task(name, world / 'nowhere', state=state, exists=exists, alive=alive)
+    item['current_state']['detail'] = detail
+    item['paths']['status_log'] = dict(last_event=dict(state=last_event) if last_event else None)
+    return item
+recorded = [stopped_task('stopped-done', 'done'),
+            stopped_task('stopped-paused-gone', 'paused', alive='dead'),
+            stopped_task('stopped-paused-live', 'paused', detail='unrecognized run status', exists=True, alive='alive'),
+            stopped_task('stopped-parked', None, state='parked', exists=False, alive='dead'),
+            stopped_task('lost-silently', 'working', alive='dead'),
+            stopped_task('failed-after-done', 'done', state='failed', alive='dead')]
+fixture(recorded, [dict(id=t['id'], structured=True, state='in_flight', requires_child_metadata=True,
+                        since=iso(hours(9))) for t in recorded])
+stopped_report = ledger()
+assert set(rows(stopped_report, 'missing_worker')) == {'lost-silently', 'failed-after-done'}, stopped_report
+assert 'failed-after-done' in rows(stopped_report, 'failed_task'), 'a recorded stop never hides a failed deliverable'
+degraded_text = ' '.join(r['evidence'] for r in rows(stopped_report, 'coverage').values())
+assert not any(name in degraded_text for name in ('stopped-done', 'stopped-paused', 'stopped-parked')), stopped_report
+fixture(tasks, backlog)
+print('PASS: recorded stopped or parked owners are neither missing nor unknown', flush=True)
+
+# Unselected ready items are visible backlog, not overdue obligations; dispatched ones still are.
+(home / 'state/started-ready.status').write_text(f'working [at={hours(1)}]: spawned\n')
+selected_task = task('selected-ready', fresh)
+fixture([selected_task], [
+    dict(id='idle-ready', structured=True, state='queued', since=iso(hours(9))),
+    dict(id='selected-ready', structured=True, state='queued', since=iso(hours(9))),
+    dict(id='started-ready', structured=True, state='queued', since=iso(hours(9)))])
+ready_report = ledger()
+ready_rows = rows(ready_report, 'ready_not_started')
+assert set(ready_rows) == {'idle-ready', 'selected-ready', 'started-ready'}, ready_report
+assert ready_rows['idle-ready']['overdue'] is False and ready_rows['idle-ready']['informational'], ready_rows
+assert ready_rows['idle-ready']['next_action'].startswith('informational'), ready_rows
+for name in ('selected-ready', 'started-ready'):
+    assert ready_rows[name]['overdue'] is True and 'informational' not in ready_rows[name], ready_rows
+(home / 'state/started-ready.status').unlink()
+fixture(tasks, backlog)
+print('PASS: only dispatched ready work is overdue', flush=True)
+
 # An unreadable source is one degraded row and complete:false; healthy sources still report.
 (home / 'snapshot-fails').write_text('')
 double['fail'] = True
@@ -773,7 +878,8 @@ for address in (address_home, address_code):
     report_task['project'] = None
     (address / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
         tasks=[report_task], backlog=dict(present=True, records=[
-            dict(id='address-ready', structured=True, state='queued')]))))
+            dict(id='address-ready', structured=True, state='queued'),
+            dict(id='address-pr', structured=True, state='done', links=[address_url])]))))
 empty_keys = ('FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE')
 address_cases = [(dict(FM_HOME=str(address_home), **{key: ''}), address_home) for key in empty_keys]
 address_cases += [
@@ -889,7 +995,9 @@ for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
         for i in range(24):
             (deadline_home / 'state' / (str(i) + '.status')).write_text('needs-decision [key=q]: question\n')
     (deadline_home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
-        tasks=deadline_tasks, backlog=dict(present=True, records=[]))))
+        tasks=deadline_tasks, backlog=dict(present=True, records=(
+            [dict(id='owns-prs', structured=True, state='done', links=[PR_URL + str(i) for i in range(24)])]
+            if reader == 'pr-checks' else [])))))  # owned PRs are the ones whose checks are fetched
     script(deadline_code / 'bin/fm-fleet-snapshot.sh', '#!/usr/bin/env python3\n'
            'import os\nfrom pathlib import Path\nhome = Path(os.environ["FM_HOME"])\n'
            '(home / "collector-pid").write_text(str(os.getppid()))\nprint((home / "snapshot.json").read_text())\n')
