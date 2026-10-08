@@ -637,24 +637,32 @@ print('PASS: unreadable shared state inventory cannot publish complete empty cov
 def greens(sha, status='completed', conclusion='success'):
     return [dict(id=1, name='unit', app=dict(id=3), status=status, conclusion=conclusion, completed_at=iso(hours(2)))]
 scope_saved = (double['pulls'], double['checks'], double.get('pulls_by_repo'))
-scope_pr = lambda number, sha, ref=None, **extra: dict(
-    number=number, html_url=PR_URL + str(number), head=dict(sha=sha, ref=ref), state='open', draft=False,
+scope_pr = lambda number, sha, ref=None, head_repo='test/project', **extra: dict(
+    number=number, html_url=PR_URL + str(number),
+    head=dict(sha=sha, ref=ref, repo=dict(full_name=head_repo) if head_repo else None), state='open', draft=False,
     updated_at=iso(hours(3)), **extra)
-shas = {n: chr(ord('a') + n - 31) * 40 for n in range(31, 37)}
-double['pulls'] = [scope_pr(31, shas[31]), scope_pr(32, shas[32]), scope_pr(33, shas[33], 'fm/branch-owned'),
+shas = {n: chr(ord('a') + n - 31) * 40 for n in range(31, 40)}
+double['pulls'] = [scope_pr(31, shas[31], 'fm/branch-owned', head_repo='contributor/project'),
+                   scope_pr(32, shas[32], 'fm/branch-owned', head_repo='contributor/project'),
+                   scope_pr(33, shas[33], 'fm/branch-owned'),
                    scope_pr(34, shas[34]), scope_pr(35, shas[35], requested_teams=[dict(slug='reviewers')]),
-                   scope_pr(36, shas[36], 'fm/other')]
+                   scope_pr(36, shas[36], 'fm/other'),
+                   scope_pr(37, shas[37], 'fm/branch-owned', head_repo='contributor/project'),
+                   scope_pr(38, shas[38], 'fm/branch-owned', head_repo=None),
+                   scope_pr(39, shas[39], 'fm/branch-owned')]
+double['pulls'][-1]['head'].pop('repo')
 double['checks'] = {shas[31]: greens(shas[31]), shas[32]: greens(shas[32], conclusion='failure'),
                     shas[33]: greens(shas[33]), shas[34]: greens(shas[34], conclusion='failure'),
                     shas[35]: greens(shas[35]), shas[36]: greens(shas[36], conclusion='failure')}
+double['checks'].update({shas[n]: greens(shas[n], conclusion='failure') for n in (37, 38, 39)})
 other = home / 'projects/other'
 out(['git', 'init', '-q', '-b', 'main', other])
 git(other, 'remote', 'add', 'origin', 'https://github.com/test/other.git')
 other_url = 'https://github.com/test/other/pull/'
 double['pulls_by_repo'] = {'/repos/test/other': [
-    dict(scope_pr(40, 'f' * 40, 'fm/branch-owned'), html_url=other_url + '40'),
-    dict(scope_pr(41, '1' * 40, 'fm/other'), html_url=other_url + '41'),
-    dict(scope_pr(42, '2' * 40, 'fm/unrelated'), html_url=other_url + '42')]}
+    dict(scope_pr(40, 'f' * 40, 'fm/branch-owned', head_repo='test/other'), html_url=other_url + '40'),
+    dict(scope_pr(41, '1' * 40, 'fm/other', head_repo='test/other'), html_url=other_url + '41'),
+    dict(scope_pr(42, '2' * 40, 'fm/unrelated', head_repo='test/other'), html_url=other_url + '42')]}
 double['checks']['f' * 40] = greens('f' * 40, conclusion='failure')
 double['checks']['1' * 40] = greens('1' * 40)
 double['checks']['2' * 40] = greens('2' * 40, conclusion='failure')
@@ -674,12 +682,13 @@ try:
     main_scope, main_requests = scoped(False)
     assert set(rows(main_scope, 'red_check')) == {PR_URL + '32'}, main_scope
     assert set(rows(main_scope, 'open_pr')) == {PR_URL + '31', PR_URL + '33'}, main_scope
-    assert all(sha not in main_requests for sha in (shas[34], shas[35], shas[36], 'f' * 40, '1' * 40, '2' * 40)), main_requests
+    assert all(sha not in main_requests for sha in (*[shas[n] for n in range(34, 40)], 'f' * 40, '1' * 40, '2' * 40)), main_requests
     lane_scope, lane_requests = scoped(True)
     assert set(rows(lane_scope, 'red_check')) == {PR_URL + '32'}, lane_scope
     assert {s for s in rows(lane_scope, 'open_pr')} == {PR_URL + '31', PR_URL + '33'}, lane_scope
     assert not any(r.get('informational') for r in lane_scope['rows'] if r['category'] == 'open_pr'), lane_scope
     assert '/repos/test/other' not in lane_requests, 'a lane does not survey repositories it has no task in'
+    assert all(shas[n] not in lane_requests for n in range(34, 40)), lane_requests
     marker_file.write_text('not a valid id!\n')
     (world / 'gh-requests').write_text('')
     malformed_scope = ledger()
@@ -694,8 +703,17 @@ try:
         cross_repo, requests = scoped(lane)
         assert set(rows(cross_repo, 'open_pr')) == {PR_URL + '31', PR_URL + '33', other_url + '41'}, cross_repo
         assert set(rows(cross_repo, 'red_check')) == {PR_URL + '32', other_url + '42'}, cross_repo
-        assert shas[36] not in requests and 'f' * 40 not in requests, requests
+        assert all(shas[n] not in requests for n in range(36, 40)) and 'f' * 40 not in requests, requests
         assert '1' * 40 in requests and '2' * 40 in requests, requests
+    double['pulls_by_repo']['/repos/test/other'].append(
+        dict(scope_pr(43, '3' * 40, 'fm/branch-owned'), html_url=other_url + '43'))
+    double['checks']['3' * 40] = greens('3' * 40)
+    (world / 'gh.json').write_text(json.dumps(double))
+    for lane in (False, True):
+        fork_owned, requests = scoped(lane)
+        assert set(rows(fork_owned, 'open_pr')) == {PR_URL + '31', PR_URL + '33', other_url + '41', other_url + '43'}, fork_owned
+        assert set(rows(fork_owned, 'red_check')) == {PR_URL + '32', other_url + '42'}, fork_owned
+        assert '3' * 40 in requests, requests
 finally:
     marker_file.unlink(missing_ok=True)
     shutil.rmtree(other)
@@ -704,7 +722,7 @@ finally:
     if scope_saved[2] is not None:
         double['pulls_by_repo'] = scope_saved[2]
     (world / 'gh.json').write_text(json.dumps(double))
-print('PASS: PR ownership is repository-scoped; unowned PRs emit no rows or check requests', flush=True)
+print('PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched', flush=True)
 
 # A worker that recorded its own stop is not missing, and an unreadable live state does not degrade the ledger.
 def stopped_task(name, last_event, state='unknown', detail='backend target gone: gone', exists=False, alive='missing',
@@ -724,9 +742,23 @@ recorded = [stopped_task('stopped-done', 'done'),
             stopped_task('stopped-multiline', None, status_text='paused: waiting for CI\nThe check is still running.\n'),
             stopped_task('resumed-after-pause', 'working', status_text='paused: waiting\nworking: resumed\n'),
             stopped_task('lost-prose', None, status_text='The worker was paused while waiting.\n')]
+recorded.extend([
+    stopped_task('stopped-unrelated-answer', 'resolved', detail='observation unavailable',
+                 status_text='needs-decision [key=choice]: choose\npaused: waiting for CI\n'
+                             'resolved [key=choice]: answered\n'),
+    stopped_task('stopped-keyed-unrelated-answer', 'resolved', exists=True, alive='unverified',
+                 detail='unrecognized run status',
+                 status_text='paused [key=ci]: waiting\nresolved [key=choice]: answered\n'),
+    stopped_task('resumed-default-phase', 'resolved', status_text='paused: waiting\nresolved: resumed\n'),
+    stopped_task('resumed-keyed-phase', 'resolved',
+                 status_text='paused [key=ci]: waiting\nresolved [key=ci]: resumed\n'),
+    stopped_task('blocked-after-pause', 'blocked', status_text='paused: waiting\nblocked: needs help\n'),
+    stopped_task('stopped-done-after-pause', 'done', status_text='paused: waiting\ndone: delivered\n'),
+])
 for state in ('working', 'blocked', 'failed'):
-    for event in ('done', 'paused'):
-        recorded.append(stopped_task(state + '-after-' + event, event, state=state, alive='dead'))
+    for event in ('done', 'paused', 'resolved'):
+        text = 'paused: waiting\nresolved [key=choice]: answered\n' if event == 'resolved' else None
+        recorded.append(stopped_task(state + '-after-' + event, event, state=state, alive='dead', status_text=text))
 for state in ('working', 'blocked'):
     item = stopped_task(state + '-unverified-after-pause', 'paused', state=state, exists=True, alive='unverified')
     item['backend'] = None
@@ -734,16 +766,19 @@ for state in ('working', 'blocked'):
 fixture(recorded, [dict(id=t['id'], structured=True, state='in_flight', requires_child_metadata=True,
                         since=iso(hours(9))) for t in recorded])
 stopped_report = ledger()
-expected_missing = {'lost-silently', 'failed-after-done', 'resumed-after-pause', 'lost-prose',
-                    *(state + '-after-' + event for state in ('working', 'blocked', 'failed') for event in ('done', 'paused'))}
+expected_missing = {'lost-silently', 'resumed-after-pause', 'lost-prose', 'resumed-default-phase',
+                    'resumed-keyed-phase', 'blocked-after-pause',
+                    *(state + '-after-' + event for state in ('working', 'blocked', 'failed') for event in ('done', 'paused', 'resolved'))}
 assert set(rows(stopped_report, 'missing_worker')) == expected_missing, stopped_report
 assert {'failed-after-done', 'failed-after-paused'} <= set(rows(stopped_report, 'failed_task')), stopped_report
 degraded_text = ' '.join(r['evidence'] for r in rows(stopped_report, 'coverage').values())
-assert not any(name in degraded_text for name in ('stopped-done', 'stopped-paused', 'stopped-parked', 'stopped-multiline')), stopped_report
+assert not any(t['id'] in degraded_text for t in recorded if t['id'].startswith('stopped-')), stopped_report
 assert all(state + '-unverified-after-pause' in degraded_text for state in ('working', 'blocked')), stopped_report
 for item in recorded:
     (home / 'state' / (item['id'] + '.status')).unlink()
-custom_paused = stopped_task('custom-paused', None, status_text='awaiting: waiting for CI\nThe check is still running.\n')
+custom_paused = stopped_task('custom-paused', 'resolved',
+                            status_text='awaiting: waiting for CI\nThe check is still running.\n'
+                                        'resolved [key=choice]: answered\n')
 literal_paused = stopped_task('literal-paused', 'paused')
 fixture([custom_paused, literal_paused],
         [dict(id=t['id'], structured=True, state='in_flight', requires_child_metadata=True) for t in (custom_paused, literal_paused)])
@@ -756,7 +791,7 @@ finally:
     for item in (custom_paused, literal_paused):
         (home / 'state' / (item['id'] + '.status')).unlink()
 fixture(tasks, backlog)
-print('PASS: authoritative current state overrides historical stops; configured logical stop events are honored', flush=True)
+print('PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them', flush=True)
 
 # Unselected ready items are visible backlog, not overdue obligations; dispatched ones still are.
 (home / 'state/started-ready.status').write_text(f'working [at={hours(1)}]: spawned\n')

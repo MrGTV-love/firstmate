@@ -590,13 +590,13 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 Each home reports only what it owns.
-A PR is owned when one of this home's task records or backlog items names its exact URL, or when its repository and head branch match the origin repository and branch of one of this home's tasks.
+A PR is owned when one of this home's task records or backlog items names its exact URL, or when its head repository (`head.repo.full_name`) and head branch match the origin repository and branch of one of this home's tasks. Matching only the base repository does not establish ownership of a fork's branch.
 Every other open PR of the discovered repositories is unowned: it gets no ledger rows, and its checks are not fetched. Unowned PR triage is separate from this ledger.
 A secondmate home, marked by a valid `.fm-secondmate-home` file, discovers repositories only from its own tasks and owned PR URLs, never from its shared `projects/` clones or its own checkout.
 An informational row carries `informational: true` and is never overdue at any age, so it neither wakes the watcher nor appears in Bearings.
 A queued item is selected for dispatch once it has a task record or a status log in this home; unselected ready items stay visible as informational rows, so the unprioritized backlog is not an overdue obligation.
 A worker whose current state is `done`, `parked`, or `paused` has recorded its own stop: a gone endpoint or an unreadable live state then adds neither a `missing_worker` row nor degraded coverage.
-When current state is unknown, the latest logical status event can establish a recorded stop: `done` or the configured pause verb (`FM_CLASSIFY_PAUSED_VERB`, default `paused`). The shared status-event parser ignores continuation prose.
+When current state is unknown, the latest logical `done` event or a standing declaration of the configured pause verb (`FM_CLASSIFY_PAUSED_VERB`, default `paused`) can establish a recorded stop. The shared status-event parser ignores continuation prose and preserves a pause behind unrelated `resolved` answers; a resolution for the pause's own phase key or any later non-resolution event retracts that pause.
 Known `working`, `blocked`, and `failed` current states override historical stop events. A recorded stop never hides unlanded commits.
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.

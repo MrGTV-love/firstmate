@@ -256,8 +256,8 @@ class Collector:
         if state in STOP_STATES:
             return True
         return self.bash('. "$1"; last=$(last_status_line "$2"); '
-                         'if [ "$(status_line_verb "$last")" = done ] || status_is_paused "$last"; '
-                         'then printf stopped; fi',
+                         'if [ "$(status_line_verb "$last")" = done ] || '
+                         'status_is_paused "$(status_declared_wait_line "$2")"; then printf stopped; fi',
                          BIN / "fm-status-event-lib.sh", self.state / (task["id"] + ".status")).strip() == "stopped"
 
     def backlog_rows(self):
@@ -497,8 +497,10 @@ class Collector:
                 if isinstance(link, str) and GITHUB_PR.fullmatch(link):
                     self.owned_urls.add(link)
 
-    def owns_pr(self, slug, pr):
-        return pr["html_url"] in self.owned_urls or (slug, (pr.get("head") or {}).get("ref")) in self.owned_branches
+    def owns_pr(self, pr):
+        head = pr.get("head") or {}
+        return pr["html_url"] in self.owned_urls or \
+            ((head.get("repo") or {}).get("full_name"), head.get("ref")) in self.owned_branches
 
     def repo_slugs(self):
         paths = {t["project"] for t in self.tasks if t.get("project")}
@@ -588,7 +590,7 @@ class Collector:
                 self.pr_state(url)
                 continue
             self.prs[url] = pr
-            if self.owns_pr(slug, pr):
+            if self.owns_pr(pr):
                 self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
 
     def question_rows(self):
