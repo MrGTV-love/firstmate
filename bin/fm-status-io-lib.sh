@@ -226,7 +226,11 @@ status_presentation_marker_parse() {
 }
 status_presentation_marker_reported_matches() {
   local raw
-  raw=$(cat "$1" 2>/dev/null) || return 1
+  # Read the marker with the shell's own read, not a cat process: this runs for
+  # every status log on every watcher cycle. Trailing newlines are dropped, as
+  # the command substitution this replaced dropped them.
+  { IFS= read -r -d '' raw || :; } 2>/dev/null < "$1" || return 1
+  while [ "${raw%$'\n'}" != "$raw" ]; do raw=${raw%$'\n'}; done
   status_presentation_marker_parse "$raw" || return 1
   [ "$STATUS_PRESENTATION_REPORTED" = "$2" ]
 }

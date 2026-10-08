@@ -103,7 +103,19 @@ fm_pid_identity() {
   # same width for the same reason.
   out=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null) || return 1
   [ -n "$out" ] || return 1
-  printf '%s\n' "$out" | sed 's/^[[:space:]]*//'
+  # Strip each line's leading blanks in the shell instead of through a sed
+  # process: this runs on every liveness probe. The loop covers a command that
+  # itself holds a newline, so the result stays byte-identical to sed's.
+  case "$out" in
+    *$'\n'*)
+      local ps_line ps_trimmed=''
+      while IFS= read -r ps_line || [ -n "$ps_line" ]; do
+        ps_trimmed="$ps_trimmed${ps_line#"${ps_line%%[![:space:]]*}"}"$'\n'
+      done <<< "$out"
+      printf '%s' "$ps_trimmed"
+      ;;
+    *) printf '%s\n' "${out#"${out%%[![:space:]]*}"}" ;;
+  esac
 }
 
 fm_path_mtime() {
@@ -2440,10 +2452,36 @@ fm_wake_signal_sig() {  # <file> -> reported-state signature
   esac
 }
 
+# The same signature assigned to <out-var>, so the per-file scan pays for the
+# stat alone and not also for a command substitution around it.
+fm_wake_signal_sig_to() {  # <out-var> <file>
+  local _fm_ws_sig
+  case "$2" in
+    *.status)
+      _fm_wake_require_status || return 1
+      status_observed_signature_to "$1" "$2"
+      ;;
+    *)
+      if [ "$_FM_UNAME" = Darwin ]; then
+        _fm_ws_sig=$(/usr/bin/stat -f '%z:%Fm' "$2" 2>/dev/null) || return 1
+      else
+        _fm_ws_sig=$(stat -c '%s:%Y' "$2" 2>/dev/null) || return 1
+      fi
+      printf -v "$1" '%s' "$_fm_ws_sig"
+      ;;
+  esac
+}
+
+fm_wake_signal_seen_path_to() {  # <out-var> <state> <file>
+  local _fm_ws_task
+  fm_basename_to _fm_ws_task "$3"
+  printf -v "$1" '%s/.seen-%s' "$2" "${_fm_ws_task//./_}"
+}
+
 fm_wake_signal_seen_path() {  # <state> <file>
-  local task
-  fm_basename_to task "$2"
-  printf '%s/.seen-%s' "$1" "${task//./_}"
+  local _fm_ws_path
+  fm_wake_signal_seen_path_to _fm_ws_path "$1" "$2"
+  printf '%s' "$_fm_ws_path"
 }
 
 # The byte size recorded in <file>'s seen marker, or 0 when no marker exists, it
@@ -2476,17 +2514,22 @@ fm_wake_signal_seen_size() {  # <state> <file>
 # This predicate never consults the owned-append ledger, which is what makes it
 # the safe gate for a captain-facing surface: a line must never be withheld from
 # presentation merely because this home is the writer that appended it.
-fm_wake_signal_reported_current() {  # <state> <file>
-  local sig marker
-  sig=$(fm_wake_signal_sig "$2") || return 1
+fm_wake_signal_reported_current() {  # <state> <file> [current-signature]
+  local sig=${3-} marker seen
+  if [ -z "$sig" ]; then
+    fm_wake_signal_sig_to sig "$2" || return 1
+  fi
   [ -n "$sig" ] || return 1
-  marker=$(fm_wake_signal_seen_path "$1" "$2")
+  fm_wake_signal_seen_path_to marker "$1" "$2"
   case "$2" in
     *.status)
       _fm_wake_require_status || return 1
       status_presentation_marker_reported_matches "$marker" "$sig"
       ;;
-    *) [ "$(cat "$marker" 2>/dev/null)" = "$sig" ] ;;
+    *)
+      seen=$(cat "$marker" 2>/dev/null)
+      [ "$seen" = "$sig" ]
+      ;;
   esac
 }
 
@@ -2499,9 +2542,9 @@ fm_wake_signal_reported_current() {  # <state> <file>
 # This is the wake-scan predicate and answers only "should this wake the home?".
 # Presentation asks the different question and uses
 # fm_wake_signal_reported_current.
-fm_wake_signal_seen_current() {  # <state> <file>
+fm_wake_signal_seen_current() {  # <state> <file> [current-signature]
   local classified size
-  fm_wake_signal_reported_current "$1" "$2" && return 0
+  fm_wake_signal_reported_current "$1" "$2" "${3-}" && return 0
   case "$2" in *.status) ;; *) return 1 ;; esac
   _fm_wake_require_status || return 1
   classified=$(fm_wake_signal_seen_size "$1" "$2")

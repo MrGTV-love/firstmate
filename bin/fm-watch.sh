@@ -866,8 +866,7 @@ recorded_windows() {
   local meta w seen=
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
-    w=$(fm_backend_target_of_meta "$meta")
-    [ -n "$w" ] || continue
+    fm_backend_target_of_meta_to w "$meta" || continue
     case "$seen" in
       *"|$w|"*) continue ;;
     esac
@@ -1001,14 +1000,14 @@ secondmate_wake_stall_tick() {
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
     watcher_beat
-    kind=$(fm_meta_get "$meta" kind)
+    fm_meta_get_to kind "$meta" kind
     [ "$kind" = secondmate ] || continue
-    remote_host=$(fm_meta_get "$meta" remote_host)
+    fm_meta_get_to remote_host "$meta" remote_host
     [ -z "$remote_host" ] || continue
     task=${meta##*/}
     task=${task%.meta}
     case "$task" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
-    home=$(fm_meta_get "$meta" home)
+    fm_meta_get_to home "$meta" home
     [ -n "$home" ] || continue
     [ -f "$home/.fm-secondmate-home" ] && [ ! -L "$home/.fm-secondmate-home" ] || continue
     [ "$(cat "$home/.fm-secondmate-home" 2>/dev/null || true)" = "$task" ] || continue
@@ -2050,11 +2049,11 @@ scan_signals() {
     if [ ! -e "$f" ]; then
       case "$f" in *.status) [ -L "$f" ] || continue ;; *) continue ;; esac
     fi
-    sig=$(fm_wake_signal_sig "$f") || continue
+    fm_wake_signal_sig_to sig "$f" || continue
     [ -n "$sig" ] || continue
-    sf=$(fm_wake_signal_seen_path "$STATE" "$f")
+    fm_wake_signal_seen_path_to sf "$STATE" "$f"
     case "$f" in
-      *.status) fm_wake_signal_seen_current "$STATE" "$f" && continue ;;
+      *.status) fm_wake_signal_seen_current "$STATE" "$f" "$sig" && continue ;;
       *) [ "$sig" = "$(cat "$sf" 2>/dev/null)" ] && continue ;;
     esac
     printf '%s\t%s\t%s\n' "$sf" "$sig" "$f"
