@@ -1716,7 +1716,7 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
   pid=${BASHPID:-$$}
   identity=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
   [ -n "$identity" ] || return 1
-  fm_lock_try_acquire "$queue_lock" || return 1
+  fm_lock_acquire_wait_max "$queue_lock" 10 || return 1
   if ! fm_lock_try_acquire "$lock"; then
     fm_lock_release "$queue_lock"
     return 1

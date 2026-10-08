@@ -20,20 +20,43 @@ TMP_ROOT=$(fm_test_tmproot fm-wake-tests)
 
 
 test_reemit_serializes_delivery_ownership() {
-  local dir state phase records expected out identity rc
+  local dir state phase records expected out identity claimant i real_sleep
   dir=$(make_case reemit-delivery-ownership)
   state="$dir/state"
   identity=$(fm_test_pid_identity "$$") || fail "could not identify the claim owner"
   mkdir "$state/.wake-queue.lock"
   printf '%s\n' "$$" > "$state/.wake-queue.lock/pid"
-  rc=0
-  FM_STATE_OVERRIDE="$state" bash -c '
+  real_sleep=$(command -v sleep) || fail "sleep is unavailable for the claim fixture"
+  cat > "$dir/fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >> "$FM_CLAIM_SLEEP_LOG"
+exec "$FM_CLAIM_REAL_SLEEP" "$@"
+SH
+  chmod +x "$dir/fakebin/sleep"
+  PATH="$dir/fakebin:$PATH" FM_CLAIM_SLEEP_LOG="$dir/claim-sleeps" FM_CLAIM_REAL_SLEEP="$real_sleep" \
+    FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
-    fm_autoarm_claim_next "$STATE" 300
-  ' _ "$ROOT/bin/fm-wake-lib.sh" || rc=$?
-  [ "$rc" -eq 1 ] || fail "claim publication must refuse a drain-owned queue, got $rc"
-  [ ! -e "$state/.claude-autoarm-epoch" ] || fail "claim publication bypassed the queue mutation boundary"
+    fm_autoarm_claim_next "$STATE" 300 || exit 10
+    [ "$FM_AUTOARM_MY_GEN" = 1 ] || exit 11
+    fm_autoarm_ledger_read "$STATE" || exit 12
+    [ "$FM_AUTOARM_OWNER" = "${BASHPID:-$$}" ] && [ "$FM_AUTOARM_OUTCOME" = arming ] || exit 13
+  ' _ "$ROOT/bin/fm-wake-lib.sh" &
+  claimant=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$dir/claim-sleeps" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  [ -s "$dir/claim-sleeps" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claimant did not wait for the queue writer"; }
+  [ ! -e "$state/.claude-autoarm-epoch" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claim publication bypassed the queue mutation boundary"; }
+  [ ! -e "$state/.claude-autoarm.lock" ] \
+    || { kill "$claimant" 2>/dev/null || true; fail "claimant held the ownership mutex while waiting for the queue"; }
   rm -rf "$state/.wake-queue.lock"
+  wait "$claimant" || fail "claimant abandoned delivery after transient queue contention"
+  [ ! -e "$state/.wake-queue.lock" ] && [ ! -e "$state/.claude-autoarm.lock" ] \
+    || fail "claim publication left a lock held"
 
   for phase in pending announced; do
     for records in 0 1; do

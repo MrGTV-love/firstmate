@@ -265,7 +265,7 @@ Its rewake commit accepts only a downtime marker, so a drain that moves the mark
 The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.
 When the claim is open, the re-emit reports how many records are queued and leaves both the queue and the marker alone.
 The drain takes the queue lock before checking the claim under the ownership micro-mutex; ownership-mutex contention also defers presentation without mutation.
-Claim publication takes those same locks without waiting and releases both before arming, so a new claim cannot appear between that check and the drain's queue/marker mutations.
+Claim publication waits up to ten seconds for the queue lock before attempting the ownership micro-mutex without waiting, and releases both before arming, so transient queue writers do not abandon delivery and a new claim cannot appear between the drain's check and its queue/marker mutations.
 The ownership micro-mutex is never held across a lock wait or output.
 The handling turn the hook starts then drains and enters handling through the ordinary `--ack-through` path.
 Once the claim is finished or absent, the re-emit drains as before.
