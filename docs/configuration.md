@@ -573,6 +573,7 @@ See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, 
 
 `bin/fm-open-loops.sh` reconciles what this home owes against its live records, so assigned work cannot be lost without a row saying so.
 `bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
+Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 An unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
 
@@ -584,14 +585,15 @@ An unknown age stays `null` and counts as overdue, and an age equal to its limit
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
 | `stalled_worker` | a live worker reads `working` but has no commit, status line, or pipeline progress; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
 | `unlanded_commit` | a ship task's copy holds commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
-| `open_pr` | an open PR of this home's projects waits on checks, a reviewer, or firstmate's review routing | 3600 s |
+| `open_pr` | an open PR discovered from this home's project origins or recorded task PR URLs waits on checks, a reviewer, or firstmate's review routing | 3600 s |
 | `red_check` | the latest run of a check on an open PR failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
+The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.
 Status questions age from their stamped opening. Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata. Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
-Registered non-GitHub origins are disclosed as degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
+GitHub repositories are discovered from recorded local task PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits. Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
 Unreadable or unknown current task state adds degraded coverage independently of liveness, and only nonfuture progress timestamps count as work evidence.
 The ledger covers this home only; each secondmate home runs its own watcher and reports through its own parent channel.
@@ -619,6 +621,8 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 Age limits are non-negative integer seconds for the categories above.
 `command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
+On either deadline, cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run. It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
+An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
 A malformed configuration is reported as an error rather than ignored.
 
 A recorded work item reaches Done with its deliverable or the captain's own words, subject to the live-teardown limitations below.
@@ -627,7 +631,7 @@ Completion accepts only an optional `task` noun, `done` or `close`, exactly one 
 A retained captain-held question must be resolved through `bin/fm-captain-hold.sh answer` or `reconcile close`; delivery evidence or drop authority cannot answer it.
 A live task record completes only through `bin/fm-teardown.sh`, whose landed-work test treats a pushed branch as recoverable work, not a delivered result.
 In local-only mode, a clean existing ship copy whose `HEAD` is contained in `refs/heads/<default>` is landed regardless of remote reachability or pushed status. A genuinely merged GitHub PR whose actual head contains the current work or default-content proof remains an alternative, including fork delivery, for non-forced teardown.
-An absent copy skips teardown's worktree safety inspection rather than requiring recorded-PR-only proof.
+An absent recorded copy or one that is not a Git worktree completes only when its recorded GitHub PR is confirmed merged by the forge, or when `--force --drop-file` retains the captain's own words; otherwise teardown refuses and leaves the backlog open.
 The collector's slot-owner admission is outside this scope, so a reassigned slot is not detected; see the follow-up `fm-open-loops-teardown-proof`.
 The collector's nonmerge patch comparison does not establish merge-commit delivery, so merge-only content is not proved; see the follow-up `fm-open-loops-teardown-proof`.
 If a recorded Orca copy path is missing, record-only cleanup never removes a backend copy by ID.

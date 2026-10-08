@@ -28,6 +28,10 @@ DEFAULT_AGES = {
     "open_pr": 3600, "red_check": 0, "coverage": 0,
 }
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
+GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
+GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
+                           r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
+                           r"([^/]+/[^/]+?)(?:[.]git)?")
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
                        r"|timed? ?out|ECONN|ENOTFOUND|\b(?:error|failure|failed|exception|fatal)\b"
@@ -63,20 +67,22 @@ class Collector:
     def __init__(self, home, now):
         self.home = Path(home).resolve()
         self.now = now
-        self.state = Path(os.environ.get("FM_STATE_OVERRIDE", self.home / "state"))
-        self.data = Path(os.environ.get("FM_DATA_OVERRIDE", self.home / "data"))
-        self.config = Path(os.environ.get("FM_CONFIG_OVERRIDE", self.home / "config"))
-        self.projects_dir = Path(os.environ.get("FM_PROJECTS_OVERRIDE", self.home / "projects"))
+        self.state = Path(os.environ.get("FM_STATE_OVERRIDE") or self.home / "state")
+        self.data = Path(os.environ.get("FM_DATA_OVERRIDE") or self.home / "data")
+        self.config = Path(os.environ.get("FM_CONFIG_OVERRIDE") or self.home / "config")
+        self.projects_dir = Path(os.environ.get("FM_PROJECTS_OVERRIDE") or self.home / "projects")
         self.load_config()
         self.env = dict(os.environ, FM_HOME=str(self.home), FM_STATE_OVERRIDE=str(self.state),
                         FM_DATA_OVERRIDE=str(self.data), FM_CONFIG_OVERRIDE=str(self.config),
-                        FM_SNAPSHOT_NOW_EPOCH=str(now), GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
+                        FM_PROJECTS_OVERRIDE=str(self.projects_dir), FM_SNAPSHOT_NOW_EPOCH=str(now),
+                        GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
         self.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.rows = {}
         self.degraded = []
         self.tasks = []
         self.backlog = []
         self.prs = {}
+        self.state_files = []
 
     def load_config(self):
         path = self.config / "open-loops.json"
@@ -95,14 +101,92 @@ class Collector:
         if type(self.timeout) is not int or not 1 <= self.timeout <= 300:
             raise ValueError("command_timeout_seconds must be 1..300")
 
-    def run(self, args, cwd=None, missing_ok=False, env=None):
-        done = subprocess.run([str(a) for a in args], cwd=cwd, env=self.env if env is None else env, capture_output=True,
-                              text=True, stdin=subprocess.DEVNULL, timeout=self.timeout)
-        if missing_ok and done.returncode == 1 and not done.stderr:
-            return ""
+    def process_table(self, pids=None):
+        if pids is not None and not pids:
+            return {}
+        selection = ["-A"] if pids is None else ["-p", ",".join(str(pid) for pid in pids)]
+        done = subprocess.run(["ps", *selection, "-o", "pid=", "-o", "ppid=", "-o", "lstart="],
+                              env=self.env, capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL)
         if done.returncode:
-            raise RuntimeError((done.stderr or done.stdout or "command failed").strip()[:300])
-        return done.stdout
+            if pids is not None and done.returncode == 1 and not done.stdout.strip() and not done.stderr.strip():
+                return {}
+            raise RuntimeError("cannot enumerate command process tree: "
+                               + (done.stderr or "ps failed").strip()[:200])
+        return {int(pid): (int(parent), identity.strip())
+                for pid, parent, identity in (line.split(None, 2) for line in done.stdout.splitlines())}
+
+    def signal_command_group(self, child, sig):
+        if child.poll() is not None:
+            return
+        try:
+            os.killpg(child.pid, sig)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            if child.poll() is None:
+                raise
+
+    def stop_command(self, child):
+        previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
+        descendants = {}
+        try:
+            try:
+                self.signal_command_group(child, signal.SIGSTOP)
+                table = self.process_table()
+                children = {}
+                for pid, (parent, _identity) in table.items():
+                    children.setdefault(parent, []).append(pid)
+                pending = list(children.get(child.pid, []))
+                while pending:
+                    pid = pending.pop()
+                    if pid not in descendants:
+                        descendants[pid] = table[pid][1]
+                        pending.extend(children.get(pid, []))
+                self.signal_command_group(child, signal.SIGTERM)
+                self.signal_command_group(child, signal.SIGCONT)
+                for pid in descendants:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                try:
+                    child.communicate(timeout=1)
+                except subprocess.TimeoutExpired:
+                    pass
+            finally:
+                try:
+                    self.signal_command_group(child, signal.SIGKILL)
+                finally:
+                    if descendants:
+                        current = self.process_table(descendants)
+                        for pid, identity in descendants.items():
+                            if current.get(pid, (None, None))[1] == identity:
+                                try:
+                                    os.kill(pid, signal.SIGKILL)
+                                except ProcessLookupError:
+                                    pass
+        finally:
+            child.wait()
+            child.stdout.close()
+            child.stderr.close()
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
+    def run(self, args, cwd=None, missing_ok=False, env=None):
+        command = [str(a) for a in args]
+        child = subprocess.Popen(command, cwd=cwd, env=self.env if env is None else env,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                 stdin=subprocess.DEVNULL, start_new_session=True)
+        try:
+            stdout, stderr = child.communicate(timeout=self.timeout)
+        except (subprocess.TimeoutExpired, CollectionDeadline):
+            self.stop_command(child)
+            raise
+        if missing_ok and child.returncode == 1 and not stderr:
+            return ""
+        if child.returncode:
+            raise RuntimeError((stderr or stdout or "command failed").strip()[:300])
+        return stdout
 
     def git(self, repo, *args):
         return self.run(["git", "-C", repo, *args]).strip()
@@ -127,6 +211,9 @@ class Collector:
             return None
 
     # -- sources ---------------------------------------------------------------------------------
+
+    def read_state_inventory(self):
+        self.state_files = sorted(self.state.iterdir())
 
     def read_snapshot(self):
         snap = json.loads(self.run([BIN / "fm-fleet-snapshot.sh", "--home-input"]))
@@ -341,7 +428,7 @@ class Collector:
     def pr_state(self, url):
         if url in self.prs:
             return self.prs[url]
-        match = re.fullmatch(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)", url)
+        match = GITHUB_PR.fullmatch(url)
         if not match:
             self.degraded.append("unsupported PR forge: " + url)
             self.prs[url] = None
@@ -355,13 +442,23 @@ class Collector:
         if (self.home / ".git").exists():
             paths.add(str(self.home))
         if self.projects_dir.is_dir():
-            paths |= {str(p) for p in self.projects_dir.iterdir() if (p / ".git").exists()}
+            projects = self.source("projects inventory", lambda: list(self.projects_dir.iterdir())) or []
+            paths |= {str(p) for p in projects if (p / ".git").exists()}
         slugs = set()
+        for task in self.tasks:
+            url = task["pr"].get("url")
+            if not url:
+                continue
+            match = GITHUB_PR.fullmatch(url)
+            if match:
+                slugs.add(match[1])
+            else:
+                self.pr_state(url)
         for path in sorted(paths):
             origin = self.source("project origin " + path, self.repo_origin, path)
             if not origin:
                 continue
-            match = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", origin)
+            match = GITHUB_ORIGIN.fullmatch(origin)
             if match:
                 slugs.add(match[1])
         return sorted(slugs)
@@ -369,7 +466,7 @@ class Collector:
     def repo_origin(self, path):
         self.git(path, "rev-parse", "--git-dir")
         origin = self.run(["git", "-C", path, "config", "--get", "remote.origin.url"], missing_ok=True).strip()
-        if origin and not re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", origin):
+        if origin and not GITHUB_ORIGIN.fullmatch(origin):
             raise ValueError("unsupported non-GitHub origin: " + origin)
         return origin
 
@@ -415,8 +512,12 @@ class Collector:
 
     def pr_rows(self, slug):
         pulls = self.forge(f"/repos/{slug}/pulls?state=open&per_page=100")
-        self.prs.update((pr["html_url"], pr) for pr in pulls)
         for pr in pulls:
+            url = pr["html_url"]
+            if not GITHUB_PR.fullmatch(url):
+                self.pr_state(url)
+                continue
+            self.prs[url] = pr
             self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
 
     def question_rows(self):
@@ -426,7 +527,7 @@ class Collector:
                          "resolve the captain hold or record its next decision date",
                          epoch(record.get("hold_set") or record.get("since")), owner="captain",
                          evidence=record.get("hold_reason") or record.get("title") or "")
-        for status in sorted(self.state.glob("*.status")):
+        for status in (p for p in self.state_files if p.name.endswith(".status")):
             if status.is_symlink():
                 continue
             try:
@@ -444,6 +545,7 @@ class Collector:
     # -- run -------------------------------------------------------------------------------------
 
     def collect(self):
+        self.source("state inventory", self.read_state_inventory)
         self.source("fleet snapshot", self.read_snapshot)
         self.source("backlog", self.backlog_rows)
         slugs = self.source("project origins", self.repo_slugs) or []
@@ -507,9 +609,9 @@ def main():
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--heartbeat", action="store_true", help="publish state/open-loops.json")
     args = parser.parse_args()
-    home = Path(os.environ.get("FM_HOME", os.environ.get("FM_ROOT_OVERRIDE", BIN.parent))).resolve()
+    home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_ROOT_OVERRIDE") or BIN.parent).resolve()
     try:
-        lock_dir = Path(os.environ.get("FM_STATE_OVERRIDE", home / "state")).resolve()
+        lock_dir = Path(os.environ.get("FM_STATE_OVERRIDE") or home / "state").resolve()
         lock_dir.mkdir(parents=True, exist_ok=True)
         lock_fd = os.open(lock_dir / ".open-loops.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         try:

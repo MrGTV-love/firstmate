@@ -1004,7 +1004,7 @@ test_scout_teardown_refuses_orca_missing_report_when_path_missing() {
   pass "fm-teardown.sh backend=orca: scout report gate precedes pathless helper cleanup"
 }
 
-test_ship_teardown_cleans_up_orca_missing_worktree_path() {
+test_ship_teardown_refuses_orca_missing_worktree_without_delivery() {
   local proj wt data state config id out rc neutral
   id="orcashipmissingz8"
   proj="$TMP_ROOT/missing-ship-project"
@@ -1027,13 +1027,15 @@ test_ship_teardown_cleans_up_orca_missing_worktree_path() {
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
   set -e
-  expect_code 0 "$rc" "Orca ship teardown should succeed when the recorded worktree path is absent"$'\n'"$out"
-  assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-missing-ship'$'\x1f''--json' \
-    "teardown did not close the recorded Orca terminal when the ship path was absent"
+  expect_code 1 "$rc" "Orca ship teardown must refuse a missing copy without delivery proof"$'\n'"$out"
+  assert_contains "$out" "completion requires a recorded GitHub PR confirmed merged" \
+    "missing-copy refusal did not explain the required delivery proof"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close' \
+    "refused missing-copy teardown closed the Orca terminal"
   assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
-    "teardown removed an Orca worktree when the recorded ship path was absent"
-  assert_absent "$state/$id.meta" "successful ship helper cleanup should remove task metadata"
-  pass "fm-teardown.sh backend=orca: absent ship path releases terminal without removing a backend copy"
+    "refused missing-copy teardown removed an Orca worktree"
+  assert_present "$state/$id.meta" "missing-copy refusal must preserve task metadata"
+  pass "fm-teardown.sh backend=orca: absent ship copy without delivery proof preserves endpoint and record"
 }
 
 test_ship_teardown_removes_orca_worktree_via_helper() {
@@ -1273,7 +1275,7 @@ test_scout_teardown_removes_orca_worktree_via_helper
 test_teardown_skips_orca_worktree_when_path_missing
 test_teardown_preserves_metadata_when_orca_remove_error_json
 test_scout_teardown_refuses_orca_missing_report_when_path_missing
-test_ship_teardown_cleans_up_orca_missing_worktree_path
+test_ship_teardown_refuses_orca_missing_worktree_without_delivery
 test_ship_teardown_removes_orca_worktree_via_helper
 test_teardown_refuses_orca_missing_worktree_id
 test_teardown_refuses_orca_worktree_without_terminal_handle

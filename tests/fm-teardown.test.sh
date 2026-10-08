@@ -1485,40 +1485,138 @@ write_windowless_legacy_meta() {
     "harness=codex"
 }
 
-test_windowless_legacy_record_with_gone_worktree_tears_down() {
-  local case_dir out
+test_windowless_legacy_record_with_gone_worktree_refuses() {
+  local case_dir out rc
   case_dir=$(make_case windowless-gone)
   write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
   seed_backlog_in_flight "$case_dir"
 
-  out=$(run_teardown "$case_dir") \
-    || fail "windowless-gone: teardown refused a leftover with a missing worktree"
-  printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
-    || fail "windowless-gone: the teardown line did not log the missing-endpoint leftover: $out"
-  printf '%s\n' "$out" | grep -Fq 'window none' \
-    || fail "windowless-gone: the teardown line did not say there was no window: $out"
-  [ "$(backlog_row_state "$case_dir")" = "done" ] \
-    || fail "windowless-gone: teardown returned success with its backlog item still open"
-  assert_absent "$case_dir/state/task-x1.meta" \
-    "windowless-gone: teardown left the leftover record"
-  pass "a windowless leftover with a missing worktree tears down without --legacy-record"
+  rc=0
+  out=$(run_teardown "$case_dir" 2>&1) || rc=$?
+  expect_code 1 "$rc" "windowless-gone: missing copy without delivery proof must refuse"
+  printf '%s\n' "$out" | grep -Fq 'completion requires a recorded GitHub PR confirmed merged' \
+    || fail "windowless-gone: missing completion-proof refusal: $out"
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "windowless-gone: refusal closed the backlog item"
+  assert_present "$case_dir/state/task-x1.meta" \
+    "windowless-gone: refusal removed the task record"
+  pass "a windowless leftover with a missing worktree refuses without delivery proof"
 }
 
-test_windowless_legacy_record_tears_down_with_the_legacy_flag() {
-  local case_dir out
+test_windowless_legacy_record_with_gone_worktree_refuses_with_legacy_flag() {
+  local case_dir out rc
   case_dir=$(make_case windowless-flag)
   write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
   seed_backlog_in_flight "$case_dir"
 
-  out=$(run_teardown "$case_dir" --legacy-record) \
-    || fail "windowless-flag: --legacy-record refused a leftover with a missing worktree"
-  printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
-    || fail "windowless-flag: the teardown line did not log the missing-endpoint leftover: $out"
-  assert_absent "$case_dir/state/task-x1.meta" \
-    "windowless-flag: teardown left the leftover record"
-  [ "$(backlog_row_state "$case_dir")" = "done" ] \
-    || fail "windowless-flag: teardown returned success with its backlog item still open"
-  pass "a windowless leftover with a missing worktree also tears down when --legacy-record is passed"
+  rc=0
+  out=$(run_teardown "$case_dir" --legacy-record 2>&1) || rc=$?
+  expect_code 1 "$rc" "windowless-flag: --legacy-record must not waive completion proof"
+  printf '%s\n' "$out" | grep -Fq 'completion requires a recorded GitHub PR confirmed merged' \
+    || fail "windowless-flag: missing completion-proof refusal: $out"
+  assert_present "$case_dir/state/task-x1.meta" \
+    "windowless-flag: refusal removed the task record"
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "windowless-flag: refusal closed the backlog item"
+  pass "--legacy-record does not waive a missing copy's delivery proof"
+}
+
+test_ship_without_git_copy_completes_with_recorded_merged_pr() {
+  local case_dir copy mode out head
+  for copy in absent non-git; do
+    for mode in no-mistakes local-only; do
+      case_dir=$(make_case "recorded-merged-$copy-$mode")
+      [ "$copy" != non-git ] || mkdir "$case_dir/missing-wt"
+      write_windowless_legacy_meta "$case_dir" "$mode" ship "$case_dir/missing-wt"
+      append_pr_meta_url "$case_dir"
+      seed_backlog_in_flight "$case_dir"
+      head=$(git -C "$case_dir/wt" rev-parse HEAD)
+      add_gh_pr_merged_for_head "$case_dir" "$head"
+
+      out=$(run_teardown "$case_dir" 2>&1) \
+        || fail "recorded-merged-$copy-$mode: merged recorded PR refused: $out"
+      assert_absent "$case_dir/state/task-x1.meta" \
+        "recorded-merged-$copy-$mode: successful completion retained metadata"
+      [ "$(backlog_row_state "$case_dir")" = done ] \
+        || fail "recorded-merged-$copy-$mode: successful completion kept backlog open"
+      assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
+        "recorded-merged-$copy-$mode: completion did not retain the PR"
+      assert_no_grep 'local main' "$case_dir/data/backlog.md" \
+        "recorded-merged-$copy-$mode: completion invented a local merge"
+    done
+  done
+  pass "absent and non-Git ship copies complete only with their recorded merged PR"
+}
+
+test_ship_without_git_copy_refuses_unconfirmed_pr() {
+  local case_dir copy proof out rc head state
+  for copy in absent non-git; do
+    for proof in open closed error unrecorded unsupported; do
+      case_dir=$(make_case "unconfirmed-$copy-$proof")
+      [ "$copy" != non-git ] || mkdir "$case_dir/missing-wt"
+      write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+      seed_backlog_in_flight "$case_dir"
+      head=$(git -C "$case_dir/wt" rev-parse HEAD)
+      add_gh_pr_merged_for_head "$case_dir" "$head"
+      case "$proof" in
+        unrecorded) ;;
+        unsupported)
+          printf '%s\n' 'pr=https://example.invalid/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
+          ;;
+        *)
+          append_pr_meta_url "$case_dir"
+          if [ "$proof" = error ]; then
+            add_gh_axi_error "$case_dir"
+            printf '#!/usr/bin/env bash\nprintf "MERGED\\n"\nexit 1\n' > "$case_dir/fakebin/gh"
+          else
+            state=OPEN
+            [ "$proof" != closed ] || state=CLOSED
+            printf '#!/usr/bin/env bash\nprintf "%%s\\n" %s\n' "$state" > "$case_dir/fakebin/gh"
+          fi
+          ;;
+      esac
+
+      rc=0
+      out=$(run_teardown "$case_dir" 2>&1) || rc=$?
+      expect_code 1 "$rc" "unconfirmed-$copy-$proof: absent delivery proof must refuse: $out"
+      assert_present "$case_dir/state/task-x1.meta" \
+        "unconfirmed-$copy-$proof: refusal removed metadata"
+      [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+        || fail "unconfirmed-$copy-$proof: refusal closed the backlog"
+    done
+  done
+  pass "ships without Git copies refuse open, closed, unreachable, unrecorded, and unsupported PR proof"
+}
+
+test_ship_without_git_copy_requires_captain_words_to_drop() {
+  local case_dir copy out rc words
+  for copy in absent non-git; do
+    case_dir=$(make_case "missing-copy-drop-$copy")
+    [ "$copy" != non-git ] || mkdir "$case_dir/missing-wt"
+    write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+    seed_backlog_in_flight "$case_dir"
+    rc=0
+    out=$(run_teardown "$case_dir" --force 2>&1) || rc=$?
+    expect_code 1 "$rc" "missing-copy-drop-$copy: force without words must refuse: $out"
+    assert_present "$case_dir/state/task-x1.meta" \
+      "missing-copy-drop-$copy: unauthorized force removed metadata"
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "missing-copy-drop-$copy: unauthorized force closed backlog"
+
+    words="$case_dir/drop-words"
+    printf '%s\n' "Discard this missing copy's unfinished work." > "$words"
+    out=$(run_teardown "$case_dir" --force --drop-file "$words" 2>&1) \
+      || fail "missing-copy-drop-$copy: authorized drop refused: $out"
+    cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" \
+      || fail "missing-copy-drop-$copy: captain words were not retained exactly"
+    [ "$(backlog_row_state "$case_dir")" = done ] \
+      || fail "missing-copy-drop-$copy: authorized drop kept backlog open"
+    grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" \
+      || fail "missing-copy-drop-$copy: authorized drop lacked drop classification"
+    assert_absent "$case_dir/state/task-x1.meta" \
+      "missing-copy-drop-$copy: authorized drop retained metadata"
+  done
+  pass "ships without Git copies require retained captain words for forced drops"
 }
 
 test_windowless_legacy_record_still_refuses_unlanded_work() {
@@ -5318,8 +5416,11 @@ test_content_fallback_refreshes_stale_origin_ref
 test_dirty_worktree_refuses
 test_gh_error_and_content_absent_refuses
 test_legacy_record_without_the_flag_refuses
-test_windowless_legacy_record_with_gone_worktree_tears_down
-test_windowless_legacy_record_tears_down_with_the_legacy_flag
+test_windowless_legacy_record_with_gone_worktree_refuses
+test_windowless_legacy_record_with_gone_worktree_refuses_with_legacy_flag
+test_ship_without_git_copy_completes_with_recorded_merged_pr
+test_ship_without_git_copy_refuses_unconfirmed_pr
+test_ship_without_git_copy_requires_captain_words_to_drop
 test_windowless_legacy_record_still_refuses_unlanded_work
 test_windowless_record_outside_the_leftover_class_still_refuses
 test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag

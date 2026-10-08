@@ -22,7 +22,8 @@ now = int(time.time())
 hours = lambda n: now - n * 3600
 iso = lambda t: dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 env = dict(os.environ, FM_HOME=str(home), NM_HOME=str(world / 'nm'), FM_OPEN_LOOPS_NOW=str(now),
-           PATH=f'{fake}:{os.environ["PATH"]}', GH_DOUBLE=str(world / 'gh.json'))
+           PATH=f'{fake}:{os.environ["PATH"]}', GH_DOUBLE=str(world / 'gh.json'),
+           GH_REQUESTS=str(world / 'gh-requests'))
 env['GIT_AUTHOR_DATE'] = env['GIT_COMMITTER_DATE'] = f'{now} +0000'
 for key in ('FM_ROOT_OVERRIDE', 'FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
     env.pop(key, None)
@@ -50,6 +51,8 @@ script(code / 'bin/fm-fleet-snapshot.sh', '#!/usr/bin/env bash\n[ "$1" = --home-
 script(fake / 'gh-axi', r'''#!/usr/bin/env python3
 import base64, json, os, re, sys
 double = json.load(open(os.environ['GH_DOUBLE']))
+with open(os.environ['GH_REQUESTS'], 'a') as stream:
+    stream.write(sys.argv[2] + '\n')
 if double.get('fail'):
     sys.exit(1)
 path = sys.argv[2]
@@ -58,7 +61,7 @@ if '/check-runs' in path:
 elif '/statuses' in path:
     value = []
 elif re.search(r'/pulls\?', path):
-    value = double['pulls']
+    value = double.get('pulls_by_repo', {}).get(path.split('/pulls?')[0], double['pulls'])
 else:
     value = double['single'][path.rsplit('/', 1)[1]]
 print('api_response:\n  body: ' + base64.b64encode(json.dumps(value).encode()).decode() + '\n  truncated: false')
@@ -254,6 +257,59 @@ def fixture(items, records=None):
     (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=items,
         backlog=dict(present=True, records=records or []))))
 
+fork_red, fork_green = task_copy('fork-red', commit_age=50), task_copy('fork-green', commit_age=50)
+fork_url = 'https://github.com/delivery/project/pull/'
+fork_heads = [git(path, 'rev-parse', 'HEAD') for path in (fork_red, fork_green)]
+fork_pulls = [dict(number=17 + i, html_url=fork_url + str(17 + i), head=dict(sha=head),
+                   state='open', draft=False, updated_at=iso(hours(3)))
+              for i, head in enumerate(fork_heads)]
+double['pulls_by_repo'] = {'/repos/delivery/project': fork_pulls}
+double['checks'] = {head: [dict(id=1, name='unit', app=dict(id=3), status='completed',
+                              conclusion='failure' if i == 0 else 'success', completed_at=iso(hours(2)))]
+                    for i, head in enumerate(fork_heads)}
+double['single']['18'] = dict(state='closed', merged_at=iso(hours(1)), head=dict(sha=fork_heads[1]))
+(world / 'gh.json').write_text(json.dumps(double))
+fork_tasks = [task('fork-red' if i == 0 else 'fork-green', path, state='failed', pr=fork_url + str(17 + i))
+              for i, path in enumerate((fork_red, fork_green))]
+for item in fork_tasks:
+    item['project'] = None
+project_path, parked_project = home / 'projects/project', world / 'parked-project'
+project_path.rename(parked_project)
+try:
+    fixture(fork_tasks)
+    fork_open = ledger()
+    assert fork_open['complete'], fork_open
+    assert set(rows(fork_open, 'red_check')) == {fork_url + '17'}, fork_open
+    assert set(rows(fork_open, 'open_pr')) == {fork_url + '18'}, fork_open
+    assert set(rows(fork_open, 'failed_task')) == {'fork-red', 'fork-green'}, fork_open
+    assert not rows(fork_open, 'unlanded_commit'), fork_open
+    projects_mode = (home / 'projects').stat().st_mode & 0o777
+    (home / 'projects').chmod(0o300)
+    try:
+        fork_blind_origin = ledger()
+        assert not fork_blind_origin['complete'], fork_blind_origin
+        assert 'projects inventory' in rows(fork_blind_origin, 'coverage')['ledger degraded']['evidence'], fork_blind_origin
+        assert set(rows(fork_blind_origin, 'red_check')) == {fork_url + '17'}, fork_blind_origin
+        assert set(rows(fork_blind_origin, 'open_pr')) == {fork_url + '18'}, fork_blind_origin
+    finally:
+        (home / 'projects').chmod(projects_mode)
+    double['pulls_by_repo']['/repos/delivery/project'] = [fork_pulls[0]]
+    (world / 'gh.json').write_text(json.dumps(double))
+    fork_merged = ledger()
+    assert set(rows(fork_merged, 'failed_task')) == {'fork-red'}, fork_merged
+    assert not rows(fork_merged, 'unlanded_commit'), fork_merged
+    for path in (fork_red, fork_green):
+        correction(path)
+    fork_corrected = ledger()
+    assert set(rows(fork_corrected, 'unlanded_commit')) == {'fork-red', 'fork-green'}, fork_corrected
+    assert set(rows(fork_corrected, 'failed_task')) == {'fork-red', 'fork-green'}, fork_corrected
+finally:
+    parked_project.rename(project_path)
+    double.pop('pulls_by_repo')
+    double['checks'] = {}
+    (world / 'gh.json').write_text(json.dumps(double))
+print('PASS: recorded task-only PR classification, fork landing, and correction coverage', flush=True)
+
 equivalent = task_copy('patch-equivalent', commit_age=3)
 equivalent_head = git(equivalent, 'rev-parse', 'HEAD')
 git(equivalent, 'checkout', '-q', 'main')
@@ -433,6 +489,45 @@ unsupported_report = ledger()
 assert not unsupported_report['complete'] and len(rows(unsupported_report, 'coverage')) == 1, unsupported_report
 assert 'non-GitHub' in rows(unsupported_report, 'coverage')['ledger degraded']['evidence'], unsupported_report
 shutil.rmtree(unsupported)
+for origin_url in ('https://github.com/test/project.git', 'git@github.com:test/project.git',
+                   'ssh://git@github.com/test/project.git', 'git://github.com/test/project.git'):
+    git(no_origin, 'config', 'remote.origin.url', origin_url)
+    assert ledger()['complete'], origin_url
+for origin_url in ('https://evilgithub.com/test/lookalike.git',
+                   'https://github.com.evil/test/lookalike.git',
+                   'ssh://git@evilgithub.com/test/lookalike.git',
+                   'git@evilgithub.com:test/lookalike.git',
+                   'https://github.com@evil.invalid/test/lookalike.git'):
+    git(no_origin, 'config', 'remote.origin.url', origin_url)
+    (world / 'gh-requests').write_text('')
+    hostname_report = ledger()
+    assert not hostname_report['complete'], (origin_url, hostname_report)
+    assert 'non-GitHub' in rows(hostname_report, 'coverage')['ledger degraded']['evidence'], hostname_report
+    assert '/repos/test/lookalike/' not in (world / 'gh-requests').read_text(), origin_url
+    assert rows(hostname_report, 'open_pr'), 'unsupported hosts must not hide healthy peers'
+git(no_origin, 'config', '--unset', 'remote.origin.url')
+unsupported_pr = dict(number=90, html_url='https://evilgithub.com/test/project/pull/90',
+                      head=dict(sha='b' * 40), state='open', updated_at=iso(hours(2)))
+double['pulls'].append(unsupported_pr)
+(world / 'gh.json').write_text(json.dumps(double))
+projection_report = ledger()
+assert not projection_report['complete'], projection_report
+assert unsupported_pr['html_url'] not in rows(projection_report), projection_report
+assert rows(projection_report, 'open_pr') and rows(projection_report, 'red_check'), projection_report
+double['pulls'].pop()
+(world / 'gh.json').write_text(json.dumps(double))
+unsupported_task = task('unsupported-pr', world / 'absent-unsupported', state='done',
+                        pr='https://github.com.evil/test/project/pull/91')
+unsupported_task['project'] = None
+fixture(tasks + [unsupported_task], backlog)
+(world / 'gh-requests').write_text('')
+admission_report = ledger()
+assert not admission_report['complete'], admission_report
+assert 'unsupported PR forge' in rows(admission_report, 'coverage')['ledger degraded']['evidence'], admission_report
+assert '/pulls/91' not in (world / 'gh-requests').read_text(), admission_report
+assert rows(admission_report, 'open_pr') and rows(admission_report, 'red_check'), admission_report
+fixture(tasks, backlog)
+print('PASS: exact GitHub host admission and PR projection', flush=True)
 broken_repo = home / 'projects/broken-repo'
 broken_repo.mkdir(); (broken_repo / '.git').write_text('gitdir: /missing/open-loops-repository\n')
 broken_config = home / 'projects/broken-config'
@@ -456,6 +551,18 @@ assert 'questions unreadable.status' in rows(status_blind, 'coverage')['ledger d
 unreadable.chmod(0o600); unreadable.unlink()
 (home / 'state/symlink.status').symlink_to(home / 'state/asker.status')
 assert ledger()['complete'], 'symlink status exclusion is not coverage failure'
+state_mode = (home / 'state').stat().st_mode & 0o777
+(home / 'state').chmod(0o300)
+try:
+    inventory_blind = ledger('--heartbeat')
+    assert not inventory_blind['complete'] and len(rows(inventory_blind, 'coverage')) == 1, inventory_blind
+    assert 'state inventory' in rows(inventory_blind, 'coverage')['ledger degraded']['evidence'], inventory_blind
+    assert rows(inventory_blind, 'open_pr'), 'state inventory failure must not hide independent PRs'
+    assert json.loads((home / 'state/open-loops.json').read_text()) == inventory_blind
+finally:
+    (home / 'state').chmod(state_mode)
+assert ledger()['complete'], 'restored readable inventory must recover coverage'
+print('PASS: unreadable shared state inventory cannot publish complete empty coverage', flush=True)
 
 # An unreadable source is one degraded row and complete:false; healthy sources still report.
 (home / 'snapshot-fails').write_text('')
@@ -575,6 +682,125 @@ assert json.loads((flight_state / 'open-loops.json').read_text()) == last
 assert (flight_home / 'entries').read_text().splitlines() == ['entered', 'entered', 'entered']
 print('PASS: held-gate singleflight and child cleanup', flush=True)
 
+address_root = world / 'address-boundary'
+address_code, address_home, decoy = (address_root / name for name in ('code', 'home', 'decoy'))
+shutil.copytree(code / 'bin', address_code / 'bin')
+decoy.mkdir()
+decoy_record = '{"age_limits_seconds":{"wrong":1}}\n'
+(decoy / 'open-loops.json').write_text(decoy_record)
+address_url = 'https://github.com/test/address/pull/1'
+double['pulls_by_repo'] = {'/repos/test/address': [
+    dict(number=1, html_url=address_url, head=dict(sha='b' * 40), state='open', updated_at=iso(hours(2)))]}
+(world / 'gh.json').write_text(json.dumps(double))
+for address in (address_home, address_code):
+    for name in ('state', 'data', 'config', 'projects'):
+        (address / name).mkdir(parents=True)
+    (address / 'state/address.status').write_text(f'needs-decision [at={hours(1)}] [key=home]: answer\n')
+    (address / 'data/address-report').mkdir()
+    (address / 'data/address-report/report.md').write_text('Delivered report\n')
+    (address / 'config/open-loops.json').write_text(json.dumps(
+        dict(age_limits_seconds=dict(ready_not_started=77))))
+    address_repo = address / 'projects/address'
+    out(['git', 'init', '-q', '-b', 'main', address_repo])
+    git(address_repo, 'remote', 'add', 'origin', 'https://github.com/test/address.git')
+    report_task = task('address-report', address_root / 'absent', state='failed', kind='scout')
+    report_task['project'] = None
+    (address / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
+        tasks=[report_task], backlog=dict(present=True, records=[
+            dict(id='address-ready', structured=True, state='queued')]))))
+empty_keys = ('FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE')
+address_cases = [(dict(FM_HOME=str(address_home), **{key: ''}), address_home) for key in empty_keys]
+address_cases += [
+    (dict(FM_HOME=str(address_home), **{key: '' for key in empty_keys}), address_home),
+    (dict(FM_HOME='', FM_ROOT_OVERRIDE=str(address_home)), address_home),
+    (dict(FM_HOME=str(address_home), FM_ROOT_OVERRIDE=''), address_home),
+    (dict(FM_HOME='', FM_ROOT_OVERRIDE=''), address_code),
+    (dict(FM_ROOT_OVERRIDE=''), address_code),
+    (dict(FM_HOME=''), address_code),
+    ({}, address_code),
+]
+for overrides, expected_home in address_cases:
+    address_env = dict(env)
+    for key in (*empty_keys, 'FM_HOME', 'FM_ROOT_OVERRIDE'):
+        address_env.pop(key, None)
+    address_env.update(overrides)
+    addressed = json.loads(out([address_code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'],
+                              env=address_env, cwd=decoy))
+    assert addressed['complete'] and addressed['home'] == str(expected_home.resolve()), (overrides, addressed)
+    assert set(rows(addressed, 'ready_not_started')) == {'address-ready'}, addressed
+    assert rows(addressed, 'ready_not_started')['address-ready']['limit_seconds'] == 77, addressed
+    assert set(rows(addressed, 'unanswered_question')) == {'address:home'}, addressed
+    assert not rows(addressed, 'failed_task'), addressed
+    assert set(rows(addressed, 'open_pr')) == {address_url}, addressed
+    assert (expected_home / 'state/.open-loops.lock').is_file(), overrides
+    assert json.loads((expected_home / 'state/open-loops.json').read_text()) == addressed
+    assert not (decoy / '.open-loops.lock').exists(), overrides
+    assert (decoy / 'open-loops.json').read_text() == decoy_record, overrides
+double.pop('pulls_by_repo')
+(world / 'gh.json').write_text(json.dumps(double))
+print('PASS: unset and empty address overrides share shell defaults before collection', flush=True)
+
+def process_alive(pid, identity):
+    observed = run(['ps', '-p', str(pid), '-o', 'stat=', '-o', 'lstart='])
+    if observed.returncode == 1 and not observed.stdout.strip() and not observed.stderr.strip():
+        return False
+    assert observed.returncode == 0, (pid, observed.stdout, observed.stderr)
+    state, current = observed.stdout.strip().split(None, 1)
+    return current.strip() == identity and not state.startswith('Z')
+
+for expiry in ('command', 'collection'):
+    timeout_root = world / ('descendants-' + expiry)
+    timeout_home, timeout_code = timeout_root / 'home', timeout_root / 'code'
+    for name in ('state', 'data', 'config', 'projects'):
+        (timeout_home / name).mkdir(parents=True)
+    shutil.copytree(code / 'bin', timeout_code / 'bin')
+    (timeout_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=30)))
+    script(timeout_code / 'bin/fm-fleet-snapshot.sh', r'''#!/usr/bin/env python3
+import os, signal, subprocess, sys, time
+from pathlib import Path
+home = Path(os.environ['FM_HOME'])
+identity = subprocess.check_output(['ps', '-p', str(os.getpid()), '-o', 'lstart='], text=True).strip()
+assert identity
+(home / 'source-identity').write_text(identity)
+(home / 'source-pid').write_text(str(os.getpid()))
+body = "import os,signal,subprocess,time;from pathlib import Path;signal.signal(signal.SIGTERM,signal.SIG_IGN);home=Path(os.environ['FM_HOME']);identity=subprocess.check_output(['ps','-p',str(os.getpid()),'-o','lstart='],text=True).strip();assert identity;home.joinpath('descendant-identity').write_text(identity);home.joinpath('descendant-pid').write_text(str(os.getpid()));time.sleep(120)"
+subprocess.Popen([sys.executable, '-c', body], start_new_session=True)
+until = time.monotonic() + 20
+while not (home / 'descendant-pid').exists() and time.monotonic() < until:
+    time.sleep(0.01)
+if os.environ['EXPIRY'] == 'collection':
+    os.kill(os.getppid(), signal.SIGALRM)
+time.sleep(120)
+''')
+    try:
+        timed = json.loads(out([timeout_code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'],
+                              env=dict(env, FM_HOME=str(timeout_home), EXPIRY=expiry), timeout=60))
+        assert not timed['complete'] and len(rows(timed, 'coverage')) == 1, timed
+        evidence = rows(timed, 'coverage')['ledger degraded']['evidence']
+        if expiry == 'collection':
+            assert 'collection exceeded its deadline' in evidence, timed
+        else:
+            assert 'fleet snapshot' in evidence or 'collection exceeded its deadline' in evidence, timed
+        assert json.loads((timeout_home / 'state/open-loops.json').read_text()) == timed
+        pids = [(int((timeout_home / (role + '-pid')).read_text()),
+                 (timeout_home / (role + '-identity')).read_text().strip())
+                for role in ('source', 'descendant')]
+        until = time.monotonic() + 2
+        while any(process_alive(pid, identity) for pid, identity in pids) and time.monotonic() < until:
+            time.sleep(0.01)
+        assert not any(process_alive(pid, identity) for pid, identity in pids), (expiry, pids)
+    finally:
+        for role in ('source', 'descendant'):
+            pid_path, identity_path = (timeout_home / (role + suffix) for suffix in ('-pid', '-identity'))
+            if pid_path.exists() and identity_path.exists():
+                pid, identity = int(pid_path.read_text()), identity_path.read_text().strip()
+                if process_alive(pid, identity):
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+    print('PASS: ' + expiry + ' deadline owns resistant descendant cleanup', flush=True)
+
 # Overall deadlines escape every reader's normal error recovery and stop later work.
 for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
     deadline_root = world / ('deadline-' + reader)
@@ -612,7 +838,7 @@ if command == 'git' and '--get' not in sys.argv:
     print('.git')
     sys.exit(0)
 if command == 'gh-axi' and '/pulls?' in sys.argv[2]:
-    pulls = [dict(number=i, html_url='https://github.com/test/project/pull/' + str(i),
+    pulls = [] if reader == 'pr-state' else [dict(number=i, html_url='https://github.com/test/project/pull/' + str(i),
                   head=dict(sha='a' * 40), state='open') for i in range(24)]
     print('api_response:\n  body: ' + base64.b64encode(json.dumps(pulls).encode()).decode()
           + '\n  truncated: false')
@@ -731,4 +957,88 @@ printf '%s' "$INPUT" | jq -e '.tasks[0].current_state.state == "unknown"
   and (.tasks[0].current_state.detail | startswith("current-state command failed (exit "))' >/dev/null \
   || { echo "FAIL: current-state timeout must retain failure evidence" >&2; exit 1; }
 echo "PASS: current-state timeout retains independent observation failure"
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+import json, os, shutil, signal, subprocess, sys, time
+from pathlib import Path
+
+root, world = map(Path, sys.argv[1:])
+home, code, temporary = (world / name for name in ('real-timeout-home', 'real-timeout-code', 'real-timeout-tmp'))
+shutil.copytree(root / 'bin', code / 'bin')
+for name in ('state', 'data', 'config', 'projects'):
+    (home / name).mkdir(parents=True)
+temporary.mkdir()
+(home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+(home / 'state/worker.meta').write_text('kind=ship\nbackend=tmux\nwindow=firstmate:fm-worker\nmode=no-mistakes\n')
+(home / 'state/worker.status').write_text('needs-decision [key=owed]: answer this\n')
+env = dict(os.environ, FM_HOME=str(home), NM_HOME=str(world / 'real-timeout-nm'),
+           TMPDIR=str(temporary), FM_SNAPSHOT_CREW_STATE_TIMEOUT='120',
+           PATH=f'{world / "unreadable-bin"}:{os.environ["PATH"]}')
+for key in ('FM_ROOT_OVERRIDE', 'FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+    env.pop(key, None)
+def process_alive(pid, identity):
+    observed = subprocess.run(['ps', '-p', str(pid), '-o', 'stat=', '-o', 'lstart='],
+                              capture_output=True, text=True)
+    if observed.returncode == 1 and not observed.stdout.strip() and not observed.stderr.strip():
+        return False
+    assert observed.returncode == 0, (pid, observed.stdout, observed.stderr)
+    state, current = observed.stdout.strip().split(None, 1)
+    return current.strip() == identity and not state.startswith('Z')
+
+mode = (home / 'state').stat().st_mode & 0o777
+(home / 'state').chmod(0o300)
+try:
+    scanned = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--heartbeat', '--json'],
+                             env=env, text=True, capture_output=True, timeout=30)
+    assert scanned.returncode == 0, (scanned.stdout, scanned.stderr)
+    inventory = json.loads(scanned.stdout)
+    assert not inventory['complete'], inventory
+    coverage = [row for row in inventory['rows'] if row['category'] == 'coverage']
+    assert len(coverage) == 1 and 'state inventory' in coverage[0]['evidence'], inventory
+    assert not any(row['category'] == 'unanswered_question' for row in inventory['rows']), inventory
+    assert json.loads((home / 'state/open-loops.json').read_text()) == inventory
+finally:
+    (home / 'state').chmod(mode)
+print('PASS: real snapshot unreadable metadata/status inventory stays degraded', flush=True)
+(home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=30)))
+(code / 'bin/fm-crew-state.sh').write_text(r'''#!/usr/bin/env python3
+import os, subprocess, time
+from pathlib import Path
+home = Path(os.environ['FM_HOME'])
+identity = subprocess.check_output(['ps', '-p', str(os.getpid()), '-o', 'lstart='], text=True).strip()
+assert identity
+(home / 'crew-identity').write_text(identity)
+(home / 'crew-pid').write_text(str(os.getpid()))
+time.sleep(120)
+''')
+(code / 'bin/fm-crew-state.sh').chmod(0o755)
+try:
+    expired = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--heartbeat', '--json'],
+                             env=env, text=True, capture_output=True, timeout=60)
+    assert expired.returncode == 0, (expired.stdout, expired.stderr)
+    report = json.loads(expired.stdout)
+    assert not report['complete'], report
+    coverage = [row for row in report['rows'] if row['category'] == 'coverage']
+    assert len(coverage) == 1 and 'fleet snapshot' in coverage[0]['evidence'], report
+    assert (home / 'crew-pid').exists(), 'real snapshot must reach its nested bounded worker read'
+    pid = int((home / 'crew-pid').read_text())
+    identity = (home / 'crew-identity').read_text().strip()
+    until = time.monotonic() + 2
+    while True:
+        alive = process_alive(pid, identity)
+        if not alive or time.monotonic() >= until:
+            break
+        time.sleep(0.01)
+    assert not alive, 'snapshot nested timeout group must not outlive collector cancellation'
+    assert not list(temporary.glob('fm-fleet-*')), list(temporary.iterdir())
+    assert json.loads((home / 'state/open-loops.json').read_text()) == report
+finally:
+    if (home / 'crew-pid').exists() and (home / 'crew-identity').exists():
+        pid, identity = int((home / 'crew-pid').read_text()), (home / 'crew-identity').read_text().strip()
+        if process_alive(pid, identity):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+print('PASS: real snapshot cancellation reaps nested groups and removes temporary inventory', flush=True)
+PY
 echo "ok - open-work reconciliation reports owned obligations from live records"
