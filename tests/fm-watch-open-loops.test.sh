@@ -433,7 +433,7 @@ while [ ! -e "$FM_HOME/.collector-release" ]; do
   [ -d "$FM_HOME" ] && [ "$SECONDS" -lt "$deadline" ] || exit 1
   sleep 0.1
 done
-printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"retained-obligation","structured":true,"state":"queued","since":"2000-01-01T00:00:00Z"}]}}'
+printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"retained-obligation","structured":true,"state":"in_flight","requires_child_metadata":true,"since":"2000-01-01T00:00:00Z"}]}}'
 SH
   chmod +x "$dir/collector-bin/fm-fleet-snapshot.sh"
   publish_ledger "$state" lost-launcher
@@ -467,7 +467,7 @@ SH
   [ "$scans" -eq 1 ] || fail "watcher restart overlapped $scans collectors before publication"
   [ "$(wc -l < "$dir/.collector-pids" | tr -d '[:space:]')" -eq 1 ] \
     || fail "a queued collector scanned after the retained publication"
-  jq -e '.complete == true and any(.rows[]; .subject == "retained-obligation" and .category == "ready_not_started" and .overdue)' \
+  jq -e '.complete == true and any(.rows[]; .subject == "retained-obligation" and .category == "missing_worker" and .overdue)' \
     "$state/open-loops.json" >/dev/null || fail "the retained scan did not publish its actual owned obligation"
   grep -q 'open-loop-ledger' "$state/.wake-queue" || fail "the retained scan publication was not surfaced durably"
   pass "a retained collector survives watcher exit, rejects overlapping restart scans, and publishes without starvation"
@@ -611,7 +611,7 @@ test_real_publication_rearms_stale_incidents_without_resetting_overdue() {
     cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2
-printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"recovery-obligation","structured":true,"state":"queued","since":"2000-01-01T00:00:00Z"}]}}'
+printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"recovery-obligation","structured":true,"state":"in_flight","requires_child_metadata":true,"since":"2000-01-01T00:00:00Z"}]}}'
 SH
     chmod +x "$dir/collector-bin/fm-fleet-snapshot.sh"
     install_failing_helper "$fakebin"
@@ -675,7 +675,7 @@ test_fresh_observation_rearms_recovery_during_blocked_stale_append() {
     cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2
-printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"blocked-recovery-obligation","structured":true,"state":"queued","since":"2000-01-01T00:00:00Z"}]}}'
+printf '%s\n' '{"schema":"fm-fleet-home-input.v1","tasks":[],"backlog":{"present":true,"records":[{"id":"blocked-recovery-obligation","structured":true,"state":"in_flight","requires_child_metadata":true,"since":"2000-01-01T00:00:00Z"}]}}'
 SH
     chmod +x "$dir/collector-bin/fm-fleet-snapshot.sh"
     install_failing_helper "$fakebin"
