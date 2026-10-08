@@ -47,7 +47,13 @@
 // Stale callbacks from a prior generation are no-ops against the active replacement.
 //
 // Delivery versus consumption (stated once here):
-// A main follow-up is delivered once omp accepts it (sendUserMessage returns).
+// A main wake is delivered once omp accepts it (sendUserMessage returns).
+// While main is streaming it is queued as a follow-up. While main is idle it is
+// sent through the prompt flow instead, because omp leaves an idle explicit
+// follow-up queued with no turn whenever its context tail is not an assistant
+// or tool result, such as an advisor note posted after the turn ended
+// (verified, omp 18.8.1); the prompt flow starts the turn and flushes any
+// follow-up already stranded there.
 // The successor pipeline never waits for the model to read it: a follow-up
 // queued while main is streaming joins the running run without ever raising
 // before_agent_start, so waiting on that event stalls every later close.
@@ -566,7 +572,8 @@ export default function (pi: ExtensionAPI) {
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
     owner.unconsumedWakes.set(token, { content, pending });
     try {
-      await pi.sendUserMessage(content, { deliverAs: "followUp" });
+      if (sessionIsIdle()) await pi.sendUserMessage(content);
+      else await pi.sendUserMessage(content, { deliverAs: "followUp" });
     } catch (error) {
       owner.unconsumedWakes.delete(token);
       throw error;
@@ -605,6 +612,15 @@ export default function (pi: ExtensionAPI) {
 
   function rememberContext(ctx: unknown): void {
     if (typeof ctx === "object" && ctx !== null) latestContext = ctx;
+  }
+
+  // Positive idle proof only; a missing or stale context keeps follow-up delivery.
+  function sessionIsIdle(): boolean {
+    try {
+      return typeof latestContext?.isIdle === "function" && latestContext.isIdle() === true;
+    } catch {
+      return false;
+    }
   }
 
   function recoverRestoredWake(owner: SessionGeneration): void {

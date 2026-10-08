@@ -20,9 +20,14 @@
 #      from the same directory. It used to overwrite state/.omp-turnend-extension-
 #      loaded with its own, soon dead, pid; both markers must keep naming the
 #      session that holds the lock.
-# Every step submits model prompts, so the guard is opt-in; it fails naming omp
+#   4. omp leaves an explicit follow-up queued with no turn when it arrives at an
+#      idle session whose context ends in an advisor note, so a wake reaching an
+#      idle lane sat unread until someone pressed Enter. The watch extension must
+#      start that wake's own turn and leave an operator draft unsent. This step
+#      drives a scripted local model and spends no tokens.
+# Steps 1-3 submit model prompts, so the guard is opt-in; it fails naming omp
 # and `omp --version`. Refresh docs/verification/runtime-backends.md
-# ("omp injected text") from its output after any omp upgrade.
+# ("omp injected text" and "omp idle wake") from its output after any omp upgrade.
 # Every Herdr call, including adapter calls, is routed through bin/fm-herdr-lab.sh.
 set -u
 unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE
@@ -37,7 +42,7 @@ LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-fm_live_gate opt-in FM_OMP_WAKE_RESTORE_LIVE herdr jq omp
+fm_live_gate opt-in FM_OMP_WAKE_RESTORE_LIVE herdr jq omp python3
 
 [ -x "$LAB_HELPER" ] || fail "FM_OMP_WAKE_RESTORE_LIVE=1 but the Herdr lab helper is not executable at $LAB_HELPER"
 
@@ -294,6 +299,126 @@ interrupt_queued_wake() {
   screen >&2
   fail "$SUBJECT: no fresh wake was observed restored into a pending composer after Escape in 3 attempts"
 }
+
+# ---------------------------------------------------------------------------
+# Session I: a wake that reaches an idle lane behind an advisor note starts its
+# own turn. A scripted local model answers every request with "ack", except that
+# the advisor gets one `advise` tool call, so the advisor posts its note after
+# the turn ends exactly as it did on the stalled lanes. The session uses the
+# extension under review with a stand-in arm script that closes on a trigger file.
+# ---------------------------------------------------------------------------
+IDLE="$LAB/idle"
+mkdir -p "$IDLE/agent" "$IDLE/home/.omp/extensions" "$IDLE/home/.pi/extensions/lib" "$IDLE/home/bin" "$IDLE/home/state"
+cp "$PROJECT/.omp/extensions/fm-primary-omp-watch.ts" "$IDLE/home/.omp/extensions/"
+cp "$PROJECT/.pi/extensions/lib/fm-operational-input.ts" "$IDLE/home/.pi/extensions/lib/"
+cp "$PROJECT/bin/fm-operational-input.sh" "$IDLE/home/bin/"
+cat > "$IDLE/home/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --handling-delivered ] || exit 0
+printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
+while :; do
+  for f in "$FM_HOME"/state/idle-trigger-*; do
+    [ -e "$f" ] || continue
+    rm -f "$f"
+    printf 'signal: %s\n' "${f##*/}"
+    exit 0
+  done
+  sleep 0.5
+done
+SH
+chmod +x "$IDLE/home/bin/"*.sh
+git -C "$IDLE/home" init -q
+cat > "$IDLE/model.py" <<'PY'
+import json, sys, time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+log_path, port_path = sys.argv[1], sys.argv[2]
+advised = False
+def text(message):
+    content = message.get("content")
+    if isinstance(content, list):
+        return " ".join(part.get("text", "") for part in content if isinstance(part, dict))
+    return content if isinstance(content, str) else ""
+class Model(BaseHTTPRequestHandler):
+    def log_message(self, *args): pass
+    def do_POST(self):
+        global advised
+        request = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
+        messages = request.get("messages", [])
+        tools = [tool.get("function", {}).get("name") for tool in request.get("tools", [])]
+        advise = not advised and "advise" in tools and any("IDLE-LAB-ADVISE" in text(m) for m in messages)
+        advised = advised or advise
+        with open(log_path, "a") as log:
+            log.write(json.dumps({"advise": advise, "text": " ".join(text(m) for m in messages)}) + "\n")
+        if advise:
+            call = {"index": 0, "id": "call_advise", "type": "function", "function": {"name": "advise", "arguments": json.dumps({"note": "IDLE-LAB-NOTE verify before finishing.", "severity": "concern"})}}
+            deltas, finish = [{"role": "assistant", "tool_calls": [call]}], "tool_calls"
+        else:
+            deltas, finish = [{"role": "assistant", "content": "ack"}], "stop"
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.end_headers()
+        chunk = {"id": "lab", "object": "chat.completion.chunk", "created": int(time.time()), "model": "m1"}
+        for delta in deltas + [{}]:
+            body = dict(chunk, choices=[{"index": 0, "delta": delta, "finish_reason": None if delta else finish}])
+            self.wfile.write(b"data: " + json.dumps(body).encode() + b"\n\n")
+        self.wfile.write(b"data: [DONE]\n\n")
+        self.wfile.flush()
+server = ThreadingHTTPServer(("127.0.0.1", 0), Model)
+with open(port_path, "w") as port_file:
+    port_file.write(str(server.server_address[1]))
+server.serve_forever()
+PY
+python3 -I "$IDLE/model.py" "$IDLE/model.log" "$IDLE/model.port" &
+wait_for 20 test -s "$IDLE/model.port" || fail "the scripted local model did not start"
+cat > "$IDLE/agent/config.yml" <<YML
+setupVersion: 2
+modelRoles:
+  default: lab/m1
+  tiny: lab/m1
+  advisor: lab/m1
+  vision: lab/m1
+advisor:
+  enabled: true
+YML
+cat > "$IDLE/agent/models.yml" <<YML
+providers:
+  lab:
+    baseUrl: http://127.0.0.1:$(cat "$IDLE/model.port")/v1
+    apiKey: lab-key
+    api: openai-completions
+    models:
+      - id: m1
+        contextWindow: 200000
+        maxTokens: 4096
+YML
+IDLE_PANE=$(lab workspace create --cwd "$IDLE/home" --label idle-wake --no-focus | jq -r '.result.root_pane.pane_id // empty')
+[ -n "$IDLE_PANE" ] || fail "could not create the idle-wake lab pane"
+# The pid written to state/.lock is the omp the shell execs, so the extension
+# owns the lock and arms at session_start without a model turn.
+lab pane run "$IDLE_PANE" "bash -c 'printf \"%s\\n\" \$\$ > $IDLE/home/state/.lock; exec env FM_HOME=$IDLE/home PI_CODING_AGENT_DIR=$IDLE/agent $REAL_OMP --model lab/m1'" >/dev/null \
+  || fail "could not start omp in the idle-wake lab pane"
+idle_screen() { lab pane read "$IDLE_PANE" --source visible 2>/dev/null || true; }
+model_saw() { grep -F -- "$1" "$IDLE/model.log" >/dev/null 2>&1; }
+note_posted() { idle_screen | grep -F 'IDLE-LAB-NOTE' >/dev/null; }
+wait_for 60 test -s "$IDLE/home/state/.omp-watch-extension-loaded" \
+  || { idle_screen >&2; fail "$SUBJECT: the idle-wake session never loaded the watch extension"; }
+sleep 3
+lab pane send-text "$IDLE_PANE" 'IDLE-LAB-ADVISE reply ack' >/dev/null
+sleep 1
+lab pane send-keys "$IDLE_PANE" Enter >/dev/null
+wait_for 60 note_posted || { idle_screen >&2; fail "$SUBJECT: the advisor note never posted after the turn"; }
+sleep 5
+lab pane send-text "$IDLE_PANE" 'operator draft kept' >/dev/null
+sleep 2
+: > "$IDLE/home/state/idle-trigger-advisor-tail"
+wait_for 20 model_saw 'FIRSTMATE WATCHER WAKE: signal: idle-trigger-advisor-tail' \
+  || { idle_screen >&2; fail "$SUBJECT: a wake reaching an idle lane behind an advisor note did not start a turn"; }
+sleep 3
+model_saw 'operator draft kept' && fail "$SUBJECT: the operator draft was submitted with the idle wake"
+idle_screen | grep -F 'operator draft kept' >/dev/null \
+  || { idle_screen >&2; fail "$SUBJECT: the operator draft did not stay in the composer"; }
+pass "live omp idle wake: $SUBJECT started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent"
+lab pane close "$IDLE_PANE" >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
 # Session A: the extension recovers a restored wake by itself.

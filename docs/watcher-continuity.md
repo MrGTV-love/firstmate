@@ -73,6 +73,14 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 - It retires the predecessor arm at replacement shutdown instead of retaining it across the handoff.
 - It reports no shutdown reason, so every shutdown with a pending actionable close persists the handoff for the next owning `session_start` to replay.
 
+### omp idle wake delivery
+
+omp starts no turn for an explicit follow-up that reaches an idle session unless its own auto-continue gate passes, and that gate refuses while the context tail is not an assistant or tool result, such as an advisor note posted after the turn ended.
+`.omp/extensions/fm-primary-omp-watch.ts` therefore sends a wake through omp's prompt-starting message API when the session positively reports itself idle, and queues it as a follow-up only while a turn is streaming or the idle state cannot be read.
+The prompt flow never touches the composer, so an operator draft stays unsent, and it also flushes any follow-up already stranded in omp's queue.
+The extension header owns the delivery mechanics.
+`tests/fm-omp-harness.test.sh` covers idle delivery behind an advisor tail with an empty composer and with a draft, plus the follow-up fallback for an unreadable idle state; the live guard's idle step and its evidence are recorded in [omp idle wake behind an advisor note](verification/runtime-backends.md#2026-10-08-omp-idle-wake-behind-an-advisor-note).
+
 ### omp restored-wake recovery
 
 omp restores queued user follow-ups to the composer when a run is interrupted with Escape or a message is dequeued with Alt+Up, so accepting a wake as a follow-up does not prove a turn consumed it.
