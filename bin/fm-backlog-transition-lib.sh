@@ -113,6 +113,18 @@ fm_backlog_bytes_of_file() {  # <path>
   perl -e 'open(my $f, "<", $ARGV[0]) or exit 1; binmode $f; local $/; my $c = <$f>; $c = "" unless defined $c; print join(" ", unpack("C*", $c)), "\n"' -- "$1"
 }
 
+# 0 when <string> holds no control byte (below 0x20, or 0x7f), newline included.
+# The byte-by-byte checks above need a child process each; this answers the same
+# question for a string already in the shell, in the C locale so that multibyte
+# characters are judged by their bytes exactly as unpack("C*") judges them.
+fm_backlog_string_control_free() {  # <string>
+  local LC_ALL=C
+  case "$1" in
+    *[[:cntrl:]]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 fm_backlog_control_bytes_valid() {  # <allow-newline: 0|1> <od-bytes>
   printf '%s\n' "$2" | awk -v allow_newline="$1" '
     { for (i = 1; i <= NF; i++) if (($i < 32 && !(allow_newline && $i == 10)) || $i == 127) exit 1 }
@@ -150,9 +162,8 @@ fm_backlog_directory_present() {
 }
 
 fm_backlog_data_absolute() {
-  local data=$1 raw_bytes check
-  raw_bytes=$(fm_backlog_bytes_of_string "$data") || return 1
-  if ! fm_backlog_control_bytes_valid 0 "$raw_bytes"; then
+  local data=$1 check
+  if ! fm_backlog_string_control_free "$data"; then
     printf 'error: data directory contains an invalid control byte\n' >&2
     return 2
   fi
@@ -448,6 +459,60 @@ fm_backlog_row_list() {  # <resolved-data-dir> [flag...]
   else
     (cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && fm_tasks_axi list "$@" 2>&1)
   fi
+}
+
+# One bounded read of every backlog row's id and state, printed as one
+# "<id>:<state>" line per row, for a caller that must decide which of many task
+# records can need a closer look. A per-record `tasks-axi show` is a node process
+# each, so asking once replaces a start-time cost that grew with the number of
+# workers. Fails (nothing printed) whenever it cannot vouch for a complete
+# answer - addressing, the bound (status 124, so the caller can latch a wedged
+# backend), the backend, or a row count that does not match what was parsed - and
+# the caller then probes each record exactly as it did before.
+fm_backlog_row_states() {  # <data-dir>
+  local data=$1 out secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10} line expected='' declared='' in_tasks=0 parsed=0 id rest rows='' status
+  local -a args=()
+  case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
+  [ "$secs" -gt 0 ] 2>/dev/null || secs=10
+  data=$(fm_backlog_data_absolute "$data") || return 1
+  fm_backlog_tasks_axi_addressing "$data" || return 1
+  [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 1
+  [ -z "$FM_BACKLOG_AXI_FILE" ] || args+=(--file "$FM_BACKLOG_AXI_FILE")
+  # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
+  out=$(fm_run_timed "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi list "$@"' \
+    _ "$FM_BACKLOG_AXI_ROOT" ${args[@]+"${args[@]}"} 2>/dev/null)
+  status=$?
+  [ "$status" -eq 0 ] || return "$status"
+  while IFS= read -r line; do
+    case "$line" in
+      'count: '*) expected=${line#count: } ;;
+      'tasks['*']{id,state,'*'}:')
+        declared=${line#'tasks['}
+        declared=${declared%%']'*}
+        case "$declared" in ''|*[!0-9]*) return 1 ;; esac
+        in_tasks=1
+        ;;
+      '  '*,*,*)
+        [ "$in_tasks" = 1 ] || continue
+        id=${line#  }
+        rest=${id#*,}
+        id=${id%%,*}
+        case "$id" in \"*\") id=${id#\"}; id=${id%\"} ;; esac
+        case "$id" in ''|.*|*[!A-Za-z0-9._-]*) return 1 ;; esac
+        rest=${rest%%,*}
+        [ -n "$rest" ] || return 1
+        rows="${rows}${id}:${rest}"$'\n'
+        parsed=$((parsed + 1))
+        ;;
+      *) in_tasks=0 ;;
+    esac
+  done <<EOF
+$out
+EOF
+  case "$expected" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$expected" = "$declared" ] || return 1
+  [ "$expected" -eq "$parsed" ] || return 1
+  printf '%s' "$rows"
 }
 
 fm_backlog_row_probe() {  # <data-dir> <id>
@@ -756,12 +821,34 @@ fm_backlog_retain() {  # <data-dir> <id> [flag...]
   fm_backlog_mutate "$authorized_data" reopen "$id"
 }
 
-fm_backlog_canonical_existing() {
+# The canonical path of an existing path. Bootstrap and every lifecycle script
+# call this several times per task record, and a perl process per call dominated
+# a locked session start. A directory, and a regular file that is not itself a
+# symlink, resolve in the shell with the same answer; anything else (a symlink
+# or a path the shell cannot classify) still goes to realpath.
+fm_backlog_canonical_existing() {  # <path>
+  local path=$1 dir base resolved
+  if [ -d "$path" ]; then
+    resolved=$(CDPATH='' cd -P -- "$path" 2>/dev/null && pwd -P) && [ -n "$resolved" ] && {
+      printf '%s' "$resolved"
+      return 0
+    }
+  elif [ -e "$path" ] && [ ! -L "$path" ]; then
+    dir=${path%/*}
+    base=${path##*/}
+    if [ "$dir" != "$path" ] && [ -n "$base" ]; then
+      [ -n "$dir" ] || dir=/
+      resolved=$(CDPATH='' cd -P -- "$dir" 2>/dev/null && pwd -P) && [ -n "$resolved" ] && {
+        printf '%s/%s' "${resolved%/}" "$base"
+        return 0
+      }
+    fi
+  fi
   LC_ALL=C perl -MCwd=realpath -e '
     my $resolved = realpath($ARGV[0]);
     exit 1 unless defined $resolved;
     print $resolved;
-  ' "$1" 2>/dev/null
+  ' "$path" 2>/dev/null
 }
 
 fm_backlog_record_parent_authorized() {  # <path> <label> <root> [parent-only]

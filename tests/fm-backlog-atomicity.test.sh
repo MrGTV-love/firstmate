@@ -1966,6 +1966,81 @@ test_recovery_marks_an_owned_record_in_flight() {
   pass "session start marks an item In flight when this home already owns a worker for it"
 }
 
+# A locked session start used to read the backlog once per owned record, a node
+# process each, which dominated its cost on a home with many workers. One read of
+# the queued ids now tells it which records can need healing at all. Records
+# whose items are not queued are never read individually, and the last queued
+# item in the answer is still healed (a trailing delimiter was once dropped).
+test_recovery_reads_the_backlog_once_for_many_owned_records() {
+  local case_dir id name out real lists
+  real=$(command -v tasks-axi)
+  for name in heal-batched heal-batched,a,b; do
+    case_dir=$(make_home "$name")
+    for id in atomic-batch-running-1 123 true false null; do
+      add_item "$case_dir" "$id"
+      start_item "$case_dir" "$id"
+      write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-running-$id"
+    done
+    id=atomic-batch-queued-b9
+    add_item "$case_dir" "$id"
+    write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-queued"
+    cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+printf '%s %s\\n' "\${1:-}" "\${2:-}" >> "$case_dir/tasks-axi.calls"
+exec "$real" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/tasks-axi"
+    : > "$case_dir/tasks-axi.calls"
+
+    out=$(run_bootstrap "$case_dir")
+    [ "$(row_state "$case_dir" "$id")" = in_flight ] \
+      || fail "the last queued owned record was not healed from the batched answer: $out"
+    lists=$(grep -c '^list ' "$case_dir/tasks-axi.calls" || true)
+    [ "$lists" = 1 ] || fail "expected one batched backlog read for $name, saw $lists"
+    for id in atomic-batch-running-1 123 true false null; do
+      if grep -Fxq "show $id" "$case_dir/tasks-axi.calls"; then
+        fail "$name individually read the nonqueued item $id"
+      fi
+      [ "$(row_state "$case_dir" "$id")" = in_flight ] \
+        || fail "batch reconciliation changed the running item $id in $name"
+      assert_present "$(home_of "$case_dir")/state/$id.meta" \
+        "batch reconciliation removed the worker record $id in $name"
+    done
+  done
+  pass "session start batches quoted task IDs and comma-containing home paths while healing queued records"
+}
+
+test_recovery_releases_nonqueued_worker_locks() {
+  local case_dir home id out
+  case_dir=$(make_home heal-nonqueued-locks)
+  home=$(home_of "$case_dir")
+  for id in atomic-running-lock atomic-done-lock; do
+    add_item "$case_dir" "$id"
+    start_item "$case_dir" "$id"
+    write_task_meta "$case_dir" "$id" ship no-mistakes
+  done
+  tasks-axi 'done' atomic-done-lock --file "$(backlog_of "$case_dir")" >/dev/null
+  cat > "$case_dir/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --version ] || exit 0
+. "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+for meta in "$FM_HOME/state"/*.meta; do
+  id=${meta##*/}
+  id=${id%.meta}
+  for lock in "$FM_HOME/state/.control-$id.lock" "$FM_HOME/state/.meta-$id.lock"; do
+    fm_lock_try_acquire "$lock" || exit 1
+    fm_lock_release "$lock"
+  done
+done
+touch "$FM_HOME/state/reconciliation-locks-released"
+SH
+  chmod +x "$case_dir/fakebin/no-mistakes"
+  out=$(run_bootstrap "$case_dir") || fail "nonqueued reconciliation failed: $out"
+  assert_present "$home/state/reconciliation-locks-released" \
+    "reconciliation retained a worker lock while bootstrap was still running: $out"
+  pass "bootstrap releases both locks for nonqueued workers before local diagnostics"
+}
+
 test_recovery_rejects_an_internal_worker_record_symlink() {
   local case_dir home id target_id out rc=0
   id=atomic-heal-internal-symlink-b8
@@ -3378,6 +3453,8 @@ test_recovery_retries_when_a_close_marker_cannot_be_removed
 test_recovery_reports_an_owned_row_read_failure
 test_orca_cleanup_recovery_never_transitions_the_backlog
 test_recovery_marks_an_owned_record_in_flight
+test_recovery_reads_the_backlog_once_for_many_owned_records
+test_recovery_releases_nonqueued_worker_locks
 test_recovery_rejects_an_internal_worker_record_symlink
 test_recovery_ignores_a_symlinked_worker_record
 test_recovery_replays_a_close_an_interrupted_cleanup_left_open

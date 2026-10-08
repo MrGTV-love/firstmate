@@ -136,6 +136,8 @@ The digest makes no external-network call at all.
 Every network call it owes runs off the blocking path, in the separately bounded deferred stage owned by `bin/fm-startup-network.sh`.
 So an unreachable host can no longer consume this budget.
 
+Home-summary publication also stays off the digest's blocking path; [`bin/fm-home-summary-refresh.sh`](../bin/fm-home-summary-refresh.sh)'s header owns detached triggering and failure escalation.
+
 ### Digest timeout
 
 Some digest work remains local but unbounded:
@@ -148,6 +150,8 @@ So the whole digest still runs as one bounded child, default 120s via `FM_SESSIO
 Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by `FM_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default).
 So a read that hangs or dies becomes that task's own `endpoint: error` line and the digest continues.
 With a wedged backend the stage's ceiling is tasks times that per-read bound and can itself reach the digest bound.
+
+[`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) owns reconciliation's conditional bulk-read fast path and per-worker metadata and lifecycle lock handling.
 
 The per-item backlog row reads inside bootstrap's reconcile and close-replay sweeps are the exception.
 Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/fm-backlog-transition-lib.sh`.

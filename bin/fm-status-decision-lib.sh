@@ -1,6 +1,36 @@
 #!/usr/bin/env bash
 # shellcheck source=bin/fm-status-record-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-record-lib.sh"
+if ! command -v _fm_open_decisions_file_ident >/dev/null 2>&1; then
+  # The checkpoint-seeded fold below reads file identity, size, and byte spans.
+  # shellcheck source=bin/fm-status-io-lib.sh
+  . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-io-lib.sh"
+fi
+
+# Version of the persisted fold checkpoint (state/.<task>.open-decisions-cursor).
+# It must be bumped whenever _fm_decision_fold_line semantics change, so every
+# checkpoint folded under an older reading is discarded and rebuilt from byte 0.
+# 4: verb parsing ends at the first "[name=value]" tag rather than only at a
+# "[key=...]" one, so lines carrying another bracketed tag first became opens
+# and closes.
+# 5: status_line_verb now also reads through an UNBRACKETED correlation token,
+# so lines that previously folded as ordinary status become opens and closes.
+# 6: a done/failed line on a ship or scout closes every open decision, and the
+# persisted version now carries the task kind, so cursors folded without that
+# terminal rule are discarded.
+# 7: that terminal rule now fires only for a line carrying a colon, so a cursor
+# folded when bare prose could close every open decision is discarded.
+# 8: a colonless line without a complete "[key=...]" token is no longer a
+# transition at all, so a cursor holding a phantom decision that bare prose
+# opened - which no later line could close - is discarded.
+# 9: the two colon tests read the line with its time tag stripped, so a
+# malformed worker stamp whose colons used to pose as the head/note separator
+# no longer opens or closes anything; cursors folded under that reading are
+# discarded.
+# 10: refuse partial-line checkpoint endpoints, including when the line has
+# since completed; older checkpoints can already contain polluted fold state
+# even at a now-valid boundary and must be rebuilt from byte 0.
+FM_OPEN_DECISIONS_FOLD_VERSION=10
 
 # The resolution verb and durable-backlog-transfer verb that CLOSE a keyed
 # status decision opened by needs-decision or blocked. See status_open_decisions
@@ -324,9 +354,9 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # Fold the WHOLE status stream into the set of decisions still open. Prints one
 # TAB-separated "<key>\t<verb>\t<summary>" line per still-open decision, in
 # most-recently-opened-last order; prints nothing when none are open. Reads the
-# status file, plus its sibling `.meta` for the task kind the terminal rule needs
-# when the caller passes no <kind>; no globals beyond the optional
-# FM_CLASSIFY_RESOLVE_VERB override. This is the durable open-set the fleet
+# status file, its sibling `.meta` for the task kind when the caller passes no
+# <kind>, and a sibling fold checkpoint when available. The fold signature
+# includes the optional verb and reserved-key overrides. This is the durable open-set the fleet
 # snapshot and any point-in-time consumer must use instead of trusting the last
 # status line.
 # The scan_open_decisions wrapper in bin/fm-classify-lib.sh enumerates a whole directory rather than
@@ -335,12 +365,54 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # before any read - a cheap builtin, unlike fm_wake_latest_event's O_NOFOLLOW
 # subprocess read, which exists for that function's much narrower payload-driven
 # path resolution rather than this directory-local glob.
+#
+# Checkpoint seeding. Status logs are append-only and never compacted, so a
+# fold from line 1 costs every line the task ever wrote (a long-lived second
+# mate's log runs to megabytes and tens of seconds of bash per fold). The
+# incremental fold in bin/fm-classify-lib.sh persists a checkpoint beside the
+# log - the open set folded through a byte offset, which already holds only the
+# decisions still open, every closed one compacted away. This whole-file read
+# starts from that checkpoint when it is trustworthy and folds only the bytes
+# after it, which is byte for byte the result a fold from line 1 prints, because
+# the checkpoint IS that fold of the prefix. It stays a pure read: it never
+# writes, refreshes, or creates a checkpoint, so a caller reading another home's
+# log leaves that home untouched. Any doubt folds from line 1 instead: an absent,
+# unreadable, symlinked, or malformed checkpoint; a fold signature that differs
+# from this read's; a file identity that differs (the log was replaced); an offset
+# past the current size; or a nonzero offset that does not sit just after a
+# newline, because a checkpoint taken mid-append folded a partial line the
+# whole-file fold would have read whole.
+# A failed tail read also falls back to byte 0; no pure read repairs the checkpoint.
+# Regression coverage: tests/fm-wake-drain-open-decisions-cursor.test.sh.
 status_open_decisions() {  # <status-file> [<kind>]
-  local f=$1 kind=${2:-} line resolve held open='' verb
+  local f=$1 kind=${2:-} line resolve held open='' verb offset=0 span seeded=0
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_fm_status_kind "$f" "$kind")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  if _fm_open_decisions_checkpoint_seed "$f" "$kind"; then
+    open=$_FM_ODC_OPEN
+    offset=$_FM_ODC_OFFSET
+    seeded=1
+  fi
+  if [ "$seeded" -eq 1 ]; then
+    [ "$offset" -lt "$_FM_ODC_SIZE" ] || { printf '%s' "$open"; return 0; }
+    if span=$(_fm_status_read_span "$f" "$offset" "$((_FM_ODC_SIZE - offset))" 2>/dev/null); then
+      while IFS= read -r line || [ -n "$line" ]; do
+        status_line_verb "$line" verb
+        case "$verb" in
+          needs-decision|blocked|done|failed|"$resolve"|"$held")
+            open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+            ;;
+        esac
+      done <<EOF
+$span
+EOF
+      printf '%s' "$open"
+      return 0
+    fi
+    open=''
+  fi
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" verb
     case "$verb" in
@@ -399,6 +471,74 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
 $open
 EOF
 }
+
+# The signature a fold checkpoint must carry to be reused for <kind>: the fold
+# version and the task kind, plus every fold-affecting override when one is set,
+# so a checkpoint folded under the default verbs is never reused by a read that
+# overrides them (and the default signature stays the historical one).
+_fm_open_decisions_fold_signature() {  # <kind>
+  local sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
+  if [ -n "${FM_CLASSIFY_RESOLVE_VERB:-}" ] || [ -n "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-}" ] \
+    || [ -n "${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-}" ]; then
+    sig="$sig:${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"
+    sig="$sig:${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}"
+    sig="$sig:${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}"
+  fi
+  printf '%s' "$sig"
+}
+
+# Parse one checkpoint file: `version=`, `offset=`, `ident=` header lines, then
+# the folded open set. Sets _FM_ODC_VERSION, _FM_ODC_OFFSET, _FM_ODC_IDENT, and
+# _FM_ODC_OPEN; returns 1 for an absent, unreadable, symlinked, or malformed
+# checkpoint. Shared by the writer in bin/fm-classify-lib.sh and the whole-file
+# readers here; the legacy offset/export reader in bin/fm-status-wake-lib.sh
+# applies the same signature, identity, size, and boundary checks.
+_fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
+  local cf=$1 data first rest line
+  _FM_ODC_VERSION='' _FM_ODC_OFFSET=0 _FM_ODC_IDENT='' _FM_ODC_OPEN=''
+  [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ] || return 1
+  data=$(LC_ALL=C command cat "$cf" 2>/dev/null) || return 1
+  first=${data%%$'\n'*}
+  case "$first" in version=?*) _FM_ODC_VERSION=${first#version=} ;; *) return 1 ;; esac
+  case "$data" in *$'\n'*) rest=${data#*$'\n'} ;; *) return 1 ;; esac
+  line=${rest%%$'\n'*}
+  case "$line" in offset=*) _FM_ODC_OFFSET=${line#offset=} ;; *) return 1 ;; esac
+  case "$_FM_ODC_OFFSET" in ''|*[!0-9]*) _FM_ODC_OFFSET=0; return 1 ;; esac
+  case "$rest" in *$'\n'*) rest=${rest#*$'\n'} ;; *) return 1 ;; esac
+  line=${rest%%$'\n'*}
+  case "$line" in ident=?*) _FM_ODC_IDENT=${line#ident=} ;; *) return 1 ;; esac
+  case "$rest" in *$'\n'*) _FM_ODC_OPEN=${rest#*$'\n'} ;; esac
+  return 0
+}
+
+_fm_open_decisions_checkpoint_boundary() {  # <status-file> <offset>
+  local last
+  [ "$2" -gt 0 ] || return 0
+  last=$(_fm_status_read_span "$1" "$(($2 - 1))" 1 2>/dev/null && printf '.') || return 2
+  case "$last" in
+    $'\n.') return 0 ;;
+    .) return 2 ;;
+    *) return 1 ;;
+  esac
+}
+
+# 0 when <status-file>'s checkpoint can seed a fold for <kind>, with the seed in
+# _FM_ODC_OPEN / _FM_ODC_OFFSET and the current file size in _FM_ODC_SIZE.
+# Read-only; status_open_decisions above owns every rejection reason.
+_fm_open_decisions_checkpoint_seed() {  # <status-file> <kind>
+  local f=$1 kind=$2 cur_ident
+  _FM_ODC_SIZE=0
+  _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$f")" || return 1
+  [ "$_FM_ODC_VERSION" = "$(_fm_open_decisions_fold_signature "$kind")" ] || return 1
+  cur_ident=$(_fm_open_decisions_file_ident "$f" 2>/dev/null) || return 1
+  [ -n "$cur_ident" ] && [ "$cur_ident" = "$_FM_ODC_IDENT" ] || return 1
+  _FM_ODC_SIZE=$(_fm_status_file_size "$f" 2>/dev/null) || return 1
+  _FM_ODC_SIZE=${_FM_ODC_SIZE//[[:space:]]/}
+  case "$_FM_ODC_SIZE" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$_FM_ODC_OFFSET" -le "$_FM_ODC_SIZE" ] || return 1
+  _fm_open_decisions_checkpoint_boundary "$f" "$_FM_ODC_OFFSET"
+}
+
 # 0 when <key> has a record in a folded "<key>\t<verb>\t<note>" open set.
 _fm_open_set_has() {  # <open-set> <key>
   case "$1" in
