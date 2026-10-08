@@ -1228,7 +1228,7 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
   A second Enter on an empty composer while queued messages exist aborts the running omp turn (omp's empty-submit rule), so the adapter re-reads a pending verdict once before it may retry.
 - **A descendant omp must not take the markers.**
   An `omp --print` child that a turn ran loaded the same `.omp/extensions` from the same directory, wrote its own pid into `state/.omp-turnend-extension-loaded`, and died, leaving the supervision proof reading `not loaded` under a healthy session.
-  [Extension supervision proof](../turnend-guard.md#extension-model) owns exact-lock marker and watcher ownership, including load-time marker writes before a live lock exists.
+  [Extension supervision proof](../turnend-guard.md#extension-model) owns current marker publication and exact-lock watcher ownership.
   The current live guard requires a fresh lab-local success record written only after the child command succeeds and both marker PIDs match the session lock PID, before the parent can repair them at its next turn boundary.
   It checks both markers again after the parent resumes and brackets busy-composer observations with agent liveness and Herdr's process-validated native busy state, checking that evidence immediately before adapter submission.
   Rendered delivery-busy readers recognize both the spinner-bearing box border and the `⎋ Waiting …` row, including when no harness identity is available.
