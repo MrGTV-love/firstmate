@@ -607,11 +607,22 @@ fm_backend_herdr_projection_journal_create() {  # <state-dir> <task-id>
   printf '%s' "$token"
 }
 
+# One read of the journal with no child process: the snapshot below asks for a
+# dozen fields of each journal, and a locked session start walks every journal,
+# so a grep-and-cut pair per field was hundreds of process creations.
 fm_backend_herdr_projection_journal_field() {  # <journal> <key>
-  local journal=$1 key=$2 count
-  count=$(grep -c "^${key}=" "$journal" 2>/dev/null || true)
-  [ "$count" = 1 ] || return 1
-  grep "^${key}=" "$journal" 2>/dev/null | cut -d= -f2-
+  local journal=$1 key=$2 line count=0 value=
+  [ -f "$journal" ] && [ -r "$journal" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "$key="*)
+        count=$((count + 1))
+        value=${line#"$key="}
+        ;;
+    esac
+  done < "$journal"
+  [ "$count" -eq 1 ] || return 1
+  printf '%s\n' "$value"
 }
 
 # fm_backend_herdr_projection_journal_snapshot: validate a version 1 attempt
