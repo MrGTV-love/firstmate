@@ -99,7 +99,8 @@ fm_secondmate_restart_capable() {  # <meta-file>
   fi
   source=${record#* }
   source=${source%% *}
-  if ! fm_busy_source_trusted "$harness" "$source"; then
+  if ! { [ "$source" = fm-spawn ] && [ "${record%% *}" = busy ]; } \
+    && ! fm_secondmate_restart_completion_source "$harness" "$source"; then
     FM_SECONDMATE_RESTART_REASON="its current launch's busy record has no trusted turn-end source ($source)"
     return 1
   fi
@@ -114,8 +115,8 @@ fm_secondmate_restart_capable() {  # <meta-file>
 # happened.
 #
 # The request lives at state/.secondmate-restart-<id>.request (key=value lines:
-# corr, placement, host, harness, model, effort, requested_at, and answered_at
-# once the answer is seen). bin/fm-secondmate-restart.sh records it and tries it
+# corr, placement, harness, requested_at, answered_at, relaunched_gen and
+# relaunch_outcome). bin/fm-secondmate-restart.sh records it and tries it
 # once; bin/fm-watch.sh's restart tick has `fm-secondmate-restart.sh
 # --process-requests` try every recorded request again on the liveness cadence
 # until it finishes. A finished attempt leaves its result and correlation at
@@ -142,18 +143,35 @@ fm_secondmate_restart_request_get() {  # <request> <key>
   sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -1
 }
 
-fm_secondmate_restart_request_write() {  # <state> <id> <corr> <placement> <host> <harness> <model> <effort>
+fm_secondmate_restart_request_write() {  # <state> <id> <corr> <placement> <harness>
   local request tmp
   request=$(fm_secondmate_restart_request_path "$1" "$2")
   tmp="$request.tmp.$$"
   {
     printf 'corr=%s\n' "$3"
     printf 'placement=%s\n' "$4"
-    printf 'host=%s\n' "$5"
-    printf 'harness=%s\n' "$6"
-    printf 'model=%s\n' "$7"
-    printf 'effort=%s\n' "$8"
+    printf 'harness=%s\n' "$5"
     printf 'requested_at=%s\n' "$(date +%s)"
+  } > "$tmp" 2>/dev/null && mv -f "$tmp" "$request" 2>/dev/null && return 0
+  rm -f "$tmp"
+  return 1
+}
+
+fm_secondmate_restart_request_relaunched() {
+  local state=$1 id=$2 line=$3 request tmp generation
+  request=$(fm_secondmate_restart_request_path "$state" "$id")
+  [ -f "$request" ] && [ ! -L "$request" ] || return 1
+  [ -z "$(fm_secondmate_restart_request_get "$request" relaunched_gen)" ] || return 0
+  if ! command -v fm_busy_current_gen >/dev/null 2>&1; then
+    . "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-busy-lib.sh" || return 1
+  fi
+  generation=$(fm_busy_current_gen "$state" "$id") \
+    || generation=$(fm_meta_get "$state/$id.meta" spawn_gen)
+  fm_busy_token_valid "$generation" || return 1
+  tmp="$request.tmp.$$"
+  {
+    cat "$request" &&
+      printf 'relaunched_gen=%s\nrelaunch_outcome=%s\n' "$generation" "$line"
   } > "$tmp" 2>/dev/null && mv -f "$tmp" "$request" 2>/dev/null && return 0
   rm -f "$tmp"
   return 1
@@ -183,6 +201,11 @@ fm_secondmate_restart_outcome_consume() {  # <state> <id>; caller holds liveness
     "$1/.secondmate-restart-$2.turn-notice"
 }
 
+fm_secondmate_restart_completion_source() {
+  case "$2" in fm-spawn|fm-interrupt|fm-recovery) return 1 ;; esac
+  fm_busy_source_trusted "$1" "$2"
+}
+
 fm_secondmate_restart_turn_ended() {  # <state> <id>
   local state=$1 id=$2 meta backend target tail40 verdict harness
   meta="$state/$id.meta"
@@ -202,7 +225,7 @@ fm_secondmate_restart_turn_ended() {  # <state> <id>
     'idle cursor-transcript') return 0 ;;
   esac
   harness=$(fm_meta_get "$meta" harness)
-  fm_busy_source_trusted "$harness" "${verdict#* }"
+  fm_secondmate_restart_completion_source "$harness" "${verdict#* }"
 }
 
 # The first line of output that carries anything, flattened to one readable
@@ -250,7 +273,7 @@ fm_secondmate_restart_service() {  # <state> <id> [consume]
 }
 
 fm_secondmate_restart_service_locked() {
-  local state=$1 id=$2 consume=${3:-} request outcome corr line now
+  local state=$1 id=$2 consume=${3:-} request outcome corr line now reply marker
   request=$(fm_secondmate_restart_request_path "$state" "$id")
   outcome=$(fm_secondmate_restart_outcome_path "$state" "$id")
   if [ -e "$outcome" ] || [ -L "$outcome" ]; then
@@ -265,26 +288,42 @@ fm_secondmate_restart_service_locked() {
     if [ ! -f "$request" ] || [ -L "$request" ]; then
       return 2
     fi
-    corr=$(fm_secondmate_restart_request_get "$request" corr)
-    if [ -z "$corr" ] || ! fm_pending_reply_try_resolve "$state" "$corr"; then
-      printf 'waiting: %s: it has not yet confirmed that its open work is written down\n' "$id"
-      return 1
-    fi
-    if [ -z "$(fm_secondmate_restart_request_get "$request" answered_at)" ]; then
-      now=$(date +%s)
-      printf 'answered_at=%s\n' "$now" >> "$request" 2>/dev/null || true
-    fi
-    if [ "$(fm_secondmate_restart_request_get "$request" placement)" = remote ] \
-      || ! fm_secondmate_restart_turn_ended "$state" "$id"; then
-      printf 'waiting: %s: it confirmed its open work is written down; affirmative turn-end evidence is not available yet\n' "$id"
-      return 1
-    fi
-    if line=$(fm_secondmate_restart_run "$state" "$id" \
-      "$(fm_secondmate_restart_request_get "$request" harness)"); then
-      :
+    if [ -n "$(fm_secondmate_restart_request_get "$request" relaunched_gen)" ]; then
+      line=$(fm_secondmate_restart_request_get "$request" relaunch_outcome) || return 3
+      [ -n "$line" ] || return 3
     else
-      printf '%s\n' "$line"
-      return 1
+      corr=$(fm_secondmate_restart_request_get "$request" corr)
+      if [ -z "$corr" ] || ! fm_pending_reply_try_resolve "$state" "$corr"; then
+        reply=$(fm_pending_reply_path "$state" "$corr")
+        marker=$(fm_pending_reply_delivery_confirmation_path "$state" "$corr")
+        if [ -n "$corr" ] && [ -f "$reply" ] \
+          && [ -z "$(fm_pending_reply_get "$reply" delivered_epoch)" ] \
+          && [ ! -e "$marker" ] && [ ! -L "$marker" ]; then
+          FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$state" FM_SEND_IDEMPOTENT=1 \
+            FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+            "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" >&2 || true
+        fi
+        printf 'waiting: %s: it has not yet confirmed that its open work is written down\n' "$id"
+        return 1
+      fi
+      if [ -z "$(fm_secondmate_restart_request_get "$request" answered_at)" ]; then
+        now=$(date +%s)
+        printf 'answered_at=%s\n' "$now" >> "$request" 2>/dev/null || return 3
+      fi
+      if [ "$(fm_secondmate_restart_request_get "$request" placement)" = remote ] \
+        || ! fm_secondmate_restart_turn_ended "$state" "$id"; then
+        printf 'waiting: %s: it confirmed its open work is written down; affirmative turn-end evidence is not available yet\n' "$id"
+        return 1
+      fi
+      if line=$(fm_secondmate_restart_run "$state" "$id" \
+        "$(fm_secondmate_restart_request_get "$request" harness)"); then
+        if [ -n "$(fm_secondmate_restart_request_get "$request" relaunched_gen)" ]; then
+          line=$(fm_secondmate_restart_request_get "$request" relaunch_outcome) || return 3
+        fi
+      else
+        printf '%s\n' "$line"
+        return 1
+      fi
     fi
     if ! fm_secondmate_restart_request_finish "$state" "$id" "$line"; then
       printf 'unreached: %s: its restart completion could not be recorded: %s\n' "$id" "$line"

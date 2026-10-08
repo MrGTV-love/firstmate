@@ -777,8 +777,12 @@ secondmate_liveness_one() {  # <meta> <id>
       ;;
     relaunchable)
       if fm_secondmate_liveness_relaunch "$meta" "$id"; then
-        secondmate_note_respawned "$id"
-        report_relaunch "$id" "$FM_SM_LIVE_CAUSE" "$FM_SM_LIVE_WHERE"
+        if [ "$FM_SM_LIVE_STATUS" = skipped ]; then
+          echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $FM_SM_LIVE_REASON"
+        else
+          secondmate_note_respawned "$id"
+          report_relaunch "$id" "$FM_SM_LIVE_CAUSE" "$FM_SM_LIVE_WHERE"
+        fi
       elif [ "$FM_SM_LIVE_POLICY_REFUSED" = 1 ]; then
         [ -z "$FM_SM_LIVE_WAKE" ] || echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $FM_SM_LIVE_REASON"
       elif [ "$FM_SM_LIVE_STATUS" = skipped ]; then

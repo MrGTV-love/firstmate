@@ -164,7 +164,8 @@ add_local_mate() {
   local dir=$1 id=$2 harness=${3:-claude} backend=${4:-} evidence=${5:-armed}
   local home="$dir/home" smhome="$dir/$id-home"
   fm_git_worktree "$dir/$id-repo" "$smhome" "sm-$id"
-  mkdir -p "$smhome/state" "$smhome/data" "$smhome/bin" "$home/data/$id"
+  mkdir -p "$smhome/state" "$smhome/data" "$smhome/bin" "$smhome/.claude" "$home/data/$id"
+  cp "$ROOT/.claude/settings.json" "$smhome/.claude/settings.json"
   printf '%s\n' "$id" > "$smhome/.fm-secondmate-home"
   printf '# agents\n' > "$smhome/AGENTS.md"
   printf '# charter\n' > "$home/data/$id/brief.md"
@@ -203,7 +204,8 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
     git init -q --bare "$dir/origin.git"
     git -C "$dir/origin.git" symbolic-ref HEAD refs/heads/main
     git clone -q "$dir/origin.git" "$dir/seed" 2>/dev/null
-    mkdir -p "$dir/seed/bin" "$dir/seed/.agents/skills"
+    mkdir -p "$dir/seed/bin" "$dir/seed/.agents/skills" "$dir/seed/.claude"
+    cp "$ROOT/.claude/settings.json" "$dir/seed/.claude/settings.json"
     printf '# agents\n' > "$dir/seed/AGENTS.md"
     printf 'echo a\n' > "$dir/seed/bin/tool.sh"
     printf 's1\n' > "$dir/seed/.agents/skills/note.md"
@@ -902,7 +904,7 @@ test_answered_mate_mid_turn_waits_for_turn_end() {
 test_new_turn_during_checkpoint_keeps_restart_queued() {
   local dir out rc state verdict real_git
   real_git=$(command -v git)
-  for verdict in busy unknown composer; do
+  for verdict in busy unknown composer fm-interrupt fm-recovery fm-spawn; do
     dir=$(new_case "checkpoint-$verdict")
     add_local_mate "$dir" sm1
     state="$dir/home/state"
@@ -924,8 +926,12 @@ rm -f "$FM_FAKE_DIR/on-composer"
 HOOK
     chmod +x "$FM_FAKE_DIR/on-composer"
   else
-    "$FM_ROOT_OVERRIDE/bin/fm-busy-event.sh" apply "$FM_HOME/state" sm1 "$verdict" \
-      --current-gen --source claude-hook --event prompt >/dev/null || exit 1
+    case "$verdict" in
+      fm-*) state=idle source=$verdict ;;
+      *) state=$verdict source=claude-hook ;;
+    esac
+    "$FM_ROOT_OVERRIDE/bin/fm-busy-event.sh" apply "$FM_HOME/state" sm1 "$state" \
+      --current-gen --source "$source" --event prompt >/dev/null || exit 1
   fi
   : > "$FM_FAKE_DIR/turn-started-during-checkpoint"
 fi
@@ -1050,7 +1056,7 @@ run_restart_watcher_tick() {  # <case-dir>
 
 test_inconclusive_turn_evidence_stays_queued() {
   local dir state out rc kind
-  for kind in missing unknown malformed generation missing-meta no-target; do
+  for kind in missing unknown malformed generation missing-meta no-target fm-interrupt fm-recovery fm-spawn; do
     dir=$(new_case "turn-$kind")
     add_local_mate "$dir" sm1
     state="$dir/home/state"
@@ -1064,6 +1070,7 @@ test_inconclusive_turn_evidence_stays_queued() {
       generation) printf 'stale-generation\n' > "$state/sm1.busy-gen" ;;
       missing-meta) rm -f "$state/sm1.meta" ;;
       no-target) printf 'kind=secondmate\nharness=claude\n' > "$state/sm1.meta" ;;
+      fm-*) "$ROOT/bin/fm-busy-event.sh" apply "$state" sm1 idle --current-gen --source "$kind" --event reset >/dev/null || fail "could not record synthetic idle" ;;
     esac
     out=$(process_requests "$dir"); rc=$?
     expect_code 0 "$rc" "inconclusive $kind must wait: $out"
@@ -1097,7 +1104,7 @@ test_inconclusive_turn_evidence_stays_queued() {
 test_unwired_launches_are_nudged_without_queueing() {
   local dir out rc harness evidence
   for harness in claude pi pi-signed omp; do
-    for evidence in missing malformed generation source; do
+    for evidence in missing malformed generation source fm-interrupt fm-recovery; do
       dir=$(new_case "unwired-$harness-$evidence")
       add_local_mate "$dir" sm1 "$harness" '' unarmed
       case "$evidence" in
@@ -1108,6 +1115,9 @@ test_unwired_launches_are_nudged_without_queueing() {
           ;;
         source)
           "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" sm1 --source alien >/dev/null || fail "could not arm source mismatch"
+          ;;
+        fm-*)
+          "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" sm1 --state idle --source "$evidence" >/dev/null || fail "could not arm synthetic idle"
           ;;
       esac
       out=$(run_restart "$dir" sm1); rc=$?
@@ -1266,11 +1276,10 @@ SH
       cli) out=$(run_restart "$dir" sm1); rc=$?; expect_code 3 "$rc" "CLI suppressed completion failure: $out" ;;
       automatic)
         mkdir -p "$dir/bin"
-        printf '#!/usr/bin/env bash\nexit 0\n' > "$dir/bin/fm-spawn.sh"
+        printf '#!/usr/bin/env bash\nprintf "spawn\\n" >> "$FM_FAKE_DIR/spawns"\n"$FM_TEST_ROOT/bin/fm-busy-event.sh" arm "$STATE" sm1 >/dev/null\n' > "$dir/bin/fm-spawn.sh"
         chmod +x "$dir/bin/fm-spawn.sh"
-        out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" STATE="$state" bash -c '
+        out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" STATE="$state" FM_ROOT_OVERRIDE="$dir" FM_FAKE_DIR="$dir/fake" FM_TEST_ROOT="$ROOT" bash -c '
           . "$1/bin/fm-secondmate-liveness-lib.sh"
-          FM_ROOT=$2
           fm_secondmate_liveness_lock sm1 || exit 1
           FM_SM_LIVE_STATE=missing FM_SM_LIVE_KILL=0
           fm_secondmate_liveness_relaunch "$STATE/sm1.meta" sm1
@@ -1288,6 +1297,27 @@ SH
     assert_present "$state/.secondmate-restart-sm1.request" "$caller lost intent on failed completion write"
     assert_absent "$state/.secondmate-restart-sm1.outcome" "$caller published a false completion marker"
     assert_absent "$state/.secondmate-liveness-sm1.lock" "$caller retained the liveness lock"
+    assert_grep "relaunched_gen=$(cat "$state/sm1.busy-gen")" "$state/.secondmate-restart-sm1.request" "$caller failed to bind completion to the replacement"
+    "$ROOT/bin/fm-busy-event.sh" apply "$state" sm1 idle --current-gen --source claude-hook --event stop >/dev/null || fail "could not complete replacement startup"
+    : > "$dir/fake/literal"
+    rm -f "$dir/fakebin/mv"
+    if [ "$caller" = automatic ]; then
+      out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" STATE="$state" FM_ROOT_OVERRIDE="$dir" FM_FAKE_DIR="$dir/fake" FM_TEST_ROOT="$ROOT" bash -c '
+        . "$1/bin/fm-secondmate-liveness-lib.sh"
+        fm_secondmate_liveness_lock sm1 || exit 1
+        FM_SM_LIVE_STATE=missing FM_SM_LIVE_KILL=0
+        fm_secondmate_liveness_relaunch "$STATE/sm1.meta" sm1
+        rc=$?
+        fm_secondmate_liveness_unlock sm1
+        exit "$rc"
+      ' _ "$ROOT" "$dir") || fail "automatic publication retry failed: $out"
+      [ "$(wc -l < "$dir/fake/spawns" | tr -d ' ')" = 1 ] || fail "automatic publication retry spawned another replacement"
+    else
+      out=$(process_requests "$dir") || fail "publication retry failed: $out"
+    fi
+    assert_no_line '/exit' "$dir/fake/literal" "$caller publication retry spent the replacement conversation"
+    assert_absent "$state/.secondmate-restart-sm1.request" "$caller retry did not retire the request"
+    assert_grep 'restarted: sm1' "$state/.secondmate-restart-sm1.outcome" "$caller retry did not publish completion"
   done
   pass "CLI, supervision, and automatic relaunch expose completion publication failures"
 }
@@ -1323,8 +1353,8 @@ SH
   assert_contains "$(cat "$dir/second.out")" "waiting to record its restart request" "the second admission did not wait for the first"
   count=$(find "$state/pending-replies" -maxdepth 1 -type f | wc -l | tr -d ' ')
   [ "$count" = 1 ] || fail "concurrent admission created $count correlations"
-  count=$(find "$state/sm1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
-  [ "$count" = 1 ] || fail "concurrent admission delivered $count persist requests"
+  [ ! -d "$state/sm1.inbox" ] || [ -z "$(find "$state/sm1.inbox" -maxdepth 1 -name '*.msg' -print)" ] \
+    || fail "persist delivery preceded durable admission"
   : > "$dir/fake/admission-release"
   i=0
   while { kill -0 "$first" 2>/dev/null || kill -0 "$second" 2>/dev/null; } && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i+1)); done
@@ -1649,6 +1679,185 @@ SH
   pass "SIGINT and SIGTERM reap fresh, recorded, supervised, and fleet restart descendants before unlock"
 }
 
+test_cursor_incarnation_reconciles_without_a_push_busy_record() {
+  local dir state out
+  dir=$(new_case cursor-incarnation)
+  state="$dir/home/state"
+  printf 'kind=secondmate\nharness=cursor\nspawn_gen=cursor-replacement\n' > "$state/sm1.meta"
+  out=$(env FM_HOME="$dir/home" STATE="$state" bash -c '
+    . "$1/bin/fm-secondmate-restart-lib.sh"
+    . "$1/bin/fm-secondmate-liveness-lib.sh"
+    fm_secondmate_liveness_lock sm1 || exit 1
+    fm_secondmate_restart_request_write "$STATE" sm1 0123456789abcdef local cursor || exit 1
+    fm_secondmate_restart_request_relaunched "$STATE" sm1 "restarted: sm1 (cursor)" || exit 1
+    [ "$(fm_secondmate_restart_request_get "$STATE/.secondmate-restart-sm1.request" relaunched_gen)" = cursor-replacement ] || exit 1
+    fm_secondmate_restart_service_locked "$STATE" sm1 consume
+    rc=$?
+    fm_secondmate_liveness_unlock sm1
+    exit "$rc"
+  ' _ "$ROOT") || fail "Cursor completion reconciliation failed: $out"
+  [ "$out" = 'restarted: sm1 (cursor)' ] || fail "Cursor lost its completion result"
+  assert_absent "$state/.secondmate-restart-sm1.request" "Cursor did not retire its completed request"
+  assert_absent "$state/.secondmate-restart-sm1.outcome" "Cursor did not consume its completed outcome"
+  pass "Cursor completion uses its launch incarnation without inventing push busy state"
+}
+
+test_cursor_incarnation_reconciles_without_a_push_busy_record
+test_admission_survives_cancellation_on_both_sides_of_delivery() {
+  local dir state mode out pid i corr count field
+  for mode in before-delivery delivered; do
+    dir=$(new_case "admission-cancel-$mode")
+    add_local_mate "$dir" sm1
+    state="$dir/home/state"
+    if [ "$mode" = before-delivery ]; then
+      cat > "$dir/fakebin/mv" <<'SH'
+#!/usr/bin/env bash
+/bin/mv "$@" || exit $?
+if [ "${!#}" = "$FM_HOME/state/.secondmate-restart-sm1.request" ]; then
+  : > "$FM_FAKE_DIR/delivery-paused"
+  while [ -e "$FM_FAKE_DIR/delivery-paused" ]; do /bin/sleep 0.01; done
+fi
+SH
+      chmod +x "$dir/fakebin/mv"
+    else
+      cat > "$dir/fake/on-doorbell" <<'SH'
+#!/usr/bin/env bash
+[ -f "$FM_HOME/state/.secondmate-restart-sm1.request" ] || exit 1
+: > "$FM_FAKE_DIR/delivery-paused"
+while [ -e "$FM_FAKE_DIR/delivery-paused" ]; do /bin/sleep 0.01; done
+SH
+      chmod +x "$dir/fake/on-doorbell"
+    fi
+    env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+      FM_ROOT_OVERRIDE="$dir/code" FM_CONFIG_OVERRIDE="$dir/home/config" \
+      FM_SPAWN_NO_GUARD=1 "$RESTART" sm1 > "$dir/restart.out" 2>&1 &
+    pid=$!
+    i=0
+    while [ ! -e "$dir/fake/delivery-paused" ] && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i+1)); done
+    if [ ! -e "$dir/fake/delivery-paused" ]; then
+      kill -TERM "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      fail "$mode never reached the delivery boundary"
+    fi
+    assert_present "$state/.secondmate-restart-sm1.request" "$mode delivered before admission was durable"
+    corr=$(sed -n 's/^corr=//p' "$state/.secondmate-restart-sm1.request")
+    kill -TERM "$pid" || fail "could not cancel admission"
+    rm -f "$dir/fake/delivery-paused"
+    wait "$pid"
+    expect_code 143 "$?" "cancelled admission lost its signal status"
+    assert_present "$state/.secondmate-restart-sm1.request" "$mode cancellation lost restart intent"
+    assert_present "$state/pending-replies/$corr" "$mode cancellation lost its answer expectation"
+    assert_absent "$state/.secondmate-liveness-sm1.lock" "$mode cancellation retained the lock (owner=$(cat "$state/.secondmate-liveness-sm1.lock/pid" 2>/dev/null)): $(cat "$dir/restart.out")"
+    rm -f "$dir/fakebin/mv" "$dir/fake/on-doorbell"
+    out=$(process_requests "$dir") || fail "delivery replay failed: $out"
+    count=$(find "$state/sm1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
+    [ "$count" = 1 ] || fail "$mode replay delivered $count persist requests"
+    for field in host model effort; do
+      assert_no_grep "$field=" "$state/.secondmate-restart-sm1.request" "admission persisted unused profile metadata"
+    done
+    answer_now "$dir" sm1
+    out=$(process_requests "$dir") || fail "cancelled admission did not complete: $out"
+    assert_grep 'restarted: sm1' "$state/.secondmate-restart-sm1.outcome" "$mode lost its eventual restart: $(cat "$state/.secondmate-restart-sm1.outcome")"
+  done
+  pass "admission and delivery replay preserve one request across cancellation"
+}
+
+test_delivery_rejection_discards_only_definite_failure() {
+  local dir state out mode corr rc
+  for mode in rejected ambiguous; do
+    dir=$(new_case "delivery-$mode")
+    add_local_mate "$dir" sm1
+    state="$dir/home/state"
+    if [ "$mode" = rejected ]; then
+      cat > "$dir/fakebin/mv" <<'SH'
+#!/usr/bin/env bash
+case "${!#}" in
+  "$FM_HOME/state/.secondmate-restart-sm1.request")
+    /bin/mv "$@" || exit $?
+    /usr/bin/sed -n 's/^corr=//p' "${!#}" > "$FM_FAKE_DIR/admitted-corr"
+    exit 0 ;;
+  "$FM_HOME/state/sm1.inbox/"*.msg)
+    if [ ! -e "$FM_FAKE_DIR/rejected-once" ]; then
+      : > "$FM_FAKE_DIR/rejected-once"
+      exit 1
+    fi ;;
+esac
+exec /bin/mv "$@"
+SH
+      chmod +x "$dir/fakebin/mv"
+    else
+      mv "$dir/code/bin/fm-send.sh" "$dir/code/bin/fm-send-real.sh"
+      cat > "$dir/code/bin/fm-send.sh" <<'SH'
+#!/usr/bin/env bash
+"${BASH_SOURCE[0]%/*}/fm-send-real.sh" "$@" || exit $?
+exit 75
+SH
+      chmod +x "$dir/code/bin/fm-send.sh"
+    fi
+    out=$(run_restart "$dir" sm1); rc=$?
+    if [ "$mode" = rejected ]; then
+      expect_code 3 "$rc" "definite delivery rejection was not reported: $out"
+      assert_absent "$state/.secondmate-restart-sm1.request" "definite rejection retained restart intent"
+      corr=$(cat "$dir/fake/admitted-corr")
+      assert_absent "$state/pending-replies/$corr" "definite rejection retained the persist answer expectation"
+      assert_contains "$out" "nudged: sm1" "definite rejection did not take the existing fallback"
+    else
+      expect_code 0 "$rc" "ambiguous delivery was treated as rejection: $out"
+      assert_contains "$out" "queued: sm1" "ambiguous delivery lost restart intent"
+      assert_present "$state/.secondmate-restart-sm1.request" "ambiguous delivery deleted its request"
+      corr=$(sed -n 's/^corr=//p' "$state/.secondmate-restart-sm1.request")
+      assert_present "$state/pending-replies/$corr" "ambiguous delivery deleted its answer expectation"
+      answer_now "$dir" sm1
+      out=$(process_requests "$dir") || fail "ambiguous delivery could not complete: $out"
+      assert_grep 'restarted: sm1' "$state/.secondmate-restart-sm1.outcome" "ambiguous delivery lost its completion"
+    fi
+    assert_no_line 'C-c' "$dir/fake/keys" "delivery handling interrupted conversational work"
+  done
+  pass "only definite delivery rejection discards a recorded restart"
+}
+
+test_long_turn_notice_serializes_with_restart_retirement() {
+  local dir state out
+  dir=$(new_case long-turn-retirement)
+  add_local_mate "$dir" sm1
+  state="$dir/home/state"
+  out=$(run_restart "$dir" sm1) || fail "could not admit restart: $out"
+  answer_now "$dir" sm1
+  printf 'answered_at=%s\n' "$(( $(date +%s) - 90 ))" >> "$state/.secondmate-restart-sm1.request"
+  cat > "$dir/fakebin/sed" <<'SH'
+#!/usr/bin/env bash
+result=$(/usr/bin/sed "$@") || exit $?
+if [ "${2:-}" = 's/^answered_at=//p' ]; then
+  STATE="$FM_HOME/state" bash -c '
+    . "$FM_TEST_ROOT/bin/fm-secondmate-liveness-lib.sh"
+    . "$FM_TEST_ROOT/bin/fm-secondmate-restart-lib.sh"
+    if fm_secondmate_liveness_lock sm1; then
+      fm_secondmate_restart_request_finish "$STATE" sm1 "restarted: sm1 (competing service)"
+      fm_secondmate_liveness_unlock sm1
+      : > "$FM_FAKE_DIR/unlocked-notice"
+    else
+      : > "$FM_FAKE_DIR/notice-serialized"
+    fi
+  '
+fi
+printf '%s\n' "$result"
+SH
+  chmod +x "$dir/fakebin/sed"
+  out=$(FM_TEST_ROOT="$ROOT" FM_BUSY_TURN_MAX_SECS=60 run_restart_watcher_tick "$dir") || fail "long-turn tick failed: $out"
+  assert_present "$dir/fake/notice-serialized" "notice reading did not exclude concurrent retirement"
+  assert_absent "$dir/fake/unlocked-notice" "retirement interleaved with notice publication"
+  assert_present "$state/.secondmate-restart-sm1.turn-notice" "the pending long turn was not reported"
+  out=$(process_requests "$dir") || fail "ordinary retirement failed: $out"
+  out=$(run_restart_watcher_tick "$dir") || fail "ordinary consumption failed: $out"
+  assert_absent "$state/.secondmate-restart-sm1.turn-notice" "consumption left a long-turn notice"
+  out=$(run_restart_watcher_tick "$dir") || fail "post-consumption tick failed: $out"
+  assert_absent "$state/.secondmate-restart-sm1.turn-notice" "a retired request recreated its notice"
+  pass "long-turn notification and completed restart consumption serialize under the mate lock"
+}
+
+test_admission_survives_cancellation_on_both_sides_of_delivery
+test_delivery_rejection_discards_only_definite_failure
+test_long_turn_notice_serializes_with_restart_retirement
 test_persist_gates_and_asks_only_for_open_records
 test_persist_precedes_restart
 test_arrived_answer_precedes_deadline_check

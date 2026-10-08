@@ -30,7 +30,9 @@ fi
 # 10: refuse partial-line checkpoint endpoints, including when the line has
 # since completed; older checkpoints can already contain polluted fold state
 # even at a now-valid boundary and must be rebuilt from byte 0.
-FM_OPEN_DECISIONS_FOLD_VERSION=10
+# 11: include parsing locales in the shared signature so a checkpoint folded
+# under another character or collation interpretation is rebuilt from byte 0.
+FM_OPEN_DECISIONS_FOLD_VERSION=11
 
 # The resolution verb and durable-backlog-transfer verb that CLOSE a keyed
 # status decision opened by needs-decision or blocked. See status_open_decisions
@@ -473,11 +475,11 @@ EOF
 }
 
 # The signature a fold checkpoint must carry to be reused for <kind>: the fold
-# version and the task kind, plus every fold-affecting override when one is set,
-# so a checkpoint folded under the default verbs is never reused by a read that
-# overrides them (and the default signature stays the historical one).
+# version, task kind, effective parsing locales, and every fold-affecting
+# override, so readers never reuse a checkpoint under a different interpretation.
 _fm_open_decisions_fold_signature() {  # <kind>
   local sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
+  sig="$sig:ctype=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}:collate=${LC_ALL:-${LC_COLLATE:-${LANG:-C}}}"
   if [ -n "${FM_CLASSIFY_RESOLVE_VERB:-}" ] || [ -n "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-}" ] \
     || [ -n "${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-}" ]; then
     sig="$sig:${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"

@@ -1335,6 +1335,11 @@ do_relaunch() {
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1
+  if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_RESTART_TURN_END:-0}" = 1 ]; then
+    . "$SCRIPT_DIR/fm-secondmate-restart-lib.sh"
+    fm_secondmate_restart_request_relaunched "$STATE" "$ID" "restarted: $ID ($TARGET_HARNESS)" \
+      || die "the replacement agent for $ID is running, but its restart incarnation could not be recorded"
+  fi
 
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
