@@ -1455,13 +1455,18 @@ shard_fixture_guard() {
 }
 
 assert_serial_shards_are_a_disjoint_cover() {
-  local runner=$1 label=$2 shards shard serial union dups
-  shards=$("$runner" --list-lanes | grep -c '^portable-serial-[0-9]*of[0-9]*$')
-  serial=$("$runner" --list --lane portable-serial | LC_ALL=C sort)
+  local runner=$1 label=$2 shards shard serial union dups listed
+  shards=$(env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$runner" --list-lanes | grep -c '^portable-serial-[0-9]*of[0-9]*$')
+  serial=$(env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$runner" --list --lane portable-serial | LC_ALL=C sort)
   union=""
   shard=1
   while [ "$shard" -le "$shards" ]; do
-    union=$(printf '%s\n%s' "$union" "$("$runner" --list --lane "portable-serial-${shard}of${shards}")")
+    listed=$(env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+      "$runner" --list --lane "portable-serial-${shard}of${shards}") \
+      || fail "$label: serial shard $shard listing failed"
+    union=$(printf '%s\n%s' "$union" "$listed")
     shard=$((shard + 1))
   done
   union=$(printf '%s\n' "$union" | grep -v '^$' || true)
@@ -1494,10 +1499,42 @@ test_serial_shard_guard_holds_at_every_lane_size() {
       assert_contains "$out" "have no measured duration hint" \
         "$count extra scripts: the guard refused for an unexpected reason"
     fi
+    assert_serial_shards_are_a_disjoint_cover "$dir/bin/fm-test-run.sh" "$count extra scripts"
   done
-  assert_serial_shards_are_a_disjoint_cover "$dir/bin/fm-test-run.sh" "20 extra scripts"
   rm -rf "$tmp"
   pass "serial shards stay a disjoint cover of the serial lane with 5, 6, and 20 extra scripts"
+}
+
+test_serial_shard_generation_failure_is_not_a_partial_success() {
+  local tmp dir real_sort rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-shard-failure.XXXXXX")
+  dir="$tmp/fixture"
+  shard_fixture_init "$dir"
+  shard_fixture_grow "$dir" 5
+  real_sort=$(command -v sort)
+  mkdir -p "$tmp/fakebin"
+  cat >"$tmp/fakebin/sort" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [ "$arg" = "-k1,1nr" ]; then
+    "$REAL_SORT" "$@" | awk 'NR == 1'
+    exit 1
+  fi
+done
+exec "$REAL_SORT" "$@"
+SH
+  chmod +x "$tmp/fakebin/sort"
+  set +e
+  env -i PATH="$tmp/fakebin:$PATH" REAL_SORT="$real_sort" \
+    HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$dir/bin/fm-test-run.sh" --list --lane portable-serial-1of9 \
+    >"$tmp/out" 2>"$tmp/err"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "failed shard generation returned successful partial coverage"
+  [ ! -s "$tmp/out" ] || fail "failed shard generation published a partial script list"
+  rm -rf "$tmp"
+  pass "serial shard generation failures refuse rather than publish partial coverage"
 }
 
 test_coverage_guard_passes_with_extra_scripts() {
@@ -2176,6 +2213,7 @@ test_portable_parallel_lanes_stay_duration_balanced
 test_portable_serial_shards_partition_the_serial_lane
 test_portable_serial_hint_coverage_is_reported_and_bounded
 test_serial_shard_guard_holds_at_every_lane_size
+test_serial_shard_generation_failure_is_not_a_partial_success
 test_coverage_guard_passes_with_extra_scripts
 test_coverage_guard_still_refuses_a_true_duplicate
 test_portable_serial_shard_lane_refusals

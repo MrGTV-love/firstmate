@@ -665,8 +665,9 @@ is_proven_isolated_script() {
 # and other unproven work stays here. Derived rather than enumerated so a newly added test
 # lands here by default instead of falling out of every lane.
 list_portable_serial() {
-  local s base fam proven_set
+  local s base fam proven_set all
   proven_set=$(list_proven_isolated)
+  all=$(all_repo_tests) || return 1
   while IFS= read -r s; do
     [ -n "$s" ] || continue
     base=${s##*/}
@@ -677,8 +678,8 @@ list_portable_serial() {
     if list_has_line "$s" "$proven_set"; then
       continue
     fi
-    printf '%s\n' "$s"
-  done < <(all_repo_tests)
+    printf '%s\n' "$s" || return 1
+  done <<<"$all"
 }
 
 # Measured portable-serial script durations in milliseconds, from the CI timing
@@ -910,40 +911,29 @@ portable_serial_weight_for() {
 # PORTABLE_SERIAL_SHARDS bins, printing "<shard>\t<script>" for every script.
 # Deterministic: candidates are ordered by hint descending then path, and ties
 # between equally loaded bins always take the lowest bin index.
-portable_serial_assignments() {
-  local ms script i best best_load
-  local -a loads=()
-  i=1
-  while [ "$i" -le "$PORTABLE_SERIAL_SHARDS" ]; do
-    loads[i]=0
-    i=$((i + 1))
-  done
-  while IFS=$'\t' read -r ms script; do
-    [ -n "$script" ] || continue
-    best=1
-    best_load=${loads[1]}
-    i=2
-    while [ "$i" -le "$PORTABLE_SERIAL_SHARDS" ]; do
-      if [ "${loads[i]}" -lt "$best_load" ]; then
-        best_load=${loads[i]}
-        best=$i
-      fi
-      i=$((i + 1))
-    done
-    loads[best]=$((best_load + ms))
-    printf '%s\t%s\n' "$best" "$script"
-  done < <(
-    # One awk pass joins every script to its hint, so selecting a shard costs a
-    # fixed number of processes however many scripts the lane holds.
-    { portable_serial_weight_hints; printf '%s\n' '--'; list_portable_serial; } \
-      | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
-          $0 == "--" { scripts = 1; next }
-          !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
-          NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
-        ' \
-      | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2
-  )
-}
+portable_serial_assignments() (
+  # Keep pipeline failures visible without changing the caller's shell options.
+  # Bash 3.2 builtin writes to an asynchronous pipe can fail with EINTR; let awk
+  # own assignment output and require the complete producer to succeed.
+  set -o pipefail
+  { portable_serial_weight_hints || return 1; printf '%s\n' '--' || return 1; list_portable_serial; } \
+    | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+        $0 == "--" { scripts = 1; next }
+        !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
+        NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
+      ' \
+    | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2 \
+    | awk -F '\t' -v shards="$PORTABLE_SERIAL_SHARDS" '
+        BEGIN { for (i = 1; i <= shards; i++) loads[i] = 0 }
+        {
+          best = 1
+          for (i = 2; i <= shards; i++)
+            if (loads[i] < loads[best]) best = i
+          loads[best] += $1
+          printf "%s\t%s\n", best, $2
+        }
+      '
+)
 
 # Parse "<k>of<n>" from a portable-serial shard lane and echo <k>, refusing when
 # <n> disagrees with this script's configured count so a CI matrix built for a
@@ -981,7 +971,7 @@ select_proven_isolated() {
 }
 
 select_lane() {
-  local want=$1 s shard idx found=0
+  local want=$1 s shard idx assignments found=0
   case "$want" in
     portable-parallel-1)
       while IFS= read -r s; do
@@ -1007,13 +997,15 @@ select_lane() {
     portable-serial-*)
       # One separate-runner shard of the same remainder, still serial in itself.
       shard=$(portable_serial_shard_index "$want")
+      assignments=$(portable_serial_assignments) \
+        || die "could not generate complete portable serial shard assignments"
       while IFS=$'\t' read -r idx s; do
         [ -n "$s" ] || continue
         if [ "$idx" = "$shard" ]; then
           add_script "$s"
           found=1
         fi
-      done < <(portable_serial_assignments)
+      done <<<"$assignments"
       ;;
     real-herdr-gated)
       select_family real-herdr-gated
@@ -1246,7 +1238,7 @@ all_repo_tests() {
   # shellcheck disable=SC2035
   for f in tests/*.test.sh; do
     [ -f "$f" ] || continue
-    printf '%s\n' "$f"
+    printf '%s\n' "$f" || return 1
   done | LC_ALL=C sort
 }
 
