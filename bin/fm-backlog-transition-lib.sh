@@ -463,7 +463,7 @@ fm_backlog_row_list() {  # <resolved-data-dir> [flag...]
 # backend), the backend, or a row count that does not match what was parsed - and
 # the caller then probes each record exactly as it did before.
 fm_backlog_row_states() {  # <data-dir>
-  local data=$1 out secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10} line expected='' parsed=0 id rest rows='' status
+  local data=$1 out secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10} line expected='' declared='' in_tasks=0 parsed=0 id rest rows='' status
   local -a args=()
   case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
   [ "$secs" -gt 0 ] 2>/dev/null || secs=10
@@ -479,20 +479,31 @@ fm_backlog_row_states() {  # <data-dir>
   while IFS= read -r line; do
     case "$line" in
       'count: '*) expected=${line#count: } ;;
+      'tasks['*']{id,state,'*'}:')
+        declared=${line#'tasks['}
+        declared=${declared%%']'*}
+        case "$declared" in ''|*[!0-9]*) return 1 ;; esac
+        in_tasks=1
+        ;;
       '  '*,*,*)
+        [ "$in_tasks" = 1 ] || continue
         id=${line#  }
         rest=${id#*,}
         id=${id%%,*}
+        case "$id" in \"*\") id=${id#\"}; id=${id%\"} ;; esac
+        case "$id" in ''|.*|*[!A-Za-z0-9._-]*) return 1 ;; esac
         rest=${rest%%,*}
-        [ -n "$id" ] && [ -n "$rest" ] || return 1
+        [ -n "$rest" ] || return 1
         rows="${rows}${id}:${rest}"$'\n'
         parsed=$((parsed + 1))
         ;;
+      *) in_tasks=0 ;;
     esac
   done <<EOF
 $out
 EOF
   case "$expected" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$expected" = "$declared" ] || return 1
   [ "$expected" -eq "$parsed" ] || return 1
   printf '%s' "$rows"
 }

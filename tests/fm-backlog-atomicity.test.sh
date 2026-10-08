@@ -1972,34 +1972,41 @@ test_recovery_marks_an_owned_record_in_flight() {
 # whose items are not queued are never read individually, and the last queued
 # item in the answer is still healed (a trailing delimiter was once dropped).
 test_recovery_reads_the_backlog_once_for_many_owned_records() {
-  local case_dir id n out real shows lists
-  case_dir=$(make_home heal-batched)
+  local case_dir id name out real shows lists
   real=$(command -v tasks-axi)
-  for n in 1 2 3 4 5; do
-    id=atomic-batch-running-$n
+  for name in heal-batched heal-batched,a,b; do
+    case_dir=$(make_home "$name")
+    for id in atomic-batch-running-1 123 true false null; do
+      add_item "$case_dir" "$id"
+      start_item "$case_dir" "$id"
+      write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-running-$id"
+    done
+    id=atomic-batch-queued-b9
     add_item "$case_dir" "$id"
-    start_item "$case_dir" "$id"
-    write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-running-$n"
-  done
-  id=atomic-batch-queued-b9
-  add_item "$case_dir" "$id"
-  write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-queued"
-  cat > "$case_dir/fakebin/tasks-axi" <<SH
+    write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-queued"
+    cat > "$case_dir/fakebin/tasks-axi" <<SH
 #!/usr/bin/env bash
 printf '%s\\n' "\${1:-}" >> "$case_dir/tasks-axi.calls"
 exec "$real" "\$@"
 SH
-  chmod +x "$case_dir/fakebin/tasks-axi"
-  : > "$case_dir/tasks-axi.calls"
+    chmod +x "$case_dir/fakebin/tasks-axi"
+    : > "$case_dir/tasks-axi.calls"
 
-  out=$(run_bootstrap "$case_dir")
-  [ "$(row_state "$case_dir" "$id")" = in_flight ] \
-    || fail "the last queued owned record was not healed from the batched answer: $out"
-  shows=$(grep -c '^show$' "$case_dir/tasks-axi.calls" || true)
-  lists=$(grep -c '^list$' "$case_dir/tasks-axi.calls" || true)
-  [ "$lists" = 1 ] || fail "expected one batched backlog read, saw $lists"
-  [ "$shows" -le 1 ] || fail "records whose items are not queued were still read one by one ($shows reads for six records)"
-  pass "session start reads the backlog once for many owned records and still heals a queued one"
+    out=$(run_bootstrap "$case_dir")
+    [ "$(row_state "$case_dir" "$id")" = in_flight ] \
+      || fail "the last queued owned record was not healed from the batched answer: $out"
+    shows=$(grep -c '^show$' "$case_dir/tasks-axi.calls" || true)
+    lists=$(grep -c '^list$' "$case_dir/tasks-axi.calls" || true)
+    [ "$lists" = 1 ] || fail "expected one batched backlog read for $name, saw $lists"
+    [ "$shows" -le 1 ] || fail "$name still read nonqueued records one by one ($shows reads for six records)"
+    for id in atomic-batch-running-1 123 true false null; do
+      [ "$(row_state "$case_dir" "$id")" = in_flight ] \
+        || fail "batch reconciliation changed the running item $id in $name"
+      assert_present "$(home_of "$case_dir")/state/$id.meta" \
+        "batch reconciliation removed the worker record $id in $name"
+    done
+  done
+  pass "session start batches quoted task IDs and comma-containing home paths while healing queued records"
 }
 
 test_recovery_rejects_an_internal_worker_record_symlink() {
