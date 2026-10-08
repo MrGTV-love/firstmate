@@ -1000,7 +1000,7 @@ test_forced_dirty_landed_deliverables_retain_captain_words() {
     run_teardown "$case_dir" --force --drop-file "$words" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 0 "$rc" "forced-dirty-$kind: authorized cleanup refused: $(cat "$case_dir/stderr")"
     cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" || fail "forced-dirty-$kind: exact captain words were lost"
-    [ "$(backlog_row_state "$case_dir")" = done ] || fail "forced-dirty-$kind: backlog was not closed"
+    [ "$(backlog_row_state "$case_dir")" = "done" ] || fail "forced-dirty-$kind: backlog was not closed"
     if [ "$kind" = ship ]; then
       grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" || fail "forced-dirty-$delivery: ship did not record the fixed drop note"
       assert_no_grep 'local main' "$case_dir/data/backlog.md" "forced-dirty-$delivery: ship retained a landing label instead of dropped"
@@ -1537,7 +1537,7 @@ test_ship_without_git_copy_completes_with_recorded_merged_pr() {
         || fail "recorded-merged-$copy-$mode: merged recorded PR refused: $out"
       assert_absent "$case_dir/state/task-x1.meta" \
         "recorded-merged-$copy-$mode: successful completion retained metadata"
-      [ "$(backlog_row_state "$case_dir")" = done ] \
+      [ "$(backlog_row_state "$case_dir")" = "done" ] \
         || fail "recorded-merged-$copy-$mode: successful completion kept backlog open"
       assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
         "recorded-merged-$copy-$mode: completion did not retain the PR"
@@ -1609,7 +1609,7 @@ test_ship_without_git_copy_requires_captain_words_to_drop() {
       || fail "missing-copy-drop-$copy: authorized drop refused: $out"
     cmp -s "$words" "$case_dir/data/task-x1/captain-drop.md" \
       || fail "missing-copy-drop-$copy: captain words were not retained exactly"
-    [ "$(backlog_row_state "$case_dir")" = done ] \
+    [ "$(backlog_row_state "$case_dir")" = "done" ] \
       || fail "missing-copy-drop-$copy: authorized drop kept backlog open"
     grep -Eq '^[[:space:]]+dropped$' "$case_dir/data/backlog.md" \
       || fail "missing-copy-drop-$copy: authorized drop lacked drop classification"

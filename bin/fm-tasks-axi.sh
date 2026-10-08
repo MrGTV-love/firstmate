@@ -243,7 +243,7 @@ guard_completion() {
   case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) return 0 ;; esac
   [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
     || fail "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
-  if [ "${FM_BACKLOG_ROW_STATE%% *}" != done ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
+  if [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
     fail "$id is an open captain call; resolve it with bin/fm-captain-hold.sh answer or reconcile close before completing the deliverable"
   fi
   if [ -n "$drop" ]; then
@@ -291,6 +291,7 @@ GUARD_ARGS=()
 GUARD_STRIP_DROP=0
 parse_task_mutation "$@"
 if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  # shellcheck source=bin/fm-wake-lib.sh
   . "$SCRIPT_DIR/fm-wake-lib.sh"
   trap task_mutation_cleanup EXIT
   case "$STATE" in /*) task_state=$STATE ;; *) task_state="$CALLER_DIR/$STATE" ;; esac

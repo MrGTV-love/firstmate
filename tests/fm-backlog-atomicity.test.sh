@@ -3042,11 +3042,11 @@ test_dispatch_retires_drop_only_after_commit() (
   before=$(printf '%s\n' "$before" | sed -n 's/^  body: //p')
   [ -n "$before" ] || fail "failed dispatch fixture exposed no complete task body"
   break_verb "$case_dir" start
-  PATH="$case_dir/fakebin:$PATH"
   rc=0
-  fm_backlog_dispatch_transition "$home/state/$id.meta" "$home/data" "$id" "$home/state" || rc=$?
+  PATH="$case_dir/fakebin:$PATH" fm_backlog_dispatch_transition \
+    "$home/state/$id.meta" "$home/data" "$id" "$home/state" || rc=$?
   [ "$rc" -ne 0 ] || fail "failed start reported dispatch success"
-  stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
+  stored=$(PATH="$case_dir/fakebin:$PATH" tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
     || fail "failed dispatch row disappeared"
   assert_equals "$before" "$(printf '%s\n' "$stored" | sed -n 's/^  body: //p')" \
     "failed dispatch did not restore the complete original task body"

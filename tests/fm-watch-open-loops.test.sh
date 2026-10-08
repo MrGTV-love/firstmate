@@ -474,6 +474,7 @@ SH
 }
 
 install_failing_helper() {
+  # shellcheck disable=SC2016 # The generated helper expands this variable at runtime.
   printf '#!/usr/bin/env bash\n: > "$FM_STATE_OVERRIDE/.helper-ran"\nexit 1\n' > "$1/failing-open-loops"
   chmod +x "$1/failing-open-loops"
 }
