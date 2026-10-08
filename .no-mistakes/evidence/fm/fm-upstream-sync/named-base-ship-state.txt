@@ -1,0 +1,29 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home
+WARNING: watcher still down (same stale episode; last beat: 751s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+warn: no registry at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home/data/projects.md; defaulting notes to no-mistakes off
+notice: sync-base-ship-live ships mode=direct-PR while the standing posture for notes is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for sync-base-ship-live: unavailable - no TypeSafe or OpenRouter key
+spawned sync-base-ship-live harness=codex kind=ship mode=direct-PR yolo=on window=primary:fm-sync-base-ship-live worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/pool/.treehouse/notes-06c218/2/notes
+
+Expected remote base=4edbe9a5db884a620ab175257b3967fe44ca3c3b
+Spawned HEAD=4edbe9a5db884a620ab175257b3967fe44ca3c3b
+Initial checkout=detached (worker creates its recorded ship branch)
+Recorded branch=fm/sync-base-ship-live
+
+window=primary:fm-sync-base-ship-live
+endpoint_task_id=sync-base-ship-live
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/pool/.treehouse/notes-06c218/2/notes
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home/projects/notes
+harness=codex
+kind=ship
+mode=direct-PR
+yolo=on
+branch=fm/sync-base-ship-live
+tasktmp=/tmp/fm-sync-base-ship-live
+base_branch=feature/hub
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+spawn_gen=s1791464993.14773.26600

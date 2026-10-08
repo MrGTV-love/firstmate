@@ -1,0 +1,7 @@
+Claude Code v2.1.294, real 120x40 private pane.
+Empty titled composer: empty
+Unsent plain text: pending
+Independent pasted-rule drafts within actual titled Claude composer:
+width: pending
+unicode: unknown
+Exact rejected-region unknown classifications: exercised separately by /bin/bash tests/fm-composer-lib.test.sh.

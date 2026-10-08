@@ -1,0 +1,26 @@
+$ fm-spawn.sh sync-capacity-deferred notes --scout --base-branch feature/hub --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home
+WARNING: watcher still down (same stale episode; last beat: 593s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+deferred: project notes admits 1 worker(s) at once on this machine (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home/config/project-capacity) and 2 already hold a place (sync-base-scout-live, sync-base-scout); task sync-capacity-deferred was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is cleaned up
+exit=75
+
+$ fm-tasks-axi.sh show sync-capacity-deferred
+task:
+  id: sync-capacity-deferred
+  title: Validate project capacity
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: notes
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""

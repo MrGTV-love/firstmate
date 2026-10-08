@@ -1,0 +1,16 @@
+$ fm-spawn.sh sync-base-missing notes --scout --base-branch feature/missing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home
+WARNING: watcher still down (same stale episode; last beat: 149s ago, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home/data/projects.md; defaulting notes to no-mistakes off
+fatal: couldn't find remote ref refs/heads/feature/missing
+error: could not fetch 'origin/feature/missing' for pooled worktree '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/pool/.treehouse/notes-06c218/2/notes'; refusing to launch from a potentially stale base
+
+exit=1; published_metadata=false
+
+$ fm-spawn.sh sync-base-mismatch notes --scout --base-branch main
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home
+WARNING: watcher still down (same stale episode; last beat: 171s ago, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home/data/projects.md; defaulting notes to no-mistakes off
+error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/phase-live/home/data/sync-base-mismatch/brief.md must record Base branch: main and no other Base branch line to spawn with --base-branch main; scaffold it with bin/fm-brief.sh --base-branch main
+
+exit=1; published_metadata=false

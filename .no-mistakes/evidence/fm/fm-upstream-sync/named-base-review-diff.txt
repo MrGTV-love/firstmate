@@ -1,0 +1,14 @@
+$ bin/fm-review-diff.sh sync-base-ship-live
+WARNING: watcher still down (same stale episode; last beat: 788s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+diff base: origin/feature/hub
+ task-change.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/task-change.txt b/task-change.txt
+new file mode 100644
+index 0000000..b470bef
+--- /dev/null
++++ b/task-change.txt
+@@ -0,0 +1 @@
++task-only delta

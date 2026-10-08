@@ -1,0 +1,17 @@
+Firstmate upstream-sync live validation
+
+Isolation: marked lab homes under the run worktree; named private fm-lab tmux socket; 120 columns by 40 rows. No default tmux or Herdr fleet operations. Initial long socket path failed, so the repository's owned short-socket helper supplied an ephemeral socket and its teardown contract.
+
+Claude Code v2.1.294: the actual session-titled empty composer classified empty; a plain unsent draft classified pending. Independent pasted unequal-width and non-ASCII titled-rule drafts classified pending and unknown respectively, never empty. The surrounding real TUI can prove the unequal-width nested draft pending; exact rejected-region unknown cases also passed the focused composer suite under stock /bin/bash 3.2.57.
+
+Named-base tasks: real fm-brief/fm-tasks-axi/fm-spawn launched a scout and a direct-PR ship at origin/feature/hub (4edbe9a5db884a620ab175257b3967fe44ca3c3b), retaining feature-only.txt and recording base_branch=feature/hub. Ship checkout starts detached; its immutable recorded branch is fm/sync-base-ship-live. Codex v0.160.0's existing account hit its usage limit, so no Codex model completion is claimed. The test driver created and committed a controlled task-only change in the disposable ship checkout; real fm-review-diff printed diff base: origin/feature/hub and only task-change.txt, excluding the base branch's feature-only.txt.
+
+Adversarial admission: a missing remote base and a disagreement between flag and generated brief refused without metadata. With project-capacity notes 1 and occupied task records, spawn exited 75, named the holders, published no new record, and left the backlog queued. A nonempty crew-exclude-tools list with unsupported Codex refused rather than silently allowing the tool.
+
+Inbox: real Claude lifecycle hooks called Firstmate's busy-state interface. Real fm-send persisted 001.msg and delivered the self-describing doorbell. Three independent watcher checks yielded a persisted first busy deferral, one stuck-busy escalation at the second deferral, and no duplicate escalation on the third check. After completing its synthetic hash benchmark, the actual Claude worker created inbox-acted.txt containing INBOX_DELIVERED and moved 001.msg into handled/.
+
+macOS: the actual /bin/bash 3.2 watcher entered a real tmux capture delayed 60s by a disposable transport shim, then exited on TERM in 0.264s. The actual Bash timeout fallback terminated a 60s sleep at its 1s deadline with exit 124, never executed its following echo, and preserved ordinary exit 7; total driver duration was 1.616s.
+
+Targeted automation: /bin/bash tests/fm-composer-lib.test.sh completed successfully, including restored pasted-title and non-ASCII refused-region coverage. The first run hit the driver's 120s timeout; the longer isolated run completed in 462.63s. No complete repository test suite, linters, formatters, CI, push, or pipeline-control commands ran.
+
+Evidence: text captures plus HTML renderings of the actual terminal grid; these are terminal replays, not native desktop screenshots.

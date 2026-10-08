@@ -1,0 +1,3 @@
+/bin/bash 3.2.57 bin/fm-watch.sh
+Actual private tmux capture delayed 60s by an isolated transport shim; entered=True
+TERM-to-exit=0.264s, exit=-15

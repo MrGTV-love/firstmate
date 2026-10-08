@@ -1,0 +1,5 @@
+Private fm-lab tmux server: stopped.
+Owned socket directory: removed by bin/fm-lab-home.sh teardown.
+Disposable project, homes, credential copy, transport shim, pool, and test scratch: removed.
+Firstmate CLI tasktmp scaffolds for this run: removed.
+Evidence retained only in the assigned evidence directory.

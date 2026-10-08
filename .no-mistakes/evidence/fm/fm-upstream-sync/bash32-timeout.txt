@@ -1,0 +1,5 @@
+/bin/bash 3.2.57; FM_TIMEOUT_MECHANISM_OVERRIDE=bash
+command-started
+deadline exit=124
+ordinary exit=7
+elapsed=1.616s
