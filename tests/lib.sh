@@ -313,9 +313,9 @@ fm_test_reap_jobs() {
 
 fm_test_cleanup() {
   local d
+  fm_test_reap_watchers
   fm_test_reap_jobs
   fm_test_reap_processes
-  fm_test_reap_watchers
   fm_test_reap_procevent_homes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
     [ -n "$d" ] && fm_test_remove_tree "$d"
