@@ -179,6 +179,36 @@ test_spawn_launch_line_and_worker_wiring() {
   pass "fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension"
 }
 
+test_worker_replace_mode_environment() {
+  local kind rec id out status launch seen
+  for kind in ship scout; do
+    id="omp-replace-$kind-q1"
+    rec=$(make_spawn_case "replace-$kind" omp "$id")
+    read_case_record "$rec"
+    if [ "$kind" = ship ]; then
+      out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+        "$id" "$PROJ_DIR" --harness omp --mode no-mistakes --yolo off)
+    else
+      : > "$HOME_DIR/config/launch-env-allowlist"
+      out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+    fi
+    status=$?
+    expect_code 0 "$status" "omp $kind spawn should succeed: $out"
+    cat > "$FAKEBIN_DIR/omp" <<'SH'
+#!/bin/sh
+printf '%s\n' "${PI_EDIT_VARIANT-unset}"
+SH
+    launch=$(cat "$LAUNCH_LOG")
+    seen=$(env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" PI_EDIT_VARIANT=hashline \
+      /bin/sh -c "$launch
+printf '%s\n' \"\$PI_EDIT_VARIANT\"") \
+      || fail "omp $kind emitted launch failed"
+    [ "$seen" = $'replace\nhashline' ] \
+      || fail "omp $kind must use replace mode without changing the pane environment, got: $seen"
+  done
+  pass "omp ship and scout launches select replace edit mode only in the worker process"
+}
+
 test_spawn_model_validation_scoped_to_listed_providers() {
   local rec id out status
   rec=$(make_spawn_case model-refused omp omp-model-refused-q2)
@@ -1372,6 +1402,7 @@ EOF
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
+test_worker_replace_mode_environment
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated

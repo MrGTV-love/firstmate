@@ -5250,6 +5250,7 @@ export default function (pi: any) {
   pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
 }
 EOF
+    LAUNCH="env PI_EDIT_VARIANT=replace $LAUNCH"
     ;;
   codex*)
     # Semantic busy-state source negotiation (bin/fm-busy-lib.sh owns the

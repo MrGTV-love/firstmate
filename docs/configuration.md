@@ -1692,7 +1692,9 @@ The guard asks Jev three things, exactly as upstream does:
 - After a shell command or file read, whether the output holds instructions aimed at the agent; flagged output reaches the agent with a warning banner.
 
 The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
-For omp native edits, each hashline file section, structured diff and move destination is judged through the upstream write gate without changing the executed edit arguments.
+omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the unchanged upstream write gate.
+The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
+An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
 A block tells the agent the block is final and to report it rather than work around it.
 On Claude the banner arrives as added context next to the unchanged output, because Claude hooks cannot replace a built-in tool's output.
 
@@ -1700,7 +1702,7 @@ The guard sends the command, the written content (first 4,000 characters) and th
 It calls TypeSafe direct first, with the single primary-home `TYPESAFE_API_KEY` resolved at call time through `fm_typesafe_key`; no key ever enters the worker environment.
 Only when the direct call is unavailable or fails does it ask OpenRouter, with `OPENROUTER_API_KEY` read through `fm_openrouter_key` from the same home and primary-home `.env` files, never from the process environment; with no such key there is no fallback call.
 A request whose text matches the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key) is withheld from both.
-Each provider has a 10-second total request budget including upstream retries and response bodies, and each complete handler shares a 25-second cancellation budget across every edit target.
+Each provider has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
 Both omp's native handler deadline and Claude's hook timeout remain 30 seconds, including result screening.
 A withheld request, missing keys, exhausted budget or any other failure lets the tool call proceed, as upstream does.
 Each decision appends one line to the owning home's private `state/jev-guard.jsonl`, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.

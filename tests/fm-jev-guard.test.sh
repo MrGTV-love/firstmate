@@ -227,7 +227,7 @@ assert.equal(blocked.block, true);
 assert.match(blocked.reason, /^jev-guard blocked this command: irreversible/);
 assert.equal(await handlers.tool_call({ toolName: "bash", input: { command: "ls" } }, ctx), undefined);
 assert.equal(await handlers.tool_call({ toolName: "write", input: { path: `${process.env.TASK_DATA}/report.md`, content: "ok" } }, ctx), undefined);
-const outside = await handlers.tool_call({ toolName: "edit", input: { path: "/etc/hosts", newText: "x" } }, ctx);
+const outside = await handlers.tool_call({ toolName: "edit", input: { path: "/etc/hosts", old_string: "a", new_string: "x" } }, ctx);
 assert.match(outside.reason, /outside the repo: \/etc\/hosts/);
 const checkEdit = async (input, reason) => {
   const event = { toolName: "edit", input };
@@ -237,23 +237,24 @@ const checkEdit = async (input, reason) => {
   if (reason) assert.match(result?.reason ?? "", reason);
   else assert.equal(result, undefined);
 };
-const section = (path, content, move = "") => `[${path}#ABCD]\nPUT >$:\n+${content}\n${move}`;
-const hash = (...parts) => `*** Begin Patch\n${section(...parts)}*** End Patch\n`;
-const multi = (...parts) => `*** Begin Patch\n${parts.map(args => section(...args)).join("")}*** End Patch\n`;
-await checkEdit({ path: "src/a.ts", paths: ["src/a.ts"], input: hash("src/a.ts", "sk-live-native") }, /contains a credential/);
-await checkEdit({ paths: ["src/a.ts", "src/b.ts"], input: multi(["src/a.ts", "ok"], ["src/b.ts", "ok"]) });
-await checkEdit({ paths: ["src/a.ts", "src/b.ts"], input: multi(["src/a.ts", "ok"], ["src/b.ts", "sk-live-second"]) }, /contains a credential/);
-await checkEdit({ path: "src/spoof.ts", paths: ["src/a.ts", "/etc/hosts"], input: multi(["src/a.ts", "ok"], ["/etc/hosts", "ok"]) }, /outside the repo/);
-await checkEdit({ input: hash('"src/spaced file.ts"', "ok", "MV \"/etc/moved file\"\n") }, /outside the repo: \/etc\/moved file/);
-await checkEdit({ input: hash("src/a.ts", "ok", `MV ${process.env.TASK_DATA}/moved.ts\n`) });
-await checkEdit({ input: "\uFEFF*** Begin Patch\r\n  ¶¶src/legacy.ts#ABCD\r\nPUT >$:\r\n+sk-live-legacy\r\n*** End Patch" }, /contains a credential/);
-await checkEdit({ path: "src/a.ts", edits: [{ diff: "@@\n+sk-live-diff" }] }, /contains a credential/);
-await checkEdit({ path: "src/a.ts", edits: [{ diff: "ok", rename: "/etc/renamed" }] }, /outside the repo: \/etc\/renamed/);
-await checkEdit({ path: "src/a.ts", edits: [{ diff: "ok", rename: "src/b.ts" }, { diff: "sk-live-second-entry" }] }, /contains a credential/);
-await checkEdit({ input: "*** Begin Patch\n*** Update File: src/a.ts\n*** Move to: /etc/moved\n@@\n+ok\n*** End Patch" }, /outside the repo: \/etc\/moved/);
-await checkEdit({ input: "*** Begin Patch\n*** Add File: src/new.ts\n+sk-live-add\n*** End Patch" }, /contains a credential/);
-await checkEdit({ input: "*** Begin Patch\n*** Delete File: /etc/hosts\n*** End Patch" }, /outside the repo/);
-await checkEdit({ path: "src/replace.ts", new_string: "sk-live-replace", old_string: "ok" }, /contains a credential/);
+for (const path of ["src/replace.ts", `${process.env.TASK_DATA}/report.md`, `${process.cwd()}/scratch.txt`]) {
+  await checkEdit({ path, old_string: "ok", new_string: "sk-live-replace" }, /contains a credential/);
+  await checkEdit({ path, old_string: "sk-live-removed", new_string: "process.env.TOKEN" });
+  await checkEdit({ path, old_string: "sk-live-removed", new_string: "" });
+}
+for (const input of [
+  { path: "src/a.ts", input: "*** Begin Patch\n[src/a.ts#ABCD]\nPUT >$:\n+sk-live-native\n*** End Patch" },
+  { paths: ["src/a.ts", "src/b.ts"], input: "*** Begin Patch\n[src/a.ts#ABCD]\nCUT 1.=1 @piece\n[src/b.ts#ABCD]\nPUT >$ @piece\n*** End Patch" },
+  { input: "*** Begin Patch\n[/tmp/staging.ts#ABCD]\nMV src/app.ts\n*** End Patch" },
+  { path: "src/a.ts", edits: [{ diff: "@@\n-sk-live-removed\n+process.env.TOKEN", rename: "src/b.ts" }] },
+  { path: "src/a.ts", newText: "sk-live-legacy" },
+  { path: "src/a.ts" },
+  { new_string: "ok" },
+  { path: null, new_string: "ok" },
+  { path: "src/a.ts", new_string: 1 },
+]) {
+  await checkEdit(input, /jev-guard needs omp replace edit mode.*Report/);
+}
 const command = "cat > src/ledger-private.ts <<'EOF'\nledger-private-heredoc\nEOF";
 assert.equal(await handlers.tool_call({ toolName: "bash", input: { command } }, ctx), undefined);
 assert.ok(entries.some(([kind, payload]) => kind === "jev-hook" && payload.command === command));
@@ -302,15 +303,14 @@ assert.match(screened.content[0].text, /^\[jev-guard\]/, "result screening also 
 const unavailableAt = performance.now();
 assert.equal(await call("tool_call", { toolName: "bash", input: { command: "stall-both" } }), undefined, "both provider timeouts allow execution");
 assert.ok(performance.now() - unavailableAt >= 19_000, "both providers were actually awaited");
-const input = "*** Begin Patch\n[src/a.ts#ABCD]\nPUT >$:\n+stall-both\n[src/b.ts#ABCD]\nPUT >$:\n+stall-both\n[src/c.ts#ABCD]\nPUT >$:\n+stall-both\n*** End Patch";
-const batchAt = performance.now();
-assert.equal(await call("tool_call", { toolName: "edit", input: { paths: ["src/a.ts", "src/b.ts", "src/c.ts"], input } }), undefined, "multi-file edits share one handler deadline");
-assert.ok(performance.now() - batchAt >= 24_000, "later targets consume the remaining shared budget");
+const editAt = performance.now();
+assert.equal(await call("tool_call", { toolName: "edit", input: { path: "src/a.ts", old_string: "ok", new_string: "stall-both" } }), undefined, "replace edits allow when both providers time out");
+assert.ok(performance.now() - editAt >= 19_000, "both edit providers were actually awaited");
 console.log("deadlines-ok");
 JS
 )
   [ "$out" = deadlines-ok ] || fail "handler deadline contract failed: $out"
-  pass "provider stalls and slow fallback finish before the host deadline, including multi-file edits and result screening"
+  pass "provider stalls and slow fallback finish before the host deadline, including replace edits and result screening"
 }
 
 test_upstream_level06_suite
