@@ -262,7 +262,7 @@ jq -e '.secondmate_current.records[0]
     and .invalidity.kind == "orphan_in_flight"
     and (.invalidity.ids | length) == 600' \
   "$TMP_ROOT/large-parent-snapshot.json" >/dev/null \
-  || fail "parent fleet snapshot did not preserve the large child invalidity"
+  || fail "parent fleet snapshot did not preserve the large child invalidity: $(jq -c '.secondmate_current.records[0]' "$TMP_ROOT/large-parent-snapshot.json")"
 pass "parent snapshot consumes large child ledgers without argument transport"
 
 mkdir -p "$CADENCE_HOME/state" "$CADENCE_HOME/data" "$CADENCE_HOME/config" \

@@ -35,9 +35,10 @@
 # process group and returns at once. Session start, spawn, and teardown use it:
 # they publish only as a side effect, so none of them may wait for the summary
 # to be computed. A detached refresh is single-flight (it takes the refresh lock
-# only when free, so triggers never pile up behind a slow run). Every trigger
-# first writes state/.home-summary-refresh.pending and the run that takes the
-# lock clears it. After a successful attempt, its parent starts another refresh
+# only when free, so triggers never pile up behind a slow run). Each idle-only
+# worker writes state/.home-summary-refresh.pending before trying the lock, and
+# the worker that acquires it clears the marker. After a successful attempt,
+# its parent starts another refresh
 # if a newer trigger left the marker behind, repeating until no marker remains;
 # a burst of triggers therefore converges without a fixed follow-up cap.
 #

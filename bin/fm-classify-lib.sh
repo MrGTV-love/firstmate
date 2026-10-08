@@ -21,17 +21,17 @@
 # daemon keeps its escalation-digest seen-markers; the watcher keeps its .seen-*
 # signatures).
 #
-# There are four documented exceptions. The absorb classification
+# There are five documented exceptions. The absorb classification
 # (crew_absorb_class and its working/paused wrappers) is NOT a pure status-file
 # read: it reuses bin/fm-crew-state.sh, which may make a bounded no-mistakes call,
 # to decide whether a crew that just stopped its turn or went stale is working,
 # deliberately paused, or neither. Callers run it ONLY on no-verb signal handling
 # and first sighting of a stale hash, never on every wake, so the per-wake triage
-# stays cheap. status_open_decisions_incremental (see "incremental (cursor-backed)
-# open-decisions fold" below) also writes: it persists a per-status-file byte
-# cursor and folded open-set as a side effect, so a per-drain fleet-wide scan
-# stays bounded by new appends instead of re-reading each task's whole lifetime
-# log every time. status_home_appends_record writes the per-task home-owned
+# stays cheap. status_open_decisions_incremental writes the live fold checkpoint;
+# the "incremental (cursor-backed) open-decisions fold" section below owns that
+# persistence contract. status_open_decisions_checkpoint_carry writes only beside
+# a captured log; its comment below owns the carry contract.
+# status_home_appends_record writes the per-task home-owned
 # append ledger documented in fm-status-wake-lib.sh so the wake scan can treat
 # this home's own bookkeeping bytes as already owned.
 # crew_worktree_written_since reads the task's meta file and walks a bounded slice
