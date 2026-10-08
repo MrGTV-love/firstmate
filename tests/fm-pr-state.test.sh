@@ -39,7 +39,7 @@ serve() {
           mergeable: (if $mergeable == "null" then null else $mergeable end),
           reviewDecision: $decision}'
       ;;
-    "api /repos/o/r/pulls/7/reviews?per_page=100 --paginate --jq "*)
+    "api repos/o/r/pulls/7/reviews?per_page=100")
       printf '%s\n' "${FM_TEST_REVIEWS:-[]}"
       ;;
     "pr checks "*" --required --json name,state,bucket --jq "*)
@@ -62,9 +62,12 @@ for arg in "$@"; do
   [ "$prev" != --jq ] || prog=$arg
   prev=$arg
 done
-serve "$@" | jq -r "$prog"
+serve "$@" | jq -r "${prog:-.}"
 SH
 chmod +x "$FAKEBIN/gh"
+fm_gh_http_shim "$FAKEBIN"
+export FM_STATE_OVERRIDE="$TMP_ROOT/state"
+mkdir -p "$FM_STATE_OVERRIDE"
 
 run_state() {
   PATH="$FAKEBIN:$PATH" "$SCRIPT" https://github.com/o/r/pull/7

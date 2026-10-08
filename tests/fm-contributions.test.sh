@@ -130,23 +130,24 @@ case "$*" in
        merged_at:(if $state == "merged" then "2026-09-16T07:00:00Z" else null end)}' ;;
   'api repos/o/r/issues/9')
     jq -n --slurpfile labels "$FORGE/labels.json" '{state:"open",user:{login:"author"},labels:$labels[0]}' ;;
-  'api repos/o/r/issues/'*'/events?'*) jq -s . "$FORGE/events.json" ;;
-  'api repos/o/r/issues/'*'/comments?'*) jq -s . "$FORGE/comments.json" ;;
-  'api repos/o/r/pulls/'*'/reviews?'*) jq -s . "$FORGE/reviews.json" ;;
-  'api repos/o/r/pulls/'*'/comments?'*) jq -s . "$FORGE/inline.json" ;;
+  'api repos/o/r/issues/'*'/events?'*) jq -c . "$FORGE/events.json" ;;
+  'api repos/o/r/issues/'*'/comments?'*) jq -c . "$FORGE/comments.json" ;;
+  'api repos/o/r/pulls/'*'/reviews?'*) jq -c . "$FORGE/reviews.json" ;;
+  'api repos/o/r/pulls/'*'/comments?'*) jq -c . "$FORGE/inline.json" ;;
   'api repos/o/r/commits/'*'/check-runs?'*)
-    printf '[{"check_runs":[{"name":"test","id":1,"status":"completed","conclusion":"success","started_at":"2026-09-16T08:00:00Z"}]}]\n' ;;
-  'api repos/o/r/commits/'*'/statuses?'*) printf '[[]]\n' ;;
+    printf '{"check_runs":[{"name":"test","id":1,"status":"completed","conclusion":"success","started_at":"2026-09-16T08:00:00Z"}]}\n' ;;
+  'api repos/o/r/commits/'*'/statuses?'*) printf '[]\n' ;;
   'api repos/o/r') printf '{"permissions":{"push":false}}\n' ;;
   *) printf 'unexpected gh fixture call: %s\n' "$*" >&2; exit 1 ;;
 esac
 SH
   chmod +x "$home/fakebin/gh"
+  fm_gh_http_shim "$home/fakebin"
 }
 
 with_home() {
   local home=$1; shift
-  PATH="$home/fakebin:$PATH" FORGE="$home/forge" HEAD_A="$HEAD_A" \
+  PATH="$home/fakebin:$PATH" FORGE="$home/forge" HEAD_A="$HEAD_A" GH_SHIM_LOG="$home/forge/shim.log" \
     FM_HOME="$home" FM_ROOT_OVERRIDE="$home/root" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
     FM_CONTRIBUTIONS_NOW="$NOW" "$@"
@@ -629,7 +630,10 @@ wrap_forge() { # home: log gh calls and apply per-call faults from $FORGE/fault
   cat > "$home/fakebin/gh" <<'SH'
 #!/usr/bin/env bash
 set -eu
-printf '%s\n' "$*" >> "$FORGE/calls"
+# The HTTP-faithful gh receives `api -i [-H If-None-Match: ...] <endpoint>`; the faults and the call log
+# below speak the plain `api <endpoint>` form.
+plain=$(printf '%s' "$*" | sed -E 's/^api -i /api /; s/ -H If-None-Match: [^ ]+//')
+printf '%s\n' "$plain" >> "$FORGE/calls"
 fault=$(cat "$FORGE/fault" 2>/dev/null || true)
 case "$fault" in latency) sleep "${FORGE_LATENCY:-2}" ;; esac
 # Concurrent forge callers each advance one shared clock. Truncating it in
@@ -643,7 +647,7 @@ clock_bump() {
   printf '%s\n' "$(( $(cat "$FORGE/clock") + $1 ))" > "$tmp"
   mv -f "$tmp" "$FORGE/clock"
 }
-case "$fault:$*" in
+case "$fault:$plain" in
   # Advance once before the parallel read wave; its readers share this clock.
   reserve:'api repos/o/r/issues/9') clock_bump 6 ;;
   slow-wave:'api repos/o/r/pulls/8') sleep 3 ;;
@@ -1182,8 +1186,72 @@ test_retire_is_idempotent_and_refuses_unknown_pairs() {
   pass 'retire is idempotent and refuses non-captain, unknown, malformed and signal-bearing pairs'
 }
 
+shim_count() { # home kind(counted|not-modified) : REST reads (api -i) the shim logged
+  grep -c "^$2 api -i " "$1/forge/shim.log" 2>/dev/null || true
+}
+
+test_repeated_poll_reads_unchanged_prs_conditionally() {
+  local home first
+  home=$(new_home conditional-poll)
+  forge_home "$home"
+  with_home "$home" "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null \
+    || fail 'could not register the owned delivery'
+  : > "$home/forge/shim.log"
+  registered_checks "$home" >/dev/null
+  first=$(shim_count "$home" counted)
+  [ "$first" -ge 7 ] || fail "the first sweep made only $first counted REST reads"
+  : > "$home/forge/shim.log"
+  registered_checks "$home" >/dev/null
+  [ "$(shim_count "$home" counted)" = 0 ] \
+    || fail "an unchanged PR was re-read with $(shim_count "$home" counted) counted REST calls on the second sweep"
+  [ "$(shim_count "$home" not-modified)" = "$first" ] \
+    || fail "the second sweep answered $(shim_count "$home" not-modified) of $first REST reads with a 304"
+  jq -e '.records[0].error == null and .records[0].observation.head == "'"$HEAD_A"'"' \
+    "$home/data/delivery/contributions.json" >/dev/null || fail 'cached reads did not yield the same observation'
+  printf '[{"id":12,"user":{"login":"maintainer"},"author_association":"OWNER","body":"changed","html_url":"https://github.com/o/r/pull/8#issuecomment-12","updated_at":"2026-09-16T08:01:00Z"}]\n' \
+    > "$home/forge/comments.json"
+  registered_checks "$home" >/dev/null
+  jq -e '.records[0].pending | length == 1' "$home/data/delivery/contributions.json" >/dev/null \
+    || fail 'a changed resource was served from the cache instead of being read'
+  pass 'a repeated poll answers unchanged PR reads with 304s and still sees a changed resource'
+}
+
+test_low_quota_poll_keeps_last_observation_marked_stale() {
+  local home out before reset
+  home=$(new_home low-quota)
+  forge_home "$home"
+  with_home "$home" "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null \
+    || fail 'could not register the owned delivery'
+  registered_checks "$home" >/dev/null
+  jq -e '.records[0].error == null' "$home/data/delivery/contributions.json" >/dev/null || fail 'healthy sweep recorded an error'
+  # A sweep whose own responses report 500 of 5000 left crosses the floor mid-observation: the reads still to come
+  # are refused before any network call, the last observation is kept, and the episode is announced once.
+  out=$(GH_SHIM_REMAINING=500 with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'sweep reporting low quota failed'
+  reset=$(jq -r .reset "$home/state/gh-ratelimit.core.json")
+  assert_contains "$out" 'quota low (500 of 5000' 'the sweep that crossed the floor did not state the remaining quota'
+  assert_contains "$out" "$(jq -rn --argjson r "$reset" '$r | todate')" 'the sweep did not state the reset time'
+  jq -e --arg head "$HEAD_A" '.records[0].observation.head == $head and (.records[0].error | contains("quota low"))' \
+    "$home/data/delivery/contributions.json" >/dev/null || fail 'the last observation was not kept and marked stale with the reason'
+  before=$(wc -l < "$home/forge/shim.log")
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'repeat low-quota poll failed'
+  [ -z "$out" ] || fail "the low-quota episode was announced twice: $out"
+  assert_equals "$before" "$(wc -l < "$home/forge/shim.log")" 'a poll below the floor still called the forge'
+  with_home "$home" "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input > "$home/input.json" \
+    || fail 'could not build the contribution input'
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" snapshot "$home/input.json" --all \
+    | jq -e '.complete == false and .checked == 0 and (.rows[0].reason | contains("quota low") and contains("resets at"))' >/dev/null \
+    || fail 'the stale row does not carry the quota reason and reset time'
+  # The window resets: the next sweep reads again and clears the mark.
+  jq --argjson past "$(( $(date +%s) - 5 ))" '.reset = $past' "$home/state/gh-ratelimit.core.json" > "$home/state/rl.tmp" \
+    && mv "$home/state/rl.tmp" "$home/state/gh-ratelimit.core.json"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'poll after the reset failed'
+  [ "$(wc -l < "$home/forge/shim.log")" -gt "$before" ] || fail 'the sweep did not resume after the window reset'
+  jq -e '.records[0].error == null' "$home/data/delivery/contributions.json" >/dev/null || fail 'the stale mark outlived the reset'
+  pass 'below the floor the poll keeps the last observation stale with the reset time, once, and resumes after the reset'
+}
+
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_budget_refusal_between_calls test_budget_bounded_call_timeout test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_reservation_defers_later_url_when_fifteen_seconds_do_not_remain test_three_second_pr_reads_complete_fresh_in_one_cycle test_slow_read_deadline_kill_is_budget_refusal test_unmeasured_url_does_not_starve_the_tail test_budget_is_cut_down_to_the_watcher_check_bound test_arm_plumbs_a_configured_budget_into_the_check_shim test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs; do
+for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_budget_refusal_between_calls test_budget_bounded_call_timeout test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_reservation_defers_later_url_when_fifteen_seconds_do_not_remain test_three_second_pr_reads_complete_fresh_in_one_cycle test_slow_read_deadline_kill_is_budget_refusal test_unmeasured_url_does_not_starve_the_tail test_budget_is_cut_down_to_the_watcher_check_bound test_arm_plumbs_a_configured_budget_into_the_check_shim test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
