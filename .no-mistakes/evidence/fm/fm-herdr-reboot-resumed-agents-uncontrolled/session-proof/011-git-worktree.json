@@ -1,0 +1,6 @@
+{
+  "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project worktree add -b fm/active-proof /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree",
+  "returncode": 0,
+  "stdout": "HEAD is now at e39990f fixture\n",
+  "stderr": "Preparing worktree (new branch 'fm/active-proof')\n"
+}

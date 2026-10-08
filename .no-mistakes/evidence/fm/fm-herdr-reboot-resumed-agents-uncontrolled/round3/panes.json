@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-fresh-proof-61122-12353 pane list --workspace w1",
+  "returncode": 0,
+  "stdout": "{\"id\":\"cli:pane:list\",\"result\":{\"panes\":[{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d45d2ce14211\",\"workspace_id\":\"w1\"}],\"type\":\"pane_list\"}}\n",
+  "stderr": ""
+}

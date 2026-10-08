@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh fresh-proof relaunch --harness 'omp --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions --config __OMPSESSIONCFG__ --config __OMPWORKERCFG__ --auto-approve --cwd __WORKTREE__ --model openai-codex/gpt-6.1-sol --thinking low -e __OMPEXT__ \"$(__OPINPUT__ encode launch-brief < __BRIEF__)\"' --note 'Resume isolated lifecycle verification. Preserve dirty.txt. Reply only IDLE PROOF READY and remain idle, without tools or changes.'",
+  "returncode": 1,
+  "stdout": "",
+  "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home\nerror: 'omp --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions --config __OMPSESSIONCFG__ --config __OMPWORKERCFG__ --auto-approve --cwd __WORKTREE__ --model openai-codex/gpt-6.1-sol --thinking low -e __OMPEXT__ \"$(__OPINPUT__ encode launch-brief < __BRIEF__)\"' is not a verified harness; fm-control refuses to relaunch onto an adapter with no verified control or launch mechanics\n"
+}

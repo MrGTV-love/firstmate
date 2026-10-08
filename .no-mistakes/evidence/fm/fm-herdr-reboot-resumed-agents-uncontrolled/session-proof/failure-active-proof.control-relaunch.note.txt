@@ -1,0 +1,1 @@
+Isolated lifecycle verification only: dirty.txt is unlanded progress and must remain untouched. Do not inspect, edit, delegate, run tools, or implement. Reply with one short acknowledgement, then remain idle.

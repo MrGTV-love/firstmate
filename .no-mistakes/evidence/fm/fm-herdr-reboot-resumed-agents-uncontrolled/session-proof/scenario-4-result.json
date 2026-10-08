@@ -1,0 +1,27 @@
+{
+  "result": "PASS",
+  "pid": 30342,
+  "pin": "live-no-extension-pin",
+  "active_session_proof_absent": true,
+  "launch_proof": "unmanaged",
+  "process_info": {
+    "foreground_process_group_id": 30342,
+    "foreground_processes": [
+      {
+        "argv": [
+          "omp",
+          "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/task.jsonl",
+          "--session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions",
+          "--cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree"
+        ],
+        "argv0": "omp",
+        "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/task.jsonl --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions --cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree",
+        "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree",
+        "name": "omp",
+        "pid": 30342
+      }
+    ],
+    "pane_id": "w2:p1",
+    "shell_pid": 47983
+  }
+}

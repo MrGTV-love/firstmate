@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+  "returncode": 0,
+  "stdout": "\n                                            \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n                                               \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                               \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                               \u2592\u2592  \u2588\u2588                  \u2588\n                                                   \u2588\u2588       v18.8.1\n\n                                             Tip: Please use nerdfont \ud83d\ude2d.\n\n\n MANAGED TASK ALPHA lifecycle verification fixture; leave idle; no implementation or tools requested.\n\n\n Resumed session\n\n Warning: Could not restore model openai/gpt-4.1\n\n\u276f\n \u03c0 \u00b7 \u2b22 no-model \u00b7 \ud83c\udf33 project/worktree \u00b7 \u2442 fm/active-proof ?1 \u00b7 \u25eb 7.1K/? \u27f2                           MANAGED TASK ALPHA\n",
+  "stderr": ""
+}

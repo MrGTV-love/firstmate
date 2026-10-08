@@ -1,0 +1,9 @@
+installed omp integration to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-reboot-cleanup/tmp/fm-omp-reboot.yOI3uT/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+native child captured: pid=21026 start=Wed Oct  7 15:00:11 2026    
+native child captured: pid=4865 start=Wed Oct  7 15:01:21 2026    
+Herdr lab runtime: {"client":{"version":"0.9.1","channel":"stable","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"remote_host_bridge":true,"remote_bridge_idle_timeout":true,"binary":"/Users/charlesabrooker/.local/bin/herdr","session":"fm-lab-omp-reboot-8402-29286"},"server":{"status":"running","running":true,"version":"0.9.1","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-reboot-8402-29286/herdr.sock","session":"fm-lab-omp-reboot-8402-29286","restart_needed":false,"server_binary_stale":false},"update":{"restart_needed":false,"server_binary_stale":false}}
+ok - native omp cleanup smoke: task and local secondmate reached live unmanaged composers in isolated homes
+guarded teardown completed for session 'fm-lab-omp-reboot-8402-29286'; waiting for native child exit
+native child exit confirmed: pid=21026 start=Wed Oct  7 15:00:11 2026    
+native child exit confirmed: pid=4865 start=Wed Oct  7 15:01:21 2026    
+private fixture tree removed: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-reboot-cleanup/tmp/fm-omp-reboot.yOI3uT

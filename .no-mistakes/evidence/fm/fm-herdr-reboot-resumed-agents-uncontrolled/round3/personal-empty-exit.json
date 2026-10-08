@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh fresh-proof exit",
+  "returncode": 1,
+  "stdout": "",
+  "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home\nerror: task fresh-proof cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\n"
+}

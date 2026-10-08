@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-fresh-proof-61122-12353 pane read w1:p1 --format svg",
+  "returncode": 2,
+  "stdout": "",
+  "stderr": "invalid read format: svg\n"
+}

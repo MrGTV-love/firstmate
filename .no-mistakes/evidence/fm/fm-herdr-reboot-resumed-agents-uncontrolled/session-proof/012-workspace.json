@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree --label fm-active-proof",
+  "returncode": 1,
+  "stdout": "",
+  "stderr": "Error: Custom { kind: InvalidInput, error: \"local socket name length exceeds capacity of sun_path of sockaddr_un\" }\n"
+}

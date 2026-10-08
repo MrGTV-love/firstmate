@@ -1,0 +1,26 @@
+Real omp 18.8.1 in guarded named Herdr session fm-lab-gate-reboot-26605-16111.
+Production adapter calls were routed through bin/fm-herdr-lab.sh run. Lifecycle commands used a marked FM_HOME without a gate bypass or fleet-path overrides.
+
+Bare native task, empty and unsent prose/!git diff/$ print(1) drafts:
+interrupt, exit and relaunch --note refused attribution.
+--recover-launch: recovery-skipped gate-task launch=unmanaged; no lifecycle action taken.
+reboot sweep: REBOOT_RECOVERY: gate-task: live launch is unmanaged; no lifecycle action taken.
+PID, screen, composer, metadata, brief and dirty work stayed unchanged.
+
+Unpinned in-process /resume to a personal conversation with a local-secondmate record:
+All five boundaries preserved the PID, screen, charter, child record and dirty work.
+
+Matching recorded launch pin, then genuine in-process /resume to a personal conversation:
+Visible: Captain personal conversation: stay idle. No model calls or tools requested.
+Visible: Resumed session.
+Same live PID; original task --resume argv remained present.
+Launch proof after switch: managed.
+interrupt: exit 0; interrupt-delivered gate-task harness=omp backend=herdr verified=agent-alive cancel=unconfirmed.
+--recover-launch: exit 0; recovery-skipped gate-task launch=managed.
+reboot sweep: exit 0 without alert output.
+exit: exit 0; stopped gate-task harness=omp backend=herdr.
+Post-exit Herdr process-info showed only the pane shell PID 27819, no omp.
+
+Guarded teardown exited 0, including its default-session tripwire check. Owned lab trees and temporary driver were removed.
+
+Acceptance conflict: the supplied recorded FIX decision requires current-session proof and no lifecycle action without it; docs/agent-control.md documents pin-retaining /resume as an accepted residual risk and says current-session proof is not implemented. This test phase did not change that policy.

@@ -1,0 +1,14 @@
+ok - holder processes expose their environment to the owner library
+ok - kernel environment entries retain spaces and omit unrelated line-breaking values
+ok - an empty session is started inside the launch agent
+ok - launchd and worker markers require gui-domain launchctl proof
+ok - unrelated multiline values and non-shell names leave proven Aqua owners untouched
+ok - duplicate and line-breaking relevant markers refuse all ownership evidence
+ok - embedded worker and launchd values never prove an Aqua birth
+ok - a missing kernel environment reader refuses server takeover
+ok - background, inherited-XPC, SSH-born, SSH-descended, and unprovable owners are taken over
+ok - a running session with no provable owner is taken over rather than trusted
+ok - a host without lsof cannot prove an Aqua birth, so the session is taken over
+ok - a foreign server that never releases the socket yields exit 1 so launchd retries
+ok - the guard starts as soon as the foreign server releases the socket
+ok - argument errors are refused before any herdr call

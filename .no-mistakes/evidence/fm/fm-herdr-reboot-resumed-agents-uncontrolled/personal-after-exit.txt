@@ -1,0 +1,28 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                        Tip: Say `orchestrate` in your message to drive a multi-phase task with
+                                    parallel subagents — watch it glow as you type
+
+
+
+ Captain personal conversation: stay idle. No model calls or tools requested.
+
+
+ Resumed session
+
+ Warning: Could not restore model openai/gpt-4.1. Using google/gemini-3.1-pro-preview
+
+ Closing session…
+
+
+╭── π > ◒ Gemini 3.1 Pro Preview > 🌳 32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77 > ⑂ detached ?2 ▶─2%─┃1M─◀ Private l… ──╮
+╰─                                                                                      ⇧⇥ to change thinking effort ─╯
+
+Resume this session with
+omp --resume aa404c53-4f0a-49de-b080-e20bf0215b73
+Mac-Studio:project charlesabrooker$

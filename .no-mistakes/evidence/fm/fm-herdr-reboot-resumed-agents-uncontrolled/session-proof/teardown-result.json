@@ -1,0 +1,14 @@
+{
+  "session": "fm-lab-session-proof-64916-7212",
+  "guarded_teardown_rc": 0,
+  "default_session_tripwire": "helper teardown succeeded",
+  "temporary_namespace_removed": true,
+  "production_owned_staging_removed": [
+    "/tmp/fm-active-proof+941921d9bfbfa720a46fca0a140ec4eabb7614faa184c4e5a3a18f179a209e4a",
+    "/tmp/fm-active-proof"
+  ],
+  "no_product_edits": true,
+  "no_unit_tests": true,
+  "first_teardown_setup_refusal": "PATH safety wrapper refused lifecycle delete; fixed by calling sole guarded lifecycle helper with original real client PATH",
+  "outside_user_data_side_effect": "canonical omp used operator default session path /Users/charlesabrooker/.omp/agent/sessions/-.no-mistakes-worktrees-32d18ed9638d-01M4AZ0K1QEE5AK43TDDQM0E77-.live-session-proof-worktree/2026-10-07T19-54-34-948Z_01a117ee-9844-7374-93d3-5a682d6789b8.jsonl; no inspection, modification or deletion of operator user data during cleanup; existence after launch unobserved"
+}

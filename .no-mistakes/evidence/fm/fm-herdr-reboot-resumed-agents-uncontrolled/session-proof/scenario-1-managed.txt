@@ -1,0 +1,23 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                                             Tip: Please use nerdfont 😭.
+
+
+ MANAGED TASK ALPHA lifecycle verification fixture; leave idle; no implementation or tools requested.
+
+
+ Warning: No default model selected. Use /login, set an API key environment variable, or select a local model with
+ /model or --model.
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.3 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+❯
+ π · ⬢ no-model · 🌳 project/worktree · ⑂ fm/active-proof ?1 · ◫ 7.1K/? ⟲                           MANAGED TASK ALPHA

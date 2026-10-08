@@ -1,0 +1,43 @@
+{
+  "result": "FAIL",
+  "classification": "product",
+  "operation": "fm-control.sh active-proof relaunch --harness omp --model openai-codex/gpt-6.1-sol --effort low --note <idle verification note>",
+  "command_timeout_seconds": 150,
+  "active_proof_exists": false,
+  "launch_proof": "unmanaged",
+  "metadata": "window=fm-lab-session-proof-64916-7212:w1:p1\nendpoint_task_id=active-proof\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree\nproject=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project\nharness=omp\nkind=ship\nmode=local-only\nyolo=off\nbranch=fm/active-proof\ntasktmp=/tmp/fm-active-proof\nmodel=openai-codex/gpt-6.1-sol\neffort=low\nbusy_gen=g1791402868.78885.29725\nspawn_gen=s1791402869.60533.15013\nlaunch_proof=env-v1\nbackend=herdr\nherdr_session=fm-lab-session-proof-64916-7212\nherdr_workspace_id=w1\nherdr_tab_id=w1:t1\nherdr_pane_id=w1:p1\ncontrol_relaunch_tx=36946.20261007T195420Z.23894\n",
+  "process_info": {
+    "foreground_process_group_id": 92315,
+    "foreground_processes": [
+      {
+        "argv": [
+          "/Users/charlesabrooker/.bun/bin/omp",
+          "--config",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.omp/fm-session-overlay.yml",
+          "--auto-approve",
+          "--cwd",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree",
+          "--config",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.omp/fm-worker-overlay.yml",
+          "--model",
+          "openai-codex/gpt-6.1-sol",
+          "--thinking",
+          "low",
+          "-e",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.omp-ext.ts",
+          "\u2063FIRSTMATE_OP: v1 launch-brief: # Current worker role contract\nYou are a crewmate: an autonomous worker agent managed by firstmate.\nThis section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\nDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\nYour steering inbox is `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\nNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\nWhen this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\nProject instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\n\n# Task\n## Captain's intent\nVerify an isolated task stays idle, without implementation or tools.\n\n## Firstmate spec\nLeave this lifecycle verification idle. Do not inspect files, delegate, modify files, or run tools.\n\nDelivery contract: mode=local-only\n\n## Progress note (2026-10-07T19:54:19Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.inbox/handled/. A steer sent before the relaunch survives there.\n\nIsolated lifecycle verification only: dirty.txt is unlanded progress and must remain untouched. Do not inspect, edit, delegate, run tools, or implement. Reply with one short acknowledgement, then remain idle."
+        ],
+        "argv0": "omp",
+        "cmdline": "/Users/charlesabrooker/.bun/bin/omp --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.omp/fm-session-overlay.yml --auto-approve --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.omp/fm-worker-overlay.yml --model openai-codex/gpt-6.1-sol --thinking low -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.omp-ext.ts \u2063FIRSTMATE_OP: v1 launch-brief: # Current worker role contract\nYou are a crewmate: an autonomous worker agent managed by firstmate.\nThis section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\nDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\nYour steering inbox is `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\nNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\nWhen this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\nProject instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\n\n# Task\n## Captain's intent\nVerify an isolated task stays idle, without implementation or tools.\n\n## Firstmate spec\nLeave this lifecycle verification idle. Do not inspect files, delegate, modify files, or run tools.\n\nDelivery contract: mode=local-only\n\n## Progress note (2026-10-07T19:54:19Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.inbox/handled/. A steer sent before the relaunch survives there.\n\nIsolated lifecycle verification only: dirty.txt is unlanded progress and must remain untouched. Do not inspect, edit, delegate, run tools, or implement. Reply with one short acknowledgement, then remain idle.",
+        "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree",
+        "name": "omp",
+        "pid": 92315
+      }
+    ],
+    "pane_id": "w1:p1",
+    "shell_pid": 43300
+  },
+  "diagnosis": "real loaded production extension session_start attempts realpathSync on an unsaved new session file, throwing ENOENT; supported fresh canonical relaunch fails to establish current-session proof",
+  "dirty_file_unchanged": true,
+  "progress_note_preserved": true
+}

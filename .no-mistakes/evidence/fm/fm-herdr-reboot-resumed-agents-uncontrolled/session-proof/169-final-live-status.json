@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 status --json",
+  "returncode": 0,
+  "stdout": "{\"client\":{\"version\":\"0.9.1\",\"channel\":\"stable\",\"protocol\":22,\"endpoint_protocol_generation\":1,\"endpoint_capabilities\":[\"surface_interest\",\"presentation_effects_fence\",\"health_check\"],\"remote_host_bridge\":true,\"remote_bridge_idle_timeout\":true,\"binary\":\"/Users/charlesabrooker/.local/bin/herdr\",\"session\":\"fm-lab-session-proof-64916-7212\"},\"server\":{\"status\":\"running\",\"running\":true,\"version\":\"0.9.1\",\"protocol\":22,\"capabilities\":{\"live_handoff\":true,\"detached_server_daemon\":false,\"endpoint_protocol_generation\":1,\"surface_interest\":true,\"health_check\":true},\"compatible\":true,\"endpoint_compatible\":true,\"socket\":\"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-session-proof-64916-7212/herdr.sock\",\"session\":\"fm-lab-session-proof-64916-7212\",\"restart_needed\":false,\"server_binary_stale\":false},\"update\":{\"restart_needed\":false,\"server_binary_stale\":false}}\n",
+  "stderr": ""
+}

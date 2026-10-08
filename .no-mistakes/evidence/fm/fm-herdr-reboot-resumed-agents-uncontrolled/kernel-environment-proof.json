@@ -1,0 +1,30 @@
+[
+  {
+    "scenario": "valid pin with unrelated multiline and exported function",
+    "pid": 14111,
+    "expected": "managed",
+    "observed": "managed",
+    "result": "pass"
+  },
+  {
+    "scenario": "marker embedded in multiline value cannot supply ownership",
+    "pid": 21965,
+    "expected": "unmanaged",
+    "observed": "unmanaged",
+    "result": "pass"
+  },
+  {
+    "scenario": "assignment-shaped argv cannot supply ownership",
+    "pid": 26075,
+    "expected": "unmanaged",
+    "observed": "unmanaged",
+    "result": "pass"
+  },
+  {
+    "scenario": "multiline relevant marker is ambiguous and refused",
+    "pid": 33839,
+    "expected": "unknown",
+    "observed": "unknown",
+    "result": "pass"
+  }
+]

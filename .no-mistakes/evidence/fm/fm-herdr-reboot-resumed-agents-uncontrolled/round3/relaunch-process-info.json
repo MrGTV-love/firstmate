@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-fresh-proof-61122-12353 pane process-info --pane w1:p1",
+  "returncode": 0,
+  "stdout": "{\"id\":\"cli:pane:process_info\",\"result\":{\"process_info\":{\"foreground_process_group_id\":69190,\"foreground_processes\":[{\"argv\":[\"-zsh\"],\"argv0\":\"zsh\",\"cmdline\":\"-zsh\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree\",\"name\":\"zsh\",\"pid\":69190}],\"pane_id\":\"w1:p1\",\"shell_pid\":69190},\"type\":\"pane_process_info\"}}\n",
+  "stderr": ""
+}

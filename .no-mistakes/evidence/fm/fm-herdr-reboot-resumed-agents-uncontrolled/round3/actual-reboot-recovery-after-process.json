@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-local-sessions-68050-30298 pane process-info --pane w1:p1",
+  "returncode": 0,
+  "stdout": "{\"id\":\"cli:pane:process_info\",\"result\":{\"process_info\":{\"foreground_process_group_id\":87648,\"foreground_processes\":[{\"argv\":[\"omp\",\"--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/2026-10-07T20-24-41-589Z_01a1180a-2975-718f-af8b-6cfe57cb0a4c.jsonl\"],\"argv0\":\"omp\",\"cmdline\":\"omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/2026-10-07T20-24-41-589Z_01a1180a-2975-718f-af8b-6cfe57cb0a4c.jsonl\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree\",\"name\":\"omp\",\"pid\":87648}],\"pane_id\":\"w1:p1\",\"shell_pid\":82729},\"type\":\"pane_process_info\"}}\n",
+  "stderr": ""
+}

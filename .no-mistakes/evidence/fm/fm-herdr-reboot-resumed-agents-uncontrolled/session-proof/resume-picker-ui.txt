@@ -1,0 +1,40 @@
+╭─ Resume Session (current folder) ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                     │
+│ >                                                                                                                   │
+│                                                                                                                     │
+│   PERSONAL CAPTAIN BRAVO                                                                                            │
+│   PERSONAL CAPTAIN BRAVO lifecycle verification fixture; leave idle; no implementation or tools requested.          │
+│   2 minutes ago  ·  927B  ·  ⏳ pending                                                                             │
+│                                                                                                                     │
+│ ❯ MANAGED TASK ALPHA                                                                                                │
+│   MANAGED TASK ALPHA lifecycle verification fixture; leave idle; no implementation or tools requested.              │
+│   2 minutes ago  ·  923B  ·  current  ·  ⏳ pending                                                                 │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│ [⌦/⌫ delete · ⏎ select · ⇥ all projects · ⎋ cancel]                                                                 │
+│                                                                                                                     │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

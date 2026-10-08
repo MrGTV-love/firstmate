@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-reboot-recover.sh recover",
+  "returncode": 0,
+  "stdout": "REBOOT_RECOVERY: fresh-proof: live launch is unmanaged; no lifecycle action taken\n",
+  "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home\n"
+}

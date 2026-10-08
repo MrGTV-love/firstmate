@@ -1,0 +1,20 @@
+{
+  "foreground_process_group_id": 11103,
+  "foreground_processes": [
+    {
+      "argv": [
+        "omp",
+        "--cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/project",
+        "--session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live",
+        "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/2dfff2a4-98c7-4691-bbc1-baa12f6e8439.jsonl"
+      ],
+      "argv0": "omp",
+      "cmdline": "omp --cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/project --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/2dfff2a4-98c7-4691-bbc1-baa12f6e8439.jsonl",
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/project",
+      "name": "omp",
+      "pid": 11103
+    }
+  ],
+  "pane_id": "w1:p1",
+  "shell_pid": 27819
+}

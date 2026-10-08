@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Bare restored task preserves PID, draft and work at all five lifecycle boundaries",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Native personal session in a local secondmate record stays untouched at all lifecycle boundaries",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Switch to a personal conversation invalidates retained launch-pin authority",
+    "result": "fail",
+    "live": true,
+    "proof": "managed"
+  },
+  {
+    "name": "Personal resumed conversation refuses lifecycle interrupt",
+    "result": "fail",
+    "live": true,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/home\ninterrupt-delivered gate-task harness=omp backend=herdr verified=agent-alive cancel=unconfirmed\n"
+  },
+  {
+    "name": "Personal resumed conversation refuses lifecycle exit",
+    "result": "fail",
+    "live": true,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/home\nstopped gate-task harness=omp backend=herdr endpoint=fm-lab-gate-reboot-26605-16111:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.fm-gate-live/project\n"
+  }
+]

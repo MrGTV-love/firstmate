@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+  "returncode": 0,
+  "stdout": "charlesabrooker@Mac-Studio worktree % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK\n43TDDQM0E77/.live-session-proof/worktree'\ncharlesabrooker@Mac-Studio worktree % export GOTMPDIR=/tmp/fm-active-proof/gotmp\ncharlesabrooker@Mac-Studio worktree % export COMPACT_ADVISER_DISABLE=1\ncharlesabrooker@Mac-Studio worktree % export FM_TASK_ID=active-proof\ncharlesabrooker@Mac-Studio worktree % . '/tmp/fm-active-proof+941921d9bfbfa720a46fca0a140ec4eabb7614faa184c4e5a3a18f179\na209e4a/launch.s1791402475.25240.9895.sh'\n",
+  "stderr": ""
+}

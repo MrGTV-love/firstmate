@@ -1,0 +1,118 @@
+{
+  "scenario_1": "PASS: pinned omp through fm-spawn with real production extension; current==task, managed",
+  "scenario_2": "PASS: real /resume personal retains PID, argv, pin; unmanaged; five operations refuse/no-op for empty and pending !git diff preserving screen/composer/files/state",
+  "scenario_3": "FAIL PRODUCT: return to task managed, recover no-op and exit pass, canonical relaunch creates unsaved session whose session_start proof realpath fails ENOENT; launch remains unmanaged; dirty progress preserved",
+  "scenario_4": "PASS: real pinned omp without production extension unmanaged",
+  "refusal_cases": [
+    {
+      "scenario": "2 empty interrupt",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty exit",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty relaunch-note",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty recover-launch",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty reboot-sweep",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff interrupt",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff exit",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff relaunch-note",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff recover-launch",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff reboot-sweep",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    }
+  ],
+  "setup_issues": [
+    "Herdr CLI private XDG changed server lookup and exceeded socket path capacity; fixed by limiting private HOME/XDG to omp process",
+    "Literal newline raw launch assignment changed inferred harness; fixed using escaped ANSI quoting",
+    "/resume path unsupported; used real interactive picker with title filter",
+    "Native editor autocomplete rendered !git different ghost text before initial baseline; stable baseline after settle preserves actual !git diff draft and identical screen",
+    "Control relaunch accepts verified harness name, not raw command; switched to canonical omp and exposed genuine product failure",
+    "Safety wrapper not suitable for guarded teardown itself; original PATH guarded helper teardown succeeded"
+  ],
+  "teardown": "PASS",
+  "outside_user_data_side_effect": "Canonical omp used default operator session path; no outside-boundary user data inspected/deleted during cleanup and no deliberate credential modifications. File existence after launch not inspected."
+}

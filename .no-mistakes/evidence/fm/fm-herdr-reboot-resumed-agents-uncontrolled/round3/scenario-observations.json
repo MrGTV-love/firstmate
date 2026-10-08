@@ -1,0 +1,204 @@
+{
+  "fresh_launch": {
+    "pid": 65217,
+    "spawn_gen": "s1791404539.33220.21041",
+    "bound_session": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/2026-10-07T20-22-29-811Z_01a11808-26b3-7057-91ed-60810a97ea62.jsonl",
+    "attribution_after_persistence": "managed"
+  },
+  "supported_relaunch": {
+    "pid": 2906,
+    "spawn_gen": "s1791404662.37731.31494",
+    "session": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/2026-10-07T20-24-41-589Z_01a1180a-2975-718f-af8b-6cfe57cb0a4c.jsonl",
+    "result": "relaunched fresh-proof harness=omp",
+    "dirty_work_preserved": true
+  },
+  "personal_switch": {
+    "same_pid": 2906,
+    "same_generation": "s1791404662.37731.31494",
+    "current_session": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl",
+    "attribution": "unmanaged",
+    "lifecycle_preservation": [
+      {
+        "draft": "",
+        "boundary": "interrupt",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "",
+        "boundary": "exit",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "",
+        "boundary": "relaunch",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "",
+        "boundary": "direct-recovery",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "",
+        "boundary": "reboot-sweep",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "!git diff",
+        "boundary": "interrupt",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "!git diff",
+        "boundary": "exit",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "!git diff",
+        "boundary": "relaunch",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "!git diff",
+        "boundary": "direct-recovery",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      },
+      {
+        "draft": "!git diff",
+        "boundary": "reboot-sweep",
+        "result": "pass",
+        "pid": 2906,
+        "protected_state_hashes": {
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.meta": "821546d739fbaddd6c3275265b9e730b68b4a5d1bdfa3a75d643753bb54c4d13",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/brief.md": "07517c916f8baf8e45cea46f1c5b45bd812e8a0de9ffbb063daa050999cdc308",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/data/fresh-proof/launch-brief.md": "a1f4a947edb9a23a07cf463a7679c3f292289e9a6fe1a0420e107b8b1627b967",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/worktree/dirty.txt": "d9df98578f55376af81a3010de94502f210cee8b10e36382b94e45f03c08575f",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/personal.jsonl": "03275096a06c8029a34fdb78c4c59b91a0ee495234e3a39eefc5d1ebf2e82863",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.omp-session.json": "ecb5b69444711c0763645e676d3da1fe76f119995d4b5a9eb127a6378184d896",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-relaunch": "aa49bd144bf99c85c86f19d13a874cf38615d51bf6108456a221199db0c890f7",
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/home/state/fresh-proof.control-exit": "cf7fb5f16217599418720bcd1721c3ed8dcb1cb21c70af5eacecb22d1d34fde8"
+        }
+      }
+    ]
+  },
+  "return_to_task": {
+    "pid": 2906,
+    "attribution": "managed",
+    "supported_exit": "stopped fresh-proof harness=omp"
+  },
+  "native_reboot": {
+    "new_pid": 87648,
+    "argv": [
+      "omp",
+      "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/sessions/2026-10-07T20-24-41-589Z_01a1180a-2975-718f-af8b-6cfe57cb0a4c.jsonl"
+    ],
+    "composer": "empty bordered composer",
+    "attribution": "unmanaged",
+    "sweep": "REBOOT_RECOVERY: fresh-proof: live launch is unmanaged; no lifecycle action taken"
+  },
+  "setup_adjustments": [
+    "Required ship relaunch handoff note supplied",
+    "Raw relaunch command refused by supported adapter allowlist; final proof uses named omp adapter and transparent --session-dir launcher",
+    "Original unconfined omp launch contained by guarded lab stop; external session files left untouched",
+    "Unsent draft assertion compares real composer content; asynchronous ghost suggestion is not submitted draft"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "command": "env FM_TEST_ONLY=test_task_session_proof_tracks_active_session bash tests/fm-omp-harness.test.sh",
+  "returncode": 0,
+  "stdout": "ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement\n",
+  "stderr": ""
+}

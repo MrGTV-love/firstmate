@@ -1,0 +1,6 @@
+{
+  "command": "bash tests/fm-remote-herdr-guard.test.sh",
+  "returncode": 0,
+  "stdout": "ok - holder processes expose their environment to the owner library\nok - kernel environment entries retain spaces and omit unrelated line-breaking values\nok - an empty session is started inside the launch agent\nok - launchd and worker markers require gui-domain launchctl proof\nok - unrelated multiline values and non-shell names leave proven Aqua owners untouched\nok - duplicate and line-breaking relevant markers refuse all ownership evidence\nok - embedded worker and launchd values never prove an Aqua birth\nok - a missing kernel environment reader refuses server takeover\nok - background, inherited-XPC, SSH-born, SSH-descended, and unprovable owners are taken over\nok - a running session with no provable owner is taken over rather than trusted\nok - a host without lsof cannot prove an Aqua birth, so the session is taken over\nok - a foreign server that never releases the socket yields exit 1 so launchd retries\nok - the guard starts as soon as the foreign server releases the socket\nok - argument errors are refused before any herdr call\n",
+  "stderr": ""
+}

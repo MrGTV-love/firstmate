@@ -1,0 +1,121 @@
+{
+  "hashes": {
+    "home/state/active-proof.meta": "aaf74ef19632d93544cd9d33b2904cf7cce5fc0166b4c4c0dbafd2d5c50c7173",
+    "home/state/active-proof.omp-session.json": "084216308626bc8441c9fdaed7f3859319c08bc1d5893941a3a32d73f7ee64ab",
+    "home/data/active-proof/brief.md": "5080482a81f23f511e3413f97049cfd5af61a0755718d1503f761dab5c4169f8",
+    "worktree/dirty.txt": "af660083239f929a47d981c862026a9ca3413a5060f237298fea1728e40269ba",
+    "sessions/task.jsonl": "05b14e21f4e6f20f8c579ec356468f12d1c8f0aa498731f31fc3ae20b30fb289",
+    "sessions/personal.jsonl": "d78a6ae6fd3352f9959dd85b98ebf724e68b6259a15498c358a4f9948d6216fa"
+  },
+  "state_files": [
+    "active-proof.busy-gen",
+    "active-proof.busy-state",
+    "active-proof.git-hooks",
+    "active-proof.meta",
+    "active-proof.omp-ext.ts",
+    "active-proof.omp-session.json",
+    "home-summary.json"
+  ],
+  "results": [
+    {
+      "scenario": "2 empty interrupt",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty exit",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty relaunch-note",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty recover-launch",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 empty reboot-sweep",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=empty\ncontent=",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff interrupt",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff exit",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff relaunch-note",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff recover-launch",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    },
+    {
+      "scenario": "2 pending-bang-git-diff reboot-sweep",
+      "result": "PASS",
+      "pid": 60096,
+      "argv_retained": true,
+      "pin_retained": true,
+      "composer_retained": "state=pending\ncontent=!git diff",
+      "screen_unchanged": true,
+      "files_unchanged": true
+    }
+  ]
+}

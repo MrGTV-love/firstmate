@@ -1,0 +1,6 @@
+{
+  "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-fresh-proof-61122-12353 pane read --help",
+  "returncode": 0,
+  "stdout": "Read pane terminal output\n\nUsage: herdr pane read [OPTIONS] <PANE_ID>\n\nArguments:\n  <PANE_ID>\n          \n\nOptions:\n      --source <SOURCE>\n          Terminal snapshot source (default: recent)\n          \n          [possible values: visible, recent, recent-unwrapped, detection]\n\n      --lines <N>\n          \n\n      --format <FORMAT>\n          [possible values: text, ansi]\n\n      --ansi\n          \n\n      --raw\n\n",
+  "stderr": ""
+}

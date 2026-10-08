@@ -1,0 +1,6 @@
+{
+  "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+  "returncode": 0,
+  "stdout": "unmanaged",
+  "stderr": ""
+}

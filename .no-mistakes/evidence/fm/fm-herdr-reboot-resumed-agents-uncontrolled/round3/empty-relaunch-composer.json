@@ -1,0 +1,6 @@
+{
+  "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-local-sessions-68050-30298:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-fresh-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+  "returncode": 0,
+  "stdout": "state=empty\ncontent=",
+  "stderr": ""
+}

@@ -1,0 +1,11 @@
+installed omp integration to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/tmp/fm-omp-reboot.FIlgYE/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+native child captured: pid=67370 start=Wed Oct  7 15:18:11 2026    
+native child captured: pid=41657 start=Wed Oct  7 15:20:56 2026    
+Herdr lab runtime: {"client":{"version":"0.9.1","channel":"stable","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"remote_host_bridge":true,"remote_bridge_idle_timeout":true,"binary":"/Users/charlesabrooker/.local/bin/herdr","session":"fm-lab-omp-reboot-57003-22982"},"server":{"status":"running","running":true,"version":"0.9.1","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-reboot-57003-22982/herdr.sock","session":"fm-lab-omp-reboot-57003-22982","rest…
+ok - native omp: task and local secondmate remain unmanaged and unchanged for empty/pending interrupt, exit, relaunch, direct recovery and reboot sweep
+guarded teardown completed for session 'fm-lab-omp-reboot-57003-22982'; waiting for native child exit
+native child exit confirmed: pid=67370 start=Wed Oct  7 15:18:11 2026    
+native child exit confirmed: pid=41657 start=Wed Oct  7 15:20:56 2026    
+private fixture tree removed: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-round3/tmp/fm-omp-reboot.FIlgYE
+
+[Some lines truncated to 768 chars]

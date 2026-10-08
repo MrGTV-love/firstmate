@@ -1,0 +1,25 @@
+Cleanup-only test fix; no product changes.
+
+Changed:
+- tests/fm-omp-reboot-live-e2e.test.sh captures each native omp PID plus ps lstart identity, preserves an uncaptured-launch refusal flag, and waits up to 10 seconds after guarded session teardown before removing the private fixture tree. A live/unconfirmed child retains the tree and fails cleanup. PID reuse never authorizes signaling; the wait sends no signals. Existing lifecycle assertions remain unchanged on the default path.
+- The same fixture exposes FM_OMP_REBOOT_CLEANUP_SMOKE=1 for focused real-native verification of task + local secondmate startup and the shared EXIT cleanup, without rerunning the slow lifecycle matrix. Smoke reporting does not claim the omitted matrix passed.
+- docs/herdr-backend.md records the dependency-preserving cleanup contract and smoke invocation.
+
+Preparation command:
+mkdir -p .live-reboot-cleanup/tmp .live-reboot-cleanup/lab-state
+
+Exact exercised verification command:
+set -o pipefail && env TMPDIR="$PWD/.live-reboot-cleanup/tmp" FM_HERDR_LAB_STATE_DIR="$PWD/.live-reboot-cleanup/lab-state" FM_TEST_SKIP_ORPHAN_REAP=1 FM_OMP_REBOOT_LIVE=1 FM_OMP_REBOOT_CLEANUP_SMOKE=1 bash tests/fm-omp-reboot-live-e2e.test.sh | tee /Users/charlesabrooker/.no-mistakes/evidence/01M4AZ0K1QEE5AK43TDDQM0E77/native-reboot-cleanup-smoke.log
+
+Result: PASS; bash job bg_5 reported completed, 130.81 seconds, with no nonzero-status or removal-error report. Full stdout is native-reboot-cleanup-smoke.log (also artifact://38).
+Runtime: Herdr 0.9.1, protocol 22.
+Owned session: fm-lab-omp-reboot-8402-29286.
+Native identities: PID 21026 / Wed Oct 7 15:00:11 2026; PID 4865 / Wed Oct 7 15:01:21 2026.
+Observed order: both real unmanaged native composers ready -> guarded named-session teardown completed (which includes unchanged default-session tripwire verification) -> both captured child exits confirmed -> private fixture tree removed. No blanket wait or suppressed rm error was introduced.
+
+Removed own residual .live-reboot-cleanup directory after the successful child-exit/private-tree-removal proof. No transient scaffolds remain.
+No full suites, linters, source-string tests, or product changes were run/made.
+
+Prior parent evidence distinction: native-reboot-e2e.log records all original product assertions passing, but original fixture rm cleanup failed with Directory not empty. The original pipeline did not enable pipefail, so its reported 0 was tee's status, not evidence that the test cleanup succeeded. That original failure was not rerun to confirm.
+
+Tool issue: two Python Eval invocations returned only Command timed out (including a trivial state-print follow-up); own workspace remained empty before the actual bash smoke. Reported via xd://report_issue. The focused real-native check above was exercised once through bash with pipefail.

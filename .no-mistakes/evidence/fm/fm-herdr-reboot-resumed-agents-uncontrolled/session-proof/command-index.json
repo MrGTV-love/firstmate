@@ -1,0 +1,847 @@
+[
+  {
+    "evidence": "001-name.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh name session-proof",
+    "returncode": 0
+  },
+  {
+    "evidence": "002-prepare.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh prepare fm-lab-session-proof-64916-7212",
+    "returncode": 0
+  },
+  {
+    "evidence": "003-lab-home.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home",
+    "returncode": 0
+  },
+  {
+    "evidence": "004-provision.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh provision fm-lab-session-proof-64916-7212",
+    "returncode": 0
+  },
+  {
+    "evidence": "005-integration.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 integration install omp",
+    "returncode": 0
+  },
+  {
+    "evidence": "006-git-init.json",
+    "command": "git init /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project",
+    "returncode": 0
+  },
+  {
+    "evidence": "007-git-name.json",
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project config user.name 'Live fixture'",
+    "returncode": 0
+  },
+  {
+    "evidence": "008-git-email.json",
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project config user.email live@example.invalid",
+    "returncode": 0
+  },
+  {
+    "evidence": "009-git-add.json",
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project add tracked.txt",
+    "returncode": 0
+  },
+  {
+    "evidence": "010-git-commit.json",
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project commit -m fixture",
+    "returncode": 0
+  },
+  {
+    "evidence": "011-git-worktree.json",
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/project worktree add -b fm/active-proof /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree",
+    "returncode": 0
+  },
+  {
+    "evidence": "012-workspace.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree --label fm-active-proof",
+    "returncode": 1
+  },
+  {
+    "evidence": "013-workspace-retry.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree --label fm-active-proof",
+    "returncode": 0
+  },
+  {
+    "evidence": "014-panes.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane list --workspace w1",
+    "returncode": 0
+  },
+  {
+    "evidence": "015-pane.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane get w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "016-production-spawn.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-spawn.sh active-proof --relaunch --harness 'HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.config XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/share XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/state XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.cache PI_CONFIG_DIR=.omp PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.omp/agent OMP_PROFILE=default PI_PROFILE=default OMP_SKIP_SETUP=1 MY_NOTE='\"'\"'first\nsecond'\"'\"' omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/task.jsonl --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions --cwd=__WORKTREE__ --config __OMPSESSIONCFG__ -e __OMPEXT__'",
+    "returncode": 3
+  },
+  {
+    "evidence": "017-production-spawn-retry.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-spawn.sh active-proof --relaunch --harness 'HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.config XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/share XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/state XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.cache PI_CONFIG_DIR=.omp PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.omp/agent OMP_PROFILE=default PI_PROFILE=default OMP_SKIP_SETUP=1 MY_NOTE='\"'\"'first\nsecond'\"'\"' omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/task.jsonl --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions --cwd=__WORKTREE__ --config __OMPSESSIONCFG__ -e __OMPEXT__'",
+    "returncode": 0
+  },
+  {
+    "evidence": "018-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "019-scenario-1-managed.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "020-scenario-1-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "021-setup-native-quit.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 /quit",
+    "returncode": 0
+  },
+  {
+    "evidence": "022-setup-native-quit-enter.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "023-production-omp-spawn.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-spawn.sh active-proof --relaunch --harness 'HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.config XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/share XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/state XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.cache PI_CONFIG_DIR=.omp PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.omp/agent OMP_PROFILE=default PI_PROFILE=default OMP_SKIP_SETUP=1 MY_NOTE=$'\"'\"'first\\nsecond'\"'\"' omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/task.jsonl --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions --cwd=__WORKTREE__ --config __OMPSESSIONCFG__ -e __OMPEXT__'",
+    "returncode": 0
+  },
+  {
+    "evidence": "024-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "025-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "026-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "027-scenario-1-managed.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "028-scenario-1-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "029-scenario-1-kernel-env.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_remote_herdr_process_env 60096'",
+    "returncode": 0
+  },
+  {
+    "evidence": "030-resume-personal-text.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 '/resume /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/personal.jsonl'",
+    "returncode": 0
+  },
+  {
+    "evidence": "031-resume-personal-enter.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "032-resume-personal-ui.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "033-resume-picker.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 /resume",
+    "returncode": 0
+  },
+  {
+    "evidence": "034-resume-picker-enter.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "035-resume-picker-ui.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "036-choose-personal.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "037-scenario-2-personal-empty.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "038-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "039-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "040-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "041-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "042-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "043-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "044-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "045-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "046-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "047-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "048-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "049-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "050-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "051-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "052-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "053-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "054-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "055-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "056-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "057-settling-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "059-command.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 /resume",
+    "returncode": 0
+  },
+  {
+    "evidence": "060-command.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "061-picker-filter-personal.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 'PERSONAL CAPTAIN BRAVO'",
+    "returncode": 0
+  },
+  {
+    "evidence": "062-filtered-personal-picker.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "063-choose-filtered-personal.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "064-scenario-2-personal-empty.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "065-scenario-2-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "066-scenario-2-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "067-personal-empty-before.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "068-personal-empty-composer-before.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "069-personal-empty-interrupt.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof interrupt",
+    "returncode": 1
+  },
+  {
+    "evidence": "070-personal-empty-interrupt-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "071-personal-empty-interrupt-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "072-personal-empty-interrupt-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "073-personal-empty-interrupt-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "074-personal-empty-exit.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof exit",
+    "returncode": 1
+  },
+  {
+    "evidence": "075-personal-empty-exit-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "076-personal-empty-exit-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "077-personal-empty-exit-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "078-personal-empty-exit-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "079-personal-empty-relaunch-note.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof relaunch --note 'Must not reach personal instructions.'",
+    "returncode": 1
+  },
+  {
+    "evidence": "080-personal-empty-relaunch-note-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "081-personal-empty-relaunch-note-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "082-personal-empty-relaunch-note-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "083-personal-empty-relaunch-note-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "084-personal-empty-recover-launch.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof relaunch --recover-launch",
+    "returncode": 0
+  },
+  {
+    "evidence": "085-personal-empty-recover-launch-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "086-personal-empty-recover-launch-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "087-personal-empty-recover-launch-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "088-personal-empty-recover-launch-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "089-personal-empty-reboot-sweep.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-reboot-recover.sh recover",
+    "returncode": 0
+  },
+  {
+    "evidence": "090-personal-empty-reboot-sweep-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "091-personal-empty-reboot-sweep-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "092-personal-empty-reboot-sweep-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "093-personal-empty-reboot-sweep-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "094-personal-pending-draft.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 '!git diff'",
+    "returncode": 0
+  },
+  {
+    "evidence": "095-personal-pending-bang-git-diff-before.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "096-personal-pending-bang-git-diff-composer-before.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "097-personal-pending-bang-git-diff-interrupt.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof interrupt",
+    "returncode": 1
+  },
+  {
+    "evidence": "098-personal-pending-bang-git-diff-interrupt-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "099-personal-pending-bang-git-diff-interrupt-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "100-personal-pending-bang-git-diff-interrupt-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "101-personal-pending-bang-git-diff-interrupt-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "102-setup-clear-draft.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 ctrl+u",
+    "returncode": 0
+  },
+  {
+    "evidence": "103-personal-pending-draft.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 '!git diff'",
+    "returncode": 0
+  },
+  {
+    "evidence": "104-personal-pending-bang-git-diff-before.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "105-personal-pending-bang-git-diff-composer-before.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "106-personal-pending-bang-git-diff-interrupt.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof interrupt",
+    "returncode": 1
+  },
+  {
+    "evidence": "107-personal-pending-bang-git-diff-interrupt-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "108-personal-pending-bang-git-diff-interrupt-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "109-personal-pending-bang-git-diff-interrupt-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "110-personal-pending-bang-git-diff-interrupt-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "111-personal-pending-bang-git-diff-exit.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof exit",
+    "returncode": 1
+  },
+  {
+    "evidence": "112-personal-pending-bang-git-diff-exit-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "113-personal-pending-bang-git-diff-exit-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "114-personal-pending-bang-git-diff-exit-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "115-personal-pending-bang-git-diff-exit-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "116-personal-pending-bang-git-diff-relaunch-note.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof relaunch --note 'Must not reach personal instructions.'",
+    "returncode": 1
+  },
+  {
+    "evidence": "117-personal-pending-bang-git-diff-relaunch-note-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "118-personal-pending-bang-git-diff-relaunch-note-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "119-personal-pending-bang-git-diff-relaunch-note-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "120-personal-pending-bang-git-diff-relaunch-note-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "121-personal-pending-bang-git-diff-recover-launch.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof relaunch --recover-launch",
+    "returncode": 0
+  },
+  {
+    "evidence": "122-personal-pending-bang-git-diff-recover-launch-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "123-personal-pending-bang-git-diff-recover-launch-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "124-personal-pending-bang-git-diff-recover-launch-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "125-personal-pending-bang-git-diff-recover-launch-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "126-personal-pending-bang-git-diff-reboot-sweep.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-reboot-recover.sh recover",
+    "returncode": 0
+  },
+  {
+    "evidence": "127-personal-pending-bang-git-diff-reboot-sweep-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "128-personal-pending-bang-git-diff-reboot-sweep-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "129-personal-pending-bang-git-diff-reboot-sweep-composer.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; target=fm-lab-session-proof-64916-7212:w1:p1; printf \"state=\"; fm_backend_composer_state herdr \"$target\" fm-active-proof; printf \"\\ncontent=\"; fm_backend_herdr_composer_content \"$target\" \"$(fm_backend_herdr_composer_identity \"$target\")\"'",
+    "returncode": 0
+  },
+  {
+    "evidence": "130-personal-pending-bang-git-diff-reboot-sweep-after.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "131-scenario-3-explicit-draft-cleanup.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 ctrl+u",
+    "returncode": 0
+  },
+  {
+    "evidence": "132-resume-task-picker.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 /resume",
+    "returncode": 0
+  },
+  {
+    "evidence": "133-command.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "134-picker-filter-task.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w1:p1 'MANAGED TASK ALPHA'",
+    "returncode": 0
+  },
+  {
+    "evidence": "135-scenario-3-task-picker.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "136-choose-task.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w1:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "137-scenario-3-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "138-scenario-3-returned-task.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "139-managed-before-recovery.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "140-managed-before-recovery-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "141-managed-recover-inspection.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof relaunch --recover-launch",
+    "returncode": 0
+  },
+  {
+    "evidence": "142-managed-reboot-inspection.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-reboot-recover.sh recover",
+    "returncode": 0
+  },
+  {
+    "evidence": "143-managed-after-recovery.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "144-managed-after-recovery-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "145-managed-supported-exit.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof exit",
+    "returncode": 0
+  },
+  {
+    "evidence": "146-managed-after-exit.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "147-managed-supported-relaunch.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-control.sh active-proof relaunch --harness 'HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.config XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/share XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/state XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.cache PI_CONFIG_DIR=.omp PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.omp/agent OMP_PROFILE=default PI_PROFILE=default OMP_SKIP_SETUP=1 MY_NOTE=$'\"'\"'first\\nsecond'\"'\"' omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/task.jsonl --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions --cwd=__WORKTREE__ --config __OMPSESSIONCFG__ -e __OMPEXT__' --note 'Resume isolated lifecycle verification; dirty.txt remains unlanded progress. Leave idle, no implementation or tools.'",
+    "returncode": 1
+  },
+  {
+    "evidence": "149-canonical-relaunch-timeout-pane.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "150-canonical-failure-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w1:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "151-canonical-failure-launch-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/active-proof.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "152-no-ext-workspace.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree --label fm-no-extension",
+    "returncode": 0
+  },
+  {
+    "evidence": "153-no-ext-panes.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane list --workspace w2",
+    "returncode": 0
+  },
+  {
+    "evidence": "154-no-ext-pane.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane get w2:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "155-pinned-no-extension-launch.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w2:p1 'env HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.config XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/share XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.local/state XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.cache PI_CONFIG_DIR=.omp PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/native-home/.omp/agent OMP_PROFILE=default PI_PROFILE=default OMP_SKIP_SETUP=1 FM_SPAWN_GEN=live-no-extension-pin '\"'\"'MY_NOTE=first\nsecond'\"'\"' omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions/task.jsonl --session-dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/sessions --cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/worktree'",
+    "returncode": 0
+  },
+  {
+    "evidence": "156-command.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w2:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "157-scenario-4-no-extension-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/no-extension.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "158-no-ext-setup-pane.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w2:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "159-no-ext-setup-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w2:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "160-no-ext-clear-partial-shell-input.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w2:p1 ctrl+c",
+    "returncode": 0
+  },
+  {
+    "evidence": "161-no-ext-real-launch-script.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-text w2:p1 'bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/no-extension-launch.sh'",
+    "returncode": 0
+  },
+  {
+    "evidence": "162-command.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane send-keys w2:p1 Enter",
+    "returncode": 0
+  },
+  {
+    "evidence": "163-scenario-4-pinned-no-extension.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w2:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "164-scenario-4-process.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane process-info --pane w2:p1",
+    "returncode": 0
+  },
+  {
+    "evidence": "165-scenario-4-no-extension-proof.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-backend.sh; fm_backend_source herdr; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_launch_proof_herdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/.live-session-proof/home/state/no-extension.meta'",
+    "returncode": 0
+  },
+  {
+    "evidence": "166-scenario-4-kernel-env.json",
+    "command": "bash -c '. /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-launch-proof-lib.sh; fm_remote_herdr_process_env 30342'",
+    "returncode": 0
+  },
+  {
+    "evidence": "167-scenario-4-final-pane.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w2:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "168-scenario-3-final-error-pane.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 pane read w1:p1 --format text",
+    "returncode": 0
+  },
+  {
+    "evidence": "169-final-live-status.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh run fm-lab-session-proof-64916-7212 status --json",
+    "returncode": 0
+  },
+  {
+    "evidence": "170-guarded-teardown.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh teardown fm-lab-session-proof-64916-7212",
+    "returncode": 1
+  },
+  {
+    "evidence": "171-guarded-teardown-real-client.json",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4AZ0K1QEE5AK43TDDQM0E77/bin/fm-herdr-lab.sh teardown fm-lab-session-proof-64916-7212",
+    "returncode": 0
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "guarded_teardown": "success",
+  "sessions": [
+    "fm-lab-local-sessions-68050-30298",
+    "fm-lab-fresh-proof-61122-12353",
+    "fm-lab-omp-reboot-57003-22982"
+  ],
+  "captured_pids": [
+    78349,
+    65217,
+    2906,
+    34693,
+    87648
+  ],
+  "remaining_pids": [],
+  "default_session_tripwire": "verified by helper",
+  "worktree_fixture_removed": true,
+  "cleanup_command": "chmod -R u+w .live-round3 && rm -rf .live-round3"
+}
