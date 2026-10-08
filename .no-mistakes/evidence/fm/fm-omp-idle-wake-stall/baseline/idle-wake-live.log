@@ -1,0 +1,49 @@
+Lab arm adapter removes extension-injected path overrides before executing the unchanged real watcher arm; no gate bypass.
+Real omp owns session lock; real watcher started on 120x40 private tmux grid.
+Published real watcher signal: idle-empty
+REPRODUCED base regression: idle advisor-tail wake remained queued for 20s; no wake reached the model.
+FAIL Timed out: 
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                         Tip: Use /tan to fork the current conversation into a background agent
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ EMPTY-ADVISE reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ EMPTY-ADVISE-NOTE verify before finishing.
+
+❯
+ π · ⬢ m1 🙈 · 🌳 32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P · ⑂ detached ?2 · ◫ 7.5%/200K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Private tmux server stopped.
+watcher: stopped pid=9274
+Private tmux socket directory removed.
+Disposable lab home removed.

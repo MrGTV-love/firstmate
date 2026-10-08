@@ -1,0 +1,237 @@
+omp/18.8.1
+FAIL ['tmux', '-L', 'fm-lab', 'new-session', '-d', '-s', 'primary', '-x', '120', '-y', '40', '-c', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P', '-e', 'FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab', 'bash -c \'printf "%s\\n" $$ > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab/state/.lock; exec omp --model lab/m1 --no-extensions -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.omp/extensions/fm-primary-omp-watch.ts --no-lsp --no-skills --no-rules --no-title --tools bash --approval-mode yolo --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.omp/fm-session-overlay.yml\'']: error connecting to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab/tmux/tmux-501/fm-lab (File name too long)
+
+tmux teardown: ['tmux', '-L', 'fm-lab', 'kill-server']: error connecting to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab/tmux/tmux-501/fm-lab (File name too long)
+
+watcher: none running
+Disposable lab home removed.
+omp/18.8.1
+FAIL Timed out: 
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                                    Tip: Try task isolation to create CoW worktrees
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: FAILED - omp extension could not restore watcher continuity
+ after 5 retries
+ watcher: FAILED - refusing to arm from a disposable validation checkout:
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/bin
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ out=$(bin/fm-wake-drain.sh 2>&1); rc=$?; printf "%s\n" "$out"; [ "$rc" -eq 0 ] || exit "$rc"; while IFS= read -r   │
+│ line; do case "$line" in WAKE_ACK_REQUIRED:*) cmd=${line#*run }; bash -c "$cmd" || exit $?;; esac; done <<< "$out"   │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ ⟦Wall: 0.80s | Timeout: 300s⟧                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+❯
+ π · ⬢ m1 🙈 · 🌳 32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P · ⑂ detached ?2 · ◫ 7.5%/200K ⟲
+
+
+
+
+
+
+
+Private tmux server stopped.
+watcher: none running
+Private tmux socket directory removed.
+Disposable lab home removed.
+omp/18.8.1
+Lab arm adapter removes extension-injected path overrides before executing the unchanged real watcher arm; no gate bypass.
+Real omp owns session lock; real watcher started on 120x40 private tmux grid.
+FAIL Timed out: 
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                        Tip: Say `orchestrate` in your message to drive a multi-phase task with
+                                     parallel subagents — watch it glow as you type
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ EMPTY-ADVISE reply ack
+
+
+ ack
+
+❯
+ π · ⬢ m1 🙈 · 🌳 32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P · ⑂ detached ?2 · ◫ 7.4%/200K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Private tmux server stopped.
+watcher: stopped pid=22853
+Private tmux socket directory removed.
+Disposable lab home removed.
+omp/18.8.1
+Lab arm adapter removes extension-injected path overrides before executing the unchanged real watcher arm; no gate bypass.
+Real omp owns session lock; real watcher started on 120x40 private tmux grid.
+Published real watcher signal: idle-empty
+FAIL Timed out: 
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                                              Tip: Please use nerdfont 😭.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ EMPTY-ADVISE reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ EMPTY-ADVISE-NOTE verify before finishing.
+
+❯
+ π · ⬢ m1 🙈 · 🌳 32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P · ⑂ detached ?2 · ◫ 7.5%/200K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Private tmux server stopped.
+watcher: stopped pid=93651
+Private tmux socket directory removed.
+Disposable lab home removed.
+omp/18.8.1
+Lab arm adapter removes extension-injected path overrides before executing the unchanged real watcher arm; no gate bypass.
+Real omp owns session lock; real watcher started on 120x40 private tmux grid.
+Published real watcher signal: idle-empty
+FAIL Timed out: 
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                        Tip: Log in to several accounts of the same provider — `/login` again —
+                                    and omp load-balances across them automatically
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ EMPTY-ADVISE reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ EMPTY-ADVISE-NOTE verify before finishing.
+
+❯
+ π · ⬢ m1 🙈 · 🌳 32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P · ⑂ detached ?2 · ◫ 7.5%/200K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Private tmux server stopped.
+watcher: stopped pid=26250
+Private tmux socket directory removed.
+Disposable lab home removed.
+omp/18.8.1
+FAIL ['bin/fm-lab-home.sh', 'create', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab']: fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab': a lab marker is only ever stamped on a fresh empty dir
+
+tmux teardown: ['tmux', '-L', 'fm-lab', 'kill-server']: error connecting to /private/tmp/tmux-501/fm-lab (No such file or directory)
+
+watcher: FAILED - refusing to arm from a disposable validation checkout: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/bin
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab': not a marked lab home
+Disposable lab home removed.
+Lab arm adapter removes extension-injected path overrides before executing the unchanged real watcher arm; no gate bypass.
+Real omp owns session lock; real watcher started on 120x40 private tmux grid.
+Published real watcher signal: idle-empty
+PASS idle advisor tail / empty composer: durable wake consumed and acknowledged in 8.4s without Enter.
+Published real watcher signal: idle-draft
+PASS idle advisor tail / operator draft: wake acknowledged, draft still rendered and never sent to model.
+Published real watcher signal: idle-repeat
+PASS successor watcher: another wake consumed without manual rearm; draft retained.
+Published real watcher signal: busy-wake
+Busy-boundary observation: durable wake queued while original model response remained in flight.
+PASS busy boundary: original response completed, queued follow-up drained and acknowledged without cancellation.
+Private tmux server stopped.
+watcher: stopped pid=73527
+Private tmux socket directory removed.
+Disposable lab home removed.
+Lab arm adapter removes extension-injected path overrides before executing the unchanged real watcher arm; no gate bypass.
+Real omp owns session lock; real watcher started on 120x40 private tmux grid.
+Published real watcher signal: idle-empty
+PASS idle advisor tail / empty composer: durable wake consumed and acknowledged in 12.2s without Enter.
+Published real watcher signal: idle-draft
+PASS idle advisor tail / operator draft: wake acknowledged, draft still rendered and never sent to model.
+Published real watcher signal: idle-repeat
+PASS successor watcher: another wake consumed without manual rearm; draft retained.
+Published real watcher signal: busy-wake
+Busy-boundary observation: durable wake queued while original model response remained in flight.
+PASS busy boundary: original response completed, queued follow-up drained and acknowledged without cancellation.
+Private tmux server stopped.
+watcher: stopped pid=83890
+Private tmux socket directory removed.
+Disposable lab home removed.

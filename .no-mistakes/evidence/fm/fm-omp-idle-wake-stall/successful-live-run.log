@@ -1,0 +1,15 @@
+Lab arm adapter removes extension-injected path overrides before executing the unchanged real watcher arm; no gate bypass.
+Real omp owns session lock; real watcher started on 120x40 private tmux grid.
+Published real watcher signal: idle-empty
+PASS idle advisor tail / empty composer: durable wake consumed and acknowledged in 12.2s without Enter.
+Published real watcher signal: idle-draft
+PASS idle advisor tail / operator draft: wake acknowledged, draft still rendered and never sent to model.
+Published real watcher signal: idle-repeat
+PASS successor watcher: another wake consumed without manual rearm; draft retained.
+Published real watcher signal: busy-wake
+Busy-boundary observation: durable wake queued while original model response remained in flight.
+PASS busy boundary: original response completed, queued follow-up drained and acknowledged without cancellation.
+Private tmux server stopped.
+watcher: stopped pid=83890
+Private tmux socket directory removed.
+Disposable lab home removed.

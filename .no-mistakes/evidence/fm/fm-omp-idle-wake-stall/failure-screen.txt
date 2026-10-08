@@ -1,0 +1,40 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                        Tip: Log in to several accounts of the same provider — `/login` again —
+                                    and omp load-balances across them automatically
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ EMPTY-ADVISE reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ EMPTY-ADVISE-NOTE verify before finishing.
+
+❯
+ π · ⬢ m1 🙈 · 🌳 32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P · ⑂ detached ?2 · ◫ 7.5%/200K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+

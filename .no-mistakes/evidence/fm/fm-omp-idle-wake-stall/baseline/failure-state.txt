@@ -1,0 +1,144 @@
+state/.omp-watch-extension-loaded
+sha256:8675a6740875b6fe155f35abc6e4728561ab2731bde4067d70f1806439fdb215
+50409
+
+
+state/.lock
+50409
+
+
+state/.last-heartbeat
+
+
+state/.watch-cycle-exits.log
+arm_pid=53037	watcher_pid=55119	origin=started	started_at=1791465840	ended_at=1791465853	exit_code=0	signal=none	reason=actionable-signal	beacon_age=7	lock_before=pid:55119|identity:Thu Oct  8 08:24:00 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=started:9274
+
+
+state/.open-loops-started
+
+
+state/.watch-arm-output.mgnS8I
+
+
+state/.inactive-outcome-reconcile
+epoch=1791465845
+cursor=
+
+
+state/.last-watcher-beat
+
+
+state/.open-loops.lock
+
+
+state/idle-empty.turn-ended
+1791465848.638881
+
+
+state/home-summary.json
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-08T13:24:09Z",
+  "generated_epoch": 1791465849,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-8l71tep1",
+  "valid": true,
+  "reason": null,
+  "invalidity": {
+    "kind": null,
+    "ids": []
+  },
+  "state": "no_active_work",
+  "active_children": [],
+  "decisions_open": [],
+  "holds": [],
+  "queued": [],
+  "landed": [],
+  "endpoints": [],
+  "counts": {
+    "active_children": 0,
+    "decisions_open": 0,
+    "holds": 0,
+    "queued": 0,
+    "landed": 0,
+    "endpoints": 0
+  },
+  "omitted": []
+}
+
+
+state/.watch-deliveries.log
+55119	Thu Oct  8 08:24:00 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/bin/fm-watch.sh	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-8l71tep1/state/idle-empty.turn-ended
+
+
+state/.wake-queue.seq
+2
+
+
+state/.fm-lab-tmux-dir
+/tmp/fml.6Lrbu6
+
+
+state/.wake-queue
+1791465849	1	signal	idle-empty.turn-ended	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-8l71tep1/state/idle-empty.turn-ended
+1791465850	2	signal	idle-empty.turn-ended	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-8l71tep1/state/idle-empty.turn-ended
+
+
+state/.seen-idle-empty_turn-ended
+18:1791465848.639030770
+
+state/.heartbeat-streak
+0
+
+
+state/open-loops.json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791465844, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-8l71tep1", "complete": true, "rows": []}
+
+
+state/.last-check
+
+
+state/.watcher-down
+announced:handling:55119.1791465850.tSQ2Pe
+
+
+state/.secondmate-liveness-tick
+
+
+state/.watch.lock.owner.UKrpv7/fm-home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-8l71tep1
+
+
+state/.watch.lock.owner.UKrpv7/pid
+9274
+
+
+state/.watch.lock.owner.UKrpv7/pid-identity
+Thu Oct  8 08:24:15 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/bin/fm-watch.sh
+
+
+state/.watch.lock.owner.UKrpv7/watcher-path
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/bin/fm-watch.sh
+
+
+state/.wake-queue.lock.owner.lPQuwp/pid
+9274

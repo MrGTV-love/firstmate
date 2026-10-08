@@ -1,0 +1,49 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                        Tip: Hit a Codex rate limit? `/usage reset` spends a saved reset credit
+                                           to immediately restore your quota
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ EMPTY-ADVISE reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ EMPTY-ADVISE-NOTE verify before finishing.
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-y_fdulko/state/id
+ le-empty.turn-ended
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ out=$(bin/fm-wake-drain.sh 2>&1); rc=$?; printf "%s\n" "$out"; [ "$rc" -eq 0 ] || exit "$rc"; while IFS= read -r   │
+│ line; do case "$line" in WAKE_ACK_REQUIRED:*) cmd=${line#*run }; bash -c "$cmd" || exit $?;; esac; done <<< "$out"   │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791465973   2   signal   idle-empty.turn-ended   signal:                                                            │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P/.idle-wake-lab-y_fdulko/state/ │
+│ idle-empty.turn-ended                                                                                                │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation           │
+│ 93358.1791465972.rUEHza                                                                                              │
+│ ⟦Wall: 3.14s | Timeout: 300s⟧                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+❯
+ π · ⬢ m1 🙈 · 🌳 32d18ed9638d/01M4DSW07B1PZ3X8NVQ78NGN8P · ⑂ detached ?2 · ◫ 7.6%/200K ⟲
