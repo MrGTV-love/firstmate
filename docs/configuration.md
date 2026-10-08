@@ -1693,7 +1693,8 @@ The guard asks Jev three things, exactly as upstream does:
 
 The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
 Write and edit paths must use a plain absolute or worktree-relative spelling.
-The shared guard blocks paths beginning with `~`, `@`, `file:` or `:/` without a Jev call because omp rewrites those spellings before execution, and tells the agent to use a plain path and report if that is not possible.
+A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
+The shared guard blocks every other spelling without a Jev call because omp can rewrite such paths before execution, and tells the agent to use a plain path and report if that is not possible.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the unchanged upstream write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.

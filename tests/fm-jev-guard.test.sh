@@ -352,7 +352,12 @@ for (const project of ["firstmate", "vernant", "", undefined]) {
   const handlers = {};
   installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { ...context, project });
   for (const toolName of ["write", "edit"]) {
-    for (const path of ["~/jev-note.txt", "~other/jev-note.txt", "@/tmp/x", "@~/jev-note.txt", "file:///tmp/x", "FILE:///tmp/x", ":/tmp/x"]) {
+    for (const path of [
+      "~/a", "~other/a", ":~/a", ":./a", ":../a", ":/tmp/a",
+      "@/tmp/a", "@~/a", "file:///tmp/a", "FILE:///tmp/a",
+      "[/Users/x/a]", "[/Users/x/a#ABCD]", "src/a#ABCD]",
+      "https://example.com/a", "C:/a", "+note.txt", "",
+    ]) {
       const event = { toolName, input: toolName === "write" ? { path, content: "hello" } : { path, old_string: "old", new_string: "hello" } };
       const original = JSON.stringify(event);
       const before = requests();

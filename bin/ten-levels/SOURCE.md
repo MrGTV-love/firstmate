@@ -47,12 +47,13 @@ Each change and its reason:
 
 ## Firstmate glue outside this directory
 
-- `bin/fm-jev-guard.ts:34-58`: installs the unchanged upstream extension for one worker and wraps both event handlers in the shared decision budget.
+- `bin/fm-jev-guard.ts:34-61`: installs the unchanged upstream extension for one worker and wraps both event handlers in the shared decision budget.
   `:37-42` selects the worktree, task-data or temporary root that holds the target, preserving intentional report and scratch writes.
 - `bin/fm-jev-guard.ts:46-49`: blocks edit inputs without a string `path` and `new_string`, telling the agent to report that omp replace edit mode is required.
   omp's default hashline schema differs from pi's, while replace mode matches the unchanged upstream gate without projecting or changing execution arguments.
-- `bin/fm-jev-guard.ts:50-53`: blocks write and edit paths beginning with `~`, `@`, `file:` or `:/` before root selection, requiring a plain absolute or worktree-relative path and a report if that is not possible.
-  omp 18.8.1 rewrites those spellings before execution, so rejecting them keeps the unchanged upstream lexical gate from judging a different target without reimplementing host resolution or mutating execution arguments.
+- `bin/fm-jev-guard.ts:50-56`: permits write and edit paths only when they begin with `/` or a character in `[A-Za-z0-9_.-]`, have no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and do not end with `]`.
+  Every other spelling blocks before root selection without a Jev call, requiring a plain absolute or worktree-relative path and a report if that is not possible.
+  This allowlist prevents omp 18.8.1's rewritten spellings from making the unchanged upstream lexical gate judge a different target without reimplementing host resolution or mutating execution arguments.
 - `bin/fm-jev-guard-claude.ts:31-48`: Claude has no pi extension API, so the adapter maps Claude's `PreToolUse` and `PostToolUse` payloads to the pi events the upstream handlers read (`file_path` to `path`, `tool_response` to text content).
   `:37` turns an upstream block into a Claude `deny`.
   `:47` delivers the banner as `additionalContext`, because a Claude hook cannot replace a built-in tool's output.
