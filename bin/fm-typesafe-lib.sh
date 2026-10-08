@@ -166,7 +166,10 @@ fm_typesafe_policy_marked_sections() {
 # standard boilerplate whose safety language reads as high stakes on every task.
 # Ship delivery mode is deliberately not sent.
 fm_typesafe_brief_task() {
-  local brief=$1 path=$2 output=$3 rc=0 heading sections
+  local brief=$1 path=$2 output=$3 kind=${4:-} rc=0 heading sections promoted=0
+  if [ "$kind" = ship ] && fm_brief_heading_present "$brief" "# Current ship Firstmate spec"; then
+    promoted=1
+  fi
   fm_typesafe_policy_marked_sections "$path" || return 1
   grep -qiE -e '<!--[[:space:]]*dispatch-never-send' "$brief" 2>/dev/null || rc=$?
   case "$rc" in
@@ -212,13 +215,18 @@ fm_typesafe_brief_task() {
   esac
   sections=$(
     for heading in "## Captain's intent" "## Firstmate spec"; do
-      fm_brief_task_heading_present "$output" "$heading" || continue
-      printf '%s\n%s\n\n' "$heading" "$(fm_brief_task_heading_body "$output" "$heading")"
+      if [ "$promoted" -eq 1 ] && [ "$heading" = "## Firstmate spec" ]; then
+        fm_brief_heading_present "$output" "# Current ship Firstmate spec" || continue
+        printf '%s\n%s\n\n' '# Current ship Firstmate spec' "$(fm_brief_heading_body "$output" "# Current ship Firstmate spec")"
+      else
+        fm_brief_task_heading_present "$output" "$heading" || continue
+        printf '%s\n%s\n\n' "$heading" "$(fm_brief_task_heading_body "$output" "$heading")"
+      fi
     done
   )
-  [ -n "$sections" ] || return 0
+  [ -n "$sections" ] || [ "$promoted" -eq 1 ] || return 0
   if ! {
-    if grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$output"; then
+    if [ "$kind" = scout ] || { [ -z "$kind" ] && grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$output"; }; then
       printf 'Brief kind: scout (report only)\n\n'
     fi
     printf '%s\n' "$sections"

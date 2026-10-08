@@ -7,6 +7,10 @@ set -eu
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 command -v node >/dev/null 2>&1 || { printf 'ok - skipped: node is not installed\n'; exit 0; }
+if ! prerequisite=$(node "$ROOT/bin/fm-skill-pick.mjs" check 2>&1); then
+  printf 'ok - skipped: %s\n' "$prerequisite"
+  exit 0
+fi
 TMP_ROOT=$(fm_test_tmproot fm-skill-pick)
 TOOL="$ROOT/bin/fm-skill-pick.sh"
 HOME_DIR="$TMP_ROOT/home"
@@ -21,11 +25,14 @@ unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY_PRIVATE
 cat > "$FAKE_FETCH" <<'JS'
 import { appendFileSync } from 'node:fs';
 const env = process.env;
+let directCalls = 0;
 globalThis.fetch = async (url, init) => {
   const provider = String(url).includes('openrouter') ? 'openrouter' : 'typesafe';
   const body = JSON.parse(init.body);
   appendFileSync(env.FAKE_LOG, JSON.stringify({ provider, auth: init.headers.Authorization, body }) + '\n');
-  const mode = provider === 'openrouter' ? env.FAKE_OPENROUTER || 'ok' : env.FAKE_TYPESAFE || 'ok';
+  if (provider === 'typesafe') directCalls++;
+  const mode = provider === 'openrouter' ? env.FAKE_OPENROUTER || 'ok' :
+    env.FAKE_RERANK_FAIL && directCalls > 1 ? env.FAKE_RERANK_FAIL : env.FAKE_TYPESAFE || 'ok';
   if (mode === 'hang') {
     return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason)));
   }
@@ -34,13 +41,26 @@ globalThis.fetch = async (url, init) => {
   for (const [id, q] of Object.entries(body.questions)) {
     if (q.type === 'noul') {
       const gate = Number(env.FAKE_GATE || 0.8);
-      const value = id === 'gate::prose_suffices' ? 1 - gate : id.startsWith('gate::') ? gate : Number(env.FAKE_FIT || 0.7);
+      const fits = JSON.parse(env.FAKE_FITS || '{}');
+      const value = id === 'gate::prose_suffices' ? 1 - gate : id.startsWith('gate::') ? gate :
+        fits[id.slice('fits::'.length)] ?? Number(env.FAKE_FIT || 0.7);
       answers[id] = { type: 'noul', noul: value };
     } else {
       const keys = Object.keys(q.criteria);
       const pick = keys.includes(env.FAKE_PICK) ? env.FAKE_PICK : keys[0];
-      answers[id] = { type: 'choice', choice: pick, confidence: 1,
-        probabilities: Object.fromEntries(keys.map((k) => [k, k === pick ? 1 : 0])) };
+      let probabilities = Object.fromEntries(keys.map((k) => [k, k === pick ? 1 : 0]));
+      if (env.FAKE_WEIGHTED) {
+        if (id === 'which::1') {
+          const leading = [0.30, 0.29, 0.28];
+          probabilities = Object.fromEntries(keys.map((k, i) => [k, leading[i] ?? 0.13 / (keys.length - 3)]));
+        } else if (id === 'which::2') {
+          probabilities = Object.fromEntries(keys.map((k, i) => [k, [0.34, 0.33, 0.33][i]]));
+        } else {
+          probabilities = Object.fromEntries(keys.map((k) => [k, k === 'skill-1' ? 0.60 : 0.40 / (keys.length - 1)]));
+        }
+      }
+      const winner = Object.entries(probabilities).sort((a, b) => b[1] - a[1])[0][0];
+      answers[id] = { type: 'choice', choice: winner, confidence: probabilities[winner], probabilities };
     }
   }
   return new Response(JSON.stringify({ model: `${provider}-jev-test`, answers, usage: { input_tokens: 1, output_tokens: 1 } }));
@@ -124,6 +144,14 @@ assert_equals "status=none" "$(sed -n 1p "$TMP_ROOT/record")" "no fit is recorde
 pass "the cookbook's two thresholds can each pick nothing"
 
 reset; keys
+out=$(pick FAKE_PICK=alpha FAKE_FITS='{"alpha":0.1,"beta":0.8,"gamma":0.4}')
+assert_contains "$out" "- Picked for this task: beta" "the highest fitting shortlist skill wins even when Choice prefers a low-fit skill"
+reset; keys
+out=$(pick FAKE_FIT=0.30)
+assert_equals "status=picked" "$(sed -n 1p "$TMP_ROOT/record")" "a fit exactly at .30 is accepted"
+pass "selection uses the highest fit and the inclusive threshold"
+
+reset; keys
 out=$(pick FAKE_TYPESAFE=500 FAKE_PICK=gamma)
 assert_contains "$out" "- Picked for this task: gamma" "the OpenRouter fallback still picks"
 assert_contains "$out" "through openrouter" "the fallback provider is named"
@@ -148,6 +176,22 @@ out=$(OPENROUTER_API_KEY=ambient-key pick FAKE_TYPESAFE=500)
 assert_not_contains "$(cat "$LOG")" ambient-key "an ambient OpenRouter key is never used"
 pass "TypeSafe direct first, OpenRouter on a failed direct call, keys from the home .env only"
 
+for exit_case in gate fit picked unavailable; do
+  reset; keys
+  case "$exit_case" in
+    gate) out=$(pick FAKE_TYPESAFE=500 FAKE_GATE=0.1) ;;
+    fit) out=$(pick FAKE_TYPESAFE=500 FAKE_FIT=0.1) ;;
+    picked) out=$(pick FAKE_TYPESAFE=500) ;;
+    unavailable) out=$(pick FAKE_TYPESAFE=500 FAKE_OPENROUTER=500) ;;
+  esac
+  assert_contains "$(sed -n 2p "$TMP_ROOT/record")" "TypeSafe direct failed" "fallback provenance survives $exit_case finalization"
+done
+reset; keys
+out=$(pick FAKE_RERANK_FAIL=500)
+assert_contains "$(sed -n 2p "$TMP_ROOT/record")" "TypeSafe direct failed" "rerank fallback provenance is attached"
+assert_contains "$out" "through openrouter" "rerank fallback serves the final pick"
+pass "fallback provenance is finalized for every outcome"
+
 reset; keys
 printf 'Use for delta work\n' > "$HOME_DIR/config/dispatch-never-send"
 out=$(pick)
@@ -160,18 +204,49 @@ assert_contains "$out" "withheld by dispatch-never-send policy" "a never-send li
 assert_equals 0 "$(requests)" "a withheld task sends nothing"
 pass "the dispatch-never-send policy covers every string a request can carry"
 
+for forbidden in "It is described as: Use for alpha work." "Use for alpha work. — # alpha" "Exactly one of these skills" "Is the assistant being asked" "jev-latest"; do
+  reset; keys
+  printf '%s\n' "$forbidden" > "$HOME_DIR/config/dispatch-never-send"
+  out=$(pick)
+  assert_contains "$out" "withheld by dispatch-never-send policy" "the assembled body checks $forbidden"
+  case "$forbidden" in
+    "It is described"*|"Use for alpha"*|"Exactly one"*) expected=1 ;;
+    *) expected=0 ;;
+  esac
+  assert_equals "$expected" "$(requests)" "withheld assembled bodies never reach either provider"
+done
+reset; keys
+printf '~typesafe/jev-latest\n' > "$HOME_DIR/config/dispatch-never-send"
+out=$(pick FAKE_TYPESAFE=500)
+assert_equals 1 "$(requests)" "the fallback model is separately checked before transport"
+assert_contains "$out" "withheld by dispatch-never-send policy" "fallback privacy rejection is reported"
+assert_contains "$(sed -n 2p "$TMP_ROOT/record")" "TypeSafe direct failed" "fallback privacy rejection retains direct provenance"
+pass "actual assembled criteria, instructions and both provider models are checked"
+reset; keys
+skill "$COPY/.agents/skills" gamma 'description: Use for report work.'
+printf 'gamma\n' > "$HOME_DIR/config/dispatch-never-send"
+out=$(pick)
+assert_contains "$out" "withheld by dispatch-never-send policy" "skill identities in Choice keys are checked"
+assert_equals 0 "$(requests)" "a forbidden Choice key stops the first request"
+skill "$COPY/.agents/skills" gamma 'description: "Use for gamma work."'
+
 reset; keys
 BIG="$TMP_ROOT/big"
 git init -q "$BIG"
-for i in $(seq 1 300); do skill "$BIG/skills" "skill-$i" "description: Use for numbered task $i."; done
+for i in $(seq 1 258); do skill "$BIG/skills" "skill-$i" "description: Use for numbered task $i."; done
 git -C "$BIG" add -- skills
-out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" FAKE_PICK=skill-7 \
-  bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$BIG/skills")
-assert_contains "$out" "- Picked for this task: skill-7" "a skill in a later chunk can win"
+out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" FAKE_WEIGHTED=1 \
+  FAKE_FITS='{"skill-1":0.9}' FAKE_FIT=0.1 bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$BIG/skills")
+assert_contains "$out" "- Picked for this task: skill-1" "a lower local probability survives into a common ranking"
 jq -se '.[0].body.questions | (keys | map(select(startswith("which"))) | sort) == ["which::1","which::2"]
-  and ([.["which::1"].criteria, .["which::2"].criteria | keys | length] | add) == 300' "$LOG" >/dev/null \
-  || fail "300 skills are split into Choice questions of at most 255, none dropped"
-pass "a roster above 255 skills is ranked in chunks"
+  and ([.["which::1"].criteria, .["which::2"].criteria | keys | length] | add) == 258' "$LOG" >/dev/null \
+  || fail "258 skills are split into Choice questions of at most 255, none dropped"
+jq -se '.[1].body.questions.which.criteria | has("skill-1") and has("skill-99") and length == 6' "$LOG" >/dev/null \
+  || fail "chunk shortlists enter a common ranking before detailed rerank"
+jq -se 'all(.[]; all(.body.questions[]; .type != "choice" or (.criteria | length) <= 255))' "$LOG" >/dev/null \
+  || fail "every Choice stays within the transport limit"
+assert_equals 3 "$(requests)" "a chunked roster adds the common ranking request"
+pass "non-point-mass chunk probabilities are not globally flattened"
 
 reset; keys
 out=$(pick FAKE_TYPESAFE=hang FAKE_PICK=alpha)
@@ -224,5 +299,186 @@ grep -qx 'skill_selection=unavailable' "$SPAWN_HOME/state/nokey-scout.meta" || f
 grep -qx 'skill_selection_reason=no TypeSafe or OpenRouter key' "$SPAWN_HOME/state/nokey-scout.meta" || fail "the task record says why"
 assert_equals 0 "$(requests)" "nothing is sent without a key"
 pass "a launch with no key proceeds and records why nothing was picked"
+
+
+reset; keys
+out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" \
+  bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$TMP_ROOT/missing" --catalog "$COPY/.agents/skills")
+assert_contains "$out" "- Picked for this task:" "a missing optional catalog is skipped"
+reset; keys
+out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" \
+  bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$TMP_ROOT/brief.md")
+assert_contains "$out" "could not enumerate skill catalog" "an existing non-directory catalog is unavailable"
+assert_contains "$out" "$TMP_ROOT/brief.md" "the catalog failure identifies its path"
+assert_equals 0 "$(requests)" "a broken catalog never sends a partial roster"
+cat > "$TMP_ROOT/io-failure.mjs" <<'JS'
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const original = fs[process.env.FAIL_OPERATION];
+fs[process.env.FAIL_OPERATION] = (path, ...args) => {
+  if (String(path) === process.env.FAIL_PATH) {
+    throw Object.assign(new Error(`permission denied: ${path}`), { code: 'EACCES' });
+  }
+  return original(path, ...args);
+};
+syncBuiltinESMExports();
+JS
+for operation in readdirSync openSync; do
+  reset; keys
+  case "$operation" in
+    readdirSync) failure_path="$(cd "$COPY" && pwd -P)/.agents/skills" ;;
+    openSync) failure_path="$(cd "$COPY" && pwd -P)/.agents/skills/alpha/SKILL.md" ;;
+  esac
+  out=$(env FAIL_OPERATION="$operation" FAIL_PATH="$failure_path" FAKE_LOG="$LOG" \
+    NODE_OPTIONS="--import=$FAKE_FETCH --import=$TMP_ROOT/io-failure.mjs" FM_HOME="$HOME_DIR" \
+    bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$COPY/.agents/skills")
+  assert_contains "$out" "permission denied" "existing catalog I/O failures remain actionable"
+  assert_contains "$out" "$failure_path" "the unreadable entry is identified"
+  assert_equals 0 "$(requests)" "I/O errors prevent transport"
+done
+pass "only absent catalogs are optional"
+
+cat > "$TMP_ROOT/unsupported-loader.mjs" <<'JS'
+export async function resolve(specifier, context, nextResolve) {
+  if (specifier.endsWith('.ts')) {
+    throw Object.assign(new Error('Unknown file extension ".ts"'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });
+  }
+  return nextResolve(specifier, context);
+}
+JS
+reset; keys
+out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH --loader=$TMP_ROOT/unsupported-loader.mjs" FM_HOME="$HOME_DIR" \
+  bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$COPY/.agents/skills")
+assert_contains "$out" "unsupported Node runtime" "failed imports explain the TypeScript runtime prerequisite"
+assert_equals 0 "$(requests)" "unsupported runtimes never start selection"
+pass "the prerequisite imports the actual vendored modules"
+
+for exit_case in gate fit picked unavailable; do
+  reset
+  printf 'OPENROUTER_API_KEY=or-test-key\n' > "$HOME_DIR/.env"
+  case "$exit_case" in
+    gate) out=$(pick FAKE_GATE=0.1) ;;
+    fit) out=$(pick FAKE_FIT=0.1) ;;
+    picked) out=$(pick) ;;
+    unavailable) out=$(pick FAKE_OPENROUTER=500) ;;
+  esac
+  assert_contains "$(sed -n 2p "$TMP_ROOT/record")" "no TypeSafe key; used OpenRouter" "key-only fallback provenance survives $exit_case"
+done
+pass "OpenRouter key-only fallback retains provenance"
+
+cp "$TMP_ROOT/brief.md" "$TMP_ROOT/ordinary-brief.md"
+cat > "$TMP_ROOT/brief.md" <<'EOF'
+# Task
+This is a SCOUT task: the deliverable is a written report, not a PR.
+## Captain's intent
+PERMITTED-ORIGINAL-INTENT
+## Firstmate spec
+STALE-SCOUT-SPEC
+# Current ship Firstmate spec
+PERMITTED-CURRENT-SHIP-SPEC
+EOF
+reset; keys
+out=$(pick)
+sent=$(jq -r '.body.state.request' "$LOG")
+assert_contains "$sent" PERMITTED-ORIGINAL-INTENT "promoted ships keep the original intent"
+assert_contains "$sent" PERMITTED-CURRENT-SHIP-SPEC "promoted ships send the current spec"
+assert_not_contains "$sent" STALE-SCOUT-SPEC "promoted ships omit the stale scout spec"
+assert_not_contains "$sent" "Brief kind: scout" "promoted ships omit the scout tag"
+. "$ROOT/bin/fm-typesafe-lib.sh"
+fm_typesafe_brief_task "$TMP_ROOT/brief.md" "$HOME_DIR/config/dispatch-never-send" "$TMP_ROOT/default-task"
+assert_contains "$(cat "$TMP_ROOT/default-task")" STALE-SCOUT-SPEC "dispatch's three-argument extraction remains unchanged"
+assert_contains "$(cat "$TMP_ROOT/default-task")" "Brief kind: scout" "dispatch retains the scout tag"
+assert_not_contains "$(cat "$TMP_ROOT/default-task")" PERMITTED-CURRENT-SHIP-SPEC "dispatch does not switch specs"
+fm_typesafe_brief_task "$TMP_ROOT/brief.md" "$HOME_DIR/config/dispatch-never-send" "$TMP_ROOT/scout-task" scout
+assert_contains "$(cat "$TMP_ROOT/scout-task")" STALE-SCOUT-SPEC "explicit scouts retain their spec"
+for hidden in whole partial; do
+  reset; keys
+  printf '# dispatch-never-send marked-sections\n' > "$HOME_DIR/config/dispatch-never-send"
+  case "$hidden" in
+    whole) marker='<!-- dispatch-never-send:start -->'$'\n''# Current ship Firstmate spec' ;;
+    partial) marker='# Current ship Firstmate spec'$'\n''<!-- dispatch-never-send:start -->' ;;
+  esac
+  printf '# Task\n## Captain'"'"'s intent\nPERMITTED-ORIGINAL-INTENT\n## Firstmate spec\nSTALE-SCOUT-SPEC\n%s\nHIDDEN-CURRENT-SPEC\n<!-- dispatch-never-send:end -->\n' "$marker" > "$TMP_ROOT/brief.md"
+  [ "$hidden" != partial ] || printf 'PERMITTED-SPEC-REMAINDER\n' >> "$TMP_ROOT/brief.md"
+  out=$(pick)
+  sent=$(jq -r '.body.state.request' "$LOG")
+  assert_contains "$sent" PERMITTED-ORIGINAL-INTENT "hidden overrides retain permitted intent"
+  assert_not_contains "$sent" HIDDEN-CURRENT-SPEC "marked override text never leaves"
+  assert_not_contains "$sent" STALE-SCOUT-SPEC "hidden overrides never revive stale instructions"
+  [ "$hidden" != partial ] || assert_contains "$sent" PERMITTED-SPEC-REMAINDER "permitted override remainder is retained"
+done
+mv "$TMP_ROOT/ordinary-brief.md" "$TMP_ROOT/brief.md"
+pass "promotion and marked regions preserve effective task privacy"
+
+for raw in plain brief; do
+  reset
+  spawn_case "raw-$raw"
+  printf 'TYPESAFE_API_KEY=ts-spawn-key\n' > "$SPAWN_HOME/.env"
+  case "$raw" in
+    plain) harness='custom-agent --flag' ;;
+    brief) harness='custom-agent --brief __BRIEF__' ;;
+  esac
+  out=$(FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FAKE_PICK=alpha FM_FAKE_LAUNCH_LOG="$TMP_ROOT/raw-$raw.launch" \
+    fm_test_run_spawn "$SPAWN_HOME" "$SPAWN_POOL" "$SPAWN_FAKEBIN" "raw-$raw" "$SPAWN_PROJECT" --harness "$harness" --mode no-mistakes --yolo off)
+  meta="$SPAWN_HOME/state/raw-$raw.meta"
+  case "$raw" in
+    plain)
+      assert_equals 0 "$(requests)" "raw launches without brief transport do not invoke the picker"
+      grep -qx 'skill_selection=undelivered' "$meta" || fail "raw launch records undelivered"
+      assert_not_contains "$(cat "$meta")" "skill_selection_picked=" "undelivered launches never record a pick"
+      assert_contains "$(cat "$TMP_ROOT/raw-$raw.launch")" 'custom-agent --flag' "the raw command is retained"
+      ;;
+    brief)
+      assert_equals 2 "$(requests)" "raw launches with a brief perform normal selection"
+      grep -qx 'skill_selection=picked' "$meta" || fail "raw brief launch records the pick"
+      assert_contains "$(cat "$SPAWN_HOME/data/raw-$raw/launch-brief.md")" "- Picked for this task: alpha" "raw brief transport receives the section"
+      ;;
+  esac
+done
+pass "raw launch records match delivery capability"
+
+reset
+spawn_case failed-overlay
+printf 'TYPESAFE_API_KEY=ts-spawn-key\n' > "$SPAWN_HOME/.env"
+real_mv=$(command -v mv)
+cat > "$SPAWN_FAKEBIN/mv" <<'SH'
+#!/usr/bin/env bash
+if [[ "${2:-}" == */launch-brief.md ]]; then
+  if [ -e "$PUBLICATION_COUNT" ]; then exit 1; fi
+  : > "$PUBLICATION_COUNT"
+fi
+exec "$REAL_MV" "$@"
+SH
+chmod +x "$SPAWN_FAKEBIN/mv"
+out=$(FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FAKE_PICK=alpha \
+  REAL_MV="$real_mv" PUBLICATION_COUNT="$TMP_ROOT/publications" \
+  fm_test_run_spawn "$SPAWN_HOME" "$SPAWN_POOL" "$SPAWN_FAKEBIN" failed-overlay "$SPAWN_PROJECT" --mode no-mistakes --yolo off)
+assert_equals 2 "$(requests)" "selection completed before the overlay publication failed"
+grep -qx 'skill_selection=undelivered' "$SPAWN_HOME/state/failed-overlay.meta" || fail "overlay failure is recorded as undelivered"
+assert_not_contains "$(cat "$SPAWN_HOME/state/failed-overlay.meta")" "skill_selection_picked=" "an unpublished pick is not recorded"
+assert_not_contains "$(cat "$SPAWN_HOME/data/failed-overlay/launch-brief.md")" "# Skill selection" "publication failure retains the original launch brief"
+pass "successful picks are not claimed when overlay publication fails"
+
+reset; keys
+fm_typesafe_brief_task "$TMP_ROOT/brief.md" "$HOME_DIR/config/dispatch-never-send" "$TMP_ROOT/explicit-scout-task" scout
+assert_contains "$(cat "$TMP_ROOT/explicit-scout-task")" "Brief kind: scout" "recorded scout kind does not depend on a brief sentinel"
+cat > "$TMP_ROOT/fully-hidden.md" <<'EOF'
+# Task
+This is a SCOUT task: the deliverable is a written report, not a PR.
+<!-- dispatch-never-send:start -->
+## Captain's intent
+HIDDEN-INTENT
+<!-- dispatch-never-send:end -->
+## Firstmate spec
+STALE-SCOUT-SPEC
+<!-- dispatch-never-send:start -->
+# Current ship Firstmate spec
+HIDDEN-CURRENT-SPEC
+<!-- dispatch-never-send:end -->
+EOF
+printf '# dispatch-never-send marked-sections\n' > "$HOME_DIR/config/dispatch-never-send"
+fm_typesafe_brief_task "$TMP_ROOT/fully-hidden.md" "$HOME_DIR/config/dispatch-never-send" "$TMP_ROOT/hidden-task" ship
+assert_equals "" "$(cat "$TMP_ROOT/hidden-task")" "fully hidden effective promoted task does not fall back to stale boilerplate"
+pass "explicit kind and entirely hidden promotion preserve task semantics"
 
 printf '# all fm-skill-pick tests passed\n'

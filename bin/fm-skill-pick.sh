@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pick the one project skill a worker should load, for its launch instructions.
-# Usage: fm-skill-pick.sh --brief <filled-brief> --catalog <skill-dir>... [--record <file>]
+# Usage: fm-skill-pick.sh --brief <filled-brief> --catalog <skill-dir>... [--record <file>] [--kind ship|scout]
 # bin/fm-skill-pick.mjs runs the TypeSafe skill-suggestion cookbook recipe on
 # the vendored hyper-jev client over the catalogs' skills (an earlier catalog
 # wins a duplicate name); its header owns the recipe, roster and provider order.
@@ -19,17 +19,18 @@ SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 FM_HOME=${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}
 CONFIG=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
-BRIEF='' RECORD='' CATALOGS=()
+BRIEF='' RECORD='' KIND=ship CATALOGS=()
 usage() { awk 'NR==1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; }
 die() { printf 'error: %s\nhelp: Run bin/fm-skill-pick.sh --help\n' "$1" >&2; exit 2; }
 while [ $# -gt 0 ]; do
   case "$1" in
-    --brief|--catalog|--record)
+    --brief|--catalog|--record|--kind)
       [ $# -ge 2 ] && [ -n "$2" ] || die "$1 requires a value"
       case "$1" in
         --brief) BRIEF=$2 ;;
         --catalog) CATALOGS+=("$2") ;;
         --record) RECORD=$2 ;;
+        --kind) KIND=$2 ;;
       esac
       shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -38,6 +39,7 @@ while [ $# -gt 0 ]; do
 done
 [ -f "$BRIEF" ] && [ -r "$BRIEF" ] || die "--brief must be a readable regular file"
 [ "${#CATALOGS[@]}" -gt 0 ] || die "--catalog is required"
+case "$KIND" in ship|scout) ;; *) die "--kind must be ship or scout" ;; esac
 
 STATUS=unavailable REASON='' PICKED='' SKILL_PATH='' FIT='' PROVIDER='' MODEL=''
 WORK=$(mktemp -d) || die "could not allocate temporary files"
@@ -69,21 +71,18 @@ fm_openrouter_key "$FM_HOME" || :
 [ -n "$TYPESAFE_API_KEY_PRIVATE$OPENROUTER_API_KEY_PRIVATE" ] || unavailable "no TypeSafe or OpenRouter key"
 command -v node >/dev/null 2>&1 || unavailable "node is not installed"
 command -v jq >/dev/null 2>&1 || unavailable "jq is not installed"
-fm_typesafe_brief_task "$BRIEF" "$CONFIG/dispatch-never-send" "$WORK/task" ||
+node "$SCRIPT_DIR/fm-skill-pick.mjs" check 2> "$WORK/error" ||
+  unavailable "$(cat "$WORK/error")"
+fm_typesafe_brief_task "$BRIEF" "$CONFIG/dispatch-never-send" "$WORK/task" "$KIND" ||
   unavailable "task text withheld: $FM_TYPESAFE_WITHHELD_REASON"
 grep -q '[^[:space:]]' "$WORK/task" || unavailable "the instructions have no task text"
-node "$SCRIPT_DIR/fm-skill-pick.mjs" roster "${CATALOGS[@]}" > "$WORK/roster.json" 2>/dev/null ||
-  unavailable "could not read this project's skills"
+node "$SCRIPT_DIR/fm-skill-pick.mjs" roster "${CATALOGS[@]}" > "$WORK/roster.json" 2> "$WORK/error" ||
+  unavailable "$(cat "$WORK/error")"
 jq -r '[.not_judged[] | "\(.name) (\(.reason))"] | join(", ") | select(length > 0)' "$WORK/roster.json" > "$WORK/not-judged" 2>/dev/null ||
   : > "$WORK/not-judged"
-# Every string either request can carry: the task, names, descriptions, excerpts.
-SENDABLE=$(jq -c --rawfile task "$WORK/task" '{task: $task, skills: [.skills[] | {name, description, excerpt}]}' "$WORK/roster.json") ||
-  unavailable "could not read this project's skills"
-fm_typesafe_permitted "$SENDABLE" "$CONFIG/dispatch-never-send" "$WORK/scan" ||
-  unavailable "withheld by dispatch-never-send policy: $FM_TYPESAFE_WITHHELD_REASON"
 printf '%s\n%s\n' "$TYPESAFE_API_KEY_PRIVATE" "$OPENROUTER_API_KEY_PRIVATE" |
-  node "$SCRIPT_DIR/fm-skill-pick.mjs" pick "$WORK/task" "$WORK/roster.json" > "$WORK/result" 2>/dev/null ||
-  unavailable "the skill picker stopped with an error"
+  node "$SCRIPT_DIR/fm-skill-pick.mjs" pick "$WORK/task" "$WORK/roster.json" "$CONFIG/dispatch-never-send" "$WORK/scan" > "$WORK/result" 2> "$WORK/error" ||
+  unavailable "the skill picker stopped with an error: $(cat "$WORK/error")"
 field() { sed -n "s/^$1=//p" "$WORK/result" | head -n 1; }
 STATUS=$(field status) REASON=$(field reason) PICKED=$(field picked) SKILL_PATH=$(field path)
 FIT=$(field fit) PROVIDER=$(field provider) MODEL=$(field model)

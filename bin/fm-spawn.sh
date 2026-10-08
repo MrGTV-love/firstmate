@@ -4614,13 +4614,17 @@ spawn_assert_agent_worktree
 # record say plainly why.
 SKILL_SELECTION_BOUND=30
 SKILL_SELECTION_STATUS='' SKILL_SELECTION_REASON='' SKILL_SELECTION_PICKED=''
-if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
+if { [ "$KIND" = ship ] || [ "$KIND" = scout ]; } && [ "$RAW_LAUNCH" = 1 ] && [[ "$LAUNCH" != *'__BRIEF__'* ]]; then
+  SKILL_SELECTION_STATUS=undelivered
+  SKILL_SELECTION_REASON="raw launch command has no __BRIEF__ placeholder"
+  echo "skill selection for $ID: $SKILL_SELECTION_STATUS - $SKILL_SELECTION_REASON" >&2
+elif [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   skill_section="$DATA/$ID/.skill-selection.md.${BASHPID:-$$}"
   skill_record="$DATA/$ID/.skill-selection.record.${BASHPID:-$$}"
   rm -f -- "$skill_section" "$skill_record"
   skill_rc=0
   fm_run_timed "$SKILL_SELECTION_BOUND" env FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG" \
-    bash "$SCRIPT_DIR/fm-skill-pick.sh" --brief "$SOURCE_BRIEF" \
+    bash "$SCRIPT_DIR/fm-skill-pick.sh" --brief "$SOURCE_BRIEF" --kind "$KIND" \
     --catalog "$WT/.agents/skills" --catalog "$WT/.claude/skills" \
     --record "$skill_record" </dev/null >"$skill_section" 2>/dev/null || skill_rc=$?
   if [ "$skill_rc" -eq 0 ] && [ -s "$skill_record" ] && [ -s "$skill_section" ]; then
@@ -4645,8 +4649,9 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     } >"$skill_section" || true
   fi
   if ! render_launch_brief "$skill_section"; then
-    SKILL_SELECTION_STATUS=unavailable
+    SKILL_SELECTION_STATUS=undelivered
     SKILL_SELECTION_REASON="the selection could not be added to the launch instructions"
+    SKILL_SELECTION_PICKED=''
   fi
   rm -f -- "$skill_section" "$skill_record"
   echo "skill selection for $ID: $SKILL_SELECTION_STATUS${SKILL_SELECTION_PICKED:+ ($SKILL_SELECTION_PICKED)}${SKILL_SELECTION_REASON:+ - $SKILL_SELECTION_REASON}" >&2

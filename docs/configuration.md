@@ -1514,9 +1514,10 @@ A brief containing `<!--` followed by optional whitespace and the reserved `disp
 With the directive present, every such line must be exactly one of the two canonical markers above after trimming surrounding whitespace: nested, unmatched, inline, malformed suffixes (`<!-- dispatch-never-send:star -->`), unspaced (`<!--dispatch-never-send:start-->`), or differently cased (`<!-- Dispatch-Never-Send:start -->`) markers stop the entire request rather than being corrected.
 A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
-Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
+On 2026-10-07, the captain authorized worker skill selection to send the same sanitized, never-send-filtered task text used by `bin/fm-dispatch-resolve.sh` to TypeSafe and its OpenRouter fallback, ruling “I asked for A already.” This authorization does not widen any other sending boundary.
+Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
 
-Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, the sanitized task text and every skill name, description, and opening excerpt either request can carry; belay checks every request string through `bin/fm-typesafe-lib.sh`.
+Before each request is sent, every remaining string in it is checked for literal matches through `bin/fm-typesafe-lib.sh`: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; belay checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -1701,21 +1702,28 @@ To move to a newer upstream version, review it, update the pinned commit in this
 
 ## Worker skill selection
 
-Every ship and scout launch and relaunch runs `bin/fm-skill-pick.sh` once its task copy exists, so the worker starts with the one project skill that fits its task.
+Every ship and scout launch and relaunch with brief delivery runs `bin/fm-skill-pick.sh` once its task copy exists, so the worker starts with the one project skill that fits its task.
 Secondmate charters are not judged.
 The picker reads the task copy's `.agents/skills` and `.claude/skills`; a firstmate task's copy holds firstmate's own skills.
 It runs the [TypeSafe skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) recipe on the vendored [hyper-jev](../.agents/skills/hyper-jev/SOURCE.md) client, and `bin/fm-skill-pick.mjs`'s header owns the recipe, roster rules, and provider order.
+
+For rosters over 255 skills, chunk-local top-three candidates enter a common Choice ranking before the detailed shortlist step; probabilities from independent chunks are never compared. This follows the cookbook's shortlist-over-chunk-winners guidance, retaining three candidates per chunk to preserve near-winners, and adds ranking requests to the ordinary two-request flow (`bin/fm-skill-pick.mjs:237-256`).
+
+**Named cookbook deviation — highest-fit delivery:** the rerank Choice is retained, but the delivered pick is the highest-fit shortlisted skill rather than the Choice winner, and its fit must be at least 0.30 (`bin/fm-skill-pick.mjs:270-280`). The captain chose this deviation because workers must read and follow the delivered skill, rather than receive the cookbook's ignorable advisory suggestion.
 
 The pick is added to the launch instructions as a skill to read in full and follow.
 Existing mandatory skill triggers and the worker's own skill index still apply first and unchanged.
 A skill the picker could not send, such as one that is not a Git-tracked file in the task copy, is listed by name for the worker to check.
 When nothing fits, the instructions say so; when the picker cannot run, the launch continues and the instructions say why.
-The task record carries `skill_selection=` (picked, none, or unavailable), `skill_selection_reason=`, and `skill_selection_picked=`.
+The task record carries `skill_selection=` (picked, none, unavailable, or undelivered), `skill_selection_reason=`, and `skill_selection_picked=` when a pick is delivered.
+Raw commands receive the selection only when they contain `__BRIEF__`; without that placeholder, selection is recorded as undelivered with its reason, no pick is claimed, and the command is unchanged. Failure to publish the selection overlay also records undelivered and clears the pick.
 `bin/fm-spawn.sh` stops the picker after 30 seconds.
 
-Only the brief text dispatch resolution may send is sent, after the same never-send checks; see the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key).
+Only the brief text dispatch resolution may send is sent, after the same never-send checks; see the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key). For a promoted scout's ship relaunch, skill selection uses the recorded ship kind and current ship Firstmate spec rather than the superseded scout spec; ordinary dispatch extraction is unchanged. Privacy-hidden promotion instructions never revive the superseded spec.
 The `TYPESAFE_API_KEY` opt-in enables it, and TypeSafe is asked directly first.
-When the direct call fails and `OPENROUTER_API_KEY` is set in the same home `.env`, the same request and the rest of that pick go through OpenRouter.
+When the direct call is unavailable because its key is absent or fails and `OPENROUTER_API_KEY` is set in the same home `.env`, the same request and the rest of that pick go through OpenRouter. This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
+Fallback provenance is retained for picked, no-selection, and unavailable outcomes.
+Missing optional catalog directories are skipped; failures inspecting existing catalogs are unavailable with their actionable reason, not successful no-selection results.
 Keys reach the picker on stdin, never in its environment or arguments.
 
 [`tests/fm-skill-pick.test.sh`](../tests/fm-skill-pick.test.sh) exercises selection, both thresholds, the fallback, the never-send boundary, and chunking through the public tool.
@@ -1733,7 +1741,7 @@ Required tools come in two parts: a universal toolchain every home needs regardl
 
 Every home requires:
 
-- node and git.
+- Node 24+ with native TypeScript loading enabled, and git. Worker skill selection capability-checks imports of its vendored TypeScript client and reports an unavailable prerequisite when they fail.
 - gh, with GitHub authentication through `gh auth login`.
 - no-mistakes v1.46.0 or newer.
 - Compatible gh-axi.

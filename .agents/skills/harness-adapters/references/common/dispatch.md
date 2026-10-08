@@ -13,7 +13,7 @@ When the opt-in `bin/fm-dispatch-resolve.sh` is on, its `clear` answer already n
 
 ## Skill selection at launch
 
-Every ship and scout spawn adds a picked project skill to the worker's launch instructions, after every existing mandatory explicit/named and safety trigger.
+Ship and scout spawns with brief delivery add the project skill selection outcome to the worker's launch instructions, after every existing mandatory explicit/named and safety trigger. Raw commands without `__BRIEF__` instead record selection as undelivered and remain unchanged.
 [Worker skill selection](../../../docs/configuration.md#worker-skill-selection) owns its input, privacy, provider order, and recorded result.
 
 
