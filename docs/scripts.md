@@ -37,7 +37,9 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |
 | [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section reader |
 | [`fm-skill-suggest.sh`](../bin/fm-skill-suggest.sh) | Suggest optional skill bodies to inspect ([operator contract](configuration.md#advisory-skill-selection)) |
-| [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe boundary for dispatch resolution and advisory skill selection |
+| [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
+| [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker wrapper for the pinned upstream belay Stop hook ([contract](configuration.md#jev-belay-stop-hook)) |
+| [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload enforcing the [belay egress policy](configuration.md#jev-belay-stop-hook) |
 | [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index and resolve dispatch model roles |
 | `fm-herdr-lab.sh`        | Provision and guardedly operate an isolated, never-default Herdr lab session         |
 | `fm-herdr-lab-viewer.py` | The pty engine behind `fm-herdr-lab.sh viewer`: one real foreground Herdr client on a non-zero window grid |

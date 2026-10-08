@@ -12,6 +12,8 @@ FM_WAKE_QUEUE_LOCK="${FM_WAKE_QUEUE_LOCK:-$STATE/.wake-queue.lock}"
 FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 # shellcheck source=bin/fm-path-lib.sh
 . "$FM_WAKE_LIB_DIR/fm-path-lib.sh"
+# shellcheck source=bin/fm-secondmate-parent-lib.sh
+. "$FM_WAKE_LIB_DIR/fm-secondmate-parent-lib.sh"
 # Resolved once at source time: fm_pid_identity and fm_path_mtime run inside 0.2s
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
@@ -1334,45 +1336,6 @@ fm_task_set_lock_path() {  # <state-dir>
   [ -n "$state" ] || return 1
   case "$state" in *[$'\n\r\t']*) return 1 ;; esac
   printf '%s/.task-set.lock\n' "$state"
-}
-
-# The top-most firstmate home reachable from this one on THIS machine, used as
-# the single anchor every local home agrees on for machine-local shared state.
-#
-# A local parent binding is followed upward. A remote parent binding terminates
-# the walk at the current home, which is the correct answer rather than an
-# error: the parent lives on another machine, so its filesystem can neither hold
-# nor be observed by a lock taken here, and a remote-seeded home is itself the
-# top of the local tree that bin/fm-teardown.sh's collect_local_firstmate_states
-# enumerates (that walk already skips remote registry entries for the same
-# reason). Refusing a remote binding instead made every operation anchored here
-# fail closed inside a remote secondmate home and its local descendants.
-#
-# Everything else still fails closed: an unreadable or malformed binding, an
-# unreachable local parent, a cycle, and a chain deeper than the bound.
-fm_firstmate_root_home() {
-  local home=${1:-$FM_HOME} marker parent seen="|" depth=0
-  home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 1
-  while [ -e "$home/.fm-secondmate-parent" ] || [ -L "$home/.fm-secondmate-parent" ]; do
-    marker="$home/.fm-secondmate-parent"
-    if ! command -v fm_secondmate_parent_record_parse >/dev/null 2>&1; then
-      # shellcheck source=bin/fm-secondmate-parent-lib.sh
-      . "$FM_WAKE_LIB_DIR/fm-secondmate-parent-lib.sh"
-    fi
-    fm_secondmate_parent_record_parse "$marker" || return 1
-    case "$FM_SECONDMATE_PARENT_ROUTE" in
-      local) ;;
-      remote) break ;;
-      *) return 1 ;;
-    esac
-    parent=$(CDPATH='' cd -- "$FM_SECONDMATE_PARENT_HOME" 2>/dev/null && pwd -P) || return 1
-    case "$seen" in *"|$parent|"*) return 1 ;; esac
-    seen="$seen$home|"
-    home=$parent
-    depth=$((depth + 1))
-    [ "$depth" -le 64 ] || return 1
-  done
-  printf '%s\n' "$home"
 }
 
 # The one lock serializing Treehouse slot allocation and return for a project.

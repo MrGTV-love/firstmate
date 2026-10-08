@@ -184,7 +184,7 @@ out=$(PATH="$FAKEBIN:$PATH" TYPESAFE_API_KEY=startup-secret bash -c 'cd "$1"; ba
 assert_contains "$out" 'Suggest optional skills' "relative source path works"
 SPACE_BIN="$TMP_ROOT/space containing/bin"
 mkdir -p "$SPACE_BIN"
-cp "$TOOL" "$ROOT/bin/fm-typesafe-lib.sh" "$ROOT/bin/fm-env-lib.sh" "$SPACE_BIN/"
+cp "$TOOL" "$ROOT/bin/fm-typesafe-lib.sh" "$ROOT/bin/fm-env-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$SPACE_BIN/"
 out=$(PATH="$FAKEBIN:$PATH" TYPESAFE_API_KEY=startup-secret bash "$SPACE_BIN/fm-skill-suggest.sh" --help)
 assert_contains "$out" 'Suggest optional skills' "space-containing source path works"
 assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "all help entry paths scrub before children"
@@ -411,7 +411,7 @@ HOME_SKILLS="$HOME_DIR/.agents/skills"
 PRIVATE_SKILL="$HOME_SKILLS/acme-private/SKILL.md"
 mkdir -p "$SPLIT_CODE/bin" "$SPLIT_CODE/.agents" "$HOME_SKILLS/acme-private"
 cp "$TOOL" "$ROOT/bin/fm-skill-catalog.jq" "$ROOT/bin/fm-typesafe-lib.sh" \
-  "$ROOT/bin/fm-env-lib.sh" "$ROOT/bin/fm-brief-heading-lib.sh" "$SPLIT_CODE/bin/"
+  "$ROOT/bin/fm-env-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$ROOT/bin/fm-brief-heading-lib.sh" "$SPLIT_CODE/bin/"
 cp -R "$CATALOG" "$SPLIT_CODE/.agents/skills"
 printf '%s\n' '---' $'name: acme-private \t' 'description: HOME-PRIVATE-DESCRIPTION' \
   '---' 'HOME-PRIVATE-OPENING' > "$PRIVATE_SKILL"

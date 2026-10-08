@@ -1047,9 +1047,10 @@ It applies to fresh launches, relaunches, raw launch commands with an identifiab
 For an unidentifiable raw command, the adviser stays off.
 
 Auto allows the installed plugin to act; it does not install the plugin or supply a credential.
-Use the plugin's supported saved settings to select `mode: auto`, acknowledge experimental automatic mode, and save the TypeSafe key without adding `TYPESAFE_API_KEY` to launch text or the worker environment.
-For omp's Pi plugin, these fields are `mode`, `autoAcknowledged`, and `typesafeApiKey` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
-Claude stores mode and saved key in its plugin options and acknowledgement in the plugin's own preferences store.
+Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
+Use the plugin's supported settings to select `mode: auto` and acknowledge experimental automatic mode.
+For omp's Pi plugin, these fields are `mode` and `autoAcknowledged` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
+Claude stores mode in its plugin options and acknowledgement in the plugin's own preferences store.
 Claude auto launches enable `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without changing the global function-hook setting, unless a leading raw-command assignment explicitly supplies the flag's value.
 When automatic activation supplies that flag rather than preserving a captain's opt-in, the launch also sets `FM_COMPACT_ADVISER_HOOKS=1`, which keeps the [firstmate-calm mod](calm.md#enabling-function-hooks) inert, so enabling the adviser does not enable Calm.
 Every launch first drops a flag that an earlier launch in the same pane marked this way, so an off or emergency-off relaunch runs without it.
@@ -1121,7 +1122,8 @@ COMPACT_ADVISER_DISABLE=1 FM_JEV_OMP_PIPELINE=1 \
 The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and exported redaction and recent-window helpers, with its full dependency tree and `@earendil-works/pi-coding-agent` resolvable from the copied static entry; the unadapted registry package is not a substitute.
 The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
 Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
-The controller reuses that package's request format, profile parsing, snapshot/redaction and environment/saved/`.env` key resolution without creating another credential store.
+The controller reuses that package's request format, profile parsing and snapshot/redaction without creating another credential store.
+The [compact-adviser setting](#compact-adviser-setting-configcompact-adviser) owns the pending compaction key-delivery contract.
 `FM_JEV_PIPELINE_AGENT_DIR` selects the adviser configuration directory; when omitted, the controller uses omp's public `getAgentDir()` and reads that configuration without modifying it.
 `TYPESAFE_BASE` follows compact-adviser's HTTPS-or-loopback-only endpoint policy.
 Neither installation nor loading changes global plugins or settings.
@@ -1366,7 +1368,9 @@ Secondmate homes inherit this file from the primary, so a secondmate's own crewm
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
 `bin/fm-dispatch-resolve.sh` resolves one concrete crewmate or scout profile from a written brief with typesafe.ai's System One model (Jev), so the rule match that firstmate otherwise reasons out in its own context becomes one short tool turn.
-It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or the home's gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the shared accessor in `bin/fm-env-lib.sh` reads the line.
+It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or a gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the shared accessor in `bin/fm-env-lib.sh` reads the line.
+The `.env` consulted is the home's own, then the top-most local home reached through the home's `.fm-secondmate-parent` record, so a secondmate home and its crews share the primary home's single key without a copy (`fm_typesafe_key` in `bin/fm-typesafe-lib.sh` owns the order).
+A home bound to a remote parent has no local primary and stops at its own `.env`.
 
 Off means one `dispatch-resolve: off` line on stderr, nothing on stdout, exit 0, and no network call, so firstmate dispatches exactly as it does without the tool.
 This section is the single owner of the tool's operator contract; the script header owns its exact flags and output lines, and "Crew dispatch profiles" above owns the declared rule and profile fields it applies.
@@ -1394,9 +1398,9 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution or advisory skill-selection requests, and keeps marked brief regions out of Jev resolver requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, advisory skill-selection, or [belay Stop-hook](#jev-belay-stop-hook) requests, and keeps marked brief regions out of Jev resolver requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so both tools there withhold the same values.
+Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so all consumers there withhold the same values.
 
 Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
@@ -1412,7 +1416,7 @@ Example Client Ltd
 # dispatch-never-send marked-sections
 ```
 
-The following marked-region rules apply only to dispatch resolution; advisory skill selection neither removes nor validates these markers.
+The following marked-region rules apply only to dispatch resolution; advisory skill selection and belay neither remove nor validate these markers.
 
 Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
 
@@ -1435,7 +1439,7 @@ A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
 Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
 
-Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; advisory skill selection checks every request string through `bin/fm-typesafe-lib.sh`.
+Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; advisory skill selection and belay check every request string through `bin/fm-typesafe-lib.sh`.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -1539,7 +1543,7 @@ Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERR
 The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
 Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
 
-The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+The screen uses the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
 Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
 It does not grant account, billing, egress, command, or secret-access authority.
 No key means `missing_key`, not a synthetic judgment.
@@ -1591,6 +1595,32 @@ Historical labels and attempt records retain their original meaning; cohort 8 do
 Evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
 The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
 This implementation cannot enable blocking or reset that date.
+
+## Jev belay Stop hook
+
+Firstmate-launched Claude ship and scout workers run the published [jev-belay](https://github.com/valentynkit/jev-belay) Stop hook, which blocks a turn that reports work as done when nothing verified it.
+`bin/fm-spawn.sh` installs one combined Stop command in the worker's gitignored `.claude/settings.local.json`, running `bin/fm-jev-belay-hook.sh` before publishing completion; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
+Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event; every other exit, including nonblocking failure or timeout, clears busy and publishes completion.
+Secondmate sessions and other harnesses do not run it.
+
+The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
+The wrapper therefore resolves the key at call time through the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and sets it for the one upstream `node` process.
+The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
+Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
+Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
+The shared timeout runner bounds the wrapper's preflight and upstream process group to 20 seconds plus a 0.2-second termination grace, regardless of `JEV_BELAY_TIMEOUT_MS`, leaving time to publish completion before Claude's 25-second Stop deadline.
+
+The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs), leaving the pinned upstream `belay.mjs` unchanged.
+Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.
+The policy comes from the resolved `FM_CONFIG_OVERRIDE` or `FM_HOME/config`, and each policy-check child runs without credentials; only the upstream Node process receives the resolved TypeSafe key.
+A forbidden value, invalid policy, or policy-check refusal withholds the entire request without network egress, and upstream catches the withheld-request error and allows the stop.
+Each policy check uses the shared three-second process-group deadline and a five-second synchronous-child ceiling, allowing shell startup and cleanup headroom while bounding stalled policy work and its descendants.
+
+`belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
+Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
+The wrapper runs the file only when its git blob id matches the pin in `bin/fm-jev-belay-hook.sh`, so a changed file never receives the key.
+A missing clone, key, or `node`, or a pin mismatch, makes the hook exit 0 silently and never delays a stop.
+To move to a newer upstream version, review it, update the pinned commit in this section and the blob id in the wrapper together, and refresh the clone.
 
 ## Advisory skill selection
 

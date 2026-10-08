@@ -1,6 +1,11 @@
 # shellcheck shell=bash
-# Shared TypeSafe boundary for dispatch and advisory skill selection.
+# Shared TypeSafe boundary for Firstmate's dispatch and Jev integrations.
 # Usage: source this before launching children, then fm_typesafe_key <home>.
+# fm_typesafe_key resolves the key from, in order, the process environment,
+# <home>/.env, then the .env of the top-most local home reached through the
+# existing .fm-secondmate-parent record (fm_firstmate_root_home), so a
+# secondmate home and its crews share the primary home's single key without
+# any copy. A remote-seeded home has no local primary and stops at its own .env.
 # fm_typesafe_post <request-json> <response-file> [transfer-seconds-file] uses
 # the fixed endpoint and five-second deadline, with no retries. Prints only the
 # HTTP code (000 on a transport failure), optionally saving curl's transfer time.
@@ -15,9 +20,15 @@ unset TYPESAFE_API_KEY
 
 # shellcheck source=bin/fm-env-lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-env-lib.sh"
+# shellcheck source=bin/fm-secondmate-parent-lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-secondmate-parent-lib.sh"
 
 fm_typesafe_key() {
+  local primary
   [ -n "$TYPESAFE_API_KEY_PRIVATE" ] || TYPESAFE_API_KEY_PRIVATE=$(fmx_env_get TYPESAFE_API_KEY "$1/.env")
+  if [ -z "$TYPESAFE_API_KEY_PRIVATE" ] && primary=$(fm_firstmate_root_home "$1" 2>/dev/null); then
+    TYPESAFE_API_KEY_PRIVATE=$(fmx_env_get TYPESAFE_API_KEY "$primary/.env")
+  fi
   [ -n "$TYPESAFE_API_KEY_PRIVATE" ]
 }
 

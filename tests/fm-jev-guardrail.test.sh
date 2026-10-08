@@ -209,7 +209,7 @@ try {
       const homes = Object.fromEntries(['physical', 'override', 'home'].map(name => [name, resolve(fixture, name)]));
       const fixtureTool = resolve(homes.physical, 'bin/fm-jev-guardrail.mjs');
       mkdirSync(resolve(homes.physical, 'bin'), { recursive: true });
-      for (const file of ['fm-jev-guardrail.mjs', 'fm-arm-command-policy.mjs', 'fm-env-lib.sh']) {
+      for (const file of ['fm-jev-guardrail.mjs', 'fm-arm-command-policy.mjs', 'fm-env-lib.sh', 'fm-typesafe-lib.sh', 'fm-secondmate-parent-lib.sh']) {
         copyFileSync(resolve(root, 'bin', file), resolve(homes.physical, 'bin', file));
       }
       const keys = Object.fromEntries(Object.keys(homes).map(name => [name, `synthetic-r21-${native}-${scenario.name}-${name}-key`]));

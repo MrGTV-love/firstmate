@@ -424,7 +424,7 @@ family_for_basename() {
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
-    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-suggest.test.sh|\
+    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-suggest.test.sh|fm-typesafe-key-source.test.sh|\
     fm-extension-binding.test.sh|fm-gitignore-config.test.sh|\
     fm-no-mistakes-required.test.sh|fm-peek-remote.test.sh|\
     fm-pending-reply.test.sh|fm-pi-branch-extension.test.sh|\
@@ -864,6 +864,7 @@ tests/fm-trace-context-lib.test.sh 227
 tests/fm-trace-context-spawn.test.sh 49071
 tests/fm-turnend-foreign-owner-arm-fix.test.sh 2397
 tests/fm-turnend-guard.test.sh 33450
+tests/fm-typesafe-key-source.test.sh 6000
 tests/fm-update.test.sh 11572
 tests/fm-vendor-auth-probe.test.sh 45255
 tests/fm-voice-relay.test.sh 32486
@@ -1525,6 +1526,11 @@ families_for_changed_path() {
     bin/fm-typesafe-lib.sh)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
+      ;;
+    bin/fm-jev-belay-hook.sh|bin/fm-jev-belay-policy.mjs)
+      printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
+      printf '%s\n' "__script__:fm-busy-adapter-wiring.test.sh"
       ;;
     bin/fm-skill-suggest.sh|bin/fm-skill-catalog.jq)
       printf '%s\n' "__script__:fm-skill-suggest.test.sh"

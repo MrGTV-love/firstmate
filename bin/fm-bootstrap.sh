@@ -180,6 +180,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-control-lib.sh"
 # shellcheck source=bin/fm-env-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-env-lib.sh"
+# shellcheck source=bin/fm-typesafe-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-typesafe-lib.sh"
 # shellcheck source=bin/fm-tangle-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-tangle-lib.sh"
 # shellcheck source=bin/fm-ff-lib.sh disable=SC1091
@@ -1035,7 +1037,7 @@ EOF
 }
 
 crew_dispatch_validate() {
-  local file err verified_harnesses resolved index_notes typed_key typed_active=false
+  local file err verified_harnesses resolved index_notes typed_active=false
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
@@ -1054,9 +1056,7 @@ crew_dispatch_validate() {
   fi
   sed -n 's/^model-index: warning: /CREW_DISPATCH: warning - /p' "$index_notes"
   rm -f "$index_notes"
-  typed_key=$TYPESAFE_API_KEY_PRIVATE
-  [ -n "$typed_key" ] || typed_key=$(fmx_env_get TYPESAFE_API_KEY "$FM_HOME/.env")
-  [ -z "$typed_key" ] || typed_active=true
+  ! fm_typesafe_key "$FM_HOME" || typed_active=true
   if $typed_active; then
     verified_harnesses=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
   else
