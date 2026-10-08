@@ -276,6 +276,32 @@ test_lab_home_helper() {
   pass "fm-lab-home: create mints marked stock homes only on fresh empty dirs; anything else is refused"
 }
 
+test_lab_home_refuses_work_tree() {
+  local repo out rc
+  repo="$TMP/lab-repo"; mkdir -p "$repo"
+  git -C "$repo" init -q || fail "lab-home: could not init the fixture repository"
+  # an existing directory inside the work tree is refused and left untouched.
+  mkdir -p "$repo/existing"
+  out=$("$LABHOME" create "$repo/existing" 2>&1); rc=$?
+  expect_code 1 "$rc" "lab-home: create inside a work tree must exit 1"
+  assert_contains "$out" "a lab home must live outside the repository" "lab-home: refusal must name the fix"
+  assert_contains "$out" "mktemp -d" "lab-home: refusal must show the safe placement"
+  assert_absent "$repo/existing/.fm-lab-home" "lab-home: refused create must not write the marker"
+  # a not-yet-existing nested path inside the work tree is refused and not created.
+  out=$("$LABHOME" create "$repo/.gate-wake-lab/home" 2>&1); rc=$?
+  expect_code 1 "$rc" "lab-home: create on a new nested path inside a work tree must exit 1"
+  assert_absent "$repo/.gate-wake-lab" "lab-home: refused create must not create the path"
+  # a relative path resolving inside the work tree is refused too.
+  out=$(cd "$repo" && "$LABHOME" create ".idle-wake-lab-x" 2>&1); rc=$?
+  expect_code 1 "$rc" "lab-home: relative create inside a work tree must exit 1"
+  assert_absent "$repo/.idle-wake-lab-x" "lab-home: refused relative create must not create the path"
+  # outside any work tree, including a new nested path, still succeeds.
+  out=$("$LABHOME" create "$TMP/outside/nested/lab" 2>&1); rc=$?
+  expect_code 0 "$rc" "lab-home: create under TMPDIR must still succeed"
+  assert_present "$TMP/outside/nested/lab/.fm-lab-home" "lab-home: create under TMPDIR must write the marker"
+  pass "fm-lab-home: create refuses a directory inside a git work tree and still mints one outside"
+}
+
 # --- fm-spawn ---------------------------------------------------------------
 
 # run_spawn <cwd> <home> <id> <proj> <pane> <fakebin> [ASSIGN...] -> combined output
@@ -533,6 +559,7 @@ test_helper_path_backstop_refuses
 test_helper_normal_is_noop
 test_helper_lab_home_admits
 test_lab_home_helper
+test_lab_home_refuses_work_tree
 test_lab_home_private_tmux_socket_survives_deep_paths
 test_spawn_refuses_and_admits
 test_send_refuses_and_admits
