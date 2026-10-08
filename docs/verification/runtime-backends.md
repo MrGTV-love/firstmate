@@ -1244,7 +1244,7 @@ If restoration is not observed, the probe retries from a fresh busy turn at most
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
-The current live guard has not been rerun for this change.
+The latest guard run stopped before restored-wake recovery was exercised; see [omp idle wake behind an advisor note](#2026-10-08-omp-idle-wake-behind-an-advisor-note).
 Historical output below predates its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
 These results do not establish the current recovery contract; output for the removed parent Enter recovery is omitted.
 
