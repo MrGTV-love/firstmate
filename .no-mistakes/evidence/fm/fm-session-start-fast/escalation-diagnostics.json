@@ -1,0 +1,5 @@
+{
+  "escalate-home/state/.home-summary-refresh.streak": "count=2\nfirst=2026-10-08T14:40:54Z\nclass=refresh exceeded its -second deadline\nescalated=\n",
+  "escalate-home/state/.home-summary-refresh.log": "[2026-10-08T14:40:54Z] refresh exceeded its 1-second deadline\n[2026-10-08T14:41:01Z] refresh exceeded its 1-second deadline\n[2026-10-08T14:41:06Z] refresh exceeded its 1-second deadline\n",
+  "escalate-home/state/.home-summary-refresh.lock.owner.gbzyv3/pid": "62639\n"
+}

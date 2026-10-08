@@ -1,0 +1,26 @@
+BOOTSTRAP OUTPUT
+BOOTSTRAP_INFO: marked queued-owned in flight to match the worker this home already owns
+
+OBSERVED REAL TASKS-AXI CALLS
+--version 
+update --help
+mv --help
+list --file
+show queued-owned
+show queued-owned
+start queued-owned
+
+CONCURRENT LOCK ACQUISITION
+all worker lifecycle locks available while bootstrap is still running
+
+FINAL BACKLOG
+count: 5
+tasks[5]{id,state,kind,repo,title}:
+  queued-owned,in_flight,ship,fixture,Exercise batch reconciliation
+  "null",in_flight,ship,fixture,Exercise batch reconciliation
+  "false",in_flight,ship,fixture,Exercise batch reconciliation
+  "true",in_flight,ship,fixture,Exercise batch reconciliation
+  "123",in_flight,ship,fixture,Exercise batch reconciliation
+help[2]:
+  - "Run `tasks-axi show <id> --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/batch,a,b/data/backlog.md` for full notes on a task"
+  - "Run `tasks-axi ready --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/batch,a,b/data/backlog.md` to see unblocked queued work"

@@ -1,0 +1,153 @@
+SPAWN exit=1 elapsed_seconds=4.695
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-local-pool
+notice: live-local-pool ships mode=local-only while the standing posture for lifecycle-project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: herdr launcher pane 'w1:p1' has no injected socket identity; refusing to place a worker from an unverifiable parent identity
+
+VERIFIED PARENT SPAWN exit=0 elapsed_seconds=13.846
+spawned live-local-pool harness=sh kind=ship mode=local-only yolo=off window=fm-lab-start-fast-72061-4735:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-project/.treehouse/lifecycle-project-5fdf64/1/lifecycle-project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-local-pool
+notice: live-local-pool ships mode=local-only while the standing posture for lifecycle-project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for live-local-pool: undelivered - raw launch command has no supported brief transport
+
+SPAWNED METADATA
+window=fm-lab-start-fast-72061-4735:w2:p2
+endpoint_task_id=live-local-pool
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-project/.treehouse/lifecycle-project-5fdf64/1/lifecycle-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-project
+harness=sh
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/live-local-pool
+tasktmp=/tmp/fm-live-local-pool
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+spawn_gen=s1791470221.40113.32462
+backend=herdr
+herdr_session=fm-lab-start-fast-72061-4735
+herdr_workspace_id=w2
+herdr_tab_id=w2:t2
+herdr_pane_id=w2:p2
+
+REAL WORKER PANE
+treehouse get
+charlesabrooker@Mac-Studio lifecycle-project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-p
+roject/.treehouse/lifecycle-project-5fdf64/1/lifecycle-project. Type 'exit' to return.
+charlesabrooker@Mac-Studio lifecycle-project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJ
+REG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-project/.treehouse/lifecycle-project-5fdf64/1/lifecycle-project'
+charlesabrooker@Mac-Studio lifecycle-project % export GOTMPDIR=/tmp/fm-live-local-pool/gotmp
+charlesabrooker@Mac-Studio lifecycle-project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio lifecycle-project % export FM_TASK_ID=live-local-pool
+charlesabrooker@Mac-Studio lifecycle-project % . '/tmp/fm-live-local-pool+793b185db7a5d078b4b33c1c01aef87891ff1ed9dfc38e
+71ff69c0dda804841b/launch.s1791470221.40113.32462.sh'
+LIVE_WORKER_READY
+
+TEARDOWN exit=0 elapsed_seconds=21.565
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown live-local-pool complete (window fm-lab-start-fast-72061-4735:w2:p2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-project/.treehouse/lifecycle-project-5fdf64/1/lifecycle-project)
+Backlog: live-local-pool is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-local-pool/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-local-pool
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for live-local-pool: 64366 82248 82299
+teardown: force-killing leaked worktree process(es) for live-local-pool: 64366
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh: child setpgid (54014 to 54014): Operation not permitted
+
+SETTLED LEDGER
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-08T14:37:02Z",
+  "generated_epoch": 1791470222,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-local-pool",
+  "valid": false,
+  "reason": "live child state has no in-flight backlog item: live-local-pool=unknown",
+  "invalidity": {
+    "kind": "unowned_current",
+    "ids": [
+      "live-local-pool"
+    ]
+  },
+  "state": "unknown",
+  "active_children": [],
+  "decisions_open": [],
+  "holds": [],
+  "queued": [
+    {
+      "id": "live-local-pool",
+      "title": "Exercise detached lifecycle refresh",
+      "blocked_by": null,
+      "blocked_by_ids": [],
+      "unresolved_blocker_ids": [],
+      "blocked_reason": null,
+      "hold_reason": null,
+      "hold_kind": null,
+      "hold_until": null,
+      "hold_bucket": null,
+      "hold_age_days": 0,
+      "captain_actionable": false,
+      "repo": "lifecycle-project",
+      "kind": "ship",
+      "since": "2026-10-08"
+    }
+  ],
+  "landed": [],
+  "endpoints": [
+    {
+      "id": "live-local-pool",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-start-fast-72061-4735:w2:p2",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-08T14:37:02Z",
+        "freshness": "fresh"
+      }
+    }
+  ],
+  "counts": {
+    "active_children": 0,
+    "decisions_open": 0,
+    "holds": 0,
+    "queued": 1,
+    "landed": 0,
+    "endpoints": 1
+  },
+  "omitted": []
+}

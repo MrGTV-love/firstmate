@@ -1,11 +1,11 @@
 
 ================================================================================
-SESSION START - /tmp/fm-lab.JtVrRF
+SESSION START - /tmp/fm-lab.XrOZ3E
 ================================================================================
 
 LOCK
 --------------------------------------------------------------------------------
-lock acquired: harness pid 1673
+lock acquired: harness pid 66956
 
 BOOTSTRAP
 --------------------------------------------------------------------------------
@@ -13,10 +13,7 @@ BOOTSTRAP
 
 WAKE QUEUE
 --------------------------------------------------------------------------------
-OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
-history [key=buried-live] needs-decision: choose the migration base
-OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
-WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+(no queued wakes)
 ================================================================================
 SUPERVISION OPERATING INSTRUCTIONS - primary harness: claude
 ================================================================================
@@ -106,9 +103,8 @@ data/backlog.md
 compact backlog listing (tasks-axi; done rows omitted; every in-flight, held, and blocked row shown in full; ready queued bounded to 20; task bodies omitted)
 
 in flight:
-count: 1
-tasks[1]{id,state,kind,repo,title,blocked_by,hold_kind,hold_reason}:
-  history,in_flight,ship,fixture,Validate accumulated history,none,"-","-"
+count: 0
+tasks: 0 in_flight tasks in this backlog
 
 held (captain- or time-gated; an in-flight item that is also held appears in both groups):
 count: 0
@@ -126,22 +122,7 @@ Full task bodies remain available on demand: bin/fm-tasks-axi.sh show <id> --ful
 
 Work under way (state/*.meta)
 --------------------------------------------------------------------------------
-
---- history ---
-window=primary:fm-history
-worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/project
-project=fixture
-harness=claude
-kind=ship
-mode=local-only
-spawn_gen=fm.livehistory
-endpoint: alive (backend=tmux window=primary:fm-history)
-status tail (last 5 line(s), each capped at 220 characters, wake-EVENT history, not current state; full log: /tmp/fm-lab.JtVrRF/state/history.status):
-working: routine validation line 23995
-working: routine validation line 23996
-working: routine validation line 23997
-working: routine validation line 23998
-working: routine validation line 23999
+(none)
 
 Orphan status logs (state/*.status without matching .meta)
 --------------------------------------------------------------------------------
@@ -154,7 +135,7 @@ absent
 ================================================================================
 NETWORK CHECKS
 ================================================================================
-completed off the startup path in 2s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+completed off the startup path in 3s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
 (silent - no problems found)
 
 ================================================================================

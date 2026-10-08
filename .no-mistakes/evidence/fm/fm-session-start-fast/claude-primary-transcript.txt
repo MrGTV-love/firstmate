@@ -1,0 +1,40 @@
+⏺ My shell is zsh. zsh does not use TIMEFORMAT. So I will give each exact command to bash without changes, one after the
+  other.
+
+  Ran 2 shell commands
+
+⏺ Both commands exited 0. Now I will read the timing files and check the two digests.
+
+  Ran 1 shell command
+
+⏺ Captain, I ran both timed commands. Both finished with exit code 0.
+
+  My shell is zsh, and zsh does not read TIMEFORMAT. So I ran each of your exact command lines through bash, with no
+  changes to the commands. I did not start monitoring or any other lifecycle work.
+
+  Timing files:
+
+  ┌─────────────────────────────────────────────┬────────────────────────┐
+  │                    File                     │        Contents        │
+  ├─────────────────────────────────────────────┼────────────────────────┤
+  │ /tmp/fm-lab.JtVrRF/state/live-cold-time.txt │ elapsed_seconds=10.494 │
+  ├─────────────────────────────────────────────┼────────────────────────┤
+  │ /tmp/fm-lab.JtVrRF/state/live-warm-time.txt │ elapsed_seconds=8.281  │
+  └─────────────────────────────────────────────┴────────────────────────┘
+
+  Decision key: buried-live. Both digests show it on task history, with the question "choose the migration base".
+
+  Do both digests end with NEXT STEP? Yes.
+  - live-cold.txt (191 lines): its final section heading is NEXT STEP.
+  - live-warm.txt (197 lines): its final section heading is NEXT STEP.
+
+  result: The cold lab startup took 10.494 s and the warm re-emit took 8.281 s; both digests show decision key
+  buried-live and end with the NEXT STEP section.
+
+✻ Crunched for 43s · done 9:29 AM
+
+──────────────────────────────────────────────────────────────────────────────────────────── session-start-digest-test ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 7% 74k/1.0M 01M4CVJREG2ZWYYTNDVWK2DHWT:ee684cae
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents

@@ -1,7 +1,13 @@
 
 ================================================================================
-SESSION START - /tmp/fm-lab.JtVrRF
+SESSION START (CONTEXT RE-EMIT) - /tmp/fm-lab.JtVrRF
 ================================================================================
+This session already took the helm at its own startup and has only lost its
+context. Lock ownership is re-verified and the durable records below are
+reprinted, but the sweeps startup already reconciled - project clone refresh,
+secondmate convergence and liveness, pending remote handoff
+retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.
+Queued wakes ARE still drained: they arrived after startup and are this turn work, unless an open Stop-hook claim owns their delivery (the WAKE QUEUE section says so).
 
 LOCK
 --------------------------------------------------------------------------------
@@ -154,7 +160,7 @@ absent
 ================================================================================
 NETWORK CHECKS
 ================================================================================
-completed off the startup path in 2s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+completed off the startup path in 1s: GitHub authentication.
 (silent - no problems found)
 
 ================================================================================

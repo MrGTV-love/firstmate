@@ -1,0 +1,623 @@
+{
+  "results": [
+    {
+      "name": "Reject a directory ledger destination without false publication",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "fm-home-summary-refresh: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json"
+    },
+    {
+      "name": "Escalate three real acquired failures once, without repeated wake spam",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "[{\"attempt\": 1, \"exit\": 0, \"elapsed_seconds\": 0.73, \"streak\": \"count=1\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0}, {\"attempt\": 2, \"exit\": 0, \"elapsed_seconds\": 0.729, \"streak\": \"count=2\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0}, {\"attempt\": 3, \"exit\": 0, \"elapsed_seconds\": 0.947, \"streak\": \"count=3\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wake_count\": 1}, {\"attempt\": 4, \"exit\": 0, \"elapsed_seconds\": 1.255, \"streak\": \"count=4\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wake_count\": 1}]"
+    },
+    {
+      "name": "Recover with a valid ledger and escalate a subsequent fresh failure streak",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "Success in 1.74s; schema=fm-secondmate-home-summary.v1; streak removed=True; subsequent wake count=2"
+    },
+    {
+      "name": "Escalate and release refresh ownership even when diagnostic logging blocks",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "[{\"attempt\": 1, \"elapsed_seconds\": 5.396, \"streak\": \"count=1\\nfirst=2026-10-08T14:27:07Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0, \"lock_remaining\": false}, {\"attempt\": 2, \"elapsed_seconds\": 5.272, \"streak\": \"count=2\\nfirst=2026-10-08T14:27:07Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0, \"lock_remaining\": false}, {\"attempt\": 3, \"elapsed_seconds\": 5.593, \"streak\": \"count=3\\nfirst=2026-10-08T14:27:07Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wake_count\": 1, \"lock_remaining\": false}]"
+    },
+    {
+      "name": "Return detached triggers immediately and drain more than three pending follow-ups",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "Initial detach=0.05s; queued=['trigger-1', 'trigger-2', 'trigger-3', 'trigger-4', 'trigger-5']; followups=[{'round': 1, 'contender_return_seconds': 0.018, 'refresh_owner_pid': '53359', 'validation_process': '65057 63100'}, {'round': 2, 'contender_return_seconds': 0.033, 'refresh_owner_pid': '53359', 'validation_process': '69647 67902'}, {'round': 3, 'contender_return_seconds': 0.019, 'refresh_owner_pid': '53359', 'validation_process': '78190 71918'}, {'round': 4, 'contender_return_seconds': 0.029, 'refresh_owner_pid': '53359', 'validation_process': '85326 82760'}, {'round': 5, 'contender_return_seconds': 0.023, 'refresh_owner_pid': '53359', 'validation_process': '90211 88240'}]"
+    },
+    {
+      "name": "Cancel a refresh parent and prevent its orphan from overwriting newer state",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "Dead owner=50222; newer refresh exit=0, duration=1.081s; orphan did not publish into directory or erase streak"
+    },
+    {
+      "name": "Start an upgraded real Claude primary with a version-9 checkpoint and 24,000 routine status lines",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "elapsed_seconds=10.494; status_bytes=936060; buried-live retained; obsolete phantom rejected; NEXT STEP reached"
+    },
+    {
+      "name": "Re-emit startup context without losing a buried unresolved decision",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "elapsed_seconds=8.281; buried-live retained; NEXT STEP reached"
+    },
+    {
+      "name": "Spawn and tear down a real worker without waiting for blocked summary publication",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "Spawn=13.846s; teardown=21.565s with summary validation blocked; final active_children=[]; pool inside worktree"
+    },
+    {
+      "name": "Reconcile quoted-looking task IDs in a comma-containing home and release lifecycle locks",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "bootstrap-batch-transcript.txt: numeric/boolean IDs avoided per-record reads; queued owned row healed; both worker locks acquired before bootstrap exited"
+    },
+    {
+      "name": "Complete a status line after a partial checkpoint and preserve pre-checkpoint decisions in publication",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "Completed split decision surfaced in the real drain; after resolving it, published keys=['late', 'still-open']; cold partial checkpoint offset=offset=85"
+    },
+    {
+      "name": "Bound stalled refreshes, preserve the last good ledger, and report a changed failure reason",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "Three acquired validation timeouts retained identical ledger bytes and released ownership; wake on third only; directory-destination failure then raised a second wake"
+    },
+    {
+      "name": "Open a real Claude primary without waiting for stalled summary validation",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-refresh-results.json",
+      "reason": "Startup completed in 8.563s while the detached validation barrier was held and no ledger existed; releasing the barrier subsequently produced a valid ledger."
+    }
+  ],
+  "product_outputs": [
+    {
+      "scenario": "directory publication and escalation",
+      "direct": {
+        "exit": 1,
+        "elapsed_seconds": 0.533,
+        "stderr": "fm-home-summary-refresh: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json\n"
+      },
+      "steps": [
+        {
+          "attempt": 1,
+          "exit": 0,
+          "elapsed_seconds": 0.73,
+          "streak": "count=1\nfirst=2026-10-08T14:26:57Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+          "wake_count": 0
+        },
+        {
+          "attempt": 2,
+          "exit": 0,
+          "elapsed_seconds": 0.729,
+          "streak": "count=2\nfirst=2026-10-08T14:26:57Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+          "wake_count": 0
+        },
+        {
+          "attempt": 3,
+          "exit": 0,
+          "elapsed_seconds": 0.947,
+          "streak": "count=3\nfirst=2026-10-08T14:26:57Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\n",
+          "wake_count": 1
+        },
+        {
+          "attempt": 4,
+          "exit": 0,
+          "elapsed_seconds": 1.255,
+          "streak": "count=4\nfirst=2026-10-08T14:26:57Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\n",
+          "wake_count": 1
+        }
+      ],
+      "wake_queue": "1791469619\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T14:26:57Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n",
+      "diagnostic_log": "[2026-10-08T14:26:57Z] atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json\n[2026-10-08T14:26:57Z] atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json\n[2026-10-08T14:26:58Z] atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json\n[2026-10-08T14:26:59Z] atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json\n"
+    },
+    {
+      "scenario": "recovery",
+      "published_ledger": {
+        "schema": "fm-secondmate-home-summary.v1",
+        "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+        "contributions": {
+          "known": 0,
+          "checked": 0,
+          "counts": {
+            "captain": 0,
+            "fleet": 0,
+            "maintainer": 0,
+            "nobody": 0
+          },
+          "unmeasured": 0,
+          "complete": true,
+          "proven_clear": true,
+          "stale_verdicts": 0,
+          "missing_verdicts": 0,
+          "unreadable_records": 0,
+          "valid_until": 900,
+          "captain": [],
+          "captain_omitted": 0
+        },
+        "generated": "2026-10-08T14:27:01Z",
+        "generated_epoch": 1791469621,
+        "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation",
+        "valid": true,
+        "reason": null,
+        "invalidity": {
+          "kind": null,
+          "ids": []
+        },
+        "state": "no_active_work",
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [],
+        "landed": [],
+        "endpoints": [],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 0,
+          "landed": 0,
+          "endpoints": 0
+        },
+        "omitted": []
+      },
+      "wake_queue": "1791469619\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T14:26:57Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json (the failed attempt ran 0s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n1791469626\t2\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T14:27:02Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n"
+    },
+    {
+      "scenario": "blocked FIFO logger",
+      "steps": [
+        {
+          "attempt": 1,
+          "elapsed_seconds": 5.396,
+          "streak": "count=1\nfirst=2026-10-08T14:27:07Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+          "wake_count": 0,
+          "lock_remaining": false
+        },
+        {
+          "attempt": 2,
+          "elapsed_seconds": 5.272,
+          "streak": "count=2\nfirst=2026-10-08T14:27:07Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+          "wake_count": 0,
+          "lock_remaining": false
+        },
+        {
+          "attempt": 3,
+          "elapsed_seconds": 5.593,
+          "streak": "count=3\nfirst=2026-10-08T14:27:07Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\n",
+          "wake_count": 1,
+          "lock_remaining": false
+        }
+      ],
+      "wake_queue": "1791469642\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T14:27:07Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/blocked-logger/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n"
+    },
+    {
+      "scenario": "single-flight follow-up draining",
+      "initial_detach_seconds": 0.05,
+      "followups": [
+        {
+          "round": 1,
+          "contender_return_seconds": 0.018,
+          "refresh_owner_pid": "53359",
+          "validation_process": "65057 63100"
+        },
+        {
+          "round": 2,
+          "contender_return_seconds": 0.033,
+          "refresh_owner_pid": "53359",
+          "validation_process": "69647 67902"
+        },
+        {
+          "round": 3,
+          "contender_return_seconds": 0.019,
+          "refresh_owner_pid": "53359",
+          "validation_process": "78190 71918"
+        },
+        {
+          "round": 4,
+          "contender_return_seconds": 0.029,
+          "refresh_owner_pid": "53359",
+          "validation_process": "85326 82760"
+        },
+        {
+          "round": 5,
+          "contender_return_seconds": 0.023,
+          "refresh_owner_pid": "53359",
+          "validation_process": "90211 88240"
+        }
+      ],
+      "final_ledger": {
+        "schema": "fm-secondmate-home-summary.v1",
+        "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+        "contributions": {
+          "known": 0,
+          "checked": 0,
+          "counts": {
+            "captain": 0,
+            "fleet": 0,
+            "maintainer": 0,
+            "nobody": 0
+          },
+          "unmeasured": 0,
+          "complete": true,
+          "proven_clear": true,
+          "stale_verdicts": 0,
+          "missing_verdicts": 0,
+          "unreadable_records": 0,
+          "valid_until": 900,
+          "captain": [],
+          "captain_omitted": 0
+        },
+        "generated": "2026-10-08T14:28:42Z",
+        "generated_epoch": 1791469722,
+        "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/coalesced",
+        "valid": true,
+        "reason": null,
+        "invalidity": {
+          "kind": null,
+          "ids": []
+        },
+        "state": "no_active_work",
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [
+          {
+            "id": "trigger-1",
+            "title": "Queued while publication waits",
+            "blocked_by": null,
+            "blocked_by_ids": [],
+            "unresolved_blocker_ids": [],
+            "blocked_reason": null,
+            "hold_reason": null,
+            "hold_kind": null,
+            "hold_until": null,
+            "hold_bucket": null,
+            "hold_age_days": null,
+            "captain_actionable": false,
+            "repo": "fixture",
+            "kind": "ship",
+            "since": null
+          },
+          {
+            "id": "trigger-2",
+            "title": "Queued while publication waits",
+            "blocked_by": null,
+            "blocked_by_ids": [],
+            "unresolved_blocker_ids": [],
+            "blocked_reason": null,
+            "hold_reason": null,
+            "hold_kind": null,
+            "hold_until": null,
+            "hold_bucket": null,
+            "hold_age_days": null,
+            "captain_actionable": false,
+            "repo": "fixture",
+            "kind": "ship",
+            "since": null
+          },
+          {
+            "id": "trigger-3",
+            "title": "Queued while publication waits",
+            "blocked_by": null,
+            "blocked_by_ids": [],
+            "unresolved_blocker_ids": [],
+            "blocked_reason": null,
+            "hold_reason": null,
+            "hold_kind": null,
+            "hold_until": null,
+            "hold_bucket": null,
+            "hold_age_days": null,
+            "captain_actionable": false,
+            "repo": "fixture",
+            "kind": "ship",
+            "since": null
+          },
+          {
+            "id": "trigger-4",
+            "title": "Queued while publication waits",
+            "blocked_by": null,
+            "blocked_by_ids": [],
+            "unresolved_blocker_ids": [],
+            "blocked_reason": null,
+            "hold_reason": null,
+            "hold_kind": null,
+            "hold_until": null,
+            "hold_bucket": null,
+            "hold_age_days": null,
+            "captain_actionable": false,
+            "repo": "fixture",
+            "kind": "ship",
+            "since": null
+          },
+          {
+            "id": "trigger-5",
+            "title": "Queued while publication waits",
+            "blocked_by": null,
+            "blocked_by_ids": [],
+            "unresolved_blocker_ids": [],
+            "blocked_reason": null,
+            "hold_reason": null,
+            "hold_kind": null,
+            "hold_until": null,
+            "hold_bucket": null,
+            "hold_age_days": null,
+            "captain_actionable": false,
+            "repo": "fixture",
+            "kind": "ship",
+            "since": null
+          }
+        ],
+        "landed": [],
+        "endpoints": [],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 5,
+          "landed": 0,
+          "endpoints": 0
+        },
+        "omitted": []
+      }
+    },
+    {
+      "scenario": "canceled parent fencing",
+      "newer_refresh_exit": 0,
+      "newer_refresh_seconds": 1.081,
+      "newer_streak": "count=1\nfirst=2026-10-08T14:29:33Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+      "after_orphan_streak": "count=1\nfirst=2026-10-08T14:29:33Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n"
+    },
+    {
+      "scenario": "spawn and teardown",
+      "spawn_seconds": 9.374,
+      "teardown_seconds": 1.151,
+      "final_ledger": {
+        "schema": "fm-secondmate-home-summary.v1",
+        "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+        "contributions": {
+          "known": 0,
+          "checked": 0,
+          "counts": {
+            "captain": 0,
+            "fleet": 0,
+            "maintainer": 0,
+            "nobody": 0
+          },
+          "unmeasured": 0,
+          "complete": true,
+          "proven_clear": true,
+          "stale_verdicts": 0,
+          "missing_verdicts": 0,
+          "unreadable_records": 0,
+          "valid_until": 900,
+          "captain": [],
+          "captain_omitted": 0
+        },
+        "generated": "2026-10-08T14:32:39Z",
+        "generated_epoch": 1791469959,
+        "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle",
+        "valid": false,
+        "reason": "live child state has no in-flight backlog item: live-lifecycle=unknown",
+        "invalidity": {
+          "kind": "unowned_current",
+          "ids": [
+            "live-lifecycle"
+          ]
+        },
+        "state": "unknown",
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [
+          {
+            "id": "live-lifecycle",
+            "title": "Exercise detached lifecycle refresh",
+            "blocked_by": null,
+            "blocked_by_ids": [],
+            "unresolved_blocker_ids": [],
+            "blocked_reason": null,
+            "hold_reason": null,
+            "hold_kind": null,
+            "hold_until": null,
+            "hold_bucket": null,
+            "hold_age_days": 0,
+            "captain_actionable": false,
+            "repo": "fixture",
+            "kind": "ship",
+            "since": "2026-10-08"
+          }
+        ],
+        "landed": [],
+        "endpoints": [
+          {
+            "id": "live-lifecycle",
+            "state": "unknown",
+            "source": "pane",
+            "endpoint": {
+              "target": "fm-lab-start-fast-16920-17434:w1:p2",
+              "exists": true,
+              "agent_alive": "dead",
+              "status": "dead",
+              "observed_at": "2026-10-08T14:32:39Z",
+              "freshness": "fresh"
+            }
+          }
+        ],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 1,
+          "landed": 0,
+          "endpoints": 1
+        },
+        "omitted": []
+      }
+    },
+    {
+      "scenario": "verified-parent in-project lifecycle",
+      "metadata": {
+        "window": "fm-lab-start-fast-72061-4735:w2:p2",
+        "endpoint_task_id": "live-local-pool",
+        "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-project/.treehouse/lifecycle-project-5fdf64/1/lifecycle-project",
+        "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-project",
+        "harness": "sh",
+        "kind": "ship",
+        "mode": "local-only",
+        "yolo": "off",
+        "branch": "fm/live-local-pool",
+        "tasktmp": "/tmp/fm-live-local-pool",
+        "model": "default",
+        "effort": "default",
+        "skill_selection": "undelivered",
+        "skill_selection_reason": "raw launch command has no supported brief transport",
+        "spawn_gen": "s1791470221.40113.32462",
+        "backend": "herdr",
+        "herdr_session": "fm-lab-start-fast-72061-4735",
+        "herdr_workspace_id": "w2",
+        "herdr_tab_id": "w2:t2",
+        "herdr_pane_id": "w2:p2"
+      },
+      "spawn_seconds": 13.846,
+      "teardown_seconds": 21.565,
+      "final_ledger": {
+        "schema": "fm-secondmate-home-summary.v1",
+        "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+        "contributions": {
+          "known": 0,
+          "checked": 0,
+          "counts": {
+            "captain": 0,
+            "fleet": 0,
+            "maintainer": 0,
+            "nobody": 0
+          },
+          "unmeasured": 0,
+          "complete": true,
+          "proven_clear": true,
+          "stale_verdicts": 0,
+          "missing_verdicts": 0,
+          "unreadable_records": 0,
+          "valid_until": 900,
+          "captain": [],
+          "captain_omitted": 0
+        },
+        "generated": "2026-10-08T14:37:02Z",
+        "generated_epoch": 1791470222,
+        "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/lifecycle-local-pool",
+        "valid": false,
+        "reason": "live child state has no in-flight backlog item: live-local-pool=unknown",
+        "invalidity": {
+          "kind": "unowned_current",
+          "ids": [
+            "live-local-pool"
+          ]
+        },
+        "state": "unknown",
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [
+          {
+            "id": "live-local-pool",
+            "title": "Exercise detached lifecycle refresh",
+            "blocked_by": null,
+            "blocked_by_ids": [],
+            "unresolved_blocker_ids": [],
+            "blocked_reason": null,
+            "hold_reason": null,
+            "hold_kind": null,
+            "hold_until": null,
+            "hold_bucket": null,
+            "hold_age_days": 0,
+            "captain_actionable": false,
+            "repo": "lifecycle-project",
+            "kind": "ship",
+            "since": "2026-10-08"
+          }
+        ],
+        "landed": [],
+        "endpoints": [
+          {
+            "id": "live-local-pool",
+            "state": "unknown",
+            "source": "pane",
+            "endpoint": {
+              "target": "fm-lab-start-fast-72061-4735:w2:p2",
+              "exists": true,
+              "agent_alive": "dead",
+              "status": "dead",
+              "observed_at": "2026-10-08T14:37:02Z",
+              "freshness": "fresh"
+            }
+          }
+        ],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 1,
+          "landed": 0,
+          "endpoints": 1
+        },
+        "omitted": []
+      }
+    },
+    {
+      "scenario": "timeouts preserve atomic ledger and failure class change",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit": 0,
+          "elapsed_seconds": 10.094,
+          "streak": "count=1\nfirst=2026-10-08T14:44:03Z\nclass=refresh exceeded its -second deadline\nescalated=\n",
+          "wake_count": 0,
+          "last_good_ledger_preserved": true,
+          "lock_remaining": false
+        },
+        {
+          "attempt": 2,
+          "exit": 0,
+          "elapsed_seconds": 7.301,
+          "streak": "count=2\nfirst=2026-10-08T14:44:03Z\nclass=refresh exceeded its -second deadline\nescalated=\n",
+          "wake_count": 0,
+          "last_good_ledger_preserved": true,
+          "lock_remaining": false
+        },
+        {
+          "attempt": 3,
+          "exit": 0,
+          "elapsed_seconds": 8.358,
+          "streak": "count=3\nfirst=2026-10-08T14:44:03Z\nclass=refresh exceeded its -second deadline\nescalated=refresh exceeded its -second deadline\n",
+          "wake_count": 1,
+          "last_good_ledger_preserved": true,
+          "lock_remaining": false
+        }
+      ],
+      "wake_queue": "1791470667\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T14:44:03Z; last: refresh exceeded its 5-second deadline (the failed attempt ran 6s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n1791470671\t2\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 4 consecutive refresh failures since 2026-10-08T14:44:03Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/deadline-preserves-ledger/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\n",
+      "diagnostic_log": "[2026-10-08T14:44:03Z] refresh exceeded its 5-second deadline\n[2026-10-08T14:44:13Z] refresh exceeded its 5-second deadline\n[2026-10-08T14:44:20Z] refresh exceeded its 5-second deadline\n[2026-10-08T14:44:29Z] atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/deadline-preserves-ledger/state/home-summary.json\n"
+    }
+  ]
+}

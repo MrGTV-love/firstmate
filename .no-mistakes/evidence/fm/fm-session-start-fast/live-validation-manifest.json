@@ -1,131 +1,109 @@
 {
+  "runtime": "real Firstmate CLI scripts; real Claude 2.1.294 primary; isolated Herdr 0.9.1 session; real tasks-axi 0.2.6",
+  "primary_transport": "tmux private fm-lab socket, 120 columns x 40 rows; explicit lab-bound command because this Claude launcher did not forward FM_HOME to its agent shell",
+  "fault_injection": "Real jq execution delayed at validation barriers; real FIFO diagnostic log. No Firstmate script or summary document was substituted.",
   "scenarios": [
     {
-      "name": "Publish an accumulated home within 30 seconds without losing its buried decision",
+      "name": "Reject a directory ledger destination without false publication",
       "result": "pass",
       "live": true,
-      "evidence": "accumulated-home-ledger.json; {'command': 'FM_HOME=<publication> bin/fm-home-summary-refresh.sh ', 'seconds': 3.937, 'exit': 0, 'output': ''}",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "fm-home-summary-refresh: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-tmp/live/escalation/state/home-summary.json"
     },
     {
-      "name": "Reject a directory ledger destination and escalate three acquired failures only once",
+      "name": "Escalate three real acquired failures once, without repeated wake spam",
       "result": "pass",
       "live": true,
-      "evidence": "[{\"attempt\": 1, \"streak\": \"count=1\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wakes\": [], \"exit\": 0}, {\"attempt\": 2, \"streak\": \"count=2\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wakes\": [], \"exit\": 0}, {\"attempt\": 3, \"streak\": \"count=3\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wakes\": [\"1791453927\\t1\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\"], \"exit\": 0}, {\"attempt\": 4, \"streak\": \"count=4\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wakes\": [\"1791453927\\t1\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\"], \"exit\": 0}]",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "[{\"attempt\": 1, \"exit\": 0, \"elapsed_seconds\": 0.73, \"streak\": \"count=1\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0}, {\"attempt\": 2, \"exit\": 0, \"elapsed_seconds\": 0.729, \"streak\": \"count=2\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0}, {\"attempt\": 3, \"exit\": 0, \"elapsed_seconds\": 0.947, \"streak\": \"count=3\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wake_count\": 1}, {\"attempt\": 4, \"exit\": 0, \"elapsed_seconds\": 1.255, \"streak\": \"count=4\\nfirst=2026-10-08T14:26:57Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wake_count\": 1}]"
     },
     {
-      "name": "Recover publication, reset the failure streak, and escalate a new three-failure streak",
+      "name": "Recover with a valid ledger and escalate a subsequent fresh failure streak",
       "result": "pass",
       "live": true,
-      "evidence": "recovered-home-ledger.json; [\"1791453927\\t1\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\", \"1791453935\\t2\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:31Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\"]",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "Success in 1.74s; schema=fm-secondmate-home-summary.v1; streak removed=True; subsequent wake count=2"
     },
     {
-      "name": "Escalate acquired failures even when diagnostic logging and stderr are blocked",
+      "name": "Escalate and release refresh ownership even when diagnostic logging blocks",
       "result": "pass",
       "live": true,
-      "evidence": "blocked-logger-state.json",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "[{\"attempt\": 1, \"elapsed_seconds\": 5.396, \"streak\": \"count=1\\nfirst=2026-10-08T14:27:07Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0, \"lock_remaining\": false}, {\"attempt\": 2, \"elapsed_seconds\": 5.272, \"streak\": \"count=2\\nfirst=2026-10-08T14:27:07Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wake_count\": 0, \"lock_remaining\": false}, {\"attempt\": 3, \"elapsed_seconds\": 5.593, \"streak\": \"count=3\\nfirst=2026-10-08T14:27:07Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wake_count\": 1, \"lock_remaining\": false}]"
     },
     {
-      "name": "Return immediately under a held refresh lock and converge a trigger burst on the newest decision",
+      "name": "Return detached triggers immediately and drain more than three pending follow-ups",
       "result": "pass",
       "live": true,
-      "evidence": "concurrent-trigger-ledger.json; initial detach seconds=0.073",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "Initial detach=0.05s; queued=['trigger-1', 'trigger-2', 'trigger-3', 'trigger-4', 'trigger-5']; followups=[{'round': 1, 'contender_return_seconds': 0.018, 'refresh_owner_pid': '53359', 'validation_process': '65057 63100'}, {'round': 2, 'contender_return_seconds': 0.033, 'refresh_owner_pid': '53359', 'validation_process': '69647 67902'}, {'round': 3, 'contender_return_seconds': 0.019, 'refresh_owner_pid': '53359', 'validation_process': '78190 71918'}, {'round': 4, 'contender_return_seconds': 0.029, 'refresh_owner_pid': '53359', 'validation_process': '85326 82760'}, {'round': 5, 'contender_return_seconds': 0.023, 'refresh_owner_pid': '53359', 'validation_process': '90211 88240'}]"
     },
     {
-      "name": "Read a large child publication through the parent fleet snapshot",
+      "name": "Cancel a refresh parent and prevent its orphan from overwriting newer state",
       "result": "pass",
       "live": true,
-      "evidence": "large-parent-snapshot.json; initial nested fixture was correctly rejected, then isolated code-root siblings restored supported topology",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "Dead owner=50222; newer refresh exit=0, duration=1.081s; orphan did not publish into directory or erase streak"
     },
     {
-      "name": "Start a real Claude primary with a version-9 checkpoint and 24,000 status lines",
+      "name": "Start an upgraded real Claude primary with a version-9 checkpoint and 24,000 routine status lines",
       "result": "pass",
       "live": true,
-      "evidence": "claude-startup-digest.txt; claude-lab-digest-stream.jsonl; completion latency=26.18s",
-      "reason": "The gate wrapper intentionally stands down. The disposable Claude SessionStart invoked the real public digest directly; Claude quoted the buried decision. Its current vendor transport previews only the first ~2KB of the emitted 14KB output."
+      "evidence": "live-refresh-results.json",
+      "reason": "elapsed_seconds=10.494; status_bytes=936060; buried-live retained; obsolete phantom rejected; NEXT STEP reached"
     },
     {
-      "name": "Bound a genuinely slow refresh and escalate the third acquired timeout",
+      "name": "Re-emit startup context without losing a buried unresolved decision",
       "result": "pass",
       "live": true,
-      "evidence": "real-timeout-state.json; [{\"command\": \"FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort\", \"seconds\": 1.873, \"exit\": 0, \"output\": \"Terminated: 15\\n\"}, {\"command\": \"FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort\", \"seconds\": 1.955, \"exit\": 0, \"output\": \"Terminated: 15\\n\"}, {\"command\": \"FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort\", \"seconds\": 2.685, \"exit\": 0, \"output\": \"Terminated: 15\\n\"}]",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "elapsed_seconds=8.281; buried-live retained; NEXT STEP reached"
     },
     {
-      "name": "Preserve append decisions while rejecting obsolete, replaced, and partial-line checkpoints",
+      "name": "Spawn and tear down a real worker without waiting for blocked summary publication",
       "result": "pass",
       "live": true,
-      "evidence": "decision-transition-transcript.json",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "Spawn=13.846s; teardown=21.565s with summary validation blocked; final active_children=[]; pool inside worktree"
     },
     {
-      "name": "Recover a queued owned task while batching numeric-looking IDs in a comma-containing home",
+      "name": "Reconcile quoted-looking task IDs in a comma-containing home and release lifecycle locks",
       "result": "pass",
       "live": true,
-      "evidence": "backlog-batching-transcript.txt",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "bootstrap-batch-transcript.txt: numeric/boolean IDs avoided per-record reads; queued owned row healed; both worker locks acquired before bootstrap exited"
     },
     {
-      "name": "Cancel a refresh parent without allowing its orphaned worker to overwrite newer success or failure state",
+      "name": "Complete a status line after a partial checkpoint and preserve pre-checkpoint decisions in publication",
       "result": "pass",
       "live": true,
-      "evidence": "parent-cancellation-state.json; cancelled-writer.log",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "Completed split decision surfaced in the real drain; after resolving it, published keys=['late', 'still-open']; cold partial checkpoint offset=offset=85"
     },
     {
-      "name": "Reopen startup context using the migrated checkpoint and retain the open decision",
+      "name": "Bound stalled refreshes, preserve the last good ledger, and report a changed failure reason",
       "result": "pass",
       "live": true,
-      "evidence": "claude-warm-digest.txt; claude-warm-digest-stream.jsonl",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "Three acquired validation timeouts retained identical ledger bytes and released ownership; wake on third only; directory-destination failure then raised a second wake"
     },
     {
-      "name": "Spawn and tear down a real long-running Herdr task without waiting for HOME_SUMMARY",
+      "name": "Open a real Claude primary without waiting for stalled summary validation",
       "result": "pass",
       "live": true,
-      "evidence": "herdr-lifecycle-transcript.txt; named fm-lab-start-fast-91959-21963 with real shell task, private marked home, held summary lock",
-      "reason": ""
-    },
-    {
-      "name": "Publish accumulated history for an owned Claude endpoint with real no-mistakes state reads",
-      "result": "pass",
-      "live": true,
-      "evidence": "owned-worker-history-ledger.json; owned-worker-pane.txt; real Claude SessionStart ran writer with a 30s budget and inherited actual pane TMUX; full CLI turn 7.89s",
-      "reason": ""
-    },
-    {
-      "name": "Raise a new wake when publication failures change to real timeouts, but deduplicate repeated timeouts",
-      "result": "pass",
-      "live": true,
-      "evidence": "changed-failure-class-state.json",
-      "reason": ""
+      "evidence": "live-refresh-results.json",
+      "reason": "Startup completed in 8.563s while the detached validation barrier was held and no ledger existed; releasing the barrier subsequently produced a valid ledger."
     }
   ],
-  "targeted_regressions": {
-    "fm-home-summary-refresh.test.sh": 1,
-    "fm-home-summary-refresh-ownership.test.sh": 0,
-    "fm-wake-drain-open-decisions-cursor.test.sh": 0,
-    "fm-home-summary-refresh-isolated.test.sh": 0
-  },
-  "fixture_setup_corrections": [
-    "Private TMUX_TMPDIR under this long worktree exceeds the Unix-domain path limit; the supported fm-lab-home.sh tmux-dir helper supplied short private sockets and teardown removed them.",
-    "The unchanged summary regression initially rejected a child nested under the real code root. Copying only its script and shared helpers to a disposable sibling code root (with real bin symlinked) restored supported isolation; it then passed.",
-    "Gate SessionStart wrappers intentionally stand down, so disposable Claude settings invoked the real public digest directly; no gate bypass was used.",
-    "The full owned-history proof ran the real writer in Claude SessionStart to inherit the actual private-pane TMUX; its ledger records endpoint exists=true."
+  "cleanup": "Private Claude socket stopped and lab home removed; every provisioned Herdr lab torn down with the helper tripwire. Disposable worktree pool returned; accidental default-pool fixture slot destroyed through Treehouse and subsequent pools configured in-project.",
+  "test_setup_fixes": [
+    "Stopped the short-deadline competing watcher before direct stale-owner recovery, preserving the original single-flight and publication assertions.",
+    "Repeating-failure regression now drives real directory-destination publication failures under the unchanged default deadline and checks every acquired streak count. Separate timeout and serialization checks remain intact; the initial 1s fixture could fail before acquisition, and a 5s validation-entry trial remained host-dependent."
   ],
-  "cold_digest_completion_seconds": 26.18,
-  "warm_claude_turn_duration_ms": 5615,
-  "owned_claude_turn_seconds": 7.89,
-  "herdr_spawn_seconds": 16.512,
-  "herdr_teardown_seconds": 12.63,
-  "cleanup": {
-    "herdr_tripwire_teardown_exit": 0,
-    "treehouse_exact_test_worktree_destroy_exit": 0,
-    "private_tmux_servers": "stopped and short socket directories removed"
+  "targeted_regressions": {
+    "ownership": "tests/fm-home-summary-refresh-ownership.test.sh passed",
+    "checkpoint_migration": "tests/fm-wake-drain-open-decisions-cursor.test.sh passed",
+    "refresh": "Full focused refresh runs exercised watcher cadence, serialization, initialization and logging deadlines, directory publication, accumulated-history publication, and detached follow-ups; fixture races were corrected. The final verbatim escalation/recovery/large-history scenario driver passed.",
+    "production_changes": "None; only tests/fm-home-summary-refresh.test.sh modified."
   }
 }
