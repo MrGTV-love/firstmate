@@ -1,0 +1,23 @@
+[
+  {
+    "attempt": 1,
+    "exit": 0,
+    "script_count": 25,
+    "stdout": "tests/fm-session-launch-policy.test.sh\ntests/fm-watcher-lock.test.sh\ntests/fm-remote-transport-lanes.test.sh\ntests/fm-secondmate-sync.test.sh\ntests/fm-agy-harness.test.sh\ntests/fm-supervision-host.test.sh\ntests/fm-remote-secondmate-parent-binding.test.sh\ntests/fm-cursor-harness.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/fm-task-delivery.test.sh\ntests/fm-fleet-snapshot-view.test.sh\ntests/fm-update.test.sh\ntests/fm-spawn-worktree-settle.test.sh\ntests/fm-gate-refuse.test.sh\ntests/fm-backend-cmux.test.sh\ntests/fm-live-gate.test.sh\ntests/fm-harness-liveness-drift-live-e2e.test.sh\ntests/fm-pr-state.test.sh\ntests/fm-nm-test-contract.test.sh\ntests/fm-send-secondmate-marker-herdr-e2e.test.sh\ntests/fm-codex-hook-layer-live-e2e.test.sh\ntests/fm-send-inbox-doorbell-live-e2e.test.sh\n",
+    "stderr": ""
+  },
+  {
+    "attempt": 2,
+    "exit": 0,
+    "script_count": 25,
+    "stdout": "tests/fm-session-launch-policy.test.sh\ntests/fm-watcher-lock.test.sh\ntests/fm-remote-transport-lanes.test.sh\ntests/fm-secondmate-sync.test.sh\ntests/fm-agy-harness.test.sh\ntests/fm-supervision-host.test.sh\ntests/fm-remote-secondmate-parent-binding.test.sh\ntests/fm-cursor-harness.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/fm-task-delivery.test.sh\ntests/fm-fleet-snapshot-view.test.sh\ntests/fm-update.test.sh\ntests/fm-spawn-worktree-settle.test.sh\ntests/fm-gate-refuse.test.sh\ntests/fm-backend-cmux.test.sh\ntests/fm-live-gate.test.sh\ntests/fm-harness-liveness-drift-live-e2e.test.sh\ntests/fm-pr-state.test.sh\ntests/fm-nm-test-contract.test.sh\ntests/fm-send-secondmate-marker-herdr-e2e.test.sh\ntests/fm-codex-hook-layer-live-e2e.test.sh\ntests/fm-send-inbox-doorbell-live-e2e.test.sh\n",
+    "stderr": ""
+  },
+  {
+    "attempt": 3,
+    "exit": 0,
+    "script_count": 25,
+    "stdout": "tests/fm-session-launch-policy.test.sh\ntests/fm-watcher-lock.test.sh\ntests/fm-remote-transport-lanes.test.sh\ntests/fm-secondmate-sync.test.sh\ntests/fm-agy-harness.test.sh\ntests/fm-supervision-host.test.sh\ntests/fm-remote-secondmate-parent-binding.test.sh\ntests/fm-cursor-harness.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/fm-task-delivery.test.sh\ntests/fm-fleet-snapshot-view.test.sh\ntests/fm-update.test.sh\ntests/fm-spawn-worktree-settle.test.sh\ntests/fm-gate-refuse.test.sh\ntests/fm-backend-cmux.test.sh\ntests/fm-live-gate.test.sh\ntests/fm-harness-liveness-drift-live-e2e.test.sh\ntests/fm-pr-state.test.sh\ntests/fm-nm-test-contract.test.sh\ntests/fm-send-secondmate-marker-herdr-e2e.test.sh\ntests/fm-codex-hook-layer-live-e2e.test.sh\ntests/fm-send-inbox-doorbell-live-e2e.test.sh\n",
+    "stderr": ""
+  }
+]

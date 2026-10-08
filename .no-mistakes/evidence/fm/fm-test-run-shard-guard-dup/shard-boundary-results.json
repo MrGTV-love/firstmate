@@ -1,0 +1,113 @@
+[
+  {
+    "extra_scripts": 0,
+    "serial_count": 215,
+    "shard_count": 9,
+    "shard_sizes": {
+      "portable-serial-1of9": 15,
+      "portable-serial-2of9": 25,
+      "portable-serial-3of9": 25,
+      "portable-serial-4of9": 25,
+      "portable-serial-5of9": 25,
+      "portable-serial-6of9": 25,
+      "portable-serial-7of9": 24,
+      "portable-serial-8of9": 25,
+      "portable-serial-9of9": 26
+    },
+    "duplicates": [],
+    "missing": [],
+    "unexpected": [],
+    "repeat_final_shard_identical": true,
+    "guard_exit": 0,
+    "guard_output": "FM_TEST_COVERAGE ok total=257 parallel=24 parallel_max_ms=417163 parallel_imbalance_ms=2894 parallel_unhinted=0 serial=215 serial_shards=9 serial_unhinted=31 herdr=18\n"
+  },
+  {
+    "extra_scripts": 5,
+    "serial_count": 220,
+    "shard_count": 9,
+    "shard_sizes": {
+      "portable-serial-1of9": 16,
+      "portable-serial-2of9": 26,
+      "portable-serial-3of9": 1,
+      "portable-serial-4of9": 26,
+      "portable-serial-5of9": 25,
+      "portable-serial-6of9": 25,
+      "portable-serial-7of9": 25,
+      "portable-serial-8of9": 26,
+      "portable-serial-9of9": 26
+    },
+    "duplicates": [],
+    "missing": [
+      "tests/fm-agy-harness.test.sh",
+      "tests/fm-backend-cmux.test.sh",
+      "tests/fm-codex-hook-layer-live-e2e.test.sh",
+      "tests/fm-cursor-harness.test.sh",
+      "tests/fm-fleet-snapshot-view.test.sh",
+      "tests/fm-gate-refuse.test.sh",
+      "tests/fm-harness-liveness-drift-live-e2e.test.sh",
+      "tests/fm-host-mirror.test.sh",
+      "tests/fm-live-gate.test.sh",
+      "tests/fm-nm-test-contract.test.sh",
+      "tests/fm-omp-composer-box-live-e2e.test.sh",
+      "tests/fm-pr-state.test.sh",
+      "tests/fm-remote-secondmate-parent-binding.test.sh",
+      "tests/fm-remote-transport-lanes.test.sh",
+      "tests/fm-secondmate-sync.test.sh",
+      "tests/fm-send-inbox-doorbell-live-e2e.test.sh",
+      "tests/fm-send-secondmate-marker-herdr-e2e.test.sh",
+      "tests/fm-spawn-compact-adviser-disable.test.sh",
+      "tests/fm-spawn-worktree-settle.test.sh",
+      "tests/fm-supervision-host.test.sh",
+      "tests/fm-task-delivery.test.sh",
+      "tests/fm-update.test.sh",
+      "tests/fm-watcher-lock.test.sh",
+      "tests/zz-shard-dummy-2.test.sh"
+    ],
+    "unexpected": [],
+    "repeat_final_shard_identical": true,
+    "guard_exit": 1,
+    "guard_output": "fm-test-run: coverage guard: 36 of 220 portable serial scripts have no measured duration hint (max 15%)\nfm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md\ntests/fm-calm-pi-queue-retention-live-e2e.test.sh\ntests/fm-claude-titled-composer-live-e2e.test.sh\ntests/fm-devin-harness.test.sh\ntests/fm-devin-signals-live-e2e.test.sh\ntests/fm-fleet-ledger.test.sh\ntests/fm-fork-free-helpers.test.sh\ntests/fm-git-strip-ai-trailers.test.sh\ntests/fm-host-mirror-live-e2e.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-inbox.test.sh\ntests/fm-jev-guardrail-home.test.sh\ntests/fm-jev-guardrail.test.sh\ntests/fm-launch-prompt-signals-live-e2e.test.sh\ntests/fm-mem-guard.test.sh\ntests/fm-model-index-live-e2e.test.sh\ntests/fm-model-index.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-omp-jev-pipeline.test.sh\ntests/fm-remote-secondmate-relaunch.test.sh\ntests/fm-session-end-relaunch.test.sh\ntests/fm-skill-suggest.test.sh\ntests/fm-spawn-acquisition-cleanup.test.sh\ntests/fm-spawn-claude-api-key-guard.test.sh\ntests/fm-spawn-compact-adviser-disable-remote.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/fm-spawn-orca-worktree.test.sh\ntests/fm-supervision-host-attended-live-e2e.test.sh\ntests/fm-teamclaude-launch-live-e2e.test.sh\ntests/fm-teamclaude-launch.test.sh\ntests/fm-worker-account-live-e2e.test.sh\ntests/fm-worker-account.test.sh\ntests/zz-shard-dummy-1.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/zz-shard-dummy-3.test.sh\ntests/zz-shard-dummy-4.test.sh\ntests/zz-shard-dummy-5.test.sh\n"
+  },
+  {
+    "extra_scripts": 6,
+    "serial_count": 221,
+    "shard_count": 9,
+    "shard_sizes": {
+      "portable-serial-1of9": 14,
+      "portable-serial-2of9": 26,
+      "portable-serial-3of9": 26,
+      "portable-serial-4of9": 26,
+      "portable-serial-5of9": 25,
+      "portable-serial-6of9": 27,
+      "portable-serial-7of9": 25,
+      "portable-serial-8of9": 26,
+      "portable-serial-9of9": 26
+    },
+    "duplicates": [],
+    "missing": [],
+    "unexpected": [],
+    "guard_exit": 1,
+    "guard_output": "fm-test-run: coverage guard: 37 of 221 portable serial scripts have no measured duration hint (max 15%)\nfm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md\ntests/fm-calm-pi-queue-retention-live-e2e.test.sh\ntests/fm-claude-titled-composer-live-e2e.test.sh\ntests/fm-devin-harness.test.sh\ntests/fm-devin-signals-live-e2e.test.sh\ntests/fm-fleet-ledger.test.sh\ntests/fm-fork-free-helpers.test.sh\ntests/fm-git-strip-ai-trailers.test.sh\ntests/fm-host-mirror-live-e2e.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-inbox.test.sh\ntests/fm-jev-guardrail-home.test.sh\ntests/fm-jev-guardrail.test.sh\ntests/fm-launch-prompt-signals-live-e2e.test.sh\ntests/fm-mem-guard.test.sh\ntests/fm-model-index-live-e2e.test.sh\ntests/fm-model-index.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-omp-jev-pipeline.test.sh\ntests/fm-remote-secondmate-relaunch.test.sh\ntests/fm-session-end-relaunch.test.sh\ntests/fm-skill-suggest.test.sh\ntests/fm-spawn-acquisition-cleanup.test.sh\ntests/fm-spawn-claude-api-key-guard.test.sh\ntests/fm-spawn-compact-adviser-disable-remote.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/fm-spawn-orca-worktree.test.sh\ntests/fm-supervision-host-attended-live-e2e.test.sh\ntests/fm-teamclaude-launch-live-e2e.test.sh\ntests/fm-teamclaude-launch.test.sh\ntests/fm-worker-account-live-e2e.test.sh\ntests/fm-worker-account.test.sh\ntests/zz-shard-dummy-1.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/zz-shard-dummy-3.test.sh\ntests/zz-shard-dummy-4.test.sh\ntests/zz-shard-dummy-5.test.sh\ntests/zz-shard-dummy-6.test.sh\n"
+  },
+  {
+    "extra_scripts": 20,
+    "serial_count": 235,
+    "shard_count": 9,
+    "shard_sizes": {
+      "portable-serial-1of9": 17,
+      "portable-serial-2of9": 27,
+      "portable-serial-3of9": 27,
+      "portable-serial-4of9": 27,
+      "portable-serial-5of9": 28,
+      "portable-serial-6of9": 27,
+      "portable-serial-7of9": 27,
+      "portable-serial-8of9": 28,
+      "portable-serial-9of9": 27
+    },
+    "duplicates": [],
+    "missing": [],
+    "unexpected": [],
+    "guard_exit": 1,
+    "guard_output": "fm-test-run: coverage guard: 51 of 235 portable serial scripts have no measured duration hint (max 15%)\nfm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md\ntests/fm-calm-pi-queue-retention-live-e2e.test.sh\ntests/fm-claude-titled-composer-live-e2e.test.sh\ntests/fm-devin-harness.test.sh\ntests/fm-devin-signals-live-e2e.test.sh\ntests/fm-fleet-ledger.test.sh\ntests/fm-fork-free-helpers.test.sh\ntests/fm-git-strip-ai-trailers.test.sh\ntests/fm-host-mirror-live-e2e.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-inbox.test.sh\ntests/fm-jev-guardrail-home.test.sh\ntests/fm-jev-guardrail.test.sh\ntests/fm-launch-prompt-signals-live-e2e.test.sh\ntests/fm-mem-guard.test.sh\ntests/fm-model-index-live-e2e.test.sh\ntests/fm-model-index.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-omp-jev-pipeline.test.sh\ntests/fm-remote-secondmate-relaunch.test.sh\ntests/fm-session-end-relaunch.test.sh\ntests/fm-skill-suggest.test.sh\ntests/fm-spawn-acquisition-cleanup.test.sh\ntests/fm-spawn-claude-api-key-guard.test.sh\ntests/fm-spawn-compact-adviser-disable-remote.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/fm-spawn-orca-worktree.test.sh\ntests/fm-supervision-host-attended-live-e2e.test.sh\ntests/fm-teamclaude-launch-live-e2e.test.sh\ntests/fm-teamclaude-launch.test.sh\ntests/fm-worker-account-live-e2e.test.sh\ntests/fm-worker-account.test.sh\ntests/zz-shard-dummy-1.test.sh\ntests/zz-shard-dummy-10.test.sh\ntests/zz-shard-dummy-11.test.sh\ntests/zz-shard-dummy-12.test.sh\ntests/zz-shard-dummy-13.test.sh\ntests/zz-shard-dummy-14.test.sh\ntests/zz-shard-dummy-15.test.sh\ntests/zz-shard-dummy-16.test.sh\ntests/zz-shard-dummy-17.test.sh\ntests/zz-shard-dummy-18.test.sh\ntests/zz-shard-dummy-19.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/zz-shard-dummy-20.test.sh\ntests/zz-shard-dummy-3.test.sh\ntests/zz-shard-dummy-4.test.sh\ntests/zz-shard-dummy-5.test.sh\ntests/zz-shard-dummy-6.test.sh\ntests/zz-shard-dummy-7.test.sh\ntests/zz-shard-dummy-8.test.sh\ntests/zz-shard-dummy-9.test.sh\n"
+  }
+]

@@ -1,0 +1,5 @@
+ok - serial shards stay a disjoint cover of the serial lane with 5, 6, and 20 extra scripts
+ok - serial shard generation failures refuse rather than publish partial coverage
+ok - coverage guard passes with five extra scripts and no script in two shards
+ok - coverage guard still refuses a script that sits in two shards
+ok - portable serial shard lanes refuse mismatched, out-of-range, and countless names

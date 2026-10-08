@@ -1,0 +1,61 @@
+Bash runtime: /bin/bash 3.2.57(1)-release (arm64-apple-darwin26)
+Product: unmodified target fm-test-run.sh copied into disposable inventory containing the 257 repository test names plus five new script inputs.
+The focused runner contract was running concurrently.
+
+FAILED LIVE INSPECTION
+$ env -i PATH="$PATH" HOME=<workspace-local-home> TMPDIR=<workspace-local-tmp> /bin/bash .runner-live-ltzsh8j8/target-plus-five/bin/fm-test-run.sh --list --lane portable-serial-3of9
+Exit: 0
+STDOUT:
+tests/fm-session-launch-policy.test.sh
+STDERR:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.runner-live-ltzsh8j8/target-plus-five/bin/fm-test-run.sh: line 934: printf: write error: Interrupted system call
+
+Across all nine shard lists: 196 of 220 serial scripts listed; 24 missing; zero duplicates.
+MISSING SCRIPTS:
+tests/fm-agy-harness.test.sh
+tests/fm-backend-cmux.test.sh
+tests/fm-codex-hook-layer-live-e2e.test.sh
+tests/fm-cursor-harness.test.sh
+tests/fm-fleet-snapshot-view.test.sh
+tests/fm-gate-refuse.test.sh
+tests/fm-harness-liveness-drift-live-e2e.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-live-gate.test.sh
+tests/fm-nm-test-contract.test.sh
+tests/fm-omp-composer-box-live-e2e.test.sh
+tests/fm-pr-state.test.sh
+tests/fm-remote-secondmate-parent-binding.test.sh
+tests/fm-remote-transport-lanes.test.sh
+tests/fm-secondmate-sync.test.sh
+tests/fm-send-inbox-doorbell-live-e2e.test.sh
+tests/fm-send-secondmate-marker-herdr-e2e.test.sh
+tests/fm-spawn-compact-adviser-disable.test.sh
+tests/fm-spawn-worktree-settle.test.sh
+tests/fm-supervision-host.test.sh
+tests/fm-task-delivery.test.sh
+tests/fm-update.test.sh
+tests/fm-watcher-lock.test.sh
+tests/zz-shard-dummy-2.test.sh
+
+REPLAYS OF THE IDENTICAL COMMAND
+[
+  {
+    "attempt": 1,
+    "exit": 0,
+    "scripts": 25,
+    "stderr": ""
+  },
+  {
+    "attempt": 2,
+    "exit": 0,
+    "scripts": 25,
+    "stderr": ""
+  },
+  {
+    "attempt": 3,
+    "exit": 0,
+    "scripts": 25,
+    "stderr": ""
+  }
+]
+The replays each list 25 scripts. The 24 scripts absent from the failed output exactly equal the missing scripts in the nine-shard union.

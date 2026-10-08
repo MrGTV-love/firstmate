@@ -1,0 +1,304 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 45,
+      "failed": 0,
+      "name": "afk"
+    },
+    {
+      "count": 1,
+      "duration_ms": 49,
+      "failed": 0,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 5,
+      "duration_ms": 903,
+      "failed": 0,
+      "name": "live-harness-optin"
+    },
+    {
+      "count": 1,
+      "duration_ms": 132,
+      "failed": 0,
+      "name": "pr-forge"
+    },
+    {
+      "count": 1,
+      "duration_ms": 100,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 5,
+      "duration_ms": 1244,
+      "failed": 0,
+      "name": "secondmate"
+    },
+    {
+      "count": 1,
+      "duration_ms": 206,
+      "failed": 0,
+      "name": "session-bootstrap"
+    },
+    {
+      "count": 8,
+      "duration_ms": 792,
+      "failed": 0,
+      "name": "standalone"
+    },
+    {
+      "count": 3,
+      "duration_ms": 151,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-10-08T08:27:25Z",
+  "run_id": "fm-test-run-1791448034276-92839",
+  "scripts": [
+    {
+      "duration_ms": 305,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-secondmate-harness.test.sh"
+    },
+    {
+      "duration_ms": 78,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-public-followup.test.sh"
+    },
+    {
+      "duration_ms": 60,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-backlog-handoff.test.sh"
+    },
+    {
+      "duration_ms": 720,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-secondmate-trace-context.test.sh"
+    },
+    {
+      "duration_ms": 218,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-classify-corr-token.test.sh"
+    },
+    {
+      "duration_ms": 229,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-wake-drain-outcome-backstop.test.sh"
+    },
+    {
+      "duration_ms": 206,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "session-bootstrap",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-fleet-sync.test.sh"
+    },
+    {
+      "duration_ms": 65,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-send-remote-delivery.test.sh"
+    },
+    {
+      "duration_ms": 50,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-fleet-ledger.test.sh"
+    },
+    {
+      "duration_ms": 46,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-launch-prompt-signals-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 44,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-skill-suggest.test.sh"
+    },
+    {
+      "duration_ms": 49,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-teamclaude-launch.test.sh"
+    },
+    {
+      "duration_ms": 61,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-backlog-read-bound.test.sh"
+    },
+    {
+      "duration_ms": 45,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "afk",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-afk-contract.test.sh"
+    },
+    {
+      "duration_ms": 42,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-on.test.sh"
+    },
+    {
+      "duration_ms": 100,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-timeout-lib.test.sh"
+    },
+    {
+      "duration_ms": 64,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-wake-drain-open-decisions.test.sh"
+    },
+    {
+      "duration_ms": 117,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-job-orphan-reap.test.sh"
+    },
+    {
+      "duration_ms": 49,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-procevent-quota.test.sh"
+    },
+    {
+      "duration_ms": 45,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-test-fixture-cleanup.test.sh"
+    },
+    {
+      "duration_ms": 132,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pr-state.test.sh"
+    },
+    {
+      "duration_ms": 40,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-nm-test-contract.test.sh"
+    },
+    {
+      "duration_ms": 110,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pi-branch-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 57,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-harness-adapter-instructions-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 199,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-calm-claude-mod-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 491,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-grok-continuity-live-e2e.test.sh"
+    }
+  ],
+  "selection": "lane=portable-serial-9of9",
+  "started_at": "2026-10-08T08:27:14Z",
+  "summary": {
+    "duration_ms": 11181,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 26
+  }
+}

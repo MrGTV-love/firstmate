@@ -1,0 +1,40 @@
+[
+  {
+    "command": [
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh",
+      "--list-scheduled",
+      "tests/fm-operational-input.test.sh",
+      "tests/fm-lint.test.sh",
+      "tests/fm-muse-harness.test.sh",
+      "tests/fm-captain-hold-lifecycle.test.sh",
+      "tests/fm-kimi-harness.test.sh",
+      "tests/fm-brief.test.sh"
+    ],
+    "exit": 0,
+    "stdout": "tests/fm-muse-harness.test.sh\ntests/fm-brief.test.sh\ntests/fm-captain-hold-lifecycle.test.sh\ntests/fm-lint.test.sh\ntests/fm-kimi-harness.test.sh\ntests/fm-operational-input.test.sh\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh",
+      "--list",
+      "--proven-isolated"
+    ],
+    "exit": 0,
+    "stdout": "tests/fm-arm-pretool-check.test.sh\ntests/fm-backend-herdr.test.sh\ntests/fm-brief.test.sh\ntests/fm-captain-hold-lifecycle.test.sh\ntests/fm-cd-pretool-check.test.sh\ntests/fm-composer-ghost.test.sh\ntests/fm-composer-lib.test.sh\ntests/fm-crew-state.test.sh\ntests/fm-ensure-agents-md.test.sh\ntests/fm-grok-harness.test.sh\ntests/fm-herdr-lab.test.sh\ntests/fm-lint.test.sh\ntests/fm-pi-primary-types.test.sh\ntests/fm-pr-merge.test.sh\ntests/fm-review-diff.test.sh\ntests/fm-send-popup-settle.test.sh\ntests/fm-send-settle.test.sh\ntests/fm-send-strict.test.sh\ntests/fm-spawn-batch.test.sh\ntests/fm-supervision-instructions.test.sh\ntests/fm-test-run.test.sh\ntests/fm-tmux-submit-busy.test.sh\ntests/fm-transition-lib.test.sh\ntests/fm-x-mode.test.sh\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh",
+      "--list-scheduled",
+      "--proven-isolated"
+    ],
+    "exit": 0,
+    "stdout": "tests/fm-arm-pretool-check.test.sh\ntests/fm-backend-herdr.test.sh\ntests/fm-brief.test.sh\ntests/fm-captain-hold-lifecycle.test.sh\ntests/fm-cd-pretool-check.test.sh\ntests/fm-composer-ghost.test.sh\ntests/fm-composer-lib.test.sh\ntests/fm-crew-state.test.sh\ntests/fm-ensure-agents-md.test.sh\ntests/fm-grok-harness.test.sh\ntests/fm-herdr-lab.test.sh\ntests/fm-lint.test.sh\ntests/fm-pi-primary-types.test.sh\ntests/fm-pr-merge.test.sh\ntests/fm-review-diff.test.sh\ntests/fm-send-popup-settle.test.sh\ntests/fm-send-settle.test.sh\ntests/fm-send-strict.test.sh\ntests/fm-spawn-batch.test.sh\ntests/fm-supervision-instructions.test.sh\ntests/fm-test-run.test.sh\ntests/fm-tmux-submit-busy.test.sh\ntests/fm-transition-lib.test.sh\ntests/fm-x-mode.test.sh\n",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,16 @@
+Command:
+env HOME="$PWD/.runner-live-ltzsh8j8/home" TMPDIR="$PWD/.runner-live-ltzsh8j8/tmp" bin/fm-test-run.sh --jobs 1 --json /Users/charlesabrooker/.no-mistakes/evidence/01M4D9CQYPTA4EJQH814DXT6AT/runner-contract-timing.json tests/fm-test-run.test.sh
+
+Tool result: Command timed out after 1200 seconds. No complete runner summary or final timing artifact was produced.
+The three added regression cases emitted:
+ok - serial shards stay a disjoint cover of the serial lane with 5, 6, and 20 extra scripts
+ok - coverage guard passes with five extra scripts and no script in two shards
+ok - coverage guard still refuses a script that sits in two shards
+
+Last completed case:
+ok - --jobs refuses non-proven / stateful selections
+
+The next case started the real concurrent selection of tests/fm-supervision-events.test.sh and tests/fm-session-lock-ancestry.test.sh at 08:40:57, 1167 seconds after the outer FM_TEST_BEGIN at 08:21:30. The outer 1200-second deadline left only about 33 seconds for that selection and subsequent cases. Thus this timeout alone is not proof that the concurrent case hangs.
+
+Isolation follow-up:
+The concurrent pair exceeded a deliberately imposed 120-second per-script cap (ancestry exit 124). Re-running the same public selection with a 600-second cap completed successfully: ancestry exit 0, duration_ms=163028; supervision-events exit 0, duration_ms=19595; FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=173682. The 120-second failure was insufficient validation-command headroom, not a demonstrated product hang. The full contract invocation remains incomplete and is not reported as passing.

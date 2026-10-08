@@ -1,0 +1,681 @@
+Real CLI evidence for fault injection, serial execution, and concurrency admission.
+Disposable test payloads exercise the actual runner; no live fleet/harness lifecycle was invoked.
+Earlier boundary checks reached a driver-only deadline; their final replay is recorded separately in runner-boundary-replay.json.
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/duplicate-guard/bin/fm-test-run.sh --check-coverage
+exit=1
+
+stderr:
+fm-test-run: coverage guard: portable parallel shards share scripts:
+tests/fm-pr-merge.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/boundaries/bin/fm-test-run.sh --check-coverage
+exit=1
+
+stderr:
+fm-test-run: coverage guard: 36 of 220 portable serial scripts have no measured duration hint (max 15%)
+fm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md
+tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+tests/fm-claude-titled-composer-live-e2e.test.sh
+tests/fm-devin-harness.test.sh
+tests/fm-devin-signals-live-e2e.test.sh
+tests/fm-fleet-ledger.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-git-strip-ai-trailers.test.sh
+tests/fm-host-mirror-live-e2e.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-inbox.test.sh
+tests/fm-jev-guardrail-home.test.sh
+tests/fm-jev-guardrail.test.sh
+tests/fm-launch-prompt-signals-live-e2e.test.sh
+tests/fm-mem-guard.test.sh
+tests/fm-model-index-live-e2e.test.sh
+tests/fm-model-index.test.sh
+tests/fm-omp-composer-box-live-e2e.test.sh
+tests/fm-omp-jev-pipeline.test.sh
+tests/fm-remote-secondmate-relaunch.test.sh
+tests/fm-session-end-relaunch.test.sh
+tests/fm-skill-suggest.test.sh
+tests/fm-spawn-acquisition-cleanup.test.sh
+tests/fm-spawn-claude-api-key-guard.test.sh
+tests/fm-spawn-compact-adviser-disable-remote.test.sh
+tests/fm-spawn-compact-adviser-disable.test.sh
+tests/fm-spawn-orca-worktree.test.sh
+tests/fm-supervision-host-attended-live-e2e.test.sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+tests/fm-teamclaude-launch.test.sh
+tests/fm-worker-account-live-e2e.test.sh
+tests/fm-worker-account.test.sh
+tests/zz-shard-dummy-1.test.sh
+tests/zz-shard-dummy-2.test.sh
+tests/zz-shard-dummy-3.test.sh
+tests/zz-shard-dummy-4.test.sh
+tests/zz-shard-dummy-5.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/boundaries/bin/fm-test-run.sh --check-coverage
+exit=1
+
+stderr:
+fm-test-run: coverage guard: 36 of 220 portable serial scripts have no measured duration hint (max 15%)
+fm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md
+tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+tests/fm-claude-titled-composer-live-e2e.test.sh
+tests/fm-devin-harness.test.sh
+tests/fm-devin-signals-live-e2e.test.sh
+tests/fm-fleet-ledger.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-git-strip-ai-trailers.test.sh
+tests/fm-host-mirror-live-e2e.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-inbox.test.sh
+tests/fm-jev-guardrail-home.test.sh
+tests/fm-jev-guardrail.test.sh
+tests/fm-launch-prompt-signals-live-e2e.test.sh
+tests/fm-mem-guard.test.sh
+tests/fm-model-index-live-e2e.test.sh
+tests/fm-model-index.test.sh
+tests/fm-omp-composer-box-live-e2e.test.sh
+tests/fm-omp-jev-pipeline.test.sh
+tests/fm-remote-secondmate-relaunch.test.sh
+tests/fm-session-end-relaunch.test.sh
+tests/fm-skill-suggest.test.sh
+tests/fm-spawn-acquisition-cleanup.test.sh
+tests/fm-spawn-claude-api-key-guard.test.sh
+tests/fm-spawn-compact-adviser-disable-remote.test.sh
+tests/fm-spawn-compact-adviser-disable.test.sh
+tests/fm-spawn-orca-worktree.test.sh
+tests/fm-supervision-host-attended-live-e2e.test.sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+tests/fm-teamclaude-launch.test.sh
+tests/fm-worker-account-live-e2e.test.sh
+tests/fm-worker-account.test.sh
+tests/zz-shard-dummy-1.test.sh
+tests/zz-shard-dummy-2.test.sh
+tests/zz-shard-dummy-3.test.sh
+tests/zz-shard-dummy-4.test.sh
+tests/zz-shard-dummy-5.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/producer-failure/bin/fm-test-run.sh --list --lane portable-serial-1of9
+exit=2
+
+stderr:
+fm-test-run: could not generate complete portable serial shard assignments
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/producer-failure/bin/fm-test-run.sh --lane portable-serial-1of9
+exit=2
+
+stderr:
+fm-test-run: could not generate complete portable serial shard assignments
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/producer-failure/bin/fm-test-run.sh --list --lane portable-serial-1of9
+exit=2
+
+stderr:
+fm-test-run: could not generate complete portable serial shard assignments
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/producer-failure/bin/fm-test-run.sh --lane portable-serial-1of9
+exit=2
+
+stderr:
+fm-test-run: could not generate complete portable serial shard assignments
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/serial-execution/bin/fm-test-run.sh --lane portable-serial-3of9 --json /Users/charlesabrooker/.no-mistakes/evidence/01M4D9CQYPTA4EJQH814DXT6AT/serial-shard-timing.json
+exit=0
+FM_TEST_BEGIN 2026-10-08T09:26:07Z tests/fm-session-launch-policy.test.sh family=backend-dispatch expected_gate_skip=none
+ok - executed tests/fm-session-launch-policy.test.sh
+FM_TEST_END 2026-10-08T09:26:07Z tests/fm-session-launch-policy.test.sh exit=0 duration_ms=264 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:08Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - executed tests/fm-watcher-lock.test.sh
+FM_TEST_END 2026-10-08T09:26:11Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=2800 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:13Z tests/fm-remote-transport-lanes.test.sh family=secondmate expected_gate_skip=none
+ok - executed tests/fm-remote-transport-lanes.test.sh
+FM_TEST_END 2026-10-08T09:26:16Z tests/fm-remote-transport-lanes.test.sh exit=0 duration_ms=1441 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:17Z tests/fm-secondmate-sync.test.sh family=secondmate expected_gate_skip=none
+ok - executed tests/fm-secondmate-sync.test.sh
+FM_TEST_END 2026-10-08T09:26:18Z tests/fm-secondmate-sync.test.sh exit=0 duration_ms=256 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:19Z tests/fm-agy-harness.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - executed tests/fm-agy-harness.test.sh
+FM_TEST_END 2026-10-08T09:26:21Z tests/fm-agy-harness.test.sh exit=0 duration_ms=935 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:22Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none
+ok - executed tests/fm-supervision-host.test.sh
+FM_TEST_END 2026-10-08T09:26:23Z tests/fm-supervision-host.test.sh exit=0 duration_ms=766 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:24Z tests/fm-remote-secondmate-parent-binding.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-remote-secondmate-parent-binding.test.sh
+FM_TEST_END 2026-10-08T09:26:25Z tests/fm-remote-secondmate-parent-binding.test.sh exit=0 duration_ms=365 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:26Z tests/fm-cursor-harness.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-cursor-harness.test.sh
+FM_TEST_END 2026-10-08T09:26:27Z tests/fm-cursor-harness.test.sh exit=0 duration_ms=1144 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:28Z tests/fm-host-mirror.test.sh family=afk expected_gate_skip=none
+ok - executed tests/fm-host-mirror.test.sh
+FM_TEST_END 2026-10-08T09:26:31Z tests/fm-host-mirror.test.sh exit=0 duration_ms=2794 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:32Z tests/fm-omp-composer-box-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-omp-composer-box-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:26:36Z tests/fm-omp-composer-box-live-e2e.test.sh exit=0 duration_ms=568 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:36Z tests/fm-spawn-compact-adviser-disable.test.sh family=backend-dispatch expected_gate_skip=none
+ok - executed tests/fm-spawn-compact-adviser-disable.test.sh
+FM_TEST_END 2026-10-08T09:26:36Z tests/fm-spawn-compact-adviser-disable.test.sh exit=0 duration_ms=228 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:36Z tests/zz-shard-dummy-2.test.sh family=unclassified expected_gate_skip=none
+ok - executed tests/zz-shard-dummy-2.test.sh
+FM_TEST_END 2026-10-08T09:26:37Z tests/zz-shard-dummy-2.test.sh exit=0 duration_ms=619 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:37Z tests/fm-afk-return.test.sh family=afk expected_gate_skip=none
+ok - executed tests/fm-afk-return.test.sh
+FM_TEST_END 2026-10-08T09:26:37Z tests/fm-afk-return.test.sh exit=0 duration_ms=247 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:37Z tests/fm-kimi-harness.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - executed tests/fm-kimi-harness.test.sh
+FM_TEST_END 2026-10-08T09:26:38Z tests/fm-kimi-harness.test.sh exit=0 duration_ms=304 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:38Z tests/fm-update.test.sh family=session-bootstrap expected_gate_skip=none
+ok - executed tests/fm-update.test.sh
+FM_TEST_END 2026-10-08T09:26:39Z tests/fm-update.test.sh exit=0 duration_ms=185 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:39Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none
+ok - executed tests/fm-spawn-worktree-settle.test.sh
+FM_TEST_END 2026-10-08T09:26:39Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=482 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:40Z tests/fm-send-secondmate-marker.test.sh family=secondmate expected_gate_skip=none
+ok - executed tests/fm-send-secondmate-marker.test.sh
+FM_TEST_END 2026-10-08T09:26:40Z tests/fm-send-secondmate-marker.test.sh exit=0 duration_ms=595 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:40Z tests/fm-backend-cmux.test.sh family=cmux expected_gate_skip=optional-binary
+ok - executed tests/fm-backend-cmux.test.sh
+FM_TEST_END 2026-10-08T09:26:41Z tests/fm-backend-cmux.test.sh exit=0 duration_ms=223 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:41Z tests/fm-ci-workflow.test.sh family=unclassified expected_gate_skip=none
+ok - executed tests/fm-ci-workflow.test.sh
+FM_TEST_END 2026-10-08T09:26:42Z tests/fm-ci-workflow.test.sh exit=0 duration_ms=245 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:42Z tests/fm-quota-choose.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-quota-choose.test.sh
+FM_TEST_END 2026-10-08T09:26:45Z tests/fm-quota-choose.test.sh exit=0 duration_ms=1994 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:45Z tests/fm-no-mistakes-required.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-no-mistakes-required.test.sh
+FM_TEST_END 2026-10-08T09:26:45Z tests/fm-no-mistakes-required.test.sh exit=0 duration_ms=609 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:46Z tests/fm-forge-detect.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - executed tests/fm-forge-detect.test.sh
+FM_TEST_END 2026-10-08T09:26:46Z tests/fm-forge-detect.test.sh exit=0 duration_ms=239 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:46Z tests/fm-cursor-primary-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-cursor-primary-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:26:47Z tests/fm-cursor-primary-live-e2e.test.sh exit=0 duration_ms=284 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:47Z tests/fm-agy-signals-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-agy-signals-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:26:47Z tests/fm-agy-signals-live-e2e.test.sh exit=0 duration_ms=722 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:47Z tests/fm-composer-matrix-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-composer-matrix-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:26:48Z tests/fm-composer-matrix-live-e2e.test.sh exit=0 duration_ms=181 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:48Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:26:48Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh exit=0 duration_ms=141 gate_skip=false
+FM_TEST_SUMMARY total=26 failed=0 skipped_gate=0 duration_ms=68285
+FM_TEST_SUMMARY_FAMILY family=afk count=3 duration_ms=3807 failed=0
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=974 failed=0
+FM_TEST_SUMMARY_FAMILY family=cmux count=1 duration_ms=223 failed=0
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=5 duration_ms=1896 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=3 duration_ms=1478 failed=0
+FM_TEST_SUMMARY_FAMILY family=secondmate count=3 duration_ms=2292 failed=0
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=185 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=4 duration_ms=4112 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=864 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=2800 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=2800
+FM_TEST_SLOWEST rank=2 script=tests/fm-host-mirror.test.sh duration_ms=2794
+FM_TEST_SLOWEST rank=3 script=tests/fm-quota-choose.test.sh duration_ms=1994
+FM_TEST_SLOWEST rank=4 script=tests/fm-remote-transport-lanes.test.sh duration_ms=1441
+FM_TEST_SLOWEST rank=5 script=tests/fm-cursor-harness.test.sh duration_ms=1144
+FM_TEST_SLOWEST rank=6 script=tests/fm-agy-harness.test.sh duration_ms=935
+FM_TEST_SLOWEST rank=7 script=tests/fm-supervision-host.test.sh duration_ms=766
+FM_TEST_SLOWEST rank=8 script=tests/fm-agy-signals-live-e2e.test.sh duration_ms=722
+FM_TEST_SLOWEST rank=9 script=tests/zz-shard-dummy-2.test.sh duration_ms=619
+FM_TEST_SLOWEST rank=10 script=tests/fm-no-mistakes-required.test.sh duration_ms=609
+FM_TEST_SLOWEST rank=11 script=tests/fm-send-secondmate-marker.test.sh duration_ms=595
+FM_TEST_SLOWEST rank=12 script=tests/fm-omp-composer-box-live-e2e.test.sh duration_ms=568
+FM_TEST_SLOWEST rank=13 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=482
+FM_TEST_SLOWEST rank=14 script=tests/fm-remote-secondmate-parent-binding.test.sh duration_ms=365
+FM_TEST_SLOWEST rank=15 script=tests/fm-kimi-harness.test.sh duration_ms=304
+stderr:
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M4D9CQYPTA4EJQH814DXT6AT/serial-shard-timing.json
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/serial-execution/bin/fm-test-run.sh --lane portable-serial-3of9
+exit=1
+FM_TEST_BEGIN 2026-10-08T09:26:52Z tests/fm-session-launch-policy.test.sh family=backend-dispatch expected_gate_skip=none
+not ok - deliberate consumer failure
+FM_TEST_END 2026-10-08T09:26:52Z tests/fm-session-launch-policy.test.sh exit=7 duration_ms=73 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:52Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - executed tests/fm-watcher-lock.test.sh
+FM_TEST_END 2026-10-08T09:26:52Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=308 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:53Z tests/fm-remote-transport-lanes.test.sh family=secondmate expected_gate_skip=none
+ok - executed tests/fm-remote-transport-lanes.test.sh
+FM_TEST_END 2026-10-08T09:26:53Z tests/fm-remote-transport-lanes.test.sh exit=0 duration_ms=443 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:53Z tests/fm-secondmate-sync.test.sh family=secondmate expected_gate_skip=none
+ok - executed tests/fm-secondmate-sync.test.sh
+FM_TEST_END 2026-10-08T09:26:54Z tests/fm-secondmate-sync.test.sh exit=0 duration_ms=213 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:54Z tests/fm-agy-harness.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - executed tests/fm-agy-harness.test.sh
+FM_TEST_END 2026-10-08T09:26:54Z tests/fm-agy-harness.test.sh exit=0 duration_ms=352 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:54Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none
+ok - executed tests/fm-supervision-host.test.sh
+FM_TEST_END 2026-10-08T09:26:55Z tests/fm-supervision-host.test.sh exit=0 duration_ms=697 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:55Z tests/fm-remote-secondmate-parent-binding.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-remote-secondmate-parent-binding.test.sh
+FM_TEST_END 2026-10-08T09:26:56Z tests/fm-remote-secondmate-parent-binding.test.sh exit=0 duration_ms=246 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:56Z tests/fm-cursor-harness.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-cursor-harness.test.sh
+FM_TEST_END 2026-10-08T09:26:56Z tests/fm-cursor-harness.test.sh exit=0 duration_ms=451 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:57Z tests/fm-host-mirror.test.sh family=afk expected_gate_skip=none
+ok - executed tests/fm-host-mirror.test.sh
+FM_TEST_END 2026-10-08T09:26:57Z tests/fm-host-mirror.test.sh exit=0 duration_ms=516 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:57Z tests/fm-omp-composer-box-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-omp-composer-box-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:26:58Z tests/fm-omp-composer-box-live-e2e.test.sh exit=0 duration_ms=252 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:58Z tests/fm-spawn-compact-adviser-disable.test.sh family=backend-dispatch expected_gate_skip=none
+ok - executed tests/fm-spawn-compact-adviser-disable.test.sh
+FM_TEST_END 2026-10-08T09:26:58Z tests/fm-spawn-compact-adviser-disable.test.sh exit=0 duration_ms=638 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:59Z tests/zz-shard-dummy-2.test.sh family=unclassified expected_gate_skip=none
+ok - executed tests/zz-shard-dummy-2.test.sh
+FM_TEST_END 2026-10-08T09:26:59Z tests/zz-shard-dummy-2.test.sh exit=0 duration_ms=544 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:26:59Z tests/fm-afk-return.test.sh family=afk expected_gate_skip=none
+ok - executed tests/fm-afk-return.test.sh
+FM_TEST_END 2026-10-08T09:27:01Z tests/fm-afk-return.test.sh exit=0 duration_ms=849 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:01Z tests/fm-kimi-harness.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - executed tests/fm-kimi-harness.test.sh
+FM_TEST_END 2026-10-08T09:27:02Z tests/fm-kimi-harness.test.sh exit=0 duration_ms=326 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:02Z tests/fm-update.test.sh family=session-bootstrap expected_gate_skip=none
+ok - executed tests/fm-update.test.sh
+FM_TEST_END 2026-10-08T09:27:02Z tests/fm-update.test.sh exit=0 duration_ms=230 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:02Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none
+ok - executed tests/fm-spawn-worktree-settle.test.sh
+FM_TEST_END 2026-10-08T09:27:04Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=1720 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:05Z tests/fm-send-secondmate-marker.test.sh family=secondmate expected_gate_skip=none
+ok - executed tests/fm-send-secondmate-marker.test.sh
+FM_TEST_END 2026-10-08T09:27:07Z tests/fm-send-secondmate-marker.test.sh exit=0 duration_ms=950 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:07Z tests/fm-backend-cmux.test.sh family=cmux expected_gate_skip=optional-binary
+ok - executed tests/fm-backend-cmux.test.sh
+FM_TEST_END 2026-10-08T09:27:09Z tests/fm-backend-cmux.test.sh exit=0 duration_ms=1482 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:09Z tests/fm-ci-workflow.test.sh family=unclassified expected_gate_skip=none
+ok - executed tests/fm-ci-workflow.test.sh
+FM_TEST_END 2026-10-08T09:27:10Z tests/fm-ci-workflow.test.sh exit=0 duration_ms=1135 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:11Z tests/fm-quota-choose.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-quota-choose.test.sh
+FM_TEST_END 2026-10-08T09:27:14Z tests/fm-quota-choose.test.sh exit=0 duration_ms=2594 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:14Z tests/fm-no-mistakes-required.test.sh family=standalone expected_gate_skip=none
+ok - executed tests/fm-no-mistakes-required.test.sh
+FM_TEST_END 2026-10-08T09:27:16Z tests/fm-no-mistakes-required.test.sh exit=0 duration_ms=435 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:16Z tests/fm-forge-detect.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - executed tests/fm-forge-detect.test.sh
+FM_TEST_END 2026-10-08T09:27:21Z tests/fm-forge-detect.test.sh exit=0 duration_ms=4029 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:21Z tests/fm-cursor-primary-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-cursor-primary-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:27:29Z tests/fm-cursor-primary-live-e2e.test.sh exit=0 duration_ms=4709 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:30Z tests/fm-agy-signals-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-agy-signals-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:27:33Z tests/fm-agy-signals-live-e2e.test.sh exit=0 duration_ms=353 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:33Z tests/fm-composer-matrix-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-composer-matrix-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:27:34Z tests/fm-composer-matrix-live-e2e.test.sh exit=0 duration_ms=593 gate_skip=false
+FM_TEST_BEGIN 2026-10-08T09:27:34Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - executed tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh
+FM_TEST_END 2026-10-08T09:27:34Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh exit=0 duration_ms=207 gate_skip=false
+FM_TEST_SUMMARY total=26 failed=1 skipped_gate=0 duration_ms=44917
+FM_TEST_SUMMARY_FAMILY family=afk count=3 duration_ms=2062 failed=0
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=2431 failed=1
+FM_TEST_SUMMARY_FAMILY family=cmux count=1 duration_ms=1482 failed=0
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=5 duration_ms=6114 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=3 duration_ms=4707 failed=0
+FM_TEST_SUMMARY_FAMILY family=secondmate count=3 duration_ms=1606 failed=0
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=230 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=4 duration_ms=3726 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=1679 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=308 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-cursor-primary-live-e2e.test.sh duration_ms=4709
+FM_TEST_SLOWEST rank=2 script=tests/fm-forge-detect.test.sh duration_ms=4029
+FM_TEST_SLOWEST rank=3 script=tests/fm-quota-choose.test.sh duration_ms=2594
+FM_TEST_SLOWEST rank=4 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=1720
+FM_TEST_SLOWEST rank=5 script=tests/fm-backend-cmux.test.sh duration_ms=1482
+FM_TEST_SLOWEST rank=6 script=tests/fm-ci-workflow.test.sh duration_ms=1135
+FM_TEST_SLOWEST rank=7 script=tests/fm-send-secondmate-marker.test.sh duration_ms=950
+FM_TEST_SLOWEST rank=8 script=tests/fm-afk-return.test.sh duration_ms=849
+FM_TEST_SLOWEST rank=9 script=tests/fm-supervision-host.test.sh duration_ms=697
+FM_TEST_SLOWEST rank=10 script=tests/fm-spawn-compact-adviser-disable.test.sh duration_ms=638
+FM_TEST_SLOWEST rank=11 script=tests/fm-composer-matrix-live-e2e.test.sh duration_ms=593
+FM_TEST_SLOWEST rank=12 script=tests/zz-shard-dummy-2.test.sh duration_ms=544
+FM_TEST_SLOWEST rank=13 script=tests/fm-host-mirror.test.sh duration_ms=516
+FM_TEST_SLOWEST rank=14 script=tests/fm-cursor-harness.test.sh duration_ms=451
+FM_TEST_SLOWEST rank=15 script=tests/fm-remote-transport-lanes.test.sh duration_ms=443
+
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/inventory/bin/fm-test-run.sh --jobs 2 --lane portable-serial-3of9
+exit=2
+
+stderr:
+fm-test-run: --jobs 2 refused: portable serial lanes stay serial; use --jobs 1
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/membership/bin/fm-test-run.sh --jobs 2 tests/fm-procevent.test.sh tests/fm-quota-choose.test.sh
+exit=0
+FM_TEST_BEGIN 2026-10-08T09:02:37Z tests/fm-procevent.test.sh family=standalone expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-08T09:02:38Z tests/fm-quota-choose.test.sh family=standalone expected_gate_skip=none
+ok - real concurrent test payload fm-procevent.test.sh
+FM_TEST_END 2026-10-08T09:02:39Z tests/fm-procevent.test.sh exit=0 duration_ms=498 gate_skip=false
+ok - real concurrent test payload fm-quota-choose.test.sh
+FM_TEST_END 2026-10-08T09:02:43Z tests/fm-quota-choose.test.sh exit=0 duration_ms=3248 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=14470
+FM_TEST_SUMMARY_FAMILY family=standalone count=2 duration_ms=3746 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-quota-choose.test.sh duration_ms=3248
+FM_TEST_SLOWEST rank=2 script=tests/fm-procevent.test.sh duration_ms=498
+
+Persisted execution trace:
+start fm-quota-choose.test.sh
+start fm-procevent.test.sh
+end fm-procevent.test.sh
+end fm-quota-choose.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/membership/bin/fm-test-run.sh --jobs 2 tests/fm-pr-merge.test.sh tests/fm-brief.test.sh
+exit=0
+FM_TEST_BEGIN 2026-10-08T09:02:50Z tests/fm-brief.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-08T09:02:52Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
+ok - real concurrent test payload fm-brief.test.sh
+FM_TEST_END 2026-10-08T09:02:54Z tests/fm-brief.test.sh exit=0 duration_ms=1997 gate_skip=false
+ok - real concurrent test payload fm-pr-merge.test.sh
+FM_TEST_END 2026-10-08T09:02:56Z tests/fm-pr-merge.test.sh exit=0 duration_ms=1614 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=11331
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=1614 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=1997 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-brief.test.sh duration_ms=1997
+FM_TEST_SLOWEST rank=2 script=tests/fm-pr-merge.test.sh duration_ms=1614
+
+Persisted execution trace:
+start fm-brief.test.sh
+start fm-pr-merge.test.sh
+end fm-pr-merge.test.sh
+end fm-brief.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/membership/bin/fm-test-run.sh --jobs 2 tests/fm-procevent.test.sh tests/zz-unclassified.test.sh
+exit=2
+
+stderr:
+fm-test-run: --jobs 2 refused: tests/zz-unclassified.test.sh is not in the proven-isolated set (see bin/fm-test-isolation-proof.sh --list) and its family has no recorded concurrent proof. Unproven stateful scripts stay serial.
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/membership/bin/fm-test-run.sh --jobs 1 tests/zz-unclassified.test.sh
+exit=0
+FM_TEST_BEGIN 2026-10-08T09:03:06Z tests/zz-unclassified.test.sh family=unclassified expected_gate_skip=none
+ran unknown test
+FM_TEST_END 2026-10-08T09:03:12Z tests/zz-unclassified.test.sh exit=0 duration_ms=3072 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8537
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=3072 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/zz-unclassified.test.sh duration_ms=3072
+
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/membership/bin/fm-test-run.sh --jobs 2 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/fm-procevent.test.sh
+exit=2
+
+stderr:
+fm-test-run: --jobs 2 refused: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/fm-procevent.test.sh is not in the proven-isolated set (see bin/fm-test-isolation-proof.sh --list) and its family has no recorded concurrent proof. Unproven stateful scripts stay serial.
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/membership/bin/fm-test-run.sh --jobs 5 tests/fm-procevent.test.sh
+exit=2
+
+stderr:
+fm-test-run: --jobs 5 refused: family standalone is proven only up to 4 concurrent workers
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh --list-scheduled tests/fm-operational-input.test.sh tests/fm-lint.test.sh tests/fm-muse-harness.test.sh tests/fm-captain-hold-lifecycle.test.sh tests/fm-kimi-harness.test.sh tests/fm-brief.test.sh
+exit=0
+tests/fm-muse-harness.test.sh
+tests/fm-brief.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
+tests/fm-lint.test.sh
+tests/fm-kimi-harness.test.sh
+tests/fm-operational-input.test.sh
+
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh --list --proven-isolated
+exit=0
+tests/fm-arm-pretool-check.test.sh
+tests/fm-backend-herdr.test.sh
+tests/fm-brief.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
+tests/fm-cd-pretool-check.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-crew-state.test.sh
+tests/fm-ensure-agents-md.test.sh
+tests/fm-grok-harness.test.sh
+tests/fm-herdr-lab.test.sh
+tests/fm-lint.test.sh
+tests/fm-pi-primary-types.test.sh
+tests/fm-pr-merge.test.sh
+tests/fm-review-diff.test.sh
+tests/fm-send-popup-settle.test.sh
+tests/fm-send-settle.test.sh
+tests/fm-send-strict.test.sh
+tests/fm-spawn-batch.test.sh
+tests/fm-supervision-instructions.test.sh
+tests/fm-test-run.test.sh
+tests/fm-tmux-submit-busy.test.sh
+tests/fm-transition-lib.test.sh
+tests/fm-x-mode.test.sh
+
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh --list-scheduled --proven-isolated
+exit=0
+tests/fm-arm-pretool-check.test.sh
+tests/fm-backend-herdr.test.sh
+tests/fm-brief.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
+tests/fm-cd-pretool-check.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-crew-state.test.sh
+tests/fm-ensure-agents-md.test.sh
+tests/fm-grok-harness.test.sh
+tests/fm-herdr-lab.test.sh
+tests/fm-lint.test.sh
+tests/fm-pi-primary-types.test.sh
+tests/fm-pr-merge.test.sh
+tests/fm-review-diff.test.sh
+tests/fm-send-popup-settle.test.sh
+tests/fm-send-settle.test.sh
+tests/fm-send-strict.test.sh
+tests/fm-spawn-batch.test.sh
+tests/fm-supervision-instructions.test.sh
+tests/fm-test-run.test.sh
+tests/fm-tmux-submit-busy.test.sh
+tests/fm-transition-lib.test.sh
+tests/fm-x-mode.test.sh
+
+
+
+Final boundary replay (driver-only deadlines corrected; no product guard changed):
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/boundary-deadline-replay/bin/fm-test-run.sh --check-coverage
+exit=1
+duration_seconds=27.391
+
+fm-test-run: coverage guard: 36 of 220 portable serial scripts have no measured duration hint (max 15%)
+fm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md
+tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+tests/fm-claude-titled-composer-live-e2e.test.sh
+tests/fm-devin-harness.test.sh
+tests/fm-devin-signals-live-e2e.test.sh
+tests/fm-fleet-ledger.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-git-strip-ai-trailers.test.sh
+tests/fm-host-mirror-live-e2e.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-inbox.test.sh
+tests/fm-jev-guardrail-home.test.sh
+tests/fm-jev-guardrail.test.sh
+tests/fm-launch-prompt-signals-live-e2e.test.sh
+tests/fm-mem-guard.test.sh
+tests/fm-model-index-live-e2e.test.sh
+tests/fm-model-index.test.sh
+tests/fm-omp-composer-box-live-e2e.test.sh
+tests/fm-omp-jev-pipeline.test.sh
+tests/fm-remote-secondmate-relaunch.test.sh
+tests/fm-session-end-relaunch.test.sh
+tests/fm-skill-suggest.test.sh
+tests/fm-spawn-acquisition-cleanup.test.sh
+tests/fm-spawn-claude-api-key-guard.test.sh
+tests/fm-spawn-compact-adviser-disable-remote.test.sh
+tests/fm-spawn-compact-adviser-disable.test.sh
+tests/fm-spawn-orca-worktree.test.sh
+tests/fm-supervision-host-attended-live-e2e.test.sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+tests/fm-teamclaude-launch.test.sh
+tests/fm-worker-account-live-e2e.test.sh
+tests/fm-worker-account.test.sh
+tests/zz-shard-dummy-1.test.sh
+tests/zz-shard-dummy-2.test.sh
+tests/zz-shard-dummy-3.test.sh
+tests/zz-shard-dummy-4.test.sh
+tests/zz-shard-dummy-5.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/boundary-deadline-replay/bin/fm-test-run.sh --check-coverage
+exit=1
+duration_seconds=282.014
+
+fm-test-run: coverage guard: 37 of 221 portable serial scripts have no measured duration hint (max 15%)
+fm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md
+tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+tests/fm-claude-titled-composer-live-e2e.test.sh
+tests/fm-devin-harness.test.sh
+tests/fm-devin-signals-live-e2e.test.sh
+tests/fm-fleet-ledger.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-git-strip-ai-trailers.test.sh
+tests/fm-host-mirror-live-e2e.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-inbox.test.sh
+tests/fm-jev-guardrail-home.test.sh
+tests/fm-jev-guardrail.test.sh
+tests/fm-launch-prompt-signals-live-e2e.test.sh
+tests/fm-mem-guard.test.sh
+tests/fm-model-index-live-e2e.test.sh
+tests/fm-model-index.test.sh
+tests/fm-omp-composer-box-live-e2e.test.sh
+tests/fm-omp-jev-pipeline.test.sh
+tests/fm-remote-secondmate-relaunch.test.sh
+tests/fm-session-end-relaunch.test.sh
+tests/fm-skill-suggest.test.sh
+tests/fm-spawn-acquisition-cleanup.test.sh
+tests/fm-spawn-claude-api-key-guard.test.sh
+tests/fm-spawn-compact-adviser-disable-remote.test.sh
+tests/fm-spawn-compact-adviser-disable.test.sh
+tests/fm-spawn-orca-worktree.test.sh
+tests/fm-supervision-host-attended-live-e2e.test.sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+tests/fm-teamclaude-launch.test.sh
+tests/fm-worker-account-live-e2e.test.sh
+tests/fm-worker-account.test.sh
+tests/zz-shard-dummy-1.test.sh
+tests/zz-shard-dummy-2.test.sh
+tests/zz-shard-dummy-3.test.sh
+tests/zz-shard-dummy-4.test.sh
+tests/zz-shard-dummy-5.test.sh
+tests/zz-shard-dummy-6.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/boundary-deadline-replay/bin/fm-test-run.sh --check-coverage
+exit=1
+duration_seconds=25.906
+
+fm-test-run: coverage guard: 51 of 235 portable serial scripts have no measured duration hint (max 15%)
+fm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md
+tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+tests/fm-claude-titled-composer-live-e2e.test.sh
+tests/fm-devin-harness.test.sh
+tests/fm-devin-signals-live-e2e.test.sh
+tests/fm-fleet-ledger.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-git-strip-ai-trailers.test.sh
+tests/fm-host-mirror-live-e2e.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-inbox.test.sh
+tests/fm-jev-guardrail-home.test.sh
+tests/fm-jev-guardrail.test.sh
+tests/fm-launch-prompt-signals-live-e2e.test.sh
+tests/fm-mem-guard.test.sh
+tests/fm-model-index-live-e2e.test.sh
+tests/fm-model-index.test.sh
+tests/fm-omp-composer-box-live-e2e.test.sh
+tests/fm-omp-jev-pipeline.test.sh
+tests/fm-remote-secondmate-relaunch.test.sh
+tests/fm-session-end-relaunch.test.sh
+tests/fm-skill-suggest.test.sh
+tests/fm-spawn-acquisition-cleanup.test.sh
+tests/fm-spawn-claude-api-key-guard.test.sh
+tests/fm-spawn-compact-adviser-disable-remote.test.sh
+tests/fm-spawn-compact-adviser-disable.test.sh
+tests/fm-spawn-orca-worktree.test.sh
+tests/fm-supervision-host-attended-live-e2e.test.sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+tests/fm-teamclaude-launch.test.sh
+tests/fm-worker-account-live-e2e.test.sh
+tests/fm-worker-account.test.sh
+tests/zz-shard-dummy-1.test.sh
+tests/zz-shard-dummy-10.test.sh
+tests/zz-shard-dummy-11.test.sh
+tests/zz-shard-dummy-12.test.sh
+tests/zz-shard-dummy-13.test.sh
+tests/zz-shard-dummy-14.test.sh
+tests/zz-shard-dummy-15.test.sh
+tests/zz-shard-dummy-16.test.sh
+tests/zz-shard-dummy-17.test.sh
+tests/zz-shard-dummy-18.test.sh
+tests/zz-shard-dummy-19.test.sh
+tests/zz-shard-dummy-2.test.sh
+tests/zz-shard-dummy-20.test.sh
+tests/zz-shard-dummy-3.test.sh
+tests/zz-shard-dummy-4.test.sh
+tests/zz-shard-dummy-5.test.sh
+tests/zz-shard-dummy-6.test.sh
+tests/zz-shard-dummy-7.test.sh
+tests/zz-shard-dummy-8.test.sh
+tests/zz-shard-dummy-9.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/healthy-deadline-replay/bin/fm-test-run.sh --check-coverage
+exit=1
+duration_seconds=18.656
+
+fm-test-run: coverage guard: 36 of 220 portable serial scripts have no measured duration hint (max 15%)
+fm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md
+tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+tests/fm-claude-titled-composer-live-e2e.test.sh
+tests/fm-devin-harness.test.sh
+tests/fm-devin-signals-live-e2e.test.sh
+tests/fm-fleet-ledger.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-git-strip-ai-trailers.test.sh
+tests/fm-host-mirror-live-e2e.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-inbox.test.sh
+tests/fm-jev-guardrail-home.test.sh
+tests/fm-jev-guardrail.test.sh
+tests/fm-launch-prompt-signals-live-e2e.test.sh
+tests/fm-mem-guard.test.sh
+tests/fm-model-index-live-e2e.test.sh
+tests/fm-model-index.test.sh
+tests/fm-omp-composer-box-live-e2e.test.sh
+tests/fm-omp-jev-pipeline.test.sh
+tests/fm-remote-secondmate-relaunch.test.sh
+tests/fm-session-end-relaunch.test.sh
+tests/fm-skill-suggest.test.sh
+tests/fm-spawn-acquisition-cleanup.test.sh
+tests/fm-spawn-claude-api-key-guard.test.sh
+tests/fm-spawn-compact-adviser-disable-remote.test.sh
+tests/fm-spawn-compact-adviser-disable.test.sh
+tests/fm-spawn-orca-worktree.test.sh
+tests/fm-supervision-host-attended-live-e2e.test.sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+tests/fm-teamclaude-launch.test.sh
+tests/fm-worker-account-live-e2e.test.sh
+tests/fm-worker-account.test.sh
+tests/zz-shard-dummy-1.test.sh
+tests/zz-shard-dummy-2.test.sh
+tests/zz-shard-dummy-3.test.sh
+tests/zz-shard-dummy-4.test.sh
+tests/zz-shard-dummy-5.test.sh
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/healthy-deadline-replay/bin/fm-test-run.sh --check-coverage
+exit=0
+duration_seconds=42.543
+FM_TEST_COVERAGE ok total=231 parallel=24 parallel_max_ms=417163 parallel_imbalance_ms=2894 parallel_unhinted=0 serial=189 serial_shards=9 serial_unhinted=5 herdr=18
+
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/healthy-deadline-replay/bin/fm-test-run.sh --check-coverage
+exit=0
+duration_seconds=14.533
+FM_TEST_COVERAGE ok total=232 parallel=24 parallel_max_ms=417163 parallel_imbalance_ms=2894 parallel_unhinted=0 serial=190 serial_shards=9 serial_unhinted=6 herdr=18
+
+
+{"name": "Add five, six, or twenty tests and obtain complete deterministic disjoint serial shards", "result": "pass", "detail": [{"added": 5, "serial_count": 220, "full_partitions_checked": 2, "shard_sizes": {"1": 16, "2": 26, "3": 25, "4": 26, "5": 25, "6": 25, "7": 25, "8": 26, "9": 26}, "guard_exit": 1, "guard_output": "fm-test-run: coverage guard: 36 of 220 portable serial scripts have no measured duration hint (max 15%)\nfm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md\ntests/fm-calm-pi-queue-retention-live-e2e.test.sh\ntests/fm-claude-titled-composer-live-e2e.test.sh\ntests/fm-devin-harness.test.sh\ntests/fm-devin-signals-live-e2e.test.sh\ntests/fm-fleet-ledger.test.sh\ntests/fm-fork-free-helpers.test.sh\ntests/fm-git-strip-ai-trailers.test.sh\ntests/fm-host-mirror-live-e2e.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-inbox.test.sh\ntests/fm-jev-guardrail-home.test.sh\ntests/fm-jev-guardrail.test.sh\ntests/fm-launch-prompt-signals-live-e2e.test.sh\ntests/fm-mem-guard.test.sh\ntests/fm-model-index-live-e2e.test.sh\ntests/fm-model-index.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-omp-jev-pipeline.test.sh\ntests/fm-remote-secondmate-relaunch.test.sh\ntests/fm-session-end-relaunch.test.sh\ntests/fm-skill-suggest.test.sh\ntests/fm-spawn-acquisition-cleanup.test.sh\ntests/fm-spawn-claude-api-key-guard.test.sh\ntests/fm-spawn-compact-adviser-disable-remote.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/fm-spawn-orca-worktree.test.sh\ntests/fm-supervision-host-attended-live-e2e.test.sh\ntests/fm-teamclaude-launch-live-e2e.test.sh\ntests/fm-teamclaude-launch.test.sh\ntests/fm-worker-account-live-e2e.test.sh\ntests/fm-worker-account.test.sh\ntests/zz-shard-dummy-1.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/zz-shard-dummy-3.test.sh\ntests/zz-shard-dummy-4.test.sh\ntests/zz-shard-dummy-5.test.sh\n"}, {"added": 6, "serial_count": 221, "full_partitions_checked": 2, "shard_sizes": {"1": 14, "2": 26, "3": 26, "4": 26, "5": 25, "6": 27, "7": 25, "8": 26, "9": 26}, "guard_exit": 1, "guard_output": "fm-test-run: coverage guard: 37 of 221 portable serial scripts have no measured duration hint (max 15%)\nfm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md\ntests/fm-calm-pi-queue-retention-live-e2e.test.sh\ntests/fm-claude-titled-composer-live-e2e.test.sh\ntests/fm-devin-harness.test.sh\ntests/fm-devin-signals-live-e2e.test.sh\ntests/fm-fleet-ledger.test.sh\ntests/fm-fork-free-helpers.test.sh\ntests/fm-git-strip-ai-trailers.test.sh\ntests/fm-host-mirror-live-e2e.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-inbox.test.sh\ntests/fm-jev-guardrail-home.test.sh\ntests/fm-jev-guardrail.test.sh\ntests/fm-launch-prompt-signals-live-e2e.test.sh\ntests/fm-mem-guard.test.sh\ntests/fm-model-index-live-e2e.test.sh\ntests/fm-model-index.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-omp-jev-pipeline.test.sh\ntests/fm-remote-secondmate-relaunch.test.sh\ntests/fm-session-end-relaunch.test.sh\ntests/fm-skill-suggest.test.sh\ntests/fm-spawn-acquisition-cleanup.test.sh\ntests/fm-spawn-claude-api-key-guard.test.sh\ntests/fm-spawn-compact-adviser-disable-remote.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/fm-spawn-orca-worktree.test.sh\ntests/fm-supervision-host-attended-live-e2e.test.sh\ntests/fm-teamclaude-launch-live-e2e.test.sh\ntests/fm-teamclaude-launch.test.sh\ntests/fm-worker-account-live-e2e.test.sh\ntests/fm-worker-account.test.sh\ntests/zz-shard-dummy-1.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/zz-shard-dummy-3.test.sh\ntests/zz-shard-dummy-4.test.sh\ntests/zz-shard-dummy-5.test.sh\ntests/zz-shard-dummy-6.test.sh\n"}, {"added": 20, "serial_count": 235, "full_partitions_checked": 2, "shard_sizes": {"1": 17, "2": 27, "3": 27, "4": 27, "5": 28, "6": 27, "7": 27, "8": 28, "9": 27}, "guard_exit": 1, "guard_output": "fm-test-run: coverage guard: 51 of 235 portable serial scripts have no measured duration hint (max 15%)\nfm-test-run: refresh the hints from a green run's timing artifacts: docs/fm-test-portable-shards.md\ntests/fm-calm-pi-queue-retention-live-e2e.test.sh\ntests/fm-claude-titled-composer-live-e2e.test.sh\ntests/fm-devin-harness.test.sh\ntests/fm-devin-signals-live-e2e.test.sh\ntests/fm-fleet-ledger.test.sh\ntests/fm-fork-free-helpers.test.sh\ntests/fm-git-strip-ai-trailers.test.sh\ntests/fm-host-mirror-live-e2e.test.sh\ntests/fm-host-mirror.test.sh\ntests/fm-inbox.test.sh\ntests/fm-jev-guardrail-home.test.sh\ntests/fm-jev-guardrail.test.sh\ntests/fm-launch-prompt-signals-live-e2e.test.sh\ntests/fm-mem-guard.test.sh\ntests/fm-model-index-live-e2e.test.sh\ntests/fm-model-index.test.sh\ntests/fm-omp-composer-box-live-e2e.test.sh\ntests/fm-omp-jev-pipeline.test.sh\ntests/fm-remote-secondmate-relaunch.test.sh\ntests/fm-session-end-relaunch.test.sh\ntests/fm-skill-suggest.test.sh\ntests/fm-spawn-acquisition-cleanup.test.sh\ntests/fm-spawn-claude-api-key-guard.test.sh\ntests/fm-spawn-compact-adviser-disable-remote.test.sh\ntests/fm-spawn-compact-adviser-disable.test.sh\ntests/fm-spawn-orca-worktree.test.sh\ntests/fm-supervision-host-attended-live-e2e.test.sh\ntests/fm-teamclaude-launch-live-e2e.test.sh\ntests/fm-teamclaude-launch.test.sh\ntests/fm-worker-account-live-e2e.test.sh\ntests/fm-worker-account.test.sh\ntests/zz-shard-dummy-1.test.sh\ntests/zz-shard-dummy-10.test.sh\ntests/zz-shard-dummy-11.test.sh\ntests/zz-shard-dummy-12.test.sh\ntests/zz-shard-dummy-13.test.sh\ntests/zz-shard-dummy-14.test.sh\ntests/zz-shard-dummy-15.test.sh\ntests/zz-shard-dummy-16.test.sh\ntests/zz-shard-dummy-17.test.sh\ntests/zz-shard-dummy-18.test.sh\ntests/zz-shard-dummy-19.test.sh\ntests/zz-shard-dummy-2.test.sh\ntests/zz-shard-dummy-20.test.sh\ntests/zz-shard-dummy-3.test.sh\ntests/zz-shard-dummy-4.test.sh\ntests/zz-shard-dummy-5.test.sh\ntests/zz-shard-dummy-6.test.sh\ntests/zz-shard-dummy-7.test.sh\ntests/zz-shard-dummy-8.test.sh\ntests/zz-shard-dummy-9.test.sh\n"}]}
+{"name": "Coverage guard succeeds with five and six new tests within the existing hint budget", "result": "pass", "detail": [{"added": 5, "output": "FM_TEST_COVERAGE ok total=231 parallel=24 parallel_max_ms=417163 parallel_imbalance_ms=2894 parallel_unhinted=0 serial=189 serial_shards=9 serial_unhinted=5 herdr=18\n", "exit": 0}, {"added": 6, "output": "FM_TEST_COVERAGE ok total=232 parallel=24 parallel_max_ms=417163 parallel_imbalance_ms=2894 parallel_unhinted=0 serial=190 serial_shards=9 serial_unhinted=6 herdr=18\n", "exit": 0}]}

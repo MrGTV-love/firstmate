@@ -1,0 +1,4 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh: line 2392:  4735 Terminated: 15          ( trap - EXIT HUP INT TERM; set +e; export TMPDIR="$work/tmp"; export TMP="$work/tmp"; unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2> /dev/null || true; cd "$ROOT" || exit 1; begin_ms=$(now_ms); set +e; run_script_bounded "$script" "$work/output" 0 "w$worker_n"; rc=$?; set -e; end_ms=$(now_ms); duration=$((end_ms - begin_ms)); if [ "$duration" -lt 0 ]; then
+    duration=0;
+fi; printf '%s\n' "$duration" > "$work/duration_ms"; printf '%s\n' "$rc" > "$work/exit"; exit 0 )
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/bin/fm-test-run.sh: line 2392:   497 Terminated: 15          sleep 0.01

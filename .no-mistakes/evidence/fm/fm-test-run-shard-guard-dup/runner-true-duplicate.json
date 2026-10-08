@@ -1,0 +1,12 @@
+{
+  "scenario": "True duplicate membership is refused rather than waived",
+  "setup": "Inserted tests/fm-pr-merge.test.sh into both parallel lane inventories in a disposable runner copy; no target sources changed.",
+  "command": [
+    "/bin/bash",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/duplicate-guard/bin/fm-test-run.sh",
+    "--check-coverage"
+  ],
+  "exit": 1,
+  "stdout": "",
+  "stderr": "fm-test-run: coverage guard: portable parallel shards share scripts:\ntests/fm-pr-merge.test.sh\n"
+}

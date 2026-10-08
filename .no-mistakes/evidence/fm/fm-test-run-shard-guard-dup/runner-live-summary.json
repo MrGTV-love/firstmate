@@ -1,0 +1,151 @@
+[
+  {
+    "name": "Add five, six, or twenty tests and repeatedly obtain complete deterministic serial shards",
+    "result": "fail",
+    "detail": "Command '['/bin/bash', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/boundaries/bin/fm-test-run.sh', '--check-coverage']' timed out after 120 seconds"
+  },
+  {
+    "name": "Coverage guard succeeds with five and six new tests inside the existing hint budget",
+    "result": "fail",
+    "detail": "Command '['/bin/bash', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D9CQYPTA4EJQH814DXT6AT/.fm-runner-live-vbd8ner6/healthy-guard/bin/fm-test-run.sh', '--check-coverage']' timed out after 120 seconds"
+  },
+  {
+    "name": "A failed inventory or assignment producer cannot publish or execute a partial shard",
+    "result": "pass",
+    "detail": [
+      {
+        "stage": "assignment",
+        "mode": "list",
+        "exit": 2,
+        "stderr": "fm-test-run: could not generate complete portable serial shard assignments\n"
+      },
+      {
+        "stage": "assignment",
+        "mode": "execute",
+        "exit": 2,
+        "stderr": "fm-test-run: could not generate complete portable serial shard assignments\n"
+      },
+      {
+        "stage": "inventory",
+        "mode": "list",
+        "exit": 2,
+        "stderr": "fm-test-run: could not generate complete portable serial shard assignments\n"
+      },
+      {
+        "stage": "inventory",
+        "mode": "execute",
+        "exit": 2,
+        "stderr": "fm-test-run: could not generate complete portable serial shard assignments\n"
+      }
+    ]
+  },
+  {
+    "name": "Execute a serial shard exactly once per script and preserve suite-failure reporting",
+    "result": "pass",
+    "detail": {
+      "selected": [
+        "tests/fm-session-launch-policy.test.sh",
+        "tests/fm-watcher-lock.test.sh",
+        "tests/fm-remote-transport-lanes.test.sh",
+        "tests/fm-secondmate-sync.test.sh",
+        "tests/fm-agy-harness.test.sh",
+        "tests/fm-supervision-host.test.sh",
+        "tests/fm-remote-secondmate-parent-binding.test.sh",
+        "tests/fm-cursor-harness.test.sh",
+        "tests/fm-host-mirror.test.sh",
+        "tests/fm-omp-composer-box-live-e2e.test.sh",
+        "tests/fm-spawn-compact-adviser-disable.test.sh",
+        "tests/zz-shard-dummy-2.test.sh",
+        "tests/fm-afk-return.test.sh",
+        "tests/fm-kimi-harness.test.sh",
+        "tests/fm-update.test.sh",
+        "tests/fm-spawn-worktree-settle.test.sh",
+        "tests/fm-send-secondmate-marker.test.sh",
+        "tests/fm-backend-cmux.test.sh",
+        "tests/fm-ci-workflow.test.sh",
+        "tests/fm-quota-choose.test.sh",
+        "tests/fm-no-mistakes-required.test.sh",
+        "tests/fm-forge-detect.test.sh",
+        "tests/fm-cursor-primary-live-e2e.test.sh",
+        "tests/fm-agy-signals-live-e2e.test.sh",
+        "tests/fm-composer-matrix-live-e2e.test.sh",
+        "tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh"
+      ],
+      "successful_receipts": [
+        "tests/fm-session-launch-policy.test.sh",
+        "tests/fm-watcher-lock.test.sh",
+        "tests/fm-remote-transport-lanes.test.sh",
+        "tests/fm-secondmate-sync.test.sh",
+        "tests/fm-agy-harness.test.sh",
+        "tests/fm-supervision-host.test.sh",
+        "tests/fm-remote-secondmate-parent-binding.test.sh",
+        "tests/fm-cursor-harness.test.sh",
+        "tests/fm-host-mirror.test.sh",
+        "tests/fm-omp-composer-box-live-e2e.test.sh",
+        "tests/fm-spawn-compact-adviser-disable.test.sh",
+        "tests/zz-shard-dummy-2.test.sh",
+        "tests/fm-afk-return.test.sh",
+        "tests/fm-kimi-harness.test.sh",
+        "tests/fm-update.test.sh",
+        "tests/fm-spawn-worktree-settle.test.sh",
+        "tests/fm-send-secondmate-marker.test.sh",
+        "tests/fm-backend-cmux.test.sh",
+        "tests/fm-ci-workflow.test.sh",
+        "tests/fm-quota-choose.test.sh",
+        "tests/fm-no-mistakes-required.test.sh",
+        "tests/fm-forge-detect.test.sh",
+        "tests/fm-cursor-primary-live-e2e.test.sh",
+        "tests/fm-agy-signals-live-e2e.test.sh",
+        "tests/fm-composer-matrix-live-e2e.test.sh",
+        "tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh"
+      ],
+      "success_stdout": "FM_TEST_BEGIN 2026-10-08T09:26:07Z tests/fm-session-launch-policy.test.sh family=backend-dispatch expected_gate_skip=none\nok - executed tests/fm-session-launch-policy.test.sh\nFM_TEST_END 2026-10-08T09:26:07Z tests/fm-session-launch-policy.test.sh exit=0 duration_ms=264 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:08Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none\nok - executed tests/fm-watcher-lock.test.sh\nFM_TEST_END 2026-10-08T09:26:11Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=2800 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:13Z tests/fm-remote-transport-lanes.test.sh family=secondmate expected_gate_skip=none\nok - executed tests/fm-remote-transport-lanes.test.sh\nFM_TEST_END 2026-10-08T09:26:16Z tests/fm-remote-transport-lanes.test.sh exit=0 duration_ms=1441 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:17Z tests/fm-secondmate-sync.test.sh family=secondmate expected_gate_skip=none\nok - executed tests/fm-secondmate-sync.test.sh\nFM_TEST_END 2026-10-08T09:26:18Z tests/fm-secondmate-sync.test.sh exit=0 duration_ms=256 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:19Z tests/fm-agy-harness.test.sh family=pure-contract-unit expected_gate_skip=none\nok - executed tests/fm-agy-harness.test.sh\nFM_TEST_END 2026-10-08T09:26:21Z tests/fm-agy-harness.test.sh exit=0 duration_ms=935 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:22Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none\nok - executed tests/fm-supervision-host.test.sh\nFM_TEST_END 2026-10-08T09:26:23Z tests/fm-supervision-host.test.sh exit=0 duration_ms=766 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:24Z tests/fm-remote-secondmate-parent-binding.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-remote-secondmate-parent-binding.test.sh\nFM_TEST_END 2026-10-08T09:26:25Z tests/fm-remote-secondmate-parent-binding.test.sh exit=0 duration_ms=365 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:26Z tests/fm-cursor-harness.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-cursor-harness.test.sh\nFM_TEST_END 2026-10-08T09:26:27Z tests/fm-cursor-harness.test.sh exit=0 duration_ms=1144 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:28Z tests/fm-host-mirror.test.sh family=afk expected_gate_skip=none\nok - executed tests/fm-host-mirror.test.sh\nFM_TEST_END 2026-10-08T09:26:31Z tests/fm-host-mirror.test.sh exit=0 duration_ms=2794 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:32Z tests/fm-omp-composer-box-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-omp-composer-box-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:26:36Z tests/fm-omp-composer-box-live-e2e.test.sh exit=0 duration_ms=568 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:36Z tests/fm-spawn-compact-adviser-disable.test.sh family=backend-dispatch expected_gate_skip=none\nok - executed tests/fm-spawn-compact-adviser-disable.test.sh\nFM_TEST_END 2026-10-08T09:26:36Z tests/fm-spawn-compact-adviser-disable.test.sh exit=0 duration_ms=228 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:36Z tests/zz-shard-dummy-2.test.sh family=unclassified expected_gate_skip=none\nok - executed tests/zz-shard-dummy-2.test.sh\nFM_TEST_END 2026-10-08T09:26:37Z tests/zz-shard-dummy-2.test.sh exit=0 duration_ms=619 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:37Z tests/fm-afk-return.test.sh family=afk expected_gate_skip=none\nok - executed tests/fm-afk-return.test.sh\nFM_TEST_END 2026-10-08T09:26:37Z tests/fm-afk-return.test.sh exit=0 duration_ms=247 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:37Z tests/fm-kimi-harness.test.sh family=pure-contract-unit expected_gate_skip=none\nok - executed tests/fm-kimi-harness.test.sh\nFM_TEST_END 2026-10-08T09:26:38Z tests/fm-kimi-harness.test.sh exit=0 duration_ms=304 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:38Z tests/fm-update.test.sh family=session-bootstrap expected_gate_skip=none\nok - executed tests/fm-update.test.sh\nFM_TEST_END 2026-10-08T09:26:39Z tests/fm-update.test.sh exit=0 duration_ms=185 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:39Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none\nok - executed tests/fm-spawn-worktree-settle.test.sh\nFM_TEST_END 2026-10-08T09:26:39Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=482 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:40Z tests/fm-send-secondmate-marker.test.sh family=secondmate expected_gate_skip=none\nok - executed tests/fm-send-secondmate-marker.test.sh\nFM_TEST_END 2026-10-08T09:26:40Z tests/fm-send-secondmate-marker.test.sh exit=0 duration_ms=595 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:40Z tests/fm-backend-cmux.test.sh family=cmux expected_gate_skip=optional-binary\nok - executed tests/fm-backend-cmux.test.sh\nFM_TEST_END 2026-10-08T09:26:41Z tests/fm-backend-cmux.test.sh exit=0 duration_ms=223 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:41Z tests/fm-ci-workflow.test.sh family=unclassified expected_gate_skip=none\nok - executed tests/fm-ci-workflow.test.sh\nFM_TEST_END 2026-10-08T09:26:42Z tests/fm-ci-workflow.test.sh exit=0 duration_ms=245 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:42Z tests/fm-quota-choose.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-quota-choose.test.sh\nFM_TEST_END 2026-10-08T09:26:45Z tests/fm-quota-choose.test.sh exit=0 duration_ms=1994 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:45Z tests/fm-no-mistakes-required.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-no-mistakes-required.test.sh\nFM_TEST_END 2026-10-08T09:26:45Z tests/fm-no-mistakes-required.test.sh exit=0 duration_ms=609 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:46Z tests/fm-forge-detect.test.sh family=pure-contract-unit expected_gate_skip=none\nok - executed tests/fm-forge-detect.test.sh\nFM_TEST_END 2026-10-08T09:26:46Z tests/fm-forge-detect.test.sh exit=0 duration_ms=239 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:46Z tests/fm-cursor-primary-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-cursor-primary-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:26:47Z tests/fm-cursor-primary-live-e2e.test.sh exit=0 duration_ms=284 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:47Z tests/fm-agy-signals-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-agy-signals-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:26:47Z tests/fm-agy-signals-live-e2e.test.sh exit=0 duration_ms=722 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:47Z tests/fm-composer-matrix-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-composer-matrix-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:26:48Z tests/fm-composer-matrix-live-e2e.test.sh exit=0 duration_ms=181 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:48Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:26:48Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh exit=0 duration_ms=141 gate_skip=false\nFM_TEST_SUMMARY total=26 failed=0 skipped_gate=0 duration_ms=68285\nFM_TEST_SUMMARY_FAMILY family=afk count=3 duration_ms=3807 failed=0\nFM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=974 failed=0\nFM_TEST_SUMMARY_FAMILY family=cmux count=1 duration_ms=223 failed=0\nFM_TEST_SUMMARY_FAMILY family=live-harness-optin count=5 duration_ms=1896 failed=0\nFM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=3 duration_ms=1478 failed=0\nFM_TEST_SUMMARY_FAMILY family=secondmate count=3 duration_ms=2292 failed=0\nFM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=185 failed=0\nFM_TEST_SUMMARY_FAMILY family=standalone count=4 duration_ms=4112 failed=0\nFM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=864 failed=0\nFM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=2800 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=2800\nFM_TEST_SLOWEST rank=2 script=tests/fm-host-mirror.test.sh duration_ms=2794\nFM_TEST_SLOWEST rank=3 script=tests/fm-quota-choose.test.sh duration_ms=1994\nFM_TEST_SLOWEST rank=4 script=tests/fm-remote-transport-lanes.test.sh duration_ms=1441\nFM_TEST_SLOWEST rank=5 script=tests/fm-cursor-harness.test.sh duration_ms=1144\nFM_TEST_SLOWEST rank=6 script=tests/fm-agy-harness.test.sh duration_ms=935\nFM_TEST_SLOWEST rank=7 script=tests/fm-supervision-host.test.sh duration_ms=766\nFM_TEST_SLOWEST rank=8 script=tests/fm-agy-signals-live-e2e.test.sh duration_ms=722\nFM_TEST_SLOWEST rank=9 script=tests/zz-shard-dummy-2.test.sh duration_ms=619\nFM_TEST_SLOWEST rank=10 script=tests/fm-no-mistakes-required.test.sh duration_ms=609\nFM_TEST_SLOWEST rank=11 script=tests/fm-send-secondmate-marker.test.sh duration_ms=595\nFM_TEST_SLOWEST rank=12 script=tests/fm-omp-composer-box-live-e2e.test.sh duration_ms=568\nFM_TEST_SLOWEST rank=13 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=482\nFM_TEST_SLOWEST rank=14 script=tests/fm-remote-secondmate-parent-binding.test.sh duration_ms=365\nFM_TEST_SLOWEST rank=15 script=tests/fm-kimi-harness.test.sh duration_ms=304\n",
+      "failed_run_exit": 1,
+      "failed_run_stdout": "FM_TEST_BEGIN 2026-10-08T09:26:52Z tests/fm-session-launch-policy.test.sh family=backend-dispatch expected_gate_skip=none\nnot ok - deliberate consumer failure\nFM_TEST_END 2026-10-08T09:26:52Z tests/fm-session-launch-policy.test.sh exit=7 duration_ms=73 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:52Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none\nok - executed tests/fm-watcher-lock.test.sh\nFM_TEST_END 2026-10-08T09:26:52Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=308 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:53Z tests/fm-remote-transport-lanes.test.sh family=secondmate expected_gate_skip=none\nok - executed tests/fm-remote-transport-lanes.test.sh\nFM_TEST_END 2026-10-08T09:26:53Z tests/fm-remote-transport-lanes.test.sh exit=0 duration_ms=443 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:53Z tests/fm-secondmate-sync.test.sh family=secondmate expected_gate_skip=none\nok - executed tests/fm-secondmate-sync.test.sh\nFM_TEST_END 2026-10-08T09:26:54Z tests/fm-secondmate-sync.test.sh exit=0 duration_ms=213 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:54Z tests/fm-agy-harness.test.sh family=pure-contract-unit expected_gate_skip=none\nok - executed tests/fm-agy-harness.test.sh\nFM_TEST_END 2026-10-08T09:26:54Z tests/fm-agy-harness.test.sh exit=0 duration_ms=352 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:54Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none\nok - executed tests/fm-supervision-host.test.sh\nFM_TEST_END 2026-10-08T09:26:55Z tests/fm-supervision-host.test.sh exit=0 duration_ms=697 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:55Z tests/fm-remote-secondmate-parent-binding.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-remote-secondmate-parent-binding.test.sh\nFM_TEST_END 2026-10-08T09:26:56Z tests/fm-remote-secondmate-parent-binding.test.sh exit=0 duration_ms=246 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:56Z tests/fm-cursor-harness.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-cursor-harness.test.sh\nFM_TEST_END 2026-10-08T09:26:56Z tests/fm-cursor-harness.test.sh exit=0 duration_ms=451 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:57Z tests/fm-host-mirror.test.sh family=afk expected_gate_skip=none\nok - executed tests/fm-host-mirror.test.sh\nFM_TEST_END 2026-10-08T09:26:57Z tests/fm-host-mirror.test.sh exit=0 duration_ms=516 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:57Z tests/fm-omp-composer-box-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-omp-composer-box-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:26:58Z tests/fm-omp-composer-box-live-e2e.test.sh exit=0 duration_ms=252 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:58Z tests/fm-spawn-compact-adviser-disable.test.sh family=backend-dispatch expected_gate_skip=none\nok - executed tests/fm-spawn-compact-adviser-disable.test.sh\nFM_TEST_END 2026-10-08T09:26:58Z tests/fm-spawn-compact-adviser-disable.test.sh exit=0 duration_ms=638 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:59Z tests/zz-shard-dummy-2.test.sh family=unclassified expected_gate_skip=none\nok - executed tests/zz-shard-dummy-2.test.sh\nFM_TEST_END 2026-10-08T09:26:59Z tests/zz-shard-dummy-2.test.sh exit=0 duration_ms=544 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:26:59Z tests/fm-afk-return.test.sh family=afk expected_gate_skip=none\nok - executed tests/fm-afk-return.test.sh\nFM_TEST_END 2026-10-08T09:27:01Z tests/fm-afk-return.test.sh exit=0 duration_ms=849 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:01Z tests/fm-kimi-harness.test.sh family=pure-contract-unit expected_gate_skip=none\nok - executed tests/fm-kimi-harness.test.sh\nFM_TEST_END 2026-10-08T09:27:02Z tests/fm-kimi-harness.test.sh exit=0 duration_ms=326 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:02Z tests/fm-update.test.sh family=session-bootstrap expected_gate_skip=none\nok - executed tests/fm-update.test.sh\nFM_TEST_END 2026-10-08T09:27:02Z tests/fm-update.test.sh exit=0 duration_ms=230 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:02Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none\nok - executed tests/fm-spawn-worktree-settle.test.sh\nFM_TEST_END 2026-10-08T09:27:04Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=1720 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:05Z tests/fm-send-secondmate-marker.test.sh family=secondmate expected_gate_skip=none\nok - executed tests/fm-send-secondmate-marker.test.sh\nFM_TEST_END 2026-10-08T09:27:07Z tests/fm-send-secondmate-marker.test.sh exit=0 duration_ms=950 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:07Z tests/fm-backend-cmux.test.sh family=cmux expected_gate_skip=optional-binary\nok - executed tests/fm-backend-cmux.test.sh\nFM_TEST_END 2026-10-08T09:27:09Z tests/fm-backend-cmux.test.sh exit=0 duration_ms=1482 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:09Z tests/fm-ci-workflow.test.sh family=unclassified expected_gate_skip=none\nok - executed tests/fm-ci-workflow.test.sh\nFM_TEST_END 2026-10-08T09:27:10Z tests/fm-ci-workflow.test.sh exit=0 duration_ms=1135 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:11Z tests/fm-quota-choose.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-quota-choose.test.sh\nFM_TEST_END 2026-10-08T09:27:14Z tests/fm-quota-choose.test.sh exit=0 duration_ms=2594 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:14Z tests/fm-no-mistakes-required.test.sh family=standalone expected_gate_skip=none\nok - executed tests/fm-no-mistakes-required.test.sh\nFM_TEST_END 2026-10-08T09:27:16Z tests/fm-no-mistakes-required.test.sh exit=0 duration_ms=435 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:16Z tests/fm-forge-detect.test.sh family=pure-contract-unit expected_gate_skip=none\nok - executed tests/fm-forge-detect.test.sh\nFM_TEST_END 2026-10-08T09:27:21Z tests/fm-forge-detect.test.sh exit=0 duration_ms=4029 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:21Z tests/fm-cursor-primary-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-cursor-primary-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:27:29Z tests/fm-cursor-primary-live-e2e.test.sh exit=0 duration_ms=4709 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:30Z tests/fm-agy-signals-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-agy-signals-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:27:33Z tests/fm-agy-signals-live-e2e.test.sh exit=0 duration_ms=353 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:33Z tests/fm-composer-matrix-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-composer-matrix-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:27:34Z tests/fm-composer-matrix-live-e2e.test.sh exit=0 duration_ms=593 gate_skip=false\nFM_TEST_BEGIN 2026-10-08T09:27:34Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability\nok - executed tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh\nFM_TEST_END 2026-10-08T09:27:34Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh exit=0 duration_ms=207 gate_skip=false\nFM_TEST_SUMMARY total=26 failed=1 skipped_gate=0 duration_ms=44917\nFM_TEST_SUMMARY_FAMILY family=afk count=3 duration_ms=2062 failed=0\nFM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=2431 failed=1\nFM_TEST_SUMMARY_FAMILY family=cmux count=1 duration_ms=1482 failed=0\nFM_TEST_SUMMARY_FAMILY family=live-harness-optin count=5 duration_ms=6114 failed=0\nFM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=3 duration_ms=4707 failed=0\nFM_TEST_SUMMARY_FAMILY family=secondmate count=3 duration_ms=1606 failed=0\nFM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=230 failed=0\nFM_TEST_SUMMARY_FAMILY family=standalone count=4 duration_ms=3726 failed=0\nFM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=1679 failed=0\nFM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=308 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/fm-cursor-primary-live-e2e.test.sh duration_ms=4709\nFM_TEST_SLOWEST rank=2 script=tests/fm-forge-detect.test.sh duration_ms=4029\nFM_TEST_SLOWEST rank=3 script=tests/fm-quota-choose.test.sh duration_ms=2594\nFM_TEST_SLOWEST rank=4 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=1720\nFM_TEST_SLOWEST rank=5 script=tests/fm-backend-cmux.test.sh duration_ms=1482\nFM_TEST_SLOWEST rank=6 script=tests/fm-ci-workflow.test.sh duration_ms=1135\nFM_TEST_SLOWEST rank=7 script=tests/fm-send-secondmate-marker.test.sh duration_ms=950\nFM_TEST_SLOWEST rank=8 script=tests/fm-afk-return.test.sh duration_ms=849\nFM_TEST_SLOWEST rank=9 script=tests/fm-supervision-host.test.sh duration_ms=697\nFM_TEST_SLOWEST rank=10 script=tests/fm-spawn-compact-adviser-disable.test.sh duration_ms=638\nFM_TEST_SLOWEST rank=11 script=tests/fm-composer-matrix-live-e2e.test.sh duration_ms=593\nFM_TEST_SLOWEST rank=12 script=tests/zz-shard-dummy-2.test.sh duration_ms=544\nFM_TEST_SLOWEST rank=13 script=tests/fm-host-mirror.test.sh duration_ms=516\nFM_TEST_SLOWEST rank=14 script=tests/fm-cursor-harness.test.sh duration_ms=451\nFM_TEST_SLOWEST rank=15 script=tests/fm-remote-transport-lanes.test.sh duration_ms=443\n",
+      "timing_artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4D9CQYPTA4EJQH814DXT6AT/serial-shard-timing.json"
+    }
+  },
+  {
+    "name": "Invalid shard coordinates and concurrent execution of a serial shard are refused",
+    "result": "pass",
+    "detail": [
+      {
+        "args": [
+          "--list",
+          "--lane",
+          "portable-serial-0of9"
+        ],
+        "exit": 2,
+        "stderr": "fm-test-run: lane 'portable-serial-0of9' shard index is outside 1..9 (see --list-lanes)\n"
+      },
+      {
+        "args": [
+          "--list",
+          "--lane",
+          "portable-serial-10of9"
+        ],
+        "exit": 2,
+        "stderr": "fm-test-run: lane 'portable-serial-10of9' shard index is outside 1..9 (see --list-lanes)\n"
+      },
+      {
+        "args": [
+          "--list",
+          "--lane",
+          "portable-serial-1of8"
+        ],
+        "exit": 2,
+        "stderr": "fm-test-run: lane 'portable-serial-1of8' asks for 8 portable serial shards but this runner is configured for 9 (see --list-lanes)\n"
+      },
+      {
+        "args": [
+          "--jobs",
+          "2",
+          "--lane",
+          "portable-serial-3of9"
+        ],
+        "exit": 2,
+        "stderr": "fm-test-run: --jobs 2 refused: portable serial lanes stay serial; use --jobs 1\n"
+      }
+    ]
+  }
+]

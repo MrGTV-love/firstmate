@@ -1,0 +1,7 @@
+Observed initial live CLI command: env -i PATH="$PATH" HOME=<workspace fixture home> TMPDIR=<workspace fixture tmp> /bin/bash bin/fm-test-run.sh --check-coverage
+Exit: 0
+FM_TEST_COVERAGE ok total=257 parallel=24 parallel_max_ms=417163 parallel_imbalance_ms=2894 parallel_unhinted=0 serial=215 serial_shards=9 serial_unhinted=31 herdr=18
+
+The live driver verified all nine standalone serial shards exactly and disjointly cover 215 serial scripts; shard sizes were 15,25,25,25,25,25,24,25,26. Parallel-1 + parallel-2 + serial + real-herdr-gated exactly covered --list --all (257 scripts). real-herdr-gated was listed only, never executed.
+
+The initial stress driver exceeded its self-imposed 900-second overall deadline before finishing all scenarios; no final pass was inferred. The replay persists each real CLI result and uses two full partitions and two guards per added-script count.
