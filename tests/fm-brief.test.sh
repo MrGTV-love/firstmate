@@ -1512,6 +1512,41 @@ test_crewmate_scaffolds_require_stopping_private_services() {
   pass "fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line"
 }
 
+test_crewmate_scaffolds_teach_the_docker_task_marker() {
+  local home mode id brief
+  home="$TMP_ROOT/docker-marker-home"
+  mkdir -p "$home/data"
+
+  # Teardown can remove only the Docker stacks that carry evidence of their task
+  # (bin/fm-task-docker-lib.sh), so every worker scaffold must teach the marker
+  # that bin/fm-spawn.sh's exported FM_TASK_ID makes free to apply.
+  for mode in no-mistakes direct-PR local-only; do
+    id="brief-docker-$mode"
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh --mode $mode exited non-zero"
+    brief="$home/data/$id/brief.md"
+    # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+    assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "$mode ship brief did not teach the Docker task label"
+    # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+    assert_grep 'docker compose -p $FM_TASK_ID' "$brief" "$mode ship brief did not teach the compose project name"
+    assert_grep "--project-id" "$brief" "$mode ship brief did not teach the Supabase project id"
+  done
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-docker-scout alpha --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh --scout exited non-zero"
+  brief="$home/data/brief-docker-scout/brief.md"
+  # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+  assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "scout brief did not teach the Docker task label"
+
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-docker-mate --secondmate alpha >/dev/null 2>&1 \
+    || fail "fm-brief.sh --secondmate exited non-zero"
+  assert_no_grep "fm.task" "$home/data/brief-docker-mate/brief.md" \
+    "secondmate charter must not inherit the crewmate Docker marker rule"
+
+  pass "fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
@@ -1550,3 +1585,4 @@ test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_crewmate_scaffolds_forbid_pool_administration
 test_crewmate_scaffolds_require_stopping_private_services
+test_crewmate_scaffolds_teach_the_docker_task_marker

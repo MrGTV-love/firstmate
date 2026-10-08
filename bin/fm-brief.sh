@@ -620,6 +620,20 @@ EOF
 PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE%$'\n'}
 PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE//__PAUSED_VERB__/$PAUSED_VERB}
 
+# Teardown removes a task's Docker stacks only when they carry evidence of the
+# task (bin/fm-task-docker-lib.sh owns the rules), and an unmarked container has
+# none: the three throwaway databases left behind for days in 2026-09/10 carried
+# no label, mount, or task id. FM_TASK_ID is exported by bin/fm-spawn.sh.
+IFS= read -r -d '' DOCKER_MARKER_RULE <<'EOF' || true
+9. Mark every Docker object you start with your task id, so teardown removes it with your task:
+   pass `--label fm.task=$FM_TASK_ID` to `docker run`, `docker create`, `docker network create`, and
+   `docker volume create`; start compose stacks with `docker compose -p $FM_TASK_ID` (or a project name
+   starting `$FM_TASK_ID-`); give a Supabase CLI stack `--project-id $FM_TASK_ID`.
+   An unmarked container cannot be attributed to you and outlives your task. Remove what you finish
+   with as you go; teardown only catches what is left, and never touches another task's stacks.
+EOF
+DOCKER_MARKER_RULE=${DOCKER_MARKER_RULE%$'\n'}
+
 if [ "$KIND" = scout ]; then
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then
   LAVISH_LINE='If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/fm-procevent-lavish.sh arm <artifact.html> --for <task-id>; never run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/fm-procevent.sh handled <source-id> <sequence> to conclude and retire your board.'
@@ -661,6 +675,7 @@ $CREWMATE_PAUSE_INSTRUCTIONS
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
+$DOCKER_MARKER_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 
@@ -742,6 +757,7 @@ $ASK_USER_BLOCK
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
+$DOCKER_MARKER_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 

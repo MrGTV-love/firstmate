@@ -318,7 +318,21 @@
 #     unarchived plist and any remaining copy.
 #     tests/fm-teardown.test.sh's private, foreign, nested, and absent-copy
 #     launch-agent cases exercise this boundary with a fake launchctl.
-# After Fix 1, Fix 3, and Fix 2, when config/pipeline-spend opts this home in, a ship
+#   Fix 4 - remove the task's own Docker stacks. A worker's throwaway database
+#     or compose stack is a container no process-reap sees, so it outlived its
+#     task for days (observed 2026-09-30 to 2026-10-06). After the process reap,
+#     teardown removes the Docker containers, networks, and marker-labelled
+#     volumes that bin/fm-task-docker-lib.sh attributes to this task - by an
+#     fm.task=<id> label, the id in a name or compose project, or a compose
+#     working directory under the task's worktree - and nothing else. That
+#     library owns the ownership rules and what is never removed. An owned
+#     container that survives its removal stops teardown with the task's
+#     records kept, so a rerun retries; --force continues past it loudly. A
+#     missing Docker CLI is silent and a Docker that cannot be listed is a
+#     warning naming the manual command, never a refusal. Not run for a
+#     secondmate. A pool slot reassigned to another task contributes no path
+#     evidence, only the task's own label and names.
+# After Fix 1, Fix 3, Fix 2, and Fix 4, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
 # ledger. It runs before the task branch it attributes runs by is deleted and
@@ -356,6 +370,7 @@ for _teardown_source in \
   fm-tasks-axi-lib.sh \
   fm-backlog-transition-lib.sh \
   fm-timeout-lib.sh \
+  fm-task-docker-lib.sh \
   fm-backend.sh \
   fm-control-lib.sh \
   fm-lock-lib.sh \
@@ -391,6 +406,8 @@ unset _teardown_source
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+# shellcheck source=bin/fm-task-docker-lib.sh
+. "$SCRIPT_DIR/fm-task-docker-lib.sh"
 # shellcheck source=bin/fm-backend.sh
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-control-lib.sh
@@ -2488,6 +2505,53 @@ EOF
   return 1
 }
 
+# A Docker compose working directory inside a nested lane (a linked worktree
+# under the task's root) belongs to that lane's task, not to this one. A path
+# that cannot be classified is left alone.
+fm_task_docker_path_excluded() {  # <root> <path>
+  local lane
+  [ "$1" != "$2" ] || return 1
+  lane=$(task_nested_lane_for_path "$1" "$2") || return 0
+  [ -n "$lane" ]
+}
+
+# Gathers what bin/fm-task-docker-lib.sh needs from this home and every local
+# home - the other live task ids (a longer one claims its own prefixed names,
+# the same id elsewhere makes the id ambiguous) and the task's path roots - then
+# lets it remove the stacks this task owns.
+teardown_docker_stacks() {
+  local state_dir other other_id siblings="" ambiguous=0 root canon
+  local -a roots canon_roots
+  roots=()
+  canon_roots=()
+  if collect_local_firstmate_states "$STATE" 2>/dev/null; then
+    for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+      for other in "$state_dir"/*.meta; do
+        [ -f "$other" ] || continue
+        [ ! "$other" -ef "$META" ] || continue
+        other_id=$(basename "$other" .meta)
+        [ "$other_id" != "$ID" ] || ambiguous=1
+        siblings="$siblings $other_id"
+      done
+    done
+  else
+    ambiguous=1
+    echo "warning: the other local Firstmate homes could not be enumerated, so Docker objects are matched to $ID only by a compose working directory under its own copy" >&2
+  fi
+  for root in "$WT" "$TASK_TMP"; do
+    [ -n "$root" ] || continue
+    [ "$root" != "$WT" ] || teardown_owns_worktree || continue
+    roots+=("$root")
+    canon=
+    if canon=$(task_canonical_path "$root" 2>/dev/null) && [ "$canon" != "$root" ]; then
+      roots+=("$canon")
+    fi
+    [ -z "$canon" ] || canon_roots+=("$canon")
+  done
+  task_registered_lanes_under_roots ${canon_roots[@]+"${canon_roots[@]}"} 2>/dev/null || TASK_REGISTERED_LANES=()
+  fm_task_docker_cleanup "$ID" "$siblings" "$ambiguous" "$(basename "${PROJ:-.}")" ${roots[@]+"${roots[@]}"}
+}
+
 
 # Fix 3 (see script header): "label<TAB>root" for a no-mistakes daemon launch
 # agent plist, from its Label and the `--root` of its `daemon run` arguments.
@@ -3863,6 +3927,19 @@ if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend"
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$SCRIPT_DIR/fm-pipeline-spend.sh" record "$ID" >/dev/null \
     || echo "warning: could not record $ID's no-mistakes pipeline spend; cleanup continues" >&2
+fi
+
+# Fix 3 (see script header): the task's own Docker stacks go in this same
+# pre-destructive cleanup, before any record or endpoint is touched, so a
+# refusal leaves everything for a rerun.
+if [ "$KIND" != secondmate ] && ! teardown_docker_stacks; then
+  if [ "$FORCE" = "--force" ]; then
+    echo "error: --force authorizes continuing past Docker objects that could not be removed; reconcile them yourself with: docker ps -a --filter label=fm.task=$ID" >&2
+  else
+    echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
+    echo "error: rerun teardown once they can be removed, or rerun with --force to discard this task's records deliberately." >&2
+    exit 1
+  fi
 fi
 
 if [ "$BACKEND" = herdr ]; then
