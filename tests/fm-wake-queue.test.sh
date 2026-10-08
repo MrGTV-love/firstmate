@@ -810,7 +810,7 @@ set -u
 case "${1:-}" in
   list-windows) printf '%s\n' 'fm-mate' ;;
   capture-pane)
-    if [ -n "${FM_FAKE_TMUX_CAPTURE:-}" ]; then cat "$FM_FAKE_TMUX_CAPTURE"; else printf '\u276f\n'; fi
+    if [ -n "${FM_FAKE_TMUX_CAPTURE:-}" ]; then cat "$FM_FAKE_TMUX_CAPTURE"; else printf '❯\n'; fi
     exit 0 ;;
   display-message)
     case "$*" in
