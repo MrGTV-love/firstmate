@@ -24,13 +24,8 @@
 # Primary config/claude-permission-mode is a captain-wide safety preference
 # (bypass or auto for every claude launch), so it flows down too and a
 # secondmate's own claude crewmates launch on the same permission posture.
-# Primary config/keep-ai-trailers is a home-wide commit-attribution choice, so
-# a secondmate's own crewmates keep AI co-author trailers too, unless that
-# secondmate home owns its own choice: a config/keep-ai-trailers.home-owned
-# marker in the DESTINATION home leaves its keep-ai-trailers untouched (neither
-# copied nor mirrored absent, and unchanged in the reread record) at every
-# convergence point, local or remote. The exception is owned by
-# .agents/skills/secondmate-provisioning/SKILL.md.
+# config/keep-ai-trailers is home-local and never inherited: each home chooses
+# its own commit-attribution policy.
 # It also pushes
 # the one primary-authoritative shared captain-preference file,
 # data/captain-shared.md, into each secondmate home's data/ as a read-only copy.
@@ -86,7 +81,7 @@ FM_SHARED_CAPTAIN_MODE="444"
 # The declared inheritable set (space-separated, config-dir-relative item paths).
 # Extend here to inherit more of the primary's local config; override via the
 # environment only in tests. Items must not contain whitespace.
-FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-model-index.json crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist compact-adviser session-launch-policy claude-permission-mode claude-launcher lavish-axi-host keep-ai-trailers}"
+FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-model-index.json crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist compact-adviser session-launch-policy claude-permission-mode claude-launcher lavish-axi-host}"
 
 # Items whose value is a home-SESSION enablement decision rather than durable
 # local configuration. They are inherited at the launch convergence point, where
@@ -94,26 +89,6 @@ FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-model-index.json crew-dispatch.j
 # untouched by live convergence into an already-running home, whose decision is
 # already frozen for its current session (bin/fm-trace-context-lib.sh).
 FM_SESSION_SCOPED_INHERITABLE_CONFIG="trace-context"
-
-# Items a secondmate home may own itself. A regular file named
-# config/<item>.home-owned in the DESTINATION home pins that home's own value
-# (present or absent) against primary-authoritative propagation; the marker is
-# destination-local, never inherited, and read by the local propagation below
-# and by the remote receiver, which only knows its own home. Only the items
-# listed here honor a marker.
-FM_HOME_OWNABLE_CONFIG="keep-ai-trailers"
-FM_HOME_OWNED_SUFFIX=".home-owned"
-
-# True when the destination config dir pins <item> as home-owned.
-fm_config_inherit_home_owned() {  # <dest-config-dir> <item>
-  local candidate
-  for candidate in $FM_HOME_OWNABLE_CONFIG; do
-    [ "$candidate" = "$2" ] || continue
-    [ -f "$1/$2$FM_HOME_OWNED_SUFFIX" ]
-    return
-  done
-  return 1
-}
 
 # True when <item> is session-scoped in the sense above.
 fm_config_inherit_item_session_scoped() {  # <item>
@@ -245,8 +220,7 @@ destination_allows_inherited_pair() {
 # (primary-authoritative). Inspection errors or existing nonregular sources
 # leave destinations unchanged; inaccessible paths and dangling source links
 # must never silently remove an inherited grant. The coupled routing-pair
-# exception and the home-owned keep-ai-trailers exception are owned by
-# .agents/skills/secondmate-provisioning/SKILL.md.
+# exception is owned by .agents/skills/secondmate-provisioning/SKILL.md.
 # The destination dir is created lazily, only when there is something to copy;
 # absence on both sides is a no-op. When FM_CONFIG_INHERIT_REPORT points at a writable
 # file, one tab-separated line per item is appended there:
@@ -741,10 +715,6 @@ propagate_inheritable_config() {
       return 1
     fi
     dest="$dest_config/$item"
-    if fm_config_inherit_home_owned "$dest_config" "$item"; then
-      record_inheritable_config_result "$item" unchanged "home-owned"
-      continue
-    fi
     if ! source_present=$(fm_config_source_present "$src"); then
       reason="cannot inspect primary source"
       warn_inheritable_config_error "$item" "$src" "$reason"
@@ -1062,6 +1032,61 @@ fm_config_reread_adopt_exact_temp() {
   return 1
 }
 
+fm_config_reread_remove_retired_sections() {
+  local instruction_path=$1
+  [ -f "$instruction_path" ] && [ ! -L "$instruction_path" ] || return 1
+  perl -MFile::Temp=tempfile -e '
+    use strict;
+    use warnings;
+    my ($path) = @ARGV;
+    my @stat = stat $path;
+    @stat or exit 1;
+    open my $in, "<:raw", $path or exit 1;
+    my $bytes = do { local $/; <$in> } // "";
+    close $in or exit 1;
+    my $retired = "config/keep-ai-trailers";
+    exit 0 if index($bytes, "\n$retired\n-----BEGIN $retired-----\n") < 0;
+    $bytes =~ /\n(config\/[^\n]+)\n-----BEGIN \1-----\n/g or exit 1;
+    my $cursor = $-[0];
+    my $filtered = substr($bytes, 0, $cursor);
+    my ($kept, $removed) = (0, 0);
+    while ($cursor < length $bytes) {
+      pos($bytes) = $cursor;
+      $bytes =~ /\G\n(config\/[^\n]+)\n-----BEGIN \1-----\n/gc or exit 1;
+      my $rel = $1;
+      my $end_marker = "-----END $rel-----\n";
+      my $end = index($bytes, $end_marker, pos($bytes));
+      while ($end >= 0) {
+        my $next = $end + length $end_marker;
+        pos($bytes) = $next;
+        last if $next == length($bytes)
+          || $bytes =~ /\G\n(config\/[^\n]+)\n-----BEGIN \1-----\n/gc;
+        $end = index($bytes, $end_marker, $end + 1);
+      }
+      $end >= 0 or exit 1;
+      my $next = $end + length $end_marker;
+      if ($rel eq $retired) {
+        $removed = 1;
+      } else {
+        $filtered .= substr($bytes, $cursor, $next - $cursor);
+        $kept = 1;
+      }
+      $cursor = $next;
+    }
+    exit 0 unless $removed;
+    exit 2 unless $kept;
+    my $parent = $path;
+    $parent =~ s{/[^/]+\z}{};
+    my ($out, $tmp) = tempfile(".fm-config-reread-filter.XXXXXX", DIR => $parent);
+    if (!binmode($out) || !(print {$out} $filtered) || !close($out)
+      || !chmod($stat[2] & 0777, $tmp) || !utime($stat[8], $stat[9], $tmp)
+      || !rename($tmp, $path)) {
+      unlink $tmp;
+      exit 1;
+    }
+  ' -- "$instruction_path"
+}
+
 fm_config_reread_pending_instructions() {
   local state=$1 pending instruction
   for pending in "$state"/.fm-inherited-config-reread.*.pending; do
@@ -1135,8 +1160,16 @@ fm_config_reread_mark_pending() {
 }
 
 fm_config_reread_publish_stage() {
-  local dest_home=$1 stage=$2 state final pending_pointer tmp
+  local dest_home=$1 stage=$2 state final pending_pointer tmp filter_rc
   [ -f "$stage" ] && [ ! -L "$stage" ] || return 1
+  if fm_config_reread_remove_retired_sections "$stage"; then
+    :
+  else
+    filter_rc=$?
+    [ "$filter_rc" -eq 2 ] || return 1
+    rm -f "$stage" 2>/dev/null || return 1
+    return 0
+  fi
   state="$dest_home/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   mkdir -p "$state" 2>/dev/null || return 1
   final="$state/${stage##*/}"
@@ -1144,8 +1177,14 @@ fm_config_reread_publish_stage() {
     pending_pointer=$(cat "$final.pending" 2>/dev/null || true)
     [ "$pending_pointer" = "$final" ] || return 1
     [ -f "$final" ] && [ ! -L "$final" ] || return 1
-    printf '%s\n' "$final"
-    return 0
+    if fm_config_reread_remove_retired_sections "$final"; then
+      printf '%s\n' "$final"
+      return 0
+    else
+      filter_rc=$?
+      [ "$filter_rc" -eq 2 ] || return 1
+      rm -f "$final.pending" "$final" 2>/dev/null || return 1
+    fi
   fi
   tmp=$(umask 077; mktemp "$state/.fm-config-reread-publish.XXXXXX" 2>/dev/null) || return 1
   if ! cat "$stage" > "$tmp" || ! chmod 0600 "$tmp" 2>/dev/null || ! mv -f "$tmp" "$final" 2>/dev/null; then
@@ -1170,7 +1209,7 @@ fm_config_reread_send_failure() {
 
 # fm_config_reread_send_pointer <id> <instruction-path>
 fm_config_reread_send_pointer() {
-  local id=$1 instruction_path=$2 pending_path selector out rc send_bin message pending_pointer
+  local id=$1 instruction_path=$2 pending_path selector out rc send_bin message pending_pointer filter_rc
   pending_path="$instruction_path.pending"
   if [ ! -f "$instruction_path" ] || [ -L "$instruction_path" ]; then
     printf 'CONFIG_REREAD: secondmate %s: send failed: pending instruction file is missing\n' "$id"
@@ -1179,6 +1218,20 @@ fm_config_reread_send_pointer() {
   pending_pointer=$(cat "$pending_path" 2>/dev/null || true)
   if [ "$pending_pointer" != "$instruction_path" ]; then
     printf 'CONFIG_REREAD: secondmate %s: send failed: pending instruction file is mismatched\n' "$id"
+    return 1
+  fi
+  if fm_config_reread_remove_retired_sections "$instruction_path"; then
+    :
+  else
+    filter_rc=$?
+    if [ "$filter_rc" -eq 2 ]; then
+      if rm -f "$pending_path" "$instruction_path" 2>/dev/null; then
+        return 0
+      fi
+      printf 'CONFIG_REREAD: secondmate %s: send failed: could not retire obsolete instruction\n' "$id"
+      return 1
+    fi
+    fm_config_reread_send_failure "$id" "$instruction_path" "$pending_path" "could not supersede retired config section"
     return 1
   fi
   selector="fm-$id"
@@ -1393,8 +1446,16 @@ fm_config_send_reread_nudge() {
       exact_tmp="$stage_path"
       break
     done
-    if [ -n "$exact_tmp" ]; then
+    if [ -n "$exact_tmp" ] \
+      || { [ -f "$retry_stage_path" ] && [ ! -L "$retry_stage_path" ] && [ -s "$retry_stage_path" ]; }; then
       rm -f "$retry_report_path" 2>/dev/null || send_failures=1
+      continue
+    fi
+    if [ -z "$(fm_config_reread_changed_items "$retry_report_path")" ]; then
+      rm -f "$retry_report_path" 2>/dev/null || send_failures=1
+      if [ -f "$retry_stage_path" ] && [ ! -L "$retry_stage_path" ] && [ ! -s "$retry_stage_path" ]; then
+        rm -f "$retry_stage_path" 2>/dev/null || send_failures=1
+      fi
       continue
     fi
     if fm_config_write_reread_instruction "$dest_home_abs" "$retry_report_path" "$retry_stage_path"; then
@@ -1469,6 +1530,7 @@ EOF
   while IFS= read -r stage_path; do
     [ -n "$stage_path" ] || continue
     if instruction_path=$(fm_config_reread_publish_stage "$dest_home_abs" "$stage_path"); then
+      [ -n "$instruction_path" ] || continue
       if [ -n "$delivery_paths" ]; then
         case $'\n'"$delivery_paths"$'\n' in
           *$'\n'"$instruction_path"$'\n'*) ;;
