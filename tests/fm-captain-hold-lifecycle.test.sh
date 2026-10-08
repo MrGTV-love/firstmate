@@ -1742,6 +1742,60 @@ SH
   pass "a bound channel's captured answers close their captain-held tasks at answer time"
 }
 
+# A keyed answer on a work item whose worker is still running must release the
+# item, never complete it: the board answered four calls held on live ships and
+# each was closed to Done while its worker was still validating. The intake
+# decides from the live task record, so a card that declares no close mode, or
+# declares `done`, cannot complete work that has not landed. A question-shaped
+# call with no worker keeps closing.
+test_keyed_answer_releases_a_live_work_item() {
+  local home id out show rc
+  home=$(make_home keyed-live-work)
+  id=sample-live-ship
+  tasks_in "$home" add "$id" "Ship the live sample" --kind ship --repo sample --start >/dev/null \
+    || fail "could not create the in-flight work item"
+  write_origin_meta "$home" "$id" ship
+  run_captain "$home" hold "$id" --reason "captain design pick needed" >/dev/null \
+    || fail "could not hold the live work item for the captain"
+  tasks_in "$home" add sample-live-done-ship "Ship the second live sample" --kind ship --repo sample --start >/dev/null \
+    || fail "could not create the second in-flight work item"
+  write_origin_meta "$home" sample-live-done-ship ship
+  run_captain "$home" hold sample-live-done-ship --reason "captain design pick needed" >/dev/null \
+    || fail "could not hold the second live work item"
+  run_captain "$home" hold sample-plain-question --title "Captain call: plain" \
+    --reason "captain choice pending" --repo sample >/dev/null \
+    || fail "could not hold the plain question"
+
+  out=$(printf '%s\tgo-b\tOption B\n%s\tgo-b\tOption B\tdone\nsample-plain-question\tyes\tYes\n' \
+    "$id" sample-live-done-ship \
+    | run_captain "$home" answers --source "live work fixture" 2>&1) \
+    || fail "answers on live work items failed: $out"
+  for id in "$id" sample-live-done-ship; do
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_not_contains "$show" "state: done" "a keyed answer completed the live work item $id"
+    assert_contains "$show" "held: no" "a keyed answer left the live work item $id held"
+    assert_contains "$show" "Resolution mode: released" "the answer on $id did not record a release"
+    assert_contains "$show" "Option B" "the answer on $id lost the captain's words"
+    assert_present "$home/state/$id.meta" "the answer removed the live task record for $id"
+  done
+  show=$(tasks_in "$home" show sample-plain-question --full)
+  assert_contains "$show" "state: done" "a question with no worker stopped closing"
+
+  out=$(printf 'sample-live-ship\tgo-b\tOption B\n' \
+    | run_captain "$home" answers --source "live work fixture" 2>&1) \
+    || fail "an identical live-work answer was not idempotent: $out"
+  rm -f "$home/state/sample-live-ship.meta"
+  set +e
+  out=$(printf 'sample-live-ship\tgo-b\tOption B\n' \
+    | run_captain "$home" answers --source "live work fixture" 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "replaying a release after the worker ended was refused: $out"
+  show=$(tasks_in "$home" show sample-live-ship --full)
+  assert_not_contains "$show" "state: done" "a late replay completed the released work item"
+  pass "a keyed answer releases a live work item and still closes a question"
+}
+
 # Answer-time closure is opt-in per source. A channel with no binding must behave
 # exactly as it always did: capture, announce, close nothing.
 # A reconcile is "go re-check reality", never the captain's answer. The value is
@@ -4095,6 +4149,7 @@ test_secondmate_hold_stays_in_authoritative_home
 test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
+test_keyed_answer_releases_a_live_work_item
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open

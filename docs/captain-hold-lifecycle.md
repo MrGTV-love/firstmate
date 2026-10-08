@@ -189,6 +189,11 @@ The optional mode column carries a card-declared close:
 | `release` | Lifts the hold so held work resumes. |
 | Any other value | Skipped. |
 
+The live task record overrides the column.
+A task whose worker still owns it, shown by a live runtime record or an In flight backlog row, is always released, whatever mode the card declared.
+Completing it would record a landing that has not happened, so only cleanup closes it.
+A replay of that answer after the worker has ended stays a release.
+
 Each key is reported as follows:
 
 | Key | Result |
