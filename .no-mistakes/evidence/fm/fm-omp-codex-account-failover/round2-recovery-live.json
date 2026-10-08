@@ -1,0 +1,81 @@
+{
+  "scope": "Real guarded Herdr isolated backend boundary; no model requests",
+  "calls": [
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-recovery/recovery/lab"
+      ],
+      "rc": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-recovery/recovery/lab\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-herdr-lab.sh",
+        "prepare",
+        "fm-lab-recovery-54173-1432"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "fm-herdr-lab: fleet-state tripwire requires exactly one running default session\n"
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-herdr-lab.sh",
+        "provision",
+        "fm-lab-recovery-54173-1432"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "fm-herdr-lab: fleet-state tripwire requires exactly one running default session\n"
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-recovery-54173-1432",
+        "tab",
+        "create",
+        "--help"
+      ],
+      "rc": 0,
+      "stdout": "Create a tab\n\nUsage: herdr tab create [OPTIONS]\n\nOptions:\n      --workspace <WORKSPACE_ID>\n          \n\n      --cwd <PATH>\n          \n\n      --label <TEXT>\n          \n\n      --env <KEY=VALUE>\n          Set an environment variable for the launched process\n\n      --focus\n          \n\n      --no-focus\n\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-recovery-54173-1432",
+        "status",
+        "--json"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "Error: Custom { kind: InvalidInput, error: \"local socket name length exceeds capacity of sun_path of sockaddr_un\" }\n"
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-herdr-lab.sh",
+        "teardown",
+        "fm-lab-recovery-54173-1432"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-recovery-54173-1432'; refusing destructive calls\n"
+    }
+  ],
+  "driver": "import os,pathlib,subprocess,json,time,shlex,shutil\nR=pathlib.Path.cwd(); B=R/'.no-mistakes/round2-recovery/recovery'; B.mkdir(parents=True,exist_ok=False)\nfor p in ['home','agent','tmp','state','work','xdg']: (B/p).mkdir()\nE={'PATH':os.environ['PATH'],'HOME':str(B/'home'),'PI_CODING_AGENT_DIR':str(B/'agent'),'TMPDIR':str(B/'tmp'),'XDG_CONFIG_HOME':str(B/'xdg'),'OMP_SKIP_SETUP':'1','FM_HERDR_LAB_STATE_DIR':str(B/'state')}\nlog=[]; name='fm-lab-recovery-54173-1432'; H=R/'bin/fm-herdr-lab.sh'\ndef run(a,t=25):\n try:\n  p=subprocess.run(list(map(str,a)),cwd=R,env=E,text=True,capture_output=True,timeout=t); row={'argv':list(map(str,a)),'rc':p.returncode,'stdout':p.stdout,'stderr':p.stderr}\n except subprocess.TimeoutExpired as x: row={'argv':list(map(str,a)),'timeout':t,'stdout':str(x.stdout),'stderr':str(x.stderr)}\n log.append(row); print(json.dumps(row),flush=True); return row\ntry:\n run([R/'bin/fm-lab-home.sh','create',B/'lab'])\n run([H,'prepare',name]); run([H,'provision',name]); run([H,'run',name,'tab','create','--help']); run([H,'run',name,'status','--json'])\nfinally:\n cleanup=run([H,'teardown',name],45)\n out={'scope':'Real guarded Herdr isolated backend boundary; no model requests','calls':log,'driver':pathlib.Path(__file__).read_text(),'cleanup':cleanup}\n if cleanup.get('rc')==0: shutil.rmtree(B); out['fixture_removed']=not B.exists()\n pathlib.Path('/Users/charlesabrooker/.no-mistakes/evidence/01M49AAWM08X3K86CZWW2AQZ0P/round2-recovery-live.json').write_text(json.dumps(out,indent=2))\n",
+  "cleanup": {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-herdr-lab.sh",
+      "teardown",
+      "fm-lab-recovery-54173-1432"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-recovery-54173-1432'; refusing destructive calls\n"
+  }
+}

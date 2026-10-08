@@ -1,0 +1,6 @@
+{
+  "herdr_prepare_refused": true,
+  "herdr_provision_refused": true,
+  "herdr_teardown_refused_missing_tripwire": true,
+  "unprovisioned_lab_home_removed": true
+}

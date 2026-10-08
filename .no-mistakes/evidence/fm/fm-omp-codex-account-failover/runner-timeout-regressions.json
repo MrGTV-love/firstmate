@@ -1,0 +1,40 @@
+{
+  "families": [
+    {
+      "count": 2,
+      "duration_ms": 607246,
+      "failed": 2,
+      "name": "pure-contract-unit"
+    }
+  ],
+  "finished_at": "2026-10-08T06:23:02Z",
+  "run_id": "fm-test-run-1791439973022-41952",
+  "scripts": [
+    {
+      "duration_ms": 600534,
+      "exit": 124,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-test-run.test.sh"
+    },
+    {
+      "duration_ms": 6712,
+      "exit": 1,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-timeout-lib.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=4",
+  "started_at": "2026-10-08T06:12:51Z",
+  "summary": {
+    "duration_ms": 609455,
+    "failed": 2,
+    "skipped_gate": 0,
+    "total": 2
+  }
+}

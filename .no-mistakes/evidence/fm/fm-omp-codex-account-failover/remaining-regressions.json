@@ -1,0 +1,79 @@
+{
+  "families": [
+    {
+      "count": 2,
+      "duration_ms": 1802220,
+      "failed": 2,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 2,
+      "duration_ms": 785114,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 1,
+      "duration_ms": 500222,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-10-08T07:15:33Z",
+  "run_id": "fm-test-run-1791440643139-54709",
+  "scripts": [
+    {
+      "duration_ms": 771438,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-test-run.test.sh"
+    },
+    {
+      "duration_ms": 13676,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-timeout-lib.test.sh"
+    },
+    {
+      "duration_ms": 901359,
+      "exit": 124,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-dispatch-profile.test.sh"
+    },
+    {
+      "duration_ms": 500222,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-claude-api-key-guard.test.sh"
+    },
+    {
+      "duration_ms": 900861,
+      "exit": 124,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control-relaunch.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=4",
+  "started_at": "2026-10-08T06:24:02Z",
+  "summary": {
+    "duration_ms": 3090814,
+    "failed": 2,
+    "skipped_gate": 0,
+    "total": 5
+  }
+}

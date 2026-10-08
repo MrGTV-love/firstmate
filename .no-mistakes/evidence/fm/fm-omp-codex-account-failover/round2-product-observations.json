@@ -1,0 +1,298 @@
+{
+  "scope": "Current-run CLI/RPC live observations; external services supplied by disposable loopback endpoints or explicit snapshot inputs. No actual Codex OAuth rotation or remote stand-in completion claimed.",
+  "native_effective_retry_settings": {
+    "retry.enabled": true,
+    "retry.usageAwareFallback": true,
+    "retry.usageReservePct": 0,
+    "retry.usageReservePolicy": "auto",
+    "retry.waitForUsageReset": false,
+    "retry.modelFallback": true,
+    "retry.maxRetries": 3,
+    "retry.maxDelayMs": 100,
+    "retry.fallbackChains": {}
+  },
+  "explicit_chain": {
+    "requested_models": [
+      "quota-primary",
+      "quota-primary",
+      "quota-primary",
+      "quota-primary",
+      "quota-primary",
+      "quota-primary",
+      "declared-exhausted",
+      "declared-exhausted",
+      "declared-exhausted",
+      "declared-exhausted",
+      "declared-exhausted",
+      "declared-exhausted",
+      "declared-ok"
+    ],
+    "events": [
+      {
+        "type": "retry_fallback_applied",
+        "from": "round2-local/quota-primary:off",
+        "to": "round2-local/declared-exhausted",
+        "role": "round2-local/quota-primary",
+        "reason": "Request failed: 429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)"
+      },
+      {
+        "type": "auto_retry_start",
+        "attempt": 1,
+        "maxAttempts": 3,
+        "delayMs": 0,
+        "errorMessage": "429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)",
+        "errorId": 659456
+      },
+      {
+        "type": "retry_fallback_applied",
+        "from": "round2-local/declared-exhausted:off",
+        "to": "round2-local/declared-ok",
+        "role": "round2-local/quota-primary",
+        "reason": "Request failed: 429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)"
+      },
+      {
+        "type": "auto_retry_start",
+        "attempt": 2,
+        "maxAttempts": 3,
+        "delayMs": 0,
+        "errorMessage": "429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)",
+        "errorId": 659456
+      },
+      {
+        "type": "retry_fallback_succeeded",
+        "model": "round2-local/declared-ok:off",
+        "role": "round2-local/quota-primary"
+      },
+      {
+        "type": "auto_retry_end",
+        "success": true,
+        "attempt": 2,
+        "retryErrors": [
+          {
+            "entryId": "d6118343",
+            "persistenceKey": "assistant:1791414237258:round2-local:quota-primary::error",
+            "note": "rate-limited; switched model; retried",
+            "retryRecovery": {
+              "kind": "auto-retry",
+              "status": "recovered",
+              "attempt": 1,
+              "recoveredAt": "2026-10-07T23:04:32.949Z",
+              "recovery": "model",
+              "note": "rate-limited; switched model; retried",
+              "supersededBy": {
+                "timestamp": 1791414272084,
+                "responseId": "round2-local",
+                "provider": "round2-local",
+                "model": "declared-ok"
+              }
+            }
+          },
+          {
+            "entryId": "146ffb8f",
+            "persistenceKey": "assistant:1791414254536:round2-local:declared-exhausted::error",
+            "note": "rate-limited; switched model; retried",
+            "retryRecovery": {
+              "kind": "auto-retry",
+              "status": "recovered",
+              "attempt": 2,
+              "recoveredAt": "2026-10-07T23:04:32.949Z",
+              "recovery": "model",
+              "note": "rate-limited; switched model; retried",
+              "supersededBy": {
+                "timestamp": 1791414272084,
+                "responseId": "round2-local",
+                "provider": "round2-local",
+                "model": "declared-ok"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "prompt_result",
+        "id": "quota-turn",
+        "agentInvoked": true,
+        "status": "completed",
+        "sessionSettled": true
+      }
+    ],
+    "available_but_undeclared_requested": false
+  },
+  "no_chain": {
+    "requested_models": [
+      "quota-primary",
+      "quota-primary",
+      "quota-primary",
+      "quota-primary",
+      "quota-primary",
+      "quota-primary"
+    ],
+    "events": [
+      {
+        "type": "auto_retry_end",
+        "success": false,
+        "attempt": 1,
+        "finalError": "Provider requested 1800000ms wait, exceeds retry.maxDelayMs (100ms). Original error: 429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)"
+      },
+      {
+        "type": "prompt_result",
+        "id": "quota-turn",
+        "agentInvoked": true,
+        "status": "error",
+        "sessionSettled": true,
+        "error": {
+          "message": "429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)",
+          "provider": "round2-local",
+          "model": "quota-primary",
+          "retryable": true,
+          "httpStatus": 429
+        }
+      }
+    ]
+  },
+  "public_chooser_observations": [
+    {
+      "name": "Default native Claude chooses positive captured subscription",
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "name": "Gateway environment must not borrow native subscription quota",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Tenant headers must not borrow native subscription quota",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings helper authentication scope guard",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings gateway authentication scope guard",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings settings-headers authentication scope guard",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings malformed authentication scope guard",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings neutral authentication scope guard",
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "name": "Isolated native OMP reports authenticated pool",
+      "exit": 0,
+      "stdout": "{\n  \"generatedAt\": 1791413913752,\n  \"reports\": [],\n  \"accountsWithoutUsage\": [],\n  \"disabledCredentials\": [],\n  \"capacity\": {}\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "Unknown unauthenticated OMP cannot inherit positive single-account snapshot",
+      "exit": 1,
+      "stdout": "none\n",
+      "stderr": ""
+    },
+    {
+      "name": "Unknown OMP permits worker to choose later positively measured native Claude",
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "name": "TeamClaude launch refuses missing proxy executable before starting Claude",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: TeamClaude is not installed: install an executable teamclaude on PATH or under one Node version in ~/.nvm/versions/node; refusing to launch Claude without it\n"
+    },
+    {
+      "name": "Typed intake is off without explicit classifier opt-in",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/user/.env)\n"
+    }
+  ],
+  "adopted_control_before": {
+    "label": "native_before",
+    "native_pane": "25042 omp",
+    "backend_agent_state": "alive",
+    "meta_hash": "f0e0d269f1129484e810eda882018a0d0035922a4071ee14a5cac5a7f09a2d3c",
+    "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+    "journal_exists": false,
+    "ledger": "",
+    "handled": "",
+    "queue": ""
+  },
+  "adopted_control_after": {
+    "label": "after_direct_control",
+    "native_pane": "25042 omp",
+    "backend_agent_state": "alive",
+    "meta_hash": "f0e0d269f1129484e810eda882018a0d0035922a4071ee14a5cac5a7f09a2d3c",
+    "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+    "journal_exists": false,
+    "ledger": "",
+    "handled": "",
+    "queue": ""
+  },
+  "automatic_control_refusal": [
+    {
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh",
+        "quota-live",
+        "relaunch",
+        "--note",
+        "Disposable quota smoke refusal"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-recovery/quota/lab\nerror: quota-exhausted: automatic recovery capacity is unknown; use a fresh spawn with known capacity or a manual relaunch profile for quota-live (adopted authentication scope)\n"
+    }
+  ],
+  "scan_limit": "Production scan function invoked with serialized origin events; automatic child lifecycle was gate-refused. Not full watcher or provider-emitted event proof.",
+  "scan_attempts_after_first": "1791414441\tattempt\n1791414443\tfailed\n",
+  "scan_attempts_after_same_origin_advances": "1791414441\tattempt\n1791414443\tfailed\n",
+  "scan_attempts_after_new_generation": "1791414441\tattempt\n1791414443\tfailed\n1791414481\tattempt\n1791414481\tfailed\n",
+  "cleanup": {
+    "native": [
+      {
+        "fixture_root_exists": false,
+        "endpoint_thread_alive": false,
+        "source_edits": "none",
+        "native_processes": "all awaited; timeout guard kills remaining own process only",
+        "removed_fixture_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive"
+      },
+      {
+        "fixture_root_exists": false,
+        "endpoint_thread_alive": false,
+        "source_edits": "none",
+        "native_processes": "all awaited; timeout guard kills remaining own process only",
+        "removed_fixture_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup"
+      }
+    ],
+    "recovery": {
+      "fixture_removed": true,
+      "socket_removed": true,
+      "watcher_processes_exited": true
+    },
+    "cli_fixture_removed": true
+  }
+}

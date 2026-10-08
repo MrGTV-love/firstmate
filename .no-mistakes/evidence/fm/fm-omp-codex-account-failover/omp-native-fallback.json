@@ -1,0 +1,111 @@
+{
+  "commands": [
+    {
+      "command": [
+        "omp",
+        "--version"
+      ],
+      "exit": 0,
+      "stdout": "omp/18.8.1\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "omp",
+        "config",
+        "get",
+        "retry",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Unknown setting: retry\n\nRun 'omp config list' to see available keys\n"
+    },
+    {
+      "command": [
+        "omp",
+        "usage",
+        "--provider",
+        "openai-codex",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"generatedAt\": 1791439393953,\n  \"reports\": [],\n  \"accountsWithoutUsage\": [],\n  \"disabledCredentials\": [],\n  \"capacity\": {}\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "omp",
+        "models",
+        "--json",
+        "-e",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/live-lzx398g1/project/.omp/extensions/local.ts"
+      ],
+      "exit": 0,
+      "stdout": "{\"models\":[{\"provider\":\"apple\",\"kind\":\"chat\",\"id\":\"on-device\",\"selector\":\"apple/on-device\",\"name\":\"Apple AFM 3 Core Advanced\",\"contextWindow\":8192,\"maxTokens\":8192,\"reasoning\":false,\"thinking\":null,\"input\":[\"text\",\"image\"],\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0},\"pricingStatus\":\"unknown\"},{\"provider\":\"fm-lab-primary\",\"kind\":\"chat\",\"id\":\"blocked\",\"selector\":\"fm-lab-primary/blocked\",\"name\":\"blocked\",\"contextWindow\":32768,\"maxTokens\":1024,\"reasoning\":false,\"thinking\":null,\"input\":[\"text\"],\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0},\"pricingStatus\":\"unknown\"},{\"provider\":\"fm-lab-secondary\",\"kind\":\"chat\",\"id\":\"available\",\"selector\":\"fm-lab-secondary/available\",\"name\":\"available\",\"contextWindow\":32768,\"maxTokens\":1024,\"reasoning\":false,\"thinking\":null,\"input\":[\"text\"],\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0},\"pricingStatus\":\"unknown\"}]}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "omp",
+        "--cwd",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/live-lzx398g1/project",
+        "--no-session",
+        "--no-tools",
+        "--no-lsp",
+        "--no-skills",
+        "--no-rules",
+        "--no-extensions",
+        "-e",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/live-lzx398g1/project/.omp/extensions/local.ts",
+        "--config",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/live-lzx398g1/fallback.yml",
+        "--config",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml",
+        "--model",
+        "fm-lab-primary/blocked",
+        "--thinking",
+        "off",
+        "--max-time",
+        "45",
+        "-p",
+        "Return the completion marker."
+      ],
+      "exit": 0,
+      "stdout": "LIVE_STANDIN_COMPLETED\n",
+      "stderr": "Working...\n"
+    }
+  ],
+  "local_provider_requests": [
+    {
+      "path": "/v1/chat/completions",
+      "model": "blocked"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "blocked"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "blocked"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "blocked"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "blocked"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "blocked"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "available"
+    }
+  ],
+  "setup": "Real installed OMP, disposable local HTTP providers; no OAuth credentials or external billed requests",
+  "cleanup": "Disposable lab removed"
+}

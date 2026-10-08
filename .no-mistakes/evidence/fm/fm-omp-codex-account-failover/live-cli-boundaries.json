@@ -1,0 +1,302 @@
+{
+  "commands": [
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-c",
+        "user.name=Disposable Lab",
+        "-c",
+        "user.email=lab@example.invalid",
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "Disposable project"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "helper_was_executed": false
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {
+        "ANTHROPIC_BASE_URL": "https://gateway.invalid"
+      },
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {
+        "ANTHROPIC_CUSTOM_HEADERS": "Authorization: disposable-local-only"
+      },
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json",
+        "--candidate",
+        "claude:sonnet",
+        "--candidate",
+        "cursor:cursor-grok-4.6-medium"
+      ],
+      "environment_changes": {
+        "CLAUDE_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/alternate-store"
+      },
+      "exit": 0,
+      "stdout": "cursor cursor-grok-4.6-medium\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json",
+        "--candidate",
+        "omp:openai-codex/gpt-6.1-sol"
+      ],
+      "environment_changes": {},
+      "exit": 1,
+      "stdout": "none\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-brief.sh",
+        "guard",
+        "project",
+        "--scout"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/data/guard/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh",
+        "guard",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/project",
+        "--scout",
+        "--harness",
+        "claude",
+        "--model",
+        "sonnet",
+        "--effort",
+        "high"
+      ],
+      "environment_changes": {
+        "ANTHROPIC_API_KEY": "disposable-test-key"
+      },
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API\n"
+    },
+    {
+      "guard_task_metadata_created": false
+    },
+    {
+      "command": [
+        "openssl",
+        "req",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-nodes",
+        "-keyout",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/key.pem",
+        "-out",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/cert.pem",
+        "-days",
+        "1",
+        "-subj",
+        "/CN=api.typesafe.ai",
+        "-addext",
+        "subjectAltName=DNS:api.typesafe.ai"
+      ],
+      "environment_changes": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ".........+.........+.....+.......+...+++++++++++++++++++++++++++++++++++++++*.....+...+.........+......+...+....+.....+......+....+..+.+.........+.........+..+...+....+++++++++++++++++++++++++++++++++++++++*..........+....+..+...+...+...........................+.......+.........+......+...........+....+...+.....+......+.+...........+.......+...............+.....+..................+.......+......+.....+.+......+...............+..................+.....+.......+...+......+.....+.........+.+...+.....................+.....+......+......+.......+........+...+......+....+..+...+......+....+..+....+...+..+...+................+.........+...........+......+.+.....+....+...+..+.+..+...+.......+......+..+...+......+...+...............+...+............+.+......+.....+...+.+......+......+.....+....+.....+...+.............+...+............+...+...........+...+.+.........+.................+...+......+..........+..+..........+........+.+......+...+.....+....+...............++++++\n.+++++++++++++++++++++++++++++++++++++++*....+.+...+...........+.+..+.......+...+..+......+++++++++++++++++++++++++++++++++++++++*.....+...+..+............+...+...+......+....+.....+....+...+..+...+.......+......+.........+.....+......+.+......++++++\n-----\n"
+    },
+    {
+      "command": [
+        "quota-axi",
+        "--json"
+      ],
+      "environment_changes": {},
+      "exit": 1,
+      "stdout": "{\n  \"generatedAt\": \"2026-10-08T06:06:42.436Z\",\n  \"schemaVersion\": 5,\n  \"providers\": [\n    {\n      \"provider\": \"claude\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"credentials_missing\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"codex\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"Codex sign-in required\"\n      },\n      \"accountKeys\": [\n        \"codex-home\"\n      ],\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      }\n    },\n    {\n      \"provider\": \"cursor\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"Cursor sign-in required\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"copilot\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"GitHub Copilot sign-in required\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"grok\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"Grok sign-in required\",\n        \"authStatus\": \"unusable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"kimi\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"kimi_credential_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"zai\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"zai_credential_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"agy\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"error\",\n        \"stale\": false,\n        \"error\": \"Antigravity CLI /quota failed\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ]\n    },\n    {\n      \"provider\": \"alibaba\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"unavailable\",\n        \"stale\": false,\n        \"error\": \"bl_cli_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"opencode-go\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"opencode_go_credential_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"commandcode\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"commandcode_sign_in_required\",\n        \"authStatus\": \"unusable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"minimax\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"minimax_credential_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"mimo\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"mimo_credential_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"deepseek\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"deepseek_credential_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"openrouter\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"openrouter_credential_unavailable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": [],\n        \"unresolvedWindowIds\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"elevenlabs\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"elevenlabs_credential_unavailable\",\n        \"authStatus\": \"unusable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"devin\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"devin_credential_unavailable\",\n        \"authStatus\": \"unusable\",\n        \"remedyCommand\": \"devin auth login\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    },\n    {\n      \"provider\": \"muse\",\n      \"windows\": [],\n      \"state\": {\n        \"status\": \"auth_required\",\n        \"stale\": false,\n        \"error\": \"muse_credential_unavailable\",\n        \"authStatus\": \"unusable\"\n      },\n      \"quotaSemantics\": {\n        \"status\": \"unknown\",\n        \"effectiveAvailability\": []\n      },\n      \"accountKeys\": [\n        \"default\"\n      ],\n      \"notSetUp\": true\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/data/guard/brief.md",
+        "--project",
+        "disposable capacity lab"
+      ],
+      "environment_changes": {
+        "HTTPS_PROXY": "http://127.0.0.1:52937",
+        "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/cert.pem",
+        "TYPESAFE_API_KEY": "disposable-local-only"
+      },
+      "exit": 2,
+      "stdout": "",
+      "stderr": "error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/config/crew-dispatch.json - use profiles whose harness lacks one authoritative provider family require provider: omp\n"
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/data/guard/brief.md"
+      ],
+      "environment_changes": {
+        "HTTPS_PROXY": "http://127.0.0.1:52937",
+        "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/cert.pem",
+        "TYPESAFE_API_KEY": "disposable-local-only"
+      },
+      "exit": 2,
+      "stdout": "",
+      "stderr": "error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/config/crew-dispatch.json - use profiles whose harness lacks one authoritative provider family require provider: omp\n"
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/data/guard/brief.md"
+      ],
+      "environment_changes": {
+        "HTTPS_PROXY": "http://127.0.0.1:52937",
+        "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/cert.pem",
+        "TYPESAFE_API_KEY": "disposable-local-only"
+      },
+      "exit": 2,
+      "stdout": "",
+      "stderr": "error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/config/crew-dispatch.json - use profiles whose harness lacks one authoritative provider family require provider: omp\n"
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/data/guard/brief.md"
+      ],
+      "environment_changes": {
+        "HTTPS_PROXY": "http://127.0.0.1:52937",
+        "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/cert.pem",
+        "TYPESAFE_API_KEY": "disposable-local-only"
+      },
+      "exit": 2,
+      "stdout": "",
+      "stderr": "error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/fm/config/crew-dispatch.json - use profiles whose harness lacks one authoritative provider family require provider: omp\n"
+    },
+    {
+      "privacy_refusal_sent_requests": 0
+    }
+  ],
+  "local_typesafe_requests": [],
+  "setup": "Real CLI consumers, snapshot user input, local TLS endpoint through real curl; isolated HOME and no production credentials",
+  "cleanup": "Disposable lab removed"
+}

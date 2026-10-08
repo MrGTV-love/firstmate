@@ -1,0 +1,281 @@
+{
+  "isolation": {
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/user",
+    "PI_CODING_AGENT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/agent",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/tmp",
+    "OMP_SKIP_SETUP": "1",
+    "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/xdg/config",
+    "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/xdg/cache",
+    "XDG_STATE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/xdg/state",
+    "XDG_DATA_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/xdg/data"
+  },
+  "input_snapshot": {
+    "schemaVersion": 5,
+    "generatedAt": "2026-10-07T00:00:00Z",
+    "providers": [
+      {
+        "provider": "claude",
+        "windows": [],
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 50,
+              "runway": {
+                "status": "unknown"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "provider": "cursor",
+        "windows": [],
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 50,
+              "runway": {
+                "status": "unknown"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "provider": "codex",
+        "windows": [],
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 50,
+              "runway": {
+                "status": "unknown"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "observations": [
+    {
+      "name": "Default native Claude chooses positive captured subscription",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "name": "Gateway environment must not borrow native subscription quota",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {
+        "ANTHROPIC_BASE_URL": "http://127.0.0.1:1"
+      },
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Tenant headers must not borrow native subscription quota",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {
+        "ANTHROPIC_CUSTOM_HEADERS": "Authorization: Bearer disposable-local-selector"
+      },
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings helper authentication scope guard",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings gateway authentication scope guard",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings settings-headers authentication scope guard",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings malformed authentication scope guard",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "cursor auto\n",
+      "stderr": ""
+    },
+    {
+      "name": "Settings neutral authentication scope guard",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "claude:sonnet",
+        "cursor:auto"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "name": "Isolated native OMP reports authenticated pool",
+      "command": [
+        "omp",
+        "usage",
+        "--provider",
+        "openai-codex",
+        "--json"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "{\n  \"generatedAt\": 1791413913752,\n  \"reports\": [],\n  \"accountsWithoutUsage\": [],\n  \"disabledCredentials\": [],\n  \"capacity\": {}\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "Unknown unauthenticated OMP cannot inherit positive single-account snapshot",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "omp:openai-codex/gpt-6.1-sol"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 1,
+      "stdout": "none\n",
+      "stderr": ""
+    },
+    {
+      "name": "Unknown OMP permits worker to choose later positively measured native Claude",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh",
+        "--snapshot",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json",
+        "omp:openai-codex/gpt-6.1-sol",
+        "claude:sonnet"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "claude sonnet\n",
+      "stderr": ""
+    },
+    {
+      "name": "Real quota snapshot mode avoids all credential acquisition",
+      "command": [
+        "quota-axi",
+        "--json"
+      ],
+      "environment_overrides": {
+        "QUOTA_AXI_SNAPSHOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/empty-cache.json"
+      },
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 2,
+      "stdout": "error: \"QUOTA_AXI_SNAPSHOT is not a readable quota snapshot: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/empty-cache.json\"\ncode: VALIDATION_ERROR\nhelp[1]: \"Point QUOTA_AXI_SNAPSHOT at a quota-axi cache file, or unset it\"\n",
+      "stderr": ""
+    },
+    {
+      "name": "TeamClaude launch refuses missing proxy executable before starting Claude",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-teamclaude-launch.sh",
+        "--check"
+      ],
+      "environment_overrides": {},
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: TeamClaude is not installed: install an executable teamclaude on PATH or under one Node version in ~/.nvm/versions/node; refusing to launch Claude without it\n"
+    },
+    {
+      "name": "Typed intake is off without explicit classifier opt-in",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/quota.json"
+      ],
+      "environment_overrides": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/user"
+      },
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/project",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-cli/user/.env)\n"
+    }
+  ],
+  "scope": "Real public CLI snapshot consumer; captured quota is disposable input, not vendor measurement. Native OMP usage reports no accounts. No authenticated Claude/Codex calls."
+}

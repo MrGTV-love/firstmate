@@ -1,0 +1,161 @@
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project --scout --harness claude --model sonnet --effort high --dispatch-rule rule_1
+exit=0
+model-matrix fallback launched omp fm-lab-secondary/available for rule_1
+spawned fresh harness=omp kind=scout window=primary:fm-fresh worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/slots/.treehouse/project-2887b3/1/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+
+fresh_spawn_metadata: window=primary:fm-fresh
+endpoint_task_id=fresh
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/slots/.treehouse/project-2887b3/1/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-fresh
+model=fm-lab-secondary/available
+effort=high
+busy_gen=g1791439981.68947.27723
+spawn_gen=s1791439982.10293.873
+dispatch_rule=rule_1
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh task --relaunch
+exit=0
+spawned task harness=omp kind=scout window=primary:fm-task worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+
+actual_worker_busy_records: {"task.busy-state": "v1 gen=g1791439997.16351.27297 seq=3 state=idle source=omp-ext event=quota-exhausted ts=1791440046\n", "task.busy-gen": "g1791439997.16351.27297\n"}
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh task relaunch --note Recover only with established capacity.
+exit=1
+
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+error: quota-exhausted: automatic recovery capacity is unknown; use a fresh spawn with known capacity or a manual relaunch profile for task (adopted authentication scope)
+
+automatic_refusal_preserved_brief: true
+automatic_refusal_preserved_local_work: true
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh task relaunch --dispatch-rule rule_99 --note Invalid rule must not stop the worker.
+exit=1
+
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+error: invalid dispatch fallback configuration: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/config/crew-dispatch.json:0): dispatch rule does not contain the requested profile
+
+invalid_rule_preserved_brief: true
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh task relaunch --harness omp --model fm-lab-secondary/available --effort high --note Deliberately continue on the permitted local profile, preserving work.
+exit=0
+relaunched task harness=omp from=omp model=fm-lab-secondary/available effort=high backend=tmux endpoint=primary:fm-task worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l
+
+replacement_metadata: window=primary:fm-task
+endpoint_task_id=task
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/worker
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-task
+model=fm-lab-secondary/available
+effort=high
+busy_gen=g1791440069.45122.24618
+spawn_gen=s1791440070.37158.12329
+dispatch_rule=rule_1
+control_relaunch_tx=77872.20261008T061418Z.18405
+
+replacement_preserved_local_work: PRESERVE_LOCAL_WORK
+
+
+Actual quota-error terminal:
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                         Tip: Use /tan to fork the current conversation into a background agent
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: # Current worker role contract
+ You are a crewmate: an autonomous worker agent managed by firstmate.
+ This section establishes your current identity before every project or task instruction below and supersedes any
+ conflicting role identity in those instructions.
+ Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+ identity, delegate the task, run fleet supervision, or address the captain.
+ Your steering inbox is
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/state/task.inbox; this exact
+ path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so
+ read and acknowledge its messages and do not reject it as another home's state.
+ Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths
+ named by this brief.
+ When this task works on Firstmate itself, the repository root AGENTS.md (also imported by CLAUDE.md) is project
+ content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+ contract.
+ Project instructions still govern the work wherever they do not conflict with this worker identity, including
+ CONTRIBUTING.md and firstmate-coding-guidelines for Firstmate changes.
+
+ Task
+
+ Captain's intent
+
+ Verify that local work is preserved during quota recovery.
+
+ Firstmate spec
+
+ Do not edit or call tools. Return only the completion marker.
+
+
+ Error: 429 usage_limit_reached: isolated provider quota exhausted
+   usage_limit_reached: isolated provider quota exhausted (type=usage_limit_reached param=usage_limit_reached)
+
+ Error: Retry failed after 1 attempts: Provider requested 1800000ms wait, exceeds retry.maxDelayMs (300000ms). Original
+ error: 429 usage_limit_reached: isolated provider quota exhausted
+ usage_limit_reached: isolated provider quota exhausted (type=usage_limit_reached param=usage_limit_reached)
+
+❯
+ π · ⬢ gpt-6.1-sol · 🌳 project/worker · ⑂ lab-task · ◫ 23.2%/33K ⟲
+
+
+Actual recovered terminal:
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                         Tip: Pair up live: `/collab` shares your session through an end-to-end
+                          encrypted relay link — a teammate runs `/join <link>` to watch tool
+                                  calls stream and prompt the agent from their own omp
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Task
+
+ Captain's intent
+
+ Verify that local work is preserved during quota recovery.
+
+ Firstmate spec
+
+ Do not edit or call tools. Return only the completion marker.
+
+ Progress note (2026-10-08T06:14:19Z)
+
+ This task was relaunched. Continue from here; the local copy and every
+ uncommitted change are exactly as the previous worker left them.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/state/task.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/l/state/task.inbox/handled/. A
+ steer sent before the relaunch survives there.
+
+ Deliberately continue on the permitted local profile, preserving work.
+
+ LIVE_WORKER_COMPLETED
+
+❯
+ π · ⬢ available · 🌳 project/worker · ⑂ lab-task ?1 · ◫ 23.4%/33K ⟲                              LIVE_WORKER_COMPLETED

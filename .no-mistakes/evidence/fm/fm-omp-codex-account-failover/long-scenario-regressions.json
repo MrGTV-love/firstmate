@@ -1,0 +1,40 @@
+{
+  "families": [
+    {
+      "count": 2,
+      "duration_ms": 2131666,
+      "failed": 0,
+      "name": "backend-dispatch"
+    }
+  ],
+  "finished_at": "2026-10-08T07:52:06Z",
+  "run_id": "fm-test-run-1791443794042-43227",
+  "scripts": [
+    {
+      "duration_ms": 1429149,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-dispatch-profile.test.sh"
+    },
+    {
+      "duration_ms": 702517,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control-relaunch.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-08T07:16:33Z",
+  "summary": {
+    "duration_ms": 2132730,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 2
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "scope": "Real native default catalog under credential-free isolated HOME; catalog presence is not authentication or launch proof. No refresh requested.",
+  "env": {
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-catalog/home",
+    "PI_CODING_AGENT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-catalog/agent",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-catalog/tmp",
+    "OMP_SKIP_SETUP": "1",
+    "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-catalog/xdg/config",
+    "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-catalog/xdg/cache",
+    "XDG_STATE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-catalog/xdg/state",
+    "XDG_DATA_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-catalog/xdg/data"
+  },
+  "calls": [
+    {
+      "argv": [
+        "omp",
+        "models",
+        "find",
+        "deepseek-v4-flash",
+        "--json",
+        "--no-extensions"
+      ],
+      "exit": 0,
+      "stdout": "{\"models\":[]}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "omp",
+        "models",
+        "find",
+        "gpt-6.1-sol",
+        "--json",
+        "--no-extensions"
+      ],
+      "exit": 0,
+      "stdout": "{\"models\":[]}\n",
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "initial_shell": "GNU Bash 3.2.57",
+  "initial_failure": "tests/fm-timeout-lib.test.sh:112: BASHPID: unbound variable",
+  "remedy": "GNU Bash 5.3 downloaded from ftp.gnu.org, built only in .no-mistakes/round2-bash, selected on PATH; no system install/config changes.",
+  "corrected_timeout_result": "exit 0; round2-timeout-modern-bash.json",
+  "corrected_runner_result": "exit 0; round2-runner-modern-bash.json",
+  "observation_bounds": "Initial Python-managed attempt interrupted without completion. Subsequent 1200s/1800s suite bounds interrupted launch checks. Final two-suite check has separate 7200s per-suite bounds; no result inferred from partial assertions.",
+  "host_load": {
+    "command": "uptime && sysctl -n hw.logicalcpu",
+    "stdout": "21:41 up 1 day, 21:51, 3 users, load averages: 167.48 148.76 111.77\n18\n",
+    "interpretation": "High scheduling load observed; cause of any specific stall not proven. Shared processes/system state unchanged."
+  }
+}

@@ -1,0 +1,52 @@
+Real public CLI invocations with isolated HOME and a disposable schema-5 quota snapshot (Claude 90%, Cursor 80%, Codex 0%). No production credentials.
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+Environment selectors: {}
+exit=0
+claude sonnet
+
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+Environment selectors: {}
+exit=0
+cursor cursor-grok-4.6-medium
+
+{"helper_was_executed": false}
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+Environment selectors: {}
+exit=0
+cursor cursor-grok-4.6-medium
+
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+Environment selectors: {"ANTHROPIC_BASE_URL": "https://gateway.invalid"}
+exit=0
+cursor cursor-grok-4.6-medium
+
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+Environment selectors: {"ANTHROPIC_CUSTOM_HEADERS": "Authorization: disposable-local-only"}
+exit=0
+cursor cursor-grok-4.6-medium
+
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json --candidate claude:sonnet --candidate cursor:cursor-grok-4.6-medium
+Environment selectors: {"CLAUDE_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/alternate-store"}
+exit=0
+cursor cursor-grok-4.6-medium
+
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-quota-choose.sh --snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/snapshot.json --candidate omp:openai-codex/gpt-6.1-sol
+Environment selectors: {}
+exit=1
+none
+
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-spawn.sh guard /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/boundaries-7r183_ys/project --scout --harness claude --model sonnet --effort high
+Environment selectors: {"ANTHROPIC_API_KEY": "disposable-test-key"}
+exit=1
+
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+{"guard_task_metadata_created": false}
+The second and third chooser invocations used apiKeyHelper and forceLoginMethod=gateway/forceLoginGatewayUrl settings respectively.

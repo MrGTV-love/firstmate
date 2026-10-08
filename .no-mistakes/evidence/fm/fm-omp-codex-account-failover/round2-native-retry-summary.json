@@ -1,0 +1,357 @@
+{
+  "status": "PASS",
+  "version": "omp/18.8.1",
+  "settings": {
+    "enabledProviders": [
+      "round2-local"
+    ],
+    "enabledModels": [
+      "round2-local/quota-primary",
+      "round2-local/declared-exhausted",
+      "round2-local/declared-ok",
+      "round2-local/undeclared-ok"
+    ],
+    "retry.enabled": true,
+    "retry.usageAwareFallback": true,
+    "retry.usageReservePct": 0,
+    "retry.usageReservePolicy": "auto",
+    "retry.waitForUsageReset": false,
+    "retry.modelFallback": true,
+    "retry.maxRetries": 3,
+    "retry.maxDelayMs": 100,
+    "retry.fallbackChains": {}
+  },
+  "scenarios": [
+    {
+      "label": "explicit-chain",
+      "status": "PASS",
+      "duration_seconds": 68.476,
+      "exit_code": 0,
+      "model_sequence": [
+        "quota-primary",
+        "quota-primary",
+        "quota-primary",
+        "quota-primary",
+        "quota-primary",
+        "quota-primary",
+        "declared-exhausted",
+        "declared-exhausted",
+        "declared-exhausted",
+        "declared-exhausted",
+        "declared-exhausted",
+        "declared-exhausted",
+        "declared-ok"
+      ],
+      "available_models": [
+        {
+          "provider": "round2-local",
+          "id": "quota-primary",
+          "baseUrl": "http://127.0.0.1:64480/v1"
+        },
+        {
+          "provider": "round2-local",
+          "id": "declared-exhausted",
+          "baseUrl": "http://127.0.0.1:64480/v1"
+        },
+        {
+          "provider": "round2-local",
+          "id": "declared-ok",
+          "baseUrl": "http://127.0.0.1:64480/v1"
+        },
+        {
+          "provider": "round2-local",
+          "id": "undeclared-ok",
+          "baseUrl": "http://127.0.0.1:64480/v1"
+        }
+      ],
+      "events": [
+        {
+          "type": "retry_fallback_applied",
+          "from": "round2-local/quota-primary:off",
+          "to": "round2-local/declared-exhausted",
+          "role": "round2-local/quota-primary",
+          "reason": "Request failed: 429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)"
+        },
+        {
+          "type": "auto_retry_start",
+          "attempt": 1,
+          "maxAttempts": 3,
+          "delayMs": 0,
+          "errorMessage": "429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)",
+          "errorId": 659456
+        },
+        {
+          "type": "retry_fallback_applied",
+          "from": "round2-local/declared-exhausted:off",
+          "to": "round2-local/declared-ok",
+          "role": "round2-local/quota-primary",
+          "reason": "Request failed: 429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)"
+        },
+        {
+          "type": "auto_retry_start",
+          "attempt": 2,
+          "maxAttempts": 3,
+          "delayMs": 0,
+          "errorMessage": "429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)",
+          "errorId": 659456
+        },
+        {
+          "type": "retry_fallback_succeeded",
+          "model": "round2-local/declared-ok:off",
+          "role": "round2-local/quota-primary"
+        },
+        {
+          "type": "auto_retry_end",
+          "success": true,
+          "attempt": 2,
+          "retryErrors": [
+            {
+              "entryId": "d6118343",
+              "persistenceKey": "assistant:1791414237258:round2-local:quota-primary::error",
+              "note": "rate-limited; switched model; retried",
+              "retryRecovery": {
+                "kind": "auto-retry",
+                "status": "recovered",
+                "attempt": 1,
+                "recoveredAt": "2026-10-07T23:04:32.949Z",
+                "recovery": "model",
+                "note": "rate-limited; switched model; retried",
+                "supersededBy": {
+                  "timestamp": 1791414272084,
+                  "responseId": "round2-local",
+                  "provider": "round2-local",
+                  "model": "declared-ok"
+                }
+              }
+            },
+            {
+              "entryId": "146ffb8f",
+              "persistenceKey": "assistant:1791414254536:round2-local:declared-exhausted::error",
+              "note": "rate-limited; switched model; retried",
+              "retryRecovery": {
+                "kind": "auto-retry",
+                "status": "recovered",
+                "attempt": 2,
+                "recoveredAt": "2026-10-07T23:04:32.949Z",
+                "recovery": "model",
+                "note": "rate-limited; switched model; retried",
+                "supersededBy": {
+                  "timestamp": 1791414272084,
+                  "responseId": "round2-local",
+                  "provider": "round2-local",
+                  "model": "declared-ok"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "prompt_result",
+          "id": "quota-turn",
+          "agentInvoked": true,
+          "status": "completed",
+          "sessionSettled": true
+        }
+      ],
+      "output": "ROUND2_DECLARED_CHAIN_OK"
+    },
+    {
+      "label": "no-fallback",
+      "status": "PASS",
+      "duration_seconds": 49.466,
+      "exit_code": 0,
+      "model_sequence": [
+        "quota-primary",
+        "quota-primary",
+        "quota-primary",
+        "quota-primary",
+        "quota-primary",
+        "quota-primary"
+      ],
+      "available_models": [
+        {
+          "provider": "round2-local",
+          "id": "quota-primary",
+          "baseUrl": "http://127.0.0.1:65509/v1"
+        },
+        {
+          "provider": "round2-local",
+          "id": "declared-exhausted",
+          "baseUrl": "http://127.0.0.1:65509/v1"
+        },
+        {
+          "provider": "round2-local",
+          "id": "declared-ok",
+          "baseUrl": "http://127.0.0.1:65509/v1"
+        },
+        {
+          "provider": "round2-local",
+          "id": "undeclared-ok",
+          "baseUrl": "http://127.0.0.1:65509/v1"
+        }
+      ],
+      "events": [
+        {
+          "type": "auto_retry_end",
+          "success": false,
+          "attempt": 1,
+          "finalError": "Provider requested 1800000ms wait, exceeds retry.maxDelayMs (100ms). Original error: 429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)"
+        },
+        {
+          "type": "prompt_result",
+          "id": "quota-turn",
+          "agentInvoked": true,
+          "status": "error",
+          "sessionSettled": true,
+          "error": {
+            "message": "429 Disposable local quota exhausted; insufficient_quota\nDisposable local quota exhausted; insufficient_quota (type=insufficient_quota param=insufficient_quota)",
+            "provider": "round2-local",
+            "model": "quota-primary",
+            "retryable": true,
+            "httpStatus": 429
+          }
+        }
+      ],
+      "output": null
+    }
+  ],
+  "commands": [
+    {
+      "label": "tracked-config",
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/work",
+      "command": "env -i PATH=/Users/charlesabrooker/.bun/bin:/usr/bin:/bin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/agent XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/config XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/cache XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/data XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/state TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TEMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp OMP_SKIP_SETUP=1 PI_CONFIG_FILES=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml:/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/isolation.yml /Users/charlesabrooker/.bun/bin/omp config list --json"
+    },
+    {
+      "label": "chain-config",
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/work",
+      "command": "env -i PATH=/Users/charlesabrooker/.bun/bin:/usr/bin:/bin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/agent XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/config XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/cache XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/data XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/state TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TEMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp OMP_SKIP_SETUP=1 PI_CONFIG_FILES=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml:/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/isolation.yml:/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/explicit-chain.yml /Users/charlesabrooker/.bun/bin/omp config list --json"
+    },
+    {
+      "label": "no-fallback-config",
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/work",
+      "command": "env -i PATH=/Users/charlesabrooker/.bun/bin:/usr/bin:/bin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/agent XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/config XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/cache XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/data XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/state TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TEMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp OMP_SKIP_SETUP=1 PI_CONFIG_FILES=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml:/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/isolation.yml:/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/no-fallback.yml /Users/charlesabrooker/.bun/bin/omp config list --json"
+    },
+    {
+      "label": "explicit-chain",
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/work",
+      "command": "env -i PATH=/Users/charlesabrooker/.bun/bin:/usr/bin:/bin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/agent XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/xdg/config XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/xdg/cache XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/xdg/data XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/xdg/state TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/tmp TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/tmp TEMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/tmp OMP_SKIP_SETUP=1 /Users/charlesabrooker/.bun/bin/omp --mode rpc --no-ui --no-session --no-tools --no-lsp --no-pty --no-skills --no-rules --no-extensions --no-title --thinking off --model round2-local/quota-primary --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/isolation.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive/explicit-chain.yml",
+      "stdin": [
+        {
+          "id": "available",
+          "type": "get_available_models"
+        },
+        {
+          "id": "before",
+          "type": "get_state"
+        },
+        {
+          "id": "quota-turn",
+          "type": "prompt",
+          "message": "Return the disposable endpoint marker only."
+        },
+        {
+          "id": "after",
+          "type": "get_state"
+        },
+        {
+          "id": "text",
+          "type": "get_last_assistant_text"
+        }
+      ]
+    },
+    {
+      "label": "no-fallback",
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/work",
+      "command": "env -i PATH=/Users/charlesabrooker/.bun/bin:/usr/bin:/bin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/agent XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/config XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/cache XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/data XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/state TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp TEMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp OMP_SKIP_SETUP=1 /Users/charlesabrooker/.bun/bin/omp --mode rpc --no-ui --no-session --no-tools --no-lsp --no-pty --no-skills --no-rules --no-extensions --no-title --thinking off --model round2-local/quota-primary --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/isolation.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/no-fallback.yml",
+      "stdin": [
+        {
+          "id": "available",
+          "type": "get_available_models"
+        },
+        {
+          "id": "before",
+          "type": "get_state"
+        },
+        {
+          "id": "quota-turn",
+          "type": "prompt",
+          "message": "Return the disposable endpoint marker only."
+        },
+        {
+          "id": "after",
+          "type": "get_state"
+        },
+        {
+          "id": "text",
+          "type": "get_last_assistant_text"
+        }
+      ]
+    }
+  ],
+  "isolation": {
+    "environment": {
+      "PATH": "/Users/charlesabrooker/.bun/bin:/usr/bin:/bin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/home",
+      "PI_CODING_AGENT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/agent",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/config",
+      "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/cache",
+      "XDG_DATA_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/data",
+      "XDG_STATE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/xdg/state",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp",
+      "TMP": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp",
+      "TEMP": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/tmp",
+      "OMP_SKIP_SETUP": "1"
+    },
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup/work",
+    "environment_inherited": false,
+    "api_credentials": "disposable-local-key only, no real credentials",
+    "tracked_overlay_sha256": "b9be791e467b545c97443ce5e31a354c3fe119ffd71f9949c84d55f58622634b"
+  },
+  "endpoint": {
+    "implementation": "Python stdlib ThreadingHTTPServer",
+    "base_url": "http://127.0.0.1:65509/v1",
+    "binding": "127.0.0.1",
+    "quota_models": [
+      "quota-primary",
+      "declared-exhausted"
+    ],
+    "sse_models": [
+      "declared-ok",
+      "undeclared-ok"
+    ],
+    "auth": "literal disposable-local-key"
+  },
+  "chain_endpoint": "http://127.0.0.1:64480/v1",
+  "cleanup": [
+    {
+      "fixture_root_exists": false,
+      "endpoint_thread_alive": false,
+      "source_edits": "none",
+      "native_processes": "all awaited; timeout guard kills remaining own process only",
+      "removed_fixture_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryLive"
+    },
+    {
+      "fixture_root_exists": false,
+      "endpoint_thread_alive": false,
+      "source_edits": "none",
+      "native_processes": "all awaited; timeout guard kills remaining own process only",
+      "removed_fixture_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/round2-native/NativeRetryFollowup"
+    }
+  ],
+  "limitations": [
+    "Fixture models are not actual Deepseek/TeamClaude logins, pooled OAuth accounts, or live OAuth rotation.",
+    "enabledProviders restricts foreign discovery, not model transports; enabledModels and credential-free isolated environment additionally restrict this smoke.",
+    "waitForUsageReset=false prevents authoritative quota-reset waits exceeding maxDelayMs; it does not disable every shorter reset-derived wait."
+  ],
+  "initial_setup_issue": "Initial config invocation used session --config flags before config subcommand; corrected with supported PI_CONFIG_FILES. Initial chain startup wait too short; bounded headroom redrive succeeded. No repository finding.",
+  "evidence": [
+    "round2-native-retry-smoke.json",
+    "round2-native-explicit-chain.jsonl",
+    "round2-native-no-fallback.jsonl",
+    "round2-native-tracked-config.json",
+    "round2-native-chain-config.json",
+    "round2-native-no-fallback-config.json",
+    "round2-native-retry-attempt1.json",
+    "round2-native-retry-attempt2.json"
+  ]
+}
