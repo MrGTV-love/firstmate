@@ -941,11 +941,13 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       # the title makes the opener look like transcript text, so without that
       # glyph the pair is not recorded and the rule below stays unproven.
       if [ "$pi_open" -ge 0 ] \
-         && { [ "$pi_open_titled" = 0 ] \
-              || { [ "$pi_glyph_row" -ge 0 ] && [ "${trimmed//─/ }" = "$pi_open_titled_spaces" ]; }; } \
+         && { [ "$pi_open_titled" = 0 ] || [ "$pi_glyph_row" -ge 0 ]; } \
          && { [ -z "$cy" ] \
               || [ "$FM_COMPOSER_SCAN_PI_OPEN" -ge "$cy" ] \
               || [ "$FM_COMPOSER_SCAN_PI_CLOSE" -le "$cy" ]; }; then
+        if [ "$pi_open_titled" = 1 ] && [ "${trimmed//─/ }" != "$pi_open_titled_spaces" ]; then
+          pi_ambiguous=1
+        fi
         FM_COMPOSER_SCAN_PI_PAIR_FOUND=1
         FM_COMPOSER_SCAN_PI_OPEN=$pi_open
         FM_COMPOSER_SCAN_PI_CLOSE=$row

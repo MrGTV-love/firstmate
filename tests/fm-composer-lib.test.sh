@@ -424,7 +424,7 @@ test_rule_pair_continuations_never_prove_empty() {
   bottom='──────────────────'
   pi_idle=$(printf 'pi\tidle')
   for top in '──────── Session ─' "$bottom"; do
-    for pasted in ' ──────── Pasted! ─' ' ────────────────' '──────── Pasted! ─' "$bottom"; do
+    for pasted in ' ──────── pasted title ─' '──────── pasted title ─' ' ──────── Pasted! ─' ' ────────────────' '──────── Pasted! ─' "$bottom"; do
       screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n'"$pasted"$'\n ❯\n'"$bottom"
       for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
         assert_screen "$top ambiguous pasted rule $pasted" unknown "$caps" "$screen" '' probe-absent
@@ -454,6 +454,39 @@ test_rule_pair_continuations_never_prove_empty() {
     assert_selected_content "Pi literal rule-pair extraction $literal" "$literal" "$CAPS_STYLED" "$screen"
   done
   pass "rule-like continuations refuse proof and literal side characters remain draft content"
+}
+
+test_rejected_titled_rule_pair_retains_refusal() {
+  local top bottom screen caps cursor later
+  for top in '──────── pasted title ─' '──────── Café ─'; do
+    bottom=$(rule_n 18)
+    [ "$top" != '──────── Café ─' ] || bottom=$(rule_n 15)
+    screen="$top"$'\n❯\n keep this unsent text\n ❯\n'"$bottom"
+    for caps in "$CAPS_TMUX" "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      assert_screen "$top rejected pair cursorless" unknown "$caps" "$screen" '' probe-absent
+      if fm_composer_extract_selected_content "$caps" "$screen"; then
+        fail "$top rejected pair must refuse extraction"
+      fi
+      if LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"; then
+        fail "$top rejected pair must refuse extraction under LC_ALL=C"
+      fi
+    done
+    for cursor in 1 2 3; do
+      assert_screen "$top rejected pair on cursor row $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+    done
+    for later in '' 'newer draft'; do
+      screen="$top"$'\n❯\n keep this unsent text\n ❯\n'"$bottom"$'\n\n──────── Live session ─\n❯ '"$later"$'\n'"$(rule_n 23)"
+      if [ -z "$later" ]; then
+        assert_screen "$top before newer empty composer" empty "$CAPS_TMUX" "$screen" 7 probe-absent
+        assert_screen "$top before newer empty composer cursorless" empty "$CAPS_STYLED_NOID" "$screen"
+      else
+        assert_screen "$top before newer draft" pending "$CAPS_TMUX" "$screen" 7 probe-absent
+        assert_screen "$top before newer draft cursorless" pending "$CAPS_STYLED_NOID" "$screen"
+      fi
+      assert_selected_content "$top before newer composer extraction" "$later" "$CAPS_STYLED_NOID" "$screen"
+    done
+  done
+  pass "rejected titled rule pairs refuse fallback without poisoning newer composers"
 }
 
 test_rule_pair_pasted_containers_remain_literal() {
@@ -1704,6 +1737,7 @@ test_rule_pair_ambiguity_is_candidate_scoped
 test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer
 test_multiline_rule_pair_retains_all_interior_rows
 test_rule_pair_continuations_never_prove_empty
+test_rejected_titled_rule_pair_retains_refusal
 test_rule_pair_pasted_containers_remain_literal
 test_rule_pair_braille_is_literal_content
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape
