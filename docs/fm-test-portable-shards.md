@@ -117,6 +117,8 @@ No fast mode, path skips, reduced checks, or paid runner provisioning is part of
 The [lint script header](../bin/fm-lint.sh) owns local dependency discovery, conservative unresolved-import selection, and successful-result cache controls; these do not replace full joint source analysis.
 Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
 Spawn, control, and remote secondmate relaunch obtain configuration inheritance through their shared launch-policy import rather than importing it again.
+The shared Claude-launcher library uses that caller-provided configuration dependency rather than importing it a second time.
+Spawn also obtains classification and PR helpers through its definition-of-done import, and timeout helpers through its backlog-transition import, instead of duplicating those source graphs with direct imports.
 The policy library's lazy wake import uses the existing canonical-owner analysis boundary, while the wake owner remains in the complete lint inventory.
 `tests/fm-test-run.test.sh` verifies changed status and UTC owners through the runner's authoritative consuming-family map.
 
