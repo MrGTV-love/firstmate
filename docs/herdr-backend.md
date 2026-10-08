@@ -607,6 +607,7 @@ Enter, Escape, and Ctrl-C are supported.
 
 Typed-plane slash input, and dollar-prefixed skill input for Codex, uses the shared harness-aware settle before the first Enter, so a completion popup cannot consume it.
 Typed-plane text is typed once; only Enter is retried.
+The [shared backend submit contract](../bin/fm-backend.sh) owns refusal before typing and retry suppression when the composer classifier identifies a blocking dialog.
 
 ### Claude composer proof
 
@@ -648,7 +649,7 @@ On an idle or done native baseline, submit confirmation proceeds in this order:
 1. Wait for `working` or `blocked` across a bounded polling window.
    Native transition alone confirms every positively identified harness except omp, including future harnesses; only omp and missing or unavailable identity still require composer clearance, because resumed omp work on another turn cannot prove this Enter delivered retained text.
 2. If native status stays idle, or identity is ineligible for native-transition-only proof, use the shared composer verdict as the next positive signal.
-   A cleared composer is delivery; pending and unproven pending text receive a fresh composer read before another Enter is allowed.
+   A cleared composer is delivery; pending and unproven pending text without a recognized blocking dialog receive a fresh composer read before another Enter is allowed.
    If the initial or refreshed composer reads unknown, every positively identified non-omp harness receives another native confirmation window against the same idle baseline, without sending another Enter; omp and missing or unavailable identity remain fail-closed.
 3. After the retry budget, `fm_composer_queued_enter_verdict` accepts retained proven pending text only for positively identified OpenCode with native `working`, whose Enter queue semantics are verified.
    omp, Claude, unknown harnesses, and idle or unreadable busy signals remain pending; a different active turn is not delivery proof.
@@ -849,7 +850,7 @@ The watcher maps the pane back to the task and skips these:
 - Declared `paused:` waits, because the worker's declared wait already accounts for its quiet.
   It is left to the watcher's own bounded pause cadence.
 - Verified `captain-held` transfers.
-  A captain-held transfer remains silent without rechecks while the away-posture record exists.
+  Their posture-sensitive rechecks follow the [architecture's supervision contract](architecture.md#event-driven-supervision).
 
 ### Polling fallback
 

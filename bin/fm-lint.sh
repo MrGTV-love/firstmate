@@ -91,8 +91,8 @@
 # without --external-sources under the same memory limit and only the time
 # left in that root's original deadline; with under a second left, the
 # memory failure stands without a retry. A clean retry passes
-# with an explicit memory-fallback reason and warning; only the same
-# cross-file-dependent codes omitted in local no-source lint are excluded.
+# with an explicit memory-fallback reason and warning; only the
+# cross-file-dependent codes listed above are excluded.
 # Other findings and failed retries still fail lint. The retry's diagnostics
 # replace the failed attempt's output; peak RSS is the maximum of both attempts.
 #
