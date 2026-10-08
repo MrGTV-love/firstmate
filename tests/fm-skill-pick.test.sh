@@ -603,6 +603,14 @@ assert_contains "$sent" PERMITTED-CURRENT-SHIP-SPEC "promoted ships send the cur
 assert_not_contains "$sent" STALE-SCOUT-SPEC "promoted ships omit the stale scout spec"
 assert_not_contains "$sent" "Brief kind: scout" "promoted ships omit the scout tag"
 . "$ROOT/bin/fm-typesafe-lib.sh"
+(
+  umask 022
+  private_task=$(mktemp "$TMP_ROOT/private-task.XXXXXX")
+  fm_typesafe_brief_task "$TMP_ROOT/brief.md" "$HOME_DIR/config/dispatch-never-send" "$private_task"
+  assert_contains "$(cat "$private_task")" PERMITTED-ORIGINAL-INTENT "private output contains the extracted intent"
+  assert_equals 600 "$(node -e 'console.log((require("node:fs").statSync(process.argv[1]).mode & 0o777).toString(8))' "$private_task")" "extraction preserves owner-only output under umask 022"
+)
+pass "shared task extraction preserves private caller permissions"
 fm_typesafe_brief_task "$TMP_ROOT/brief.md" "$HOME_DIR/config/dispatch-never-send" "$TMP_ROOT/default-task"
 assert_contains "$(cat "$TMP_ROOT/default-task")" STALE-SCOUT-SPEC "dispatch's three-argument extraction remains unchanged"
 assert_contains "$(cat "$TMP_ROOT/default-task")" "Brief kind: scout" "dispatch retains the scout tag"
@@ -625,6 +633,46 @@ for hidden in whole partial; do
   assert_not_contains "$sent" STALE-SCOUT-SPEC "hidden overrides never revive stale instructions"
   [ "$hidden" != partial ] || assert_contains "$sent" PERMITTED-SPEC-REMAINDER "permitted override remainder is retained"
 done
+cat > "$TMP_ROOT/brief.md" <<'EOF'
+# Task
+This is a SCOUT task: the deliverable is a written report, not a PR.
+[captain] Investigate the session-floor refusal.
+  [captain] Preserve the existing launch path.
+Captain's ask: Retain the legacy provenance contract.
+UNMARKED-STALE-SCOUT-INSTRUCTIONS
+```markdown
+[captain] FENCED-CAPTAIN-EXAMPLE
+```
+~~~markdown
+[captain] TILDE-FENCED-CAPTAIN-EXAMPLE
+~~~
+    [captain] INDENTED-CAPTAIN-EXAMPLE
+<!-- dispatch-never-send:start -->
+[captain] HIDDEN-LEGACY-INTENT
+<!-- dispatch-never-send:end -->
+# Outside Task
+[captain] OUTSIDE-TASK-CAPTAIN-TEXT
+# Current ship Firstmate spec
+PERMITTED-CURRENT-SHIP-SPEC
+EOF
+reset; keys
+printf '# dispatch-never-send marked-sections\n' > "$HOME_DIR/config/dispatch-never-send"
+out=$(pick)
+assert_equals 2 "$(requests)" "legacy promoted intent completes both cookbook requests"
+jq -se 'all(.[]; .body.state.request |
+  contains("Investigate the session-floor refusal.") and
+  contains("Preserve the existing launch path.") and
+  contains("Retain the legacy provenance contract.") and
+  contains("PERMITTED-CURRENT-SHIP-SPEC") and
+  (contains("[captain]") | not) and
+  (contains("Captain'"'"'s ask:") | not) and
+  (contains("UNMARKED-STALE-SCOUT-INSTRUCTIONS") | not) and
+  (contains("FENCED-CAPTAIN-EXAMPLE") | not) and
+  (contains("INDENTED-CAPTAIN-EXAMPLE") | not) and
+  (contains("HIDDEN-LEGACY-INTENT") | not) and
+  (contains("OUTSIDE-TASK-CAPTAIN-TEXT") | not) and
+  (contains("Brief kind: scout") | not))' "$LOG" >/dev/null \
+  || fail "each promoted request carries only permitted legacy captain words and the current ship spec"
 mv "$TMP_ROOT/ordinary-brief.md" "$TMP_ROOT/brief.md"
 pass "promotion and marked regions preserve effective task privacy"
 

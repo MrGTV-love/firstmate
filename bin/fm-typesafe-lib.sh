@@ -218,20 +218,18 @@ fm_typesafe_brief_task() {
       if [ "$promoted" -eq 1 ] && [ "$heading" = "## Firstmate spec" ]; then
         fm_brief_heading_present "$output" "# Current ship Firstmate spec" || continue
         printf '%s\n%s\n\n' '# Current ship Firstmate spec' "$(fm_brief_heading_body "$output" "# Current ship Firstmate spec")"
-      else
-        fm_brief_task_heading_present "$output" "$heading" || continue
+      elif fm_brief_task_heading_present "$output" "$heading"; then
         printf '%s\n%s\n\n' "$heading" "$(fm_brief_task_heading_body "$output" "$heading")"
+      elif [ "$promoted" -eq 1 ] && [ "$heading" = "## Captain's intent" ]; then
+        fm_brief_marked_captain_words "$(fm_brief_heading_body "$output" "# Task")"
       fi
     done
   )
   [ -n "$sections" ] || [ "$promoted" -eq 1 ] || return 0
-  if ! {
-    if [ "$kind" = scout ] || { [ -z "$kind" ] && grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$output"; }; then
-      printf 'Brief kind: scout (report only)\n\n'
-    fi
-    printf '%s\n' "$sections"
-  } > "$output.sections" || ! mv "$output.sections" "$output"; then
-    rm -f "$output.sections"
+  if [ "$kind" = scout ] || { [ -z "$kind" ] && grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$output"; }; then
+    sections=$'Brief kind: scout (report only)\n\n'"$sections"
+  fi
+  if ! printf '%s\n' "$sections" > "$output"; then
     FM_TYPESAFE_WITHHELD_REASON="could not read the brief"
     return 1
   fi
