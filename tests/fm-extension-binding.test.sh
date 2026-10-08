@@ -1047,7 +1047,7 @@ assert_grep 'extension_id=org.example.flow' "$H_FLOW/state/procevent/flow-source
 assert_grep 'capability_version=1' "$H_FLOW/state/procevent/flow-source.source" "registration did not retain capability version"
 assert_grep 'package_digest=sha256:' "$H_FLOW/state/procevent/flow-source.source" "registration did not retain package digest"
 
-FM_HOME="$H_FLOW" "$PROCEVENT" start flow-source > "$TMP_ROOT/flow-start.out"
+FM_HOME="$H_FLOW" "$PROCEVENT" start flow-source 4</dev/null > "$TMP_ROOT/flow-start.out"
 result=$(first_result "$H_FLOW" flow-source) || fail "external source produced no captured result"
 assert_contains "$(wake_payloads "$H_FLOW")" "procevent ext-flow flow-source 1" "external source did not publish the existing bounded event"
 assert_absent "${result%.result}.handled" "external evidence was silently treated as handled"
@@ -1065,6 +1065,14 @@ assert_not_contains "$classification" "wrong-built-in-owner" "a later same-name 
 assert_absent "$H_FLOW/state/procevent/flow-source.source" "terminal external source stayed registered"
 FM_HOME="$H_FLOW" "$PROCEVENT" retire flow-source --if-owner "$owner_one" >/dev/null
 pass "one external adapter registers, invokes, captures unhandled evidence, classifies, and terminally retires end to end"
+FM_HOME="$H_FLOW" "$PROCEVENT" register-extension ext-flow silent-source --config-ref silent-result >/dev/null
+FM_HOME="$H_FLOW" "$PROCEVENT" start silent-source 3</dev/null 4</dev/null 5</dev/null \
+  > "$TMP_ROOT/silent-start.out" || fail "silent source failed with inherited descriptors"
+silent_result=$(first_result "$H_FLOW" silent-source) || fail "silent source produced no captured result"
+assert_present "${silent_result%.result}.handled" "inherited descriptors prevented silent acknowledgement"
+assert_absent "$H_FLOW/state/procevent/silent-source.source" "inherited descriptors prevented silent terminal retirement"
+assert_not_contains "$(wake_payloads "$H_FLOW")" "silent-source" "silent source published a wake with inherited descriptors"
+pass "inherited descriptors preserve silent acknowledgement and terminal retirement"
 FM_HOME="$H_FLOW" "$PROCEVENT" register-extension ext-flow crash-silent-source --config-ref crash-silent >/dev/null
 FM_HOME="$H_FLOW" "$PROCEVENT" start crash-silent-source > "$TMP_ROOT/crash-silent-start.out" 2>&1 &
 crash_silent_start_pid=$!
@@ -1118,7 +1126,7 @@ H_ORDER="$HOMES/lock-order"; new_home "$H_ORDER"
 touch "$order_release"
 bind_package "$H_ORDER" "$P_ORDER" ext-lock-order >/dev/null
 FM_HOME="$H_ORDER" "$PROCEVENT" register-extension ext-lock-order order-source --config-ref good >/dev/null
-FM_HOME="$H_ORDER" "$PROCEVENT" start order-source > "$TMP_ROOT/lock-order-start.out" 2>&1 \
+FM_HOME="$H_ORDER" "$PROCEVENT" start order-source 4</dev/null > "$TMP_ROOT/lock-order-start.out" 2>&1 \
   || fail "lock-order source did not capture its result"
 assert_absent "$H_ORDER/state/procevent/order-source.source" "lock-order terminal source stayed registered"
 assert_absent "$H_ORDER/state/procevent-inbox/order-source.1.handled" "lock-order result was not left unhandled"

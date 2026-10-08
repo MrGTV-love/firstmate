@@ -474,6 +474,18 @@ case "${1:-} ${2:-}" in
       exit 1
     fi
     ;;
+  "pane process-info")
+    # The old pane is a bare shell husk: process evidence, not only the missing
+    # agent registration, is what licenses calling its endpoint dead.
+    if [ "${4:-}" = p-old ] && [ ! -e "$killed" ]; then
+      husk_pid=$(cat "${state}.huskpid")
+      printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"p-old","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"zsh","argv0":"zsh","argv":["-zsh"],"cmdline":"-zsh"}]}}}\n' \
+        "$husk_pid" "$husk_pid" "$husk_pid"
+    else
+      printf '%s\n' '{"error":{"code":"pane_not_found"}}' >&2
+      exit 1
+    fi
+    ;;
   "pane close")
     [ "${3:-}" = p-old ] && : > "$killed"
     ;;
@@ -676,6 +688,10 @@ EOF
   fm_fake_exit0 "$fakebin" pi
   make_fake_herdr_secondmate_recovery "$fakebin"
   : > "$log"
+  # An idle process stands in for the husk pane's lone shell, so the pane's
+  # process evidence names a pid that really exists and has no children.
+  sleep 600 >/dev/null 2>&1 &
+  printf '%s\n' "$!" > "$state.huskpid"
   printf '%s|%s|%s|%s|%s|%s\n' "$root" "$home" "$fakebin" "$mate" "$log" "$state"
 }
 
@@ -683,7 +699,7 @@ run_session_start_herdr_secondmate() {
   local root=$1 home=$2 fakebin=$3 mate=$4 log=$5 state=$6
   FM_BACKEND=herdr FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_STATE="$state" \
     FM_FAKE_SECOND_MATE_ID="$SESSION_START_HERDR_SECOND_MATE_ID" \
-    FM_FAKE_HARNESS_PID=$$ \
+    FM_FAKE_HARNESS_PID=$$ FM_HERDR_PS_BIN=/bin/ps \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH"
 }
 
@@ -1369,6 +1385,7 @@ EOF
   run_session_start_herdr_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$state" >/dev/null
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
+  kill "$(cat "$state.huskpid")" 2>/dev/null || true
   out=$(network_stage_report "$home" "$root")
   assert_not_contains "$out" "SECONDMATE_LIVENESS:" "successful Herdr husk recovery should stay non-actionable"
   assert_contains "$(cat "$log")" "pane close p-old" "session start did not close the confirmed Herdr husk"
@@ -2418,6 +2435,89 @@ EOF
   pass "--reemit reprints the digest without repeating startup's mutating sweeps and still drains queued wakes"
 }
 
+# 2026-10-08: a compaction at Stop re-emitted the digest while the Stop hook was
+# still arming. The digest's drain moved the recovery marker to handling, the
+# hook's rewake commit then refused it, and queued worker events sat unread for
+# two hours. An open Stop-hook claim makes the hook the only deliverer, so the
+# re-emit must report the queue and leave both queue and marker alone.
+test_reemit_leaves_queue_and_marker_alone_while_a_stop_hook_claim_is_open() {
+  local rec root home fakebin owner identity reemit again mode reason queue_before
+  rec=$(new_world reemit-open-claim)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  # The claim's pid-identity is read through ps (lstart + command), which the
+  # fake does not answer; hand exactly that question to the real ps.
+  awk '{ print } !done && /^case "\$\*" in$/ { print "  *\"lstart=\"*) exec /bin/ps \"$@\" ;;"; done = 1 }' \
+    "$fakebin/ps" > "$fakebin/ps.new" && mv "$fakebin/ps.new" "$fakebin/ps" && chmod +x "$fakebin/ps"
+  append_wake "$home/state" signal task-c "done: queued while the hook arms" || fail "seed wake failed"
+  queue_before=$(cat "$home/state/.wake-queue")
+  fm_write_meta "$home/state/task-c.meta" "window=firstmate:fm-task-c" "kind=ship"
+  printf 'pending:downtime:claim-test-generation\n' > "$home/state/.watcher-down"
+  sleep 60 &
+  owner=$!
+  identity=$(fm_test_pid_identity "$owner") || fail "could not compute the claim owner identity"
+  printf 'epoch=3 owner_pid=%s outcome=arming updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \
+    > "$home/state/.claude-autoarm-epoch"
+
+  for mode in fresh stale mutex; do
+    reason='the Stop hook owns wake delivery'
+    if [ "$mode" = fresh ]; then
+      touch "$home/state/.last-watcher-beat"
+    else
+      rm -f "$home/state/.last-watcher-beat"
+    fi
+    if [ "$mode" = mutex ]; then
+      reason='wake delivery ownership is being decided'
+      printf 'epoch=3 owner_pid=%s outcome=rewake updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \
+        > "$home/state/.claude-autoarm-epoch"
+      mkdir "$home/state/.claude-autoarm.lock"
+      printf '%s\n' "$owner" > "$home/state/.claude-autoarm.lock/pid"
+    fi
+    printf 'unchanged-episode\n' > "$home/state/.guard-watcher-stale-banner"
+    reemit=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
+      env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+      "$SESSION_START" --reemit)
+    assert_contains "$reemit" "deferred (context re-emit while $reason) - 1 record(s) are queued" \
+      "--reemit did not report the queue it deferred ($mode)"
+    assert_not_contains "$reemit" "done: queued while the hook arms" "--reemit presented a wake the Stop hook must deliver"
+    assert_not_contains "$reemit" "WAKE_ACK_REQUIRED: after handling" "--reemit demanded an acknowledgement for wakes it did not present"
+    assert_not_contains "$reemit" "lacks verified fleet-lock ownership" "delivery deferral denied verified lock ownership"
+    assert_not_contains "$reemit" "read-only session" "delivery deferral emitted lock-refused guidance"
+    assert_not_contains "$reemit" "After draining queued wakes" "delivery deferral instructed immediate wake handling"
+    assert_not_contains "$reemit" "drain them with bin/fm-wake-drain.sh" "delivery deferral instructed an immediate drain"
+    if [ "$mode" != fresh ]; then
+      assert_contains "$reemit" "WATCHER DOWN - SUPERVISION IS OFF" "delivery deferral suppressed the supervision alarm"
+    fi
+    [ "$(cat "$home/state/.guard-watcher-stale-banner")" = unchanged-episode ] \
+      || fail "delivery deferral mutated the guard episode ($mode)"
+    [ "$(cat "$home/state/.watcher-down")" = pending:downtime:claim-test-generation ] \
+      || fail "--reemit moved the recovery marker while delivery was deferred ($mode)"
+    [ "$(cat "$home/state/.wake-queue")" = "$queue_before" ] \
+      || fail "--reemit changed the queue while delivery was deferred ($mode)"
+  done
+  rm -rf "$home/state/.claude-autoarm.lock"
+
+  # Control: once the claim is finished, the same re-emit drains as before.
+  printf 'epoch=3 owner_pid=%s outcome=rewake updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \
+    > "$home/state/.claude-autoarm-epoch"
+  again=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    "$SESSION_START" --reemit)
+  assert_contains "$again" "done: queued while the hook arms" "--reemit stopped draining once the claim was finished"
+  assert_contains "$again" "WAKE_ACK_REQUIRED: after handling" "--reemit omitted the acknowledgement once the claim was finished"
+  case "$(cat "$home/state/.watcher-down")" in
+    pending:handling:*) ;;
+    *) fail "the drain after a finished claim must enter handling, got: $(cat "$home/state/.watcher-down")" ;;
+  esac
+  kill "$owner" 2>/dev/null || true
+  wait "$owner" 2>/dev/null || true
+
+  pass "--reemit defers the drain while a Stop-hook claim is open and drains normally after it finishes"
+}
+
 test_agents_baseline_stays_at_true_start_and_reemits_on_every_drifted_pi_compact() {
   local rec root home fakebin startup compact_equal compact_first compact_second clear_out resume_out reset_out baseline baseline_after expected_hash refresh_line bootstrap_line
   rec=$(new_world agents-refresh)
@@ -3060,6 +3160,7 @@ test_portable_timeout_escalates_term_resistant_process
 test_runtime_bound_leaves_a_healthy_digest_untouched
 test_runtime_bound_leaves_harness_ancestry_headroom
 test_reemit_skips_startup_sweeps_but_keeps_the_wake_drain
+test_reemit_leaves_queue_and_marker_alone_while_a_stop_hook_claim_is_open
 test_agents_baseline_stays_at_true_start_and_reemits_on_every_drifted_pi_compact
 test_read_only_pi_compact_refreshes_against_its_own_session_identity
 test_codex_unreachable_reset_sources_do_not_claim_instruction_refresh

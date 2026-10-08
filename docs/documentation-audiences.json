@@ -405,6 +405,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "docs/cpu-pass-pool.md",
+      "audience": "operator-current"
+    },
+    {
       "path": "docs/configuration.md",
       "audience": "operator-current"
     },

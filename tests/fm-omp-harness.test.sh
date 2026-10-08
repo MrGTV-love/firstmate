@@ -335,7 +335,9 @@ drive_omp_ext() {  # <ext-path> <mode>
 import { pathToFileURL } from "node:url";
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
 const handlers = {};
-mod.default({ on: (name, fn) => { handlers[name] = fn; } });
+// The extension API exposes the host SDK; the session proof only reads the
+// live registry from it inside its own handlers, which these modes never fire.
+mod.default({ on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({}) } } });
 // ctx.isIdle() reads false at a natural TUI agent_end on omp; the extension
 // must go idle on a plain agent_end regardless of it.
 const ctx = { isIdle: () => false };

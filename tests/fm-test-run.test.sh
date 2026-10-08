@@ -12,6 +12,24 @@ set -u
 
 RUNNER="$ROOT/bin/fm-test-run.sh"
 
+POOL_TMP=$(fm_test_tmproot fm-test-run-pool)
+REAL_PYTHON=$(command -v python3)
+mkdir -p "$POOL_TMP/bin"
+printf '#!%s\n' "$REAL_PYTHON" >"$POOL_TMP/bin/python3"
+cat >>"$POOL_TMP/bin/python3" <<'PY'
+import os, runpy, sys
+if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) == "fm-cpu-pass.py":
+    os.cpu_count = lambda: 4
+    sys.argv = sys.argv[1:]
+    runpy.run_path(sys.argv[0], run_name="__main__")
+else:
+    os.execv(sys.executable, [sys.executable] + sys.argv[1:])
+PY
+chmod +x "$POOL_TMP/bin/python3"
+export PATH="$POOL_TMP/bin:$PATH"
+export FM_CPU_POOL_DIR="$POOL_TMP/pool"
+unset FM_CPU_PASS_HELD
+
 assert_present "$RUNNER" "bin/fm-test-run.sh is missing"
 [ -x "$RUNNER" ] || fail "bin/fm-test-run.sh must be executable"
 
@@ -92,6 +110,7 @@ init_changed_fixture_repo() {
   local repo=$1 script
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   chmod +x "$repo/bin/fm-test-run.sh"
   for script in \
@@ -316,6 +335,37 @@ test_shell_line_ending_policy_selects_runner_contract() {
   pass "shell line-ending policy selects runner coverage"
 }
 
+test_changed_spawn_selects_picker_without_broadening_siblings() {
+  local tmp repo listed source
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-spawn-selection.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-skill-pick.test.sh"
+  chmod +x "$repo/tests/fm-skill-pick.test.sh"
+  for source in fm-spawn.sh fm-send.sh fm-harness.sh fm-peek.sh fm-composer.sh fm-composer-lib.sh; do
+    : >"$repo/bin/$source"
+  done
+  git -C "$repo" add bin tests/fm-skill-pick.test.sh
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm spawn-selection-fixture
+
+  for source in fm-spawn.sh fm-send.sh fm-harness.sh fm-peek.sh fm-composer.sh fm-composer-lib.sh; do
+    printf '\n' >"$repo/bin/$source"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$source changed selection failed"
+    assert_contains "$listed" "tests/fm-backend.test.sh" "$source retains backend-dispatch coverage"
+    assert_contains "$listed" "tests/fm-brief.test.sh" "$source retains pure-contract-unit coverage"
+    if [ "$source" = fm-spawn.sh ]; then
+      assert_contains "$listed" "tests/fm-skill-pick.test.sh" "spawn selects worker picker coverage"
+    else
+      assert_not_contains "$listed" "tests/fm-skill-pick.test.sh" "$source does not select worker picker coverage"
+    fi
+    : >"$repo/bin/$source"
+  done
+
+  rm -rf "$tmp"
+  pass "spawn changes select picker coverage without broadening sibling commands"
+}
+
 test_changed_dependency_selection_and_unmapped_failure() {
   local tmp repo listed rc source script
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-changed.XXXXXX")
@@ -323,17 +373,17 @@ test_changed_dependency_selection_and_unmapped_failure() {
   init_changed_fixture_repo "$repo"
 
   : >"$repo/bin/fm-env-lib.sh"
-  for script in fm-dispatch-resolve.test.sh fm-skill-suggest.test.sh; do
+  for script in fm-dispatch-resolve.test.sh fm-skill-pick.test.sh; do
     printf '#!/usr/bin/env bash\n' >"$repo/tests/$script"
     chmod +x "$repo/tests/$script"
   done
-  git -C "$repo" add bin/fm-env-lib.sh tests/fm-dispatch-resolve.test.sh tests/fm-skill-suggest.test.sh
+  git -C "$repo" add bin/fm-env-lib.sh tests/fm-dispatch-resolve.test.sh tests/fm-skill-pick.test.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm typesafe-fixture
   printf '\n' >>"$repo/bin/fm-env-lib.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/fm-pr-merge.test.sh" "environment accessor retains pr-forge coverage"
   assert_contains "$listed" "tests/fm-dispatch-resolve.test.sh" "environment accessor selects dispatch coverage"
-  assert_contains "$listed" "tests/fm-skill-suggest.test.sh" "environment accessor selects picker coverage"
+  assert_contains "$listed" "tests/fm-skill-pick.test.sh" "environment accessor selects picker coverage"
   assert_not_contains "$listed" "tests/fm-daemon.test.sh" "environment accessor selection stays focused"
   git -C "$repo" add bin/fm-env-lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm environment-change
@@ -835,6 +885,7 @@ test_family_proofs_run_in_separate_concurrent_phases() {
   repo="$tmp/repo"
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/fm-timeout-lib.sh"
   chmod +x "$repo/bin/fm-test-run.sh"
@@ -2066,6 +2117,7 @@ test_jobs_parallel_scheduler_and_failure_propagation() {
   d=tests/fm-supervision-instructions.test.sh
   mkdir -p "$repo/bin" "$repo/tests" "$evidence" "$fake_bin"
   cp "$RUNNER" "$runner"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   cat >"$fake_bin/stat" <<'SH'
 #!/usr/bin/env bash
@@ -2272,6 +2324,7 @@ test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
+test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency

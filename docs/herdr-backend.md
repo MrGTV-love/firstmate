@@ -723,6 +723,7 @@ If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 Unpaired bare agent-glyph rows and left-bar rows carrying trailing non-idle text then degrade to `unknown` instead of misreading ghost suggestions as typed input.
 That refusal defers injection and eventually raises the wedge alarm.
 A proven prompt-bearing rule pair instead retains its entire interior: any nonblank content surviving the capture's styling policy and removal of the single proving prompt glyph reads `pending`, even in a plain capture.
+The one exception is an unstyled capture whose interior holds literal-owned native omp rows when the identity is not exactly Pi: that reads `unknown-draft`, and the shared classifier's verdict contract in `bin/fm-composer-lib.sh` owns it.
 Complete pasted containers, literal side characters, later prompt glyphs, and Braille remain draft content rather than nested-composer or animation furniture.
 Rendered rule pairs may be indented, provided the opening and closing rules have the same indentation.
 Ambiguous rule continuations and unsafe geometry still refuse proof; exact selection and refusal predicates are owned by `bin/fm-composer-lib.sh`.

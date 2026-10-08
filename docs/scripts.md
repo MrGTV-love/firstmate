@@ -36,8 +36,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto fm-captain-hold.sh |
 | `fm-brief.sh`            | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), scout, secondmate-charter, and Herdr-lab briefs, with Captain's intent and Firstmate spec subsections on ship/scout |
 | [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |
-| [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section reader |
-| [`fm-skill-suggest.sh`](../bin/fm-skill-suggest.sh) | Suggest optional skill bodies to inspect ([operator contract](configuration.md#advisory-skill-selection)) |
+| [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section and legacy captain-provenance reader |
+| [`fm-skill-pick.sh`](../bin/fm-skill-pick.sh) | Pick the project skill a ship or scout worker loads at launch ([operator contract](configuration.md#worker-skill-selection)) |
 | [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
 | [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker wrapper for the pinned upstream belay Stop hook ([contract](configuration.md#jev-belay-stop-hook)) |
 | [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload enforcing the [belay egress policy](configuration.md#jev-belay-stop-hook) |
@@ -50,6 +50,10 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-herdr-ci-cleanup.sh` | Snapshot and tear down only job-owned `fm-lab-*` sessions in the Herdr CI lane       |
 | `fm-test-run.sh`         | Behavior-test runner: selection, portable lanes, bounded concurrency, budgets, coverage guard, timing/JSON; refuses to execute in the repository primary checkout when `FM_TASK_ID` marks a task worker |
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
+| `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
+| `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
+| `fm-load-report.sh`      | Record host load and judge it with pipeline agent durations ([recipe](cpu-pass-pool.md#judging-the-pool)) |
+| `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
 | `fm-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
 | `fm-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |
 | `fm-primary-scope-lib.sh` | Shared marker-or-plain-checkout primary-home predicate for tracked hooks             |
