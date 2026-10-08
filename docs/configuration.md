@@ -2411,12 +2411,13 @@ Real feedback, terminal responses, unknown errors or help text, and exhausted in
 
 **Keep open Lavish reviews listening**
 
-An ordinary firstmate-owned Lavish review keeps the same runner and exclusive claim after feedback, browser disconnection, a spurious `waiting` response, or an empty poll return.
+An ordinary firstmate-owned review armed through the shipped Lavish adapter keeps the same runner and exclusive claim after feedback, browser disconnection, a spurious `waiting` response, or an empty poll return.
 It does not wait for watcher reconciliation or for firstmate to handle an earlier answer before collecting the next one.
 Disconnected and empty rounds wait the adapter's retry delay before listening again, so an immediately returning source cannot spin.
 Only an ended or missing session retires automatically; an open session is never retired merely because its browser disconnected or its registration is old.
 Unknown poll failures still reach the handler and release the listener rather than retrying indefinitely.
 The runner's existing owner lease and source launch pacing remain in force.
+An arbitrary source command registered with the Lavish classifier still completes after one poll; the `bin/fm-procevent.sh` header owns the tracked-adapter identity requirement for continuation.
 `bin/fm-procevent.sh list --age` reports registration age alongside ownership and pending-result counts so an operator can deliberately retire old open reviews through the adapter's existing `retire` command.
 
 **Deliver captured feedback during a Claude turn**
