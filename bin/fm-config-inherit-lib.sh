@@ -1458,6 +1458,7 @@ fm_config_send_reread_nudge() {
     retry_rebuildable=1
     while IFS=$'\t' read -r retry_item retry_status retry_reason; do
       [ "$retry_status" = pushed ] || continue
+      [ "$retry_item" != "$FM_SHARED_CAPTAIN_REL" ] || continue
       if [ "$retry_item" = keep-ai-trailers ]; then
         retry_retired=1
       else

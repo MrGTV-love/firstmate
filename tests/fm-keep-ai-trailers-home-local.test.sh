@@ -369,6 +369,7 @@ test_retained_retry_case() (
   esac
   if [ "$representation" = legacy-report ]; then
     printf '%s\tpushed\tmirrored primary absence\n' "$FLAG" > "$retained"
+    printf 'data/captain-shared.md\tpushed\t\n' >> "$retained"
     if [ "$contents" = mixed ]; then printf 'crew-dispatch.json\tpushed\t\n' >> "$retained"; fi
   elif [ "$contents" = mixed ]; then
     {
@@ -386,6 +387,7 @@ test_retained_retry_case() (
   fi
   if [ "$representation" = staged ]; then
     printf '%s\tpushed\tmirrored primary absence\n' "$FLAG" > "$retained.report"
+    printf 'data/captain-shared.md\tpushed\t\n' >> "$retained.report"
     if [ "$contents" = mixed ]; then printf 'crew-dispatch.json\tpushed\t\n' >> "$retained.report"; fi
   fi
   case "$representation" in
@@ -465,6 +467,7 @@ test_excluded_report_retry_case() (
   {
     printf 'model-index.json\tpushed\t\n'
     printf 'crew-dispatch.json\tpushed\t\n'
+    printf 'data/captain-shared.md\tpushed\t\n'
     if [ "$contents" = mixed ]; then
       printf 'crew-harness\tpushed\t\n'
       printf '%s\tpushed\tmirrored primary absence\n' "$FLAG"
