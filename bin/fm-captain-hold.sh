@@ -83,7 +83,9 @@
 # identically no matter which channel the answer arrived on. The key IS the
 # task id - no identity arithmetic. The optional fourth field selects the close:
 # empty or `done` completes the task, `release` lifts the hold so held work
-# resumes; anything else is skipped. A key that names no task, a task that is
+# resumes; anything else is skipped. A task a worker still owns (a live runtime
+# record or an In flight row) is always released, whatever mode was declared,
+# because completing it would record a landing that has not happened. A key that names no task, a task that is
 # not held for the captain, or a task already closed is reported as `skipped:`
 # and feeds nothing. A replayed delivery whose answer digest and requested
 # close mode both match the newest record is reported `closed:` and is a no-op;
@@ -1072,6 +1074,13 @@ apply_pending_retained_artifact() {  # <task-id>
   esac
 }
 
+# True while a worker still owns the work item: its runtime record exists or the
+# backlog still lists it In flight. Completing such an item would record a
+# landing that has not happened, so a keyed answer only ever releases it.
+live_work_item() {  # <task-id> <backlog-state>
+  [ "$2" = in_flight ] || [ -f "$STATE/$1.meta" ]
+}
+
 close_answered() {  # <task-id> <release-0-or-1>
   if [ "$2" = 1 ]; then
     tasks_axi unhold "$1" >/dev/null
@@ -1409,6 +1418,14 @@ command_answers() {
     body=$(show_field "$show" body)
     recorded_digest=$(recorded_decision_digest "$body" || true)
     recorded_mode=$(recorded_resolution_mode "$body" || true)
+    # A close mode is the card's guess about the call's shape; the live task
+    # record is the fact. Work still in flight is released, never completed.
+    if [ -z "$release_flag" ] && [ "$state" != done ] \
+      && { live_work_item "$id" "$state" \
+        || { [ "$hold_kind" != captain ] && [ "$recorded_digest" = "$digest" ] \
+          && [ "$recorded_mode" = released ]; }; }; then
+      release_flag=--release
+    fi
     if body_has_resolution_record "$body" \
       && { [ "$recorded_digest" = "$digest" ] \
         || { case "$body" in *"Resolution recorded by fm-decision-hold."*) true ;; *) false ;; esac \
