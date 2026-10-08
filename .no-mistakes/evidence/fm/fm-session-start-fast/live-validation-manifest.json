@@ -1,0 +1,131 @@
+{
+  "scenarios": [
+    {
+      "name": "Publish an accumulated home within 30 seconds without losing its buried decision",
+      "result": "pass",
+      "live": true,
+      "evidence": "accumulated-home-ledger.json; {'command': 'FM_HOME=<publication> bin/fm-home-summary-refresh.sh ', 'seconds': 3.937, 'exit': 0, 'output': ''}",
+      "reason": ""
+    },
+    {
+      "name": "Reject a directory ledger destination and escalate three acquired failures only once",
+      "result": "pass",
+      "live": true,
+      "evidence": "[{\"attempt\": 1, \"streak\": \"count=1\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wakes\": [], \"exit\": 0}, {\"attempt\": 2, \"streak\": \"count=2\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=\\n\", \"wakes\": [], \"exit\": 0}, {\"attempt\": 3, \"streak\": \"count=3\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wakes\": [\"1791453927\\t1\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\"], \"exit\": 0}, {\"attempt\": 4, \"streak\": \"count=4\\nfirst=2026-10-08T10:05:22Z\\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\\n\", \"wakes\": [\"1791453927\\t1\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\"], \"exit\": 0}]",
+      "reason": ""
+    },
+    {
+      "name": "Recover publication, reset the failure streak, and escalate a new three-failure streak",
+      "result": "pass",
+      "live": true,
+      "evidence": "recovered-home-ledger.json; [\"1791453927\\t1\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\", \"1791453935\\t2\\tcheck\\thome-summary-refresh\\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:31Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log\"]",
+      "reason": ""
+    },
+    {
+      "name": "Escalate acquired failures even when diagnostic logging and stderr are blocked",
+      "result": "pass",
+      "live": true,
+      "evidence": "blocked-logger-state.json",
+      "reason": ""
+    },
+    {
+      "name": "Return immediately under a held refresh lock and converge a trigger burst on the newest decision",
+      "result": "pass",
+      "live": true,
+      "evidence": "concurrent-trigger-ledger.json; initial detach seconds=0.073",
+      "reason": ""
+    },
+    {
+      "name": "Read a large child publication through the parent fleet snapshot",
+      "result": "pass",
+      "live": true,
+      "evidence": "large-parent-snapshot.json; initial nested fixture was correctly rejected, then isolated code-root siblings restored supported topology",
+      "reason": ""
+    },
+    {
+      "name": "Start a real Claude primary with a version-9 checkpoint and 24,000 status lines",
+      "result": "pass",
+      "live": true,
+      "evidence": "claude-startup-digest.txt; claude-lab-digest-stream.jsonl; completion latency=26.18s",
+      "reason": "The gate wrapper intentionally stands down. The disposable Claude SessionStart invoked the real public digest directly; Claude quoted the buried decision. Its current vendor transport previews only the first ~2KB of the emitted 14KB output."
+    },
+    {
+      "name": "Bound a genuinely slow refresh and escalate the third acquired timeout",
+      "result": "pass",
+      "live": true,
+      "evidence": "real-timeout-state.json; [{\"command\": \"FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort\", \"seconds\": 1.873, \"exit\": 0, \"output\": \"Terminated: 15\\n\"}, {\"command\": \"FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort\", \"seconds\": 1.955, \"exit\": 0, \"output\": \"Terminated: 15\\n\"}, {\"command\": \"FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort\", \"seconds\": 2.685, \"exit\": 0, \"output\": \"Terminated: 15\\n\"}]",
+      "reason": ""
+    },
+    {
+      "name": "Preserve append decisions while rejecting obsolete, replaced, and partial-line checkpoints",
+      "result": "pass",
+      "live": true,
+      "evidence": "decision-transition-transcript.json",
+      "reason": ""
+    },
+    {
+      "name": "Recover a queued owned task while batching numeric-looking IDs in a comma-containing home",
+      "result": "pass",
+      "live": true,
+      "evidence": "backlog-batching-transcript.txt",
+      "reason": ""
+    },
+    {
+      "name": "Cancel a refresh parent without allowing its orphaned worker to overwrite newer success or failure state",
+      "result": "pass",
+      "live": true,
+      "evidence": "parent-cancellation-state.json; cancelled-writer.log",
+      "reason": ""
+    },
+    {
+      "name": "Reopen startup context using the migrated checkpoint and retain the open decision",
+      "result": "pass",
+      "live": true,
+      "evidence": "claude-warm-digest.txt; claude-warm-digest-stream.jsonl",
+      "reason": ""
+    },
+    {
+      "name": "Spawn and tear down a real long-running Herdr task without waiting for HOME_SUMMARY",
+      "result": "pass",
+      "live": true,
+      "evidence": "herdr-lifecycle-transcript.txt; named fm-lab-start-fast-91959-21963 with real shell task, private marked home, held summary lock",
+      "reason": ""
+    },
+    {
+      "name": "Publish accumulated history for an owned Claude endpoint with real no-mistakes state reads",
+      "result": "pass",
+      "live": true,
+      "evidence": "owned-worker-history-ledger.json; owned-worker-pane.txt; real Claude SessionStart ran writer with a 30s budget and inherited actual pane TMUX; full CLI turn 7.89s",
+      "reason": ""
+    },
+    {
+      "name": "Raise a new wake when publication failures change to real timeouts, but deduplicate repeated timeouts",
+      "result": "pass",
+      "live": true,
+      "evidence": "changed-failure-class-state.json",
+      "reason": ""
+    }
+  ],
+  "targeted_regressions": {
+    "fm-home-summary-refresh.test.sh": 1,
+    "fm-home-summary-refresh-ownership.test.sh": 0,
+    "fm-wake-drain-open-decisions-cursor.test.sh": 0,
+    "fm-home-summary-refresh-isolated.test.sh": 0
+  },
+  "fixture_setup_corrections": [
+    "Private TMUX_TMPDIR under this long worktree exceeds the Unix-domain path limit; the supported fm-lab-home.sh tmux-dir helper supplied short private sockets and teardown removed them.",
+    "The unchanged summary regression initially rejected a child nested under the real code root. Copying only its script and shared helpers to a disposable sibling code root (with real bin symlinked) restored supported isolation; it then passed.",
+    "Gate SessionStart wrappers intentionally stand down, so disposable Claude settings invoked the real public digest directly; no gate bypass was used.",
+    "The full owned-history proof ran the real writer in Claude SessionStart to inherit the actual private-pane TMUX; its ledger records endpoint exists=true."
+  ],
+  "cold_digest_completion_seconds": 26.18,
+  "warm_claude_turn_duration_ms": 5615,
+  "owned_claude_turn_seconds": 7.89,
+  "herdr_spawn_seconds": 16.512,
+  "herdr_teardown_seconds": 12.63,
+  "cleanup": {
+    "herdr_tripwire_teardown_exit": 0,
+    "treehouse_exact_test_worktree_destroy_exit": 0,
+    "private_tmux_servers": "stopped and short socket directories removed"
+  }
+}

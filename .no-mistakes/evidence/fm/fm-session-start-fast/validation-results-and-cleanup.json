@@ -1,0 +1,33 @@
+{
+  "scenario_results": {
+    "cached_startup_busy_summary": "pass",
+    "old_checkpoint_upgrade_startup": "fail: 120.784s, wake-queue truncation",
+    "backlog_bulk_numeric_boolean_comma_path": "pass",
+    "checkpoint_transitions_partial_boundary_rotation_terminal": "pass",
+    "summary_three_failure_escalation_recovery": "pass",
+    "summary_blocked_logger_accounting_release": "pass",
+    "five_pending_followups_same_owner": "pass",
+    "cancelled_owner_newer_ledger_fencing": "pass",
+    "directory_ledger_destination": "fail: false success, no streak",
+    "wide_history_summary_absent_endpoint": "pass: real public writer published cost-gate in 12.006s"
+  },
+  "targeted_commands": {
+    "checkpoint_cursor_script": 0,
+    "ownership_script_after_deadline_contract_fix": 0,
+    "refresh_script_after_fixture_and_test_fixes": 1
+  },
+  "refresh_final_failure": "accumulated home: 300 wide working lines plus cost-gate decision exceeded 30-second publication deadline",
+  "test_related_changes": [
+    "ownership: use complete configured refresh/handling deadline rather than <9s incidental runtime",
+    "refresh: remove incidental synchronous wall-clock assertions, require fresh timeout log and interrupted initializer/unchanged prior ledger",
+    "refresh: bound blocked logger process with configured 1s worker deadline and full handling allowance"
+  ],
+  "primary_labs_torn_down": [
+    "fm-lab-start-fast-77979-1475",
+    "fm-lab-upgrade-cold-53699-6156"
+  ],
+  "fixture_directories_removed": true,
+  "remaining_owned_fixture_processes_signalled": [],
+  "test_related_changes_verified": "Modified ownership assertions passed; modified refresh timeout/initializer/logging checks passed before the unchanged accumulated-home deadline assertion failed.",
+  "remaining_validation_fixture_directories": []
+}

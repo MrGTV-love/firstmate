@@ -1,0 +1,13 @@
+{
+  "session": "fm-lab-start-fast-77979-1475",
+  "before_default_tripwire": {
+    "name": "default",
+    "default": true,
+    "running": true,
+    "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+  },
+  "teardown_returncode": 0,
+  "teardown_stdout": "",
+  "teardown_stderr": "",
+  "tripwire_removed_after_verified_default_unchanged": true
+}

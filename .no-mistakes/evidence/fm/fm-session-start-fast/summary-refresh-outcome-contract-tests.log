@@ -1,0 +1,14 @@
+ok - watcher-carried status append publishes the real home summary
+ok - large backlog snapshots and home-summary publication stay within exec limits
+ok - fleet snapshot transport does not require or mutate operational state
+ok - parent snapshot consumes large child ledgers without argument transport
+ok - live watcher cadence bounds publication staleness without signals
+ok - fleet snapshot consumes the published local ledger by default
+ok - writer kill and replacement preserve an atomic JSON ledger
+ok - best-effort publication logs and continues
+Terminated: 15
+Terminated: 15
+ok - best-effort refresh bounds publication lock acquisition
+ok - best-effort refresh bounds validation and publication
+grep: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-primary/focused-test-world/tmp/fm-home-summary-refresh.60PriP/mate-home/state/.home-summary-refresh.log: No such file or directory
+not ok - state initialization timeout was not logged

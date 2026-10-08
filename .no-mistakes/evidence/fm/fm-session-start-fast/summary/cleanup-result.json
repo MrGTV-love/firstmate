@@ -1,0 +1,10 @@
+{
+  "fixture_root_removed": true,
+  "source_edits": false,
+  "backend_servers_started": false,
+  "owned_processes": {
+    "last_busy_refresh_rc": 0,
+    "lock_holder_rc": 0,
+    "contended_refresh_rc": 0
+  }
+}

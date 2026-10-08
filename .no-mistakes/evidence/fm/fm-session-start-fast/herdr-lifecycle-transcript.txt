@@ -1,0 +1,43 @@
+SPAWN (16.512s)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/spawn
+notice: lifecycle ships mode=local-only while the standing posture for batch-project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned lifecycle harness=sh kind=ship mode=local-only yolo=off window=fm-lab-start-fast-91959-21963:w1:p2 worktree=/Users/charlesabrooker/.treehouse/batch-project-b57f44/1/batch-project
+
+METADATA
+window=fm-lab-start-fast-91959-21963:w1:p2
+endpoint_task_id=lifecycle
+worktree=/Users/charlesabrooker/.treehouse/batch-project-b57f44/1/batch-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch-project
+harness=sh
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/lifecycle
+tasktmp=/tmp/fm-lifecycle
+model=default
+effort=default
+spawn_gen=s1791454549.57141.24203
+backend=herdr
+herdr_session=fm-lab-start-fast-91959-21963
+herdr_workspace_id=w1
+herdr_tab_id=w1:t2
+herdr_pane_id=w1:p2
+
+TEARDOWN (12.63s)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/spawn
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for lifecycle: 12964 12988 91480
+teardown: force-killing leaked worktree process(es) for lifecycle: 91480
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown lifecycle complete (window fm-lab-start-fast-91959-21963:w1:p2, worktree /Users/charlesabrooker/.treehouse/batch-project-b57f44/1/batch-project)
+Backlog: lifecycle is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/spawn/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.

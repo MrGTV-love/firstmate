@@ -1,0 +1,43 @@
+REAL TASKS LISTING
+count: 6
+tasks[6]{id,state,kind,repo,title}:
+  heal-queued,in_flight,ship,"-",item for heal-queued
+  "null",in_flight,ship,"-",item for null
+  "false",in_flight,ship,"-",item for false
+  "true",in_flight,ship,"-",item for true
+  "123",in_flight,ship,"-",item for 123
+  alpha,in_flight,ship,"-",item for alpha
+help[2]:
+  - "Run `tasks-axi show <id> --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data/backlog.md` for full notes on a task"
+  - "Run `tasks-axi ready --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data/backlog.md` to see unblocked queued work"
+
+BULK STATES
+heal-queued:in_flight
+null:in_flight
+false:in_flight
+true:in_flight
+123:in_flight
+alpha:in_flight
+
+BOOTSTRAP
+BOOTSTRAP_INFO: marked heal-queued in flight to match the worker this home already owns
+
+HEALED TASK
+task:
+  id: heal-queued
+  title: item for heal-queued
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""

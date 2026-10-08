@@ -1,0 +1,18 @@
+stakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/claude-busy-summary-startup-events.jsonl 2> /Users/charlesabrooker/.no-mista
+kes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/claude-busy-summary-startup-stderr.txt; printf "CLAUDE_BUSY_EXIT=%s\n" "$?"
+CLAUDE_BUSY_EXIT=0
+charlesabrooker@Mac-Studio 01M4CVJREG2ZWYYTNDVWK2DHWT % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVE
+RRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u TASKS_AXI_FILE -u TASKS
+_AXI_BACKEND FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-
+primary/home,a,b FM_HOME_SUMMARY_TIMEOUT=20 TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJRE
+G2ZWYYTNDVWK2DHWT/.validation-primary/tmp claude -p --tools Bash --permission-mode bypassPermissions --setting-sources
+project --strict-mcp-config --mcp-config '{"mcpServers":{}}' --no-session-persistence --output-format stream-json --inc
+lude-hook-events --verbose 'Isolated lab validation only. Run EXACTLY this one Bash command (no trailing punctuation or
+ arguments):
+bash -c '"'"'TIMEFORMAT="STARTUP_RUNTIME_SECONDS=%R"; time ./bin/fm-session-start.sh'"'"'
+Your FM_HOME is disposable and marked. Do not run any other command and do not repair anything. Then report whether the
+ digest completed and its measured runtime.' > /Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/
+claude-busy-summary-startup-events.jsonl 2> /Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/cla
+ude-busy-summary-startup-stderr.txt; printf "CLAUDE_BUSY_EXIT=%s\n" "$?"
+CLAUDE_BUSY_EXIT=0
+charlesabrooker@Mac-Studio 01M4CVJREG2ZWYYTNDVWK2DHWT %

@@ -1,0 +1,14 @@
+{
+  "real_primary": "Claude (machine existing login), named Herdr lab",
+  "native_hook": "deliberately silent in gate linked worktree; real primary manually invoked public bin/fm-session-start.sh",
+  "public_digest_runtime_seconds": 46.037,
+  "home_summary_deadline_seconds": 20,
+  "fixture_lock_hold_seconds": 150,
+  "summary_lock_holder_observed_alive_after_digest": true,
+  "pending_trigger_observed": true,
+  "summary_failure_log_absent": true,
+  "digest_completed": true,
+  "backlog_bulk_healed_queued_record": true,
+  "open_decision_after_cached_history": "tail",
+  "cold_history_setup": "24000-line cold fold exceeded 110s; replaced with 2000-line fixture and seeded through real drain (27.721s)"
+}

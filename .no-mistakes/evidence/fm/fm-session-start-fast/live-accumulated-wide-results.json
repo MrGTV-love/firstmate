@@ -1,0 +1,20 @@
+{
+  "command": "FM_HOME=<marked .validation-cost/home> FM_HOME_SUMMARY_TIMEOUT=30 bin/fm-home-summary-refresh.sh --best-effort",
+  "returncode": 0,
+  "seconds": 12.006,
+  "width_depth": "300 wide working lines, 25 repeated note clauses each, then cost-gate question",
+  "backend": "real tools; absent worker endpoint recorded, no backend or producer mocks",
+  "ledger_exists": true,
+  "stdout": "",
+  "stderr": "",
+  "decisions_open": [
+    {
+      "id": "cost-task",
+      "key": "cost-gate",
+      "verb": "needs-decision",
+      "summary": "which base to rebuild from",
+      "reason": null,
+      "source": "status"
+    }
+  ]
+}

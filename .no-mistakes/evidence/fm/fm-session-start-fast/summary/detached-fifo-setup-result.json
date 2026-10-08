@@ -1,0 +1,9 @@
+{
+  "setup_only": true,
+  "live": true,
+  "result": "real producer exited rc 0 before opening backlog FIFO; -f backlog guard means FIFO is not a supported blocking fixture",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+    "--best-effort"
+  ]
+}

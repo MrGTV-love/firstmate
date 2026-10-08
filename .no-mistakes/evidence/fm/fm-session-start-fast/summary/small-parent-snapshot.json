@@ -1,0 +1,238 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-08T08:37:38Z",
+  "fm_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT",
+    "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/state",
+    "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data",
+    "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/config",
+    "projects": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/projects"
+  },
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data/backlog.md",
+    "present": true,
+    "records": []
+  },
+  "tasks": [
+    {
+      "id": "small-child",
+      "kind": "secondmate",
+      "harness": "claude",
+      "mode": "secondmate",
+      "yolo": "off",
+      "branch": null,
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/state/small-child.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/state/small-child.status",
+          "present": false,
+          "kind": "event_history",
+          "last_event": {
+            "state": "",
+            "note": "",
+            "raw": "",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child",
+          "present": true
+        },
+        "home": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child",
+          "present": true
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data/small-child/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [
+        "firstmate"
+      ],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "backend unreachable (tmux endpoint state: unreadable)",
+        "raw": "state: unknown · source: none · backend unreachable (tmux endpoint state: unreadable)",
+        "observed_at": "2026-10-08T08:37:38Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fmtest:fm-small-child",
+        "exists": false,
+        "agent_alive": "unknown",
+        "status": "absent",
+        "observed_at": "2026-10-08T08:37:38Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": ""
+      },
+      "actions": {
+        "send": "bin/fm-send.sh fm-small-child '<request>'",
+        "watch": "read status/doc return channel; do not routinely fm-peek a secondmate for answers",
+        "return_channel_note": "Secondmate answers come back through status/doc paths after a marked fm-send request."
+      },
+      "backlog": null
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": {
+      "present": true,
+      "available": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-10-08T08:37:38Z"
+      },
+      "records": [
+        {
+          "id": "small-child",
+          "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child",
+          "host": null,
+          "root": null,
+          "remote": false,
+          "registered": true,
+          "registry_error": null
+        }
+      ],
+      "input_truncated": false,
+      "records_truncated": false,
+      "complete": true,
+      "reasons": [],
+      "lines_in_window": 1,
+      "records_in_window": 1
+    },
+    "records": [
+      {
+        "id": "small-child",
+        "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child",
+        "host": null,
+        "remote": false,
+        "registered": true,
+        "spawn_gen": null,
+        "current": {
+          "state": "unknown",
+          "reason": "invalid home: secondmate home cannot be inside the firstmate repo"
+        },
+        "invalidity": null,
+        "reconcile_inventory": null,
+        "provenance": {
+          "selected": "unknown",
+          "structured_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child",
+          "parent_event_role": "fallback-only-not-current"
+        },
+        "freshness": {
+          "status": "unknown",
+          "observed_at": "2026-10-08T08:37:38Z",
+          "age_seconds": null
+        },
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [],
+        "landed": [],
+        "endpoints": [],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 0,
+          "landed": 0,
+          "endpoints": 0
+        },
+        "omitted": [],
+        "parent_event": {
+          "raw": "",
+          "note": "",
+          "age_seconds": null,
+          "open_activities": [],
+          "open_decisions": [],
+          "activity_scan": {
+            "records": [],
+            "available": true,
+            "input_truncated": false,
+            "retained_truncated": false,
+            "reasons": [],
+            "lines_in_window": 0,
+            "records_in_window": 0
+          }
+        },
+        "terminal_evidence": {
+          "provenance": "parent-direct-report-terminal",
+          "trust": "untrusted-supplement",
+          "captured": false,
+          "observed_at": "2026-10-08T08:37:38Z",
+          "freshness": "not-collected",
+          "reason": "no parent event to compare",
+          "lines": 0,
+          "bytes": 0,
+          "event_note_seen": false,
+          "contradiction": false
+        },
+        "contradiction": false
+      }
+    ],
+    "total_registered": 1,
+    "total": 1,
+    "shown": 1,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child"
+    ],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

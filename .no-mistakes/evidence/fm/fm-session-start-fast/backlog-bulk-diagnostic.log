@@ -1,0 +1,83 @@
++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-backlog-transition-lib.sh
+++ FM_BACKLOG_TRANSITION_SKIP=
+++ FM_BACKLOG_TRANSITION_ERROR=
+++ FM_BACKLOG_ROW_RESULT=
+++ FM_BACKLOG_ROW_STATE=
+++ FM_BACKLOG_ROW_ERROR=
+++ FM_BACKLOG_ROW_HOLD_KIND=
+++ FM_BACKLOG_CLOSE_REPLAY_RESULT=
+++++ dirname /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-backlog-transition-lib.sh
++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin
++++ pwd
+++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-timeout-lib.sh
++++ set -u
+++ FM_BACKLOG_ROW_SHOW_WEDGED=0
++ fm_backlog_row_states /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++ local data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data out secs=10 line expected= declared= in_tasks=0 parsed=0 id rest rows= status
++ args=()
++ local -a args
++ case "$secs" in
++ '[' 10 -gt 0 ']'
+++ fm_backlog_data_absolute /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ local data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data check
+++ fm_backlog_string_control_free /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ local LC_ALL=C
+++ case "$1" in
+++ return 0
+++ check=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data '!=' / ']'
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data ']'
+++ '[' '!' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data ']'
++++ CDPATH=
++++ cd -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++++ pwd -P
+++ data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++ data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++ fm_backlog_tasks_axi_addressing /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++ FM_BACKLOG_AXI_FILE=
++ local data root backend
+++ fm_backlog_data_absolute /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ local data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data check
+++ fm_backlog_string_control_free /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ local LC_ALL=C
+++ case "$1" in
+++ return 0
+++ check=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data '!=' / ']'
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data ']'
+++ '[' '!' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data ']'
++++ CDPATH=
++++ cd -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++++ pwd -P
+++ data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++ data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ fm_backlog_root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ local data parent
++++ fm_backlog_data_absolute /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++++ local data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data check
++++ fm_backlog_string_control_free /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++++ local LC_ALL=C
++++ case "$1" in
++++ return 0
++++ check=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data '!=' / ']'
++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data ']'
++++ '[' '!' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data ']'
+++++ CDPATH=
+++++ cd -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++++ pwd -P
++++ data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
++++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ data=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b/data
+++ case "$data" in
+++ parent=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b ']'
+++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b
++ root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b
+++ fm_tasks_axi_backend /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch,a,b
++ backend='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-backlog-transition-lib.sh: line 289: fm_tasks_axi_backend: command not found'
++ FM_BACKLOG_TRANSITION_ERROR='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-backlog-transition-lib.sh: line 289: fm_tasks_axi_backend: command not found'
++ return 2
++ return 1

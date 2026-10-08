@@ -1,0 +1,26 @@
+{
+  "lock_holder_command": [
+    "bash",
+    "-c",
+    ". \"$1/bin/fm-wake-lib.sh\"; lock=\"$FM_HOME/state/.home-summary-refresh.lock\"; fm_lock_acquire_wait \"$lock\" || exit; trap 'fm_lock_release \"$lock\"' EXIT; : > \"$2\"; while [ ! -e \"$3\" ]; do sleep 0.1; done",
+    "summary-lock-holder",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/held-real-lock",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/release-real-lock"
+  ],
+  "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+  "holder_pid": 98571,
+  "lock_owner": "98571",
+  "waiting_public_refresh_pid": 99304,
+  "waiting_public_refresh_command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+    "--best-effort"
+  ],
+  "live_product": true,
+  "private_backend_environment": {
+    "FM_BACKEND": "tmux",
+    "TMUX_TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/private-tmux"
+  },
+  "backend_used": false,
+  "pending_while_busy": true
+}

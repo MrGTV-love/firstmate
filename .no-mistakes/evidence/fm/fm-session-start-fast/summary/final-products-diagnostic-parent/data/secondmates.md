@@ -1,0 +1,1 @@
+- small-child - fixture domain (home: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child; scope: fixture work; projects: firstmate; added 2026-08-28)

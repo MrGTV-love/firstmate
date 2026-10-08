@@ -1,0 +1,28 @@
+[
+  {
+    "attempt": 1,
+    "seconds": 7.4,
+    "exit": 0,
+    "streak": "count=1\nfirst=2026-10-08T10:05:56Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+    "wakes": [],
+    "released": true
+  },
+  {
+    "attempt": 2,
+    "seconds": 5.928,
+    "exit": 0,
+    "streak": "count=2\nfirst=2026-10-08T10:05:56Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=\n",
+    "wakes": [],
+    "released": true
+  },
+  {
+    "attempt": 3,
+    "seconds": 5.39,
+    "exit": 0,
+    "streak": "count=3\nfirst=2026-10-08T10:05:56Z\nclass=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\nescalated=atomic ledger replacement failed: destination is a directory: /Users/charlesabro\n",
+    "wakes": [
+      "1791453974\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:56Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/blocked-logger/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log"
+    ],
+    "released": true
+  }
+]

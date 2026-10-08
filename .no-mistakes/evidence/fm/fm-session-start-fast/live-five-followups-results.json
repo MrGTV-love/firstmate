@@ -1,0 +1,65 @@
+{
+  "owner_returncode": 0,
+  "trigger_rounds": [
+    {
+      "round": 1,
+      "owner_pid": "69194",
+      "task": "during-refresh-1",
+      "detach_returncode": 0,
+      "detach_seconds": 1.041,
+      "pending_observed": true,
+      "publication_temp_names": [
+        ".home-summary.json.IC3iBE"
+      ]
+    },
+    {
+      "round": 2,
+      "owner_pid": "69194",
+      "task": "during-refresh-2",
+      "detach_returncode": 0,
+      "detach_seconds": 0.11,
+      "pending_observed": true,
+      "publication_temp_names": [
+        ".home-summary.json.B59Kko"
+      ]
+    },
+    {
+      "round": 3,
+      "owner_pid": "69194",
+      "task": "during-refresh-3",
+      "detach_returncode": 0,
+      "detach_seconds": 0.064,
+      "pending_observed": true,
+      "publication_temp_names": [
+        ".home-summary.json.o74qou"
+      ]
+    },
+    {
+      "round": 4,
+      "owner_pid": "69194",
+      "task": "during-refresh-4",
+      "detach_returncode": 0,
+      "detach_seconds": 0.031,
+      "pending_observed": true,
+      "publication_temp_names": [
+        ".home-summary.json.tNF0ME"
+      ]
+    },
+    {
+      "round": 5,
+      "owner_pid": "69194",
+      "task": "during-refresh-5",
+      "detach_returncode": 0,
+      "detach_seconds": 0.028,
+      "pending_observed": true,
+      "publication_temp_names": [
+        ".home-summary.json.ozwo8h"
+      ]
+    }
+  ],
+  "same_owner_all_rounds": true,
+  "all_five_latest_tasks_in_final_ledger": true,
+  "pending_absent_after_drain": true,
+  "lock_absent": true,
+  "streak_absent": true
+}

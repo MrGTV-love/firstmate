@@ -1,0 +1,12 @@
+{
+  "old_parent_pid": 85772,
+  "old_worker_pid": 86342,
+  "old_parent_killed_after_lock_acquisition": true,
+  "new_owner_returncode": 0,
+  "newest_transition_present": true,
+  "old_worker_resumed_after_new_publication": true,
+  "ledger_byte_identical_after_resume": true,
+  "streak_absent": true,
+  "lock_absent": true,
+  "final_worker_status": ""
+}

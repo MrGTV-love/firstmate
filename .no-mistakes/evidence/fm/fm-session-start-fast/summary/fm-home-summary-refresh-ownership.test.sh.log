@@ -1,0 +1,5 @@
+ok - parent cancellation fences both acquisition paths after validation
+ok - reclaim waits for publication, accounting, and release critical sections
+Traceback (most recent call last):
+  File "<stdin>", line 180, in <module>
+AssertionError: blocked logger exceeded bounded handling

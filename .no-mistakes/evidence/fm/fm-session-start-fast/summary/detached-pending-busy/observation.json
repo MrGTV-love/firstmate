@@ -1,0 +1,7 @@
+{
+  "ledger_exists": true,
+  "streak_exists": false,
+  "wake_count": 0,
+  "lock_exists": true,
+  "fence_exists": true
+}

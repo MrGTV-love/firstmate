@@ -1,0 +1,58 @@
+[
+  {
+    "scenario": "live-fold-initial",
+    "command": "bin/fm-wake-drain.sh",
+    "returncode": 0,
+    "elapsed_seconds": 5.724,
+    "expected": "foldtask [key=current] blocked: waiting for access",
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/live-fold-initial.txt"
+  },
+  {
+    "scenario": "live-fold-cached-tail",
+    "command": "bin/fm-wake-drain.sh",
+    "returncode": 0,
+    "elapsed_seconds": 2.005,
+    "expected": "foldtask [key=fresh] needs-decision: follow-up decision",
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/live-fold-cached-tail.txt"
+  },
+  {
+    "scenario": "live-fold-partial-append",
+    "command": "bin/fm-wake-drain.sh",
+    "returncode": 0,
+    "elapsed_seconds": 3.117,
+    "expected": "foldtask [key=partial] blocked: question",
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/live-fold-partial-append.txt"
+  },
+  {
+    "scenario": "live-fold-completed-append",
+    "command": "bin/fm-wake-drain.sh",
+    "returncode": 0,
+    "elapsed_seconds": 4.295,
+    "expected": "foldtask [key=partial] blocked: question completed after checkpoint",
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/live-fold-completed-append.txt"
+  },
+  {
+    "scenario": "live-fold-rejects-midline",
+    "command": "bin/fm-wake-drain.sh",
+    "returncode": 0,
+    "elapsed_seconds": 2.684,
+    "expected": "foldtask [key=partial] blocked: question completed after checkpoint",
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/live-fold-rejects-midline.txt"
+  },
+  {
+    "scenario": "live-fold-replaced-log",
+    "command": "bin/fm-wake-drain.sh",
+    "returncode": 0,
+    "elapsed_seconds": 3.09,
+    "expected": "foldtask [key=rotated] needs-decision: replacement log decision",
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/live-fold-replaced-log.txt"
+  },
+  {
+    "scenario": "live-fold-terminal-and-reopen",
+    "command": "bin/fm-wake-drain.sh",
+    "returncode": 0,
+    "elapsed_seconds": 2.224,
+    "expected": "foldtask [key=after-done] needs-decision: new question",
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/live-fold-terminal-and-reopen.txt"
+  }
+]

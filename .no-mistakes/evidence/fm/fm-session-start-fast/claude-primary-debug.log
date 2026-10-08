@@ -1,0 +1,246 @@
+2026-10-08T10:07:03.875Z [DEBUG] MDM settings load completed in 0ms
+2026-10-08T10:07:03.888Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /Library/Application Support/ClaudeCode/managed-settings.json
+2026-10-08T10:07:03.935Z [DEBUG] CA certs: Config fallback - globalEnv keys: , settingsEnv keys: none
+2026-10-08T10:07:03.942Z [DEBUG] [init] configureGlobalMTLS starting
+2026-10-08T10:07:03.942Z [DEBUG] [init] configureGlobalMTLS complete
+2026-10-08T10:07:03.942Z [DEBUG] [init] configureGlobalAgents starting
+2026-10-08T10:07:03.943Z [DEBUG] CA certs: stores=bundled,system, extraCertsPath=undefined
+2026-10-08T10:07:03.943Z [DEBUG] CA certs: Loaded 121 bundled root certificates
+2026-10-08T10:07:03.975Z [DEBUG] CA certs: Loaded 4 system CA certificates
+2026-10-08T10:07:03.975Z [DEBUG] mTLS: Creating HTTPS agent with custom certificates
+2026-10-08T10:07:03.976Z [DEBUG] [init] configureGlobalAgents complete
+2026-10-08T10:07:03.979Z [DEBUG] Error log sink initialized
+2026-10-08T10:07:04.006Z [DEBUG] [ToolSearch:optimistic] mode=tst, ENABLE_TOOL_SEARCH=undefined, result=true
+2026-10-08T10:07:04.010Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.043Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-10-08T10:07:04.044Z [DEBUG] [STARTUP] Running setup()...
+2026-10-08T10:07:04.050Z [DEBUG] [claudeai-mcp] Fetching from https://api.anthropic.com/v1/mcp_servers?limit=1000&include_additional_installs=true
+2026-10-08T10:07:04.050Z [DEBUG] mcp runtime arm: v2 (source: growthbook)
+2026-10-08T10:07:04.071Z [DEBUG] Loading skills from: managed=/Library/Application Support/ClaudeCode/.claude/skills, user=/Users/charlesabrooker/.claude/skills, project=[/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.claude/skills]
+2026-10-08T10:07:04.076Z [DEBUG] Failed to stat directory /Library/Application Support/ClaudeCode/.claude/agents: ENOENT: no such file or directory, stat '/Library/Application Support/ClaudeCode/.claude/agents'
+2026-10-08T10:07:04.076Z [DEBUG] Failed to stat directory /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.claude/agents: ENOENT: no such file or directory, stat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.claude/agents'
+2026-10-08T10:07:04.076Z [DEBUG] Failed to stat directory /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.claude/commands: ENOENT: no such file or directory, stat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.claude/commands'
+2026-10-08T10:07:04.076Z [DEBUG] Failed to stat directory /Library/Application Support/ClaudeCode/.claude/commands: ENOENT: no such file or directory, stat '/Library/Application Support/ClaudeCode/.claude/commands'
+2026-10-08T10:07:04.105Z [DEBUG] Loaded 15 installed plugins from /Users/charlesabrooker/.claude/plugins/installed_plugins.json
+2026-10-08T10:07:04.113Z [DEBUG] Git remote URL: https://github.com/MrGTV-love/firstmate
+2026-10-08T10:07:04.114Z [DEBUG] Parsed repository: github.com/MrGTV-love/firstmate from URL: https://github.com/MrGTV-love/firstmate
+2026-10-08T10:07:04.117Z [DEBUG] Loaded 29 unique skills (29 unconditional, 0 conditional, managed: 0, user: 0, project: 29, additional: 0, legacy commands: 0)
+2026-10-08T10:07:04.141Z [DEBUG] Read hooks.json for plugin firstmate-calm (enabled=true): /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.claude/skills/firstmate-calm/hooks/hooks.json
+2026-10-08T10:07:04.150Z [INFO] [uds-messaging] Listening: /tmp/cc-socks/97031.sock
+2026-10-08T10:07:04.150Z [INFO] [uds-messaging] Inject messages (auth line optional here): { echo '{"type":"auth","token":"[REDACTED]"$CLAUDE_CODE_MESSAGING_TOKEN"'"}'; echo '{"type":"user","message":{"role":"user","content":"hello"}}'; } | socat - UNIX-CONNECT:/tmp/cc-socks/97031.sock
+2026-10-08T10:07:04.150Z [INFO] [uds-messaging] Connect when the data is ready (e.g. out=$(cmd); printf '%s\n' "$out" | nc -U "$CLAUDE_CODE_MESSAGING_SOCKET" — or the socat form above): a connection that sends no complete line within 30000 ms is closed
+2026-10-08T10:07:04.152Z [DEBUG] Error log sink initialized
+2026-10-08T10:07:04.173Z [DEBUG] Loaded 1 skills-as-plugins
+2026-10-08T10:07:04.175Z [DEBUG] Found 5 plugins (4 enabled, 1 disabled)
+2026-10-08T10:07:04.176Z [DEBUG] getPluginSkills: Processing 4 enabled plugins
+2026-10-08T10:07:04.176Z [DEBUG] Checking plugin firstmate-calm: skillsPath=none, skillsPaths=0 paths
+2026-10-08T10:07:04.176Z [DEBUG] Checking plugin cc-plugin-agents-md: skillsPath=none, skillsPaths=0 paths
+2026-10-08T10:07:04.176Z [DEBUG] Checking plugin cc-plugin-telemetry: skillsPath=none, skillsPaths=0 paths
+2026-10-08T10:07:04.176Z [DEBUG] Checking plugin cc-plugin-plugin-authoring: skillsPath=none, skillsPaths=0 paths
+2026-10-08T10:07:04.177Z [DEBUG] Total plugin workflows loaded: 0
+2026-10-08T10:07:04.178Z [DEBUG] Total plugin commands loaded: 0
+2026-10-08T10:07:04.179Z [DEBUG] Total plugin skills loaded: 0 (0 duplicate/user-owned entries skipped)
+2026-10-08T10:07:04.180Z [DEBUG] Total plugin agents loaded: 0
+2026-10-08T10:07:04.181Z [DEBUG] cc-plugin-sec-default@builtin not seated: no managed settings and not a Team or Enterprise organization (max)
+2026-10-08T10:07:04.204Z [DEBUG] Cannot acquire lock for 2.1.294 - held by PID 47648
+2026-10-08T10:07:04.204Z [ERROR] NON-FATAL: Lock acquisition failed for /Users/charlesabrooker/.local/share/claude/versions/2.1.294 (expected in multi-process scenarios): Lock already held by another process
+2026-10-08T10:07:04.206Z [DEBUG] [STARTUP] setup() completed in 161ms
+2026-10-08T10:07:04.206Z [DEBUG] Cleared mTLS configuration cache
+2026-10-08T10:07:04.206Z [DEBUG] Cleared proxy agent cache
+2026-10-08T10:07:04.206Z [DEBUG] mTLS: Creating HTTPS agent with custom certificates
+2026-10-08T10:07:04.216Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.216Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.216Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.claude/settings.local.json
+2026-10-08T10:07:04.216Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.216Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.216Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.216Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.217Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.217Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.217Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.217Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.217Z [DEBUG] [STARTUP] Loading commands and agents...
+2026-10-08T10:07:04.224Z [DEBUG] getSkills returning: 29 skill dir commands, 0 plugin skills, 39 bundled skills, 1 builtin plugin skills
+2026-10-08T10:07:04.233Z [DEBUG] [STARTUP] Commands and agents loaded in 16ms
+2026-10-08T10:07:04.237Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2026-10-08T10:07:04.237Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2026-10-08T10:07:04.237Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2026-10-08T10:07:04.237Z [DEBUG] Starting background startup prefetches
+2026-10-08T10:07:04.239Z [DEBUG] [Bootstrap] Fetching
+2026-10-08T10:07:04.248Z [DEBUG] Passes: Using fresh cached eligibility data
+2026-10-08T10:07:04.252Z [DEBUG] [STARTUP] MCP configs resolved in 209ms (awaited at +209ms)
+2026-10-08T10:07:04.279Z [DEBUG] Cleared mTLS configuration cache
+2026-10-08T10:07:04.279Z [DEBUG] Cleared proxy agent cache
+2026-10-08T10:07:04.279Z [DEBUG] mTLS: Creating HTTPS agent with custom certificates
+2026-10-08T10:07:04.282Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.284Z [DEBUG] All plugins already exist, skipping migration
+2026-10-08T10:07:04.293Z [DEBUG] Initialized versioned plugins system with 15 plugins
+2026-10-08T10:07:04.294Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-10-08T10:07:04.294Z [DEBUG] [MCP] --mcp-config servers running fully async (nonblocking)
+2026-10-08T10:07:04.294Z [DEBUG] [MCP] claude.ai connectors running fully async (nonblocking)
+2026-10-08T10:07:04.303Z [DEBUG] [servedCatalog] off (flag)
+2026-10-08T10:07:04.309Z [DEBUG] [Perfetto] initializePerfettoTracing called, env value: undefined
+2026-10-08T10:07:04.309Z [DEBUG] [3P telemetry] isTelemetryEnabled=false (CLAUDE_CODE_ENABLE_TELEMETRY=undefined)
+2026-10-08T10:07:04.313Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.313Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.384Z [DEBUG] [event-loop-stall] detector started (interval=200ms, threshold=500ms)
+2026-10-08T10:07:04.408Z [DEBUG] Grove: Using fresh cached config
+2026-10-08T10:07:04.420Z [DEBUG] Total LSP servers loaded: 0
+2026-10-08T10:07:04.422Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2026-10-08T10:07:04.422Z [DEBUG] LSP manager initialized with 0 servers
+2026-10-08T10:07:04.423Z [DEBUG] LSP server manager initialized successfully
+2026-10-08T10:07:04.424Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2026-10-08T10:07:04.461Z [DEBUG] [auto-mode] verifyAutoModeGateAccess: enabledState=enabled disabledBySettings=false model=claude-opus-5-5 modelSupported=true disableFastModeBreakerFires=false carouselAvailable=true canEnterAuto=true
+2026-10-08T10:07:04.614Z [WARN] localSettings: not canonicalizing the consent store to /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git — its ownership could not be verified (ENOENT: no such file or directory, lstat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.git'); the store stays at the session cwd
+2026-10-08T10:07:04.616Z [DEBUG] [3P telemetry] Event dropped (no event logger initialized): hook_registered
+2026-10-08T10:07:04.704Z [DEBUG] [claudeai-mcp] Fetched 3 servers
+2026-10-08T10:07:04.721Z [DEBUG] [sessionRegistry] sweep permitted (domain darwin)
+2026-10-08T10:07:04.721Z [DEBUG] Watching for changes in skill/command directories: /Users/charlesabrooker/.claude/skills, /Users/charlesabrooker/.claude/skills/synced, /Users/charlesabrooker/.claude/commands, /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.claude/skills, /Users/charlesabrooker/.claude/agents...
+2026-10-08T10:07:04.739Z [DEBUG] Lock acquisition took longer than expected - another Claude instance may be running
+2026-10-08T10:07:04.792Z [DEBUG] Watching for changes in setting files /Users/charlesabrooker/.claude/settings.json, /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.claude/settings.json, /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.claude/settings.local.json...
+2026-10-08T10:07:04.856Z [DEBUG] MCP server "claude.ai Claude Docs": Initializing claude.ai proxy transport for server mcpsrv_014Fj7srWvLMyCuRCS8J9W3d
+2026-10-08T10:07:04.856Z [DEBUG] MCP server "claude.ai Claude Docs": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_014Fj7srWvLMyCuRCS8J9W3d
+2026-10-08T10:07:04.856Z [DEBUG] MCP server "claude.ai Claude Docs": GET notification stream disabled for claude.ai connectors; a GET the SDK sends to the proxy URL is answered locally with 405
+2026-10-08T10:07:04.857Z [DEBUG] MCP server "claude.ai Claude Docs": claude.ai proxy transport created successfully
+2026-10-08T10:07:04.875Z [DEBUG] plugin cc-plugin-agents-md: no pluginConfigs["agents-md@builtin" or "cc-plugin-agents-md@builtin"].options in user, --settings or managed settings (project settings are not read); every option is its default
+2026-10-08T10:07:04.875Z [DEBUG] cc-plugin-telemetry: hooks telemetry for: anthropic, collector
+2026-10-08T10:07:04.877Z [DEBUG] hooks worker spawned (one for every plugin)
+2026-10-08T10:07:04.885Z [DEBUG] Preserving file permissions: 100600
+2026-10-08T10:07:04.885Z [DEBUG] Writing to temp file: /Users/charlesabrooker/.claude.json.tmp.97031.437b2e88134d
+2026-10-08T10:07:04.911Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/compound-engineering-plugin/compound-engineering: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:04.920Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/compound-engineering-plugin: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:04.921Z [DEBUG] MCP server "claude.ai Claude Docs": Starting connection with timeout of 30000ms
+2026-10-08T10:07:04.922Z [DEBUG] Applied original permissions to temp file
+2026-10-08T10:07:04.927Z [DEBUG] Temp file written successfully, size: 386144 bytes
+2026-10-08T10:07:04.927Z [DEBUG] Renaming /Users/charlesabrooker/.claude.json.tmp.97031.437b2e88134d to /Users/charlesabrooker/.claude.json
+2026-10-08T10:07:04.935Z [DEBUG] File /Users/charlesabrooker/.claude.json written atomically
+2026-10-08T10:07:04.937Z [DEBUG] hooks module firstmate-calm@skills-dir loaded (worker, environment 1, tier user); events: session.start,command.run,config.set,turn.step,ui.render
+2026-10-08T10:07:04.939Z [DEBUG] hooks module cc-plugin-agents-md@builtin loaded (native, environment 2, tier builtin); events: session.start,prompt.context,command.run,session.compact,prompt.submit,turn.start,turn.complete,agent.spawn,tool.call,prompt.mention
+2026-10-08T10:07:04.940Z [DEBUG] hooks module cc-plugin-telemetry@builtin loaded (native, environment 3, tier builtin); events: telemetry.*,telemetry.log,telemetry.mark,session.start,session.end,engine.create
+2026-10-08T10:07:04.941Z [DEBUG] hooks module cc-plugin-telemetry@builtin engine.create settled in 0.8ms (native hop, next() included)
+2026-10-08T10:07:04.943Z [DEBUG] engine.create: no plugin-provided interfaces; $ built for firstmate-calm,cc-plugin-agents-md,cc-plugin-telemetry
+2026-10-08T10:07:04.943Z [DEBUG] plugin.register: cc-plugin-agents-md (builtin, cc-plugin-agents-md@builtin), judged by core alone: admitted
+2026-10-08T10:07:04.943Z [DEBUG] plugin.register: cc-plugin-telemetry (builtin, cc-plugin-telemetry@builtin), judged by core alone: admitted
+2026-10-08T10:07:04.943Z [DEBUG] plugin.register: firstmate-calm (user, firstmate-calm@skills-dir), judged by core alone: admitted
+2026-10-08T10:07:04.946Z [DEBUG] Registered 0 hooks from 4 plugins
+2026-10-08T10:07:04.950Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 1.9ms (native link, next() included)
+2026-10-08T10:07:04.954Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/compact-adviser/compact-adviser: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:04.958Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/compact-adviser: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:04.973Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/openai-codex/codex: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:04.976Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/openai-codex: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:04.987Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/ponytail/ponytail: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:04.995Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/ponytail: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.041Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/cli-anything/cli-anything: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.053Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/cli-anything: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.103Z [DEBUG] Hook output does not start with {, treating as plain text
+2026-10-08T10:07:05.125Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 6.3ms (native link, next() included)
+2026-10-08T10:07:05.192Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official/qodo-skills: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.201Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official/vercel: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.302Z [DEBUG] [print.ts] MCP task sidecar restore skipped: tasks gate off after the flag settle
+2026-10-08T10:07:05.310Z [DEBUG] [ScheduledTasks] scheduler start() — enabled=false, hasTasks=false
+2026-10-08T10:07:05.315Z [DEBUG] session.start: raised (surface none, not interactive)
+2026-10-08T10:07:05.323Z [DEBUG] [Bootstrap] Fetch ok
+2026-10-08T10:07:05.324Z [DEBUG] [Bootstrap] Cache updated, persisting to disk
+2026-10-08T10:07:05.327Z [DEBUG] Org fast mode: enabled
+2026-10-08T10:07:05.706Z [DEBUG] installPluginsForHeadless: starting
+2026-10-08T10:07:05.709Z [DEBUG] installPluginsForHeadless: no marketplaces declared
+2026-10-08T10:07:05.721Z [DEBUG] MCP server "claude.ai Claude Docs": Successfully connected (transport: claudeai-proxy) in 866ms
+2026-10-08T10:07:05.722Z [DEBUG] MCP server "claude.ai Claude Docs": no auto-opened subscriptions/listen on a modern connection; running the listen open through the reopen machinery (no-op if the server advertises no listChanged capability)
+2026-10-08T10:07:05.723Z [DEBUG] MCP server "claude.ai Claude Docs": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"Claude Docs","version":"0.1.0"},"protocolEra":"modern","negotiatedProtocolVersion":"2026-07-28"}
+2026-10-08T10:07:05.723Z [DEBUG] [MCP] Server "claude.ai Claude Docs" connected with subscribe=false
+2026-10-08T10:07:05.729Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 2.9ms (native link, next() included)
+2026-10-08T10:07:05.739Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official/linear: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.740Z [DEBUG] hooks module cc-plugin-telemetry@builtin (native): telemetry.log nested in cc-plugin-agents-md#0
+2026-10-08T10:07:05.741Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 0.6ms (native link, next() included)
+2026-10-08T10:07:05.741Z [DEBUG] hooks module cc-plugin-telemetry@builtin session.start settled in 1.1ms (native link, next() included)
+2026-10-08T10:07:05.741Z [DEBUG] cc-plugin-telemetry (builtin) answered telemetry.log without next() in 0.8ms; nothing beneath it ran for this dispatch
+2026-10-08T10:07:05.741Z [DEBUG] hooks module cc-plugin-agents-md@builtin session.start settled in 1.4ms (native link, next() included)
+2026-10-08T10:07:05.748Z [DEBUG] hooks module firstmate-calm@skills-dir session.start settled in 431.2ms (worker hop, next() included)
+2026-10-08T10:07:05.759Z [DEBUG] [fs.watch probe] verdict: delivers
+2026-10-08T10:07:05.786Z [DEBUG] Preserving file permissions: 100600
+2026-10-08T10:07:05.786Z [DEBUG] Writing to temp file: /Users/charlesabrooker/.claude.json.tmp.97031.0967ff64ed12
+2026-10-08T10:07:05.827Z [DEBUG] Applied original permissions to temp file
+2026-10-08T10:07:05.853Z [DEBUG] Temp file written successfully, size: 386071 bytes
+2026-10-08T10:07:05.853Z [DEBUG] Renaming /Users/charlesabrooker/.claude.json.tmp.97031.0967ff64ed12 to /Users/charlesabrooker/.claude.json
+2026-10-08T10:07:05.853Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official/code-review: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.862Z [DEBUG] $.process.run (cc-plugin-telemetry): sh with 2 args in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT (pid 5751)
+2026-10-08T10:07:05.878Z [DEBUG] File /Users/charlesabrooker/.claude.json written atomically
+2026-10-08T10:07:05.883Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official/mattpocock-skills: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.884Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official/skill-creator: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.890Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official/telegram: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.897Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/claude-plugins-official: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.899Z [DEBUG] $.process.run (cc-plugin-telemetry): sh exited 0 in 45ms, 50 + 0 chars
+2026-10-08T10:07:05.901Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/anthropic-plugin-directory/humanizer-blader: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.904Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/anthropic-plugin-directory: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.906Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/temporal-marketplace/temporal: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.908Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/temporal-marketplace: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.911Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/vernant-local/vernant-simplicity-harness: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:05.911Z [DEBUG] Keeping /Users/charlesabrooker/.claude/plugins/cache/vernant-local: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-08T10:07:06.366Z [DEBUG] hooks module cc-plugin-telemetry@builtin (native): telemetry.log nested in cc-plugin-agents-md#1
+2026-10-08T10:07:06.368Z [DEBUG] hooks module cc-plugin-telemetry@builtin (native): telemetry.mark nested in cc-plugin-agents-md#1
+2026-10-08T10:07:06.368Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 2.4ms (native link, next() included)
+2026-10-08T10:07:06.368Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.mark settled in 0.1ms (native link, next() included)
+2026-10-08T10:07:06.368Z [DEBUG] cc-plugin-telemetry (builtin) answered telemetry.mark without next() in 0.4ms; nothing beneath it ran for this dispatch
+2026-10-08T10:07:06.368Z [DEBUG] hooks module cc-plugin-agents-md@builtin prompt.context settled in 11.4ms (native link, next() included)
+2026-10-08T10:07:06.373Z [DEBUG] Ripgrep first use test: PASSED (mode=embedded, path=/Users/charlesabrooker/.local/share/claude/versions/2.1.294)
+2026-10-08T10:07:06.385Z [DEBUG] Failed to stat directory /Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.claude/output-styles: ENOENT: no such file or directory, stat '/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/.claude/output-styles'
+2026-10-08T10:07:06.385Z [DEBUG] Failed to stat directory /Library/Application Support/ClaudeCode/.claude/output-styles: ENOENT: no such file or directory, stat '/Library/Application Support/ClaudeCode/.claude/output-styles'
+2026-10-08T10:07:06.388Z [DEBUG] Total plugin output styles loaded: 0
+2026-10-08T10:07:06.393Z [DEBUG] act_dont_rederive_arm_active source=growthbook
+2026-10-08T10:07:06.413Z [DEBUG] [mcp-registry] Loaded 294 official MCP URLs (legacy)
+2026-10-08T10:07:06.425Z [DEBUG] intro_frame_arm_active source=growthbook
+2026-10-08T10:07:06.461Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2026-10-08T10:07:06.461Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2026-10-08T10:07:06.461Z [DEBUG] Hooks: Found 0 total hooks in registry
+2026-10-08T10:07:06.462Z [DEBUG] Sending 43 skills via attachment (initial)
+2026-10-08T10:07:06.463Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2026-10-08T10:07:06.474Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 2.4ms (native link, next() included)
+2026-10-08T10:07:06.475Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 0.1ms (native link, next() included)
+2026-10-08T10:07:06.475Z [DEBUG] Lock acquisition took longer than expected - another Claude instance may be running
+2026-10-08T10:07:07.672Z [DEBUG] Hook output does not start with {, treating as plain text
+2026-10-08T10:07:07.719Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 28.4ms (native link, next() included)
+2026-10-08T10:07:07.720Z [WARN] [event-loop-stall] blocked for 712ms monotonic (wall drift 712ms, clock jump 0ms, expected 200ms). Total stalls: 1, cumulative: 712ms monotonic / 712ms wall blocked_write=false sigcont=n/a cpu=252ms majflt=0 rss=202MB heap=67MB ext=27MB
+2026-10-08T10:07:07.734Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-10-08T10:07:07.734Z [DEBUG] [session-notices] advertise=false mode=default flag=true(payload) pollChannel=false ownEventsOnly=false remote=false remoteEnv=false nonInteractive=true
+2026-10-08T10:07:07.741Z [DEBUG] [engine] turn 1 start
+2026-10-08T10:07:07.746Z [DEBUG] hooks module cc-plugin-agents-md@builtin turn.start settled in 4.9ms (native link, next() included)
+2026-10-08T10:07:07.746Z [DEBUG] hooks module cc-plugin-agents-md@builtin prompt.submit settled in 1273.1ms (native link, next() included)
+2026-10-08T10:07:07.748Z [DEBUG] autocompact: tokens=[REDACTED] level=ok effectiveWindow=980000
+2026-10-08T10:07:07.758Z [DEBUG] [AdvisorTool] Server-side tool enabled with claude-opus-5-5 as the advisor model
+2026-10-08T10:07:07.919Z [DEBUG] Dynamic tool loading: found 3 discovered tools in message history
+2026-10-08T10:07:07.931Z [DEBUG] Dynamic tool loading: 0/22 deferred tools included
+2026-10-08T10:07:07.941Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.294.f5e; cc_entrypoint=sdk-cli; cch=00000; cc_prompt_id=d2a03c8c-9092-4f89-affc-2b10cbf87f32; cc_turn_origin=sdk; cc_prompt_index=0; cc_turn_index=1;
+2026-10-08T10:07:07.941Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-10-08T10:07:07.998Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-10-08T10:07:08.007Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-10-08T10:07:08.007Z [DEBUG] [API:timing] dispatching to firstParty model=claude-opus-5-5
+2026-10-08T10:07:08.007Z [DEBUG] [dispatch] sent anthropic-dispatch-id=v2d
+2026-10-08T10:07:08.010Z [DEBUG] [API REQUEST] /v1/messages x-client-request-id=b772ac0a-2ae8-4d61-b2b7-723b95bcda27 source=sdk
+2026-10-08T10:07:09.433Z [DEBUG] Stream started - received first chunk
+2026-10-08T10:07:09.433Z [DEBUG] [API:timing] first byte after 1427ms
+2026-10-08T10:07:10.785Z [DEBUG] $.http.fetch (cc-plugin-telemetry): POST https://api.anthropic.com/api/event_logging/v2/batch
+2026-10-08T10:07:11.148Z [DEBUG] $.http.fetch (cc-plugin-telemetry): 200 in 364ms, 39 chars
+2026-10-08T10:07:11.149Z [DEBUG] [cc-plugin-telemetry] $.ui.log (to debug): telemetry: sent 3 row(s)
+2026-10-08T10:07:11.608Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 1.6ms (native link, next() included)
+2026-10-08T10:07:11.608Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 0.1ms (native link, next() included)
+2026-10-08T10:07:11.610Z [DEBUG] hooks module firstmate-calm@skills-dir turn.step stream settled in 3811.0ms (worker hop, next() included)
+2026-10-08T10:07:11.614Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 0.3ms (native link, next() included)
+2026-10-08T10:07:11.628Z [DEBUG] Preserving file permissions: 100600
+2026-10-08T10:07:11.628Z [DEBUG] Writing to temp file: /Users/charlesabrooker/.claude.json.tmp.97031.1e690ae0d862
+2026-10-08T10:07:11.631Z [DEBUG] Applied original permissions to temp file
+2026-10-08T10:07:11.634Z [DEBUG] Temp file written successfully, size: 386067 bytes
+2026-10-08T10:07:11.634Z [DEBUG] Renaming /Users/charlesabrooker/.claude.json.tmp.97031.1e690ae0d862 to /Users/charlesabrooker/.claude.json
+2026-10-08T10:07:11.635Z [DEBUG] File /Users/charlesabrooker/.claude.json written atomically
+2026-10-08T10:07:11.815Z [DEBUG] Hook output does not start with {, treating as plain text
+2026-10-08T10:07:11.871Z [DEBUG] Hook output does not start with {, treating as plain text
+2026-10-08T10:07:11.921Z [DEBUG] Hook output does not start with {, treating as plain text
+2026-10-08T10:07:11.926Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 1.2ms (native link, next() included)
+2026-10-08T10:07:11.928Z [DEBUG] [engine] turn 1 end (turns=1 usage in=2 out=213 cost=$0.3404 api=3607ms stop=end_turn resultLen=437)
+2026-10-08T10:07:11.928Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-10-08T10:07:11.934Z [DEBUG] hooks module cc-plugin-agents-md@builtin turn.complete settled in 0.2ms (native link, next() included)
+2026-10-08T10:07:11.938Z [DEBUG] MCP server "claude.ai Claude Docs": CLAUDEAI-PROXY connection closed after 6s (cleanly)
+2026-10-08T10:07:11.939Z [DEBUG] MCP server "claude.ai Claude Docs": Cleared connection cache for reconnection
+2026-10-08T10:07:11.943Z [DEBUG] hooks module cc-plugin-telemetry@builtin telemetry.log settled in 3.7ms (native link, next() included)
+2026-10-08T10:07:11.945Z [DEBUG] [uds-messaging] Shutting down
+2026-10-08T10:07:11.958Z [DEBUG] LSP server manager shut down successfully
+2026-10-08T10:07:11.972Z [DEBUG] hooks module cc-plugin-telemetry@builtin session.end settled in 0.4ms (native link, next() included)

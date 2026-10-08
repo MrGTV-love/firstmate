@@ -1,0 +1,45 @@
+ok - watcher-carried status append publishes the real home summary
+ok - large backlog snapshots and home-summary publication stay within exec limits
+ok - fleet snapshot transport does not require or mutate operational state
+ok - parent snapshot consumes large child ledgers without argument transport
+ok - live watcher cadence bounds publication staleness without signals
+ok - fleet snapshot consumes the published local ledger by default
+ok - writer kill and replacement preserve an atomic JSON ledger
+ok - best-effort publication logs and continues
+Terminated: 15
+ok - best-effort refresh bounds publication lock acquisition
+Terminated: 15
+ok - best-effort refresh bounds validation and publication
+ok - best-effort refresh bounds state initialization
+ok - detached foreground returns before stalled bounded state initialization
+ok - best-effort refresh logs worker termination
+ok - best-effort refresh bounds failure reporting fallback
+ok - valid publication ignores an unavailable failure record
+ok - directory ledger destinations fail without false publication and count acquired attempts
+ok - publication completes on a home carrying accumulated status history
+ok - producer skips remote per-task state probes
+ok - a stalled publication does not delay the watcher liveness beacon
+ok - publication remains single-flight across watcher restart
+ok - bootstrap scopes retained failures to the current publication
+Terminated: 15
+ok - failure records preserve refresh attempt ordering
+ok - repeated publication failure is reported at session start until it clears
+ok - a detached trigger returns at once and records no failure while a refresh is in flight
+ok - a detached trigger on an idle home publishes and clears its marker
+ok - triggers during a refresh coalesce into exactly one follow-up refresh
+ok - successful pending refreshes drain beyond four attempts
+Terminated: 15
+ok - timeout wake accounting finishes before a newer success publishes and resets the streak
+Terminated: 15
+Terminated: 15
+Terminated: 15
+Terminated: 15
+Terminated: 15
+Terminated: 15
+ok - three consecutive deadline failures raise one wake that names the reason and duration, and no more
+ok - a changed failure reason raises a new wake and a repeated one does not
+Terminated: 15
+Terminated: 15
+Terminated: 15
+ok - a successful publication ends the streak so a later streak wakes again
+ok - publication on a large history reads only what was appended and publishes the same decisions as a full fold

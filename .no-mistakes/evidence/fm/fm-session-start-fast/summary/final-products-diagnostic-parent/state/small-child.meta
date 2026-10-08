@@ -1,0 +1,10 @@
+window=fmtest:fm-small-child
+endpoint_task_id=small-child
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child
+harness=claude
+kind=secondmate
+mode=secondmate
+yolo=off
+home=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child
+projects=firstmate

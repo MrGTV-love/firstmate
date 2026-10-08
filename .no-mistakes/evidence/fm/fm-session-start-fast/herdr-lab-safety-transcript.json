@@ -1,0 +1,42 @@
+[
+  {
+    "command": "bin/fm-herdr-lab.sh prepare fm-lab-start-fast-91959-21963 ",
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "bin/fm-herdr-lab.sh provision fm-lab-start-fast-91959-21963 ",
+    "exit": 1,
+    "output": "fm-herdr-lab: tripwire already exists for 'fm-lab-start-fast-91959-21963'; refusing ambiguous ownership\n"
+  },
+  {
+    "command": "bin/fm-herdr-lab.sh teardown fm-lab-start-fast-91959-21963 ",
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "bin/fm-herdr-lab.sh provision fm-lab-start-fast-91959-21963 ",
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "bin/fm-herdr-lab.sh run fm-lab-start-fast-91959-21963 status --json",
+    "exit": 0,
+    "output": "{\"client\":{\"version\":\"0.9.1\",\"channel\":\"stable\",\"protocol\":22,\"endpoint_protocol_generation\":1,\"endpoint_capabilities\":[\"surface_interest\",\"presentation_effects_fence\",\"health_check\"],\"remote_host_bridge\":true,\"remote_bridge_idle_timeout\":true,\"binary\":\"/Users/charlesabrooker/.local/bin/herdr\",\"session\":\"fm-lab-start-fast-91959-21963\"},\"server\":{\"status\":\"running\",\"running\":true,\"version\":\"0.9.1\",\"protocol\":22,\"capabilities\":{\"live_handoff\":true,\"detached_server_daemon\":false,\"endpoint_protocol_generation\":1,\"surface_interest\":true,\"health_check\":true},\"compatible\":true,\"endpoint_compatible\":true,\"socket\":\"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-start-fast-91959-21963/herdr.sock\",\"session\":\"fm-lab-start-fast-91959-21963\",\"restart_needed\":false,\"server_binary_stale\":false},\"update\":{\"restart_needed\":false,\"server_binary_stale\":false}}\n"
+  },
+  {
+    "command": "bin/fm-herdr-lab.sh run fm-lab-start-fast-91959-21963 pane --help",
+    "exit": 0,
+    "output": "Control terminal panes\n\nUsage: herdr pane [COMMAND]\n\nCommands:\n  list                  List panes\n  current               Show the current pane\n  get                   Show a pane\n  layout                Show pane layout information\n  process-info          Show pane process information\n  neighbor              Find a pane neighbor\n  edges                 Show pane edge information\n  focus                 Focus a neighboring pane\n  resize                Resize a pane split\n  zoom                  Toggle or set pane zoom\n  read                  Read pane terminal output\n  rename                Rename a pane\n  input                 Set pane input routing\n  split                 Split a pane\n  swap                  Swap panes\n  move                  Move a pane\n  close                 Close a pane\n  send-text             Send literal text to a pane\n  send-keys             Send key presses to a pane\n  wait-output           Wait for matching pane output\n  run                   Run a command in a pane\n  report-agent          Report pane agent lifecycle state\n  report-agent-session  Report pane agent session identity\n  release-agent         Release pane agent lifecycle authority\n  report-metadata       Report display-only pane metadata\n\nAre you an AI? Use these resources ONLY IF your task specifically asks you to:\n  Help a human understand or set up Herdr for the first time:\n    https://herdr.dev/agent-guide.md\n  Debug or investigate a problem with Herdr:\n    https://herdr.dev/llms.txt\n  Control Herdr panes, agents, or workspaces:\n    SKIP if a Herdr skill is already in your context. Otherwise run: herdr --skill\n\n"
+  },
+  {
+    "command": "bin/fm-herdr-lab.sh run fm-lab-start-fast-91959-21963 pane get w1:p2",
+    "exit": 0,
+    "output": "{\"id\":\"cli:pane:get\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/batch-project\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.treehouse/batch-project-b57f44/1/batch-project\",\"pane_id\":\"w1:p2\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t2\",\"terminal_id\":\"term_65d5183afcee62\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n"
+  },
+  {
+    "command": "bin/fm-herdr-lab.sh teardown fm-lab-start-fast-91959-21963 ",
+    "exit": 0,
+    "output": ""
+  }
+]

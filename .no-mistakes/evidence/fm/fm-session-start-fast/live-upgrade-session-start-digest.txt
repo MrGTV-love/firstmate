@@ -1,0 +1,28 @@
+================================================================================
+SESSION START - /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-primary/upgrade-home
+================================================================================
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 93635
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+(silent - all good)
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  STARTUP TRUNCATED - SESSION START HIT ITS 120s RUNTIME BOUND
+●  It stopped during the "wake-queue" stage, so everything above is COMPLETE
+●  only up to that point.
+●  RECONCILE these stages before acting on anything they would have shown:
+●    wake-queue supervision-instructions read-once fleet-state network-checks context next-step
+●  Rerun bin/fm-session-start.sh now to finish taking the helm. If it truncates
+●  again, raise FM_SESSION_START_TIMEOUT and report the slow stage - a stage that
+●  cannot finish inside the bound is a fleet problem, not a reporting detail.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STARTUP_RUNTIME_SECONDS=120.784
+
+[exited with code 0]

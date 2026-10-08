@@ -1,0 +1,14 @@
+{
+  "refresh_rc": 0,
+  "holder_rc": 0,
+  "total_refresh_seconds": 2.612,
+  "after_lock_release_seconds": 1.233,
+  "latest_task_in_queued": true,
+  "pending_cleared": true,
+  "live_product": true,
+  "ledger_exists": true,
+  "streak_exists": false,
+  "wake_count": 0,
+  "lock_exists": false,
+  "fence_exists": false
+}

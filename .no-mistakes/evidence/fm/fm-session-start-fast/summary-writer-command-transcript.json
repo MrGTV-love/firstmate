@@ -1,0 +1,152 @@
+[
+  {
+    "command": "FM_HOME=<publication> bin/fm-home-summary-refresh.sh ",
+    "seconds": 3.937,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 3.23,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 0.954,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.701,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.041,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 2.262,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.227,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.504,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.715,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<concurrent-triggers> bin/fm-home-summary-refresh.sh --detach",
+    "seconds": 0.072,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<concurrent-triggers> bin/fm-home-summary-refresh.sh --detach",
+    "seconds": 0.065,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<concurrent-triggers> bin/fm-home-summary-refresh.sh --detach",
+    "seconds": 0.053,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<concurrent-triggers> bin/fm-home-summary-refresh.sh --detach",
+    "seconds": 0.111,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<concurrent-triggers> bin/fm-home-summary-refresh.sh --detach",
+    "seconds": 0.048,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<concurrent-triggers> bin/fm-home-summary-refresh.sh --detach",
+    "seconds": 0.142,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<concurrent-triggers> bin/fm-home-summary-refresh.sh --detach",
+    "seconds": 0.085,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<large-child> bin/fm-home-summary-refresh.sh ",
+    "seconds": 2.89,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.873,
+    "exit": 0,
+    "output": "Terminated: 15\n"
+  },
+  {
+    "command": "FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.955,
+    "exit": 0,
+    "output": "Terminated: 15\n"
+  },
+  {
+    "command": "FM_HOME=<real-timeouts> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 2.685,
+    "exit": 0,
+    "output": "Terminated: 15\n"
+  },
+  {
+    "command": "FM_HOME=<parent-cancellation> bin/fm-home-summary-refresh.sh ",
+    "seconds": 12.848,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<parent-cancellation> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 3.1,
+    "exit": 0,
+    "output": "Terminated: 15\n"
+  },
+  {
+    "command": "FM_HOME=<spawn> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 0.873,
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.692,
+    "exit": 0,
+    "output": "Terminated: 15\n"
+  },
+  {
+    "command": "FM_HOME=<directory-failure> bin/fm-home-summary-refresh.sh --best-effort",
+    "seconds": 1.668,
+    "exit": 0,
+    "output": "Terminated: 15\n"
+  }
+]

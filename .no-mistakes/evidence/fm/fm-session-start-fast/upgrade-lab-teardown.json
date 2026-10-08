@@ -1,0 +1,11 @@
+{
+  "session": "fm-lab-upgrade-cold-53699-6156",
+  "before_default_tripwire": {
+    "name": "default",
+    "default": true,
+    "running": true,
+    "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+  },
+  "teardown_returncode": 0,
+  "tripwire_removed_after_verifying_default_unchanged": true
+}

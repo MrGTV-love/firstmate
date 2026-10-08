@@ -1,0 +1,157 @@
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-08T08:37:45Z",
+  "generated_epoch": 1791448665,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-primary/home,a,b",
+  "valid": false,
+  "reason": "child current state unavailable: 123, false, heal-last, heal-last-2, null, running-ordinary, true",
+  "invalidity": {
+    "kind": "child_current_unavailable",
+    "ids": [
+      "123",
+      "false",
+      "heal-last",
+      "heal-last-2",
+      "null",
+      "running-ordinary",
+      "true"
+    ]
+  },
+  "state": "unknown",
+  "active_children": [],
+  "decisions_open": [
+    {
+      "id": "running-ordinary",
+      "key": "tail",
+      "verb": "needs-decision",
+      "summary": "choose retry policy",
+      "reason": null,
+      "source": "status"
+    }
+  ],
+  "holds": [],
+  "queued": [],
+  "landed": [],
+  "endpoints": [
+    {
+      "id": "123",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-08T08:37:45Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "false",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-08T08:37:45Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "heal-last",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-08T08:37:45Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "heal-last-2",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-08T08:37:45Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "null",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-08T08:37:45Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "running-ordinary",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-08T08:37:45Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "true",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-08T08:37:45Z",
+        "freshness": "fresh"
+      }
+    }
+  ],
+  "counts": {
+    "active_children": 0,
+    "decisions_open": 1,
+    "holds": 0,
+    "queued": 0,
+    "landed": 0,
+    "endpoints": 7
+  },
+  "omitted": []
+}

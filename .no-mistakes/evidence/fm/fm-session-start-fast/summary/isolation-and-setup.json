@@ -1,0 +1,21 @@
+{
+  "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT",
+  "fixture_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary",
+  "evidence_root": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/summary",
+  "targeted_test_env_policy": "Removed FM_*_OVERRIDE, TASKS_AXI_FILE, TASKS_AXI_BACKEND, FM_HOME, TMUX, TMUX_PANE, FM_TEST_SEAM, FM_GATE_REFUSE_BYPASS from inherited env; TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/tmp",
+  "live_env_policy": "Removed all FM_*, HERDR_*, CMUX_*, TASKS_AXI_* and TMUX/TMUX_PANE from inherited env. Added only FM_HOME for each marked home, FM_BACKEND=tmux, TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/tmp, TMUX_TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/private-tmux",
+  "live_binaries": {
+    "jq": "/usr/bin/jq",
+    "tasks-axi": "/opt/homebrew/bin/tasks-axi",
+    "tmux": "/opt/homebrew/bin/tmux",
+    "chflags": "/usr/bin/chflags"
+  },
+  "publication_obstacle_commands": [
+    "/usr/bin/chflags uchg $FM_HOME/state/home-summary.json",
+    "FM_HOME=$HOME bin/fm-home-summary-refresh.sh --best-effort",
+    "/usr/bin/chflags nouchg $FM_HOME/state/home-summary.json"
+  ],
+  "ownership_live_boundary": "Test real writer and producer with jq/mv/rm syscall shims and fake tmux; blocked logger test additionally forces validation failure through jq shim. Separate immutable-ledger logger exercise has no product/syscall stand-ins.",
+  "diagnostic_root_cause": "Secondmate home validator rejects inside repo; forced in-worktree TMPDIR invalidates large-child suite fixture. Small retained live executable snapshot and direct validation confirm before ledger selection.",
+  "cleanup": "All own foreground/subprocesses completed or were reaped in try/finally; detached skipped triggers completed before contention owner and real refresh converged. No tmux/Herdr server was created."
+}

@@ -1,0 +1,651 @@
+[
+  {
+    "name": "create-marked-home",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home"
+    ],
+    "FM_HOME": null,
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.06,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home\n",
+    "stderr": ""
+  },
+  {
+    "name": "real-tasks-help",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "add",
+      "--help"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.272,
+    "stdout": "usage: tasks-axi add <id> \"<title>\" [flags]\naliases: create\nflags:\n  --kind <ship|scout|docs|...>, --repo <name>, --body <text> or --body-file <path>\n  --start (place in In flight) | --queue (place in Queued, default)\n  --blocked-by <id> (repeatable, must exist), --pr <url>, --report <path>, --priority <0-4>\n  --mint [--prefix <p>]   mint a slug-xx id from the title instead of passing one\n  --json   print the resulting task as a JSON object\nexamples:\n  tasks-axi add lavish-foo-q9 \"fix summary toggle\" --kind ship --repo lavish-axi --start\n  tasks-axi add fm-x \"adopt lease\" --blocked-by treehouse-lease-t4\n  tasks-axi add \"quick note\" --mint",
+    "stderr": ""
+  },
+  {
+    "name": "seed-real-task",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "add",
+      "summary-proof",
+      "Real summary validation",
+      "--kind",
+      "ship",
+      "--repo",
+      "firstmate",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.317,
+    "stdout": "{\n  \"ok\": true,\n  \"action\": \"add\",\n  \"task\": {\n    \"id\": \"summary-proof\",\n    \"title\": \"Real summary validation\",\n    \"state\": \"queued\",\n    \"kind\": \"ship\",\n    \"repo\": \"firstmate\",\n    \"priority\": null,\n    \"created\": \"2026-10-08\",\n    \"closed\": null,\n    \"deps\": [],\n    \"hold\": null,\n    \"links\": [],\n    \"body\": null,\n    \"blocked\": false,\n    \"blocked_by\": [],\n    \"held\": false\n  }\n}\n",
+    "stderr": ""
+  },
+  {
+    "name": "initial-summary",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 4.909,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "directory-publication-obstacle",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 3.325,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "restore-summary",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 4.674,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "freeze-ledger",
+    "command": [
+      "/usr/bin/chflags",
+      "uchg",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home/state/home-summary.json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.01,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "real-publication-failure-1",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 4.691,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "real-publication-failure-2",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 4.151,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "real-publication-failure-3",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 8.477,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "real-publication-failure-4",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 2.902,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "unfreeze-ledger",
+    "command": [
+      "/usr/bin/chflags",
+      "nouchg",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home/state/home-summary.json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.006,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "recovered-summary",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 1.398,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "freeze-ledger-again",
+    "command": [
+      "/usr/bin/chflags",
+      "uchg",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home/state/home-summary.json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.01,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "post-recovery-failure-1",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 3.617,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "post-recovery-failure-2",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 5.372,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "post-recovery-failure-3",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 5.074,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "unfreeze-ledger-again",
+    "command": [
+      "/usr/bin/chflags",
+      "nouchg",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home/state/home-summary.json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.012,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "final-recovered-summary",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 3.266,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "blocked-logger-freeze-ledger",
+    "command": [
+      "/usr/bin/chflags",
+      "uchg",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home/state/home-summary.json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.01,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "blocked-logger-unfreeze-ledger",
+    "command": [
+      "/usr/bin/chflags",
+      "nouchg",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home/state/home-summary.json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.007,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "blocked-logger-recovery",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 2.987,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "create-detached-marked-home",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home"
+    ],
+    "FM_HOME": null,
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.1,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home\n",
+    "stderr": ""
+  },
+  {
+    "name": "seed-detached-real-task",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "add",
+      "initial-task",
+      "Initial FIFO observation",
+      "--kind",
+      "ship",
+      "--repo",
+      "firstmate",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.598,
+    "stdout": "{\n  \"ok\": true,\n  \"action\": \"add\",\n  \"task\": {\n    \"id\": \"initial-task\",\n    \"title\": \"Initial FIFO observation\",\n    \"state\": \"queued\",\n    \"kind\": \"ship\",\n    \"repo\": \"firstmate\",\n    \"priority\": null,\n    \"created\": \"2026-10-08\",\n    \"closed\": null,\n    \"deps\": [],\n    \"hold\": null,\n    \"links\": [],\n    \"body\": null,\n    \"blocked\": false,\n    \"blocked_by\": [],\n    \"held\": false\n  }\n}\n",
+    "stderr": ""
+  },
+  {
+    "name": "detached-baseline-summary",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 5.971,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "busy-detached-trigger-1",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--detach"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.055,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "busy-detached-trigger-2",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--detach"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 1.411,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "busy-detached-trigger-3",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--detach"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.575,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "add-latest-real-task-during-refresh",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "add",
+      "latest-task",
+      "Latest trigger must converge",
+      "--kind",
+      "ship",
+      "--repo",
+      "firstmate",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/detach-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 1.696,
+    "stdout": "{\n  \"ok\": true,\n  \"action\": \"add\",\n  \"task\": {\n    \"id\": \"latest-task\",\n    \"title\": \"Latest trigger must converge\",\n    \"state\": \"queued\",\n    \"kind\": \"ship\",\n    \"repo\": \"firstmate\",\n    \"priority\": null,\n    \"created\": \"2026-10-08\",\n    \"closed\": null,\n    \"deps\": [],\n    \"hold\": null,\n    \"links\": [],\n    \"body\": null,\n    \"blocked\": false,\n    \"blocked_by\": [],\n    \"held\": false\n  }\n}\n",
+    "stderr": ""
+  },
+  {
+    "name": "create-contended-marked-home",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home"
+    ],
+    "FM_HOME": null,
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.371,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home\n",
+    "stderr": ""
+  },
+  {
+    "name": "seed-contended-task",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "add",
+      "old-task",
+      "Initial state",
+      "--kind",
+      "ship",
+      "--repo",
+      "firstmate",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.362,
+    "stdout": "{\n  \"ok\": true,\n  \"action\": \"add\",\n  \"task\": {\n    \"id\": \"old-task\",\n    \"title\": \"Initial state\",\n    \"state\": \"queued\",\n    \"kind\": \"ship\",\n    \"repo\": \"firstmate\",\n    \"priority\": null,\n    \"created\": \"2026-10-08\",\n    \"closed\": null,\n    \"deps\": [],\n    \"hold\": null,\n    \"links\": [],\n    \"body\": null,\n    \"blocked\": false,\n    \"blocked_by\": [],\n    \"held\": false\n  }\n}\n",
+    "stderr": ""
+  },
+  {
+    "name": "contended-baseline-summary",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 1.327,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "contended-detached-trigger-1",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--detach"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.084,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "contended-detached-trigger-2",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--detach"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.041,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "contended-detached-trigger-3",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--detach"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.256,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "contended-add-latest-task",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "add",
+      "latest-task",
+      "Latest trigger must converge",
+      "--kind",
+      "ship",
+      "--repo",
+      "firstmate",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.242,
+    "stdout": "{\n  \"ok\": true,\n  \"action\": \"add\",\n  \"task\": {\n    \"id\": \"latest-task\",\n    \"title\": \"Latest trigger must converge\",\n    \"state\": \"queued\",\n    \"kind\": \"ship\",\n    \"repo\": \"firstmate\",\n    \"priority\": null,\n    \"created\": \"2026-10-08\",\n    \"closed\": null,\n    \"deps\": [],\n    \"hold\": null,\n    \"links\": [],\n    \"body\": null,\n    \"blocked\": false,\n    \"blocked_by\": [],\n    \"held\": false\n  }\n}\n",
+    "stderr": ""
+  },
+  {
+    "name": "create-diagnostic-diagnostic-child",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child"
+    ],
+    "FM_HOME": null,
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 1.151,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\n",
+    "stderr": ""
+  },
+  {
+    "name": "create-diagnostic-diagnostic-parent",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent"
+    ],
+    "FM_HOME": null,
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.814,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent\n",
+    "stderr": ""
+  },
+  {
+    "name": "small-child-real-summary",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 6.244,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "small-parent-real-snapshot",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-fleet-snapshot.sh",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 2.274,
+    "stdout": "{\n  \"schema\": \"fm-fleet-snapshot.v1\",\n  \"generated\": \"2026-10-08T08:37:38Z\",\n  \"fm_home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent\",\n  \"roots\": {\n    \"fm_root\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT\",\n    \"state\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/state\",\n    \"data\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data\",\n    \"config\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/config\",\n    \"projects\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/projects\"\n  },\n  \"backlog\": {\n    \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data/backlog.md\",\n    \"present\": true,\n    \"records\": []\n  },\n  \"tasks\": [\n    {\n      \"id\": \"small-child\",\n      \"kind\": \"secondmate\",\n      \"harness\": \"claude\",\n      \"mode\": \"secondmate\",\n      \"yolo\": \"off\",\n      \"branch\": null,\n      \"project\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\",\n      \"spawn_gen\": null,\n      \"backend\": \"tmux\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/state/small-child.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/state/small-child.status\",\n          \"present\": false,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"\",\n            \"note\": \"\",\n            \"raw\": \"\",\n            \"age_seconds\": null\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\",\n          \"present\": true\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data/small-child/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [\n        \"firstmate\"\n      ],\n      \"current_state\": {\n        \"state\": \"unknown\",\n        \"source\": \"none\",\n        \"detail\": \"backend unreachable (tmux endpoint state: unreadable)\",\n        \"raw\": \"state: unknown \u00b7 source: none \u00b7 backend unreachable (tmux endpoint state: unreadable)\",\n        \"observed_at\": \"2026-10-08T08:37:38Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fmtest:fm-small-child\",\n        \"exists\": false,\n        \"agent_alive\": \"unknown\",\n        \"status\": \"absent\",\n        \"observed_at\": \"2026-10-08T08:37:38Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"\"\n      },\n      \"actions\": {\n        \"send\": \"bin/fm-send.sh fm-small-child '<request>'\",\n        \"watch\": \"read status/doc return channel; do not routinely fm-peek a secondmate for answers\",\n        \"return_channel_note\": \"Secondmate answers come back through status/doc paths after a marked fm-send request.\"\n      },\n      \"backlog\": null\n    }\n  ],\n  \"main_inventory\": {\n    \"valid\": true,\n    \"reason\": null,\n    \"orphan_in_flight\": [],\n    \"unstructured_current_count\": 0\n  },\n  \"contributions\": {\n    \"known\": 0,\n    \"checked\": 0,\n    \"counts\": {\n      \"captain\": 0,\n      \"fleet\": 0,\n      \"maintainer\": 0,\n      \"nobody\": 0\n    },\n    \"unmeasured\": 0,\n    \"complete\": true,\n    \"proven_clear\": true,\n    \"stale_verdicts\": 0,\n    \"missing_verdicts\": 0,\n    \"unreadable_records\": 0,\n    \"valid_until\": 900,\n    \"captain\": [],\n    \"captain_omitted\": 0\n  },\n  \"scout_reports\": [],\n  \"secondmate_current\": {\n    \"registry\": {\n      \"present\": true,\n      \"available\": true,\n      \"reason\": null,\n      \"provenance\": \"registered-table\",\n      \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent/data/secondmates.md\",\n      \"freshness\": {\n        \"status\": \"fresh\",\n        \"observed_at\": \"2026-10-08T08:37:38Z\"\n      },\n      \"records\": [\n        {\n          \"id\": \"small-child\",\n          \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\",\n          \"host\": null,\n          \"root\": null,\n          \"remote\": false,\n          \"registered\": true,\n          \"registry_error\": null\n        }\n      ],\n      \"input_truncated\": false,\n      \"records_truncated\": false,\n      \"complete\": true,\n      \"reasons\": [],\n      \"lines_in_window\": 1,\n      \"records_in_window\": 1\n    },\n    \"records\": [\n      {\n        \"id\": \"small-child\",\n        \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\",\n        \"host\": null,\n        \"remote\": false,\n        \"registered\": true,\n        \"spawn_gen\": null,\n        \"current\": {\n          \"state\": \"unknown\",\n          \"reason\": \"invalid home: secondmate home cannot be inside the firstmate repo\"\n        },\n        \"invalidity\": null,\n        \"reconcile_inventory\": null,\n        \"provenance\": {\n          \"selected\": \"unknown\",\n          \"structured_home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\",\n          \"parent_event_role\": \"fallback-only-not-current\"\n        },\n        \"freshness\": {\n          \"status\": \"unknown\",\n          \"observed_at\": \"2026-10-08T08:37:38Z\",\n          \"age_seconds\": null\n        },\n        \"active_children\": [],\n        \"decisions_open\": [],\n        \"holds\": [],\n        \"queued\": [],\n        \"landed\": [],\n        \"endpoints\": [],\n        \"counts\": {\n          \"active_children\": 0,\n          \"decisions_open\": 0,\n          \"holds\": 0,\n          \"queued\": 0,\n          \"landed\": 0,\n          \"endpoints\": 0\n        },\n        \"omitted\": [],\n        \"parent_event\": {\n          \"raw\": \"\",\n          \"note\": \"\",\n          \"age_seconds\": null,\n          \"open_activities\": [],\n          \"open_decisions\": [],\n          \"activity_scan\": {\n            \"records\": [],\n            \"available\": true,\n            \"input_truncated\": false,\n            \"retained_truncated\": false,\n            \"reasons\": [],\n            \"lines_in_window\": 0,\n            \"records_in_window\": 0\n          }\n        },\n        \"terminal_evidence\": {\n          \"provenance\": \"parent-direct-report-terminal\",\n          \"trust\": \"untrusted-supplement\",\n          \"captured\": false,\n          \"observed_at\": \"2026-10-08T08:37:38Z\",\n          \"freshness\": \"not-collected\",\n          \"reason\": \"no parent event to compare\",\n          \"lines\": 0,\n          \"bytes\": 0,\n          \"event_note_seen\": false,\n          \"contradiction\": false\n        },\n        \"contradiction\": false\n      }\n    ],\n    \"total_registered\": 1,\n    \"total\": 1,\n    \"shown\": 1,\n    \"truncated\": 0\n  },\n  \"secondmate_landed\": {\n    \"records\": [],\n    \"truncated\": [],\n    \"unreadable\": [\n      \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child\"\n    ],\n    \"partial\": []\n  },\n  \"secondmate_guidance\": {\n    \"note\": \"For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority.\"\n  }\n}\n",
+    "stderr": ""
+  },
+  {
+    "name": "small-child-direct-home-boundary",
+    "command": [
+      "bash",
+      "-c",
+      ". \"$1/bin/fm-ff-lib.sh\"; if validate_secondmate_home small-child \"$2\"; then printf \"valid=%s\\n\" \"$VALIDATED_HOME\"; else printf \"validation_error=%s\\n\" \"$VALIDATION_ERROR\"; exit 1; fi",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent",
+    "extra_env": {},
+    "rc": 1,
+    "seconds": 0.027,
+    "stdout": "validation_error=firstmate repo is not a directory\n",
+    "stderr": ""
+  },
+  {
+    "name": "installed-tasks-schema",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "show",
+      "old-task",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 2,
+    "seconds": 0.201,
+    "stdout": "error: \"Unknown flag: --json\"\ncode: VALIDATION_ERROR\nhelp[1]: Run the command with --help to see supported flags\n",
+    "stderr": ""
+  },
+  {
+    "name": "installed-tasks-version",
+    "command": [
+      "/opt/homebrew/bin/tasks-axi",
+      "--version"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 0.122,
+    "stdout": "0.2.6\n",
+    "stderr": ""
+  },
+  {
+    "name": "small-child-correctly-initialized-home-boundary",
+    "command": [
+      "bash",
+      "-c",
+      "FM_ROOT=\"$1\"; . \"$1/bin/fm-ff-lib.sh\"; if validate_secondmate_home small-child \"$2\"; then printf \"valid=%s\\n\" \"$VALIDATED_HOME\"; else printf \"validation_error=%s\\n\" \"$VALIDATION_ERROR\"; exit 1; fi",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-child"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/diagnostic-parent",
+    "extra_env": {},
+    "rc": 1,
+    "seconds": 0.072,
+    "stdout": "validation_error=secondmate home cannot be inside the firstmate repo\n",
+    "stderr": ""
+  },
+  {
+    "name": "installed-tasks-list-help",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "list",
+      "--help"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 0,
+    "seconds": 1.114,
+    "stdout": "usage: tasks-axi list [flags]\nflags:\n  --state <queued|in_flight|done|held>, --repo <name>, --kind <name>, --blocked\n  --limit <n>, --fields <a,b,c>  (extra: blocked, blocked_by, body, closed, created, delivery_state, deps, held, hold_kind, hold_reason, hold_until, links, priority)\nexamples:\n  tasks-axi list --state queued\n  tasks-axi list --repo no-mistakes --fields blocked_by,created\n  tasks-axi list --blocked",
+    "stderr": ""
+  },
+  {
+    "name": "installed-tasks-real-list-json",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-tasks-axi.sh",
+      "list",
+      "--json"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/contended-home",
+    "extra_env": {},
+    "rc": 2,
+    "seconds": 1.325,
+    "stdout": "error: \"Unknown flag: --json\"\ncode: VALIDATION_ERROR\nhelp[1]: Run the command with --help to see supported flags\n",
+    "stderr": ""
+  }
+]

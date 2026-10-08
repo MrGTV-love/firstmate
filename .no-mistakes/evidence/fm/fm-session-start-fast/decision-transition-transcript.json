@@ -1,0 +1,32 @@
+[
+  {
+    "step": "initial cold fold",
+    "exit": 0,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=access] blocked: waiting\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+  },
+  {
+    "step": "terminal completion",
+    "exit": 0,
+    "output": "UNREAD STATUS (new since last drain, not re-printed after this presentation):\ntask note: cleanup complete\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+  },
+  {
+    "step": "reopen with append",
+    "exit": 0,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=new] needs-decision: choose a new path\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+  },
+  {
+    "step": "replace authoritative log",
+    "exit": 0,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=replaced] needs-decision: replaced-log choice\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+  },
+  {
+    "step": "mid-append partial line",
+    "exit": 0,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=partial] needs-decision: choose the\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+  },
+  {
+    "step": "complete partial line",
+    "exit": 0,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=partial] needs-decision: choose the complete choice\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n"
+  }
+]

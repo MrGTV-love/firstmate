@@ -1,0 +1,18 @@
+[
+  {
+    "streak": "count=4\nfirst=2026-10-08T10:05:31Z\nclass=refresh exceeded its -second deadline\nescalated=refresh exceeded its -second deadline\n",
+    "wakes": [
+      "1791453927\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log",
+      "1791453935\t2\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:31Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log",
+      "1791454836\t3\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 4 consecutive refresh failures since 2026-10-08T10:05:31Z; last: refresh exceeded its 1-second deadline (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log"
+    ]
+  },
+  {
+    "streak": "count=5\nfirst=2026-10-08T10:05:31Z\nclass=refresh exceeded its -second deadline\nescalated=refresh exceeded its -second deadline\n",
+    "wakes": [
+      "1791453927\t1\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:22Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log",
+      "1791453935\t2\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 3 consecutive refresh failures since 2026-10-08T10:05:31Z; last: atomic ledger replacement failed: destination is a directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.live-validation-emr992ci/directory-failure/state/home-summary.json (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log",
+      "1791454836\t3\tcheck\thome-summary-refresh\tcheck: home-summary-refresh: 4 consecutive refresh failures since 2026-10-08T10:05:31Z; last: refresh exceeded its 1-second deadline (the failed attempt ran 1s). state/home-summary.json is not being republished; reproduce with bin/fm-home-summary-refresh.sh and read state/.home-summary-refresh.log"
+    ]
+  }
+]

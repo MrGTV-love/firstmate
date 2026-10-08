@@ -1,0 +1,53 @@
+[
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "stderr": "real pipe prefilled with 65536 bytes and no reader",
+    "failure": "real uchg ledger prevents mv; log path is a directory",
+    "rc": 0,
+    "seconds": 9.861,
+    "count": "1",
+    "ledger_exists": true,
+    "streak_exists": true,
+    "wake_count": 2,
+    "lock_exists": false,
+    "fence_exists": false
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "stderr": "real pipe prefilled with 65536 bytes and no reader",
+    "failure": "real uchg ledger prevents mv; log path is a directory",
+    "rc": 0,
+    "seconds": 6.795,
+    "count": "2",
+    "ledger_exists": true,
+    "streak_exists": true,
+    "wake_count": 2,
+    "lock_exists": false,
+    "fence_exists": false
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/bin/fm-home-summary-refresh.sh",
+      "--best-effort"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/live-home",
+    "stderr": "real pipe prefilled with 65536 bytes and no reader",
+    "failure": "real uchg ledger prevents mv; log path is a directory",
+    "rc": 0,
+    "seconds": 9.758,
+    "count": "3",
+    "ledger_exists": true,
+    "streak_exists": true,
+    "wake_count": 3,
+    "lock_exists": false,
+    "fence_exists": false
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "command": "bin/fm-bootstrap.sh (FM_HOME marked comma-containing lab; FM_BOOTSTRAP_NETWORK=skip; transparent exec tracer delegates to actual tasks-axi)",
+  "returncode": 0,
+  "elapsed_seconds": 21.38,
+  "task_backend_calls": {
+    "update": 1,
+    "start": 1,
+    "list": 1,
+    "--version": 1,
+    "show": 1,
+    "mv": 1
+  },
+  "rows": {
+    "running-ordinary": "task:\n  id: running-ordinary\n  title: Live startup validation running-ordinary\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\n",
+    "123": "task:\n  id: \"123\"\n  title: Live startup validation 123\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\n",
+    "true": "task:\n  id: \"true\"\n  title: Live startup validation true\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\n",
+    "false": "task:\n  id: \"false\"\n  title: Live startup validation false\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\n",
+    "null": "task:\n  id: \"null\"\n  title: Live startup validation null\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\n",
+    "heal-last-2": "task:\n  id: heal-last-2\n  title: Queued record requiring startup repair\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"-\"\n  hold_kind: \"-\"\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\n"
+  },
+  "queued_repair_stdout": "BOOTSTRAP_INFO: marked heal-last-2 in flight to match the worker this home already owns\n"
+}

@@ -1,0 +1,1 @@
+BOOTSTRAP_INFO: marked heal-last-2 in flight to match the worker this home already owns

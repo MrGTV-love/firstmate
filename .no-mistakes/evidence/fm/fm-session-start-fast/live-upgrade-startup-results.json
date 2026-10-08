@@ -1,0 +1,24 @@
+{
+  "scenario": "First upgrade from a version-9 checkpoint on a long-lived worker status log",
+  "real_primary": "Claude machine existing login, named non-default Herdr lab; public startup command invoked manually because native gate hook stands down",
+  "status_log_lines": 24001,
+  "status_log_bytes": 840058,
+  "prior_checkpoint_version": "9:ship",
+  "prior_checkpoint_offset": 840058,
+  "prior_checkpoint_open_key": "buried-upgrade",
+  "runtime_seconds": 120.784,
+  "startup_completed": false,
+  "truncated_stage": "wake-queue",
+  "buried_decision_delivered": false,
+  "remaining_sections_not_delivered": [
+    "supervision-instructions",
+    "read-once",
+    "fleet-state",
+    "network-checks",
+    "context",
+    "next-step"
+  ],
+  "cold_native_cursor_present_after_timeout": true,
+  "published_summary_present": true,
+  "lab_torn_down": true
+}

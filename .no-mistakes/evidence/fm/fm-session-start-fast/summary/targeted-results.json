@@ -1,0 +1,14 @@
+[
+  {
+    "command": "TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/tmp bash tests/fm-home-summary-refresh.test.sh",
+    "rc": 1,
+    "seconds": 39.253,
+    "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/summary/fm-home-summary-refresh.test.sh.log"
+  },
+  {
+    "command": "TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT/.validation-summary/tmp bash tests/fm-home-summary-refresh-ownership.test.sh",
+    "rc": 1,
+    "seconds": 70.432,
+    "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M4CVJREG2ZWYYTNDVWK2DHWT/summary/fm-home-summary-refresh-ownership.test.sh.log"
+  }
+]

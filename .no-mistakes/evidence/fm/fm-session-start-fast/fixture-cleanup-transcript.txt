@@ -1,0 +1,10 @@
+Treehouse exact disposable worktree
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Destroyed 1 worktree in ~/.treehouse/batch-project-b57f44/1/batch-project and freed 417 B.
+  1     [disposable]  417 B  ~/.treehouse/batch-project-b57f44/1/batch-project
+
+Herdr safety teardown
+
+Private tmux socket directories removed by fm-lab-home.sh teardown.
