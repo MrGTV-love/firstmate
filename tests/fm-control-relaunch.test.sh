@@ -60,24 +60,12 @@ make_process_table_stub() { # <case-dir>
   cat > "$1/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
-if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
-  mode=$(cat "$D/process-mode" 2>/dev/null || printf live)
-  uid=$(id -u)
-  case "$mode" in
-    broken) exit 1 ;;
-    empty) exit 0 ;;
-    malformed) printf 'not a process row\n'; exit 0 ;;
-    transient)
-      if [ -f "$D/process-read" ]; then mode=live; else : > "$D/process-read"; mode=none; fi
-      ;;
+# The one process a case stages as holding the task's worktree.
+if [ -f "$D/holder-pid" ] && [ "${1:-}" = -p ] && [ "${2:-}" = "$(cat "$D/holder-pid")" ]; then
+  case "${3:-} ${4:-}" in
+    '-o comm=') cat "$D/holder-comm"; printf '\n'; exit 0 ;;
+    '-o args=') cat "$D/holder-args"; printf '\n'; exit 0 ;;
   esac
-  if [ -s "$D/created-windows" ] || [ -s "$D/created-sessions" ]; then mode=live; fi
-  printf '%s 111 bash\n' "$uid"
-  case "$mode" in
-    live) printf '%s 222 /usr/local/bin/tmux: server\n' "$uid" ;;
-    foreign) printf '%s 222 tmux: server\n' "$((uid + 1))" ;;
-  esac
-  exit 0
 fi
 if [ -f "$D/herdr-agent-registration" ]; then
   case "$*" in
@@ -88,6 +76,25 @@ fi
 exec /bin/ps "$@"
 SH
   chmod +x "$1/fakebin/ps"
+  # The working-directory table the worktree-holder scan reads. By default it
+  # holds only processes unrelated to the task - a tmux server and a shell
+  # somewhere else, standing in for the several servers a busy machine always
+  # has. lsof-mode: holder adds the staged holder; broken fails; partial lists some
+  # processes and then fails; nocwd lists a process with no directory; empty is blind.
+  cat > "$1/fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+D=$FM_FAKE_DIR
+case "$(cat "$D/lsof-mode" 2>/dev/null || printf none)" in
+  broken) echo 'lsof: WARNING: could not read the process table' >&2; exit 1 ;;
+  partial) printf 'p111\nn/\np222\nn/private/tmp\n'; echo 'lsof: WARNING: read timeout' >&2; exit 1 ;;
+  nocwd) printf 'p111\nn/\np%s\n' "$(cat "$D/holder-pid")"; exit 0 ;;
+  empty) exit 0 ;;
+  holder) printf 'p111\nn/\np222\nn/private/tmp\np%s\nn%s\n' "$(cat "$D/holder-pid")" "$(cat "$D/holder-cwd")"; exit 0 ;;
+esac
+printf 'p111\nn/\np222\nn/private/tmp\n'
+exit 0
+SH
+  chmod +x "$1/fakebin/lsof"
 }
 
 make_tmux_stub() {  # <dir>
@@ -167,6 +174,19 @@ case "${1:-}" in
     # The three shapes real tmux answers a per-session inventory with. The
     # first two are DEFINITIVE and classify `missing`; the third is not and
     # classifies `unreadable`.
+    # Reads are counted so a case can change what the NEXT read answers: a
+    # window that appears, or a server that stops answering, after the first
+    # read. A case resets list-count before each verb it drives.
+    count=$(( $(cat "$D/list-count" 2>/dev/null || printf 0) + 1 ))
+    printf '%s' "$count" > "$D/list-count"
+    if [ -f "$D/broken-after" ] && [ "$count" -gt "$(cat "$D/broken-after")" ]; then
+      echo 'lost server' >&2
+      exit 1
+    fi
+    if [ -f "$D/late-window" ] && [ "$count" -gt "$(cat "$D/late-window-after")" ]; then
+      cat "$D/late-window"
+      exit 0
+    fi
     if [ -f "$D/server-dead" ]; then
       echo 'no server running on /tmp/tmux-1000/default' >&2
       exit 1
@@ -2310,33 +2330,54 @@ test_spawn_relaunch_refuses_a_pane_outside_the_worktree() {
 # reclaimed by anything, and any no-mistakes approval it was parked on had no
 # seat left to answer it.
 
-# strand_endpoint <case-dir> <id>: make a tmux endpoint read `missing` the way
-# a destroyed window does - a successful session inventory that omits the exact
-# window.
-strand_endpoint() {  # <case-dir> <id>
-  : > "$1/fake/windows"
+# stage_gone <case-dir> <id> <shape>: make the recorded tmux endpoint read
+# `missing` in one of the three ways real tmux reports a destroyed endpoint.
+stage_gone() {
+  local dir=$1 id=$2 shape=$3
+  case "$shape" in
+    window-absent) printf 'scratch\nfm-someone-else\n' > "$dir/fake/windows" ;;
+    session-missing) : > "$dir/fake/session-missing" ;;
+    server-dead) : > "$dir/fake/server-dead" ;;
+    *) fail "unknown gone shape $shape for $id" ;;
+  esac
 }
 
-# A missing endpoint still refuses while ANY user-owned tmux process exists,
-# including a server on a foreign socket. Socket-local absence is not proof.
+# stage_holder <case-dir> <comm> <args> <cwd>: a live process whose working
+# directory is <cwd>, as the machine's working-directory table reports it.
+stage_holder() {
+  printf holder > "$1/fake/lsof-mode"
+  printf 4343 > "$1/fake/holder-pid"
+  printf '%s' "$2" > "$1/fake/holder-comm"
+  printf '%s' "$3" > "$1/fake/holder-args"
+  printf '%s' "$4" > "$1/fake/holder-cwd"
+}
+
+# A missing endpoint whose absence cannot be shown for THIS task still
+# refuses, and the refusal comes from the shared absence proof (its message
+# names the reading) rather than from any later backend policy.
 assert_tmux_missing_refuses() {  # <case-dir> <id> <what-was-staged>
   local dir=$1 id=$2 what=$3 out rc brief_before
 
+  rm -f "$dir/fake/list-count"
   out=$(run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
   expect_code 1 "$rc" "relaunch must refuse a tmux endpoint whose absence cannot be proven ($what)"$'\n'"$out"
+  assert_contains "$out" "may still hold a live agent" "the refusal must come from the absence proof ($what)"
   assert_absent "$dir/fake/created-windows" "a refused relaunch must not create a window ($what)"
   assert_absent "$dir/fake/created-sessions" "a refused relaunch must not create a session ($what)"
   [ ! -s "$dir/fake/literal" ] || fail "a refused relaunch must send nothing into any pane ($what)"
 
   brief_before=$(cat "$dir/home/data/$id/brief.md")
+  rm -f "$dir/fake/list-count"
   out=$(run_control "$dir" "$id" exit); rc=$?
   expect_code 1 "$rc" "exit must refuse a tmux endpoint whose absence cannot be proven ($what)"$'\n'"$out"
   assert_not_contains "$out" "endpoint-gone" \
     "exit must not report a stop it cannot see ($what)"
   [ ! -s "$dir/fake/literal" ] || fail "a refused exit must send nothing into any pane ($what)"
 
+  rm -f "$dir/fake/list-count"
   out=$(run_control "$dir" "$id" relaunch --note "this note must never reach a live agent"); rc=$?
   expect_code 1 "$rc" "the relaunch transaction must fail closed ($what)"$'\n'"$out"
+  assert_contains "$out" "will not claim an agent stopped" "the transaction must stop at the absence proof ($what)"
   [ "$(cat "$dir/home/data/$id/brief.md")" = "$brief_before" ] \
     || fail "a refused relaunch edited instructions an agent that may still be running is reading ($what)"
   assert_absent "$dir/fake/created-windows" "a refused transaction must not create a window ($what)"
@@ -2344,67 +2385,116 @@ assert_tmux_missing_refuses() {  # <case-dir> <id> <what-was-staged>
   [ ! -s "$dir/fake/literal" ] || fail "a refused transaction must launch nothing ($what)"
 }
 
-test_tmux_refuses_a_window_missing_from_its_session() {
-  local dir
-  dir=$(new_case tmux-gone rl60)
-  add_ship_task "$dir" rl60 claude
-  strand_endpoint "$dir" rl60
-  assert_tmux_missing_refuses "$dir" rl60 "window absent from a readable session inventory"
-  pass "tmux: a window absent from its session refuses both verbs rather than being assumed gone"
+# prepare_herdr_reclaim <case-dir>: configure the home to replace a proven-gone
+# tmux endpoint on Herdr. Returns 1 when the Herdr adapter's jq is missing.
+prepare_herdr_reclaim() {
+  command -v jq >/dev/null 2>&1 || return 1
+  make_herdr_stub "$1"
+  mkdir -p "$1/home/config"
+  printf herdr > "$1/home/config/backend"
+  printf '%%none' > "$1/fake/herdr-pane"
+  : > "$1/fake/herdr-log"
+  : > "$1/fake/herdr-stopped"
 }
 
-test_tmux_refuses_a_session_that_cannot_be_found() {
-  local dir
-  dir=$(new_case tmux-nosession rl61)
-  add_ship_task "$dir" rl61 claude
-  # Real tmux's answer to a renamed session, and to a different
-  # TMUX_TMPDIR/socket: definitive about the SESSION, silent about whether the
-  # window and its agent survived elsewhere.
-  : > "$dir/fake/session-missing"
-  assert_tmux_missing_refuses "$dir" rl61 "recorded session not found"
-  pass "tmux: an unfindable session refuses both verbs, so a live agent is never duplicated"
-}
+# (a) The recorded endpoint is gone while unrelated tmux servers keep running:
+# the lsof fixture always lists unrelated processes, and a user's unrelated
+# servers can never be shown absent, so none of them may block this task.
+test_tmux_gone_endpoint_is_proven_despite_unrelated_servers() {
+  local dir shape id out rc wt head_before
+  command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
+  for shape in window-absent session-missing server-dead shell-in-worktree; do
+    id="rl90${shape//-/}"
+    dir=$(new_case "tmux-scoped-$shape" "$id")
+    add_ship_task "$dir" "$id"
+    prepare_herdr_reclaim "$dir"
+    wt=$(meta_field "$dir" "$id" worktree)
+    if [ "$shape" = shell-in-worktree ]; then
+      # An idle shell in the copy is the pane's own leftover, not an agent.
+      stage_gone "$dir" "$id" window-absent
+      stage_holder "$dir" zsh -zsh "$wt/sub"
+    else
+      stage_gone "$dir" "$id" "$shape"
+    fi
+    head_before=$(git -C "$wt" rev-parse HEAD)
+    printf 'unlanded content\n' > "$wt/dirty.txt"
+    printf 'working: preserved history\n' > "$dir/home/state/$id.status"
 
-test_tmux_refuses_when_the_server_is_gone() {
-  local dir
-  dir=$(new_case tmux-noserver rl62)
-  add_ship_task "$dir" rl62 claude
-  # No server on the socket this process addresses. Another server may still be
-  # running the task's window, and the record cannot say which socket is its.
-  : > "$dir/fake/server-dead"
-  assert_tmux_missing_refuses "$dir" rl62 "no tmux server on this socket"
-  pass "tmux: a dead server on this socket refuses both verbs rather than proving absence"
-}
-
-test_tmux_process_read_uncertainty_refuses() {
-  local dir mode
-  for mode in broken empty malformed transient; do
-    dir=$(new_case "tmux-process-$mode" "rl80$mode")
-    add_ship_task "$dir" "rl80$mode"
-    : > "$dir/fake/server-dead"
-    printf '%s' "$mode" > "$dir/fake/process-mode"
-    assert_tmux_missing_refuses "$dir" "rl80$mode" "process read $mode"
+    out=$(run_control "$dir" "$id" exit); rc=$?
+    expect_code 0 "$rc" "a gone recorded endpoint must be proven despite unrelated tmux servers ($shape)"$'\n'"$out"
+    assert_contains "$out" endpoint-gone "exit should report proven absence ($shape)"
+    rm -f "$dir/fake/list-count"
+    out=$(FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+    expect_code 0 "$rc" "relaunch must proceed for a gone recorded endpoint ($shape)"$'\n'"$out"
+    [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "reclaim did not publish Herdr ($shape)"
+    [ "$(meta_field "$dir" "$id" worktree)" = "$wt" ] || fail "reclaim changed the local copy ($shape)"
+    [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] || fail "reclaim moved the branch head ($shape)"
+    [ "$(cat "$wt/dirty.txt")" = "unlanded content" ] || fail "reclaim lost uncommitted work ($shape)"
+    assert_contains "$(cat "$dir/home/state/$id.status")" "preserved history" "reclaim truncated status ($shape)"
+    assert_absent "$dir/fake/created-windows" "reclaim created a tmux endpoint ($shape)"
+    assert_absent "$dir/fake/created-sessions" "reclaim started a tmux server ($shape)"
+    assert_present "$dir/fake/herdr-created-tabs" "reclaim did not create the Herdr endpoint ($shape)"
   done
-  pass "tmux: unreadable, empty, malformed and changing process snapshots refuse both verbs"
+  pass "tmux: a gone recorded endpoint is proven and reclaimed while unrelated tmux servers run"
 }
 
-test_tmux_zero_processes_with_readable_inventory_refuses() {
-  local dir
-  dir=$(new_case tmux-contradiction rl81)
-  add_ship_task "$dir" rl81
-  strand_endpoint "$dir" rl81
-  printf none > "$dir/fake/process-mode"
-  assert_tmux_missing_refuses "$dir" rl81 "a server inventory contradicts the process snapshot"
-  pass "tmux: a readable server contradicting the process snapshot refuses"
+# (b) The recorded endpoint may still be live: the window answers, or an agent
+# still holds the worktree (its window can sit on a socket this process does
+# not address). Either refuses both verbs.
+test_tmux_refuses_while_the_recorded_endpoint_may_be_live() {
+  local dir shape id wt
+  for shape in window-answers-first window-answers-second agent-in-worktree agent-in-subdirectory gemini-agent-in-worktree; do
+    id="rl91${shape//-/}"
+    dir=$(new_case "tmux-live-$shape" "$id")
+    add_ship_task "$dir" "$id"
+    stage_gone "$dir" "$id" window-absent
+    wt=$(meta_field "$dir" "$id" worktree)
+    case "$shape" in
+      window-answers-first) printf 'fm-%s\n' "$id" > "$dir/fake/late-window"; printf 1 > "$dir/fake/late-window-after" ;;
+      window-answers-second) printf 'fm-%s\n' "$id" > "$dir/fake/late-window"; printf 2 > "$dir/fake/late-window-after" ;;
+      agent-in-worktree) stage_holder "$dir" /usr/local/bin/claude 'claude --resume' "$wt" ;;
+      agent-in-subdirectory) stage_holder "$dir" claude claude "$wt/src/deep" ;;
+      gemini-agent-in-worktree) stage_holder "$dir" MainThread 'node /home/u/.local/bin/gemini -y' "$wt" ;;
+    esac
+    assert_tmux_missing_refuses "$dir" "$id" "$shape"
+  done
+  pass "tmux: an answering window or an agent holding the worktree refuses both verbs"
+}
+
+# (c) Evidence that cannot be read is never evidence of absence.
+test_tmux_unreadable_evidence_refuses() {
+  local dir shape id wt
+  for shape in lsof-fails lsof-partial lsof-record-without-cwd lsof-blind holder-unreadable inventory-unreadable-first inventory-unreadable-second; do
+    id="rl92${shape//-/}"
+    dir=$(new_case "tmux-unreadable-$shape" "$id")
+    add_ship_task "$dir" "$id"
+    stage_gone "$dir" "$id" window-absent
+    wt=$(meta_field "$dir" "$id" worktree)
+    case "$shape" in
+      lsof-fails) printf broken > "$dir/fake/lsof-mode" ;;
+      lsof-partial) printf partial > "$dir/fake/lsof-mode" ;;
+      lsof-record-without-cwd) stage_holder "$dir" claude claude "$wt"; printf nocwd > "$dir/fake/lsof-mode" ;;
+      lsof-blind) printf empty > "$dir/fake/lsof-mode" ;;
+      holder-unreadable)
+        # A live holder (this very shell) whose name and command line cannot be read.
+        stage_holder "$dir" '' '' "$wt"
+        printf '%s' "$$" > "$dir/fake/holder-pid"
+        ;;
+      inventory-unreadable-first) printf 1 > "$dir/fake/broken-after" ;;
+      inventory-unreadable-second) printf 2 > "$dir/fake/broken-after" ;;
+    esac
+    assert_tmux_missing_refuses "$dir" "$id" "$shape"
+  done
+  pass "tmux: an unreadable process table or tmux answer refuses both verbs"
 }
 
 test_tmux_no_server_reclaim_keeps_work_and_task() {
   local dir second out rc head_before mode id wt first_id second_id first_endpoint
   command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
-  for mode in none foreign; do
+  for mode in server-dead session-missing; do
     first_id="rl82${mode}a"
     second_id="rl82${mode}b"
-    dir=$(new_case "tmux-no-user-server-$mode" "$first_id")
+    dir=$(new_case "tmux-sequential-reclaim-$mode" "$first_id")
     second=$(new_case "tmux-second-$mode" "$second_id")
     add_ship_task "$dir" "$first_id"
     add_ship_task "$second" "$second_id"
@@ -2412,8 +2502,7 @@ test_tmux_no_server_reclaim_keeps_work_and_task() {
     mkdir -p "$dir/home/data/$second_id"
     cp "$second/home/data/$second_id/brief.md" "$dir/home/data/$second_id/brief.md"
     make_herdr_stub "$dir"
-    printf '%s' "$mode" > "$dir/fake/process-mode"
-    : > "$dir/fake/server-dead"
+    : > "$dir/fake/$mode"
     : > "$dir/fake/stale-socket"
     printf '%%none' > "$dir/fake/herdr-pane"
     : > "$dir/fake/herdr-log"
@@ -2467,7 +2556,6 @@ test_tmux_reclaim_refuses_other_configured_backends() {
   for backend in tmux zellij cmux orca unknown; do
     dir=$(new_case "tmux-reclaim-$backend" "rl84$backend")
     add_ship_task "$dir" "rl84$backend"
-    printf none > "$dir/fake/process-mode"
     : > "$dir/fake/server-dead"
     mkdir -p "$dir/home/config"
     printf '%s' "$backend" > "$dir/home/config/backend"
@@ -2484,7 +2572,7 @@ test_tmux_reclaim_refuses_other_configured_backends() {
     assert_absent "$dir/fake/herdr-created-tabs" "refused reclaim created a Herdr endpoint"
     [ ! -s "$dir/fake/literal" ] || fail "refused reclaim delivered launch input"
   done
-  pass "tmux: no-server reclaim refuses every configured backend other than Herdr"
+  pass "tmux: a proven-gone endpoint refuses every configured backend other than Herdr"
 }
 
 test_reclaim_refuses_an_unreadable_endpoint() {
@@ -3920,11 +4008,9 @@ test_spawn_relaunch_refuses_a_pending_authoritative_close
 test_spawn_relaunch_refuses_contradicting_flags
 test_spawn_relaunch_refuses_an_unrecorded_task
 test_spawn_relaunch_refuses_a_pane_outside_the_worktree
-test_tmux_refuses_a_window_missing_from_its_session
-test_tmux_refuses_a_session_that_cannot_be_found
-test_tmux_refuses_when_the_server_is_gone
-test_tmux_process_read_uncertainty_refuses
-test_tmux_zero_processes_with_readable_inventory_refuses
+test_tmux_gone_endpoint_is_proven_despite_unrelated_servers
+test_tmux_refuses_while_the_recorded_endpoint_may_be_live
+test_tmux_unreadable_evidence_refuses
 test_tmux_no_server_reclaim_keeps_work_and_task
 test_tmux_reclaim_refuses_other_configured_backends
 test_reclaim_refuses_an_unreadable_endpoint

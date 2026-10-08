@@ -302,6 +302,65 @@ fm_control_backend_state_verified() {  # <backend>
   return 1
 }
 
+# fm_control_worktree_agent_holder: whether a harness agent process has the
+# recorded worktree (or a directory under it) as its working directory.
+# Prints `none`, `held`, or `unknown`; only `none` is evidence, and any read
+# that cannot be completed is `unknown`: a scan that exits non-zero, a process
+# record with no working directory, or a holder whose name or command line
+# cannot be read. Each holder is classified from every identity surface by
+# fm_agent_process_classify, so node-bundle harnesses count as agents too.
+# Reads the machine's process working-directory table once and touches no tmux
+# server.
+fm_control_worktree_agent_holder() {  # <worktree>
+  local wt=${1-} wt_real records rc line pid="" path root comm args argv0 holders="" seen=0 has_cwd=1
+  case "$wt" in /*) ;; *) printf 'unknown'; return 0 ;; esac
+  wt=${wt%/}
+  [ -n "$wt" ] || { printf 'unknown'; return 0; }
+  wt_real=$(cd "$wt" 2>/dev/null && pwd -P) || wt_real=$wt
+  command -v lsof >/dev/null 2>&1 || { printf 'unknown'; return 0; }
+  records=$(LC_ALL=C lsof -w +c 0 -d cwd -F pn 2>/dev/null)
+  rc=$?
+  [ "$rc" -eq 0 ] || { printf 'unknown'; return 0; }
+  while IFS= read -r line; do
+    case "$line" in
+      p*)
+        [ "$has_cwd" -eq 1 ] || { printf 'unknown'; return 0; }
+        pid=${line#p}
+        seen=1
+        has_cwd=0
+        ;;
+      n*)
+        has_cwd=1
+        path=${line#n}
+        for root in "$wt" "$wt_real"; do
+          case "$path/" in
+            "$root"/*) holders="$holders $pid" ;;
+          esac
+        done
+        ;;
+    esac
+  done <<HOLDERS
+$records
+HOLDERS
+  [ "$seen" -eq 1 ] && [ "$has_cwd" -eq 1 ] || { printf 'unknown'; return 0; }
+  for pid in $holders; do
+    case "$pid" in ''|*[!0-9]*) printf 'unknown'; return 0 ;; esac
+    comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null)
+    args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null)
+    if [ -z "$comm" ] || [ -z "$args" ]; then
+      # A process that exited since the scan holds nothing; one that is still
+      # there but unreadable cannot be ruled out.
+      kill -0 "$pid" 2>/dev/null && { printf 'unknown'; return 0; }
+      continue
+    fi
+    argv0=${args%% *}
+    case "$(fm_agent_process_classify "$comm" "$argv0" "$args" "$pid")" in
+      agent) printf 'held'; return 0 ;;
+    esac
+  done
+  printf 'none'
+}
+
 # fm_control_endpoint_absence_verdict: the ONE owner of the per-backend proof
 # that an endpoint reading `missing` is actually GONE rather than merely
 # unreachable from this seat. Call it only for a `missing` raw state.
@@ -332,55 +391,58 @@ fm_control_backend_state_verified() {  # <backend>
 #     passes `--session <session>`, so the recheck starts and reads the session
 #     the RECORD names, through that session's own socket. The answer is about
 #     the task's endpoint and nothing else.
-#   tmux CAN prove the machine-wide no-server case only. Its record has no
-#     socket identity, so any tmux process owned by the current uid prevents
-#     proof, even on another socket. Two readable full process snapshots must
-#     contain none, and the addressed socket must independently report no
-#     server on each pass. Empty, malformed, failed, or contradictory reads
-#     refuse. Counting clients too is intentionally conservative.
+#   tmux CAN prove it for the recorded endpoint. Its record carries a session
+#     and window name but no socket identity, so the proof is scoped to what
+#     the record does name: the exact recorded session on the server this
+#     process addresses, plus the recorded worktree. The addressed server must
+#     twice answer definitively that the session or the whole server is absent,
+#     or list the session without the recorded window; a window that answers
+#     is never absent. Between those reads, no process classified as a harness
+#     agent may hold the recorded worktree as its working directory, because a
+#     window that lives on another socket still leaves its agent running there.
+#     An unrelated tmux server owned by the same uid proves nothing about this
+#     endpoint and does not block the proof. An unreadable worktree, a missing
+#     lsof, an unreadable process, or a non-definitive tmux answer refuses.
 #
 # Both control-plane callers share this one implementation so the proof cannot
 # drift into two answers for the same endpoint.
-fm_control_endpoint_absence_verdict() {  # <backend> <target>
-  local backend=${1-} target=${2-} uid snapshot inventory pass=0
+fm_control_endpoint_absence_verdict() {  # <backend> <target> [worktree]
+  local backend=${1-} target=${2-} worktree=${3-} session window inventory status holder pass=0
   fm_backend_source "$backend" \
     || { printf 'unproven\tbackend %s could not be loaded to prove anything about that endpoint' "'$backend'"; return 0; }
   case "$backend" in
     tmux)
-      uid=$(id -u) || uid=
-      case "$uid" in
-        ''|*[!0-9]*) printf 'unproven\tthe current uid could not be read'; return 0 ;;
+      case "$target" in
+        *:*:*|'':*|*:'') printf 'unproven\tthe recorded tmux endpoint is not a session:window pair'; return 0 ;;
+        *:*) ;;
+        *) printf 'unproven\tthe recorded tmux endpoint is not a session:window pair'; return 0 ;;
       esac
+      session=${target%%:*}
+      window=${target#*:}
+      # Read the recorded session's inventory before and after the worktree
+      # scan, so a window that appears between the two reads is caught.
       while [ "$pass" -lt 2 ]; do
         pass=$((pass + 1))
-        snapshot=$(LC_ALL=C ps -axww -o uid=,pid=,comm= 2>/dev/null) || {
-          printf 'unproven\tthe machine process table could not be read'
-          return 0
-        }
-        if ! printf '%s\n' "$snapshot" | LC_ALL=C awk -v uid="$uid" '
-          NF < 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ { invalid = 1 }
-          $1 == uid {
-            seen = 1
-            comm = $0
-            sub(/^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/, "", comm)
-            sub(/^.*\//, "", comm)
-            if (comm ~ /^tmux($|[ :])/) live = 1
-          }
-          END { exit (invalid || !seen || live) ? 1 : 0 }
-        '; then
-          printf 'unproven\tthe process table does not positively show zero tmux processes owned by the current uid; a server on another socket may still hold the endpoint'
-          return 0
-        fi
-        # A readable server inventory contradicts the zero-process snapshot,
-        # even if it omits this window. A transient error is not absence.
-        if inventory=$(LC_ALL=C tmux list-windows -t "=${target%%:*}" -F '#{window_name}' 2>&1); then
-          printf 'unproven\ttmux answered from a server despite the zero-process snapshot'
-          return 0
-        fi
-        case "$inventory" in
-          *"no server running on "*|*"error connecting to "*" (No such file or directory)"|*"error connecting to "*" (Connection refused)") ;;
-          *) printf 'unproven\ttmux did not corroborate the no-server process snapshot'; return 0 ;;
+        inventory=$(fm_backend_tmux_window_inventory "=$session")
+        status=$?
+        case "$status" in
+          0)
+            if printf '%s\n' "$inventory" | grep -Fqx -- "$window"; then
+              printf 'unproven\tthe recorded tmux window answers on the addressed server'
+              return 0
+            fi
+            ;;
+          2) ;;
+          *) printf 'unproven\ttmux did not answer definitively about the recorded session'; return 0 ;;
         esac
+        if [ "$pass" -eq 1 ]; then
+          holder=$(fm_control_worktree_agent_holder "$worktree")
+          case "$holder" in
+            none) ;;
+            held) printf 'unproven\tan agent process still holds the recorded worktree, so its endpoint may live on a server this process does not address'; return 0 ;;
+            *) printf 'unproven\tthe processes holding the recorded worktree could not be read'; return 0 ;;
+          esac
+        fi
       done
       printf 'gone\t'
       ;;

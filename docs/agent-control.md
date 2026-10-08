@@ -114,7 +114,7 @@ An `fm-send` message never clears recovery by its text.
 ### Reclaiming a task whose endpoint is gone
 
 A terminal can disappear while its task's worktree, branch, commits, and uncommitted changes survive.
-Reclaim supports Herdr's session-scoped absence proof and tmux's machine-wide no-user-server proof.
+Reclaim supports Herdr's session-scoped absence proof and a tmux proof scoped to the recorded session and worktree.
 
 Two endpoint verdicts can permit a relaunch, subject to the backend policy below:
 
@@ -129,12 +129,16 @@ An unreachable endpoint can still hold the live agent a rebind would duplicate, 
   `dead` means the pane survived the restart and is adopted after all, with no second tab; `alive` means the agent came back and refuses; only a second `missing` proves the pane itself did not survive ([`docs/herdr-backend.md`](herdr-backend.md) "Restart and liveness behavior").
   That server start is a real side effect, and the parenthetical above does not cover it: when the recorded session's server no longer exists at all, the probe stands a fresh empty one up in order to ask, and nothing afterwards uses it.
   So in that state `exit` - which otherwise reads as a read-only inspection - leaves an idle herdr server behind.
-- **tmux can prove only the no-user-server case.**
-  Two successful full process-table snapshots must positively show no tmux process owned by the current uid, and socket reads must corroborate that no server is answering.
-  Clients are counted conservatively too; unreadable, empty, malformed, or contradictory reads refuse.
-  Stale socket files without a process do not prove a live server.
-  Otherwise `list-windows -a` still describes only the server the current process addresses, and the record carries no socket identity.
-  A renamed session, moved window, foreign socket, or dead addressed server therefore still refuses whenever any user-owned tmux process exists anywhere on the machine.
+- **tmux proves absence for the recorded endpoint only.**
+  The record names a session and window but carries no socket identity, so the proof uses what the record does name: the exact recorded session on the server this process addresses, plus the recorded worktree.
+  The addressed server must answer definitively, on two reads, that the whole server or the exact session is absent, or list the session without the recorded window.
+  A window that answers on either read is never absent.
+  Between the reads, one scan of the machine's process working directories must find no harness agent holding the recorded worktree or a directory under it, because a window on a socket this process does not address still leaves its agent running in that worktree.
+  Idle shells and other non-agent processes do not block the proof.
+  Other tmux servers owned by the same uid, and their clients, say nothing about this endpoint and no longer block it; this proof never queries or lists them.
+  Every harness counts as an agent here, including node-bundle harnesses such as Gemini, because each holder is classified from its name, its first argument and its full command line.
+  An unreadable process table, a missing `lsof`, a scan that fails part way, a process record with no working directory, a holder whose name or command line cannot be read, or a tmux answer that is not definitive refuses.
+  A renamed session or a window moved to another server still refuses while an agent holds the worktree.
 
 Every transient or self-contradicting read stays `unreadable` or `ambiguous` and still refuses, so a momentary backend failure can never be mistaken for absence.
 
@@ -162,7 +166,7 @@ A Herdr reclaim deliberately uses the flat container shape rather than presentat
 A proven-gone tmux endpoint is replaced on Herdr **only when the task home's current configured spawn backend is `herdr` and passes spawn validation**.
 Every other configured backend, including `tmux`, `zellij`, and `cmux`, retains the relaunch refusal: reclaim never recreates tmux endpoints and never migrates to another backend.
 The Herdr replacement uses the home's current Herdr session resolution and the same flat placement path as an ordinary Herdr reclaim.
-It never starts a tmux server, so reclaiming one rebooted task does not invalidate the no-server absence proof for the home's remaining missing tmux tasks.
+It never starts a tmux server, so reclaiming one rebooted task does not affect the absence proof for the home's remaining missing tmux tasks.
 Herdr-to-Herdr reclaim continues to use its recorded session unchanged.
 
 **Known limitation - a refusal before the record is republished leaves a stray husk pane** (follow-up bead `fm-herdr-rebind-leak-20260913`).
@@ -222,5 +226,5 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 ## Verification
 
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
-- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr no-server reclaim, refusal of other configured backends, and conservative process-read refusals.
+- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr reclaim, tmux absence scoped to the recorded endpoint despite unrelated servers, refusal of other configured backends, and refusals on a live window, a worktree-holding agent, or unreadable evidence.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.
