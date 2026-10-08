@@ -210,7 +210,7 @@ bash bin/fm-test-run.sh tests/fm-control-relaunch.test.sh
 ```
 
 The suite exercises the production control and launch commands but does not start or stop a real tmux server or Herdr session.
-Its process seam also separates a current-user server on another socket from a server owned by another uid.
+Its working-directory fixtures cover escaped paths, live and unattributed holders, and inconclusive reads; the real-`lsof` cases exercise exit, ordinary relaunch, reconciliation-only recovery, and direct replacement from the worktree root and a descendant when their tool prerequisites are available.
 The reclaim cases cover two missing tmux tasks in one home, recovered sequentially onto configured Herdr while preserving work, task identity, status, armed polls, and progress notes, plus refusal of every other configured backend.
 
 ### Agent liveness name sources

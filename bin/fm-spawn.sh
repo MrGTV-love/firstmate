@@ -71,9 +71,10 @@
 #   worktree and the republished record rebinds the task to it. That proof is
 #   its own step, because a backend's `missing` also covers an endpoint that is
 #   merely unreachable from here. fm_control_endpoint_absence_verdict owns the
-#   proof for Herdr and the tmux no-user-server case. Herdr keeps its recorded
-#   session; a gone tmux endpoint requires the home's current configured spawn
-#   backend to resolve to Herdr and pass spawn validation.
+#   proof for Herdr and for a tmux endpoint scoped to the recorded session and
+#   worktree. Herdr keeps its recorded session; a gone tmux endpoint requires
+#   the home's current configured spawn backend to resolve to Herdr and pass
+#   spawn validation.
 #   The validated worktree is reused untouched either way;
 #   a rebind is a recovery, never a teardown. Only a crewmate or scout rebinds: a
 #   secondmate whose endpoint is gone is respawned by its own owner
@@ -1914,7 +1915,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # which proven-gone endpoints may be replaced.
   RELAUNCH_STATE=$(fm_backend_agent_state "$BACKEND" "$RELAUNCH_TARGET")
   if [ "$RELAUNCH_STATE" = missing ]; then
-    RELAUNCH_ABSENCE=$(fm_control_endpoint_absence_verdict "$BACKEND" "$RELAUNCH_TARGET")
+    RELAUNCH_ABSENCE=$(fm_control_endpoint_absence_verdict "$BACKEND" "$RELAUNCH_TARGET" "$(fm_meta_get "$RELAUNCH_META" worktree)")
     case "${RELAUNCH_ABSENCE%%$'\t'*}" in
       gone) RELAUNCH_STATE=missing ;;
       dead) RELAUNCH_STATE=dead ;;
