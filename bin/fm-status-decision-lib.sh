@@ -422,12 +422,9 @@ EOF
   printf '%s' "$open"
 }
 
-# The signature a fold checkpoint must carry to be reused for <kind>: the fold
-# version and the task kind, plus every fold-affecting override when one is set,
-# so a checkpoint folded under the default verbs is never reused by a read that
-# overrides them (and the default signature stays the historical one).
 _fm_open_decisions_fold_signature() {  # <kind>
   local sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
+  sig="$sig:ctype=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}:collate=${LC_ALL:-${LC_COLLATE:-${LANG:-C}}}"
   if [ -n "${FM_CLASSIFY_RESOLVE_VERB:-}" ] || [ -n "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-}" ] \
     || [ -n "${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-}" ]; then
     sig="$sig:${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"

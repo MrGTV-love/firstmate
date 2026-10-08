@@ -1111,8 +1111,12 @@ secondmate_liveness_tick() {
             err="relaunch park marker could not be written; endpoint left $FM_SM_LIVE_STATE"
           fi
         elif fm_secondmate_liveness_relaunch "$meta" "$id" "$SECONDMATE_LIVENESS_TIMEOUT"; then
-          reason="check: secondmate $id auto-relaunched after $FM_SM_LIVE_CAUSE ($FM_SM_LIVE_WHERE)"
-          notify_key="secondmate-relaunch-$id-$now"
+          if [ "$FM_SM_LIVE_STATUS" = skipped ]; then
+            triage_log "secondmate $id liveness: $FM_SM_LIVE_REASON"
+          else
+            reason="check: secondmate $id auto-relaunched after $FM_SM_LIVE_CAUSE ($FM_SM_LIVE_WHERE)"
+            notify_key="secondmate-relaunch-$id-$now"
+          fi
         elif [ "$FM_SM_LIVE_POLICY_REFUSED" = 1 ]; then
           [ -z "$FM_SM_LIVE_WAKE" ] || [ -n "$first_reason" ] || first_reason=$FM_SM_LIVE_WAKE
         elif [ "$FM_SM_LIVE_STATUS" = skipped ]; then
@@ -1214,15 +1218,24 @@ secondmate_restart_tick() {
   done
   for request in "$STATE"/.secondmate-restart-*.request; do
     [ -f "$request" ] && [ ! -L "$request" ] || continue
-    pending=1
     id=${request##*/.secondmate-restart-}
     id=${id%.request}
+    fm_secondmate_liveness_lock "$id" || continue
+    if [ ! -f "$request" ] || [ -L "$request" ]; then
+      fm_secondmate_liveness_unlock "$id"
+      continue
+    fi
+    pending=1
+    if [ -n "$(fm_secondmate_restart_request_get "$request" relaunched_gen)" ]; then
+      fm_secondmate_liveness_unlock "$id"
+      continue
+    fi
     notice="$STATE/.secondmate-restart-$id.turn-notice"
     answered=$(fm_secondmate_restart_request_get "$request" answered_at 2>/dev/null) || answered=''
-    case "$answered" in ''|*[!0-9]*) continue ;; esac
-    [ ! -e "$notice" ] || continue
+    case "$answered" in ''|*[!0-9]*) fm_secondmate_liveness_unlock "$id"; continue ;; esac
+    [ ! -e "$notice" ] || { fm_secondmate_liveness_unlock "$id"; continue; }
     age=$((now - answered))
-    [ "$age" -ge "$BUSY_TURN_MAX_SECS" ] || continue
+    [ "$age" -ge "$BUSY_TURN_MAX_SECS" ] || { fm_secondmate_liveness_unlock "$id"; continue; }
     triage_log "bounded wait expired: waiter=watcher waited-on=secondmate $id turn end after its restart answer bound=${BUSY_TURN_MAX_SECS}s actual=${age}s"
     reason="check: secondmate $id restart still waiting for its turn to end: it confirmed its open work ${age}s ago; the restart stays recorded"
     notify_key="secondmate-restart-turn-$id-$answered"
@@ -1232,6 +1245,7 @@ secondmate_restart_tick() {
       : > "$notice"
       [ -n "$first_reason" ] || first_reason=$reason
     fi
+    fm_secondmate_liveness_unlock "$id"
   done
   if [ "$pending" -eq 1 ] && [ "$(age_of "$STATE/.secondmate-restart-tick")" -ge "$SECONDMATE_LIVENESS_SECS" ]; then
     if [ -z "$SECONDMATE_RESTART_PID" ] || ! kill -0 "$SECONDMATE_RESTART_PID" 2>/dev/null; then

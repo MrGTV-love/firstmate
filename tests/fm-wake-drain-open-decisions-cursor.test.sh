@@ -694,6 +694,43 @@ test_utf8_whitespace_uses_full_fold_locale() {
   pass "UTF-8 fold locale matches full parsing with byte offsets and legacy invalidation"
 }
 
+test_checkpoint_rejects_a_previous_parsing_locale() {
+  local dir state out from to
+  dir=$(make_case cross-locale); state="$dir/state"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  mkdir -p "$dir/copy"
+  printf 'kind=secondmate\n' > "$dir/copy/task.meta"
+  for from in C en_US.UTF-8; do
+    if [ "$from" = C ]; then to=en_US.UTF-8; else to=C; fi
+    printf 'needs-decision:\342\200\203[key=api] choose a plan\n' > "$state/task.status"
+    rm -f "$state/.task.open-decisions-cursor" "$dir/copy/.task.open-decisions-cursor"
+    LC_ALL="$from" bash -c '. "$1"; status_open_decisions_incremental "$2" >/dev/null' \
+      _ "$ROOT/bin/fm-classify-lib.sh" "$state/task.status" || fail "could not seed $from checkpoint"
+    cp "$state/task.status" "$dir/copy/task.status"
+    out=$(LC_ALL="$to" bash -c '
+      . "$1"
+      f=$2 copy=$3 cf="$(dirname "$2")/.task.open-decisions-cursor"
+      cp "$f" "$copy"
+      expected=$(status_open_decisions "$copy")
+      before=$(cat "$cf")
+      [ "$(status_open_decisions "$f")" = "$expected" ] || { echo "whole-file reused another locale"; exit 1; }
+      [ "$(cat "$cf")" = "$before" ] || { echo "read-only fold wrote its checkpoint"; exit 1; }
+      . "$4"
+      [ "$(status_open_decisions_cursor_offset "$f")" = 0 ] || { echo "wake reader accepted another locale"; exit 1; }
+      status_open_decisions_checkpoint_carry "$f" "$copy" "$(_fm_open_decisions_file_ident "$f")"
+      [ ! -e "$(dirname "$copy")/.task.open-decisions-cursor" ] || { echo "snapshot carried another locale"; exit 1; }
+      [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "incremental reused another locale"; exit 1; }
+      [ "$(cat "$cf")" != "$before" ] || { echo "incremental did not replace the signature"; exit 1; }
+      printf "resolved [key=api]: settled\n" >> "$f"
+      printf "resolved [key=api]: settled\n" >> "$copy"
+      [ "$(status_open_decisions_incremental "$f")" = "$(status_open_decisions "$copy")" ] || { echo "resolution diverged"; exit 1; }
+    ' _ "$ROOT/bin/fm-classify-lib.sh" "$state/task.status" "$dir/copy/task.status" "$ROOT/bin/fm-status-wake-lib.sh" 2>&1) \
+      || fail "$from to $to checkpoint reuse: $out"
+  done
+  pass "locale changes invalidate incremental, read-only, wake and snapshot checkpoint reuse"
+}
+
+test_checkpoint_rejects_a_previous_parsing_locale
 test_successive_appends_replay_unfinished_lines
 test_utf8_whitespace_uses_full_fold_locale
 test_terminal_supersession_reaches_cached_drains

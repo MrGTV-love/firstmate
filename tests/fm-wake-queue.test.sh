@@ -3550,7 +3550,7 @@ test_secondmate_restart_tick_surfaces_a_finished_restart_once() {
     . "$1/bin/fm-secondmate-restart-lib.sh"
     . "$1/bin/fm-secondmate-liveness-lib.sh"
     fm_secondmate_liveness_lock sm1 || exit 1
-    fm_secondmate_restart_request_write "$STATE" sm1 0123456789abcdef local "" claude "" "" \
+    fm_secondmate_restart_request_write "$STATE" sm1 0123456789abcdef local claude \
       && fm_secondmate_restart_request_finish "$STATE" sm1 "restarted: sm1 (claude)"
     rc=$?
     fm_secondmate_liveness_unlock sm1
@@ -3575,7 +3575,7 @@ test_secondmate_auto_relaunch_finishes_a_waiting_restart() {
   local dir state pid
   dir=$(make_secondmate_liveness_case restart-auto-relaunch)
   state="$dir/state"
-  printf 'corr=0123456789abcdef\nplacement=local\nhost=\nharness=claude\nmodel=\neffort=\nrequested_at=1\n' \
+  printf 'corr=0123456789abcdef\nplacement=local\nharness=claude\nrequested_at=1\n' \
     > "$state/.secondmate-restart-sm1.request"
 
   run_liveness_leg "$dir" dead FM_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
@@ -3601,7 +3601,7 @@ test_secondmate_restart_tick_reports_a_turn_that_never_ends_once() {
   dir=$(make_secondmate_liveness_case restart-long-turn)
   state="$dir/state"
   now=$(date +%s)
-  printf 'corr=0123456789abcdef\nplacement=local\nhost=\nharness=claude\nmodel=\neffort=\nrequested_at=%s\nanswered_at=%s\n' \
+  printf 'corr=0123456789abcdef\nplacement=local\nharness=claude\nrequested_at=%s\nanswered_at=%s\n' \
     "$((now - 100))" "$((now - 90))" > "$state/.secondmate-restart-sm1.request"
 
   run_liveness_leg "$dir" long FM_FAKE_TMUX_CURRENT_COMMAND=claude FM_BUSY_TURN_MAX_SECS=60; pid=$LIVENESS_PID

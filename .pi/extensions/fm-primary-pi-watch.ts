@@ -521,9 +521,22 @@ async function waitForGenerationChildClose(armChild: ChildProcess | null): Promi
   });
 }
 
-async function stopSessionGeneration(generation: SessionGeneration, replacement: boolean): Promise<void> {
+async function stopSessionGeneration(
+  generation: SessionGeneration,
+  replacement: boolean,
+  lifecycle: ReturnType<typeof createLifecycleLog>,
+): Promise<void> {
   generation.replacement = replacement;
-  retireGenerationOwner(generation, replacement);
+  try {
+    retireGenerationOwner(generation, replacement);
+  } catch (error) {
+    lifecycle("generation-owner-retire-failed", {
+      generation: generation.id,
+      replacement,
+      code: nodeErrorCode(error),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
   if (!replacement) {
     const child = stopGeneration(generation);
     await waitForGenerationChildClose(child);
@@ -1253,7 +1266,7 @@ export default function (pi: ExtensionAPI) {
     const stopped = generation;
     stoppedForReplacement = replacement;
     recoveryPending = replacement;
-    generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, replacement)]).then(() => {});
+    generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, replacement, lifecycle)]).then(() => {});
     try {
       await generationStopped;
     } finally {
@@ -1322,7 +1335,7 @@ export default function (pi: ExtensionAPI) {
       const stopped = generation;
       if (!stopped.stopping) {
         stoppedForReplacement = true;
-        generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true)]).then(() => {});
+        generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true, lifecycle)]).then(() => {});
       }
       const retirement = generationStopped.finally(() => {
         lifecycle("generation-stop", { generation: stopped.id, cause: "factory-retire" });

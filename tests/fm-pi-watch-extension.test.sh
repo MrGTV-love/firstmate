@@ -215,6 +215,134 @@ EOF
   pass "Pi replacement with no successor heals once; a real successor never double-arms; quit never heals"
 }
 
+test_pi_owner_publication_failure_does_not_poison_retirement() {
+  local repo home out status
+  repo="$TMP_ROOT/pi-owner-retirement-root"
+  home="$TMP_ROOT/pi-owner-retirement-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_watch_extension_fixture "$repo"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+previous=$(cat "${FM_CHILD_PID_FILE:?}" 2>/dev/null || true)
+[ -z "$previous" ] || kill -TERM "$previous" 2>/dev/null || true
+printf '%s\n' "$$" > "$FM_CHILD_PID_FILE"
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+exec sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$repo/.pi/extensions/fm-primary-pi-watch.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" \
+    FM_ARM_LOG="$home/arms.log" FM_CHILD_PID_FILE="$home/child.pid" FM_PI_SUCCESSOR_GRACE_MS=400 \
+    FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" node --input-type=module 2>&1 <<'EOF'
+import fs, { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { pathToFileURL } from "node:url";
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const home = process.env.FM_HOME;
+const marker = `${home}/state/.pi-watch-extension-loaded`;
+const lifecycle = () => readFileSync(`${home}/state/extensions/pi-primary-watch/lifecycle.log`, "utf8");
+const rows = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean) : [];
+const waitForArms = async (expected) => {
+  for (let i = 0; i < 100 && rows().length < expected; i += 1) await sleep(50);
+  await sleep(900);
+  if (rows().length !== expected) throw new Error(`expected exactly ${expected} arms, saw ${rows().length}`);
+};
+const originalWrite = fs.writeFileSync;
+const originalRename = fs.renameSync;
+let fault = "";
+let injected = 0;
+const failPublication = (operation) => {
+  if (fault !== operation) return;
+  fault = "";
+  injected += 1;
+  throw Object.assign(new Error(`transient owner ${operation} failure`), { code: "EIO" });
+};
+fs.writeFileSync = function(path, ...args) {
+  if (String(path).startsWith(`${marker}.tmp-`)) failPublication("write");
+  return originalWrite.call(this, path, ...args);
+};
+fs.renameSync = function(from, to) {
+  if (String(to) === marker) failPublication("rename");
+  return originalRename.call(this, from, to);
+};
+syncBuiltinESMExports();
+const unhandled = [];
+process.on("unhandledRejection", (error) => unhandled.push(String(error)));
+const module = await import(pathToFileURL(process.env.PLUGIN).href);
+const bind = () => {
+  const handlers = new Map(); const box = {};
+  module.default({
+    on(event, handler) { handlers.set(event, handler); },
+    registerCommand() {},
+    registerTool(tool) { if (tool.name === "fm_watch_arm_pi") box.tool = tool; },
+    sendUserMessage: async () => {},
+    events: { on() {}, emit() {} },
+  });
+  return { handlers, box };
+};
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+let owner = bind();
+await owner.handlers.get("session_start")({}, {});
+await waitForArms(1);
+let expected = 1;
+for (const operation of ["write", "rename"]) {
+  for (const recovery of ["session", "arm", "timer", "factory-stopped", "factory-live"]) {
+    const predecessor = owner;
+    const before = readFileSync(marker, "utf8");
+    const predecessorPid = Number(readFileSync(process.env.FM_CHILD_PID_FILE, "utf8").trim());
+    const previousFaults = injected;
+    fault = operation;
+    if (recovery === "factory-live") {
+      owner = bind();
+    } else {
+      await owner.handlers.get("session_shutdown")({ reason: "reload" }, {});
+      if (readFileSync(marker, "utf8") !== before) throw new Error("failed publication unexpectedly changed the marker");
+      process.kill(predecessorPid, 0);
+    }
+    if (fault || injected !== previousFaults + 1) throw new Error(`${operation}/${recovery} did not exercise retirement publication failure`);
+    const diagnostics = lifecycle().split("\n").filter((line) => line.includes("event=generation-owner-retire-failed"));
+    if (diagnostics.length !== injected || !diagnostics.at(-1).includes("replacement=true") ||
+        !diagnostics.at(-1).includes("code=EIO") || !diagnostics.at(-1).includes(`transient_owner_${operation}_failure`)) {
+      throw new Error(`publication failure diagnostic was lost: ${lifecycle()}`);
+    }
+    if (recovery === "session") await owner.handlers.get("session_start")({}, {});
+    if (recovery === "arm") {
+      const repair = await owner.box.tool.execute();
+      if (!repair.details.ok) throw new Error(`arm recovery rejected: ${JSON.stringify(repair.details)}`);
+    }
+    if (recovery === "factory-stopped") owner = bind();
+    if (recovery === "factory-live") await owner.handlers.get("session_start")({}, {});
+    await waitForArms(++expected);
+    const after = readFileSync(marker, "utf8");
+    if (after === before || !after.includes("phase=active")) throw new Error(`${operation}/${recovery} did not publish a fresh active generation`);
+    const owned = await owner.box.tool.execute();
+    if (!owned.details.ok || !owned.details.message.includes("unchanged")) throw new Error("successor did not retain its tracked arm");
+    if (owner !== predecessor) {
+      const stale = await predecessor.box.tool.execute();
+      if (stale.details.ok || !stale.details.message.includes("shutting down")) throw new Error("factory transfer revived its superseded owner");
+    }
+    if (unhandled.length) throw new Error(`unhandled retirement rejection: ${unhandled.join("; ")}`);
+  }
+}
+await owner.handlers.get("session_shutdown")({ reason: "quit" }, {});
+await sleep(900);
+if (rows().length !== expected) throw new Error("terminal shutdown healed after publication recovery");
+const quit = await owner.box.tool.execute();
+if (quit.details.ok || !quit.details.message.includes("shutting down")) throw new Error("terminal shutdown lost its refusal");
+if (unhandled.length) throw new Error(`unhandled timer rejection: ${unhandled.join("; ")}`);
+fs.writeFileSync = originalWrite;
+fs.renameSync = originalRename;
+syncBuiltinESMExports();
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "Pi owner publication failure must not poison retirement or successor recovery: $out"
+  [ -z "$out" ] || fail "Pi owner retirement publication test printed output: $out"
+  pass "Pi owner publication failures retain diagnostics and allow every successor recovery path"
+}
+
 test_pi_factory_replacement_retires_and_hands_off() {
   local repo home out status
   repo="$TMP_ROOT/pi-factory-root"; home="$TMP_ROOT/pi-factory-home"
@@ -4626,6 +4754,7 @@ EOF
 test_pi_extension_reports_external_healthy_watcher
 test_pi_replacement_without_successor_heals_once
 test_pi_factory_replacement_retires_and_hands_off
+test_pi_owner_publication_failure_does_not_poison_retirement
 test_pi_tool_returns_agent_tool_result
 test_pi_redundant_tool_call_is_owned_noop
 test_pi_scheduled_retry_call_is_owned_noop

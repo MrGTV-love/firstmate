@@ -130,7 +130,7 @@ reap_restart_children() {
   for pid in $children; do
     stop_restart_tree "$pid"
   done
-  for pid in "${STOPPED_RESTART_PIDS[@]}"; do
+  for pid in "${STOPPED_RESTART_PIDS[@]+"${STOPPED_RESTART_PIDS[@]}"}"; do
     kill -KILL "$pid" 2>/dev/null || true
     while :; do
       state=$(ps -p "$pid" -o stat= 2>/dev/null) || break
@@ -144,7 +144,7 @@ reap_restart_children() {
 cleanup_restart() {
   trap '' INT TERM HUP
   reap_restart_children
-  for id in "${IDS[@]}"; do
+  for id in "${IDS[@]+"${IDS[@]}"}"; do
     fm_secondmate_liveness_unlock "$id"
   done
   [ -z "$RESULT_DIR" ] || rm -rf -- "$RESULT_DIR"
@@ -342,15 +342,15 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
-  if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
-    REASON[i]=$FM_SECONDMATE_RESTART_REASON
-    fm_secondmate_liveness_unlock "$id"
+  if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ]; then
+    PLAN[i]="recorded"
     i=$((i + 1))
     continue
   fi
 
-  if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ]; then
-    PLAN[i]="recorded"
+  if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
+    REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))
     continue
   fi
@@ -362,21 +362,28 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
-  if ! send_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    FM_PENDING_REPLY_EXISTING_CORR="$corr" \
-    "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
+  if ! fm_secondmate_restart_request_write "$STATE" "$id" "$corr" local \
+    "$FM_SECONDMATE_RESTART_HARNESS"; then
     fm_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true
-    REASON[i]="the request to write down its open work could not be delivered: $(first_reported_line "$send_out")"
+    REASON[i]="its restart request could not be recorded, so no persist request was sent"
     fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))
     continue
   fi
-  if ! fm_secondmate_restart_request_write "$STATE" "$id" "$corr" local \
-    '' "$FM_SECONDMATE_RESTART_HARNESS" '' ''; then
-    REASON[i]="its restart request could not be recorded, so it was asked to write down its open work but will not be restarted"
-    fm_secondmate_liveness_unlock "$id"
-    i=$((i + 1))
-    continue
+  send_rc=0
+  send_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_PENDING_REPLY_EXISTING_CORR="$corr" FM_SEND_IDEMPOTENT=1 \
+    "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1) || send_rc=$?
+  if [ "$send_rc" -eq 1 ] \
+    && [ ! -e "$(fm_pending_reply_delivery_confirmation_path "$STATE" "$corr")" ] \
+    && fm_pending_reply_reset_known_undelivered "$STATE" "$corr"; then
+    if rm -f "$(fm_secondmate_restart_request_path "$STATE" "$id")"; then
+      fm_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true
+      REASON[i]="the request to write down its open work could not be delivered: $(first_reported_line "$send_out")"
+      fm_secondmate_liveness_unlock "$id"
+      i=$((i + 1))
+      continue
+    fi
   fi
   PLAN[i]="recorded"
   i=$((i + 1))
