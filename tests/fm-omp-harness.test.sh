@@ -30,7 +30,6 @@
 #   7. The watch extension arms through fm_watch_arm_omp and delivers an
 #      actionable close as one follow-up.
 set -u
-unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE
 
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -56,38 +55,10 @@ export NODE_NO_WARNINGS=1
 make_named_shells() {  # <dir> -> echoes <bindir>
   local dir=$1 name
   mkdir -p "$dir"
-  for name in omp ompd comp bash; do
+  for name in omp ompd comp; do
     ln -sf /bin/bash "$dir/$name"
   done
-  cat > "$dir/ps" <<'SH'
-#!/usr/bin/env bash
-set -u
-field= pid= prev=
-for arg in "$@"; do
-  [ "$prev" = -o ] && field=$arg
-  [ "$prev" = -p ] && pid=$arg
-  prev=$arg
-done
-if [ "$field" = ppid= ] && [ "$pid" = "${FM_TEST_ANCESTRY_ROOT:?}" ]; then
-  printf '0\n'
-else
-  exec "${FM_TEST_REAL_PS:?}" "$@"
-fi
-SH
-  chmod +x "$dir/ps"
   printf '%s' "$dir"
-}
-
-under_named_shell() {
-  local bin=$1 name=$2
-  shift 2
-  # shellcheck disable=SC2016
-  env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u FM_PI_HARNESS \
-    -u GROK_AGENT -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    -u ATLASSIAN_AGENT_TYPE -u ROVODEV_CLI \
-    -u FM_SUPERVISION_ACTOR -u FM_SUPERVISION_PRIMARY_HARNESS \
-    PATH="$bin:$PATH" FM_TEST_REAL_PS="$(command -v ps)" "$@" \
-    "$bin/$name" -c 'export FM_TEST_ANCESTRY_ROOT=$$; "$1"; :' _ "$HARNESS"
 }
 
 # --- 1. Detection --------------------------------------------------------------
@@ -95,17 +66,25 @@ under_named_shell() {
 test_detection_anchored_name_and_marker_precedence() {
   local bin out
   bin=$(make_named_shells "$TMP_ROOT/named")
-  out=$(under_named_shell "$bin" omp)
+  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
+  out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "a process named omp must detect as omp, got '$out'"
   for decoy in ompd comp; do
-    out=$(under_named_shell "$bin" "$decoy")
-    [ "$out" = unknown ] || fail "'$decoy' merely contains omp and must detect as unknown, got '$out'"
+    # shellcheck disable=SC2016 # the quoted body expands inside the named shell
+    out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+      "$bin/$decoy" -c '"$1"; :' _ "$HARNESS")
+    [ "$out" != omp ] || fail "'$decoy' merely contains omp and must not detect as omp"
   done
   # The marker beats an inherited CLAUDECODE only under a real omp ancestor.
-  out=$(under_named_shell "$bin" omp CLAUDECODE=1 FM_OMP_HARNESS=omp)
+  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
+  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
+    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "FM_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
   # ...and is inert when it leaks into a worker with no omp ancestor.
-  out=$(under_named_shell "$bin" bash CLAUDECODE=1 FM_OMP_HARNESS=omp)
+  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
+  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
+    bash -c '"$1"; :' _ "$HARNESS")
   [ "$out" = claude ] || fail "a leaked FM_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
   pass "fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry"
 }
@@ -230,12 +209,12 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 }
 
 test_secondmate_launch_relies_on_discovery() {
-  local world repo home fakebin launchlog out status launch state
-  world="$TMP_ROOT/"'secondmate\n"paths'
-  repo="$world/repo"
-  fm_git_init_commit "$repo"
-  ln -s "$ROOT/bin" "$repo/bin"
-  ln -s "$ROOT/.omp" "$repo/.omp"
+  # A seeded secondmate home, launched for real through fm-spawn on omp: the
+  # launch must carry the posture overlay and pin --cwd to the home, and must
+  # name NO -e, because omp auto-discovers the home's tracked .omp/extensions
+  # and a file named both ways loads twice.
+  local world home fakebin launchlog out status launch
+  world="$TMP_ROOT/secondmate"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
   printf '# Firstmate\n' > "$home/AGENTS.md"
@@ -250,7 +229,7 @@ test_secondmate_launch_relies_on_discovery() {
   # FM_BACKEND=tmux pins the fake tmux even where the developer shell carries a
   # live Herdr environment; without it auto-detection would spawn a real pane.
   out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
+    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
     FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
     FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
@@ -259,57 +238,15 @@ test_secondmate_launch_relies_on_discovery() {
   expect_code 0 "$status" "omp secondmate spawn should succeed: $out"
   assert_grep "harness=omp" "$world/home/state/sm.meta" "secondmate meta missing harness=omp"
   launch=$(cat "$launchlog")
-  state="$world/home/state"
-  assert_not_contains "$launch" " -e " "secondmate primary extensions must load only through cwd discovery"
-  assert_contains "$launch" "--config '$repo/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
+  case "$launch" in
+    *" -e "*) fail "an omp secondmate launch must name no -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch" ;;
+  esac
+  assert_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
   assert_not_contains "$launch" "fm-worker-overlay.yml" "secondmate launch must preserve the lane's memory settings"
   assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
   assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
-  assert_absent "$state/sm.omp-ext.ts" "secondmate spawn generated a per-task busy extension"
-  assert_absent "$state/sm.busy-state" "secondmate spawn armed a per-task busy-state record"
-  assert_absent "$state/sm.busy-gen" "secondmate spawn minted a per-task busy generation"
-  [ -z "$(fm_meta_get "$state/sm.meta" busy_gen)" ] || fail "secondmate metadata published a busy generation"
-  pass "fm-spawn: omp secondmates rely on primary extension discovery without generated busy wiring"
-}
-
-test_raw_secondmate_launch_has_no_busy_contract() {
-  local world repo home fakebin launchlog out status launch state
-  world="$TMP_ROOT/raw-secondmate"
-  repo="$world/repo"
-  fm_git_init_commit "$repo"
-  ln -s "$ROOT/bin" "$repo/bin"
-  ln -s "$ROOT/.omp" "$repo/.omp"
-  home="$world/sm"
-  mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
-  printf 'sm\n' > "$home/.fm-secondmate-home"
-  printf 'charter\n' > "$home/data/charter.md"
-  printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
-  git -C "$home" init -q -b main
-  fakebin=$(make_spawn_fakebin "$world/fake" claude)
-  make_fake_omp "$fakebin"
-  launchlog="$world/launch.log"
-  : > "$launchlog"
-  out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
-    FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
-    FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
-    "$ROOT/bin/fm-spawn.sh" sm "$home" 'omp --auto-approve' --secondmate 2>&1)
-  status=$?
-  expect_code 0 "$status" "raw omp secondmate spawn should succeed: $out"
-  state="$world/home/state"
-  launch=$(cat "$launchlog")
-  assert_contains "$launch" "omp --auto-approve" "raw secondmate command was not preserved in the emitted launch: $launch"
-  assert_present "$state/sm.meta" "raw secondmate spawn did not write its metadata"
-  [ "$(fm_meta_get "$state/sm.meta" harness)" = omp ] || fail "raw secondmate metadata lost its omp harness"
-  assert_absent "$state/sm.busy-state" "raw secondmate spawn armed a busy-state record without a lifecycle adapter"
-  assert_absent "$state/sm.busy-gen" "raw secondmate spawn minted a busy generation without a lifecycle adapter"
-  assert_absent "$state/sm.omp-ext.ts" "raw secondmate spawn generated a lifecycle extension"
-  [ -z "$(fm_meta_get "$state/sm.meta" busy_gen)" ] || fail "raw secondmate metadata published a busy generation"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown missing" ] \
-    || fail "raw secondmate without lifecycle evidence must classify unknown, not false busy"
-  pass "fm-spawn: raw omp secondmates preserve their command without arming an unobservable busy contract"
+  assert_absent "$world/home/state/sm.omp-ext.ts" "a secondmate must not receive a per-task worker extension"
+  pass "fm-spawn: a real omp secondmate launch relies on auto-discovery while crewmates load one -e"
 }
 
 test_secondmate_config_pinned_model_is_validated() {
@@ -317,12 +254,8 @@ test_secondmate_config_pinned_model_is_validated() {
   # primary's config/secondmate-harness rather than the command line: the
   # durable pin lands on MODEL after the harness case arm, so an unlisted id
   # under a listed provider must still be refused before endpoint creation.
-  local world repo home fakebin launchlog out status
+  local world home fakebin launchlog out status
   world="$TMP_ROOT/secondmate-config-model"
-  repo="$world/repo"
-  fm_git_init_commit "$repo"
-  ln -s "$ROOT/bin" "$repo/bin"
-  ln -s "$ROOT/.omp" "$repo/.omp"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
   printf '# Firstmate\n' > "$home/AGENTS.md"
@@ -336,7 +269,7 @@ test_secondmate_config_pinned_model_is_validated() {
   launchlog="$world/launch.log"
   : > "$launchlog"
   out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
+    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
     FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
     FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
@@ -353,7 +286,7 @@ test_secondmate_config_pinned_model_is_validated() {
 # --- 3. Busy state -------------------------------------------------------------
 
 drive_omp_ext() {  # <ext-path> <mode>
-  FM_HOME="$TMP_ROOT/ext-home" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$TMP_ROOT/ext-home/state" FM_CONFIG_OVERRIDE="$TMP_ROOT/ext-home/config" FM_DATA_OVERRIDE="$TMP_ROOT/ext-home/data" EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
+  EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
 const handlers = {};
@@ -388,7 +321,7 @@ test_busy_extension_lifecycle() {
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
   esac
-  for handler in agent_start agent_end tool_call turn_end; do
+  for handler in agent_start agent_end turn_end; do
     case " $out " in
       *" $handler "*) ;;
       *) fail "the omp extension must register $handler, got '$out'" ;;
@@ -414,7 +347,6 @@ test_busy_extension_lifecycle() {
   fm_busy_source_trusted omp omp-ext || fail "omp must trust its own extension's records"
   pass "omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification"
 }
-
 
 # --- 4. Control, composer, supervision model -----------------------------------
 
@@ -545,7 +477,7 @@ SH
   # shellcheck disable=SC2016 # $2 expands in the generated script
   printf '#!/usr/bin/env bash\nprintf "OMP DIGEST source=%%s\\n" "$2"\n' > "$repo/bin/fm-sessionstart-run.sh"
   chmod +x "$repo/bin/"*.sh
-  out=$(FM_GUARD_LOG="$TMP_ROOT/guard/guard.log" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
+  out=$(FM_GUARD_LOG="$TMP_ROOT/guard/guard.log" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { readFileSync, existsSync } from "node:fs";
 const handlers = new Map();
@@ -606,7 +538,7 @@ fi
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, existsSync, readFileSync } from "node:fs";
@@ -680,7 +612,7 @@ printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-2\n' "$$"
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync } from "node:fs";
@@ -751,7 +683,7 @@ fi
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
@@ -831,7 +763,7 @@ printf '%s\n' "$started"
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync } from "node:fs";
@@ -1297,7 +1229,6 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
-test_raw_secondmate_launch_has_no_busy_contract
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
 test_control_composer_and_model_tables

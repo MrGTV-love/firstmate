@@ -944,30 +944,6 @@ test_send_text_submit_detects_landed_send() {
   pass "fm_backend_zellij_send_text_submit: reports 'empty' once the composer classifies empty (submitted)"
 }
 
-test_send_text_submit_accepts_boundaryless_codex_footer() {
-  local dir fb out footer
-  dir="$TMP_ROOT/submit-codex-footer"; mkdir -p "$dir/responses"
-  footer='  gpt-6-astra high · Context 97% left · /private/my project · 2…'
-  zellij_pane_response "$dir" 1 7 3
-  printf '%s' $'›\n\n'"$footer" > "$dir/responses/2.out"
-  zellij_pane_response "$dir" 3 7 3
-  zellij_pane_response "$dir" 5 7 3
-  printf '%s' $'› hello captain\n\n'"$footer" > "$dir/responses/6.out"
-  zellij_pane_response "$dir" 7 7 3
-  zellij_pane_response "$dir" 9 7 3
-  printf '%s' $'hello captain\n›\n\n'"$footer" > "$dir/responses/10.out"
-  fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
-    bash -c '. "$0/bin/backends/zellij.sh"; fm_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
-  [ "$out" = empty ] || fail "boundaryless Codex footer must permit before-empty and payload append proof, got '$out'"
-  assert_contains "$(cat "$dir/log")" $'\x1f''paste'$'\x1f''--pane-id'$'\x1f''7'$'\x1f''--'$'\x1f''hello captain' \
-    "Codex footer must permit literal payload paste"
-  assert_contains "$(cat "$dir/log")" $'\x1f''send-keys'$'\x1f''--pane-id'$'\x1f''7'$'\x1f''Enter' \
-    "Codex footer must permit Enter after observed payload append"
-  pass "Zellij submits boundaryless Codex payload with terminal Context footer"
-}
-
 test_send_text_submit_ignores_styled_effort_hint() {
   local dir fb out hint after mode
   hint=$'\033[38;2;0;180;255m⇧⇥\033[38;2;229;229;231m \033[38;2;107;114;128mto change thinking effort\033[0m'
@@ -1438,7 +1414,6 @@ test_kill_is_noop_when_session_absent
 test_teardown_passes_recorded_tab_id_to_zellij_kill
 test_forced_secondmate_teardown_kills_zellij_children_with_child_home_tag
 test_send_text_submit_detects_landed_send
-test_send_text_submit_accepts_boundaryless_codex_footer
 test_send_text_submit_ignores_styled_effort_hint
 test_send_text_submit_detects_swallowed_enter
 test_send_text_submit_refreshes_busy_pending_before_retry

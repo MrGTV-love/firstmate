@@ -139,7 +139,7 @@ WAKE_TASK=
 
 screen() { lab pane read "$PANE" --source visible 2>/dev/null || true; }
 send_text() { fm_backend_herdr_send_literal "$TARGET" "$1" >/dev/null; }
-send_key() { fm_backend_herdr_send_key "$TARGET" "$1" >/dev/null; }
+send_key() { fm_backend_herdr_send_key "$TARGET" "$1" >/dev/null || fail "$SUBJECT: could not send $1"; }
 composer() { fm_backend_herdr_composer_state "$TARGET"; }
 queue_rows() { grep -c . "$PROJECT/state/.wake-queue" 2>/dev/null || true; }
 

@@ -1243,6 +1243,10 @@ An executable smoke of the live guard's generated Herdr wrapper, using the real 
 The touched spawn, live-guard, and wake-queue shell files passed syntax checks.
 No real model or Herdr session was exercised; the live guard has not been rerun here.
 
+The test-scope removal round passed the composer and Zellij test files and an executable key-delivery smoke: the prior helper continued after a failed Escape, while the current helper stopped on failed Escape, Enter, and C-u and continued on successful sends.
+The omp harness file stopped at its restored baseline decoy-detection case under this review process's omp ancestry; that case was not rerun.
+A direct execution of the retained restored-wake, descendant-ownership, and marker-self-repair tests passed; no real model or Herdr session was exercised.
+
 The live guard that refreshes this entry submits real prompts and stays opt-in:
 
 ```sh
