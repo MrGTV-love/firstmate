@@ -335,6 +335,65 @@ JS
   pass "omp: the unchanged upstream extension blocks, allows task-data writes and prepends the banner"
 }
 
+test_omp_path_spellings() {
+  local out
+  printf 'OPENROUTER_API_KEY=fm-jev-guard-or-key\n' >> "$HOME_DIR/.env"
+  out=$(HOME_DIR="$HOME_DIR" WT="$WT" TASK_DATA="$TASK_DATA" REQUESTS="$REQUESTS" GUARD="$ROOT/bin/fm-jev-guard.ts" \
+    "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = process.env.HOME_DIR;
+const context = { home, config: `${home}/config`, state: `${home}/state`, task: "t1", worktree: process.env.WT, data: process.env.TASK_DATA };
+const ctx = { cwd: process.env.WT };
+const requests = () => readFileSync(process.env.REQUESTS, "utf8");
+for (const project of ["firstmate", "vernant", "", undefined]) {
+  const handlers = {};
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { ...context, project });
+  for (const toolName of ["write", "edit"]) {
+    for (const path of ["~/jev-note.txt", "~other/jev-note.txt", "@/tmp/x", "@~/jev-note.txt", "file:///tmp/x", "FILE:///tmp/x", ":/tmp/x"]) {
+      const event = { toolName, input: toolName === "write" ? { path, content: "hello" } : { path, old_string: "old", new_string: "hello" } };
+      const original = JSON.stringify(event);
+      const before = requests();
+      const result = await handlers.tool_call(event, ctx);
+      assert.equal(result?.block, true, `${project} ${toolName} ${path} must block`);
+      assert.match(result.reason, /plain absolute or worktree-relative path.*report if that is not possible/);
+      assert.equal(requests(), before, "rewritten paths must reach neither provider");
+      assert.equal(JSON.stringify(event), original, "judgment must not mutate execution arguments");
+    }
+    for (const path of ["src/note.txt", `${process.env.WT}/src/note.txt`]) {
+      for (const content of ["hello", "sk-live-path-test"]) {
+        const event = { toolName, input: toolName === "write" ? { path, content } : { path, old_string: "old", new_string: content } };
+        const original = JSON.stringify(event);
+        const before = requests();
+        const result = await handlers.tool_call(event, ctx);
+        assert.equal(JSON.stringify(event), original, "plain paths must retain execution arguments");
+        if (project === "firstmate") {
+          if (content === "hello") assert.equal(result, undefined);
+          else {
+            assert.equal(result?.block, true);
+            assert.match(result.reason, /contains a credential/);
+          }
+          const sent = requests().slice(before.length).trim().split("\n").map(JSON.parse);
+          assert.deepEqual(sent.map(row => row.path), ["/v1/systemone"]);
+          assert.deepEqual(JSON.parse(sent[0].body).state, { path, content });
+        } else {
+          assert.equal(result, undefined);
+          assert.equal(requests(), before, "withheld plain paths must reach neither provider");
+        }
+      }
+    }
+  }
+}
+console.log("paths-ok");
+JS
+) || fail "omp path spelling verification failed: $out"
+  [ "$out" = paths-ok ] || fail "omp path spelling contract failed: $out"
+  printf 'TYPESAFE_API_KEY=%s\n' "$KEY" > "$HOME_DIR/.env"
+  pass "omp write/edit: rewritten paths block without requests; plain paths retain credential judgment and project withholding"
+}
+
 test_handler_deadlines() {
   local out
   printf 'OPENROUTER_API_KEY=fm-jev-guard-or-key\n' >> "$HOME_DIR/.env"
@@ -385,5 +444,6 @@ test_openrouter_fallback
 test_project_scope
 test_claude_adapter_under_node
 test_omp_installer
+test_omp_path_spellings
 test_handler_deadlines
 test_ledger_privacy

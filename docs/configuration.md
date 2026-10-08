@@ -1692,6 +1692,8 @@ The guard asks Jev three things, exactly as upstream does:
 - After a shell command or file read, whether the output holds instructions aimed at the agent; flagged output reaches the agent with a warning banner.
 
 The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
+Write and edit paths must use a plain absolute or worktree-relative spelling.
+The shared guard blocks paths beginning with `~`, `@`, `file:` or `:/` without a Jev call because omp rewrites those spellings before execution, and tells the agent to use a plain path and report if that is not possible.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the unchanged upstream write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
@@ -1708,7 +1710,7 @@ Only when an authorized direct call is unavailable or fails does it ask OpenRout
 A request whose text matches the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key) is withheld from both.
 Each provider has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
 Both omp's native handler deadline and Claude's hook timeout remain 30 seconds, including result screening.
-A withheld request, missing keys, exhausted budget or any other failure lets the tool call proceed, as upstream does, while writes outside the allowed roots still block without a Jev call.
+A withheld request, missing keys, exhausted budget or any other failure lets the tool call proceed, as upstream does, while writes outside the allowed roots and unsupported write/edit path spellings still block without a Jev call.
 Each decision appends one line to the owning home's private `state/jev-guard.jsonl`, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
 Only the session entry retains the full upstream payload.
 [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) is the portable regression, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) holds the live host evidence.

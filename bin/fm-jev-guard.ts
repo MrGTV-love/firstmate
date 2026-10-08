@@ -47,6 +47,10 @@ export function installJevGuard(pi: any, c: JevGuardContext): void {
           && (typeof event.input?.path !== "string" || typeof event.input?.new_string !== "string")) {
           return { block: true, reason: "jev-guard needs omp replace edit mode. Report this configuration problem rather than working around it." };
         }
+        if (name === "tool_call" && (event?.toolName === "write" || event?.toolName === "edit")
+          && /^(?:[~@]|file:|:\/)/i.test(String(event.input?.path ?? ""))) {
+          return { block: true, reason: "jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block." };
+        }
         return handler(event, writeRoot(event, ctx));
       })),
     appendEntry: (...args: unknown[]) => pi.appendEntry?.(...args),
