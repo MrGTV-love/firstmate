@@ -247,13 +247,13 @@ fm_test_record_process() {
 export -f fm_test_process_start fm_test_record_process
 
 fm_test_process_alive() {  # <pidfile> <command-needle>
-  local pid start current_start command ps_bin=/bin/ps
+  local pid start live_start command ps_bin=/bin/ps
   FM_TEST_PROCESS_PID=
   IFS=$'\t' read -r pid start 2>/dev/null < "$1" || return 1
   case "$pid" in '' | *[!0-9]*) return 1 ;; esac
   [ -n "$start" ] || return 1
-  current_start=$(fm_test_process_start "$pid") || return 1
-  [ "$current_start" = "$start" ] || return 1
+  live_start=$(fm_test_process_start "$pid") || return 1
+  [ "$live_start" = "$start" ] || return 1
   [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
   command=$("$ps_bin" -o command= -p "$pid" 2>/dev/null) || return 1
   case "$command" in *"$2"*) FM_TEST_PROCESS_PID=$pid; return 0 ;; esac
