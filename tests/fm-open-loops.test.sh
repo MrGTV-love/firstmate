@@ -218,6 +218,23 @@ for name in ('covered', 'merged'):
     assert '1 commit(s)' in rows(corrected, 'unlanded_commit')[name]['evidence'], corrected
     assert 'local correction B' in rows(corrected, 'unlanded_commit')[name]['evidence'], corrected
 
+# A PR head that is not a local object cannot be read, so its coverage is skipped for that one task: the
+# task keeps its own row naming the absent head, and the ledger stays complete instead of degrading whole.
+absent_head = 'd' * 40
+present_head = double['single']['5']['head']['sha']
+double['single']['5']['head']['sha'] = absent_head
+(world / 'gh.json').write_text(json.dumps(double))
+missing_head = ledger()
+assert missing_head['complete'] is True and 'ledger degraded' not in rows(missing_head), missing_head
+missing_evidence = rows(missing_head, 'unlanded_commit')['merged']['evidence']
+assert f'PR head {absent_head[:8]} is not in this copy, so PR coverage was not applied' in missing_evidence, missing_evidence
+assert '2 commit(s)' in missing_evidence and 'local correction B' in missing_evidence, missing_evidence
+assert 'merged' in rows(missing_head, 'failed_task'), missing_head
+assert 'PR head' not in rows(missing_head, 'unlanded_commit')['covered']['evidence'], missing_head
+double['single']['5']['head']['sha'] = present_head
+(world / 'gh.json').write_text(json.dumps(double))
+assert ledger()['complete'] is True
+
 # Failed deliverables actually landed in the current PR head, in default, or dropped are not owed.
 double['single']['5']['head']['sha'] = git(merged, 'rev-parse', 'HEAD')
 (world / 'gh.json').write_text(json.dumps(double))

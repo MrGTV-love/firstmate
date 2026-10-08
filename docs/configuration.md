@@ -644,6 +644,7 @@ Only nonfuture progress timestamps count as work evidence.
 Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
 Progress remains scoped to that resolved store and the task's project and branch.
 The ledger covers this home's current backlog, ordinary task records, status questions, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+A recorded PR head that is not a local object in the task's copy cannot be compared, so PR coverage is skipped for that task alone: its unlanded-commit row names the absent head and counts every commit not on the default branch, and the ledger stays complete.
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
 

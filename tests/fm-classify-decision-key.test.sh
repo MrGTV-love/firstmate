@@ -658,3 +658,60 @@ test_dated_decisions_follow_valid_reopenings() {
 
 test_dated_decisions_ignore_rejected_openers
 test_dated_decisions_follow_valid_reopenings
+test_dated_decisions_pair_each_open_key_with_its_own_last_opening() {
+  local dir f expected
+  dir=$(case_dir dated-many-keys)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  {
+    printf 'needs-decision [key=alpha] [at=100]: first alpha question\n'
+    printf 'blocked [key=beta] [at=110]: beta waits on a credential\n'
+    printf 'note [at=120]: mentions [key=alpha] and [key=beta] in prose only\n'
+    printf 'needs-decision [key=alpha] [at=130]: second alpha question\n'
+    printf 'blocked [key=alpha] [at=140]: alpha is now a blocker\n'
+    printf 'needs-decision [key=gamma] [at=150]: gamma question\n'
+    printf 'resolved [key=gamma] [at=160]: gamma answered\n'
+    printf 'needs-decision [at=170]: keyless question\n'
+    printf 'needs-decision [key=beta]: unstamped beta reopening\n'
+    printf 'blocked [key=beta] [at=190]: beta blocker again\n'
+  } >> "$f"
+  expected=$(printf '%s\n' \
+    "$(printf 'alpha\tblocked\t140\talpha is now a blocker')" \
+    "$(printf 'default\tneeds-decision\t170\tkeyless question')" \
+    "$(printf 'beta\tblocked\t190\tbeta blocker again')")
+  assert_equals "$expected" "$(status_open_decisions_dated "$f")" \
+    "each open key took its own last opening, by verb"
+  pass "dated decisions pair every open key with its own last opening in one log"
+}
+
+# A lane status log of current size (about 1.2k lines, a few hundred historical
+# openings, 25 still open) must date every open decision in a time that grows
+# with the log, not with open keys times log lines. The ledger's questions
+# source runs this under a 60 second command limit on a host that is often
+# loaded, and a per-key rescan of the log took longer than that.
+test_dated_decisions_cost_does_not_scale_with_open_keys_times_lines() {
+  local dir f out started elapsed expected_count=25
+  dir=$(case_dir dated-cost-bound)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  awk 'BEGIN {
+    n = 0
+    for (i = 1; i <= 1200; i++) {
+      r = i % 4
+      if (r == 1) { n++; printf "needs-decision [key=lane-q%03d] [at=%d]: question %d\n", n, 1700000000 + i, n }
+      else if (r == 2 && n > 25) printf "resolved [key=lane-q%03d] [at=%d]: answered %d\n", n, 1700000000 + i, n
+      else printf "working [at=%d]: routine progress line %d with padding text for a realistic width\n", 1700000000 + i, i
+    }
+  }' > "$f"
+  started=$SECONDS
+  out=$(status_open_decisions_dated "$f")
+  elapsed=$((SECONDS - started))
+  assert_equals "$expected_count" "$(printf '%s\n' "$out" | grep -c .)" "the fixture did not leave 25 decisions open"
+  assert_equals "$(printf 'lane-q025\tneeds-decision\t1700000097\tquestion 25')" "$(printf '%s\n' "$out" | tail -1)" \
+    "the last open decision lost its opening time"
+  [ "$elapsed" -le 20 ] || fail "dating $expected_count open decisions over a 1200-line log took ${elapsed}s, expected at most 20s"
+  pass "dating 25 open decisions over a lane-size log finished in ${elapsed}s"
+}
+
+test_dated_decisions_pair_each_open_key_with_its_own_last_opening
+test_dated_decisions_cost_does_not_scale_with_open_keys_times_lines

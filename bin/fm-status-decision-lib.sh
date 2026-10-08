@@ -453,10 +453,17 @@ status_own_open_decisions() {  # <status-file>
 # "<key>\t<verb>\t<epoch>\t<summary>" line per still-open decision, <epoch> empty
 # when the opening line carries no readable time stamp (age unknown, never zero).
 # The opening is the LAST line that opens the key, found with the same verb and
-# key readers the fold uses, and its time comes from status_line_at_epoch, so a
+# key readers the fold uses, and its time comes from _fm_status_at_epoch, so a
 # tag quoted in another line's prose or a malformed stamp can never set an age.
+# One pass over the file serves every open decision, so the cost is the lines
+# once rather than the lines once per open key. A line is folded only when its
+# verb is one an open decision carries and it mentions that decision's key (or
+# the decision is keyed "default", which a line need not mention); that
+# prefilter only skips a line that could not open the key.
+# Regression coverage: tests/fm-status-open-decisions-dated.test.sh.
 status_open_decisions_dated() {  # <status-file> [<kind>]
-  local f=$1 open key verb summary line line_verb opened kind resolve held line_open
+  local f=$1 open key verb summary line line_verb kind resolve held line_open count=0 i hit epoch
+  local -a keys verbs opened summaries
   open=$(status_open_decisions "$f" "${2:-}")
   [ -n "$open" ] || return 0
   kind=$(_fm_status_kind "$f" "${2:-}")
@@ -464,18 +471,36 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   while IFS=$'\t' read -r key verb summary; do
     [ -n "$verb" ] || continue
-    opened=
-    while IFS= read -r line || [ -n "$line" ]; do
-      status_line_verb "$line" line_verb
-      [ "$line_verb" = "$verb" ] || continue
-      line_open=$(_fm_decision_fold_line '' "$line" "$resolve" "$held" "$kind")
-      _fm_open_set_has "$line_open" "$key" || continue
-      opened=$(status_line_at_epoch "$line" 2>/dev/null || true)
-    done < "$f"
-    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$opened" "$summary"
+    keys[count]=$key
+    verbs[count]=$verb
+    summaries[count]=$summary
+    opened[count]=
+    count=$((count + 1))
   done <<EOF
 $open
 EOF
+  while IFS= read -r line || [ -n "$line" ]; do
+    status_line_verb "$line" line_verb
+    hit=0
+    for ((i = 0; i < count; i++)); do
+      [ "${verbs[i]}" = "$line_verb" ] || continue
+      case "$line" in
+        *"${keys[i]}"*) hit=1; break ;;
+      esac
+      [ "${keys[i]}" = default ] && { hit=1; break; }
+    done
+    [ "$hit" -eq 1 ] || continue
+    line_open=$(_fm_decision_fold_line '' "$line" "$resolve" "$held" "$kind")
+    for ((i = 0; i < count; i++)); do
+      [ "${verbs[i]}" = "$line_verb" ] || continue
+      _fm_open_set_has "$line_open" "${keys[i]}" || continue
+      _fm_status_at_epoch "$line" epoch || epoch=
+      opened[i]=$epoch
+    done
+  done < "$f"
+  for ((i = 0; i < count; i++)); do
+    printf '%s\t%s\t%s\t%s\n' "${keys[i]}" "${verbs[i]}" "${opened[i]}" "${summaries[i]}"
+  done
 }
 
 # The signature a fold checkpoint must carry to be reused for <kind>: the fold
