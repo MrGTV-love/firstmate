@@ -13,10 +13,10 @@ REAL_TMUX=$(command -v tmux || true)
 # failed or interrupted case would leave the server and its shells running. Stop
 # any that survive before the shared cleanup removes the sockets.
 # The socket is always reached by its relative name from the case directory: the
-# absolute path is longer than a unix socket path may be on macOS under the
-# default per-user TMPDIR, where tmux refuses it and the kill would silently do
-# nothing. A server that still answers after its kill outlived the test, which
-# is a leak, so the test exits nonzero naming it.
+# absolute path can exceed the Unix socket path limit on macOS under the default
+# per-user TMPDIR, where tmux refuses it and the kill would silently do nothing.
+# A server that still answers after its kill outlived the test, which is a leak,
+# so the test exits nonzero naming it.
 reap_isolated_tmux() {
   local sock dir leaked=0
   [ -n "$REAL_TMUX" ] || return 0
@@ -1059,9 +1059,7 @@ test_own_and_absent_slot_claims_still_tear_down() {
 # that is NOT one of tmux's definitive missing-session/server answers, which is
 # the transient-server and tmux-absent-from-PATH shape: the read never happened,
 # so it proves nothing about whether the window survived.
-# The socket stays a RELATIVE name reached from <dir>, matching the isolated
-# case above: this fixture's absolute path is longer than a unix socket path
-# may be on macOS.
+# Keep the socket relative to <dir>; reap_isolated_tmux above owns the path-limit rationale.
 write_close_failing_tmux_shim() {  # <dir> <socket-name> <real-tmux>
   local dir=$1 socket=$2 real=$3
   cat > "$dir/fakebin/tmux" <<SH
