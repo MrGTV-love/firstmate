@@ -1,0 +1,42 @@
+[
+  {
+    "case": "stale-birth",
+    "cleanup_exit": 0,
+    "process_after": "40657 40657 Ss   /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/bash-5.3/bash -c sleep 30 & echo $! > \"$1\"; wait fixture-stale-birth /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/identity-guards/stale-birth.descendant\n",
+    "subject_alive": true,
+    "descendant_alive": true,
+    "expected_guard_result": true,
+    "cleanup_stdout": "",
+    "cleanup_stderr": ""
+  },
+  {
+    "case": "wrong-command",
+    "cleanup_exit": 0,
+    "process_after": "40674 40674 Ss   /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/bash-5.3/bash -c sleep 30 & echo $! > \"$1\"; wait fixture-wrong-command /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/identity-guards/wrong-command.descendant\n",
+    "subject_alive": true,
+    "descendant_alive": true,
+    "expected_guard_result": true,
+    "cleanup_stdout": "",
+    "cleanup_stderr": ""
+  },
+  {
+    "case": "matching-owned-group",
+    "cleanup_exit": 0,
+    "process_after": "40705 40705 Z    <defunct>\n",
+    "subject_alive": false,
+    "descendant_alive": false,
+    "expected_guard_result": true,
+    "cleanup_stdout": "",
+    "cleanup_stderr": ""
+  },
+  {
+    "case": "stale-watcher",
+    "cleanup_exit": 0,
+    "process_after": "40717 40717 Ts   /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/bash-5.3/bash -c sleep 30 & echo $! > \"$1\"; wait fixture-stale-watcher /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/identity-guards/stale-watcher.descendant\n",
+    "subject_alive": true,
+    "descendant_alive": false,
+    "expected_guard_result": true,
+    "cleanup_stdout": "",
+    "cleanup_stderr": ""
+  }
+]

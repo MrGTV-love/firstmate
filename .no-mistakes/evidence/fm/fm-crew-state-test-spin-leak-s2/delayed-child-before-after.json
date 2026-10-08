@@ -1,0 +1,16 @@
+[
+  {
+    "variant": "base",
+    "exit": 0,
+    "stdout": "deadline_status=124\ndelayed_child_survived=true pid=14038\n14038     1 14038 S    sleep 8\n",
+    "stderr": "",
+    "schedule_injection": "Delay setpgrp(0,0) by 1.5s, exceeding the 1s deadline. Workload is real bash executing sleep 8."
+  },
+  {
+    "variant": "target",
+    "exit": 0,
+    "stdout": "deadline_status=124\ndelayed_child_never_started=true\n",
+    "stderr": "",
+    "schedule_injection": "Delay setpgrp(0,0) by 1.5s, exceeding the 1s deadline. Workload is real bash executing sleep 8."
+  }
+]

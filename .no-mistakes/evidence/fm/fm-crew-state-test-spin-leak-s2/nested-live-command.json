@@ -1,0 +1,6 @@
+{
+  "exit": 0,
+  "stdout": "outer_deadline_status=124\ncaptured_stdout=nested-command-started\nnested_child_survived=false pid=23049\n",
+  "stderr": "",
+  "elapsed_seconds": 1.645
+}

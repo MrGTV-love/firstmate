@@ -1,0 +1,24 @@
+[
+  {
+    "signal": "INT",
+    "status": 130,
+    "expected_status": 130,
+    "child_pid": 1346,
+    "watchdog_pid": 1273,
+    "child_survived": false,
+    "elapsed_seconds": 0.355,
+    "stdout": "live-command-started\n",
+    "stderr": ""
+  },
+  {
+    "signal": "HUP",
+    "status": 129,
+    "expected_status": 129,
+    "child_pid": 2944,
+    "watchdog_pid": 2893,
+    "child_survived": false,
+    "elapsed_seconds": 0.361,
+    "stdout": "live-command-started\n",
+    "stderr": ""
+  }
+]

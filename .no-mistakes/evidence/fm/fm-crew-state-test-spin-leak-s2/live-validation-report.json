@@ -1,0 +1,178 @@
+{
+  "crew_state_output": "state: working \u00b7 source: pane \u00b7 harness busy (claude-hook)",
+  "crew_state_timeout_process": "ok - no timeout command uses perl bound\ntimed_out_no_mistakes_pid=69790 birth=Thu Oct  8 01:30:01 2026\ntimed_out_no_mistakes_survived=false\nno_mistakes_calls=axi status\n",
+  "public_commands": [
+    {
+      "name": "public-bound-contract",
+      "exit": 0,
+      "elapsed_seconds": 0.76,
+      "stdout": "fm_run_timed status=7 stdout=input-from-user\nfm_nm_bounded status=9 stdout=nm-input\nsignal-killed command status=143\n",
+      "stderr": "command-stderr\nnm-stderr\n"
+    },
+    {
+      "name": "repeated-no-timeout-leak-check",
+      "exit": 0,
+      "elapsed_seconds": 1.574,
+      "stdout": "call=1 deadline_status=124\ncall=8 deadline_status=124\ncall=7 deadline_status=124\ncall=3 deadline_status=124\ncall=6 deadline_status=124\ncall=2 deadline_status=124\ncall=4 deadline_status=124\ncall=5 deadline_status=124\ncall=9 deadline_status=124\ncall=12 deadline_status=124\ncall=10 deadline_status=124\ncall=11 deadline_status=124\nsurviving_bounded_commands=0\n",
+      "stderr": ""
+    },
+    {
+      "name": "bound-TERM",
+      "owner_pid": 97032,
+      "signaled_pid": 97080,
+      "child_before": "97140 97080 97140 S    sleep 20\n",
+      "owner_exit": 143,
+      "stdout": "child-started\n",
+      "stderr": "",
+      "elapsed_after_signal": 0.354,
+      "child_survived": false
+    },
+    {
+      "name": "owner-KILL",
+      "owner_pid": 99377,
+      "signaled_pid": 99407,
+      "child_before": "99464 99411 99464 S    sleep 20\n",
+      "owner_exit": 137,
+      "stdout": "child-started\n",
+      "stderr": "bin/fm-nm-run-lib.sh: line 38: 99407 Killed: 9                  ( cd \"$dir\" && fm_timeout_perl_bound \"$timeout_secs\" \"$@\" )\n",
+      "elapsed_after_signal": 0.593,
+      "child_survived": false
+    }
+  ],
+  "delayed_launch_before_after": [
+    {
+      "variant": "base",
+      "exit": 0,
+      "stdout": "deadline_status=124\ndelayed_child_survived=true pid=14038\n14038     1 14038 S    sleep 8\n",
+      "stderr": "",
+      "schedule_injection": "Delay setpgrp(0,0) by 1.5s, exceeding the 1s deadline. Workload is real bash executing sleep 8."
+    },
+    {
+      "variant": "target",
+      "exit": 0,
+      "stdout": "deadline_status=124\ndelayed_child_never_started=true\n",
+      "stderr": "",
+      "schedule_injection": "Delay setpgrp(0,0) by 1.5s, exceeding the 1s deadline. Workload is real bash executing sleep 8."
+    }
+  ],
+  "nested_command": {
+    "exit": 0,
+    "stdout": "outer_deadline_status=124\ncaptured_stdout=nested-command-started\nnested_child_survived=false pid=23049\n",
+    "stderr": "",
+    "elapsed_seconds": 1.645
+  },
+  "additional_signals": [
+    {
+      "signal": "INT",
+      "status": 130,
+      "expected_status": 130,
+      "child_pid": 1346,
+      "watchdog_pid": 1273,
+      "child_survived": false,
+      "elapsed_seconds": 0.355,
+      "stdout": "live-command-started\n",
+      "stderr": ""
+    },
+    {
+      "signal": "HUP",
+      "status": 129,
+      "expected_status": 129,
+      "child_pid": 2944,
+      "watchdog_pid": 2893,
+      "child_survived": false,
+      "elapsed_seconds": 0.361,
+      "stdout": "live-command-started\n",
+      "stderr": ""
+    }
+  ],
+  "watcher_teardown": [
+    {
+      "ending": "normal",
+      "owner_exit": 0,
+      "before_process_tree": "91213 90933 13334 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/bin/fm-watch.sh\n98567 98523 98523 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/tmp/fm-lab.Mj1anq/state/.fm-custom-check.gl9lFD\n98598 98567 98523 S    sleep 30\n",
+      "cleanup_elapsed_seconds": 1.225,
+      "survivors": [],
+      "lock_remaining": false,
+      "owner_stdout": "",
+      "owner_stderr": "",
+      "watcher_stdout": "",
+      "watcher_stderr": ""
+    },
+    {
+      "ending": "TERM",
+      "owner_exit": 143,
+      "before_process_tree": " 7983  7739 13334 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/bin/fm-watch.sh\n14386 14352 14352 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/tmp/fm-lab.r2J5zw/state/.fm-custom-check.EeCgP1\n14412 14386 14352 S    sleep 30\n",
+      "cleanup_elapsed_seconds": 1.058,
+      "survivors": [],
+      "lock_remaining": false,
+      "owner_stdout": "",
+      "owner_stderr": "",
+      "watcher_stdout": "",
+      "watcher_stderr": ""
+    },
+    {
+      "ending": "stopped-TERM",
+      "owner_exit": 143,
+      "before_process_tree": "23800 23510 13334 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/bin/fm-watch.sh\n30008 29988 29988 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/tmp/fm-lab.jezHIP/state/.fm-custom-check.JqHf5s\n30030 30008 29988 S    sleep 30\n",
+      "cleanup_elapsed_seconds": 1.113,
+      "survivors": [],
+      "lock_remaining": false,
+      "owner_stdout": "",
+      "owner_stderr": "",
+      "watcher_stdout": "",
+      "watcher_stderr": ""
+    }
+  ],
+  "identity_guards": [
+    {
+      "case": "stale-birth",
+      "cleanup_exit": 0,
+      "process_after": "40657 40657 Ss   /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/bash-5.3/bash -c sleep 30 & echo $! > \"$1\"; wait fixture-stale-birth /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/identity-guards/stale-birth.descendant\n",
+      "subject_alive": true,
+      "descendant_alive": true,
+      "expected_guard_result": true,
+      "cleanup_stdout": "",
+      "cleanup_stderr": ""
+    },
+    {
+      "case": "wrong-command",
+      "cleanup_exit": 0,
+      "process_after": "40674 40674 Ss   /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/bash-5.3/bash -c sleep 30 & echo $! > \"$1\"; wait fixture-wrong-command /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/identity-guards/wrong-command.descendant\n",
+      "subject_alive": true,
+      "descendant_alive": true,
+      "expected_guard_result": true,
+      "cleanup_stdout": "",
+      "cleanup_stderr": ""
+    },
+    {
+      "case": "matching-owned-group",
+      "cleanup_exit": 0,
+      "process_after": "40705 40705 Z    <defunct>\n",
+      "subject_alive": false,
+      "descendant_alive": false,
+      "expected_guard_result": true,
+      "cleanup_stdout": "",
+      "cleanup_stderr": ""
+    },
+    {
+      "case": "stale-watcher",
+      "cleanup_exit": 0,
+      "process_after": "40717 40717 Ts   /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/bash-5.3/bash -c sleep 30 & echo $! > \"$1\"; wait fixture-stale-watcher /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/identity-guards/stale-watcher.descendant\n",
+      "subject_alive": true,
+      "descendant_alive": false,
+      "expected_guard_result": true,
+      "cleanup_stdout": "",
+      "cleanup_stderr": ""
+    }
+  ],
+  "final_cleanup": {
+    "scenario_processes_remaining": [],
+    "disposable_workspace_removed": true
+  },
+  "environment_notes": [
+    "Initial macOS Bash 3.2 targeted suite stopped at an existing BASHPID probe. Built Bash 5.3 only in the disposable worktree and reran successfully.",
+    "Corrected disposable drivers to use fresh PID files, signal the watchdog or its direct owner, launch the watcher with its canonical path, and retain the shared test helper sandbox setting. All corrected scenarios passed.",
+    "Shared fixture orphan-sweep check initially inherited FM_TEST_SKIP_ORPHAN_REAP=1. Removed that setting for its confined TMPDIR and the focused test passed."
+  ],
+  "limits": "No complete repository suite, linters, formatters, gate-control, real agent launch, default tmux server, or live Herdr session was exercised. The changed surface is CLI/process lifecycle, not UI."
+}

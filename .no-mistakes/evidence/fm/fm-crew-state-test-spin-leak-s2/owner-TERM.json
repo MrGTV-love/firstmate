@@ -1,0 +1,11 @@
+{
+  "name": "bound-TERM",
+  "owner_pid": 97032,
+  "signaled_pid": 97080,
+  "child_before": "97140 97080 97140 S    sleep 20\n",
+  "owner_exit": 143,
+  "stdout": "child-started\n",
+  "stderr": "",
+  "elapsed_after_signal": 0.354,
+  "child_survived": false
+}

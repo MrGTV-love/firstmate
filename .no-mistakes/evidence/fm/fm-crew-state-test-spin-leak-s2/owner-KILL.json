@@ -1,0 +1,11 @@
+{
+  "name": "owner-KILL",
+  "owner_pid": 99377,
+  "signaled_pid": 99407,
+  "child_before": "99464 99411 99464 S    sleep 20\n",
+  "owner_exit": 137,
+  "stdout": "child-started\n",
+  "stderr": "bin/fm-nm-run-lib.sh: line 38: 99407 Killed: 9                  ( cd \"$dir\" && fm_timeout_perl_bound \"$timeout_secs\" \"$@\" )\n",
+  "elapsed_after_signal": 0.593,
+  "child_survived": false
+}

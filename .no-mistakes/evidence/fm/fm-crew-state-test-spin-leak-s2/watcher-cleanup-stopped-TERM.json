@@ -1,0 +1,12 @@
+{
+  "ending": "stopped-TERM",
+  "owner_exit": 143,
+  "before_process_tree": "23800 23510 13334 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/bin/fm-watch.sh\n30008 29988 29988 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D23NV25Q1M1CFJV1KQS7TG/.live-timeout-validation/tmp/fm-lab.jezHIP/state/.fm-custom-check.JqHf5s\n30030 30008 29988 S    sleep 30\n",
+  "cleanup_elapsed_seconds": 1.113,
+  "survivors": [],
+  "lock_remaining": false,
+  "owner_stdout": "",
+  "owner_stderr": "",
+  "watcher_stdout": "",
+  "watcher_stderr": ""
+}

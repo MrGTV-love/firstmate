@@ -1,0 +1,7 @@
+{
+  "name": "repeated-no-timeout-leak-check",
+  "exit": 0,
+  "elapsed_seconds": 1.574,
+  "stdout": "call=1 deadline_status=124\ncall=8 deadline_status=124\ncall=7 deadline_status=124\ncall=3 deadline_status=124\ncall=6 deadline_status=124\ncall=2 deadline_status=124\ncall=4 deadline_status=124\ncall=5 deadline_status=124\ncall=9 deadline_status=124\ncall=12 deadline_status=124\ncall=10 deadline_status=124\ncall=11 deadline_status=124\nsurviving_bounded_commands=0\n",
+  "stderr": ""
+}

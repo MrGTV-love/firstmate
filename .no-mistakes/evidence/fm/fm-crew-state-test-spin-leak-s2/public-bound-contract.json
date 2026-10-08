@@ -1,0 +1,7 @@
+{
+  "name": "public-bound-contract",
+  "exit": 0,
+  "elapsed_seconds": 0.76,
+  "stdout": "fm_run_timed status=7 stdout=input-from-user\nfm_nm_bounded status=9 stdout=nm-input\nsignal-killed command status=143\n",
+  "stderr": "command-stderr\nnm-stderr\n"
+}
