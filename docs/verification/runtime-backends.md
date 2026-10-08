@@ -1899,7 +1899,8 @@ FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=505707
 Before provisioning Herdr, the fixture proves submitted and literal allocation interception, exact generated-copy return interception, and refusal of unmatched commands and foreign paths.
 It executes the production cwd inventory and reaper against generated native processes through a PID- and birth-identity-scoped `lsof` boundary, removes only the owned process, and requires an unrelated process to survive.
 No shared Treehouse allocation or return is invoked.
-Generated homes, copies, process fixtures, and evidence stay in the checkout, and task IDs include the unique lab-session identity to isolate the production commands' incidental temporary namespaces.
+The regression's [fixture setup](../../tests/fm-backend-herdr-recovery-lock-e2e.test.sh) owns its temporary-root placement; the [lab helper's header](../../bin/fm-lab-home.sh) owns the home-placement constraint.
+Task IDs include the unique lab-session identity to isolate the production commands' incidental temporary namespaces.
 The regression invokes the original public spawn and teardown executables without transforming them.
 
 The original allocation and return contention scenarios remain covered.
