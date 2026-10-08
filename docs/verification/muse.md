@@ -112,7 +112,8 @@ An unauthenticated launch does not exit; it waits indefinitely:
   Esc cancel
 ```
 
-That is why `bin/fm-spawn.sh` preflights worker-reachable `META_API_KEY` or `<config>/muse/auth.json` and refuses before creating an endpoint.
+That is why `bin/fm-spawn.sh` preflights worker-reachable `META_API_KEY` or `<config>/muse/auth.json` and refuses before worker execution.
+Dispatch-dependent selection follows the [launch-boundary contract](../configuration.md#pooled-omp-capacity-and-declared-stand-ins).
 A caller-only `META_API_KEY` is refused because a long-lived backend daemon does not inherit it, while the non-secret `XDG_CONFIG_HOME` and `XDG_DATA_HOME` roots are resolved to absolute paths before preflight and forwarding so the stored credential and session-log binding reach the same worker environment.
 
 ### Foreign personal context

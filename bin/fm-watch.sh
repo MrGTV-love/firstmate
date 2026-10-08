@@ -141,15 +141,12 @@
 #                          again (FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
 #                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
 #   check: <id> auto-relaunched after session-end
-#                          an in-flight ship or scout recorded event=session-end
-#                          and its endpoint was recovery-grade dead;
-#                          relaunched through bin/fm-control.sh relaunch, which
-#                          keeps the recorded worktree
-#                          (bin/fm-session-end-relaunch-lib.sh)
-#   check: <id> auto-relaunch failed after session-end: <detail>
-#                          the same evidence authorized recovery but the
-#                          relaunch failed; the attempt is ledgered and counts
-#                          toward the caps below
+#                          ship/scout recovery through bin/fm-control.sh relaunch;
+#                          bin/fm-session-end-relaunch-lib.sh owns eligibility
+#                          for ordinary SessionEnd and OMP quota events
+#   check: <id> auto-relaunch failed after <cause>: <detail>
+#                          recovery failed after session-end or quota exhaustion;
+#                          the recovery owner defines attempt accounting
 #   check: <id> auto-relaunch paused after <n> attempt(s) in <s>s; ...
 #                          the task exceeded one automatic relaunch per 30
 #                          minutes or 3 per day; one wake
@@ -243,9 +240,9 @@ WATCH_HOME_EXISTED=0
 # and wake emission (secondmate_liveness_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
-# In-flight ship/scout session-end relaunch. The library owns eligibility,
-# the deliberate-exit skip, and the attempt caps. This watcher only scans
-# and wakes (session_end_relaunch_tick below).
+# In-flight ship/scout recovery. The library owns SessionEnd and OMP quota-event
+# eligibility, deliberate-exit cancellation, and attempt accounting. This watcher
+# only scans and wakes (session_end_relaunch_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
 

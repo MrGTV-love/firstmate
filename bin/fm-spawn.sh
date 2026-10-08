@@ -2138,7 +2138,7 @@ omp_model_validate() { # <omp-bin> <model> <config-dir> <cwd> [tmux-session]
 # instead of wedging a worker pane. The listing is a remote fetch that needs
 # network and a signed-in account, so the probe runs under the shared hard
 # bound (bin/fm-timeout-lib.sh) with stdin detached: a stalled fetch or a
-# sign-in prompt can never block the spawn before any pane exists. An
+# sign-in prompt cannot indefinitely block launch. An
 # unreachable listing establishes nothing (harness-adapters
 # model-and-effort.md) and launches unvalidated with a notice.
 agy_model_validate() {  # <agy-bin> <model>

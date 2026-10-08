@@ -1381,7 +1381,7 @@ This section is the single owner of the canonical schema and its per-field seman
 
 ### Pooled OMP capacity and declared stand-ins
 
-Fresh-spawn routing internally classifies the pool and accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model.
+Fresh-spawn routing internally classifies the pool as `usable`, `exhausted`, or `unknown`, and each reported account additionally as `ineligible` for that model.
 OMP's own `usage --provider openai-codex --json`, measured through the owned initialized worker pane in its destination working directory under the same authentication boundary as launch, is authoritative for that classification, not quota-axi's single-account Codex row.
 Shared OMP usage and model-catalog queries require that initialized endpoint and a nonempty, resolvable destination directory; typed intake has no owned worker endpoint, so its OMP capacity remains unknown without probing a reconstructed environment or the caller's directory, and classification consumes only explicitly supplied usage JSON.
 A fresh usable entitled sibling keeps the model available; an unmeasured or unknown-entitlement sibling prevents a whole-pool exhaustion verdict unless it is known to be ineligible.
@@ -1407,7 +1407,7 @@ Bound native Claude capacity includes global quota and exact `model:<selected mo
 An adopted pane retains its existing shell environment, which current tmux session/global settings cannot establish, so its native Claude and OMP quota remain unknown.
 An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established also keeps native Claude and OMP quota unknown.
 
-Each fallback profile requires `harness`, `model`, and `effort`; `floor` declarations are unsupported and rejected in both rule `fallback` and top-level `default_fallback` arrays.
+Each fallback profile requires `harness` (`omp` or `claude`), `model`, and `effort` (`low`, `medium`, `high`, `xhigh`, or `max`); `floor` declarations are unsupported and rejected in both rule `fallback` and top-level `default_fallback` arrays.
 An OMP fallback uses a concrete selector from a catalog discovered in the same established destination authentication and project scope as launch, including provider credentials retained by the launch allowlist; a caller-only catalog cannot establish support.
 Capacity and catalog probes normalize relative-PATH executables in the same way as launch.
 A Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
@@ -1427,8 +1427,7 @@ Omitted model and effort fields match their persisted `default` metadata values 
 An explicitly selected rule with an empty or omitted fallback list also permits completing unspecified effort at intake and retains that rule's identity and zero fallback permission during recovery.
 Harness and model matching remain exact after default normalization; rules granting stand-ins and implicit rule selection also require matching effort.
 OMP 18.6.1 natively rotates pooled credentials on `usage_limit_reached`, including review processes launched with extensions disabled.
-Firstmate's worker overlay enables usage-aware selection without a generic percentage reserve and preserves destination-owned native model-fallback settings.
-Its `retry.waitForUsageReset: false` keeps reset-derived waits subject to the destination's inherited `retry.maxDelayMs` ceiling (five minutes by default), rather than disabling all reset waits; `retry.maxDelayMs: 0` disables that ceiling.
+The [worker overlay](../.omp/fm-worker-overlay.yml) owns Firstmate's worker-only retry settings and their reserve, reset-wait, and destination-policy rationale.
 In-worker model switching belongs to OMP's `retry.fallbackChains`; for example, an operator may configure `openai-codex/gpt-6.1-sol` -> `openrouter/openai/gpt-6.1-sol` -> `openrouter/deepseek/deepseek-v4-flash`.
 Firstmate neither installs nor changes that chain.
 Firstmate does not promise live terminal fallback: its shared selector applies declared stand-ins at fresh spawn and at relaunch only where authoritative destination capacity proves exhaustion.
@@ -1614,7 +1613,7 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
-- OMP Codex assessment, unknown economics, unverifiable floors, and exhaustion-only fallback follow the [pooled-capacity contract](#pooled-omp-capacity-and-declared-stand-ins).
+- OMP Codex and native Claude assessment, unknown economics, unverifiable floors, and exhaustion-only fallback follow the [pooled-capacity contract](#pooled-omp-capacity-and-declared-stand-ins).
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
@@ -1632,7 +1631,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 **Candidate eligibility and evidence**
 
-- For non-pooled routes, a known profile-floor shortfall makes a candidate ineligible, as does any applicable `exhausted_now` row or known zero bound, before unrelated quota uncertainty is considered.
+- For quota-mapped, non-pooled routes, a known profile-floor shortfall makes a candidate ineligible, as does any applicable `exhausted_now` row or known zero bound, before unrelated quota uncertainty is considered.
   Exhaustion activates a declared stand-in only when the profile floor is absent or verified passing.
 - Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
 - Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.

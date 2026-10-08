@@ -4,7 +4,7 @@
 #
 # This is the shared preflight for refusing a Claude worker when an Anthropic
 # credential could be inherited without deliberate API billing:
-#   - bin/fm-spawn.sh checks before creating a worker.
+#   - bin/fm-spawn.sh checks before worker execution, not endpoint acquisition.
 #   - bin/fm-control.sh checks before stopping the current worker for relaunch.
 #
 # On tmux it checks the effective prospective or established destination

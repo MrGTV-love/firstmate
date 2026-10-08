@@ -17,8 +17,6 @@
 #
 # Candidates are accepted as `--candidate <harness:model>` or as positional
 # colon-separated arguments, with earlier candidates preferred.
-# This script is deterministic and safe: it performs no side effects and exits
-# nonzero when the environment would lead to an unsafe dispatch.
 #
 # The helper is the canonical worker-side selection used after the agent has
 # already run `quota-axi` for its model selection. It never replaces the agent's
@@ -36,7 +34,7 @@
 # discovery from the harness catalog and quota matching by that explicit
 # provider - is owned by AGENTS.md section 4 and the quota-array-dispatch skill,
 # not by this helper. Use this helper only when the brief already fixed the
-# candidate order and every candidate's provider is the harness's primary family.
+# candidate order and every candidate's established provider fits this mapping.
 #
 # omp (Oh My Pi) has no single primary family. openai-codex/<id> reads every
 # pooled account from one `omp usage --provider openai-codex --json` report:
@@ -48,9 +46,9 @@
 #
 # Native OMP usage is measured in the running worker's inherited process
 # environment, not a reconstructed future launch or tmux environment.
-# Native Claude candidates are skipped when that process retains an alternate
-# store, credential, profile, enabled cloud backend, or paired federation rule
-# and organization: the captured default-account quota cannot establish theirs.
+# Native Claude candidates are skipped when the shared authentication inspection
+# cannot bind that process to default-account quota; bin/fm-worker-account-lib.sh
+# owns the inspection, and docs/configuration.md owns its settings-source contract.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

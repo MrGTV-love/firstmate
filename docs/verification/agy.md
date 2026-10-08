@@ -85,6 +85,7 @@ gemini-3.8-flash-low	Gemini 3.8 Flash (Low)
 The bare `gemini-3.8-flash` id from this home's previous config is not listed; only the suffixed `-high`, `-medium`, and `-low` variants are.
 The adapter's [operating facts](../../.agents/skills/harness-adapters/references/harness/agy.md#operating-facts) own the current model-validation boundary.
 The listing is a remote fetch (`Fetching available models...`); [`fm-spawn.sh`](../../bin/fm-spawn.sh) owns the bounded, stdin-detached probe for native non-index-entry literals.
+The [`agy_model_validate` implementation](../../bin/fm-spawn.sh) owns the timeout setting and invalid-value handling.
 Print mode (`agy -p "Reply with exactly: AGY_PRINT_PROBE_OK" --model gemini-3.8-flash-low`) returned the exact reply with exit 0 in about 8 seconds, proving the credential path without a pane.
 
 ## Busy state: the pinned status row, unknown on absence
