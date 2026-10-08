@@ -87,16 +87,35 @@ omp restores queued user follow-ups to the composer when a run is interrupted wi
 Before recording or sending a wake, `.omp/extensions/fm-primary-omp-watch.ts` normalizes CRLF and CR to LF, expands each tab to three spaces, and strips other C0 controls to match omp's editor restoration.
 Consumption still matches the emitted text exactly.
 Only an accepted user `message_start` carrying the exact emitted text consumes one pending token. `before_agent_start` records context and the loaded build but does not consume a wake: preparation can still be cancelled by Escape. A second identical wake therefore remains recoverable and eligible for replacement handoff, and shutdown during cancelled preparation retains the pending record until the replacement accepts its user message.
-While a wake remains unconsumed, `agent_end` schedules one editor check after two seconds; this is not continuous polling.
-The check requires the current generation to be live, a UI editor, positive idle state, and no pending messages.
+While a wake remains unconsumed, `agent_end` schedules one editor check after two seconds, replacing a check already pending so the editor is read two full seconds after the run ended.
+Omp accepting the wake as a follow-up schedules one too, unless a check is already pending.
+The check requires the current generation to be live, a UI editor, and positive idle state.
+While omp still reports queued messages the check waits for them to drain into a run, in up to fifteen further two-second rounds, rather than skipping for good.
 Recovery accepts only a complete unchanged emitted wake segment bounded by editor edges or omp's blank-line joins, with only its leading invisible transport mark allowed to be present or absent.
 Direct prefix, suffix, or internal edits are left untouched and not submitted.
 The extension removes only the wake and one transport blank-line separator, preserves operator draft bytes including invisible marks and leading/trailing newlines, and resends the wake alone through omp's prompt-starting message API.
 Recovery is bounded to three resubmission attempts per wake; another `agent_end` is needed to schedule another check.
+A queue that is still full once omp has stayed idle through that wait is stuck, because omp's follow-up gate refused to start a turn for it.
+A wake sitting in the composer is then recovered as above.
+With no wake in the composer, the check sends the oldest unconsumed wake through the same prompt-starting API, which starts the turn and flushes the queue behind it, so the wake can reach main twice and the idempotent drain absorbs the repeat.
+Delivery is proven by the accepted user `message_start` carrying the wake; if three resubmissions of every unconsumed wake do not produce it, the extension reports the wait once through omp's own notification and leaves the durable queue and shutdown handoff to the parent's stalled-loop alarm.
 A wake restored by Alt+Up while idle without `agent_end` is not resubmitted, and rare credential loss during recovery can reject resubmission after the editable copy is removed; the durable queue and shutdown handoff retain the wake, the existing parent stalled-loop alarm reports either stall for endpoint-recorded local secondmates, and consumption-confirmed removal remains follow-up `fm-omp-wake-recovery-rollback`.
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
 `tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, pending-wake retention across cancelled preparation without `agent_end`, later completed draft turns, and replacement handoff until accepted user `message_start`, plus identical wakes across preparation plus accepted-message callbacks, streaming delivery, and session replacement.
+It also covers the wait on queued messages: a queue that drains, a restored wake behind a queue that never drains, a wake stuck in the queue itself, and resubmissions that start no turn.
 The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
+
+### omp stranded wake text
+
+An idle omp raises no event when text lands in its composer, so wake text that older wiring typed there and never submitted stayed pending until someone pressed Enter, and a restart that needs an empty composer was refused.
+Once the extension owns the watch for the lock-holding session, at session start or through `fm_watch_arm_omp`, `.omp/extensions/fm-primary-omp-watch.ts` polls the editor every three seconds.
+A poll acts only when omp is idle and the editor holds a complete Firstmate watcher wake: the watcher envelope header from `bin/fm-operational-input.sh`, the wake body, and its fixed closing sentence, bounded by editor edges or omp's blank-line joins, with the leading transport mark present or absent.
+The same wake text must be in the editor, unchanged, on two consecutive polls, so text still being pasted is never taken.
+The extension sends the wake alone through omp's prompt-starting message API, restores the transport mark, and then removes only that wake and one blank-line separator from the editor.
+Any other text is left exactly as found: operator drafts, a wake that was edited, truncated, prefixed, or followed on its line, and a wake this extension still tracks, which the bounded restored-wake recovery above owns.
+Delivery is bounded to three attempts per distinct wake text, and a wake sent this way is tracked until an accepted user `message_start` consumes it.
+`tests/fm-omp-harness.test.sh` covers delivery with and without the transport mark, operator drafts on both sides, several wakes, text that is not a whole wake, a running turn, text still changing, and the attempt bound.
+The live guard's stranded-wake step and its evidence are recorded in [omp stranded wake text and the queue panel](verification/runtime-backends.md#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 
 ### Cursor stop hook
 
