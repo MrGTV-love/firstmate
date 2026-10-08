@@ -1365,6 +1365,8 @@ CONFIG_INHERIT_LOCK=
 CONFIG_INHERIT_LOCK_HELD=0
 GIT_HOOKS_DIR=
 SPAWN_LAUNCH_SENT=0
+SPAWN_BRIEF_DELIVERED=0
+SPAWN_BRIEF_FAILURE_REASON=
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_TREEHOUSE_ABORT_TARGET=
 SPAWN_ROUTING_PAIR=
@@ -1397,7 +1399,7 @@ parse_orca_worktree_result() {
 }
 
 spawn_abort_cleanup() {
-  local status=$?
+  local status=$? skill_meta_tmp
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ] &&
     [ "$SPAWN_META_PUBLISH_STARTED" = 1 ] &&
     [ -n "$SPAWN_META_TMP" ] &&
@@ -1515,6 +1517,24 @@ spawn_abort_cleanup() {
     if ! spawn_fresh_commit_rollback; then
       status=1
     fi
+  fi
+  if [ "$status" -ne 0 ] && [ "$SPAWN_BRIEF_DELIVERED" = 0 ] &&
+    [ "$SPAWN_META_LOCK_HELD" = 1 ] && [ -n "${SKILL_SELECTION_STATUS:-}" ] &&
+    [ -n "${SPAWN_GEN:-}" ] &&
+    grep -Fqx "spawn_gen=$SPAWN_GEN" "$STATE/$ID.meta" 2>/dev/null; then
+    skill_meta_tmp=$(mktemp "$STATE/.$ID.meta.skill-selection.XXXXXX") || skill_meta_tmp=
+    if [ -n "$skill_meta_tmp" ] &&
+      awk -F= '$1 != "skill_selection" && $1 != "skill_selection_reason" && $1 != "skill_selection_picked"' \
+        "$STATE/$ID.meta" >"$skill_meta_tmp" &&
+      printf 'skill_selection=undelivered\nskill_selection_reason=%s\n' \
+        "${SPAWN_BRIEF_FAILURE_REASON:-launch aborted before brief delivery (exit status $status)}" >>"$skill_meta_tmp" &&
+      fm_backlog_atomic_transition publish "$skill_meta_tmp" "$STATE/$ID.meta" "task record" "$STATE"; then
+      :
+    else
+      echo "error: could not record undelivered skill selection for $ID" >&2
+      status=1
+    fi
+    [ -z "$skill_meta_tmp" ] || rm -f "$skill_meta_tmp"
   fi
   if [ "$SPAWN_META_LOCK_HELD" = 1 ]; then
     SPAWN_META_LOCK_HELD=0
@@ -4333,6 +4353,7 @@ kimi_wait_for_delivery() {
 }
 
 kimi_spawn_fail() { # <detail>
+  SPAWN_BRIEF_FAILURE_REASON=$1
   printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
   echo "error: $1; inspect window $T" >&2
 }
@@ -4401,6 +4422,7 @@ rovo_wait_for_delivery() {
 }
 
 rovo_spawn_fail() { # <detail>
+  SPAWN_BRIEF_FAILURE_REASON=$1
   printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
@@ -5466,6 +5488,7 @@ case "$LAUNCH" in
     *) brief_opstate=$STATE ;;
   esac
   brief_doorbell=$(FM_STATE_OVERRIDE="$brief_opstate" "$FM_ROOT/bin/fm-operational-input.sh" record launch-brief <"$BRIEF") || {
+    SPAWN_BRIEF_FAILURE_REASON="could not publish the launch brief as an operational-inbox record"
     echo "error: could not publish the launch brief for $ID as an operational-inbox record under $brief_opstate; $HARNESS strips the typed operational marker, so the worker was not launched" >&2
     exit 1
   }
@@ -5812,6 +5835,7 @@ if [ "$HARNESS" = agy ]; then
     exit 1
   fi
 fi
+SPAWN_BRIEF_DELIVERED=1
 
 if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
   if ! fm_config_reread_discard_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then

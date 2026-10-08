@@ -213,6 +213,52 @@ for roster_case in absent empty untracked undescribed partial; do
   done
 done
 
+reset; keys
+roster="$TMP_ROOT/non-skill-links"
+non_skill_target="$TMP_ROOT/non-skill-target"
+git init -q "$roster"
+mkdir -p "$roster/.agents/skills" "$roster/.claude/skills" "$non_skill_target"
+printf 'NON-SKILL-TARGET-SENTINEL\n' > "$non_skill_target/README"
+ln -s "$non_skill_target" "$roster/.agents/skills/alpha"
+ln -s "$non_skill_target" "$roster/.claude/skills/plugin-helper"
+for catalog in .agents .claude; do
+  ln -s "$non_skill_target/README" "$roster/$catalog/skills/file-link"
+  ln -s "$TMP_ROOT/missing-non-skill-target" "$roster/$catalog/skills/dangling-link"
+done
+git -C "$roster" add -- .agents .claude
+roster_json=$(node "$ROOT/bin/fm-skill-pick.mjs" roster "$roster/.agents/skills" "$roster/.claude/skills")
+printf '%s\n' "$roster_json" | jq -e '.skills == [] and .not_judged == []' >/dev/null \
+  || fail "non-skill links in both catalogs emit no phantom skill names or exclusions"
+out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" \
+  bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$roster/.agents/skills" \
+  --catalog "$roster/.claude/skills" --record "$TMP_ROOT/record")
+grep -qx 'status=none' "$TMP_ROOT/record" || fail "a plugin-only catalog records no skill selection"
+grep -qx 'reason=this project has no skills to judge' "$TMP_ROOT/record" \
+  || fail "non-skill links leave the catalog empty rather than unavailable"
+assert_not_contains "$out" "Not judged, so check them yourself if relevant:" "non-skill links do not require manual checking"
+assert_not_contains "$out" "Skill selection was unavailable" "non-skill links do not make selection unavailable"
+assert_equals 0 "$(requests)" "a plugin-only catalog makes no requests"
+reset; keys
+skill "$roster/.claude/skills" alpha 'description: Use for alpha work.'
+git -C "$roster" add -- .claude/skills/alpha/SKILL.md
+roster_json=$(node "$ROOT/bin/fm-skill-pick.mjs" roster "$roster/.agents/skills" "$roster/.claude/skills")
+printf '%s\n' "$roster_json" | jq -e '
+  (.skills | map(.name)) == ["alpha"] and .not_judged == []' >/dev/null \
+  || fail "a non-skill link does not reserve the name of a later tracked skill"
+out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" FAKE_PICK=alpha \
+  bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$roster/.agents/skills" \
+  --catalog "$roster/.claude/skills" --record "$TMP_ROOT/record")
+grep -qx 'status=picked' "$TMP_ROOT/record" || fail "the later tracked skill can be picked"
+grep -qx 'picked=alpha' "$TMP_ROOT/record" || fail "the non-skill link does not shadow the picked name"
+assert_contains "$out" "- Picked for this task: alpha - read $(cd "$roster" && pwd -P)/.claude/skills/alpha/SKILL.md" "selection resolves to the later tracked skill"
+assert_not_contains "$out" "Not judged, so check them yourself if relevant:" "non-skill links stay absent beside a tracked skill"
+assert_equals 2 "$(requests)" "the later tracked skill completes normal selection"
+jq -se 'all(.[]; (.body.questions.which.criteria | keys) == ["alpha"])' "$LOG" >/dev/null \
+  || fail "only the actual later skill enters ranking and reranking"
+assert_not_contains "$roster_json" NON-SKILL-TARGET-SENTINEL "non-skill linked target contents stay out of the roster"
+assert_not_contains "$(cat "$LOG")" NON-SKILL-TARGET-SENTINEL "non-skill linked target contents stay out of transport"
+pass "non-skill links leave catalogs empty and do not reserve later tracked skill names"
+
 linked_target="$TMP_ROOT/linked-target"
 skill "$linked_target" TARGET-FRONTMATTER-SENTINEL 'description: LINKED-DESCRIPTION-SENTINEL'
 printf 'LINKED-BODY-SENTINEL\n' >> "$linked_target/TARGET-FRONTMATTER-SENTINEL/SKILL.md"
@@ -611,14 +657,24 @@ pass "raw launch records match delivery capability"
 
 raw_pointer_fake() {
   mv "$SPAWN_FAKEBIN/tmux" "$SPAWN_FAKEBIN/tmux-base"
-  fm_fake_exit0 "$SPAWN_FAKEBIN" rovo
+  fm_fake_exit0 "$SPAWN_FAKEBIN" rovo kimi
   cat > "$SPAWN_FAKEBIN/tmux" <<'SH'
 #!/usr/bin/env bash
 set -eu
 state=$(cat "$POINTER_STATE" 2>/dev/null || true)
 screen() {
+  if [ "${POINTER_RELAUNCH:-0}" = 1 ] && [ ! -f "$FM_FAKE_LAUNCH_LOG" ]; then
+    printf 'test-shell$ \n'
+    return
+  fi
+  if [ "${POINTER_FAILURE:-}" = ready ]; then
+    printf 'Starting agent...\n'
+    return
+  fi
   if [ "$state" = delivered ]; then
     printf 'Read the brief at %s and follow it exactly.\nContext: | 3.3%% 30.1K/922K\n' "$POINTER_BRIEF"
+  elif [ "${POINTER_HARNESS:-rovo}" = kimi ]; then
+    printf 'Welcome to Kimi Code!\ncontext: 0.0%%\n'
   else
     printf 'Welcome to Rovo!\nContext: | 0.0%% 0/922K\n? for shortcuts.\n'
   fi
@@ -629,12 +685,21 @@ screen() {
 }
 case "$*" in
   *"#{cursor_y}"*) printf '4\n'; exit 0 ;;
+  *"#{pane_current_command}"*) printf 'zsh\n'; exit 0 ;;
+  *"#{pane_tty}"*) exit 0 ;;
 esac
 case "${1:-}" in
+  list-windows)
+    if [ "${POINTER_RELAUNCH:-0}" = 1 ]; then
+      printf '%s\n' "$POINTER_WINDOW"
+      exit 0
+    fi
+    ;;
   send-keys)
     prev=
     for arg in "$@"; do
       if [ "$prev" = -l ] && [[ "$arg" = 'Read the brief at '* ]]; then
+        [ "${POINTER_FAILURE:-}" != submit ] || exit 1
         printf '%s\n' "$arg" >> "$POINTER_LOG"
         printf 'typed\n' > "$POINTER_STATE"
         exit 0
@@ -642,7 +707,12 @@ case "${1:-}" in
       prev=$arg
     done
     if [ "$state" = typed ]; then
-      case " $* " in *' Enter '*) printf 'delivered\n' > "$POINTER_STATE" ;; esac
+      case " $* " in
+        *' Enter '*)
+          if [ "${POINTER_FAILURE:-}" = confirmation ]; then printf 'submitted\n' > "$POINTER_STATE"
+          else printf 'delivered\n' > "$POINTER_STATE"; fi
+          ;;
+      esac
     fi
     ;;
   capture-pane)
@@ -736,6 +806,130 @@ SH
   done
 done
 pass "raw doorbell and pointer transports deliver picked, none and unavailable outcomes"
+
+relaunch_selection_case() {
+  local id=$1 kind=$2
+  spawn_case "$id"
+  mkdir -p "$SPAWN_HOME/user-home/.kimi-code"
+  printf 'default_model = "kimi-for-coding"\n' > "$SPAWN_HOME/user-home/.kimi-code/config.toml"
+  meta="$SPAWN_HOME/state/$id.meta"
+  {
+    printf 'window=firstmate:fm-%s\nendpoint_task_id=%s\n' "$id" "$id"
+    printf 'worktree=%s\nproject=%s\n' "$SPAWN_POOL" "$SPAWN_PROJECT"
+    printf 'harness=codex\nkind=%s\n' "$kind"
+    printf 'mode=no-mistakes\nyolo=off\nbranch=fm/%s\nmodel=default\neffort=default\n' "$id"
+    printf 'spawn_gen=prior-incarnation\nskill_selection=picked\nskill_selection_picked=prior-skill\nskill_selection_reason=prior-reason\n'
+    printf 'owner_note=preserve this owner metadata\n'
+  } > "$meta"
+  raw_pointer_fake
+}
+
+relaunch_publish_failure_fake() {
+  cat > "$SPAWN_FAKEBIN/mv" <<'SH'
+#!/usr/bin/env bash
+set -eu
+for arg in "$@"; do
+  case "${PUBLICATION_FAILURE:-}:$arg" in
+    metadata:*/.*.meta.relaunch.*) exit 1 ;;
+  esac
+done
+exec "$REAL_MV" "$@"
+SH
+  chmod +x "$SPAWN_FAKEBIN/mv"
+}
+
+real_mv=$(command -v mv)
+for transport in kimi rovo doorbell; do
+  for failure in ready submit confirmation; do
+    [ "$transport" != doorbell ] || [ "$failure" = ready ] || continue
+    for outcome in picked none unavailable; do
+      reset
+      id="relaunch-$transport-$failure-$outcome"
+      case "$outcome" in none) kind=scout ;; *) kind=ship ;; esac
+      relaunch_selection_case "$id" "$kind"
+      printf 'TYPESAFE_API_KEY=ts-spawn-key\n' > "$SPAWN_HOME/.env"
+      gate=0.8
+      case "$outcome" in
+        none) gate=0.1 ;;
+        unavailable) rm "$SPAWN_HOME/.env" ;;
+      esac
+      brief="$SPAWN_HOME/data/$id/launch-brief.md"
+      case "$transport" in
+        kimi|rovo)
+          harness="$transport"
+          recorded_harness="$transport"
+          case "$failure" in
+            ready) failure_reason="$transport did not show a verified ready signal before brief delivery" ;;
+            submit) failure_reason="$transport brief pointer could not be submitted" ;;
+            confirmation) failure_reason="$transport brief pointer delivery was not confirmed" ;;
+          esac
+          ;;
+        doorbell)
+          harness='custom-agent --brief __BRIEFDOORBELL__'
+          recorded_harness=custom-agent
+          failure_reason='could not publish the launch brief as an operational-inbox record'
+          : > "$SPAWN_HOME/state/operational-inbox"
+          ;;
+      esac
+      if out=$(FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FAKE_PICK=alpha FAKE_GATE="$gate" \
+        FM_FAKE_LAUNCH_LOG="$TMP_ROOT/$id.launch" POINTER_LOG="$TMP_ROOT/$id.pointer" \
+        POINTER_STATE="$TMP_ROOT/$id.pointer-state" POINTER_BRIEF="$brief" POINTER_RELAUNCH=1 \
+        POINTER_HARNESS="$transport" POINTER_FAILURE="$failure" POINTER_WINDOW="fm-$id" \
+        FM_KIMI_READY_POLLS=2 FM_KIMI_DELIVERY_POLLS=2 FM_KIMI_POLL_INTERVAL=0 FM_KIMI_SUBMIT_SLEEP=0 \
+        FM_ROVO_READY_POLLS=2 FM_ROVO_DELIVERY_POLLS=2 FM_ROVO_POLL_INTERVAL=0 FM_ROVO_SUBMIT_SLEEP=0 \
+        REAL_MV="$real_mv" \
+        fm_test_run_spawn "$SPAWN_HOME" "$SPAWN_POOL" "$SPAWN_FAKEBIN" "$id" --relaunch --harness "$harness"); then
+        fail "$transport $failure relaunch must fail after selection"
+      fi
+      if [ "$transport" = doorbell ]; then
+        assert_contains "$out" "could not publish the launch brief for $id" "the relaunch reports its actual publication failure"
+      else
+        assert_contains "$out" "$failure_reason" "the relaunch reports its actual delivery failure"
+      fi
+      grep -qx "harness=$recorded_harness" "$meta" || fail "failed relaunch retains the replacement harness record"
+      grep -qx "kind=$kind" "$meta" || fail "failed relaunch preserves the instruction-owner kind"
+      grep -qx 'skill_selection=undelivered' "$meta" || fail "failed $transport $failure relaunch marks $outcome undelivered"
+      assert_contains "$(sed -n 's/^skill_selection_reason=//p' "$meta")" "$failure_reason" "undelivered metadata records the actual failure"
+      assert_not_contains "$(cat "$meta")" 'skill_selection_picked=' "failed delivery clears old and new picked fields"
+      assert_not_contains "$(cat "$meta")" 'prior-reason' "failed delivery clears the prior selection reason"
+      assert_not_contains "$(cat "$meta")" 'spawn_gen=prior-incarnation' "failed delivery retains the replacement incarnation"
+      grep -qx 'owner_note=preserve this owner metadata' "$meta" || fail "failed delivery preserves unrelated owner metadata"
+      case "$outcome" in
+        picked)
+          assert_equals 2 "$(requests)" "selection completed before the picked relaunch failed"
+          assert_contains "$(cat "$brief")" "- Picked for this task: alpha" "the generated brief already contains the completed alpha pick"
+          ;;
+        none)
+          assert_equals 1 "$(requests)" "no-fit selection completed before relaunch delivery failed"
+          assert_contains "$(cat "$brief")" "Skill selection found no fit among the judged project skills" "the generated brief contains the no-fit outcome"
+          ;;
+        unavailable)
+          assert_equals 0 "$(requests)" "unavailable selection makes no requests before relaunch failure"
+          assert_contains "$(cat "$brief")" "Skill selection was unavailable for this task" "the generated brief contains the unavailable outcome"
+          ;;
+      esac
+    done
+  done
+done
+pass "failed Kimi, Rovo and doorbell relaunch delivery records undelivered selection for ships and scouts"
+
+reset
+id=relaunch-before-publication
+relaunch_selection_case "$id" ship
+printf 'TYPESAFE_API_KEY=ts-spawn-key\n' > "$SPAWN_HOME/.env"
+prior_meta=$(cat "$meta")
+relaunch_publish_failure_fake
+if out=$(FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FAKE_PICK=alpha \
+  FM_FAKE_LAUNCH_LOG="$TMP_ROOT/$id.launch" POINTER_LOG="$TMP_ROOT/$id.pointer" \
+  POINTER_STATE="$TMP_ROOT/$id.pointer-state" POINTER_BRIEF="$SPAWN_HOME/data/$id/launch-brief.md" \
+  POINTER_RELAUNCH=1 POINTER_WINDOW="fm-$id" REAL_MV="$real_mv" PUBLICATION_FAILURE=metadata \
+  fm_test_run_spawn "$SPAWN_HOME" "$SPAWN_POOL" "$SPAWN_FAKEBIN" "$id" --relaunch --harness rovo); then
+  fail "relaunch must fail when replacement metadata cannot be published"
+fi
+assert_equals "$prior_meta" "$(cat "$meta")" "pre-publication abort preserves the entire previous selection and owner record"
+assert_equals 2 "$(requests)" "the pre-publication abort occurs after normal selection"
+[ ! -f "$TMP_ROOT/$id.launch" ] || fail "replacement launch is not sent before metadata publication"
+pass "pre-publication relaunch abort leaves prior selection metadata unchanged"
 
 reset
 spawn_case failed-overlay

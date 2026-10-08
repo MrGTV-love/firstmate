@@ -16,7 +16,7 @@
 // pick prints status=, reason=, picked=, path=, fit=, provider= and model=
 // lines; path is a JSON string, and status is picked, none or unavailable.
 import { execFileSync } from 'node:child_process';
-import { closeSync, lstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from 'node:fs';
+import { closeSync, lstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 let JevClient, choice, noul, LIMITS;
@@ -130,6 +130,8 @@ function roster(catalogs) {
       try {
         const entry = lstatSync(join(dir, child));
         if (entry.isSymbolicLink()) {
+          if (!statSync(join(dir, child), { throwIfNoEntry: false })?.isDirectory()) continue;
+          if (!lstatSync(path, { throwIfNoEntry: false })) continue;
           reason = 'not a Git-tracked file in this project';
         } else {
           if (!entry.isDirectory()) continue;
