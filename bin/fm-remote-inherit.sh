@@ -9,6 +9,8 @@
 # Only the inherited-material allowlist is writable or removable. Writes are
 # atomic ordinary-file replacements. data/captain-shared.md is read-only and is
 # quarantined before removal or before replacing bytes not last published here.
+# An item this home pins with config/<item>.home-owned (see
+# fm_config_inherit_home_owned in bin/fm-config-inherit-lib.sh) is left alone.
 set -eu
 
 FM_HOME=${FM_HOME:?FM_HOME is required}
@@ -75,6 +77,14 @@ mkdir -p "$PARENT" || die "cannot create inherited destination parent"
 PARENT_REAL=$(CDPATH='' cd -- "$PARENT" && pwd -P)
 case "$PARENT_REAL" in "$HOME_REAL/config"|"$HOME_REAL/data") ;; *) die "inherited destination escapes FM_HOME" ;; esac
 DEST="$PARENT_REAL/$(basename "$REL")"
+# A destination home that owns this item (config/<item>.home-owned) keeps its
+# own value; the primary's bytes or absence are acknowledged and not applied.
+if [ "$COMMAND" != check ] && [ "$PARENT_REAL" = "$HOME_REAL/config" ] \
+  && fm_config_inherit_home_owned "$PARENT_REAL" "$(basename "$REL")"; then
+  [ "$COMMAND" != put ] || head -c "$((MAX_BYTES + 1))" > /dev/null || true
+  printf 'unchanged: %s\n' "$REL"
+  exit 0
+fi
 case "$REL" in
   config/model-index.json|config/crew-dispatch.json)
     guard_destination "$PARENT_REAL/model-index.json"

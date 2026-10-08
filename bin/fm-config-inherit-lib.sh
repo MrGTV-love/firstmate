@@ -25,7 +25,12 @@
 # (bypass or auto for every claude launch), so it flows down too and a
 # secondmate's own claude crewmates launch on the same permission posture.
 # Primary config/keep-ai-trailers is a home-wide commit-attribution choice, so
-# a secondmate's own crewmates keep AI co-author trailers too.
+# a secondmate's own crewmates keep AI co-author trailers too, unless that
+# secondmate home owns its own choice: a config/keep-ai-trailers.home-owned
+# marker in the DESTINATION home leaves its keep-ai-trailers untouched (neither
+# copied nor mirrored absent, and unchanged in the reread record) at every
+# convergence point, local or remote. The exception is owned by
+# .agents/skills/secondmate-provisioning/SKILL.md.
 # It also pushes
 # the one primary-authoritative shared captain-preference file,
 # data/captain-shared.md, into each secondmate home's data/ as a read-only copy.
@@ -89,6 +94,26 @@ FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-model-index.json crew-dispatch.j
 # untouched by live convergence into an already-running home, whose decision is
 # already frozen for its current session (bin/fm-trace-context-lib.sh).
 FM_SESSION_SCOPED_INHERITABLE_CONFIG="trace-context"
+
+# Items a secondmate home may own itself. A regular file named
+# config/<item>.home-owned in the DESTINATION home pins that home's own value
+# (present or absent) against primary-authoritative propagation; the marker is
+# destination-local, never inherited, and read by the local propagation below
+# and by the remote receiver, which only knows its own home. Only the items
+# listed here honor a marker.
+FM_HOME_OWNABLE_CONFIG="keep-ai-trailers"
+FM_HOME_OWNED_SUFFIX=".home-owned"
+
+# True when the destination config dir pins <item> as home-owned.
+fm_config_inherit_home_owned() {  # <dest-config-dir> <item>
+  local candidate
+  for candidate in $FM_HOME_OWNABLE_CONFIG; do
+    [ "$candidate" = "$2" ] || continue
+    [ -f "$1/$2$FM_HOME_OWNED_SUFFIX" ]
+    return
+  done
+  return 1
+}
 
 # True when <item> is session-scoped in the sense above.
 fm_config_inherit_item_session_scoped() {  # <item>
@@ -220,7 +245,8 @@ destination_allows_inherited_pair() {
 # (primary-authoritative). Inspection errors or existing nonregular sources
 # leave destinations unchanged; inaccessible paths and dangling source links
 # must never silently remove an inherited grant. The coupled routing-pair
-# exception is owned by .agents/skills/secondmate-provisioning/SKILL.md.
+# exception and the home-owned keep-ai-trailers exception are owned by
+# .agents/skills/secondmate-provisioning/SKILL.md.
 # The destination dir is created lazily, only when there is something to copy;
 # absence on both sides is a no-op. When FM_CONFIG_INHERIT_REPORT points at a writable
 # file, one tab-separated line per item is appended there:
@@ -715,6 +741,10 @@ propagate_inheritable_config() {
       return 1
     fi
     dest="$dest_config/$item"
+    if fm_config_inherit_home_owned "$dest_config" "$item"; then
+      record_inheritable_config_result "$item" unchanged "home-owned"
+      continue
+    fi
     if ! source_present=$(fm_config_source_present "$src"); then
       reason="cannot inspect primary source"
       warn_inheritable_config_error "$item" "$src" "$reason"
