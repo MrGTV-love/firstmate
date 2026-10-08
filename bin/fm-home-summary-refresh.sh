@@ -15,10 +15,16 @@
 # successful publication into that directory. After a failed, interrupted, or
 # killed refresh, an existing ledger remains complete, never torn output.
 # A home-local refresh lock serializes concurrent triggers so an older in-flight
-# summary cannot overwrite one computed after a later status change. The shared
-# timeout owner bounds state initialization, lock acquisition, and publication
-# with FM_HOME_SUMMARY_TIMEOUT (default 60 seconds). No reader can observe
-# temporary output through the ledger path.
+# summary cannot overwrite one computed after a later status change. The deadline
+# owner retains the lock through publication and streak reset or failure accounting.
+# The existing lock's steal mutex fences handoff, pending-marker consumption,
+# publication, streak changes, wake appends, and release against stale-owner recovery;
+# each critical section checks parent liveness and ownership while holding it.
+# The shared timeout owner bounds state initialization, lock acquisition, validation,
+# and publication with FM_HOME_SUMMARY_TIMEOUT (default 60 seconds).
+# Failure logging, streak accounting, and owner-checked release have independent
+# deadlines of 4, 10, and 4 seconds, so logging failure cannot skip the latter two.
+# No reader can observe temporary output through the ledger path.
 #
 # With --best-effort, a failure is appended to the bounded home-local
 # state/.home-summary-refresh.log when available, with stderr as the bounded
@@ -31,16 +37,20 @@
 # to be computed. A detached refresh is single-flight (it takes the refresh lock
 # only when free, so triggers never pile up behind a slow run). Every trigger
 # first writes state/.home-summary-refresh.pending and the run that takes the
-# lock clears it, so a trigger that finds a refresh in flight is never lost: the
-# in-flight run sees the marker when it finishes and refreshes once more, which
-# makes a burst of triggers converge on one follow-up refresh.
+# lock clears it. After a successful attempt, its parent starts another refresh
+# if a newer trigger left the marker behind, repeating until no marker remains;
+# a burst of triggers therefore converges without a fixed follow-up cap.
 #
-# A failure that repeats must not stay a logged line. state/.home-summary-refresh.streak
-# counts consecutive failures of attempts that acquired the refresh lock; the
-# first success clears it. Three failures raise one `check: home-summary-refresh`
-# wake naming the reason, the streak start, and how
-# long the failed attempt ran. It is raised once per failure class: it is raised
-# again only when the reason changes or after a success ends the streak.
+# In best-effort mode, state/.home-summary-refresh.streak counts consecutive
+# failures of attempts that acquired the refresh lock; the first successful
+# publication clears it. Initialization and lock-contention failures are logged
+# but cannot alter the streak without ownership; skipped detached contenders
+# are not failures. Three acquired failures raise one `check: home-summary-refresh`
+# wake naming the reason, the streak start, and how long the failed attempt ran.
+# This threshold is fixed. A wake repeats only when the failure class changes
+# or after a success ends the streak; home_summary_note_failure owns classification.
+# Regression coverage: tests/fm-home-summary-refresh.test.sh and
+# tests/fm-home-summary-refresh-ownership.test.sh.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

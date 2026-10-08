@@ -136,6 +136,8 @@ The digest makes no external-network call at all.
 Every network call it owes runs off the blocking path, in the separately bounded deferred stage owned by `bin/fm-startup-network.sh`.
 So an unreachable host can no longer consume this budget.
 
+Home-summary publication also stays off the digest's blocking path; [`bin/fm-home-summary-refresh.sh`](../bin/fm-home-summary-refresh.sh)'s header owns detached triggering and failure escalation.
+
 ### Digest timeout
 
 Some digest work remains local but unbounded:

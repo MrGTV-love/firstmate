@@ -355,7 +355,6 @@ Under that gate, dispatch accepts only an unheld, unblocked Queued or In flight 
 Either would place a row In flight without a task record, status file, or inbox, counting it as live work that nobody is doing.
 The wrapper still passes through the documented direct transition `tasks-axi start <id>`.
 Completion refuses to report success until the item is closed, and session start reconciles this home's own books after an interrupted run.
-Reconciliation uses one bounded task-state listing to skip per-record reads for nonqueued items, decoding quoted task IDs and excluding appended help from the task table.
 
 When a spawn is interrupted after launch delivery began, its exit path re-reads the paired task record and the backlog row under the same per-task lock as the commit, repairs a row the commit believed it had moved, and reports only what was verified or honestly attempted, never intent phrased as outcome ([`bin/fm-spawn.sh`](../bin/fm-spawn.sh); [`tests/fm-backlog-atomicity.test.sh`](../tests/fm-backlog-atomicity.test.sh)).
 
@@ -2827,7 +2826,7 @@ FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this ho
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
-FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; failure logging, wake accounting, and owner-checked lock release have separate hard bounds of 4, 10, and 4 seconds; invalid or zero values use 60
+FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2
 FM_SNAPSHOT_CREW_STATE_TIMEOUT=10   # seconds bounding each local per-task current-state read inside bin/fm-fleet-snapshot.sh; remote endpoint liveness is not probed on the snapshot path

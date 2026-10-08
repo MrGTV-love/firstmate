@@ -27,9 +27,9 @@ fi
 # malformed worker stamp whose colons used to pose as the head/note separator
 # no longer opens or closes anything; cursors folded under that reading are
 # discarded.
-# Version 4 was already spent on the bracketed-tag parser change above, and a
-# cursor persisted under that reading predates this one, so it must still be
-# discarded and rebuilt from byte 0 under the new reading.
+# 10: refuse partial-line checkpoint endpoints, including when the line has
+# since completed; older checkpoints can already contain polluted fold state
+# even at a now-valid boundary and must be rebuilt from byte 0.
 FM_OPEN_DECISIONS_FOLD_VERSION=10
 
 # The resolution verb and durable-backlog-transfer verb that CLOSE a keyed
@@ -354,9 +354,9 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # Fold the WHOLE status stream into the set of decisions still open. Prints one
 # TAB-separated "<key>\t<verb>\t<summary>" line per still-open decision, in
 # most-recently-opened-last order; prints nothing when none are open. Reads the
-# status file, plus its sibling `.meta` for the task kind the terminal rule needs
-# when the caller passes no <kind>; no globals beyond the optional
-# FM_CLASSIFY_RESOLVE_VERB override. This is the durable open-set the fleet
+# status file, its sibling `.meta` for the task kind when the caller passes no
+# <kind>, and a sibling fold checkpoint when available. The fold signature
+# includes the optional verb and reserved-key overrides. This is the durable open-set the fleet
 # snapshot and any point-in-time consumer must use instead of trusting the last
 # status line.
 # The scan_open_decisions wrapper in bin/fm-classify-lib.sh enumerates a whole directory rather than
@@ -377,11 +377,13 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # the checkpoint IS that fold of the prefix. It stays a pure read: it never
 # writes, refreshes, or creates a checkpoint, so a caller reading another home's
 # log leaves that home untouched. Any doubt folds from line 1 instead: an absent,
-# unreadable, symlinked, or malformed checkpoint; a version, kind, or verb
-# signature that differs from this read's; a file identity that differs (the
-# log was replaced); an offset past the current size; or an offset that does
-# not sit just after a newline, because a checkpoint taken mid-append folded a
-# partial line the whole-file fold would have read whole.
+# unreadable, symlinked, or malformed checkpoint; a fold signature that differs
+# from this read's; a file identity that differs (the log was replaced); an offset
+# past the current size; or a nonzero offset that does not sit just after a
+# newline, because a checkpoint taken mid-append folded a partial line the
+# whole-file fold would have read whole.
+# A failed tail read also falls back to byte 0; no pure read repairs the checkpoint.
+# Regression coverage: tests/fm-wake-drain-open-decisions-cursor.test.sh.
 status_open_decisions() {  # <status-file> [<kind>]
   local f=$1 kind=${2:-} line resolve held open='' verb offset=0 span seeded=0
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
@@ -468,8 +470,9 @@ _fm_open_decisions_fold_signature() {  # <kind>
 # Parse one checkpoint file: `version=`, `offset=`, `ident=` header lines, then
 # the folded open set. Sets _FM_ODC_VERSION, _FM_ODC_OFFSET, _FM_ODC_IDENT, and
 # _FM_ODC_OPEN; returns 1 for an absent, unreadable, symlinked, or malformed
-# checkpoint. The ONE parser of that format, shared by the writer in
-# bin/fm-classify-lib.sh and the readers here and in bin/fm-status-wake-lib.sh.
+# checkpoint. Shared by the writer in bin/fm-classify-lib.sh and the whole-file
+# readers here; the legacy offset/export reader in bin/fm-status-wake-lib.sh
+# applies the same signature, identity, size, and boundary checks.
 _fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
   local cf=$1 data first rest line
   _FM_ODC_VERSION='' _FM_ODC_OFFSET=0 _FM_ODC_IDENT='' _FM_ODC_OPEN=''

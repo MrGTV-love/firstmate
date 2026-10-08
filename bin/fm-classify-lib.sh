@@ -222,18 +222,11 @@ EOF
 
 # --- incremental (cursor-backed) open-decisions fold ------------------------
 #
-# status_open_decisions above re-reads and re-folds a status file's ENTIRE
-# lifetime on every call, so its cost grows with total log size. A per-drain
-# fleet-wide scan using that whole-file function would pay that cost for every
-# task on every wake, which grows unbounded as tasks run longer and accumulate
-# status history. status_open_decisions_incremental and scan_open_decisions_incremental
-# below are the bounded-cost siblings used for that per-drain path: each call
-# reads only the bytes appended to a status file since its own last call (a
-# persisted per-file byte cursor) and folds just those new lines into a
-# persisted running open-set, via the exact same _fm_decision_fold_line rule
-# status_open_decisions uses - so the two strategies can never disagree on what
-# is open. Cost is bounded by NEW appends since the last drain, not by the
-# status file's total lifetime size.
+# status_open_decisions in bin/fm-status-decision-lib.sh is a read-only fold;
+# this incremental sibling persists the checkpoint that lets later readers
+# avoid re-folding consumed history. Both use the same _fm_decision_fold_line
+# rule. With a valid checkpoint, each call folds only new appends plus a
+# one-byte boundary check; a cold or refused checkpoint requires a byte-0 rebuild.
 #
 # Correctness invariant (unchanged from the whole-file fold): cursor advancement,
 # age, and being buried under later appends never drop an open decision - the
@@ -241,29 +234,17 @@ EOF
 # of how much new unrelated log content has since been folded in. Only a line the
 # shared fold rule retires removes one.
 #
-# The cursor format is `version` (the fold signature from
-# _fm_open_decisions_fold_signature: FM_OPEN_DECISIONS_FOLD_VERSION plus the task
-# kind, as `<n>:<kind>`, plus any fold-affecting override), `offset`, `ident`,
-# then the folded open set; _fm_open_decisions_checkpoint_parse in
-# bin/fm-status-decision-lib.sh is its one parser, and status_open_decisions
-# there reuses it read-only as the seed of every whole-file fold.
-# FM_OPEN_DECISIONS_FOLD_VERSION must be bumped whenever
-# _fm_decision_fold_line semantics change, so persisted state from an older
-# interpretation is discarded and rebuilt from byte 0; the kind suffix does the
-# same when a task kind changes, because kind changes the fold below.
-#
-# Cursor invalidation is deliberately minimal, matching how status files are
-# ACTUALLY used in this repo: every one is created once (`>`) and only ever
-# appended to (`>>`) - never replaced, renamed, or rewritten in place. So the
-# ways a cursor can go stale are a fold-version mismatch, a shrink (truncated),
-# or the file at this path being a different file than before
-# (replaced/rotated/recreated), which a changed device+inode makes an O(1) check
-# via a single `stat` call - no content hashing, no re-reading the consumed
-# prefix. Any signal falls back to a full re-fold of the whole current file from
-# byte 0 - byte for byte what status_open_decisions itself would compute - and
-# rewrites the cursor from that clean baseline. A same-inode, same-size,
-# in-place byte edit is NOT detected; that is a deliberately accepted gap
-# because no code path in this repo ever does that to a status file.
+# bin/fm-status-decision-lib.sh owns the checkpoint format, fold signature,
+# version-bump rule, and read-only seed validation.
+# The incremental writer additionally rejects a checkpoint beyond its captured
+# endpoint, so a later cached result cannot leak into an earlier snapshot.
+# An unterminated final line participates in that point-in-time fold, but its
+# partial endpoint cannot seed a later fold even if the line has since completed.
+# Invalid state is rebuilt and the cursor rewritten from the clean baseline;
+# rebuilding fold state does not rewind the independent presentation manifest.
+# Regression coverage: tests/fm-wake-drain-open-decisions-cursor.test.sh.
+# Identity and size checks assume append-only logs: a same-inode, same-size,
+# in-place byte edit is NOT detected, because no repository writer does that.
 #
 # The other real failure mode is OUR OWN read failing (a stat/wc/tail I/O
 # error), not a malformed writer: every such read here is checked, and on
