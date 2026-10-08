@@ -1,0 +1,16 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.ynnB4z/control-home
+ok - live claude titled border: claude (2.1.294 (Claude Code)) on herdr 0.9.1 draws the session title in the prompt box's top border in isolated session fm-lab-claude-titled-li-36073-31964
+ok - live claude titled border: claude (2.1.294 (Claude Code)) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+ok - live claude titled border: claude (2.1.294 (Claude Code)) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+ok - live claude titled border: claude (2.1.294 (Claude Code)) on herdr 0.9.1 retains a multiline draft and its later glyph, reads pending, and refuses exit without typing
+Adversarial pasted-title composer state: unknown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.ynnB4z/control-home
+error: task claudetitled34343's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+ok - real Claude refuses lifecycle injection into a pasted titled-rule draft
+ok - live claude titled border: claude (2.1.294 (Claude Code)) on herdr 0.9.1 fm-send doorbell reaches the titled-border worker, which acts on the record and acknowledges it
+Unicode-title draft composer state: unknown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.ynnB4z/control-home
+error: task claudetitled34343's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+ok - real Unicode Claude title preserves nonempty draft and refuses lifecycle injection
+ok - live claude titled border: claude (2.1.294 (Claude Code)) on herdr 0.9.1 fm-control exit stops the idle titled-border worker and preserves its endpoint
+skip: live claude titled border relaunch: opt-in; set FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 to run

@@ -1,0 +1,12 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.FODJJl/control-home
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.FODJJl/control-home/data/mismatch/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.FODJJl/control-home
+error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.FODJJl/control-home/data/mismatch/brief.md must record Base branch: feature/hub and no other Base branch line to spawn with --base-branch feature/hub; scaffold it with bin/fm-brief.sh --base-branch feature/hub
+ok - named-base mismatch refuses without publishing a worker
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.FODJJl/control-home/data/missing/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.FODJJl/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+error: 'herdr status --json' failed; is herdr installed correctly?
+not ok - wrong base refusal: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.FODJJl/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+error: 'herdr status --json' failed; is herdr installed correctly?

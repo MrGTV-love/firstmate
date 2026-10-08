@@ -1,0 +1,161 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/data/mismatch/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home
+error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/data/mismatch/brief.md must record Base branch: feature/hub and no other Base branch line to spawn with --base-branch feature/hub; scaffold it with bin/fm-brief.sh --base-branch feature/hub
+ok - named-base mismatch refuses without publishing a worker
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/data/missing/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+fatal: couldn't find remote ref refs/heads/feature/missing
+error: could not fetch 'origin/feature/missing' for pooled worktree '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/pool/.treehouse/probe-0a5048/1/probe'; refusing to launch from a potentially stale base
+ok - named-base missing refuses without publishing a worker
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/data/based/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned based harness=claude kind=scout window=fm-lab-claude-titled-li-74235-9394:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/pool/.treehouse/probe-0a5048/1/probe
+Named-base HEAD: 4fe46269c37d26658c287de6f0b66db9717103ef
+Named-base file: named branch only
+window=fm-lab-claude-titled-li-74235-9394:w2:p2
+endpoint_task_id=based
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/pool/.treehouse/probe-0a5048/1/probe
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/projects/probe
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-based
+base_branch=feature/hub
+model=default
+effort=default
+busy_gen=g1791441286.37322.26340
+spawn_gen=s1791441287.8989.11310
+backend=herdr
+herdr_session=fm-lab-claude-titled-li-74235-9394
+herdr_workspace_id=w2
+herdr_tab_id=w2:t2
+herdr_pane_id=w2:p2
+ok - real spawn starts its detached copy at feature/hub and records the base
+# Starting-branch validation report (scout, no project files changed)
+
+## What I did
+- Read `feature-only.txt` in the worktree root.
+- Ran `git rev-parse HEAD`.
+- Ran `git status --short` to confirm the tree is clean and I changed nothing.
+- No pipeline run, no code edits, no commits.
+
+## Findings
+- `feature-only.txt` contains one line: `named branch only`. The file is present, so the starting checkout has the feature branch's content.
+- `git rev-parse HEAD` = `4fe46269c37d26658c287de6f0b66db9717103ef`.
+- `git log --oneline -3` = `4fe4626 feature`, then `6c79f68 main`. HEAD is the `feature` commit on top of `main`.
+- The worktree is a detached HEAD (`git branch --show-current` is empty). The brief names the base branch as `feature/hub`, and HEAD matches that branch's tip commit `feature`.
+- `git status --short` printed nothing, so the tree is clean.
+
+## Recommendation
+The starting branch is valid: it is the expected feature commit, `feature-only.txt` is present with the expected content, and the tree is clean. Nothing needs shipping and no captain decisions are open.
+Busy backend verdict: busy
+
+ ▐▛███▛█   Claude Code v2.1.294
+▝▜██████▀  Sonnet 5.5 with high effort · Claude API
+ ▝▝   ▝▝   ~/…/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/pool/.treehouse/probe-0a5048/1/probe
+
+
+❯ : Firstmate operational input waiting: read
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claud
+  e-titled-live.qhMcE0/control-home/state/operational-inbox/1791441289-d78ab10465837f45.msg' and handle its contents as
+  Firstmate operational input.
+
+  Read 1 file, ran 4 shell commands
+
+❯ Run one foreground Bash call: touch '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFK
+  XD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/busy-started'; sleep 90. Set timeout 120000, do not
+  background it, and do not read your inbox during this call. After it returns, end your turn.
+
+⏺ Report is written and the captain-call inventory is closed. I'm appending the done status, then running the 90-second
+  wait you asked for.
+
+  Running touch '/Users/charlesabrooker/.no-mistakes/worktr…
+  ⎿  $ touch '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tm
+     p/fm-claude-titled-live.qhMcE0/busy-started'; sleep 90
+
+
+
+
+
+
+
+
+
+
+✳ Topsy-turvying… (31s · ↓ 2.6k tokens)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 4% 49k/1.0M probe:e849243c
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Queued real inbox record: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/state/based.inbox/001.msg
+signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/state/based.status
+1791441335	2	signal	based.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/state/based.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 70335.1791441335.69jnMz
+wake annotation: latest wake-EVENT observed at drain, not current state: based.status: done [at=1791441321]: starting branch validated (HEAD 4fe4626, feature-only.txt present, tree clean); report written
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+based done [at=1791441321]: starting branch validated (HEAD 4fe4626, feature-only.txt present, tree clean); report written
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+stale: fm-lab-claude-titled-li-74235-9394:w2:p2 (unread firstmate instruction: stuck-busy after 2 consecutive busy-deferred due doorbells; /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/control-home/state/based.inbox/001.msg stays unhandled and no doorbell was typed; inspect the worker)
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/bin/backends/herdr.sh: line 3984: printf: write error: Broken pipe
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/bin/backends/herdr.sh: line 3985: printf: write error: Broken pipe
+001.msg	2
+
+ ▐▛███▛█   Claude Code v2.1.294
+▝▜██████▀  Sonnet 5.5 with high effort · Claude API
+ ▝▝   ▝▝   ~/…/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/pool/.treehouse/probe-0a5048/1/probe
+
+
+❯ : Firstmate operational input waiting: read
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claud
+  e-titled-live.qhMcE0/control-home/state/operational-inbox/1791441289-d78ab10465837f45.msg' and handle its contents as
+  Firstmate operational input.
+
+  Read 1 file, ran 4 shell commands
+
+❯ Run one foreground Bash call: touch '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFK
+  XD52B/.no-mistakes/test-tmp/fm-claude-titled-live.qhMcE0/busy-started'; sleep 90. Set timeout 120000, do not
+  background it, and do not read your inbox during this call. After it returns, end your turn.
+
+⏺ Report is written and the captain-call inventory is closed. I'm appending the done status, then running the 90-second
+  wait you asked for.
+
+  Running touch '/Users/charlesabrooker/.no-mistakes/worktr… · 25s
+  ⎿  $ touch '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tm
+     p/fm-claude-titled-live.qhMcE0/busy-started'; sleep 90 (25s)
+     (ctrl+b to run in background)
+
+❯ : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'based.inbox' steering inbox, read and act on
+  each in numeric order, then mv each into its handled/.
+  ctrl+enter to send now
+
+
+
+
+
+✢ Topsy-turvying… (54s · ↓ 2.6k tokens)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Press up to edit queued messages
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 4% 49k/1.0M probe:e849243c
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+ok - real busy worker keeps its unread record and escalates at the configured busy bound without a retry doorbell

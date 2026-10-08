@@ -1,0 +1,7 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.SbTkos/control-home
+Real Bash 3.2 watcher pid=78037 held capture pid=83443 child=83461
+TERM completed after 1s with exit=143
+Capture descendant 83443 no longer exists
+Capture descendant 83461 no longer exists
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/bin/fm-watch.sh: line 2158: 83152 Terminated: 15          fm_backend_capture "$@" < /dev/null > "$FM_CAPTURE_OUTPUT"
+ok - real Bash 3.2 watcher honors TERM during stalled live pane I/O and reaps the capture group

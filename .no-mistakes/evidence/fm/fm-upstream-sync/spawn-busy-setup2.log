@@ -1,0 +1,18 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home/data/mismatch/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home
+error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home/data/mismatch/brief.md must record Base branch: feature/hub and no other Base branch line to spawn with --base-branch feature/hub; scaffold it with bin/fm-brief.sh --base-branch feature/hub
+ok - named-base mismatch refuses without publishing a worker
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home/data/missing/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+fatal: couldn't find remote ref refs/heads/feature/missing
+error: could not fetch 'origin/feature/missing' for pooled worktree '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/pool/.treehouse/probe-bfc134/1/probe'; refusing to launch from a potentially stale base
+ok - named-base missing refuses without publishing a worker
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home/data/based/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned based harness=claude kind=scout window=fm-lab-claude-titled-li-32008-9536:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.aBaoD2/pool/.treehouse/probe-bfc134/1/probe
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/tests/.nm-spawn-busy.test.sh: line 246: fm_meta_get: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/tests/.nm-spawn-busy.test.sh: line 247: fm_meta_get: command not found
+not ok - spawn did not start at origin/feature/hub

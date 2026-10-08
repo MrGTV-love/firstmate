@@ -1,0 +1,5 @@
+completed: /bin/bash 3.2, exit=7, elapsed=0.22s
+bounded command ran
+
+expired: /bin/bash 3.2, exit=124, elapsed=1.39s
+bounded sleep started

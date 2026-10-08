@@ -1,0 +1,94 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home/data/mismatch/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home
+error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home/data/mismatch/brief.md must record Base branch: feature/hub and no other Base branch line to spawn with --base-branch feature/hub; scaffold it with bin/fm-brief.sh --base-branch feature/hub
+ok - named-base mismatch refuses without publishing a worker
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home/data/missing/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+fatal: couldn't find remote ref refs/heads/feature/missing
+error: could not fetch 'origin/feature/missing' for pooled worktree '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/pool/.treehouse/probe-44db1d/1/probe'; refusing to launch from a potentially stale base
+ok - named-base missing refuses without publishing a worker
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home/data/based/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned based harness=claude kind=scout window=fm-lab-claude-titled-li-19845-26539:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/pool/.treehouse/probe-44db1d/1/probe
+Named-base HEAD: d0df2c587ae4e75f1581d5ab64d47daf33b3fff1
+Named-base file: named branch only
+window=fm-lab-claude-titled-li-19845-26539:w2:p2
+endpoint_task_id=based
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/pool/.treehouse/probe-44db1d/1/probe
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home/projects/probe
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-based
+base_branch=feature/hub
+model=default
+effort=default
+busy_gen=g1791441008.88831.19244
+spawn_gen=s1791441008.67990.30306
+backend=herdr
+herdr_session=fm-lab-claude-titled-li-19845-26539
+herdr_workspace_id=w2
+herdr_tab_id=w2:t2
+herdr_pane_id=w2:p2
+ok - real spawn starts its detached copy at feature/hub and records the base
+# Starting-branch validation report (scout, no changes made)
+
+## What I did
+Read `feature-only.txt` and ran `git rev-parse HEAD` in the probe worktree. No project file was edited, no pipeline run, nothing pushed.
+
+## Findings
+- `cat feature-only.txt` -> `named branch only`
+- `git rev-parse HEAD` -> `d0df2c587ae4e75f1581d5ab64d47daf33b3fff1`
+- `git log --oneline --decorate -5` -> `d0df2c5 (HEAD, origin/feature/hub, feature/hub) feature` then `fc8e533 (origin/main, origin/HEAD, main) main`
+- Detached HEAD is exactly at `feature/hub` (= `origin/feature/hub`), one commit ahead of `main`. This matches the brief's base branch.
+- `git status --short` is empty (clean). Files present: `main.txt`, `feature-only.txt`, `treehouse.toml`, `.claude/`.
+- `feature-only.txt` exists only on the feature commit, consistent with the branch being the intended starting point (not `main`).
+
+## Recommendation
+The starting branch is valid: HEAD is `feature/hub` @ d0df2c5, clean, with the feature-only content. No action needed; no captain decisions are open.
+Busy backend verdict: busy
+
+ ▐▛███▛█   Claude Code v2.1.294
+▝▜██████▀  Sonnet 5.5 with high effort · Claude API
+ ▝▝   ▝▝   ~/…/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/pool/.treehouse/probe-44db1d/1/probe
+
+
+❯ : Firstmate operational input waiting: read
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claud
+  e-titled-live.9576o9/control-home/state/operational-inbox/1791441010-c5195837f0b74dbf.msg' and handle its contents as
+  Firstmate operational input.
+
+  Read 1 file, ran 4 shell commands
+
+❯ Run one foreground Bash call: touch '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFK
+  XD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/busy-started'; sleep 90. Set timeout 120000, do not
+  background it, and do not read your inbox during this call. After it returns, end your turn.
+
+⏺ Running the requested 90-second foreground call now: it touches the marker file, then sleeps.
+
+⏺ Touching marker file, then sleeping 90 seconds
+  ⎿  $ touch '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tm
+     p/fm-claude-titled-live.9576o9/busy-started'; sleep 90
+
+
+
+
+
+
+
+
+
+
+
+✽ Befuddling… (28s · ↓ 2.5k tokens)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 50k/1.0M probe:7a94bf85
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+Queued real inbox record: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home/state/based.inbox/001.msg
+signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1WYWEEBA66SMGDFKXD52B/.no-mistakes/test-tmp/fm-claude-titled-live.9576o9/control-home/state/based.status
+not ok - real busy worker did not surface bounded unread-instruction escalation
