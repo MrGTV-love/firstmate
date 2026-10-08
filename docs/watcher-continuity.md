@@ -86,6 +86,7 @@ The prompt flow never touches the composer, so an operator draft stays unsent, a
 A stopped generation refuses every arm, so a shutdown that no successor `session_start` follows would otherwise leave the session unable to arm a watcher at all.
 Both primary watcher extensions bind a fresh generation themselves when no successor arrives within a short grace while the process still owns the home lock, and an arm call on that stopped generation heals at once; Pi does this only after a replacement shutdown, never after a terminal quit.
 Only the latest factory bind of an extension in a process owns the home, so a session that loaded the file twice keeps one live generation and one arm.
+The new factory retires its predecessor through the replacement lifecycle, carrying unconsumed actionable wakes even across separate module evaluations. An arm repair that awaits retirement checks instance ownership and the captured generation again before activation; omp forwards a superseded repair to the current instance, while Pi refuses it.
 Each extension header owns its exact rule, `.pi/extensions/lib/fm-watch-lifecycle.ts` owns the shared registry, and every lifecycle transition and expired bound is recorded in `state/extensions/<extension>/lifecycle.log`.
 
 ### omp restored-wake recovery

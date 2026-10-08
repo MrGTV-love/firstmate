@@ -618,9 +618,12 @@ const cleanupOnProcessExit = () => {
 };
 process.once("exit", cleanupOnProcessExit);
 
+type PiWatchInstanceApi = {
+  retire: () => Promise<void>;
+};
+
 export default function (pi: ExtensionAPI) {
-  const instance = bindWatchInstance<true>("__firstmatePiWatchInstances", state);
-  instance.publish(true);
+  const instance = bindWatchInstance<PiWatchInstanceApi>("__firstmatePiWatchInstances", state);
   const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
   let generation = createGeneration();
   activateGeneration(generation);
@@ -630,6 +633,9 @@ export default function (pi: ExtensionAPI) {
   let stoppedForReplacement = false;
   let healTimer: ReturnType<typeof setTimeout> | null = null;
   lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
+  if (instance.previous?.api) {
+    void instance.previous.api.retire().catch(() => {});
+  }
 
   function clearHealTimer(): void {
     if (healTimer) clearTimeout(healTimer);
@@ -650,6 +656,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   function scheduleSelfHeal(stopped: SessionGeneration): void {
+    if (!instance.isCurrent() || generation !== stopped || !stopped.stopping) return;
     clearHealTimer();
     const shutdownAt = Date.now();
     const timer = setTimeout(() => {
@@ -681,7 +688,13 @@ export default function (pi: ExtensionAPI) {
       return { ok: false, message: shuttingDownMessage };
     }
     if (generation.stopping && stoppedForReplacement) {
-      await generationStopped;
+      const stopped = generation;
+      const retirement = generationStopped;
+      await retirement;
+      if (!instance.isCurrent()) return { ok: false, message: shuttingDownMessage };
+      if (generation !== stopped || generationStopped !== retirement || !stoppedForReplacement) {
+        return armFromSession();
+      }
       if (generation.stopping) {
         lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
         bindLiveGeneration("arm-call");
@@ -1368,6 +1381,17 @@ export default function (pi: ExtensionAPI) {
         content: [{ type: "text", text: result.message }],
         details: result,
       };
+    },
+  });
+
+  instance.publish({
+    retire: async () => {
+      clearHealTimer();
+      lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
+      if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
+      stoppedForReplacement = true;
+      generationStopped = stopSessionGeneration(generation, true);
+      await generationStopped;
     },
   });
 

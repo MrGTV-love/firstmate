@@ -1215,19 +1215,35 @@ secondmate_restart_tick() {
     [ -f "$outcome" ] && [ ! -L "$outcome" ] || continue
     id=${outcome##*/.secondmate-restart-}
     id=${id%.outcome}
+    fm_secondmate_liveness_lock "$id" || continue
+    if [ ! -f "$outcome" ] || [ -L "$outcome" ]; then
+      fm_secondmate_liveness_unlock "$id"
+      continue
+    fi
     line=$(sed -n '1p' "$outcome" 2>/dev/null) || line=''
     [ -n "$line" ] || line="unreached: $id: the restart finished without a recorded outcome"
+    if ! fm_secondmate_restart_request_finish "$STATE" "$id" "$line"; then
+      fm_secondmate_liveness_unlock "$id"
+      echo "watcher: secondmate $id completed restart request could not be retired" >&2
+      return 1
+    fi
     reason="check: secondmate $id restart finished: $line"
     notify_key="secondmate-restart-$id-$now"
     queued=$(fm_wake_queued_keys check)
     if printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1 \
       || fm_wake_append check "$notify_key" "$reason"; then
-      rm -f "$outcome" "$STATE/.secondmate-restart-$id.turn-notice"
+      if ! fm_secondmate_restart_outcome_consume "$STATE" "$id"; then
+        fm_secondmate_liveness_unlock "$id"
+        echo "watcher: secondmate $id restart outcome could not be consumed" >&2
+        return 1
+      fi
       [ -n "$first_reason" ] || first_reason=$reason
     else
+      fm_secondmate_liveness_unlock "$id"
       echo "watcher: secondmate $id restart outcome could not be queued" >&2
       return 1
     fi
+    fm_secondmate_liveness_unlock "$id"
   done
   for request in "$STATE"/.secondmate-restart-*.request; do
     [ -f "$request" ] && [ ! -L "$request" ] || continue
@@ -1252,10 +1268,14 @@ secondmate_restart_tick() {
   done
   if [ "$pending" -eq 1 ] && [ "$(age_of "$STATE/.secondmate-restart-tick")" -ge "$SECONDMATE_LIVENESS_SECS" ]; then
     if [ -z "$SECONDMATE_RESTART_PID" ] || ! kill -0 "$SECONDMATE_RESTART_PID" 2>/dev/null; then
-      [ -z "$SECONDMATE_RESTART_PID" ] || wait "$SECONDMATE_RESTART_PID" 2>/dev/null || true
+      if [ -n "$SECONDMATE_RESTART_PID" ] && ! wait "$SECONDMATE_RESTART_PID"; then
+        SECONDMATE_RESTART_PID=
+        echo "watcher: recorded secondmate restart processing failed" >&2
+        return 1
+      fi
       touch "$STATE/.secondmate-restart-tick" || return 1
       FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-        "$SCRIPT_DIR/fm-secondmate-restart.sh" --process-requests </dev/null >/dev/null 2>&1 &
+        "$SCRIPT_DIR/fm-secondmate-restart.sh" --process-requests </dev/null >/dev/null &
       SECONDMATE_RESTART_PID=$!
     fi
   fi

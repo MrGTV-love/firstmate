@@ -629,6 +629,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   function scheduleSelfHeal(stopped: SessionGeneration): void {
+    if (!instance.isCurrent() || generation !== stopped || !stopped.stopping) return;
     clearHealTimer();
     const shutdownAt = Date.now();
     const timer = setTimeout(() => {
@@ -663,7 +664,12 @@ export default function (pi: ExtensionAPI) {
       return { ok: false, message: shuttingDownMessage };
     }
     if (generation.stopping) {
-      await generationStopped;
+      const stopped = generation;
+      const retirement = generationStopped;
+      await retirement;
+      if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement) {
+        return armFromSession();
+      }
       if (generation.stopping) {
         lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
         bindLiveGeneration("arm-call");
@@ -1358,7 +1364,8 @@ export default function (pi: ExtensionAPI) {
       if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
       if (restoreTimer) clearTimeout(restoreTimer);
       restoreTimer = null;
-      await stopSessionGeneration(generation, true);
+      generationStopped = stopSessionGeneration(generation, true);
+      await generationStopped;
     },
   });
 
