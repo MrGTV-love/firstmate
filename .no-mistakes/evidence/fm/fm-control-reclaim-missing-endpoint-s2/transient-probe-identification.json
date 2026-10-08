@@ -1,0 +1,16 @@
+[
+  {
+    "pid": "41285",
+    "comm": "bash",
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-caf\\xc3\\xa9\\\\lane/deep",
+    "identity_read_exit_after_scan": 1,
+    "identity_after_scan": ""
+  },
+  {
+    "pid": "41305",
+    "comm": "bash",
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-caf\\xc3\\xa9\\\\lane/deep",
+    "identity_read_exit_after_scan": 1,
+    "identity_after_scan": ""
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "meta": "window=fm-lab-r2-19846:w1:p3\nendpoint_task_id=recover\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-caf\u00e9\nproject=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/project\nharness=claude\nkind=ship\nrecovery=reconcile-only\nmode=no-mistakes\nyolo=off\nbranch=fm/recover\ntasktmp=/tmp/fm-recover\nmodel=default\neffort=default\nbusy_gen=g1791443443.98513.2666\nspawn_gen=s1791443444.79989.13654\nbackend=herdr\nherdr_session=fm-lab-r2-19846\nherdr_workspace_id=w1\nherdr_tab_id=w1:t3\nherdr_pane_id=w1:p3\ncontrol_relaunch_tx=70906.20261008T071032Z.12255\n",
+  "head_before": "1719ac3ea588cd3263e4c9daab66c08f5fe75721",
+  "head_after": "1719ac3ea588cd3263e4c9daab66c08f5fe75721",
+  "branch_after": "task-recover",
+  "dirty_file": "recover uncommitted work must survive\n",
+  "status": "working: preserve this recovery status history\n",
+  "backlog": "$ tasks-axi show recover --file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/backlog.md\ncwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7\ntask:\n  id: recover\n  title: Recover real Claude instruction owner\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: yes\n  hold_reason: Wait for explicit continuation\n  hold_kind: captain\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\nexit=0\n"
+}

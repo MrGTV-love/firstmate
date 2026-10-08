@@ -1,0 +1,100 @@
+$ git init /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/project
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/project/.git/
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/project -c 'user.name=Live fixture' -c user.email=lab@example.invalid commit --allow-empty -m 'Disposable recovery task'
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+[master (root-commit) 1719ac3] Disposable recovery task
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/project worktree add -b task-proof '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane'
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+HEAD is now at 1719ac3 Disposable recovery task
+Preparing worktree (new branch 'task-proof')
+exit=0
+
+$ mkdir -p '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane/deep' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/proof /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/user-home
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+exit=0
+
+$ tasks-axi add proof 'Recover instruction owner' --kind ship --file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/backlog.md
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+ok: added proof (ship) -> Queued
+task:
+  id: proof
+  title: Recover instruction owner
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start proof --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block proof --by <other> --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/backlog.md` to record a dependency
+exit=0
+
+$ tasks-axi start proof --file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/backlog.md
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+ok: start proof -> In flight
+help[1]:
+  - Run `tasks-axi done proof --pr <url> --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/backlog.md` when it ships
+exit=0
+
+$ tasks-axi hold --help
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+usage: tasks-axi hold <id> --reason "<text>" [flags]
+Record a structured dispatch hold (idempotent).
+flags:
+  --reason "<text>"   required single-line reason; no parentheses
+  --until YYYY-MM-DD  date gate; inactive on and after that date
+  --kind captain|external|load|parked|future
+  --json   print the resulting task as a JSON object
+examples:
+  tasks-axi hold fm-x --reason "captain decision pending" --kind captain
+  tasks-axi hold future-q1 --reason "start after launch" --until 2026-07-10exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane
+endpoint-gone proof harness=claude backend=tmux endpoint=recorded:fm-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane/deep
+endpoint-gone proof harness=claude backend=tmux endpoint=recorded:fm-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof relaunch --harness claude --reconcile-only --note 'Restore instruction owner only'
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane/deep
+error: configured backend 'tmux' is not herdr; refusing to replace task proof's proven-gone tmux endpoint
+error: the replacement agent for proof could not be launched on claude
+error: proof's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-spawn.sh proof --relaunch --harness claude --reconcile-only
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane
+error: configured backend 'tmux' is not herdr; refusing to replace task proof's proven-gone tmux endpoint
+exit=1

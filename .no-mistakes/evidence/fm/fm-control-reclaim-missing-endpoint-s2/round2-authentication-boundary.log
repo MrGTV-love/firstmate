@@ -1,0 +1,3 @@
+Normal `claude auth status`: loggedIn=true, authMethod=claude.ai.
+With the workspace-isolated HOME used by the real relaunch: loggedIn=false, authMethod=none.
+The actual replacement launched, was detected as Claude by Herdr, and after theme selection displayed Select login method. No sign-in was attempted, no production credentials were copied, and no operator trust store was modified. Authenticated prompt interpretation was not exercised.

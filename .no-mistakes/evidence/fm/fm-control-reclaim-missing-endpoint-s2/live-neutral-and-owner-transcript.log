@@ -1,0 +1,123 @@
+Actual addressed tmux socket: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.a
+
+Unrelated private server: fm-lab-unrelated
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof relaunch --harness claude --reconcile-only --note 'Restore only to reconcile instructions'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: reconciliation-only recovery requires a proven exited owner (endpoint reads unproven	the processes holding the recorded worktree could not be read)
+exit=1
+
+SCENARIO reconcile-only-from-descendant: FAIL
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+endpoint-gone proof harness=claude backend=tmux endpoint=recorded:fm-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+exit=0
+
+SCENARIO missing-window: PASS
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+endpoint-gone proof harness=claude backend=tmux endpoint=absent-session:fm-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+exit=0
+
+SCENARIO missing-session: PASS
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+endpoint-gone proof harness=claude backend=tmux endpoint=recorded:fm-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+exit=0
+
+SCENARIO missing-server: PASS
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-spawn.sh proof --relaunch --harness claude --reconcile-only
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: configured backend 'tmux' is not herdr; refusing to replace task proof's proven-gone tmux endpoint
+exit=1
+
+SCENARIO backend-policy: PASS
+
+Live Claude owner on other socket:
+ees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane/deep:
+Path "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z
+36H5S5Y4VK7/.live-validation/wt-café\lane/deep" does not exist
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 1, Thu Oct  8 01:41:11 2026)
+
+
+Live owner process:
+31991 env  dead=1 size=80x24
+
+
+Escaped real owner CWD record:
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+endpoint-gone proof harness=claude backend=tmux endpoint=recorded:fm-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+exit=0
+
+SCENARIO other-socket-exit: FAIL
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof relaunch --harness claude --reconcile-only --note 'Do not replace live owner'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: configured backend 'tmux' is not herdr; refusing to replace task proof's proven-gone tmux endpoint
+error: the replacement agent for proof could not be launched on claude
+error: proof's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane
+exit=1
+
+SCENARIO other-socket-relaunch: FAIL
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-spawn.sh proof --relaunch --harness claude --reconcile-only
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: configured backend 'tmux' is not herdr; refusing to replace task proof's proven-gone tmux endpoint
+exit=1
+
+SCENARIO other-socket-direct-spawn: FAIL
+
+Original HEAD unchanged: True
+
+Dirty file: uncommitted work must survive
+
+Status history: working: preserve this status history
+
+Backlog with preserved hold:
+task:
+  id: proof
+  title: Recover instruction owner
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: Wait for explicit continuation
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+

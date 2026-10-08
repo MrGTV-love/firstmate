@@ -1,0 +1,7 @@
+$ focused functions from tests/fm-control-relaunch.test.sh
+First completed run: scoped absence, real-lsof recovery and live-owner guards passed; empty-scan fixture failed.
+After fixture correction:
+ok - tmux: an unreadable process table or tmux answer refuses both verbs
+ok - tmux: two missing tasks reclaim sequentially onto Herdr, preserving work, note and poll
+ok - tmux: a proven-gone endpoint refuses every configured backend other than Herdr
+exit=0

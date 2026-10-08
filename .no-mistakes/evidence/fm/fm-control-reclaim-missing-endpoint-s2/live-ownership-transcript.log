@@ -1,0 +1,31 @@
+Actual addressed tmux socket: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.a
+
+Unrelated private server: fm-lab-unrelated
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's endpoint recorded:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+exit=1
+
+SCENARIO missing-window: FAIL
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's endpoint absent-session:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+exit=1
+
+SCENARIO missing-session: FAIL
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's endpoint recorded:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+exit=1
+
+SCENARIO missing-server: FAIL
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-spawn.sh proof --relaunch --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's recorded endpoint recorded:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+exit=1
+
+SCENARIO backend-policy: FAIL

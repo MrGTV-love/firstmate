@@ -1,0 +1,111 @@
+Real Codex process on other socket: 82075 node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane/deep dead=0 size=80x24
+
+
+Codex terminal capture:
+
+  Update available · 0.160.0 → 0.161.0
+  Release notes: https://github.com/openai/codex/releases/latest
+
+› 1. Update now (runs `npm install -g @openai/codex`)
+  2. Skip
+  3. Skip until next version
+
+  enter continue · esc skip
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Owned process: 82075 81793 node node /Users/charlesabrooker/.local/bin/codex
+
+
+Escaped CWD record:
+p82075
+fcwd
+n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-caf\xc3\xa9\\lane/deep
+
+
+Owned process: 82395 82075 /Users/charlesab /Users/charlesabrooker/.nvm/versions/node/v24.4.1/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex
+
+
+Escaped CWD record:
+p82395
+fcwd
+n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-caf\xc3\xa9\\lane/deep
+
+
+Owned process: 84241 82395 /Users/charlesab /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home/codex/packages/app-server-daemon/releases/0.160.0-aarch64-apple-darwin/bin/codex app-server --listen unix:// --managed-daemon
+
+
+Escaped CWD record:
+p84241
+fcwd
+n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-caf\xc3\xa9\\lane/deep
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's endpoint recorded:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+exit=1
+
+SCENARIO real-codex-owner-exit: PASS
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof relaunch --harness claude --reconcile-only --note 'Do not duplicate a live or uncertain holder'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: reconciliation-only recovery requires a proven exited owner (endpoint reads unproven	the processes holding the recorded worktree could not be read)
+exit=1
+
+SCENARIO real-codex-owner-relaunch: PASS
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-spawn.sh proof --relaunch --harness claude --reconcile-only
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's recorded endpoint recorded:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+exit=1
+
+SCENARIO real-codex-owner-direct-spawn: PASS
+
+Unattributed holder: 61830 node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane/deep dead=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's endpoint recorded:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+exit=1
+
+SCENARIO unattributed-node-holder-exit: PASS
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof relaunch --harness claude --reconcile-only --note 'Do not duplicate a live or uncertain holder'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: reconciliation-only recovery requires a proven exited owner (endpoint reads unproven	the processes holding the recorded worktree could not be read)
+exit=1
+
+SCENARIO unattributed-node-holder-relaunch: PASS
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-spawn.sh proof --relaunch --harness claude --reconcile-only
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+error: task proof's recorded endpoint recorded:fm-proof reads 'missing', but the processes holding the recorded worktree could not be read. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+exit=1
+
+SCENARIO unattributed-node-holder-direct-spawn: PASS
+
+Idle shell holder: 93577 zsh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane/deep dead=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh proof exit
+endpoint-gone proof harness=claude backend=tmux endpoint=recorded:fm-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-café\lane
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/home
+exit=0
+
+SCENARIO idle-shell-holder: PASS

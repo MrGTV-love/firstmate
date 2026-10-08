@@ -1,0 +1,6 @@
+$ bin/fm-control.sh recover relaunch --harness claude --reconcile-only --note "Restore instruction owner only"
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/recover/launch-brief.md records no ship branch; defaulting to legacy branch fm/recover
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/recover/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched recover harness=claude from=claude model=default effort=default backend=herdr endpoint=fm-lab-r2-19846:w1:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café
+
+exit=0

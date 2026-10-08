@@ -1,0 +1,17 @@
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.a new-window -t recorded -n fm-absent -c '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane/deep' '/bin/bash --noprofile --norc'
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control.sh absent exit
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane/deep
+already-stopped absent harness=claude backend=tmux endpoint=recorded:fm-absent worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane
+exit=0
+
+$ bash -c 'source bin/fm-control-lib.sh; fm_control_endpoint_absence_verdict tmux recorded:fm-absent "$1"' bash '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane'
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+unproven	backend 'tmux' could not be loaded to prove anything about that endpointbin/fm-control-lib.sh: line 434: fm_backend_source: command not found
+exit=0
+
+$ bash -c 'source bin/fm-backend.sh; source bin/fm-control-lib.sh; fm_control_endpoint_absence_verdict tmux recorded:fm-absent "$1"' bash '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane'
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+unproven	the recorded tmux window answers on the addressed serverexit=0

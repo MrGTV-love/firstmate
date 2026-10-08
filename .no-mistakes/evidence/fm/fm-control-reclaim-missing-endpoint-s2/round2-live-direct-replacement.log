@@ -1,0 +1,35 @@
+$ bin/fm-spawn.sh direct --relaunch --harness claude --reconcile-only
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-direct-café
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/direct/launch-brief.md records no ship branch; defaulting to legacy branch fm/direct
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/home/data/direct/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned direct harness=claude kind=ship mode=no-mistakes yolo=off window=fm-lab-r2-19846:w1:p4 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-direct-café
+
+exit=0
+Published task record:
+window=fm-lab-r2-19846:w1:p4
+endpoint_task_id=direct
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-direct-café
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/project
+harness=claude
+kind=ship
+recovery=reconcile-only
+mode=no-mistakes
+yolo=off
+branch=fm/direct
+tasktmp=/tmp/fm-direct
+model=default
+effort=default
+busy_gen=g1791443832.28784.23880
+spawn_gen=s1791443832.19780.8194
+backend=herdr
+herdr_session=fm-lab-r2-19846
+herdr_workspace_id=w1
+herdr_tab_id=w1:t4
+herdr_pane_id=w1:p4
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-herdr-lab.sh run fm-lab-r2-19846 agent list
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_status":"idle","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café","pane_id":"w1:p3","revision":0,"state_change_seq":3,"tab_id":"w1:t3","terminal_id":"term_65d4eedfda5e53","workspace_id":"w1"},{"agent":"claude","agent_status":"unknown","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-direct-café","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-direct-café","pane_id":"w1:p4","revision":0,"state_change_seq":0,"tab_id":"w1:t4","terminal_id":"term_65d4f0539ca784","workspace_id":"w1"}],"type":"agent_list"}}
+exit=0
+
+First recovered endpoint unchanged; direct replacement preserved dirty file.

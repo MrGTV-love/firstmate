@@ -1,0 +1,9 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-herdr-lab.sh run fm-lab-r2-19846 pane read w1:p2 --source recent-unwrapped --lines 120
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+charlesabrooker@Mac-Studio wt-café\lane % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane'
+charlesabrooker@Mac-Studio wt-café\lane % export GOTMPDIR=/tmp/fm-proof/gotmp
+charlesabrooker@Mac-Studio wt-café\lane % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio wt-café\lane % export FM_TASK_ID=proof
+charlesabrooker@Mac-Studio wt-café\lane % . '/tmp/fm-proof+2a0789364a691bc0919970569a16263c7dafe4468ca17a4c9b1f7bbf0b934f05/launch.s1791443228.23870.14448.sh'
+Error: Can't access working directory /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane: Path "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane" does not exist
+charlesabrooker@Mac-Studio wt-café\lane %exit=0

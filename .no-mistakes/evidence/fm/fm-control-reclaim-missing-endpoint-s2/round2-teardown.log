@@ -1,0 +1,16 @@
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.a kill-server
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+exit=0
+
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.b kill-server
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-herdr-lab.sh teardown fm-lab-r2-19846
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+exit=0
+
+Named lab teardown passed its unchanged-default-session tripwire.
+Remaining fixture processes: []
+
+Read-only fixture hook directories required chmod u+w before removal. All disposable worktree homes, sockets, tool routers, generated Herdr release-note cache, and focused driver were then removed; explicit absence checks succeeded. The only intentional test-source edit corrects the empty-lsof fixture.

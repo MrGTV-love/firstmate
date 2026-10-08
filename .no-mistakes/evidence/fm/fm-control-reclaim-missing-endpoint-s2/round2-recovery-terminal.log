@@ -1,0 +1,31 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-herdr-lab.sh run fm-lab-r2-19846 pane read w1:p3 --source recent-unwrapped --lines 100
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+charlesabrooker@Mac-Studio wt-café % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café'
+charlesabrooker@Mac-Studio wt-café % export GOTMPDIR=/tmp/fm-recover/gotmp
+charlesabrooker@Mac-Studio wt-café % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio wt-café % export FM_TASK_ID=recover
+charlesabrooker@Mac-Studio wt-café % . '/tmp/fm-recover+2a0789364a691bc0919970569a16263c7dafe4468ca17a4c9b1f7bbf0b934f05/launch.s1791443444.79989.13654.sh'
+Welcome to Claude Code v2.1.294
+..........................................................
+
+     *                                       █████▓▓░
+                                 *         ███▓░     ░░
+            ░░░░░░                        ███▓░
+    ░░░   ░░░░░░░░░░                      ███▓░
+   ░░░░░░░░░░░░░░░░░░░    *                ██▓░░      ▓
+                                             ░▓▓███▓▓░
+ *                                 ░░░░
+                                 ░░░░░░░░
+                               ░░░░░░░░░░░░░░░░
+       █████████                                        *
+      ██▄█████▄██                        *
+       █████████      *
+.......█ █   █ █..........................................
+
+ Claude Code can be used with your Claude subscription or billed based on API usage through your Console account.
+
+ Select login method:
+
+ ❯ 1. Claude account with subscription · Pro, Max, Team, or Enterprise
+   2. Anthropic Console account · API usage billing
+   3. 3rd-party platform · Amazon Bedrock, Microsoft Foundry, Google Vertex AIexit=0

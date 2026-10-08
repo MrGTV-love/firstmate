@@ -1,0 +1,5 @@
+Focused endpoint-recovery regressions before correcting the test fixture:
+ok - scoped absence and reclaim despite unrelated servers
+ok - real lsof worktree-local exit, relaunch, reconcile-only and direct replacement
+ok - live-window and worktree-agent guards
+not ok - lsof-blind expected absence-proof refusal, got configured backend refusal because the fixture emitted a scanner CWD before its empty mode.

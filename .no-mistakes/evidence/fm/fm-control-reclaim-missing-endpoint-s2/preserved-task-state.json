@@ -1,0 +1,6 @@
+{
+  "worktree_head": "e97268a42a61a63da506c6c2820225a45ecaeb34",
+  "dirty_file": "uncommitted work must survive\n",
+  "status_history": "working: preserve this status history\n",
+  "backlog": "task:\n  id: proof\n  title: Recover instruction owner\n  state: in_flight\n  blocked: no\n  blocked_by: none\n  held: yes\n  hold_reason: Wait for explicit continuation\n  hold_kind: captain\n  hold_until: \"-\"\n  kind: ship\n  repo: \"-\"\n  priority: \"-\"\n  created: 2026-10-08\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"\"\n"
+}

@@ -1,0 +1,13 @@
+Timing hook ran the real /usr/sbin/lsof and emitted its output unchanged; it then created the actual recorded window before the second inventory read.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-spawn.sh absent --relaunch --harness claude --reconcile-only
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-round2/wt-café\lane/deep
+error: task absent's recorded endpoint recorded:fm-absent reads 'missing', but the recorded tmux window answers on the addressed server. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+exit=1
+
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.a list-windows -t =recorded -F '#{window_name}'
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7
+scratch
+fm-absent
+exit=0
+
+Metadata unchanged, no replacement launched.

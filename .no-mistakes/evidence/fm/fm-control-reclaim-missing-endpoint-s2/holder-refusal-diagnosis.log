@@ -1,0 +1,116 @@
+verdict: unknown
++ for pid in '$holders'
++ case "$pid" in
+++ LC_ALL=C
+++ ps -p 79654 -o comm=
++ comm=/bin/bash
+++ LC_ALL=C
+++ ps -p 79654 -o args=
++ args='/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\'''
++ '[' -n /bin/bash ']'
++ '[' -n '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' ']'
++ argv0=/bin/bash
++ case "$(fm_agent_process_classify "$comm" "$argv0" "$args" "$pid")" in
+++ fm_agent_process_classify /bin/bash /bin/bash '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' 79654
+++ local name=/bin/bash argv0=/bin/bash 'args=/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' pid=79654 by_name by_argv0
++++ fm_agent_process_classify_name /bin/bash /bin/bash
++++ local path=/bin/bash argv0=/bin/bash base
++++ base=bash
++++ base=bash
++++ case "$base" in
++++ printf shell
+++ by_name=shell
+++ '[' shell '!=' agent ']'
+++ '[' -n /bin/bash ']'
++++ fm_agent_process_classify_name /bin/bash /bin/bash
++++ local path=/bin/bash argv0=/bin/bash base
++++ base=bash
++++ base=bash
++++ case "$base" in
++++ printf shell
+++ by_argv0=shell
+++ '[' shell '!=' agent ']'
+++ '[' -n 79654 ']'
+++ fm_gemini_pid_is_gemini 79654
+++ local pid=79654 token argv0= index=0
+++ '[' -r /proc/79654/cmdline ']'
+++ return 1
+++ '[' -n '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' ']'
+++ fm_gemini_args_are_gemini '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\'''
+++ local 'args=/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' argv0 rest token
+++ '[' -n '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' ']'
+++ args='/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\'''
+++ argv0=/bin/bash
+++ fm_gemini_path_is_gemini /bin/bash
+++ local path=/bin/bash
+++ '[' -n /bin/bash ']'
+++ case "$path" in
+++ case "${path##*/}" in
+++ case "$path" in
+++ return 1
+++ case "${argv0##*/}" in
+++ return 1
+++ '[' shell = shell ']'
+++ '[' shell = shell ']'
+++ printf shell
++ for pid in '$holders'
++ case "$pid" in
+++ LC_ALL=C
+++ ps -p 79654 -o comm=
++ comm=/bin/bash
+++ LC_ALL=C
+++ ps -p 79654 -o args=
++ args='/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\'''
++ '[' -n /bin/bash ']'
++ '[' -n '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' ']'
++ argv0=/bin/bash
++ case "$(fm_agent_process_classify "$comm" "$argv0" "$args" "$pid")" in
+++ fm_agent_process_classify /bin/bash /bin/bash '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' 79654
+++ local name=/bin/bash argv0=/bin/bash 'args=/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' pid=79654 by_name by_argv0
++++ fm_agent_process_classify_name /bin/bash /bin/bash
++++ local path=/bin/bash argv0=/bin/bash base
++++ base=bash
++++ base=bash
++++ case "$base" in
++++ printf shell
+++ by_name=shell
+++ '[' shell '!=' agent ']'
+++ '[' -n /bin/bash ']'
++++ fm_agent_process_classify_name /bin/bash /bin/bash
++++ local path=/bin/bash argv0=/bin/bash base
++++ base=bash
++++ base=bash
++++ case "$base" in
++++ printf shell
+++ by_argv0=shell
+++ '[' shell '!=' agent ']'
+++ '[' -n 79654 ']'
+++ fm_gemini_pid_is_gemini 79654
+++ local pid=79654 token argv0= index=0
+++ '[' -r /proc/79654/cmdline ']'
+++ return 1
+++ '[' -n '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' ']'
+++ fm_gemini_args_are_gemini '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\'''
+++ local 'args=/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' argv0 rest token
+++ '[' -n '/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\''' ']'
+++ args='/bin/bash -c . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-agent-process-lib.sh; . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/bin/fm-control-lib.sh; set -x; fm_control_worktree_agent_holder '\''/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1RDBMZB23Z36H5S5Y4VK7/.live-validation/wt-cafM-CM-)\lane'\'''
+++ argv0=/bin/bash
+++ fm_gemini_path_is_gemini /bin/bash
+++ local path=/bin/bash
+++ '[' -n /bin/bash ']'
+++ case "$path" in
+++ case "${path##*/}" in
+++ case "$path" in
+++ return 1
+++ case "${argv0##*/}" in
+++ return 1
+++ '[' shell = shell ']'
+++ '[' shell = shell ']'
+++ printf shell
++ for pid in '$holders'
++ case "$pid" in
+++ LC_ALL=C
+++ ps -p 79863 -o comm=
++ comm=
++ printf unknown
++ return 0
