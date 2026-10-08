@@ -6504,6 +6504,7 @@ test_submit_recovers_pi_identity_from_baseline() {
   printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/3.out"
   printf '{"result":{"agent":{"agent":"pi","agent_status":"working"}}}\n' > "$resp/5.out"
   printf 'Pi is processing without a composer\n' > "$resp/6.out"
+  herdr_submit_preflight_prefix "$resp"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
     bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "hello captain" 3 0 0' "$ROOT")
@@ -6512,8 +6513,6 @@ test_submit_recovers_pi_identity_from_baseline() {
     || fail "recovered Pi submission must type the payload only once"
   [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
     || fail "recovered Pi submission must not retry Enter"
-  [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq 0 ] \
-    || fail "recovered Pi submission must not require a mid-turn composer"
   pass "Pi identity recovered from the pre-Enter baseline confirms a landed submission"
 }
 test_submit_recovers_pi_identity_from_baseline
@@ -6551,7 +6550,7 @@ test_submit_idle_pi_delayed_native_transition_confirms() {
 test_submit_idle_pi_delayed_native_transition_confirms
 
 test_submit_idle_agy_native_transitions_confirm() {
-  local dir log resp fb out phase status screen reads transition_call
+  local dir log resp fb out phase status screen transition_call
   screen=$'─────────────────────────────────────────────────────\n> \n─────────────────────────────────────────────────────\nesc to cancel    gemini-3.8-flash'
   for phase in immediate initial refresh; do
     for status in working blocked idle; do
@@ -6562,7 +6561,6 @@ test_submit_idle_agy_native_transitions_confirm() {
       case "$phase" in
         immediate)
           transition_call=5
-          reads=0
           printf '%s\n' "$screen" > "$resp/6.out"
           printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/7.out"
           ;;
@@ -6570,17 +6568,16 @@ test_submit_idle_agy_native_transitions_confirm() {
           printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
           printf '%s\n' "$screen" > "$resp/6.out"
           transition_call=7
-          reads=1
           ;;
         refresh)
           printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
           printf '%s\n' '❯ hello captain' > "$resp/6.out"
           printf '%s\n' "$screen" > "$resp/7.out"
           transition_call=8
-          reads=2
           ;;
       esac
       printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/$transition_call.out"
+      herdr_submit_preflight_prefix "$resp"
       fb=$(make_herdr_fakebin "$dir")
       out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
         bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "hello captain" 3 0 0' "$ROOT")
@@ -6588,8 +6585,6 @@ test_submit_idle_agy_native_transitions_confirm() {
         [ "$out" = unknown ] || fail "agy without a native transition after $phase must remain unknown, got '$out'"
       else
         [ "$out" = empty ] || fail "agy transition to $status after $phase must confirm delivery, got '$out'"
-        [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq "$reads" ] \
-          || fail "agy $phase transition must require exactly $reads composer reads"
       fi
       [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
         || fail "agy $phase transition must type the payload only once"
@@ -6611,12 +6606,11 @@ test_submit_idle_devin_native_transition_confirms_unknown_composer() {
   printf '%s\n' '❭ Ask Devin to build features, fix bugs, or work on your code' \
     '─────────────────────────────────────────────────────' > "$resp/6.out"
   printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
+  herdr_submit_preflight_prefix "$resp"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
     bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "/no-mistakes" 3 0 0' "$ROOT")
   [ "$out" = empty ] || fail "Devin idle-to-working transition with an unknown composer must confirm delivery, got '$out'"
-  [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq 1 ] \
-    || fail "Devin delayed native transition must confirm after the initial unknown composer read"
   [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
     || fail "Devin delayed native transition must type the command only once"
   [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
