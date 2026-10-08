@@ -56,7 +56,7 @@ finish() {
       printf -- '- Picked for this task: %s - read %s\n' "$PICKED" "$SKILL_PATH"
       printf "Picked by %s through %s from this project's skills (fit %s); your skill index still applies for anything else this task needs.\n" "$MODEL" "$PROVIDER" "$FIT"
       ;;
-    none) printf 'Skill selection found no project skill that fits this task (%s); use your skill index as usual.\n' "$REASON" ;;
+    none) printf 'Skill selection found no fit among the judged project skills (%s); use your skill index as usual.\n' "$REASON" ;;
     *) printf 'Skill selection was unavailable for this task (%s). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.\n' "$REASON" ;;
   esac
   [ ! -s "$WORK/not-judged" ] || printf 'Not judged, so check them yourself if relevant: %s.\n' "$(cat "$WORK/not-judged")"
@@ -84,7 +84,7 @@ printf '%s\n%s\n' "$TYPESAFE_API_KEY_PRIVATE" "$OPENROUTER_API_KEY_PRIVATE" |
   node "$SCRIPT_DIR/fm-skill-pick.mjs" pick "$WORK/task" "$WORK/roster.json" "$CONFIG/dispatch-never-send" "$WORK/scan" > "$WORK/result" 2> "$WORK/error" ||
   unavailable "the skill picker stopped with an error: $(cat "$WORK/error")"
 field() { sed -n "s/^$1=//p" "$WORK/result" | head -n 1; }
-STATUS=$(field status) REASON=$(field reason) PICKED=$(field picked) SKILL_PATH=$(field path)
+STATUS=$(field status) REASON=$(field reason) PICKED=$(field picked) SKILL_PATH=$(field path | jq -r '.')
 FIT=$(field fit) PROVIDER=$(field provider) MODEL=$(field model)
 case "$STATUS" in
   picked|none) ;;

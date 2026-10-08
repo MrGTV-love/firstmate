@@ -6,10 +6,17 @@
 set -eu
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
-command -v node >/dev/null 2>&1 || { printf 'ok - skipped: node is not installed\n'; exit 0; }
-if ! prerequisite=$(node "$ROOT/bin/fm-skill-pick.mjs" check 2>&1); then
-  printf 'ok - skipped: %s\n' "$prerequisite"
-  exit 0
+command -v node >/dev/null 2>&1 || { printf 'skip: node not found\n'; exit 0; }
+if prerequisite=$(node "$ROOT/bin/fm-skill-pick.mjs" check 2>&1); then
+  :
+else
+  prerequisite_status=$?
+  if [ "$prerequisite_status" -eq 77 ]; then
+    printf 'skip: unsupported Node runtime\n%s\n' "$prerequisite"
+    exit 0
+  fi
+  printf '%s\n' "$prerequisite" >&2
+  exit "$prerequisite_status"
 fi
 TMP_ROOT=$(fm_test_tmproot fm-skill-pick)
 TOOL="$ROOT/bin/fm-skill-pick.sh"
@@ -133,13 +140,87 @@ assert_not_contains "$(cat "$LOG")" CLAUDE-COPY-DESCRIPTION "a later folder's co
 assert_not_contains "$out" ts-test-key "the key is never printed"
 pass "a clear task picks one project skill through TypeSafe direct"
 
+for whitespace in spaces tab newline; do
+  reset; keys
+  case "$whitespace" in
+    spaces) path_project="$TMP_ROOT/project  repeated  spaces" ;;
+    tab) path_project="$TMP_ROOT/"$'project\twith\ttabs' ;;
+    newline) path_project="$TMP_ROOT/"$'Client  Reports\tQuarter\nNotes' ;;
+  esac
+  git init -q "$path_project"
+  skill "$path_project/skills" alpha 'description: Use for alpha work.'
+  git -C "$path_project" add -- skills
+  selected_path="$(cd "$path_project" && pwd -P)/skills/alpha/SKILL.md"
+  out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" \
+    bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$path_project/skills" --record "$TMP_ROOT/record")
+  assert_contains "$out" "- Picked for this task: alpha - read $selected_path" "the launch instruction preserves $whitespace in the project path"
+  [ -f "$selected_path" ] || fail "the emitted selected path identifies the existing skill"
+  grep -qx 'status=picked' "$TMP_ROOT/record" || fail "the whitespace project selection is recorded"
+  assert_equals 2 "$(requests)" "a whitespace project path completes selection"
+done
+pass "selected paths preserve repeated spaces, tabs and embedded newlines"
+
+for roster_case in absent empty untracked undescribed partial; do
+  roster="$TMP_ROOT/roster-$roster_case"
+  git init -q "$roster"
+  case "$roster_case" in
+    absent) ;;
+    empty) mkdir -p "$roster/skills" ;;
+    untracked) skill "$roster/skills" scratch 'description: Untracked local skill.' ;;
+    undescribed) skill "$roster/skills" blank ''; git -C "$roster" add -- skills ;;
+    partial)
+      skill "$roster/skills" alpha 'description: Use for alpha work.'
+      skill "$roster/skills" blank ''
+      git -C "$roster" add -- skills
+      skill "$roster/skills" scratch 'description: Untracked local skill.'
+      ;;
+  esac
+  thresholds=(gate)
+  [ "$roster_case" != partial ] || thresholds+=(fit)
+  for threshold in "${thresholds[@]}"; do
+    reset; keys
+    if [ "$threshold" = gate ]; then threshold_env=FAKE_GATE=0.1
+    else threshold_env=FAKE_FIT=0.2; fi
+    out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" "$threshold_env" \
+      bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$roster/skills" --record "$TMP_ROOT/record")
+    case "$roster_case" in
+      absent|empty)
+        status=none; reason='this project has no skills to judge'; count=0
+        assert_contains "$out" "Skill selection found no fit among the judged project skills ($reason)" "an $roster_case roster reports no skills"
+        ;;
+      untracked|undescribed)
+        status=unavailable; count=0
+        if [ "$roster_case" = untracked ]; then excluded='scratch (not a Git-tracked file in this project)'
+        else excluded='blank (no readable description)'; fi
+        reason="no project skills could be judged: $excluded"
+        assert_contains "$out" "Skill selection was unavailable for this task ($reason)" "an entirely excluded roster is unavailable"
+        assert_contains "$out" "Not judged, so check them yourself if relevant: $excluded." "excluded skills remain visible"
+        ;;
+      partial)
+        status=none
+        if [ "$threshold" = gate ]; then reason='no judged project skill fits this task: need 0.10 below 0.3'; count=1
+        else reason='no judged project skill fits this task: best fit 0.20 below 0.3'; count=2; fi
+        assert_contains "$out" "Skill selection found no fit among the judged project skills ($reason)" "a low $threshold applies only to judged skills"
+        assert_contains "$out" "blank (no readable description)" "an undescribed skill remains visible beside a low $threshold"
+        assert_contains "$out" "scratch (not a Git-tracked file in this project)" "an untracked skill remains visible beside a low $threshold"
+        jq -se 'all(.[]; (.body.questions.which.criteria | keys) == ["alpha"])' "$LOG" >/dev/null \
+          || fail "only the judged skill enters requests"
+        ;;
+    esac
+    grep -Fqx "status=$status" "$TMP_ROOT/record" || fail "the $roster_case $threshold status is recorded"
+    grep -Fqx "reason=$reason" "$TMP_ROOT/record" || fail "the $roster_case $threshold reason is recorded"
+    assert_equals "$count" "$(requests)" "the $roster_case $threshold request count"
+  done
+done
+pass "empty, excluded and partially judged rosters have distinct outcomes"
+
 reset; keys
 out=$(pick FAKE_GATE=0.1)
-assert_contains "$out" "Skill selection found no project skill that fits this task (need 0.10 below 0.3)" "a low need picks nothing"
+assert_contains "$out" "Skill selection found no fit among the judged project skills (no judged project skill fits this task: need 0.10 below 0.3)" "a low need picks nothing"
 assert_equals 1 "$(requests)" "a low need stops after request 1"
 reset; keys
 out=$(pick FAKE_FIT=0.2)
-assert_contains "$out" "(best fit 0.20 below 0.3)" "a low best fit picks nothing"
+assert_contains "$out" "Skill selection found no fit among the judged project skills (no judged project skill fits this task: best fit 0.20 below 0.3)" "a low best fit is limited to judged skills"
 assert_equals "status=none" "$(sed -n 1p "$TMP_ROOT/record")" "no fit is recorded as none"
 pass "the cookbook's two thresholds can each pick nothing"
 
@@ -352,6 +433,51 @@ out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH --loader=$TMP_ROOT/
 assert_contains "$out" "unsupported Node runtime" "failed imports explain the TypeScript runtime prerequisite"
 assert_equals 0 "$(requests)" "unsupported runtimes never start selection"
 pass "the prerequisite imports the actual vendored modules"
+cat > "$TMP_ROOT/missing-module-loader.mjs" <<'JS'
+export async function resolve(specifier, context, nextResolve) {
+  if (specifier.endsWith('.ts')) {
+    throw Object.assign(new Error('Cannot find vendored TypeScript module'), { code: 'ERR_MODULE_NOT_FOUND' });
+  }
+  return nextResolve(specifier, context);
+}
+JS
+for loader_case in unsupported missing-module; do
+  loader_options="--no-warnings --loader=$TMP_ROOT/$loader_case-loader.mjs"
+  if check_out=$(env NODE_OPTIONS="$loader_options" node "$ROOT/bin/fm-skill-pick.mjs" check 2>&1); then
+    check_status=0
+  else check_status=$?; fi
+  if [ "$loader_case" = unsupported ]; then
+    assert_equals 77 "$check_status" "unsupported TypeScript imports have a distinct check exit"
+    assert_contains "$check_out" "unsupported Node runtime:" "the executable check diagnoses an unsupported runtime"
+    expected_suite_status=0
+  else
+    assert_equals 1 "$check_status" "missing modules fail the executable check"
+    assert_contains "$check_out" "could not load vendored TypeScript client: Cannot find vendored TypeScript module" "missing modules are loading failures"
+    assert_not_contains "$check_out" "unsupported Node runtime" "a missing module is not an unsupported runtime"
+    expected_suite_status=1
+  fi
+  reset; keys
+  out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH $loader_options" FM_HOME="$HOME_DIR" \
+    bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$COPY/.agents/skills" --record "$TMP_ROOT/record")
+  assert_contains "$out" "$check_out" "the picker reports the actual loader failure"
+  grep -qx 'status=unavailable' "$TMP_ROOT/record" || fail "loader failure is recorded as unavailable"
+  assert_equals 0 "$(requests)" "loader failures send no requests"
+  if suite_out=$(env NODE_OPTIONS="$loader_options" bash "$ROOT/tests/fm-skill-pick.test.sh" 2>&1); then
+    suite_status=0
+  else suite_status=$?; fi
+  assert_equals "$expected_suite_status" "$suite_status" "the suite distinguishes $loader_case prerequisites"
+  if [ "$loader_case" = unsupported ]; then
+    assert_equals "skip: unsupported Node runtime"$'\n'"$check_out" "$suite_out" "unsupported runtime suite skips are canonical"
+  else
+    assert_equals "$check_out" "$suite_out" "a broken vendored import fails the suite without skipping"
+  fi
+done
+mkdir -p "$TMP_ROOT/no-node-bin"
+ln -s "$(command -v dirname)" "$TMP_ROOT/no-node-bin/dirname"
+suite_out=$(env PATH="$TMP_ROOT/no-node-bin" ROOT="$ROOT" FM_TEST_LIB_SOURCED=1 FM_TEST_FIXTURES_SOURCED=1 \
+  /bin/bash "$ROOT/tests/fm-skill-pick.test.sh" 2>&1)
+assert_equals 'skip: node not found' "$suite_out" "a missing Node executable produces the canonical suite skip"
+pass "check and suite entry distinguish unsupported runtimes from broken imports"
 
 for exit_case in gate fit picked unavailable; do
   reset

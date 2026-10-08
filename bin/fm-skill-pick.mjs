@@ -14,7 +14,7 @@
 // sent only when <name>/SKILL.md is a regular Git-tracked file with a
 // description, and every other one is listed in not_judged with its reason.
 // pick prints status=, reason=, picked=, path=, fit=, provider= and model=
-// lines; status is picked, none or unavailable.
+// lines; path is a JSON string, and status is picked, none or unavailable.
 import { execFileSync } from 'node:child_process';
 import { closeSync, lstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
@@ -25,7 +25,11 @@ try {
   ({ choice, noul } = await import('../.agents/skills/hyper-jev/templates/starter/src/core/helpers.ts'));
   ({ LIMITS } = await import('../.agents/skills/hyper-jev/templates/starter/src/core/types.ts'));
 } catch (error) {
-  process.stderr.write(`unsupported Node runtime: importing the vendored TypeScript client requires Node with TypeScript support (${error.message})\n`);
+  if (error.code === 'ERR_UNKNOWN_FILE_EXTENSION' && error.message.includes('".ts"')) {
+    process.stderr.write(`unsupported Node runtime: importing the vendored TypeScript client requires Node with TypeScript support (${error.message})\n`);
+    process.exit(77);
+  }
+  process.stderr.write(`could not load vendored TypeScript client: ${error.message}\n`);
   process.exit(1);
 }
 
@@ -154,7 +158,7 @@ function line(value) {
 
 async function pick(taskFile, rosterFile, policyPath, scratchPath) {
   const request = readFileSync(taskFile, 'utf8');
-  const { skills } = JSON.parse(readFileSync(rosterFile, 'utf8'));
+  const { skills, not_judged = [] } = JSON.parse(readFileSync(rosterFile, 'utf8'));
   const [typesafe = '', openrouter = ''] = readFileSync(0, 'utf8').split('\n');
   const keys = { typesafe: typesafe.trim(), openrouter: openrouter.trim() };
   const byName = new Map(skills.map((skill) => [skill.name, skill]));
@@ -164,10 +168,14 @@ async function pick(taskFile, rosterFile, policyPath, scratchPath) {
   const done = () => {
     if (directFailure) out.reason = [out.reason, `TypeSafe direct failed (${directFailure})`].filter(Boolean).join('; ');
     if (fallbackReason) out.reason = [out.reason, fallbackReason].filter(Boolean).join('; ');
-    for (const [key, value] of Object.entries(out)) process.stdout.write(`${key}=${line(value)}\n`);
+    for (const [key, value] of Object.entries(out)) process.stdout.write(`${key}=${key === 'path' ? JSON.stringify(value) : line(value)}\n`);
   };
   if (!skills.length) {
-    Object.assign(out, { status: 'none', reason: 'this project has no skills to judge' });
+    if (not_judged.length) {
+      out.reason = `no project skills could be judged: ${not_judged.map(({ name, reason }) => `${name} (${reason})`).join(', ')}`;
+    } else {
+      Object.assign(out, { status: 'none', reason: 'this project has no skills to judge' });
+    }
     return done();
   }
   const client = (provider) => {
@@ -231,7 +239,7 @@ async function pick(taskFile, rosterFile, policyPath, scratchPath) {
     const gate = oriented.reduce((sum, value) => sum + value, 0) / oriented.length;
     Object.assign(out, { provider: current.provider, model: wide.meta.resolvedModel });
     if (gate < GATE_THRESHOLD) {
-      Object.assign(out, { status: 'none', reason: `need ${gate.toFixed(2)} below ${GATE_THRESHOLD}` });
+      Object.assign(out, { status: 'none', reason: `no judged project skill fits this task: need ${gate.toFixed(2)} below ${GATE_THRESHOLD}` });
       return done();
     }
     const rank = (answers) => Object.entries(answers.probabilities).sort((a, b) => b[1] - a[1]);
@@ -272,7 +280,7 @@ async function pick(taskFile, rosterFile, policyPath, scratchPath) {
     const best = result.answers[`fits::${winner.name}`].noul;
     Object.assign(out, { provider: current.provider, model: result.meta.resolvedModel });
     if (best < FITS_THRESHOLD) {
-      Object.assign(out, { status: 'none', reason: `best fit ${best.toFixed(2)} below ${FITS_THRESHOLD}` });
+      Object.assign(out, { status: 'none', reason: `no judged project skill fits this task: best fit ${best.toFixed(2)} below ${FITS_THRESHOLD}` });
       return done();
     }
     Object.assign(out, {

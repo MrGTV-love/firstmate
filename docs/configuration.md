@@ -1707,14 +1707,14 @@ Secondmate charters are not judged.
 The picker reads the task copy's `.agents/skills` and `.claude/skills`; a firstmate task's copy holds firstmate's own skills.
 It runs the [TypeSafe skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) recipe on the vendored [hyper-jev](../.agents/skills/hyper-jev/SOURCE.md) client, and `bin/fm-skill-pick.mjs`'s header owns the recipe, roster rules, and provider order.
 
-For rosters over 255 skills, chunk-local top-three candidates enter a common Choice ranking before the detailed shortlist step; probabilities from independent chunks are never compared. This follows the cookbook's shortlist-over-chunk-winners guidance, retaining three candidates per chunk to preserve near-winners, and adds ranking requests to the ordinary two-request flow (`bin/fm-skill-pick.mjs:237-256`).
+For rosters over 255 skills, chunk-local top-three candidates enter a common Choice ranking before the detailed shortlist step; probabilities from independent chunks are never compared. This follows the cookbook's shortlist-over-chunk-winners guidance, retaining three candidates per chunk to preserve near-winners, and adds ranking requests to the ordinary two-request flow (`bin/fm-skill-pick.mjs:245-264`).
 
-**Named cookbook deviation — highest-fit delivery:** the rerank Choice is retained, but the delivered pick is the highest-fit shortlisted skill rather than the Choice winner, and its fit must be at least 0.30 (`bin/fm-skill-pick.mjs:270-280`). The captain chose this deviation because workers must read and follow the delivered skill, rather than receive the cookbook's ignorable advisory suggestion.
+**Named cookbook deviation — highest-fit delivery:** the rerank Choice is retained, but the delivered pick is the highest-fit shortlisted skill rather than the Choice winner, and its fit must be at least 0.30 (`bin/fm-skill-pick.mjs:278-288`). The captain chose this deviation because workers must read and follow the delivered skill, rather than receive the cookbook's ignorable advisory suggestion.
 
 The pick is added to the launch instructions as a skill to read in full and follow.
 Existing mandatory skill triggers and the worker's own skill index still apply first and unchanged.
 A skill the picker could not send, such as one that is not a Git-tracked file in the task copy, is listed by name for the worker to check.
-When nothing fits, the instructions say so; when the picker cannot run, the launch continues and the instructions say why.
+No-fit outcomes apply only to judged skills; when every discovered skill is excluded, selection is unavailable with the exclusion reasons, not a finding that no skill fits. A genuinely empty catalog reports that there are no skills to judge. When the picker cannot run, the launch continues and the instructions say why.
 The task record carries `skill_selection=` (picked, none, unavailable, or undelivered), `skill_selection_reason=`, and `skill_selection_picked=` when a pick is delivered.
 Raw commands receive the selection only when they contain `__BRIEF__`; without that placeholder, selection is recorded as undelivered with its reason, no pick is claimed, and the command is unchanged. Failure to publish the selection overlay also records undelivered and clears the pick.
 `bin/fm-spawn.sh` stops the picker after 30 seconds.
@@ -1741,7 +1741,7 @@ Required tools come in two parts: a universal toolchain every home needs regardl
 
 Every home requires:
 
-- Node 24+ with native TypeScript loading enabled, and git. Worker skill selection capability-checks imports of its vendored TypeScript client and reports an unavailable prerequisite when they fail.
+- Node 24+ with native TypeScript loading enabled, and git. Worker skill selection capability-checks imports of its vendored TypeScript client; unsupported TypeScript loading is a runtime prerequisite, while other import failures report a client-loading error. The picker test suite emits canonical `skip:` output only for missing Node or unsupported TypeScript loading; other client-loading errors fail the suite.
 - gh, with GitHub authentication through `gh auth login`.
 - no-mistakes v1.46.0 or newer.
 - Compatible gh-axi.
