@@ -87,16 +87,30 @@ status_paused_until() {  # <status-line> -> epoch on stdout
 # Any decision the fold still holds open wins over unrelated events, and the
 # fold's most recently opened record supplies it; a standing declared wait, then
 # the latest recognized event, stands when nothing is open.
+# One exception: a standing `paused` declaration for the very key a decision
+# opened is that decision's current state. A standing declared wait is always
+# newer than every open decision (a later opener ends it), and a worker that
+# re-declares its own open key as a wait is waiting on that answer, not asking
+# again. The decision stays open in the fold, so OPEN DECISIONS and the fleet
+# snapshot still surface it; only a still-open decision under ANOTHER key keeps
+# precedence over the pause. A captain-held line closes its own key in the fold,
+# so it never takes this exception.
 # Actual run/pane evidence is still reconciled by fm-crew-state.sh.
 status_current_line() {  # <status-file> <kind>
-  local open key verb note current=''
+  local open key verb note current='' wait wait_key=''
   open=$(status_open_decisions "$1" "$2")
+  wait=$(status_declared_wait_line "$1")
+  if status_is_paused "$wait"; then
+    wait_key=$(_fm_decision_key "$wait") || wait_key=''
+  fi
   while IFS=$'\t' read -r key verb note; do
-    case "$verb" in ?*) current="$verb [key=$key]: $note" ;; esac
+    case "$verb" in ?*) ;; *) continue ;; esac
+    [ -n "$wait_key" ] && [ "$key" = "$wait_key" ] && continue
+    current="$verb [key=$key]: $note"
   done <<EOF
 $open
 EOF
-  [ -n "$current" ] || current=$(status_declared_wait_line "$1")
+  [ -n "$current" ] || current=$wait
   [ -n "$current" ] || current=$(last_status_line "$1")
   printf '%s\n' "$current"
 }
@@ -241,8 +255,12 @@ EOF
 # of how much new unrelated log content has since been folded in. Only a line the
 # shared fold rule retires removes one.
 #
-# The cursor format is `version` (FM_OPEN_DECISIONS_FOLD_VERSION plus the task
-# kind, as `<n>:<kind>`), `offset`, `ident`, then the folded open set.
+# The cursor format is `version` (the fold signature from
+# _fm_open_decisions_fold_signature: FM_OPEN_DECISIONS_FOLD_VERSION plus the task
+# kind, as `<n>:<kind>`, plus any fold-affecting override), `offset`, `ident`,
+# then the folded open set; _fm_open_decisions_checkpoint_parse in
+# bin/fm-status-decision-lib.sh is its one parser, and status_open_decisions
+# there reuses it read-only as the seed of every whole-file fold.
 # FM_OPEN_DECISIONS_FOLD_VERSION must be bumped whenever
 # _fm_decision_fold_line semantics change, so persisted state from an older
 # interpretation is discarded and rebuilt from byte 0; the kind suffix does the
@@ -279,54 +297,22 @@ EOF
 # re-derives from whatever offset actually landed on disk.
 
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
-  local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open='' cursor_data first rest offset_line ident_line
+  local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
   local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
   local target_cursor kind fold_version
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_fm_status_kind "$f")
-  fold_version="$FM_OPEN_DECISIONS_FOLD_VERSION:$kind"
+  fold_version=$(_fm_open_decisions_fold_signature "$kind")
   cf=$(_fm_open_decisions_cursor_path "$f")
   offset=0
   ident=''
-  if [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ]; then
-    cursor_data=$(LC_ALL=C command cat "$cf" 2>/dev/null) || cursor_data=''
-  fi
-  if [ -n "${cursor_data:-}" ]; then
-      first=${cursor_data%%$'\n'*}
-      case "$first" in
-        version=*)
-          version=${first#version=}
-          [ "$version" = "$fold_version" ] || version=''
-          rest=${cursor_data#*$'\n'}
-          offset_line=${rest%%$'\n'*}
-          case "$offset_line" in
-            offset=*) offset=${offset_line#offset=} ;;
-            *) offset=0; version='' ;;
-          esac
-          case "$offset" in
-            ''|*[!0-9]*) offset=0; version='' ;;
-            *)
-              case "$rest" in
-                *$'\n'*)
-                  rest=${rest#*$'\n'}
-                  ident_line=${rest%%$'\n'*}
-                  case "$ident_line" in
-                    ident=*)
-                      ident=${ident_line#ident=}
-                      case "$rest" in
-                        *$'\n'*) open=${rest#*$'\n'} ;;
-                      esac
-                      if [ -n "$version" ] && [ -n "$ident" ]; then trusted_open=$open; fi
-                      ;;
-                    *) offset=0; version='' ;;
-                  esac
-                  ;;
-                *) offset=0; version='' ;;
-              esac
-              ;;
-          esac
-          ;;
-      esac
+  if _fm_open_decisions_checkpoint_parse "$cf"; then
+    version=$_FM_ODC_VERSION
+    [ "$version" = "$fold_version" ] || version=''
+    offset=$_FM_ODC_OFFSET
+    ident=$_FM_ODC_IDENT
+    open=$_FM_ODC_OPEN
+    if [ -n "$version" ]; then trusted_open=$open; fi
   fi
 
   # A stat/size-read failure is a genuine I/O error, not "the file is empty" -
@@ -391,6 +377,40 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     mv -f "$target_cursor" "$cf" || return 1
   fi
   printf '%s' "$open"
+}
+
+# Carry a live log's fold checkpoint onto a point-in-time copy of that log, so
+# a whole-file fold of the copy (the fleet snapshot folds its captured copies)
+# starts from the checkpoint instead of line 1. <live-ident> is the live log's
+# identity read BEFORE the copy was taken; the checkpoint is carried only when
+# it was folded from that same file, the file still has that identity now (so
+# the copy's bytes are a prefix-preserving sample of the log the checkpoint
+# describes), and its offset lies within the copy. The carried checkpoint names
+# the copy's own identity and is written only beside the copy. Anything else
+# writes nothing, and the copy's fold simply starts from line 1.
+status_open_decisions_checkpoint_carry() {  # <live-status> <captured-status> <live-ident>
+  local live=$1 copy=$2 live_ident=$3 now_ident copy_ident copy_size target
+  [ -n "$live_ident" ] || return 0
+  [ -f "$copy" ] && [ ! -L "$copy" ] || return 0
+  _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$live")" || return 0
+  [ "$_FM_ODC_IDENT" = "$live_ident" ] || return 0
+  now_ident=$(_fm_open_decisions_file_ident "$live" 2>/dev/null) || return 0
+  [ "$now_ident" = "$live_ident" ] || return 0
+  copy_ident=$(_fm_open_decisions_file_ident "$copy" 2>/dev/null) || return 0
+  [ -n "$copy_ident" ] || return 0
+  copy_size=$(_fm_status_file_size "$copy" 2>/dev/null) || return 0
+  copy_size=${copy_size//[[:space:]]/}
+  case "$copy_size" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$_FM_ODC_OFFSET" -le "$copy_size" ] || return 0
+  target=$(_fm_open_decisions_cursor_path "$copy")
+  {
+    printf 'version=%s\n' "$_FM_ODC_VERSION"
+    printf 'offset=%s\n' "$_FM_ODC_OFFSET"
+    printf 'ident=%s\n' "$copy_ident"
+    if [ -n "$_FM_ODC_OPEN" ]; then printf '%s' "$_FM_ODC_OPEN"; fi
+  } > "$target.tmp.$$" 2>/dev/null || { rm -f "$target.tmp.$$"; return 0; }
+  mv -f "$target.tmp.$$" "$target" 2>/dev/null || rm -f "$target.tmp.$$"
+  return 0
 }
 
 # Incremental sibling of scan_open_decisions: same fleet-wide directory walk and

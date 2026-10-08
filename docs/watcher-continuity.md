@@ -73,6 +73,13 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 - It retires the predecessor arm at replacement shutdown instead of retaining it across the handoff.
 - It reports no shutdown reason, so every shutdown with a pending actionable close persists the handoff for the next owning `session_start` to replay.
 
+### Stopped generations and duplicate loads
+
+A stopped generation refuses every arm, so a shutdown that no successor `session_start` follows would otherwise leave the session unable to arm a watcher at all.
+Both primary watcher extensions bind a fresh generation themselves when no successor arrives within a short grace while the process still owns the home lock, and an arm call on that stopped generation heals at once; Pi does this only after a replacement shutdown, never after a terminal quit.
+Only the latest factory bind of an extension in a process owns the home, so a session that loaded the file twice keeps one live generation and one arm.
+Each extension header owns its exact rule, `.pi/extensions/lib/fm-watch-lifecycle.ts` owns the shared registry, and every lifecycle transition and expired bound is recorded in `state/extensions/<extension>/lifecycle.log`.
+
 ### omp restored-wake recovery
 
 omp restores queued user follow-ups to the composer when a run is interrupted with Escape or a message is dequeued with Alt+Up, so accepting a wake as a follow-up does not prove a turn consumed it.

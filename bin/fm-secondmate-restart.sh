@@ -3,6 +3,7 @@
 # wiring, persisting their open records first.
 #
 # Usage: fm-secondmate-restart.sh <secondmate-id>... [--help]
+#        fm-secondmate-restart.sh --process-requests
 #
 # This is the executable half of /updatefirstmate's reload step. A running agent
 # holds AGENTS.md and every skill it has loaded frozen from launch, and no
@@ -29,17 +30,26 @@
 #      All requests go out before any restart, so a slow mate delays only its own
 #      restart instead of serializing the fleet behind it.
 #   B. RESTART. Only after that mate's own correlated answer lands on the parent
-#      channel. The gate is that answer, never a wall clock, so a mate that is
-#      mid-turn queues the request behind that turn; the bound below exists to
-#      end the wait, not to authorize a restart without the answer. A timeout
-#      deliberately leaves that unanswered expectation open: it is a genuine
-#      open loop owned by the ordinary pending-reply recovery ladder, not state
-#      this restart pass may close.
+#      channel and, for a local mate, the turn that answered has ended. Both
+#      gates are events, never a wall clock: a mate can sit inside one turn for
+#      hours, so this command records a durable restart request, tries it once,
+#      and returns. A mate whose answer has not arrived yet is reported as
+#      queued, and supervision finishes its restart whenever both events have
+#      happened (bin/fm-secondmate-restart-lib.sh owns the request record, the
+#      gates, and the lock shared with the watcher's automatic relaunch). An
+#      unanswered request stays a genuine open loop owned by the ordinary
+#      pending-reply recovery ladder, not state this restart pass may close.
 #
-# A mate whose persist answer did not arrive or whose runtime cannot prove a
-# restart gets the ordinary re-read nudge and is reported as a nudge, never as a
-# clean reload. Once a relaunch is attempted, any failed or ambiguous result is
-# reported as unknown rather than attributing it to either incarnation.
+#   --process-requests is that supervision half: bin/fm-watch.sh runs it
+#      detached on its liveness cadence while any request is recorded, and it
+#      tries every recorded request once, leaving each finished outcome for the
+#      watcher to surface as one check wake.
+#
+# A mate whose runtime cannot prove a restart, or whose persist request could
+# not be delivered or tracked, gets the ordinary re-read nudge and is reported as
+# a nudge, never as a clean reload. Once a relaunch is attempted, any failed or
+# ambiguous result is reported as unknown rather than attributing it to either
+# incarnation.
 #
 # Placement changes the transport and nothing else. A local mate is restarted
 # with bin/fm-control.sh <id> relaunch, which republishes this home's own
@@ -59,24 +69,32 @@
 # the update pass actually left on the target commit; this command re-checks
 # capability on its own argv rather than trusting a caller's list.
 #
-# Environment knobs:
-#   FM_SECONDMATE_PERSIST_WAIT  seconds to wait for one mate's persist answer (900)
-#   FM_SECONDMATE_PERSIST_POLL  seconds between checks of that answer (5)
+# Per-mate outcome lines: `restarted: <id> ...`, `queued: <id>: <what it waits
+# for>`, `nudged: <id>: <reason>`, or `unreached: <id>: <reason>`, then one
+# `summary:` line.
 #
-# Exit status: 0 every named mate restarted; 3 at least one was nudged or left
-# unreached and every mate was still accounted for; 1 the input itself is
-# unusable; 2 invalid use.
+# Environment knobs:
+#   FM_SECONDMATE_PERSIST_POLL  seconds between checks of in-flight restarts (5)
+#
+# Exit status: 0 every named mate restarted or is queued for its event-driven
+# restart; 3 at least one was nudged or left unreached and every mate was still
+# accounted for; 1 the input itself is unusable; 2 invalid use.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
-  sed -n '2,65{s/^# \{0,1\}//;p;}' "$0"
+  sed -n '2,81{s/^# \{0,1\}//;p;}' "$0"
 }
 
+PROCESS_REQUESTS=0
 case "${1:-}" in
   -h|--help) usage; exit 0 ;;
+  --process-requests)
+    [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+    PROCESS_REQUESTS=1
+    ;;
   '') usage >&2; exit 2 ;;
 esac
 
@@ -94,11 +112,25 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 # shellcheck source=bin/fm-pending-reply-lib.sh
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
+# The per-mate lock the restart shares with the watcher's automatic relaunch.
+# shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
+. "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
 
-PERSIST_WAIT=${FM_SECONDMATE_PERSIST_WAIT:-900}
 PERSIST_POLL=${FM_SECONDMATE_PERSIST_POLL:-5}
-case "$PERSIST_WAIT" in ''|*[!0-9]*) echo "error: FM_SECONDMATE_PERSIST_WAIT must be a non-negative integer: $PERSIST_WAIT" >&2; exit 2 ;; esac
 case "$PERSIST_POLL" in ''|*[!0-9]*|0) echo "error: FM_SECONDMATE_PERSIST_POLL must be a positive integer: $PERSIST_POLL" >&2; exit 2 ;; esac
+
+# Supervision half: try every recorded request once and leave each finished
+# outcome for the watcher to surface. Silent; the outcome files are the result.
+if [ "$PROCESS_REQUESTS" -eq 1 ]; then
+  for request in "$STATE"/.secondmate-restart-*.request; do
+    [ -f "$request" ] && [ ! -L "$request" ] || continue
+    id=${request##*/.secondmate-restart-}
+    id=${id%.request}
+    case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
+    fm_secondmate_restart_service "$STATE" "$id" >/dev/null 2>&1 || true
+  done
+  exit 0
+fi
 
 IDS=()
 for arg in "$@"; do
@@ -121,8 +153,6 @@ done
 # reason already decided.
 PLAN=()
 REASON=()
-CORR=()
-DEADLINE=()
 PLACEMENT=()
 HOST=()
 HARNESS=()
@@ -132,14 +162,14 @@ RESTART_PID=()
 RESTART_RESULT=()
 
 restarted_count=0
+queued_count=0
 nudged_count=0
 unreached_count=0
 
-# The first line of a command's output that carries anything, flattened to one
-# readable line with its "error: " prefix dropped. A refusal's own words are the
-# most useful thing this report can carry, and its first line is often blank.
+# A refusal's own words are the most useful thing this report can carry, and
+# its first line is often blank.
 first_reported_line() {  # <text>
-  printf '%s\n' "$1" | sed -n '/./{s/^error: //;s/[[:space:]]\{1,\}/ /g;p;q;}'
+  fm_secondmate_restart_first_line "$1"
 }
 
 # Send the ordinary re-read steer to a mate this pass will not restart, and say
@@ -157,45 +187,32 @@ fall_back_to_nudge() {  # <id> <reason>
   fi
 }
 
-report_unreached() {  # <id> <reason>
-  unreached_count=$((unreached_count + 1))
-  printf 'unreached: %s: %s\n' "$1" "$2"
-}
-
-restart_mate() {  # <array-index>
-  local i=$1 id restart_out restart_rc restart_reason ran_on
+# One restart worker: try the mate's recorded request once. A finished
+# outcome was reported here, so its outcome record is removed rather than left
+# for the watcher to surface a second time; a waiting mate stays queued.
+service_mate() {  # <array-index>
+  local i=$1 id line rc
   id=${IDS[$i]}
-  if [ "${PLACEMENT[i]}" = remote ]; then
-    restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-      "$SCRIPT_DIR/fm-remote-secondmate-relaunch.sh" \
-      "$id" "${HARNESS[i]}" "${MODEL[i]:-default}" "${EFFORT[i]:-default}" < /dev/null 2>&1)
-    restart_rc=$?
-  else
-    restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-      "$SCRIPT_DIR/fm-control.sh" "$id" relaunch 2>&1)
-    restart_rc=$?
-  fi
-  if [ "$restart_rc" -eq 0 ]; then
-    ran_on=$(printf '%s\n' "$restart_out" | sed -n 's/^relaunched .* harness=\([^ ]*\).*/\1/p' | tail -1)
-    [ -n "$ran_on" ] || ran_on=${HARNESS[i]}
-    if [ "${PLACEMENT[i]}" = remote ]; then
-      printf 'restarted: %s on %s (%s)\n' "$id" "${HOST[i]}" "$ran_on"
-    else
-      printf 'restarted: %s (%s)\n' "$id" "$ran_on"
-    fi
-    return
-  fi
-
-  restart_reason=$(first_reported_line "$restart_out")
-  [ -n "$restart_reason" ] || restart_reason="the restart failed without a reported reason"
-  report_unreached "$id" "the restart outcome is unknown: $restart_reason"
+  line=$(fm_secondmate_restart_service "$STATE" "$id"); rc=$?
+  case "$rc" in
+    0)
+      rm -f "$(fm_secondmate_restart_outcome_path "$STATE" "$id")"
+      printf '%s\n' "$line"
+      ;;
+    1)
+      printf 'queued: %s: %s; supervision restarts it once it has\n' "$id" "${line#waiting: "$id": }"
+      ;;
+    *)
+      printf 'unreached: %s: its restart request was not recorded\n' "$id"
+      ;;
+  esac
 }
 
 launch_restart() {  # <array-index>
   local i=$1 result tmp
   result="$RESULT_DIR/$i.result"
   tmp="$result.tmp"
-  ( trap - EXIT; restart_mate "$i" > "$tmp"; mv -f "$tmp" "$result" ) &
+  ( trap - EXIT; service_mate "$i" > "$tmp"; mv -f "$tmp" "$result" ) &
   RESTART_PID[i]=$!
   RESTART_RESULT[i]=$result
   PLAN[i]=restarting
@@ -234,6 +251,7 @@ harvest_restarts() {
     printf '%s\n' "$out"
     case "$out" in
       restarted:*) restarted_count=$((restarted_count + 1)) ;;
+      queued:*) queued_count=$((queued_count + 1)) ;;
       nudged:*) nudged_count=$((nudged_count + 1)) ;;
       *) unreached_count=$((unreached_count + 1)) ;;
     esac
@@ -252,8 +270,6 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   id=${IDS[$i]}
   PLAN[i]="fallback"
   REASON[i]=""
-  CORR[i]=""
-  DEADLINE[i]=""
   PLACEMENT[i]=""
   HOST[i]=""
   HARNESS[i]=""
@@ -295,6 +311,15 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     fi
   fi
 
+  # A restart already recorded for this mate is still waiting on that mate's
+  # own events; asking again would only queue a second persist request behind
+  # the first, so the recorded request is tried instead.
+  if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ]; then
+    PLAN[i]="recorded"
+    i=$((i + 1))
+    continue
+  fi
+
   if ! corr=$(fm_pending_reply_create "$FM_HOME" "$STATE" "$id" \
     "$FM_SECONDMATE_PERSIST_REQUEST"); then
     REASON[i]="its answer about the open work cannot be tracked, so a clean reload could not be proven"
@@ -309,25 +334,30 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     i=$((i + 1))
     continue
   fi
-  CORR[i]=$corr
-  DEADLINE[i]=$(($(date +%s) + PERSIST_WAIT))
-  PLAN[i]="persisted-pending"
+  if ! fm_secondmate_restart_request_write "$STATE" "$id" "$corr" "${PLACEMENT[i]}" \
+    "${HOST[i]}" "${HARNESS[i]}" "${MODEL[i]}" "${EFFORT[i]}"; then
+    REASON[i]="its restart request could not be recorded, so it was asked to write down its open work but will not be restarted"
+    i=$((i + 1))
+    continue
+  fi
+  PLAN[i]="recorded"
   i=$((i + 1))
 done
 
 # --- phase B: restart ------------------------------------------------------
+# Each recorded mate is tried once, in parallel. One whose answer and turn end
+# have already happened restarts now; any other stays queued for supervision.
 
 RESULT_DIR=$(mktemp -d "$STATE/.secondmate-restart.XXXXXX") || {
   echo "error: could not create restart result directory under $STATE" >&2
   exit 1
 }
 trap 'rm -rf -- "$RESULT_DIR"' EXIT
-pending_count=0
 restart_active_count=0
 i=0
 while [ "$i" -lt "${#IDS[@]}" ]; do
-  if [ "${PLAN[i]}" = persisted-pending ]; then
-    pending_count=$((pending_count + 1))
+  if [ "${PLAN[i]}" = recorded ]; then
+    launch_restart "$i"
   else
     fall_back_to_nudge "${IDS[$i]}" "${REASON[i]}"
     PLAN[i]="done"
@@ -335,52 +365,14 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   i=$((i + 1))
 done
 
-while [ "$((pending_count + restart_active_count))" -gt 0 ]; do
-  now=$(date +%s)
-  next_wait=$PERSIST_POLL
-  # Resolve every arrived answer before processing any timeout. Delivery of a
-  # later fleet request can outlast an earlier mate's deadline under load; that
-  # expired mate must not hold an already-confirmed mate behind its fallback.
-  i=0
-  while [ "$i" -lt "${#IDS[@]}" ]; do
-    if [ "${PLAN[i]}" = persisted-pending ] \
-      && fm_pending_reply_try_resolve "$STATE" "${CORR[i]}"; then
-      pending_count=$((pending_count - 1))
-      launch_restart "$i"
-    fi
-    i=$((i + 1))
-  done
-  i=0
-  while [ "$i" -lt "${#IDS[@]}" ]; do
-    if [ "${PLAN[i]}" != persisted-pending ]; then
-      i=$((i + 1))
-      continue
-    fi
-    if [ "$now" -ge "${DEADLINE[i]}" ]; then
-      # A reply can land after the fleet-wide resolution pass. Recheck at the
-      # timeout decision so an answer already on disk wins over the fallback.
-      if fm_pending_reply_try_resolve "$STATE" "${CORR[i]}"; then
-        pending_count=$((pending_count - 1))
-        launch_restart "$i"
-      else
-        fall_back_to_nudge "${IDS[$i]}" \
-          "it did not confirm within ${PERSIST_WAIT}s that its open work is written down, so its conversation was not spent"
-        PLAN[i]="done"
-        pending_count=$((pending_count - 1))
-      fi
-    else
-      remaining=$((DEADLINE[i] - now))
-      [ "$remaining" -ge "$next_wait" ] || next_wait=$remaining
-    fi
-    i=$((i + 1))
-  done
+while [ "$restart_active_count" -gt 0 ]; do
   harvest_restarts
-  [ "$((pending_count + restart_active_count))" -eq 0 ] || sleep "$next_wait"
+  [ "$restart_active_count" -eq 0 ] || sleep "$PERSIST_POLL"
 done
 
 # --- summary ---------------------------------------------------------------
 
-printf 'summary: %d of %d restarted, %d nudged, %d unreached\n' \
-  "$restarted_count" "${#IDS[@]}" "$nudged_count" "$unreached_count"
+printf 'summary: %d of %d restarted, %d queued, %d nudged, %d unreached\n' \
+  "$restarted_count" "${#IDS[@]}" "$queued_count" "$nudged_count" "$unreached_count"
 [ "$((nudged_count + unreached_count))" -eq 0 ] || exit 3
 exit 0

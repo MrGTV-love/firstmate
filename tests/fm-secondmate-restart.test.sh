@@ -6,8 +6,9 @@
 # transaction) against a lifecycle-modelling session-provider stub:
 #
 #   1. The persist request is a GATE. Nothing is stopped until that mate's own
-#      correlated answer lands on the parent channel, and a mate that never
-#      answers keeps its agent and gets the re-read message instead.
+#      correlated answer lands on the parent channel and its turn has ended, and
+#      both are events, not a clock: an unanswered mate keeps its agent and a
+#      durable restart request that supervision finishes once both happen.
 #   2. The order is persist THEN restart, observable in what reaches the pane.
 #   3. The persist request is the task-subset of /stow: it asks for open records
 #      and task status, and explicitly not for the memory, learnings, or
@@ -74,6 +75,7 @@ case "${1:-}" in
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
         /exit|/quit)
+          [ ! -x "$D/on-exit" ] || "$D/on-exit"
           if [ ! -e "$D/remote-relaunch-end" ]; then
             : > "$D/local-relaunch-before-remote-end"
           fi
@@ -249,10 +251,36 @@ run_restart() {  # <case-dir> <args...>
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
     FM_CONFIG_OVERRIDE="$dir/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
-    FM_SECONDMATE_PERSIST_WAIT="${FM_TEST_PERSIST_WAIT:-30}" \
     FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
     FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
     "$RESTART" "$@" 2>&1
+}
+
+# assert_line / assert_no_line <line> <file> <msg>: a whole line is (not) present.
+assert_line() {
+  grep -qxF -- "$1" "$2" 2>/dev/null || fail "$3"
+}
+assert_no_line() {
+  ! grep -qxF -- "$1" "$2" 2>/dev/null || fail "$3"
+}
+
+# process_requests <case-dir>: the supervision half the watcher runs detached.
+process_requests() {
+  local dir=$1
+  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_CONFIG_OVERRIDE="$dir/home/config" \
+    FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
+    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
+    FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
+    "$RESTART" --process-requests 2>&1
+}
+
+# answer_now <case-dir> <id>: the modelled mate answers its recorded request.
+answer_now() {
+  local dir=$1 id=$2 corr
+  corr=$(sed -n 's/^corr=//p' "$dir/home/state/.secondmate-restart-$id.request")
+  [ -n "$corr" ] || fail "no restart request is recorded for $id"
+  printf 'done [corr=%s]: open records written down\n' "$corr" >> "$dir/home/state/$id.status"
 }
 
 # --- T1: the persist request is the task subset of /stow, and it gates --------
@@ -261,19 +289,22 @@ test_persist_gates_and_asks_only_for_open_records() {
   dir=$(new_case gate)
   add_local_mate "$dir" sm1
   # No answer armed: the mate never confirms its open work is written down.
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" fm-sm1); rc=$?
+  out=$(run_restart "$dir" fm-sm1); rc=$?
 
-  expect_code 3 "$rc" "an unconfirmed persist is a fallback, not a success"$'\n'"$out"
-  assert_contains "$out" "nudged: sm1:" "an unconfirmed persist must fall back to the re-read message"
-  assert_contains "$out" "its open work is written down" "the fallback must name the missing confirmation"
+  expect_code 0 "$rc" "an unconfirmed persist is queued, not a failure"$'\n'"$out"
+  assert_contains "$out" "queued: sm1:" "an unconfirmed persist must leave the restart queued"
+  assert_contains "$out" "its open work is written down" "the queued line must name the missing confirmation"
+  assert_not_contains "$out" "nudged: sm1" "a queued restart must not be downgraded to the re-read message"
   assert_not_contains "$out" "restarted: sm1" "a mate that never confirmed must not be restarted"
-  assert_contains "$out" "summary: 0 of 1 restarted" "the summary must not claim a reload"
+  assert_contains "$out" "summary: 0 of 1 restarted, 1 queued, 0 nudged, 0 unreached" "the summary must not claim a reload"
+  grep -q '^corr=[0-9a-f]\{16\}$' "$dir/home/state/.secondmate-restart-sm1.request" \
+    || fail "the queued restart was not recorded durably with its correlation"
   # The agent is untouched: nothing exited, nothing relaunched.
-  assert_no_grep '^/exit$' "$dir/fake/literal" "the agent was stopped without a confirmed persist"
+  assert_no_line '/exit' "$dir/fake/literal" "the agent was stopped without a confirmed persist"
   assert_absent "$dir/home/state/sm1.control-relaunch" \
     "a restart transaction was opened without a confirmed persist"
   grep -h '^phase=' "$dir/home/state/pending-replies"/* | grep -q '^phase=awaiting_report$' \
-    || fail "the timed-out persist expectation was closed instead of left to recovery"
+    || fail "the unanswered persist expectation was closed instead of left to recovery"
 
   # The request the mate actually received is the open-record half of /stow only.
   request=$(cat "$dir/home/state/sm1.inbox"/*.msg)
@@ -284,6 +315,11 @@ test_persist_gates_and_asks_only_for_open_records() {
     "the request must flush an unregistered captain call"
   assert_contains "$request" "Do NOT run the memory, learnings, or captain-preference sweeps" \
     "the request must exclude the memory curation half of stow"
+
+  # Supervision's later pass changes nothing while the answer is still missing.
+  out=$(process_requests "$dir") || fail "the supervision pass failed: $out"
+  assert_no_line '/exit' "$dir/fake/literal" "a supervision pass stopped a mate that never confirmed"
+  assert_present "$dir/home/state/.secondmate-restart-sm1.request" "an unanswered request was dropped"
   pass "T1 persist is a gate, and asks for open records and task status only"
 }
 
@@ -298,7 +334,7 @@ test_persist_precedes_restart() {
 
   expect_code 0 "$rc" "a confirmed persist should restart the mate"$'\n'"$out"
   assert_contains "$out" "restarted: sm1 (claude)" "the mate should be restarted on its pinned runtime"
-  assert_contains "$out" "summary: 1 of 1 restarted, 0 nudged, 0 unreached" "the summary should report the reload"
+  assert_contains "$out" "summary: 1 of 1 restarted, 0 queued, 0 nudged, 0 unreached" "the summary should report the reload"
   # The pane transcript orders the two phases: the instruction doorbell first,
   # the harness exit command only after it.
   doorbell_line=$(grep -n '^: Firstmate instruction waiting: ' "$dir/fake/literal" | head -1 | cut -d: -f1)
@@ -313,21 +349,23 @@ test_persist_precedes_restart() {
   pass "T2 the mate persists before anything is stopped"
 }
 
-# --- T2b: an answer delivered at a zero-second bound still releases the gate -
+# --- T2b: an answer delivered with the request restarts in the same pass -----
 test_arrived_answer_precedes_deadline_check() {
   local dir out rc
   dir=$(new_case arrived-at-bound)
   add_local_mate "$dir" sm1
   arm_answer "$dir" sm1
 
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
+  out=$(run_restart "$dir" sm1); rc=$?
 
-  expect_code 0 "$rc" "an answer delivered with the request must beat the deadline check"$'\n'"$out"
-  assert_contains "$out" "restarted: sm1" "the arrived persist answer was ignored at the deadline"
-  pass "T2b an arrived persist answer is resolved before timeout"
+  expect_code 0 "$rc" "an answer delivered with the request must restart at once"$'\n'"$out"
+  assert_contains "$out" "restarted: sm1" "the arrived persist answer was ignored"
+  assert_absent "$dir/home/state/.secondmate-restart-sm1.outcome" \
+    "an outcome the command reported itself was left for supervision to report again"
+  pass "T2b an arrived persist answer restarts the mate in the same pass"
 }
 
-# --- T2c: an answer arriving between resolution and timeout wins -------------
+# --- T2c: an answer arriving after the command's try is finished later -------
 test_answer_between_resolution_and_timeout_wins() {
   local dir out rc
   dir=$(new_case answer-at-timeout-decision)
@@ -356,12 +394,17 @@ esac
 SH
   chmod +x "$dir/fakebin/mv"
 
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
+  out=$(run_restart "$dir" sm1); rc=$?
 
-  expect_code 0 "$rc" "an answer already on disk at the timeout decision must release the gate"$'\n'"$out"
-  assert_contains "$out" "restarted: sm1" "the reply that raced the timeout was ignored"
-  assert_not_contains "$out" "nudged: sm1" "a confirmed mate must not take the timeout fallback"
-  pass "T2c a reply between the preliminary scan and timeout decision wins"
+  expect_code 0 "$rc" "an answer landing after the command's try must leave the restart queued"$'\n'"$out"
+  assert_contains "$out" "queued: sm1" "the late answer was neither restarted nor queued"
+  assert_not_contains "$out" "nudged: sm1" "a mate that confirmed late must not take a fallback"
+  out=$(process_requests "$dir") || fail "the supervision pass failed: $out"
+  assert_grep 'restarted: sm1' "$dir/home/state/.secondmate-restart-sm1.outcome" \
+    "supervision did not finish the restart once the late answer landed"
+  assert_absent "$dir/home/state/.secondmate-restart-sm1.request" "a finished restart left its request behind"
+  assert_line '/exit' "$dir/fake/literal" "the late-confirmed mate was never stopped"
+  pass "T2c a reply landing after the command's try is restarted by the next supervision pass"
 }
 
 # --- T3: a runtime that cannot prove a restart never gets one ----------------
@@ -400,7 +443,7 @@ test_unknown_mate_is_accounted_for() {
   assert_contains "$out" "restarted: sm1" "the known mate should still be restarted"
   assert_contains "$out" "ghost:" "the unknown mate must be accounted for by name"
   assert_contains "$out" "no durable record" "the unknown mate's reason must be concrete"
-  assert_contains "$out" "summary: 1 of 2 restarted, 0 nudged, 1 unreached" "the summary must count both mates"
+  assert_contains "$out" "summary: 1 of 2 restarted, 0 queued, 0 nudged, 1 unreached" "the summary must count both mates"
   pass "T4 every named mate is accounted for, including one this home does not know"
 }
 
@@ -424,7 +467,7 @@ test_refused_restart_falls_back_without_claiming_a_reload() {
   assert_not_contains "$out" "restarted: sm1" "a refused restart must not be reported as restarted"
   [ "$(cat "$dir/fake/command")" = "$before" ] \
     || fail "a refusal before the stop should leave the running agent exactly as it was"
-  assert_no_grep '^/exit$' "$dir/fake/literal" "a pre-stop refusal must not have stopped the agent"
+  assert_no_line '/exit' "$dir/fake/literal" "a pre-stop refusal must not have stopped the agent"
   pass "T5 a refused restart leaves the mate running and reports an unknown outcome"
 }
 
@@ -582,7 +625,7 @@ test_remote_fleet_restart_obeys_initiating_policy() {
   unset FM_FAKE_ANSWER_STATUS
 
   expect_code 3 "$rc" "fleet restart misreported a refused remote profile"$'\n'"$out"
-  assert_contains "$out" "summary: 0 of 1 restarted, 0 nudged, 1 unreached" "fleet restart claimed a refused replacement succeeded"
+  assert_contains "$out" "summary: 0 of 1 restarted, 0 queued, 0 nudged, 1 unreached" "fleet restart claimed a refused replacement succeeded"
   assert_contains "$out" "config/session-launch-policy" "fleet restart lost the initiating policy reason"
   assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
     "fleet restart transported a forbidden replacement"
@@ -725,11 +768,12 @@ printf 'done [corr=$corr]: unrelated request answered\n' >> "$state/sm1.status"
 SH
   chmod +x "$dir/fake/on-doorbell"
 
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
+  out=$(run_restart "$dir" sm1); rc=$?
 
-  expect_code 3 "$rc" "an unrelated concurrent answer must not release the persist gate"$'\n'"$out"
+  expect_code 0 "$rc" "an unrelated concurrent answer must leave the restart queued"$'\n'"$out"
+  assert_contains "$out" "queued: sm1" "an unrelated answer must not finish the queued restart"
   assert_not_contains "$out" "restarted: sm1" "the unrelated answer authorized a restart"
-  assert_no_grep '^/exit$' "$dir/fake/literal" "the unrelated answer stopped the mate"
+  assert_no_line '/exit' "$dir/fake/literal" "the unrelated answer stopped the mate"
   pass "T9 the persist gate retains its explicitly allocated correlation"
 }
 
@@ -741,14 +785,13 @@ test_persist_waits_are_polled_together() {
   add_local_mate "$dir" sm2
   arm_answer "$dir" sm2
 
-  out=$(FM_TEST_PERSIST_WAIT=3 run_restart "$dir" sm1 sm2); rc=$?
+  out=$(run_restart "$dir" sm1 sm2); rc=$?
 
-  expect_code 3 "$rc" "the unanswered mate should fall back after the confirmed mate restarts"$'\n'"$out"
-  exit_line=$(grep -n '^/exit$' "$dir/fake/literal" | head -1 | cut -d: -f1)
-  nudge_line=$(grep -n '^: Firstmate instruction waiting: ' "$dir/fake/literal" | tail -1 | cut -d: -f1)
-  [ -n "$exit_line" ] && [ -n "$nudge_line" ] && [ "$exit_line" -lt "$nudge_line" ] \
-    || fail "the first mate's timeout held the confirmed second mate behind it: $out"
-  pass "T10 pending persist answers are polled as one fleet"
+  expect_code 0 "$rc" "one unanswered mate must not hold the confirmed mate behind it"$'\n'"$out"
+  assert_contains "$out" "restarted: sm2" "the confirmed mate was held behind the unanswered one"
+  assert_contains "$out" "queued: sm1" "the unanswered mate was not left queued"
+  assert_contains "$out" "summary: 1 of 2 restarted, 1 queued, 0 nudged, 0 unreached" "both mates must be accounted for"
+  pass "T10 one unanswered mate never holds a confirmed mate behind it"
 }
 
 # --- T11: a failed post-stop relaunch is not described as a nudge ------------
@@ -765,7 +808,7 @@ test_post_stop_failure_is_reported_unreached() {
   assert_contains "$out" "unreached: sm1:" "a stopped mate must be reported as unreached"
   assert_contains "$out" "restart outcome is unknown" "the report must not attribute the failed lifecycle operation"
   assert_not_contains "$out" "nudged: sm1" "a durable enqueue must not masquerade as a running mate's nudge"
-  assert_contains "$out" "summary: 0 of 1 restarted, 0 nudged, 1 unreached" \
+  assert_contains "$out" "summary: 0 of 1 restarted, 0 queued, 0 nudged, 1 unreached" \
     "the summary must not claim that a stopped mate remains on older instructions with a message"
   pass "T11 post-stop restart failure is never misreported as a nudge"
 }
@@ -781,13 +824,13 @@ test_relaunches_do_not_block_persist_polling() {
   export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
   arm_answer "$dir" sm2
 
-  out=$(FM_TEST_PERSIST_WAIT=5 run_restart "$dir" sm1 sm2); rc=$?
+  out=$(run_restart "$dir" sm1 sm2); rc=$?
   unset FM_FAKE_ANSWER_STATUS
 
   expect_code 0 "$rc" "both confirmed mates should restart independently"$'\n'"$out"
   assert_present "$dir/fake/local-relaunch-before-remote-end" \
     "the slow first relaunch blocked lifecycle progress for the second mate"
-  assert_contains "$out" "summary: 2 of 2 restarted, 0 nudged, 0 unreached" \
+  assert_contains "$out" "summary: 2 of 2 restarted, 0 queued, 0 nudged, 0 unreached" \
     "parallel relaunches were not both accounted for"
   assert_grep 'fm-remote-secondmate-control.sh relaunch sm1 claude default default' "$dir/ssh.log" \
     "an absent remote model and effort pin were not expressed as explicit defaults"
@@ -831,7 +874,7 @@ test_unpublished_worker_result_is_accounted_for() {
   [ "$(cat "$rc_file")" = 3 ] || fail "an unpublished worker result did not fail as accounted"
   assert_contains "$(cat "$out")" "restart worker exited before publishing an outcome" \
     "the missing worker result was not reported"
-  assert_contains "$(cat "$out")" "summary: 0 of 1 restarted, 0 nudged, 1 unreached" \
+  assert_contains "$(cat "$out")" "summary: 0 of 1 restarted, 0 queued, 0 nudged, 1 unreached" \
     "the missing worker result was not included in the summary"
   pass "T13 a dead restart worker cannot hang the parent"
 }
@@ -901,7 +944,7 @@ test_already_current_mate_restarts_end_to_end() {
 
   expect_code 0 "$rc" "the mate named by the update pass did not restart"$'\n'"$out"
   assert_contains "$out" "restarted: sm1" "an already-current mate must actually be replaced"
-  assert_contains "$out" "summary: 1 of 1 restarted, 0 nudged, 0 unreached" \
+  assert_contains "$out" "summary: 1 of 1 restarted, 0 queued, 0 nudged, 0 unreached" \
     "the pass must report the reload it performed"
   # Persist strictly before replace, read off the pane transcript.
   doorbell_line=$(grep -n '^: Firstmate instruction waiting: ' "$dir/fake/literal" | head -1 | cut -d: -f1)
@@ -949,7 +992,7 @@ test_already_current_unprovable_mate_stays_on_the_nudge_path() {
   assert_not_contains "$out" "restarted: sm1" "an unprovable mate must never be reported as reloaded"
   [ "$(cat "$dir/fake/command")" = "$before" ] \
     || fail "the unprovable mate's agent was stopped anyway"
-  assert_no_grep '^/exit$' "$dir/fake/literal" "nothing may be stopped on the nudge path"
+  assert_no_line '/exit' "$dir/fake/literal" "nothing may be stopped on the nudge path"
   pass "T16 an already-current mate with an unprovable runtime keeps the honest nudge path"
 }
 
@@ -970,6 +1013,97 @@ test_teamclaude_restart_reaches_claude_through_the_proxy() {
     "$(grep -F 'Firstmate operational input waiting: read' "$dir/fake/literal" | tail -1)" \
     "secondmate restart"
   pass "T12 a TeamClaude home restarts its Claude mate through the TeamClaude proxy"
+}
+
+# --- T17: an answered mate still inside its turn is not stopped mid-turn -----
+# The answer is one event; the end of the turn that wrote it is the other. A
+# semantic busy record proves the turn is still running, so supervision keeps
+# the request until the record says the turn ended.
+test_answered_mate_mid_turn_waits_for_turn_end() {
+  local dir out rc state now
+  dir=$(new_case mid-turn)
+  add_local_mate "$dir" sm1
+  state="$dir/home/state"
+  printf 'g1\n' > "$state/sm1.busy-gen"
+  now=$(date +%s)
+  printf 'v1 gen=g1 seq=1 state=busy source=claude-hook event=prompt ts=%s\n' "$now" > "$state/sm1.busy-state"
+
+  out=$(run_restart "$dir" sm1); rc=$?
+  expect_code 0 "$rc" "a queued restart is not a failure"$'\n'"$out"
+  answer_now "$dir" sm1
+  out=$(process_requests "$dir") || fail "the supervision pass failed: $out"
+  assert_no_line '/exit' "$dir/fake/literal" "a mate was stopped while its busy record proved a running turn"
+  assert_present "$state/.secondmate-restart-sm1.request" "the request was dropped while the turn was still running"
+  grep -q '^answered_at=[0-9]' "$state/.secondmate-restart-sm1.request" \
+    || fail "the seen answer was not recorded on the request"
+
+  printf 'v1 gen=g1 seq=2 state=idle source=claude-hook event=stop ts=%s\n' "$now" > "$state/sm1.busy-state"
+  out=$(process_requests "$dir") || fail "the supervision pass failed: $out"
+  assert_line '/exit' "$dir/fake/literal" "the mate was not restarted after its turn ended"
+  assert_grep 'restarted: sm1' "$state/.secondmate-restart-sm1.outcome" "the finished restart left no outcome"
+  pass "T17 an answered mate is restarted only after the turn that answered ends"
+}
+
+# --- T18: a restart and the automatic relaunch never contend -----------------
+# Both hold the same per-mate lock: a liveness relaunch in progress defers the
+# restart, and a restart in progress holds the lock across its own stop and
+# relaunch, so the watcher's probe cannot read the gap as a dead endpoint.
+test_restart_and_auto_relaunch_share_one_lock() {
+  local dir out rc state holder i
+  dir=$(new_case shared-lock)
+  add_local_mate "$dir" sm1
+  arm_answer "$dir" sm1
+  state="$dir/home/state"
+
+  # A liveness relaunch in progress holds the lock.
+  FM_HOME="$dir/home" STATE="$state" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_try_acquire "$2/.secondmate-liveness-sm1.lock" || exit 1
+    : > "$2/.holder-ready"
+    exec sleep 30
+  ' _ "$ROOT" "$state" &
+  holder=$!
+  i=0
+  while [ ! -e "$state/.holder-ready" ] && [ "$i" -lt 500 ]; do /bin/sleep 0.01; i=$((i + 1)); done
+  [ -e "$state/.holder-ready" ] || { kill "$holder" 2>/dev/null; fail "the lock holder never started"; }
+
+  out=$(run_restart "$dir" sm1); rc=$?
+  expect_code 0 "$rc" "a deferred restart is queued, not failed"$'\n'"$out"
+  assert_contains "$out" "queued: sm1: supervision is probing or relaunching its endpoint" \
+    "a restart contended with a liveness relaunch in progress"
+  assert_no_line '/exit' "$dir/fake/literal" "the restart stopped a mate the liveness path was relaunching"
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+
+  # Once free, the restart holds the lock across its own stop.
+  cat > "$dir/fake/on-exit" <<SH
+#!/usr/bin/env bash
+if [ -d "$state/.secondmate-liveness-sm1.lock" ] || [ -L "$state/.secondmate-liveness-sm1.lock" ]; then
+  : > "$dir/fake/lock-held-at-exit"
+fi
+SH
+  chmod +x "$dir/fake/on-exit"
+  out=$(process_requests "$dir") || fail "the supervision pass failed: $out"
+  assert_grep 'restarted: sm1' "$state/.secondmate-restart-sm1.outcome" "the deferred restart was not finished"
+  assert_present "$dir/fake/lock-held-at-exit" "the restart stopped the mate without holding the shared lock"
+  [ ! -e "$state/.secondmate-liveness-sm1.lock" ] || fail "the restart left the shared lock held"
+  pass "T18 the restart and the automatic relaunch serialize on one per-mate lock"
+}
+
+# --- T19: a second pass reuses the recorded request instead of re-asking -----
+test_second_pass_reuses_the_recorded_request() {
+  local dir out rc first second
+  dir=$(new_case reuse)
+  add_local_mate "$dir" sm1
+  out=$(run_restart "$dir" sm1); rc=$?
+  expect_code 0 "$rc" "the first pass should queue"$'\n'"$out"
+  first=$(find "$dir/home/state/sm1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
+  out=$(run_restart "$dir" sm1); rc=$?
+  expect_code 0 "$rc" "the second pass should still be queued"$'\n'"$out"
+  assert_contains "$out" "queued: sm1" "the second pass did not report the recorded restart"
+  second=$(find "$dir/home/state/sm1.inbox" -maxdepth 1 -name '*.msg' | wc -l | tr -d ' ')
+  [ "$first" = "$second" ] || fail "a second pass sent another persist request ($first then $second messages)"
+  pass "T19 a repeated pass tries the recorded restart instead of asking the mate again"
 }
 
 test_persist_gates_and_asks_only_for_open_records
@@ -995,4 +1129,7 @@ test_already_current_mate_restarts_end_to_end
 test_already_current_unprovable_mate_stays_on_the_nudge_path
 test_teamclaude_restart_reaches_claude_through_the_proxy
 
+test_answered_mate_mid_turn_waits_for_turn_end
+test_restart_and_auto_relaunch_share_one_lock
+test_second_pass_reuses_the_recorded_request
 echo "# all fm-secondmate-restart tests passed"

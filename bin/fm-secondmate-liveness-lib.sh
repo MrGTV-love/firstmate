@@ -122,6 +122,23 @@ fm_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
     "$ledger" 2>/dev/null
 }
 
+# A recorded event-driven restart (bin/fm-secondmate-restart-lib.sh) for a mate
+# this relaunch just brought back has nothing left to do: the replacement agent
+# already started on the current instructions and launch-time wiring, and the
+# conversation the restart was waiting to persist ended with the old agent.
+# Retire it with that outcome rather than leave it waiting for an answer the
+# dead agent can never give. Called with the per-mate lock held, so no restart
+# can be servicing the same request.
+fm_sm_live_finish_restart_request() {  # <id>
+  [ -f "$STATE/.secondmate-restart-$1.request" ] || return 0
+  if ! command -v fm_secondmate_restart_request_finish >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-secondmate-restart-lib.sh
+    . "$FM_SM_LIVE_LIB_DIR/fm-secondmate-restart-lib.sh" || return 0
+  fi
+  fm_secondmate_restart_request_finish "$STATE" "$1" \
+    "restarted: $1 (its endpoint had stopped, so the automatic relaunch brought it up on the current instructions)" || true
+}
+
 # fm_secondmate_liveness_probe <meta> <id> <full|poll>
 #
 # Read-only probe of one registered secondmate's recorded endpoint. Populates:
@@ -344,6 +361,7 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   FM_SM_LIVE_RC=$rc
   if [ "$rc" -eq 0 ]; then
     fm_secondmate_liveness_ledger_add "$id" relaunched || true
+    fm_sm_live_finish_restart_request "$id"
   else
     fm_secondmate_liveness_ledger_add "$id" failed || true
   fi

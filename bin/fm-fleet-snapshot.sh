@@ -629,7 +629,7 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
 
 prefetch_task_observations() {  # <meta> <id>
   local meta=$1 id=$2 remote_host current_file endpoint_file current_pid='' current_rc=0
-  local status_log status_capture report_path report_capture
+  local status_log status_capture status_ident report_path report_capture
   local kind backend target endpoint_exists=null agent_alive=not_checked generation_current=1
   remote_host=$(meta_value "$meta" remote_host)
   current_file="$SNAPSHOT_TASK_DIR/$id.json"
@@ -641,7 +641,9 @@ prefetch_task_observations() {  # <meta> <id>
 
   snapshot_task_generation_is_current "$meta" "$id" || generation_current=0
   if [ "$generation_current" = 1 ]; then
+    status_ident=$(_fm_open_decisions_file_ident "$status_log" 2>/dev/null) || status_ident=''
     snapshot_capture_optional "$status_log" "$status_capture" || current_rc=1
+    status_open_decisions_checkpoint_carry "$status_log" "$status_capture" "$status_ident"
     snapshot_mark_optional_present "$report_path" "$report_capture" || current_rc=1
   fi
 

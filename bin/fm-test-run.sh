@@ -1562,6 +1562,17 @@ families_for_changed_path() {
       # a real Pi TUI can answer, so the live guards are selected too.
       printf '%s\n' live-harness-optin
       ;;
+    .pi/extensions/lib/fm-watch-lifecycle.ts)
+      # The primary watcher extensions' shared lifecycle record and instance
+      # registry: the suites that load either watcher extension, plus the Pi
+      # typecheck and the live guards that load the real harness.
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' __script__:fm-watch-recovery-loop.test.sh
+      printf '%s\n' __script__:fm-calm-pi-extension.test.sh
+      printf '%s\n' __script__:fm-pi-primary-types.test.sh
+      printf '%s\n' live-harness-optin
+      ;;
     .pi/extensions/lib/fm-operational-input.ts)
       # The same rule for the operational-input library, whose reach is wider:
       # every Pi extension that classifies or encodes operational text.

@@ -451,7 +451,8 @@ install_omp_extension_fixture() {  # <repo>
   local repo=$1
   mkdir -p "$repo/.omp/extensions" "$repo/.pi/extensions/lib" "$repo/bin" "$repo/node_modules/typebox"
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
-  cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" "$repo/.pi/extensions/lib/"
+  cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" \
+    "$ROOT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$repo/.pi/extensions/lib/"
   cp "$ROOT/bin/fm-operational-input.sh" "$repo/bin/"
   chmod +x "$repo/bin/fm-operational-input.sh"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
@@ -1271,6 +1272,156 @@ EOF
   pass ".omp turn-end guard: the loaded marker follows the lock owner at turn boundaries instead of only at load"
 }
 
+# A watch-arm stub that records every arm it starts and then stays up as a
+# healthy cycle, so the number of arms is the number of rows in the arm log.
+install_counting_arm() {  # <repo>
+  cat > "$1/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+exec sleep 30
+SH
+  chmod +x "$1/bin/fm-watch-arm.sh"
+}
+
+# A session generation stopped with no successor session_start is not a dead
+# end: after the successor grace the extension binds a fresh generation and
+# arms exactly once; a real session_start inside the grace arms nothing twice;
+# and an arm call on a stopped generation heals at once instead of refusing.
+# Every transition, and the expired bound, is in the lifecycle record.
+test_watch_extension_heals_a_generation_stopped_without_a_successor() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-heal/repo"; home="$TMP_ROOT/watch-heal/home"
+  install_omp_extension_fixture "$repo"
+  install_counting_arm "$repo"
+  mkdir -p "$home/state"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null;
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage() { return undefined; },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const lifecycle = () => readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, {});
+for (let i = 0; i < 50 && arms() < 1; i += 1) await sleep(50);
+if (arms() !== 1) throw new Error(`startup should arm once, saw ${arms()}`);
+
+// 1. Shutdown with no successor: one self-heal arm after the grace, no more.
+await handlers.get("session_shutdown")({}, {});
+await sleep(150);
+if (arms() !== 1) throw new Error(`a heal fired before the successor grace: ${arms()} arms`);
+for (let i = 0; i < 60 && arms() < 2; i += 1) await sleep(50);
+if (arms() !== 2) throw new Error(`a stopped generation with no successor was not healed: ${arms()} arms`);
+await sleep(900);
+if (arms() !== 2) throw new Error(`the self-heal armed more than once: ${arms()} arms`);
+const healed = await tool.execute();
+if (!/^watcher: unchanged/.test(healed.content[0].text)) throw new Error(`the healed generation does not own its arm: ${healed.content[0].text}`);
+const record = lifecycle();
+for (const needle of ["event=session_shutdown", "event=generation-stop", "event=bound-expired", "waiter=omp-watch-extension", "waited-on=session_start", "bound=400ms", "outcome=self-heal", "event=generation-create", "cause=self-heal", "event=self-heal"]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+
+// 2. Shutdown then a real session_start inside the grace: one arm, no heal.
+await handlers.get("session_shutdown")({}, {});
+await handlers.get("session_start")({ type: "session_start" }, {});
+for (let i = 0; i < 60 && arms() < 3; i += 1) await sleep(50);
+await sleep(900);
+if (arms() !== 3) throw new Error(`a successor session_start must arm exactly once with no heal: ${arms()} arms`);
+if ((lifecycle().match(/event=self-heal /g) ?? []).length + (lifecycle().match(/event=self-heal$/gm) ?? []).length !== 1) {
+  throw new Error(`a heal fired despite a successor session_start:\n${lifecycle()}`);
+}
+
+// 3. An arm call on a stopped generation heals at once instead of refusing.
+await handlers.get("session_shutdown")({}, {});
+const armed = await tool.execute();
+if (/shutting down/.test(armed.content[0].text)) throw new Error(`an arm call on a stopped generation was refused: ${armed.content[0].text}`);
+if (!/^watcher: started/.test(armed.content[0].text)) throw new Error(`an arm call did not heal and arm: ${armed.content[0].text}`);
+await sleep(900);
+if (arms() !== 4) throw new Error(`the arm-call heal and the timed heal both armed: ${arms()} arms`);
+if (!lifecycle().includes("cause=arm-call")) throw new Error(`the arm-call heal is not recorded:\n${lifecycle()}`);
+await handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension self-heal: $out"
+  [ -z "$out" ] || fail "omp watch extension self-heal test printed output: $out"
+  pass ".omp watch extension: a generation stopped without a successor heals once; a real successor or arm call never double-arms"
+}
+
+# Loading the extension twice in one process (auto-discovery plus -e) leaves
+# exactly one live generation and one arm: the earlier instance retires, its
+# events are ignored, and its arm tool forwards to the current instance.
+test_watch_extension_is_single_instance_per_home() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-single/repo"; home="$TMP_ROOT/watch-single/home"
+  install_omp_extension_fixture "$repo"
+  install_counting_arm "$repo"
+  mkdir -p "$home/state"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const makePi = () => {
+  const handlers = new Map(); const box = { tool: null };
+  return { handlers, box, pi: {
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { box.tool = t; },
+    sendUserMessage() { return undefined; },
+  } };
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const mod = await import(pathToFileURL(process.env.EXT).href);
+const first = makePi(); mod.default(first.pi);
+const second = makePi(); mod.default(second.pi);
+// Both instances see the same session events, as a double load would.
+await first.handlers.get("session_start")({ type: "session_start" }, {});
+await second.handlers.get("session_start")({ type: "session_start" }, {});
+for (let i = 0; i < 50 && arms() < 1; i += 1) await sleep(50);
+await sleep(600);
+if (arms() !== 1) throw new Error(`a double load armed ${arms()} cycles`);
+const viaFirst = await first.box.tool.execute();
+if (!/^watcher: unchanged/.test(viaFirst.content[0].text)) throw new Error(`the tool of the superseded instance did not reach the live owner: ${viaFirst.content[0].text}`);
+const viaSecond = await second.box.tool.execute();
+if (!/^watcher: unchanged/.test(viaSecond.content[0].text)) throw new Error(`the current instance lost its arm: ${viaSecond.content[0].text}`);
+// A shutdown seen by the superseded instance is ignored: the live cycle keeps running.
+await first.handlers.get("session_shutdown")({}, {});
+await sleep(900);
+if (arms() !== 1) throw new Error(`the superseded instance changed the live cycle: ${arms()} arms`);
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+for (const needle of ["event=factory-bind", "superseded=1", "event=instance-retired", "event=session_start-ignored", "event=arm-forwarded", "event=session_shutdown-ignored"]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+await second.handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension single instance: $out"
+  [ -z "$out" ] || fail "omp watch extension single-instance test printed output: $out"
+  pass ".omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool"
+}
+
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
@@ -1288,3 +1439,5 @@ test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
 test_primary_extensions_ignore_a_descendant_session
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
+test_watch_extension_heals_a_generation_stopped_without_a_successor
+test_watch_extension_is_single_instance_per_home
