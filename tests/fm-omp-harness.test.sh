@@ -505,6 +505,9 @@ install_omp_extension_fixture() {  # <repo>
   chmod +x "$repo/bin/fm-operational-input.sh"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
   printf 'export const Type = { Object(p) { return { type: "object", properties: p }; } };\n' > "$repo/node_modules/typebox/index.js"
+  mkdir -p "$repo/node_modules/@oh-my-pi/pi-coding-agent"
+  printf '{"type":"module","exports":{"./registry/agent-registry":"./registry.js"}}\n' > "$repo/node_modules/@oh-my-pi/pi-coding-agent/package.json"
+  printf 'export class AgentRegistry { static global() { return { list() { return []; } }; } }\n' > "$repo/node_modules/@oh-my-pi/pi-coding-agent/registry.js"
 }
 
 test_turnend_guard_extension_compels_one_continuation() {
@@ -877,7 +880,7 @@ let file = task;
 const ctx = { agent: { kind: "main", id: "Main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
 let transitionSettled = Promise.resolve();
 globalThis.proofSession = { sessionManager: ctx.sessionManager, waitForSessionTransition() { globalThis.proofWaitStarted?.(); return transitionSettled; } };
-globalThis.proofRefs = [{ session: null }, { session: { sessionManager: {} } }, { session: globalThis.proofSession }];
+globalThis.proofRefs = [{ kind: "sub", session: null }, { kind: "sub", session: { sessionManager: {} } }, { kind: "main", session: globalThis.proofSession }];
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const start = (context = ctx) => handlers.get("session_start")({}, context);
 const stop = () => handlers.get("session_shutdown")({}, ctx);
@@ -903,11 +906,24 @@ writeFileSync(task, "{}\n");
 start();
 assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: realpathSync(task), current_session_file: realpathSync(task) });
 const parentProof = record();
+const events = ["session_start", "session_switch", "session_branch", "session_before_switch", "session_before_branch", "session_shutdown"];
 for (const childFile of [personal, undefined]) {
-  const childCtx = { agent: { kind: "sub" }, sessionManager: { getSessionFile() { return childFile; } }, ui: ctx.ui };
-  for (const event of ["session_start", "session_switch", "session_branch", "session_before_switch", "session_before_branch", "session_shutdown"]) {
-    handlers.get(event)({}, childCtx);
-    assert.deepEqual(record(), parentProof, `${event} from ${childFile ? "persisted" : "in-memory"} child must preserve parent proof`);
+  const manager = { getSessionFile() { return childFile; } };
+  const childSession = { sessionManager: manager, waitForSessionTransition() { throw new Error("child transition must not be awaited"); } };
+  for (const kind of ["sub", "advisor"]) {
+    const ref = { kind, session: childSession };
+    globalThis.proofRefs.push(ref);
+    for (const childCtx of [{ agent: { kind }, sessionManager: manager, ui: ctx.ui }, { sessionManager: manager, ui: ctx.ui }]) {
+      for (const event of events) {
+        handlers.get(event)({}, childCtx);
+        assert.deepEqual(record(), parentProof, `${event} from ${childFile ? "persisted" : "in-memory"} ${kind} must preserve parent proof`);
+      }
+    }
+    globalThis.proofRefs.pop();
+  }
+  for (const event of events) {
+    handlers.get(event)({}, { agent: { kind: "main" }, sessionManager: manager, ui: ctx.ui });
+    assert.deepEqual(record(), parentProof, `${event} from an unregistered manager must preserve parent proof`);
   }
 }
 for (const context of [ctx, { sessionManager: ctx.sessionManager, ui: ctx.ui }]) {
@@ -976,17 +992,28 @@ const originalWarn = console.warn; console.warn = () => {};
 try {
   await flush();
   const registered = globalThis.proofRefs;
-  for (const event of ["session_before_switch", "session_before_branch"]) {
-    for (const refs of [registered.slice(0, 2), [...registered, { session: globalThis.proofSession }]]) {
+  for (const event of events) {
+    for (const refs of [registered.slice(0, 2), [...registered, { kind: "main", session: globalThis.proofSession }]]) {
       start();
+      const prior = record();
       globalThis.proofRefs = refs;
       const count = warnings.length;
       handlers.get(event)({}, { sessionManager: ctx.sessionManager, ui: ctx.ui });
       await flush();
-      assert.equal(record().current_session_file, "", `${event} must not restore without a unique owner`);
-      assert.equal(warnings.length, count + 1);
+      assert.deepEqual(record(), prior, `${event} without a unique registered owner must preserve parent proof`);
+      assert.equal(warnings.length, count);
       globalThis.proofRefs = registered;
     }
+  }
+  for (const event of ["session_before_switch", "session_before_branch"]) {
+    start();
+    const transition = begin(event, { sessionManager: ctx.sessionManager, ui: ctx.ui });
+    await transition.waiting;
+    globalThis.proofRefs = registered.slice(0, 2);
+    transition.settle();
+    await flush();
+    assert.equal(record().current_session_file, "", `${event} must not restore after its owner is unregistered`);
+    globalThis.proofRefs = registered;
   }
   start();
   beforeSwitch();
@@ -1040,6 +1067,7 @@ try {
       installTaskSessionProof(pi, state, "demo");
       let file = process.env.FM_REPLACEMENT_FILE;
       const ctx = { sessionManager: { getSessionFile() { return file; } } };
+      globalThis.proofRefs = [{ kind: "main", session: { sessionManager: ctx.sessionManager, waitForSessionTransition() { return Promise.resolve(); } } }];
       const start = () => handlers.get("session_start")({}, ctx);
       const record = () => JSON.parse(readFileSync(state + "/demo.omp-session.json", "utf8"));
       const canonical = ${JSON.stringify(canonicalReplacement)};
