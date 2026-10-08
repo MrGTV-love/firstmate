@@ -75,7 +75,7 @@ case "${1:-}" in
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
         /exit|/quit)
-          [ ! -x "$D/on-exit" ] || "$D/on-exit"
+          [ ! -x "$D/on-exit" ] || "$D/on-exit" "$target"
           if [ ! -e "$D/remote-relaunch-end" ]; then
             : > "$D/local-relaunch-before-remote-end"
           fi
@@ -1617,6 +1617,128 @@ SH
   pass "completion replay uses stable per-outcome identity and excludes acknowledgement during retirement"
 }
 
+test_cancellation_reaps_lifecycle_tree_before_unlocking() {
+  local dir state mode signal mates id pid rc attempt process_state descendant monitor_was_on=0
+  local -a args=()
+  case $- in *m*) monitor_was_on=1 ;; esac
+  for mode in new recorded process fleet; do
+    for signal in INT TERM; do
+      dir=$(new_case "cancel-$mode-$signal")
+      add_local_mate "$dir" sm1
+      state="$dir/home/state"
+      mates="sm1"
+      if [ "$mode" = fleet ]; then
+        add_local_mate "$dir" sm2
+        mates="sm1 sm2"
+      fi
+      if [ "$mode" != new ]; then
+        run_restart "$dir" $mates > "$dir/queued.out" || fail "could not queue cancellation fixture"
+        for id in $mates; do answer_now "$dir" "$id"; done
+      else
+        arm_answer "$dir" sm1
+      fi
+      cat > "$dir/fake/on-exit" <<'SH'
+#!/usr/bin/env bash
+set -u
+id=${1##*fm-}
+trap '' INT TERM
+printf '%s\n' "$$" > "$FM_FAKE_DIR/lifecycle-pid.$id"
+printf 'zsh' > "$FM_FAKE_DIR/command.$1"
+set -m
+bash -c '
+  trap "" INT TERM
+  printf "%s\n" "$$" > "$FM_FAKE_DIR/descendant-pid.$1"
+  while [ ! -e "$FM_FAKE_DIR/release.$1" ]; do /bin/sleep 0.01; done
+  : > "$FM_FAKE_DIR/escaped.$1"
+' _ "$id" &
+wait "$!"
+SH
+      chmod +x "$dir/fake/on-exit"
+      cat > "$dir/fakebin/rm" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  case "$arg" in
+    "$FM_HOME/state"/.secondmate-liveness-*.lock)
+      for record in "$FM_FAKE_DIR"/lifecycle-pid.* "$FM_FAKE_DIR"/descendant-pid.*; do
+        [ -f "$record" ] || continue
+        state=$(ps -p "$(cat "$record")" -o stat= 2>/dev/null || true)
+        case "$state" in ''|Z*) ;; *) : > "$FM_FAKE_DIR/unsafe-unlock" ;; esac
+      done
+      ;;
+  esac
+done
+exec /bin/rm "$@"
+SH
+      chmod +x "$dir/fakebin/rm"
+      args=($mates)
+      [ "$mode" != process ] || args=(--process-requests)
+      set -m
+      env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+        FM_ROOT_OVERRIDE="$dir/code" FM_CONFIG_OVERRIDE="$dir/home/config" \
+        FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
+        FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
+        "$RESTART" "${args[@]}" \
+        > "$dir/restart.out" 2>&1 &
+      pid=$!
+      [ "$monitor_was_on" -eq 1 ] || set +m
+      for id in $mates; do
+        attempt=0
+        while [ ! -s "$dir/fake/descendant-pid.$id" ] && [ "$attempt" -lt 500 ]; do
+          /bin/sleep 0.01
+          attempt=$((attempt + 1))
+        done
+        [ -s "$dir/fake/descendant-pid.$id" ] || {
+          kill -TERM "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+          fail "$mode $signal never reached the in-flight lifecycle: $(cat "$dir/restart.out")"
+        }
+        env FM_HOME="$dir/home" STATE="$state" bash -c '
+          . "$1/bin/fm-secondmate-liveness-lib.sh"
+          if fm_secondmate_liveness_lock "$2"; then
+            fm_secondmate_liveness_unlock "$2"
+            exit 1
+          fi
+        ' _ "$ROOT" "$id" || fail "automatic relaunch could acquire an in-flight restart lock"
+      done
+      kill "-$signal" "$pid" || fail "could not cancel restart with $signal"
+      attempt=0
+      while kill -0 "$pid" 2>/dev/null && [ "$attempt" -lt 500 ]; do
+        /bin/sleep 0.01
+        attempt=$((attempt + 1))
+      done
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+        fail "$mode restart did not exit after $signal"
+      fi
+      wait "$pid"; rc=$?
+      case "$signal" in
+        INT) expect_code 130 "$rc" "SIGINT did not report cancellation" ;;
+        TERM) expect_code 143 "$rc" "SIGTERM did not report cancellation" ;;
+      esac
+      assert_absent "$dir/fake/unsafe-unlock" "cancellation unlocked while lifecycle descendants were still alive"
+      for id in $mates; do
+        for descendant in "$dir/fake/lifecycle-pid.$id" "$dir/fake/descendant-pid.$id"; do
+          descendant=$(cat "$descendant")
+          process_state=$(ps -p "$descendant" -o stat= 2>/dev/null || true)
+          case "$process_state" in
+            ''|Z*) ;;
+            *) kill -KILL "$descendant" 2>/dev/null || true; fail "$mode $signal left lifecycle descendant $descendant alive" ;;
+          esac
+        done
+        : > "$dir/fake/release.$id"
+        assert_absent "$dir/fake/escaped.$id" "a cancelled descendant resumed lifecycle work"
+        assert_absent "$state/.secondmate-liveness-$id.lock" "cancellation left the lifecycle lock held"
+        env FM_HOME="$dir/home" STATE="$state" bash -c '
+          . "$1/bin/fm-secondmate-liveness-lib.sh"
+          fm_secondmate_liveness_lock "$2" || exit 1
+          fm_secondmate_liveness_unlock "$2"
+        ' _ "$ROOT" "$id" || fail "automatic relaunch could not acquire the lock after cancellation"
+      done
+    done
+  done
+  pass "SIGINT and SIGTERM reap fresh, recorded, supervised, and fleet restart descendants before unlock"
+}
+
 test_persist_gates_and_asks_only_for_open_records
 test_persist_precedes_restart
 test_arrived_answer_precedes_deadline_check
@@ -1652,4 +1774,5 @@ test_concurrent_admission_creates_one_request
 test_watcher_propagates_failed_request_worker
 test_cli_owns_completion_from_admission_through_service
 test_completion_notification_replays_one_identity_under_queue_lock
+test_cancellation_reaps_lifecycle_tree_before_unlocking
 echo "# all fm-secondmate-restart tests passed"

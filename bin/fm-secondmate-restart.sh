@@ -118,6 +118,53 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 PERSIST_POLL=${FM_SECONDMATE_PERSIST_POLL:-5}
 case "$PERSIST_POLL" in ''|*[!0-9]*|0) echo "error: FM_SECONDMATE_PERSIST_POLL must be a positive integer: $PERSIST_POLL" >&2; exit 2 ;; esac
 
+IDS=()
+RESULT_DIR=
+
+stop_restart_tree() {
+  local pid=$1 children child
+  kill -STOP "$pid" 2>/dev/null || return 0
+  children=$(ps -axo pid=,ppid= | awk -v parent="$pid" '$2 == parent { print $1 }')
+  for child in $children; do
+    stop_restart_tree "$child"
+  done
+  STOPPED_RESTART_PIDS+=("$pid")
+}
+
+reap_restart_children() {
+  local owner children pid state
+  local -a STOPPED_RESTART_PIDS=()
+  fm_sm_live_require_locks || return 1
+  fm_current_pid owner || return 1
+  children=$(ps -axo pid=,ppid= | awk -v parent="$owner" '$2 == parent { print $1 }')
+  for pid in $children; do
+    stop_restart_tree "$pid"
+  done
+  for pid in "${STOPPED_RESTART_PIDS[@]}"; do
+    kill -KILL "$pid" 2>/dev/null || true
+    while :; do
+      state=$(ps -p "$pid" -o stat= 2>/dev/null) || break
+      case "$state" in ''|Z*) break ;; esac
+      sleep 0.01
+    done
+    wait "$pid" 2>/dev/null || true
+  done
+}
+
+cleanup_restart() {
+  trap '' INT TERM HUP
+  reap_restart_children
+  for id in "${IDS[@]}"; do
+    fm_secondmate_liveness_unlock "$id"
+  done
+  [ -z "$RESULT_DIR" ] || rm -rf -- "$RESULT_DIR"
+}
+
+trap cleanup_restart EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
 # Supervision half: try every recorded request once and leave each finished
 # outcome for the watcher to surface. Completion errors remain visible.
 if [ "$PROCESS_REQUESTS" -eq 1 ]; then
@@ -127,13 +174,21 @@ if [ "$PROCESS_REQUESTS" -eq 1 ]; then
     id=${request##*/.secondmate-restart-}
     id=${id%.request}
     case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
-    fm_secondmate_restart_service "$STATE" "$id" >/dev/null
+    IDS=("$id")
+    fm_secondmate_liveness_lock "$id" || continue
+    (
+      trap 'trap "" INT TERM HUP; reap_restart_children' EXIT
+      trap 'exit 143' TERM
+      trap 'exit 129' HUP
+      fm_secondmate_restart_service_locked "$STATE" "$id" >/dev/null
+    ) &
+    wait "$!"
     [ "$?" -ne 3 ] || process_rc=3
+    fm_secondmate_liveness_unlock "$id"
   done
   exit "$process_rc"
 fi
 
-IDS=()
 for arg in "$@"; do
   case "$arg" in
     -*) echo "error: unexpected argument '$arg'" >&2; usage >&2; exit 2 ;;
@@ -212,7 +267,13 @@ launch_restart() {  # <array-index>
   local i=$1 result tmp
   result="$RESULT_DIR/$i.result"
   tmp="$result.tmp"
-  ( trap - EXIT; service_mate "$i" > "$tmp"; mv -f "$tmp" "$result" ) &
+  (
+    trap 'trap "" INT TERM HUP; reap_restart_children' EXIT
+    trap 'exit 143' TERM
+    trap 'exit 129' HUP
+    service_mate "$i" > "$tmp"
+    mv -f "$tmp" "$result"
+  ) &
   RESTART_PID[i]=$!
   RESTART_RESULT[i]=$result
   PLAN[i]=restarting
@@ -266,7 +327,6 @@ RESULT_DIR=$(mktemp -d "$STATE/.secondmate-restart.XXXXXX") || {
   echo "error: could not create restart result directory under $STATE" >&2
   exit 1
 }
-trap 'for id in "${IDS[@]}"; do fm_secondmate_liveness_unlock "$id"; done; rm -rf -- "$RESULT_DIR"' EXIT
 restart_active_count=0
 sorted_ids=$(printf '%s\n' "${IDS[@]}" | LC_ALL=C sort)
 IDS=()

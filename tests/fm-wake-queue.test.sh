@@ -3764,7 +3764,16 @@ test_secondmate_restart_tick_surfaces_a_finished_restart_once() {
   local dir state pid out
   dir=$(make_secondmate_liveness_case restart-outcome)
   state="$dir/state"
-  printf 'restarted: sm1 (claude)\n' > "$state/.secondmate-restart-sm1.outcome"
+  env FM_HOME="$dir" FM_STATE_OVERRIDE="$state" STATE="$state" bash -c '
+    . "$1/bin/fm-secondmate-restart-lib.sh"
+    . "$1/bin/fm-secondmate-liveness-lib.sh"
+    fm_secondmate_liveness_lock sm1 || exit 1
+    fm_secondmate_restart_request_write "$STATE" sm1 0123456789abcdef local "" claude "" "" \
+      && fm_secondmate_restart_request_finish "$STATE" sm1 "restarted: sm1 (claude)"
+    rc=$?
+    fm_secondmate_liveness_unlock sm1
+    exit "$rc"
+  ' _ "$ROOT" || fail "could not finish the recorded restart fixture"
 
   run_liveness_leg "$dir" outcome FM_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "the watcher did not exit on the restart outcome wake"
