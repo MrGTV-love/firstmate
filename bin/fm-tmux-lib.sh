@@ -12,9 +12,6 @@
 # Styled captures remain internal; fm-peek and every human-facing capture stay
 # plain.
 #
-# The queued-Enter policy itself lives in fm_composer_queued_enter_verdict
-# (bin/fm-composer-lib.sh); this file supplies tmux's pane-busy primitive.
-#
 # FM_COMPOSER_IDLE_RE is interpreted by the shared classifier with its structural
 # and styling safety gates.
 # FM_BUSY_REGEX overrides the rendered delivery-busy matching used here.
@@ -84,6 +81,43 @@ fm_tmux_composer_cursor_row() {  # <target>
 fm_tmux_composer_caps() {
   printf 'styled=1\ncursor=1\nidentity=1\nrows=0\n'
 }
+# fm_backend_tmux_foreground_comms: the kernel-side names of every process in
+# <target>'s pane tty foreground process group, one full value per line.
+# Empty on any failure.
+#
+# This is the foreground-process-group half of the liveness probe, and it exists
+# because `#{pane_current_command}` and `ps -o comm=` expose different name
+# fields whose roles vary by platform. On macOS the tmux field can carry a
+# harness-rewritten title (Claude Code 2.1.220 reports `2.1.220`) while `comm`
+# retains executable identity; the portable Linux regression observes the
+# reverse for its version-named executable. Reading both `comm` and argv[0]
+# preserves an identifying install path without making either platform's field
+# assignment load-bearing.
+#
+# Scoping to the foreground process group rather than to the pane's descendants
+# is what keeps the probe honest in the other direction: a harness-named process
+# left running in the background of an otherwise idle pane is deliberately NOT
+# reported, so a genuinely agent-free pane still classifies `dead`. It also
+# reports every member of a multi-process launcher (the Pi Launcher path runs a
+# `pi-signed` wrapper and a `pi` engine in one group), so no launcher needs its
+# own special case here.
+#
+# Like fm_backend_tmux_current_command this is a RAW pane read: tmux answers an
+# absent target from the client's active window rather than failing, so callers
+# must confirm exact window membership first, exactly as the classifier below
+# does, or they will describe some other pane entirely.
+fm_backend_tmux_foreground_comms() {  # <target>
+  local target=$1 tty pid pgid tpgid comm
+  tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || return 0
+  [ -n "$tty" ] || return 0
+  LC_ALL=C ps -t "${tty#/dev/}" -o pid=,pgid=,tpgid=,comm= 2>/dev/null \
+    | while read -r pid pgid tpgid comm; do
+        [ -n "$comm" ] || continue
+        [ "$pgid" = "$tpgid" ] || continue
+        printf '%s\n' "$comm"
+      done
+}
+
 
 # fm_tmux_composer_identity: the tmux agent-identity probe backing the
 # separated (pi) composer shape, tmux's analogue of herdr's native
@@ -215,13 +249,33 @@ fm_pane_is_busy() {  # <target> [harness]
   [ "$(fm_pane_busy_state "$1" "${2:-}")" = busy ]
 }
 
+fm_tmux_submit_harness() {
+  local target=$1 harness comm
+  harness=$(tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null) || harness=
+  harness=${harness##*/}
+  if [ "$harness" != omp ]; then
+    while IFS= read -r comm; do
+      if [ "${comm##*/}" = omp ]; then
+        harness=omp
+        break
+      fi
+    done <<EOF
+$(fm_backend_tmux_foreground_comms "$target")
+EOF
+  fi
+  printf '%s' "$harness"
+}
+
 # fm_tmux_submit_core: type <text> into <target> ONCE, then submit with Enter,
 # verifying the composer cleared. Retries Enter ONLY — never retypes, because a
 # swallowed Enter leaves our text in the composer and retyping would duplicate
 # it. Echoes the final proof-carrying verdict on stdout so callers can require
 # exact `empty` before treating submission as confirmed.
-fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle]
-  local target=$1 retries=$2 sleep_s=$3 baseline_idle=${4:-} i=0 j state busy_state harness
+fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle] [foreground-command]
+  local target=$1 retries=$2 sleep_s=$3 baseline_idle=${4:-} harness=${5-} i=0 j state
+  if [ "$#" -lt 5 ]; then
+    harness=$(fm_tmux_submit_harness "$target")
+  fi
   tmux send-keys -t "$target" Enter 2>/dev/null || true
   sleep "$sleep_s"
   state=$(fm_tmux_composer_state "$target")
@@ -229,22 +283,20 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     case "$state" in
       pending|pending-unproven) ;;
       unknown)
+        if [ "$harness" = omp ]; then
+          printf 'pending'
+          return 0
+        fi
         if [ "$baseline_idle" = 1 ]; then
-          harness=$(tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null) || harness=
-          harness=${harness##*/}
-          case "$harness" in
-            claude|devin|codex|opencode|pi|pi-signed|grok|agy|kimi|cursor)
-              j=0
-              while [ "$j" -lt "$retries" ]; do
-                if fm_pane_is_busy "$target" "$harness"; then
-                  printf 'empty'
-                  return 0
-                fi
-                j=$((j + 1))
-                [ "$j" -ge "$retries" ] || sleep "$sleep_s"
-              done
-              ;;
-          esac
+          j=0
+          while [ "$j" -lt "$retries" ]; do
+            if fm_pane_is_busy "$target"; then
+              printf 'empty'
+              return 0
+            fi
+            j=$((j + 1))
+            [ "$j" -ge "$retries" ] || sleep "$sleep_s"
+          done
         fi
         printf 'unknown'
         return 0
@@ -253,36 +305,36 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     esac
     i=$((i + 1))
     [ "$i" -lt "$retries" ] || break
+    if [ "$harness" = omp ]; then
+      sleep "$sleep_s"
+      state=$(fm_tmux_composer_state "$target")
+      case "$state" in
+        pending|pending-unproven) ;;
+        unknown) printf 'pending'; return 0 ;;
+        *) printf '%s' "$state"; return 0 ;;
+      esac
+    fi
+    tmux send-keys -t "$target" Enter 2>/dev/null || true
     sleep "$sleep_s"
     state=$(fm_tmux_composer_state "$target")
-    case "$state" in
-      pending|pending-unproven)
-        tmux send-keys -t "$target" Enter 2>/dev/null || true
-        sleep "$sleep_s"
-        state=$(fm_tmux_composer_state "$target")
-        ;;
-      *) continue ;;
-    esac
   done
-  if [ "$state" != pending ]; then
+  if [ "$state" = pending ] && [ "$harness" != omp ] && fm_pane_is_busy "$target"; then
+    printf 'empty'
+  else
     printf '%s' "$state"
-    return 0
   fi
-  # Retries exhausted, composer still shows proven pending.
-  # Busy conversion is owned by fm_composer_queued_enter_verdict.
-  busy_state=idle
-  fm_pane_is_busy "$target" && busy_state=busy
-  harness=$(tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null) || harness=
-  fm_composer_queued_enter_verdict "$state" "$busy_state" "${harness##*/}"
 }
 
 fm_tmux_submit_core() {  # <target> <text> <retries> <enter-sleep> <settle>
-  local target=$1 text=$2 retries=$3 sleep_s=$4 settle=$5 baseline_idle='' baseline_state err
+  local target=$1 text=$2 retries=$3 sleep_s=$4 settle=$5 baseline_idle='' baseline_state err harness
   # The turn-started baseline must predate our own typing: a pane already
   # busy before the text lands can turn "busy" for reasons unrelated to our
   # Enter, so only a clean idle-to-busy transition may confirm a submit.
-  baseline_state=$(fm_pane_busy_state "$target")
-  [ "$baseline_state" = idle ] && baseline_idle=1
+  harness=$(fm_tmux_submit_harness "$target")
+  if [ "$harness" != omp ]; then
+    baseline_state=$(fm_pane_busy_state "$target")
+    [ "$baseline_state" = idle ] && baseline_idle=1
+  fi
   # A failed literal send replays tmux's stderr (for example "command too
   # long") so the caller can log why nothing was typed.
   if ! err=$(tmux send-keys -t "$target" -l "$text" 2>&1 >/dev/null); then
@@ -291,5 +343,5 @@ fm_tmux_submit_core() {  # <target> <text> <retries> <enter-sleep> <settle>
     return 0
   fi
   sleep "$settle"
-  fm_tmux_submit_enter_core "$target" "$retries" "$sleep_s" "$baseline_idle"
+  fm_tmux_submit_enter_core "$target" "$retries" "$sleep_s" "$baseline_idle" "$harness"
 }

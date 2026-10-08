@@ -27,8 +27,10 @@ case "${1:-}" in
     for a in "$@"; do
       case "$a" in
         *cursor_y*)
-          if [ "${FM_FAKE_WATCHER_TURN:-0}" = 1 ] && [ -f "$FM_FAKE_CAPTURE_COUNT" ] \
-            && [ "$(cat "$FM_FAKE_CAPTURE_COUNT")" -ge "${FM_FAKE_WATCHER_AFTER:-2}" ]; then
+          count=0
+          [ ! -f "${FM_FAKE_CAPTURE_COUNT:-/dev/null}" ] || count=$(cat "$FM_FAKE_CAPTURE_COUNT")
+          if [ "${FM_FAKE_WATCHER_TURN:-0}" = 1 ] \
+            && [ "$count" -ge "${FM_FAKE_WATCHER_AFTER:-2}" ]; then
             printf 'transcript\n\n  ⎋ Waiting independent watcher turn\n╭── ⠦ 13s > model ──╮\n╰─ %s ─╯\n' \
               "$(cat "$COMPOSER.payload")" > "$COMPOSER"
           fi
@@ -46,10 +48,6 @@ case "${1:-}" in
       if [ "${FM_FAKE_FAIL_FIRST_CAPTURE:-0}" = 1 ] && [ "$count" -eq 1 ]; then
         exit 1
       fi
-      if [ "${FM_FAKE_REFRESH_UNKNOWN:-0}" = 1 ] && [ "$count" -ge 3 ]; then
-        printf 'Pi is processing\nWorking...\n'
-        exit 0
-      fi
     fi
     cat "$COMPOSER" 2>/dev/null; exit 0 ;;
   send-keys)
@@ -59,6 +57,7 @@ case "${1:-}" in
         -t) shift ;;
         -l)
           if [ "${FM_FAKE_WATCHER_TURN:-0}" = 1 ]; then
+            printf 'literal\n' >> "$COMPOSER.types"
             printf '%s' "$2" > "$COMPOSER.payload"
             printf '╭── π > model ──╮\n╰─ %s ─╯\n' "$2" > "$COMPOSER"
           fi
@@ -246,41 +245,28 @@ test_failed_baseline_capture_keeps_busy_unknown_unconfirmed() {
   pass "fm_tmux_submit_core: failed baseline capture disables busy unknown conversion"
 }
 
-test_refreshed_unknown_requires_eligible_identity_and_idle_baseline() {
-  local dir fakebin composer sent out baseline harness expected
-  for harness in pi pi-signed codex omp node ''; do
-    for baseline in idle busy failed; do
-      dir="$TMP_ROOT/refreshed-unknown-${harness:-absent}-$baseline"
-      fakebin=$(make_submit_mock "$dir")
-      composer="$dir/composer"; sent="$dir/sent"
-      printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
-      [ "$baseline" != busy ] || printf 'Working...\n' >> "$composer"
-      touch "$dir/.swallow"; : > "$sent"
-      expected=unknown
-      case "$harness:$baseline" in pi:idle|pi-signed:idle) expected=empty ;; esac
-      out=$(
-        # shellcheck disable=SC2329
-        fm_pane_is_busy() { [ "$(fm_pane_busy_state "$1" "${2:-}")" = busy ]; }
-        PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-          FM_FAKE_HARNESS="$harness" \
-          FM_FAKE_CAPTURE_COUNT="$dir/captures" FM_FAKE_REFRESH_UNKNOWN=1 \
-          FM_FAKE_FAIL_FIRST_CAPTURE="$([ "$baseline" = failed ] && printf 1 || printf 0)" \
-          FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
-          fm_tmux_submit_core win fix 3 0 0
-      )
-      [ "$out" = "$expected" ] || fail "$harness/$baseline refreshed unknown must return $expected, got '$out'"
-      [ "$(grep -c '^Enter$' "$sent")" -eq 1 ] \
-        || fail "refreshed unknown must be dispatched without another Enter"
-      [ "$(cat "$dir/captures")" -ge 3 ] || fail "pending composer must be refreshed before unknown dispatch"
-    done
-  done
-  pass "tmux refreshed unknown requires eligible identity and idle-baseline turn-start proof"
-}
-test_refreshed_unknown_requires_eligible_identity_and_idle_baseline
+test_omp_explicit_idle_baseline_does_not_confirm_unknown() (
+  local dir="$TMP_ROOT/omp-explicit-idle-baseline" fakebin composer sent out
+  fakebin=$(make_submit_mock "$dir")
+  composer="$dir/composer"; sent="$dir/sent"
+  printf '│ > unbounded\nWorking…\n' > "$composer"
+  touch "$dir/.swallow"; : > "$sent"
+  fm_pane_is_busy() { [ "$(fm_pane_busy_state "$1" omp)" = busy ]; }
+  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_pane_is_busy win \
+    || fail "omp explicit-baseline regression must render a canonical busy signature"
+  out=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
+    FM_FAKE_HARNESS=omp \
+    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
+    fm_tmux_submit_enter_core win 3 0 1)
+  [ "$out" = pending ] || fail "omp unknown with an explicit idle baseline must stay pending, got '$out'"
+  [ "$(grep -c '^Enter$' "$sent")" -eq 1 ] || fail "omp explicit baseline must not cause another Enter"
+  pass "tmux omp unknown remains pending despite explicit idle baseline and canonical busy footer"
+)
+test_omp_explicit_idle_baseline_does_not_confirm_unknown
 
-test_dropped_enter_independent_omp_turn_redraw_stays_unknown() {
+test_dropped_enter_independent_omp_turn_redraw_stays_pending() {
   local dir fakebin composer sent out after expected_enters
-  for after in 1 2 3; do
+  for after in 0 1 2; do
     dir="$TMP_ROOT/omp-watcher-redraw-$after"
     fakebin=$(make_submit_mock "$dir")
     composer="$dir/composer"; sent="$dir/sent"
@@ -295,9 +281,9 @@ test_dropped_enter_independent_omp_turn_redraw_stays_unknown() {
         FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
         fm_tmux_submit_core win 'unsubmitted watcher wake' 3 0 0
     )
-    [ "$out" = unknown ] || fail "independent omp turn with redraw must not confirm held input, got '$out'"
+    [ "$out" = pending ] || fail "independent omp turn with redraw must keep held input pending, got '$out'"
     expected_enters=1
-    [ "$after" -ne 3 ] || expected_enters=2
+    [ "$after" -ne 2 ] || expected_enters=2
     [ "$(grep -c '^Enter$' "$sent")" -eq "$expected_enters" ] \
       || fail "omp must stop sending Enter at the unreadable redraw"
     [ "$(fm_composer_classify_screen "$(fm_tmux_composer_caps)" "$(cat "$composer")" 1)" = unknown ] \
@@ -309,9 +295,9 @@ test_dropped_enter_independent_omp_turn_redraw_stays_unknown() {
     printf '%s\n' "$(cat "$composer")" | fm_busy_lines_match omp \
       || fail "independent watcher turn must supply the misleading busy signal"
   done
-  pass "tmux dropped Enter plus independent omp turn and redraw never confirms held input"
+  pass "tmux omp initial, refreshed, and postretry redraws retain independent-watcher payloads"
 }
-test_dropped_enter_independent_omp_turn_redraw_stays_unknown
+test_dropped_enter_independent_omp_turn_redraw_stays_pending
 
 test_busy_pane_ambiguous_pending_retries_without_conversion() {
   local dir fakebin composer sent vfile
@@ -458,25 +444,166 @@ test_busy_pane_ambiguous_pending_retries_without_conversion
 test_unrecognized_state_skips_busy_conversion
 test_claude_busy_signature_uses_real_capture_shapes
 
-test_pending_frame_clears_before_retry() (
-  local dir="$TMP_ROOT/stale-pending" state out initial final
+test_omp_pending_frame_refreshes_before_retry() (
+  local dir="$TMP_ROOT/omp-stale-pending" out initial final expected
   mkdir -p "$dir"
   for initial in pending pending-unproven; do
     for final in empty unknown; do
       : > "$dir/enters"; printf '0' > "$dir/reads"
-      # shellcheck disable=SC2329
-      tmux() { printf 'Enter\n' >> "$dir/enters"; }
-      # shellcheck disable=SC2329
+      tmux() {
+        case "$1" in
+          display-message) printf 'omp\n' ;;
+          send-keys) printf 'Enter\n' >> "$dir/enters" ;;
+        esac
+      }
       fm_tmux_composer_state() {
         local n
         n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
         if [ "$n" -eq 1 ]; then printf '%s' "$initial"; else printf '%s' "$final"; fi
       }
       out=$(fm_tmux_submit_enter_core win 3 0)
-      [ "$out" = "$final" ] || fail "tmux $initial then $final must return fresh verdict, got '$out'"
-      [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "tmux must not Enter after fresh $final"
+      expected=$final
+      [ "$final" != unknown ] || expected=pending
+      [ "$out" = "$expected" ] || fail "omp $initial then $final must return $expected, got '$out'"
+      [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "omp must not Enter after fresh $final"
     done
   done
-  pass "tmux refreshes proven and unproven pending frames before retry"
+  pass "tmux omp refreshes pending frames and requires empty proof before confirming"
 )
-test_pending_frame_clears_before_retry
+test_omp_pending_frame_refreshes_before_retry
+
+test_omp_dropped_first_enter_retries_successfully() {
+  local dir fakebin composer sent out
+  dir="$TMP_ROOT/omp-first-enter-dropped"
+  fakebin=$(make_submit_mock "$dir")
+  composer="$dir/composer"; sent="$dir/sent"
+  printf '╭── π > model ──╮\n╰─ ─╯\n' > "$composer"
+  touch "$dir/.swallow"; : > "$sent"
+  out=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
+    FM_FAKE_HARNESS=omp FM_FAKE_SWALLOW="$dir/.swallow" \
+    FM_FAKE_WATCHER_TURN=1 FM_FAKE_WATCHER_AFTER=100 FM_FAKE_CAPTURE_COUNT="$dir/captures" \
+    fm_tmux_submit_core win 'retry me' 3 0 0)
+  [ "$out" = empty ] || fail "omp must confirm the successful second Enter, got '$out'"
+  [ "$(grep -c '^Enter$' "$sent")" -eq 2 ] || fail "omp dropped first Enter must retry exactly once"
+  [ "$(grep -c '^literal$' "$composer.types")" -eq 1 ] || fail "omp Enter retry must never retype the payload"
+  [ "$(cat "$composer.payload")" = 'retry me' ] || fail "omp retry must type the intended payload"
+  pass "tmux omp retries dropped first Enter and confirms a cleared composer"
+}
+test_omp_dropped_first_enter_retries_successfully
+
+test_nonomp_unknown_and_retry_keep_main_behavior() (
+  local dir="$TMP_ROOT/legacy-main" pane_command out
+  mkdir -p "$dir"
+  for pane_command in pi-launcher kimi; do
+    tmux() {
+      case "$1" in
+        display-message)
+          case "$*" in *pane_current_command*) printf '%s\n' "$pane_command" ;; esac
+          ;;
+        send-keys) printf 'Enter\n' >> "$dir/enters" ;;
+      esac
+    }
+    fm_pane_is_busy() { return 0; }
+    fm_tmux_composer_state() { printf 'unknown'; }
+    : > "$dir/enters"
+    out=$(fm_tmux_submit_enter_core win 3 0 1)
+    [ "$out" = empty ] || fail "$pane_command legacy idle-to-busy unknown must confirm, got '$out'"
+    [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "$pane_command unknown must not repeat Enter"
+    out=$(fm_tmux_submit_enter_core win 3 0)
+    [ "$out" = unknown ] || fail "$pane_command unknown without baseline must remain unknown, got '$out'"
+    : > "$dir/enters"; printf '0' > "$dir/reads"
+    fm_tmux_composer_state() {
+      local n enters
+      n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
+      enters=$(wc -l < "$dir/enters" | tr -d ' ')
+      [ "$enters" -eq "$n" ] || fail "$pane_command must not refresh before retry Enter"
+      if [ "$n" -lt 3 ]; then printf 'pending'; else printf 'empty'; fi
+    }
+    out=$(fm_tmux_submit_enter_core win 3 0)
+    [ "$out" = empty ] || fail "$pane_command legacy third Enter must clear the composer, got '$out'"
+    [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 3 ] || fail "$pane_command must retain all three legacy Enter attempts"
+    fm_tmux_composer_state() { printf 'pending'; }
+    : > "$dir/enters"
+    out=$(fm_tmux_submit_enter_core win 3 0)
+    [ "$out" = empty ] || fail "$pane_command legacy busy pending must remain queued, got '$out'"
+    [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 3 ] || fail "$pane_command queued pending must exhaust legacy retries"
+  done
+  pass "tmux pi-launcher and kimi retain main unknown confirmation, repeated Enter, and busy queue handling"
+)
+test_nonomp_unknown_and_retry_keep_main_behavior
+
+test_omp_identity_snapshot_survives_missing_later_identity() (
+  local dir="$TMP_ROOT/omp-identity-snapshot" out
+  mkdir -p "$dir"
+  : > "$dir/enters"; printf '0' > "$dir/identities"
+  tmux() {
+    local n
+    case "$1" in
+      display-message)
+        n=$(cat "$dir/identities"); n=$((n + 1)); printf '%s' "$n" > "$dir/identities"
+        [ "$n" -ne 1 ] || printf 'omp\n'
+        ;;
+      send-keys)
+        case " $* " in *' Enter '*) printf 'Enter\n' >> "$dir/enters" ;; esac
+        ;;
+    esac
+  }
+  fm_tmux_composer_state() {
+    tmux display-message -p -t win '#{pane_current_command}' >/dev/null
+    printf 'unknown'
+  }
+  fm_pane_busy_state() { printf 'idle'; }
+  fm_pane_is_busy() { return 0; }
+  out=$(fm_tmux_submit_core win retained 3 0 0)
+  [ "$out" = pending ] || fail "missing later identity must not discard a proven omp snapshot, got '$out'"
+  [ "$(cat "$dir/identities")" -ge 2 ] || fail "identity snapshot scenario must reach a missing subsequent identity"
+  [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "omp unknown after identity loss must not retry"
+  pass "tmux proven omp identity survives a missing subsequent pane identity"
+)
+test_omp_identity_snapshot_survives_missing_later_identity
+
+test_omp_foreground_identity_controls_submit_scope() (
+  local dir="$TMP_ROOT/omp-foreground-identity" scenario title processes expected out
+  mkdir -p "$dir"
+  tmux() {
+    case "$1" in
+      display-message)
+        case "$*" in
+          *pane_current_command*) printf '%s\n' "$title" ;;
+          *pane_tty*) printf '/dev/ttys777\n' ;;
+        esac
+        ;;
+      send-keys) printf 'Enter\n' >> "$dir/enters" ;;
+    esac
+  }
+  ps() {
+    printf '%s\n' "$processes"
+  }
+  fm_tmux_composer_state() { printf 'unknown'; }
+  fm_pane_is_busy() { return 0; }
+  for scenario in absent-title rewritten-title background-omp; do
+    case "$scenario" in
+      absent-title)
+        title=''
+        processes='101 20 20 /opt/bin/omp'
+        expected=pending
+        ;;
+      rewritten-title)
+        title=node
+        processes='101 20 20 /opt/bin/omp'
+        expected=pending
+        ;;
+      background-omp)
+        title=kimi
+        processes=$'101 10 20 /opt/bin/omp\n102 20 20 /opt/bin/kimi'
+        expected=empty
+        ;;
+    esac
+    : > "$dir/enters"
+    out=$(fm_tmux_submit_enter_core win 3 0 1)
+    [ "$out" = "$expected" ] || fail "$scenario must return $expected, got '$out'"
+    [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "$scenario unknown must stop after one Enter"
+  done
+  pass "tmux foreground omp proof survives title loss while background omp cannot change legacy submit scope"
+)
+test_omp_foreground_identity_controls_submit_scope
