@@ -129,6 +129,21 @@ EOF
   printf '%s\n' "$home"
 }
 
+# Missing-copy teardown cases carry forge proof independent of public delivery.
+write_missing_copy_landing_proof() {  # <home>
+  local home=$1
+  git init -q -b main "$home/projects/sample" || fail "could not create fixture project"
+  cat > "$home/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "pr view https://github.com/example/repo/pull/7 --json state -q .state")
+    printf '%s\n' MERGED ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$home/fakebin/gh"
+}
+
 run_pf() {  # <home> <args...>
   local home=$1
   shift
@@ -1273,6 +1288,7 @@ test_cleanup_refuses_while_a_public_reply_is_owed() {
     || fail "could not add the guarded ship to its home's backlog"
   tasks_in "$home" start ship-task >/dev/null \
     || fail "could not mark the guarded ship In flight"
+  write_missing_copy_landing_proof "$home"
   fm_write_meta "$home/state/ship-task.meta" \
     "window=firstmate:fm-ship-task" \
     "worktree=$home/projects/gone" \
@@ -1280,7 +1296,8 @@ test_cleanup_refuses_while_a_public_reply_is_owed() {
     "harness=codex" \
     "kind=ship" \
     "mode=no-mistakes" \
-    "spawn_gen=public-followup-guard"
+    "spawn_gen=public-followup-guard" \
+    "pr=https://github.com/example/repo/pull/7"
 
   rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
@@ -1298,8 +1315,9 @@ test_cleanup_refuses_while_a_public_reply_is_owed() {
   rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-task >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 0 ] || fail "cleanup must proceed once the public reply has landed (rc=$rc)"
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-task \
+    > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "cleanup must proceed once the public reply has landed (rc=$rc): $(cat "$home/teardown.err")"
   pass "cleanup refuses while a public reply is owed and proceeds once it has landed"
 }
 
@@ -2148,6 +2166,7 @@ test_retention_creates_no_false_teardown_refusal() {
     || fail "could not add the retained-registration ship to its home's backlog"
   tasks_in "$home" start ship-retain >/dev/null \
     || fail "could not mark the retained-registration ship In flight"
+  write_missing_copy_landing_proof "$home"
   fm_write_meta "$home/state/ship-retain.meta" \
     "window=firstmate:fm-ship-retain" \
     "worktree=$home/projects/gone" \
@@ -2155,7 +2174,8 @@ test_retention_creates_no_false_teardown_refusal() {
     "harness=codex" \
     "kind=ship" \
     "mode=no-mistakes" \
-    "spawn_gen=public-followup-retain"
+    "spawn_gen=public-followup-retain" \
+    "pr=https://github.com/example/repo/pull/7"
   emit_terminal "$home" "$home" pf-retain main ship-retain >/dev/null || fail "emit failed"
   run_pf "$home" consume >/dev/null || fail "consume failed"
   FAKE_CURL_LOG="$home/curl.log" run_pf "$home" deliver pf-retain >/dev/null || fail "delivery failed"
@@ -2168,7 +2188,7 @@ test_retention_creates_no_false_teardown_refusal() {
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-retain \
     > "$home/td.out" 2> "$home/td.err" || rc=$?
-  [ "$rc" -eq 0 ] || fail "teardown must proceed with a retained delivered registration (rc=$rc)"
+  [ "$rc" -eq 0 ] || fail "teardown must proceed with a retained delivered registration (rc=$rc): $(cat "$home/td.err")"
   case "$(cat "$home/td.err")" in
     *"still owes a public reply"*) fail "retention must not create a false public-reply refusal" ;;
   esac
@@ -2308,9 +2328,10 @@ test_x_request_teardown_warns_when_final_unposted() {
     || fail "could not add the legacy-link ship to its home's backlog"
   tasks_in "$home" start linked-task >/dev/null \
     || fail "could not mark the legacy-link ship In flight"
+  fm_git_init_commit "$home/projects/sample"
   fm_write_meta "$home/state/linked-task.meta" \
     "window=firstmate:fm-linked-task" \
-    "worktree=$home/projects/gone" \
+    "worktree=$home/projects/sample" \
     "project=$home/projects/sample" \
     "kind=ship" \
     "mode=local-only" \
@@ -2321,7 +2342,7 @@ test_x_request_teardown_warns_when_final_unposted() {
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" linked-task \
     > "$home/td.out" 2> "$home/td.err" || rc=$?
-  [ "$rc" -eq 0 ] || fail "legacy-link warning must not block teardown (rc=$rc)"
+  [ "$rc" -eq 0 ] || fail "legacy-link warning must not block teardown (rc=$rc): $(cat "$home/td.err")"
   assert_grep "still carries an unreconciled Relay request link (req-legacy-final) on its task record" "$home/td.err" \
     "teardown must report the remaining link without claiming the post failed"
   assert_no_grep "never posted" "$home/td.err" \

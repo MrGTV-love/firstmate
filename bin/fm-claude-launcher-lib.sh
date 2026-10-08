@@ -9,8 +9,7 @@
 # the same selection before a relaunch stops the old agent.
 
 FM_CLAUDE_LAUNCHER_LIB_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# shellcheck source=bin/fm-config-inherit-lib.sh
-. "$FM_CLAUDE_LAUNCHER_LIB_DIR/fm-config-inherit-lib.sh"
+# Both callers load fm-config-inherit-lib.sh through fm-session-launch-policy-lib.sh.
 
 # fm_claude_launcher_select <config-dir>
 # Prints the executable a Claude launch starts: `claude` when

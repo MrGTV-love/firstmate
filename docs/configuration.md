@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
-| Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -90,6 +90,7 @@ Each effective `FM_HOME` contains private operational directories.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
+- The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -360,6 +361,7 @@ When a spawn is interrupted after launch delivery began, its exit path re-reads 
 ### Which backlog receives a transition
 
 Automatic transitions run from the configured data directory's parent, letting that home's effective tasks-axi configuration address its selected adapter while keeping relative scout-report links rooted there.
+The wrapper resolves the data directory against the caller's working directory before entering that parent, and uses the same absolute path for restart provenance updates, failed-transition readback, and rollback.
 A markdown backlog is additionally addressed by an explicit `--file` at `<data>/backlog.md`, so the change lands in the home that owns the task regardless of the caller's working directory.
 
 Any other configured adapter is addressed by that root alone, because `--file` would override the adapter's own workspace path.
@@ -566,6 +568,86 @@ See [`trace-context.md`](trace-context.md) for carrier semantics, supported rout
 ## Fleet activity ledger (config/fleet-ledger)
 
 See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, and limits.
+
+## Open-work ledger (config/open-loops.json)
+
+`bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
+`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
+Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
+Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
+An unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
+
+| Category | A row exists when | Default limit |
+| --- | --- | --- |
+| `missing_worker` | an In flight item requiring child metadata lacks a task record or endpoint, or an ordinary task has a confirmed missing or dead worker | 600 s |
+| `ready_not_started` | a Queued item has no hold kind or unresolved blocker, and its optional hold date is absent or due | 1800 s |
+| `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
+| `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
+| `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
+| `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
+| `open_pr` | an open PR discovered from this home's project origins or recorded task PR URLs waits on checks, a reviewer, or firstmate's review routing | 3600 s |
+| `red_check` | the latest run of a check on an open PR failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
+| `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
+
+A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
+The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.
+Status questions age from their stamped opening.
+Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata.
+Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
+For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
+GitHub repositories are discovered from recorded local task PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits.
+Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
+An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage.
+Unreadable or unknown current task state adds degraded coverage independently of liveness, and only nonfuture progress timestamps count as work evidence.
+Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
+Progress remains scoped to that resolved store and the task's project and branch.
+The ledger covers this home's current backlog, ordinary task records, status questions, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
+The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
+
+The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
+The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
+A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
+When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
+A ledger the helper stopped publishing for three intervals is its own `check: open-loop-ledger-stale` wake.
+Both durable payloads are identical to their printed wake reasons, including the canonical `check:` prefix.
+Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
+Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
+Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
+Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
+The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors.
+Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
+No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
+
+Create the optional local `config/open-loops.json` to override the limits:
+
+```json
+{
+  "age_limits_seconds": { "stalled_worker": 3600, "unlanded_commit": 86400 },
+  "command_timeout_seconds": 60
+}
+```
+
+Age limits are non-negative integer seconds for the categories above.
+`command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
+On either deadline, cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run.
+It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
+An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
+A malformed configuration is reported as an error rather than ignored.
+
+### Completion and discard
+
+Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
+[`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
+[`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
+A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
+[`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.
+Dropped work is never presented as recently landed.
+A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
+Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`.
+Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
+A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
+A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 
@@ -2706,6 +2788,8 @@ The two read files use different parsing rules:
 
 Runtime tuning via environment variables (defaults shown):
 
+`FM_BACKLOG_ROW_TIMEOUT_SECS` covers lightweight and full-body reads, including start/reopen and dispatch; the first timeout prevents later backend reads in the same process.
+
 ```sh
 FM_HOME=                 # optional operational home for most scripts, unset means this repo root; fm-send requires it explicitly
 FM_ROOT_OVERRIDE=        # override firstmate repo root, tangle-guard target, and zellij/cmux home-title hash; also legacy whole-root override when FM_HOME is unset
@@ -2735,6 +2819,9 @@ FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppres
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
 FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
+FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
+FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
+FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding the complete best-effort home-summary refresh, including lock acquisition, validation, atomic publication, and worker-side failure logging; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2

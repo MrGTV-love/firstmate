@@ -561,3 +561,57 @@ test_declared_wait_survives_answers_past_the_event_window() {
 test_keyless_wait_survives_stated_default_retraction
 test_declared_wait_survives_answers_past_the_event_window
 test_bare_prose_cannot_open_or_close_a_decision
+
+test_dated_decisions_ignore_rejected_openers() {
+  local dir f expected
+  dir=$(case_dir dated-rejected-openers)
+  f="$dir/pending.status"
+  printf 'kind=secondmate\n' > "$dir/pending.meta"
+  printf 'needs-decision [key=pending-reply-route] [at=100]: pending-reply-missed: choose a recovery route\n' > "$f"
+  printf 'needs-decision [key=pending-reply-route] [at=200]: unrelated prose using the reserved key\n' >> "$f"
+  expected=$(printf 'pending-reply-route\tneeds-decision\tpending-reply-missed: choose a recovery route\n')
+  assert_fold "$f" "$expected" "unrelated reserved-key declaration"
+  assert_equals "$(printf 'pending-reply-route\tneeds-decision\t100\tpending-reply-missed: choose a recovery route\n')" \
+    "$(status_open_decisions_dated "$f")" "a rejected reserved-key declaration refreshed the opening date"
+
+  printf 'needs-decision [key=pending-reply-route] [at=300]: pending-reply-delivery-unknown: choose a recovery route\n' >> "$f"
+  assert_equals "$(printf 'pending-reply-route\tneeds-decision\t300\tpending-reply-delivery-unknown: choose a recovery route\n')" \
+    "$(status_open_decisions_dated "$f")" "an accepted reserved-key declaration did not refresh the opening date"
+
+  f="$dir/default.status"
+  printf 'blocked [at=100]: need release access\nblocked [at=200]\n' > "$f"
+  assert_fold "$f" "$(printf 'default\tblocked\tneed release access\n')" "bare stamped continuation"
+  assert_equals "$(printf 'default\tblocked\t100\tneed release access\n')" \
+    "$(status_open_decisions_dated "$f")" "a bare stamped continuation erased the accepted opening date"
+  pass "dated decisions use only openings accepted by the declaration and reserved-key fold guards"
+}
+
+test_dated_decisions_follow_valid_reopenings() {
+  local dir f
+  dir=$(case_dir dated-reopenings)
+  f="$dir/task.status"
+  printf 'kind=ship\n' > "$dir/task.meta"
+  printf 'needs-decision [key=route] [at=100]: north or south\n' > "$f"
+  assert_equals "$(printf 'route\tneeds-decision\t100\tnorth or south\n')" \
+    "$(status_open_decisions_dated "$f")" "an ordinary opening lost its timestamp"
+  printf 'resolved [key=route] [at=200]: north\n' >> "$f"
+  assert_equals "" "$(status_open_decisions_dated "$f")" "a resolved key retained an opening date"
+  printf 'blocked [key=route] [at=300]: north is closed\n' >> "$f"
+  assert_equals "$(printf 'route\tblocked\t300\tnorth is closed\n')" \
+    "$(status_open_decisions_dated "$f")" "a valid reopening kept the resolved opening date"
+  printf 'done [at=400]: landed\n' >> "$f"
+  assert_equals "" "$(status_open_decisions_dated "$f")" "a ship terminal retained an opening date"
+  printf 'needs-decision [at=500]: [key=route] choose another route\n' >> "$f"
+  assert_equals "$(printf 'route\tneeds-decision\t500\tchoose another route\n')" \
+    "$(status_open_decisions_dated "$f")" "a colon-first post-terminal reopening lost its opening date"
+  printf 'needs-decision [key=route] [at=600]: choose another route\n' >> "$f"
+  assert_equals "$(printf 'route\tneeds-decision\t600\tchoose another route\n')" \
+    "$(status_open_decisions_dated "$f")" "an accepted identical declaration did not refresh its opening date"
+  printf 'needs-decision [key=route]: choose another route\n' >> "$f"
+  assert_equals "$(printf 'route\tneeds-decision\t\tchoose another route\n')" \
+    "$(status_open_decisions_dated "$f")" "an accepted unstamped reopening inherited an earlier date"
+  pass "dated decisions retain only the last valid reopening across resolutions and terminal declarations"
+}
+
+test_dated_decisions_ignore_rejected_openers
+test_dated_decisions_follow_valid_reopenings

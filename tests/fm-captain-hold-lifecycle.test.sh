@@ -105,6 +105,9 @@ printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
+      *state,headRefOid,url*)
+        printf 'MERGED\t%s\t%s\n' "${FM_TEST_MERGED_HEAD:-}" "${FM_TEST_MERGED_PR:-}"
+        ;;
       *statusCheckRollup*)
         printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}'
         ;;
@@ -2629,7 +2632,7 @@ test_teardown_never_closes_a_captain_held_task() {
     || fail "could not hold the forced fixture for the captain"
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$forced" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$forced" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/forced.out" 2> "$home/forced.err" \
     || fail "forced cleanup failed: $(cat "$home/forced.err")"
   show=$(tasks_in "$home" show "$forced" --full) || fail "forced cleanup erased the captain-held row"
@@ -2933,7 +2936,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -2992,7 +2995,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3046,7 +3049,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3110,7 +3113,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3487,7 +3490,7 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
     FM_TEST_REUSE_TEARDOWN_READY="$teardown_ready" \
     FM_TEST_REUSE_TEARDOWN_RELEASE="$teardown_release" \
     FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
-    "$TEARDOWN" "$id" --force > "$home/reuse-teardown.out" \
+    "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" > "$home/reuse-teardown.out" \
     2> "$home/reuse-teardown.err" &
   teardown_pid=$!
   if ! wait_for_test_file "$teardown_ready" "$teardown_pid"; then
@@ -3577,7 +3580,7 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
     FM_TEST_REUSE_TEARDOWN_READY="$local_teardown_ready" \
     FM_TEST_REUSE_TEARDOWN_RELEASE="$local_teardown_release" \
     FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
-    "$TEARDOWN" "$local_id" --force > "$local_home/reuse-teardown.out" \
+    "$TEARDOWN" "$local_id" --force --drop-file "$(fm_test_drop_file)" > "$local_home/reuse-teardown.out" \
     2> "$local_home/reuse-teardown.err" &
   local_teardown_pid=$!
   if ! wait_for_test_file "$local_teardown_ready" "$local_teardown_pid"; then
@@ -3712,7 +3715,7 @@ SH
   set +e
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/race-pr-teardown.out" 2> "$home/race-pr-teardown.err"
   teardown_rc=$?
   set -e
@@ -3795,7 +3798,7 @@ SH
   set +e
   PATH="$local_home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$local_home" \
     FM_STATE_OVERRIDE="$local_home/state" FM_DATA_OVERRIDE="$local_home/data" \
-    FM_CONFIG_OVERRIDE="$local_home/config" "$TEARDOWN" "$local_id" --force \
+    FM_CONFIG_OVERRIDE="$local_home/config" "$TEARDOWN" "$local_id" --force --drop-file "$(fm_test_drop_file)" \
     > "$local_home/race-local-teardown.out" 2> "$local_home/race-local-teardown.err"
   local_teardown_rc=$?
   set -e
@@ -3851,7 +3854,9 @@ test_released_merge_passes_the_entrypoint_and_lands() {
     || fail "the released merge was refused: $(cat "$home/merge.err")"
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" FM_TEST_GH_LOG="$home/gh.log" \
+    FM_TEST_MERGED_HEAD="$(git -C "$wt" rev-parse HEAD)" FM_TEST_MERGED_PR="$pr" \
+    "$TEARDOWN" "$id" \
     > "$home/teardown.out" 2> "$home/teardown.err" \
     || fail "the released merge cleanup failed: $(cat "$home/teardown.err")"
   json=$(run_bearings "$home") || fail "Bearings failed after the released merge lifecycle"
@@ -3891,7 +3896,7 @@ SH
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     TASKS_AXI_FAIL_SHOW_ID="$id" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -4036,7 +4041,44 @@ test_retained_body_keeps_its_utf8_bytes() {
   pass "cleanup preserves every byte of a retained body's non-ASCII characters"
 }
 
+test_internal_retention_preserves_active_drop_provenance() (
+  local home id stored before
+  home=$(make_home retain-drop-provenance)
+  id=retained-drop
+  tasks_in "$home" add "$id" "retained captain disposition" --kind scout --start >/dev/null \
+    || fail "could not create retained drop fixture"
+  printf '%s\n' 'Body café 航海' 'dropped' 'Deliverable of the finished work: dropped' \
+    'Question: which route?' > "$home/body.txt"
+  tasks_in "$home" update "$id" --body-file "$home/body.txt" >/dev/null \
+    || fail "could not attach retained body"
+  tasks_in "$home" hold "$id" --kind captain --reason "which route?" >/dev/null \
+    || fail "could not hold retained drop fixture"
+  mkdir -p "$home/data/$id"
+  printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+  cp "$home/data/$id/captain-drop.md" "$home/words-before"
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  before=$(cat "$home/data/backlog.md")
+  fm_backlog_relaunch_admission "$home/config" "$home/data" scout "$id" 1 \
+    || fail "read-only reconciliation admission failed: $FM_BACKLOG_TRANSITION_ERROR"
+  assert_equals "$before" "$(cat "$home/data/backlog.md")" "read-only admission changed active provenance"
+  fm_backlog_retain "$home/data" "$id" --note dropped \
+    || fail "internal retain failed: $FM_BACKLOG_TRANSITION_ERROR"
+  stored=$(tasks_in "$home" show "$id" --full) || fail "retained row disappeared"
+  assert_contains "$stored" "state: queued" "internal retain did not reopen the row"
+  assert_contains "$stored" "hold_kind: captain" "internal retain lost captain classification"
+  assert_contains "$stored" "Deliverable of the finished work: dropped" "internal retain retired active deliverable"
+  assert_not_contains "$stored" "Historical captain disposition:" "internal retain retired active disposition"
+  assert_not_contains "$stored" "Historical deliverable of the finished work:" "internal retain retired active deliverable"
+  assert_contains "$stored" "Body café 航海" "internal retain changed Unicode bytes"
+  assert_contains "$stored" "Question: which route?" "internal retain changed the question"
+  cmp -s "$home/words-before" "$home/data/$id/captain-drop.md" || fail "internal retain changed captain words"
+  pass "internal retention and read-only admission preserve active captain drop classification"
+)
+
+tests=(
 test_uninventoried_report_decision_refuses_completion
+test_internal_retention_preserves_active_drop_provenance
 test_hold_decodes_a_bare_scalar_body_without_the_nonref_default
 test_retained_body_keeps_its_utf8_bytes
 test_completion_gate_attests_and_transfers
@@ -4089,3 +4131,17 @@ test_verify_names_the_unresolvable_legacy_id_once
 test_verify_resolves_a_pre_collapse_key_through_its_derived_marker
 test_captain_hold_mutations_address_the_beads_backend
 test_hold_creates_a_captain_row_when_beads_requires_due_without_custom_type
+)
+if [ "$#" -gt 0 ]; then
+  for requested in "$@"; do
+    selected=0
+    for candidate in "${tests[@]}"; do
+      [ "$requested" != "$candidate" ] || selected=1
+    done
+    [ "$selected" -eq 1 ] || fail "unknown captain hold lifecycle test: $requested"
+  done
+  tests=("$@")
+fi
+for selected_test in "${tests[@]}"; do
+  "$selected_test" || exit "$?"
+done

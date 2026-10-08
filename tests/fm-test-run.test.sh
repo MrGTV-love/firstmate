@@ -454,6 +454,41 @@ test_changed_dependency_selection_and_unmapped_failure() {
   pass "changed selection covers dependents, fails closed for live unmapped source, and accepts retired unconsumed source"
 }
 
+test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer() {
+  local tmp repo owner script listed expected family
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-fleet-snapshot.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for script in fm-open-loops.test.sh fm-fleet-snapshot-view.test.sh; do
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  for owner in fm-bearings-snapshot.sh fm-fleet-snapshot.sh fm-fleet-view.sh fm-contributions.sh fm-contributions.jq fm-home-summary-refresh.sh; do
+    : >"$repo/bin/$owner"
+  done
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fleet-snapshot-fixture
+  family=$(cd "$repo" && bin/fm-test-run.sh --list --family snapshot-bearings)
+  [ -n "$family" ] || fail "snapshot fixture family is empty"
+  for owner in fm-fleet-snapshot.sh fm-bearings-snapshot.sh fm-fleet-view.sh fm-contributions.sh fm-contributions.jq fm-home-summary-refresh.sh; do
+    printf '\n' >>"$repo/bin/$owner"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$owner changed selection failed"
+    if [ "$owner" = fm-fleet-snapshot.sh ]; then
+      expected=$(printf '%s\n%s\n' "$family" tests/fm-open-loops.test.sh | LC_ALL=C sort)
+    else
+      expected=$(printf '%s\n' "$family" | LC_ALL=C sort)
+    fi
+    [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+      || fail "$owner selected unrelated suites, omitted a consumer, or duplicated a suite: $listed"
+    assert_not_contains "$listed" "tests/fm-pr-merge.test.sh" "$owner must not select unrelated pr-forge coverage"
+    git -C "$repo" add "bin/$owner"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm "$owner-change"
+  done
+  rm -rf "$tmp"
+  pass "fleet snapshot selects its exact ledger consumer without widening snapshot siblings"
+}
+
 test_changed_status_owners_select_all_consuming_tests() {
   local tmp repo listed expected family script owner
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-status-record.XXXXXX")
@@ -2022,6 +2057,7 @@ test_task_marker_refuses_the_primary_checkout
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
+test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency

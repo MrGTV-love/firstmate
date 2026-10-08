@@ -320,6 +320,21 @@ HOME_SUMMARY_INTERVAL=${FM_HOME_SUMMARY_INTERVAL:-300}
 case "$HOME_SUMMARY_INTERVAL" in
   ''|*[!0-9]*|0) HOME_SUMMARY_INTERVAL=300 ;;
 esac
+# The open-work ledger (docs/configuration.md "Open-work ledger") is refreshed by a detached
+# helper at this cadence and re-surfaced to firstmate when it still lists the same overdue rows.
+OPEN_LOOPS_INTERVAL=${FM_OPEN_LOOPS_INTERVAL:-600}
+case "$OPEN_LOOPS_INTERVAL" in
+  ''|*[!0-9]*) OPEN_LOOPS_INTERVAL=600 ;;
+  *) OPEN_LOOPS_INTERVAL=$((10#$OPEN_LOOPS_INTERVAL)) ;;
+esac
+[ "$OPEN_LOOPS_INTERVAL" -gt 0 ] || OPEN_LOOPS_INTERVAL=600
+OPEN_LOOPS_RESURFACE=${FM_OPEN_LOOPS_RESURFACE:-21600}
+case "$OPEN_LOOPS_RESURFACE" in
+  ''|*[!0-9]*) OPEN_LOOPS_RESURFACE=21600 ;;
+  *) OPEN_LOOPS_RESURFACE=$((10#$OPEN_LOOPS_RESURFACE)) ;;
+esac
+[ "$OPEN_LOOPS_RESURFACE" -gt 0 ] || OPEN_LOOPS_RESURFACE=21600
+OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-$SCRIPT_DIR/fm-open-loops.sh}
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
@@ -2504,6 +2519,75 @@ home_summary_refresh_detached() {
   HOME_SUMMARY_PID=$!
 }
 
+# Open-work ledger refresh, detached for the same reason as the home summary: the
+# reconciler can outlast the beacon grace, and the poll must keep advancing the
+# beacon while it runs. The helper publishes state/open-loops.json atomically; the
+# surfacing below reads that file, so a slow or failing helper never blocks a poll.
+OPEN_LOOPS_PID=
+open_loops_refresh_detached() {
+  if [ -n "$OPEN_LOOPS_PID" ]; then
+    if kill -0 "$OPEN_LOOPS_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$OPEN_LOOPS_PID" 2>/dev/null || true
+    OPEN_LOOPS_PID=
+  fi
+  "$OPEN_LOOPS_BIN" --heartbeat </dev/null >/dev/null 2>&1 &
+  OPEN_LOOPS_PID=$!
+  [ -e "$STATE/.open-loops-started" ] || : > "$STATE/.open-loops-started"
+}
+
+# Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
+# wakes firstmate at once; an unchanged overdue set repeats only every
+# OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
+# The durable row is appended before wake() exits, and firstmate's acknowledgement clears it.
+open_loops_stale_wake() {  # <ledger-path>
+  local marker="$STATE/.open-loops-stale-surfaced" reason
+  [ ! -e "$marker" ] || [ "$(age_of "$marker")" -ge "$OPEN_LOOPS_RESURFACE" ] || return 0
+  reason="check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)"
+  fm_wake_append check open-loop-ledger-stale "$reason" || exit 1
+  : > "$marker"
+  wake "$reason"
+}
+open_loops_surface() {
+  local ledger="$STATE/open-loops.json" marker="$STATE/.open-loops-surfaced" ids digest previous overdue reason
+  if [ -f "$ledger" ] && [ ! -L "$ledger" ]; then
+    [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ] || open_loops_stale_wake "$ledger"
+  else
+    # No ledger yet: only a helper that was started and never published is stale.
+    [ ! -e "$STATE/.open-loops-started" ] \
+      || [ "$(age_of "$STATE/.open-loops-started")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ] \
+      || open_loops_stale_wake "$ledger"
+    return 0
+  fi
+  ids=$(jq -rs '
+    if length == 1 then .[0] else error("expected one open-loop ledger") end
+    | if type == "object" and .schema == "fm-open-loops.v1"
+        and (.generated_epoch | type) == "number"
+        and (.home | type) == "string" and (.home | length) > 0
+        and (.complete | type) == "boolean" and (.rows | type) == "array"
+        and all(.rows[]; type == "object" and (.id | type) == "string"
+          and (.id | length) > 0 and (.overdue | type) == "boolean")
+      then [.rows[] | select(.overdue) | .id] | sort | .[]
+      else error("invalid open-loop ledger") end
+  ' "$ledger" 2>/dev/null) || return 0
+  if [ -f "$ledger" ] && [ ! -L "$ledger" ] \
+    && [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ]; then
+    rm -f "$STATE/.open-loops-stale-surfaced"
+  fi
+  [ -n "$ids" ] || { rm -f "$marker"; return 0; }
+  digest=$(printf '%s\n' "$ids" | cksum | awk '{print $1 "-" $2}')
+  previous=$(cat "$marker" 2>/dev/null || true)
+  if [ "$previous" = "$digest" ] && [ "$(age_of "$marker")" -lt "$OPEN_LOOPS_RESURFACE" ]; then
+    return 0
+  fi
+  overdue=$(printf '%s\n' "$ids" | wc -l | tr -d '[:space:]')
+  reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
+  fm_wake_append check open-loop-ledger "$reason" || exit 1
+  printf '%s\n' "$digest" > "$marker"
+  wake "$reason"
+}
+
 # One reconcile pass can wait on a single shared launch-confirmation window of up
 # to FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS (600 s), longer than the beacon
 # grace. Results are durable and observed below on every poll, so restarting
@@ -2702,6 +2786,15 @@ while :; do
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
     home_summary_refresh_detached
   fi
+
+  # Ledger refresh and surfacing run before any signal or check exit below, so a chatty
+  # fleet can never starve the obligation scan (wake() exits the cycle).
+  if [ ! -e "$STATE/open-loops.json" ] \
+    || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
+    open_loops_refresh_detached
+  fi
+  open_loops_surface
+  watcher_beat
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;

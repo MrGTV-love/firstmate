@@ -1223,7 +1223,7 @@ test_branch_cannot_force_teardown_or_directly_relaunch() {
   ln -s "$ROOT/bin" "$root/bin"
 
   # Forced teardown discards work; the branch never discards anything.
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch "$ROOT/bin/fm-teardown.sh" task-x --force 2>&1)
+  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch "$ROOT/bin/fm-teardown.sh" task-x --force --drop-file "$(fm_test_drop_file)" 2>&1)
   status=$?
   [ "$status" -eq 6 ] || fail "branch forced teardown exited $status, not 6: $out"
   assert_contains "$out" "cannot discard work" "forced-teardown refusal lost its wording"

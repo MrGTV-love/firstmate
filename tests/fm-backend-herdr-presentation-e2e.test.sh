@@ -26,6 +26,11 @@ HERDR_ORIGINAL_PATH=$PATH
 # daemon did not inherit the controller's TREEHOUSE_ROOT.
 mkdir -p "$ROOT/.no-mistakes/test-tmp"
 TMP_ROOT=$(mktemp -d "$ROOT/.no-mistakes/test-tmp/fm-herdr-presentation.XXXXXX")
+# This standalone suite does not source tests/lib.sh; ordinary-work teardown --force needs the captain's words.
+fm_test_drop_file() {
+  [ -f "$TMP_ROOT/captain-words.txt" ] || printf 'Fixture: the captain approved discarding this work.\n' > "$TMP_ROOT/captain-words.txt"
+  printf '%s\n' "$TMP_ROOT/captain-words.txt"
+}
 # The code root and operational homes must be siblings: secondmate safety
 # correctly refuses homes inside the declared Firstmate repository.
 FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
@@ -504,7 +509,7 @@ teardown_task() {  # <id> <home>
   FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" \
-    "$FIXTURE_ROOT/bin/fm-teardown.sh" "$id" --force
+    "$FIXTURE_ROOT/bin/fm-teardown.sh" "$id" --force --drop-file "$(fm_test_drop_file)"
 }
 
 finish_concurrent_teardown() {  # <id> <status> <stdout> <stderr>

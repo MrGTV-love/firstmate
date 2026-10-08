@@ -1658,7 +1658,7 @@ EOF
     err="$TMP_ROOT/teardown-binding-$case_name.err"
     if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
       FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-binding-$case_name-fake/pane.txt" \
-      "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+      "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
       fail "secondmate teardown accepted $case_name registry binding"
     fi
     [ -d "$sub" ] || fail "secondmate teardown removed the home after $case_name refusal"
@@ -1715,7 +1715,7 @@ test_secondmate_teardown_refuses_process_events_without_sweep_script() {
 
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_PROCEVENT_CLAIM_ROOT="$claim_root" \
       FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-refusal-fake/pane.txt" \
-      "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+      "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "force teardown removed process-event state without a sweep-capable child script"
   fi
   grep -F 'no sweep-capable bin/fm-procevent.sh' "$err" >/dev/null || fail "missing sweep capability refusal was not explained"
@@ -1794,7 +1794,7 @@ EOF
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-force-fake/pane.txt" \
     FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>/dev/null \
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>/dev/null \
     || fail "force teardown failed after recursively sweeping process events"
   grep -Fx "$subhome_abs" "$sweep_log" >/dev/null || fail "force teardown did not sweep the parent secondmate home"
   grep -Fx "$childhome_abs" "$sweep_log" >/dev/null || fail "force teardown did not sweep the nested secondmate home"
@@ -1840,7 +1840,7 @@ EOF
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-nested-fail-fake/pane.txt" \
     FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" FM_FAKE_PROCEVENT_REARM_LOG="$rearm_log" \
     FM_FAKE_TREEHOUSE_RETURN_FAIL=1 FM_FAKE_PROCEVENT_REARM_FAIL=1 \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"
   rc=$?
   set -e
 
@@ -1993,7 +1993,7 @@ EOF
     fail "teardown allowed a secondmate with in-flight child work"
   fi
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-teardown-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>/dev/null \
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>/dev/null \
     || fail "force teardown failed to discard child work"
   [ ! -d "$subhome" ] || fail "force teardown did not remove the retired secondmate home"
   [ ! -d "$childwt" ] || fail "force teardown did not remove child worktree"
@@ -2045,7 +2045,7 @@ EOF
   set +e
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-duplicate-slot-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "forced secondmate teardown returned a duplicated child slot"
@@ -2132,7 +2132,7 @@ SH
   set +e
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-lock-child-fake/pane.txt" \
     FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"
   rc=$?
   set -e
 
@@ -2171,7 +2171,7 @@ EOF
     fakebin=$(make_fake_tmux "$TMP_ROOT/symlink-inside-teardown-fake-$opdir")
     log="$TMP_ROOT/symlink-inside-teardown-fake-$opdir/tmux.log"
     PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/symlink-inside-teardown-fake-$opdir/pane.txt" \
-      "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err" \
+      "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err" \
       || fail "force teardown refused $opdir symlinked inside the secondmate home"
     [ ! -e "$subhome" ] || fail "force teardown did not remove subhome with inside $opdir symlink"
     [ ! -e "$home/state/domain.meta" ] || fail "force teardown did not clear parent meta for inside $opdir symlink"
@@ -2204,7 +2204,7 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/symlink-state-teardown-fake")
   log="$TMP_ROOT/symlink-state-teardown-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/symlink-state-teardown-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "force teardown accepted a symlinked secondmate state directory"
   fi
   [ -d "$subhome" ] || fail "force teardown removed subhome after symlinked state refusal"
@@ -2397,7 +2397,7 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/prevalidate-teardown-fake")
   log="$TMP_ROOT/prevalidate-teardown-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/prevalidate-teardown-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "force teardown discarded child work before validating subhome"
   fi
   [ -d "$subhome" ] || fail "force teardown removed unmarked subhome after refusal"
@@ -2522,7 +2522,7 @@ EOF
   log="$TMP_ROOT/taskset-state-file-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-file-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "forced teardown accepted a non-directory descendant state path"
   fi
   [ -d "$subhome" ] || fail "state-path refusal removed the descendant home"
@@ -2547,7 +2547,7 @@ EOF
   log="$TMP_ROOT/taskset-state-symlink-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-symlink-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "forced teardown accepted a symlinked descendant state path"
   fi
   [ -d "$subhome" ] || fail "symlinked state-path refusal removed the descendant home"
@@ -2589,7 +2589,7 @@ SH
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-absent-fake/pane.txt" \
     XDG_STATE_HOME="$TMP_ROOT/taskset-state-absent-xdg" \
     FM_TASK_SET_TEST_READY="$ready" FM_TASK_SET_TEST_RELEASE="$release" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err" &
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   pid=$!
   while [ ! -e "$ready" ] && kill -0 "$pid" 2>/dev/null && [ "$i" -lt 200 ]; do
@@ -2633,7 +2633,7 @@ EOF
   log="$TMP_ROOT/taskset-teardown-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-teardown-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "forced teardown proceeded while a task was being published"
   fi
   [ -d "$subhome" ] || fail "forced teardown removed the home despite refusing"
@@ -2738,7 +2738,7 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/child-active-descendant-fake")
   log="$TMP_ROOT/child-active-descendant-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-active-descendant-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "force teardown removed a child worktree inside active FM_HOME"
   fi
   [ -d "$home/data" ] || fail "force teardown removed active home data"
@@ -2789,7 +2789,7 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/child-repo-descendant-fake")
   log="$TMP_ROOT/child-repo-descendant-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fakeroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-repo-descendant-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "force teardown removed a child worktree inside FM_ROOT"
   fi
   [ -d "$childwt" ] || fail "force teardown removed repo descendant worktree"
@@ -2834,7 +2834,7 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/unregistered-child-fake")
   log="$TMP_ROOT/unregistered-child-fake/tmux.log"
   if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/unregistered-child-fake/pane.txt" \
-    "$ROOT/bin/fm-teardown.sh" domain --force >/dev/null 2>"$err"; then
+    "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"; then
     fail "force teardown removed an unregistered child worktree"
   fi
   [ -d "$childwt" ] || fail "force teardown removed unregistered child worktree"

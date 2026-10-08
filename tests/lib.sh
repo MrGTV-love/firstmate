@@ -342,6 +342,20 @@ fm_test_tmproot() {
   printf '%s\n' "$root"
 }
 
+# Ordinary-work teardown --force needs the captain's own words. One fixture words file serves every
+# case; it is created here, in the sourcing shell, so command substitutions reuse it.
+fm_test_drop_file() {
+  if [ ! -f "${FM_TEST_DROP_WORDS:-}" ]; then
+    FM_TEST_DROP_WORDS=$(fm_test_tmproot fm-drop-words)/captain-words.txt
+    printf 'Fixture: the captain approved discarding this work.\n' > "$FM_TEST_DROP_WORDS"
+    export FM_TEST_DROP_WORDS
+  fi
+  printf '%s\n' "$FM_TEST_DROP_WORDS"
+}
+fm_test_drop_file >/dev/null
+
+export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
+
 trap fm_test_cleanup EXIT
 trap 'fm_test_cleanup; exit 130' INT
 trap 'fm_test_cleanup; exit 143' TERM

@@ -1281,15 +1281,22 @@ backlog_record_reconcile() {
       return 2
     fi
     id=$(basename "$meta" .meta)
+    control_lock="$STATE/.control-$id.lock"
     meta_lock=$(fm_meta_lock_path "$meta") || continue
-    fm_lock_try_acquire "$meta_lock" || continue
+    fm_lock_try_acquire "$control_lock" || continue
+    if ! fm_lock_try_acquire "$meta_lock"; then
+      fm_lock_release "$control_lock"
+      continue
+    fi
     if [ -e "$STATE/$id.backlog-close" ] || [ -L "$STATE/$id.backlog-close" ]; then
       fm_lock_release "$meta_lock"
+      fm_lock_release "$control_lock"
       continue
     fi
     if ! fm_backlog_record_present "$meta" "task record" "$STATE"; then
       echo "BACKLOG_RECONCILE: $id: post-lock worker record check refused: $FM_BACKLOG_TRANSITION_ERROR"
       fm_lock_release "$meta_lock"
+      fm_lock_release "$control_lock"
       return 2
     fi
     if [ "$(fm_meta_get "$meta" kind)" != secondmate ] \
@@ -1312,6 +1319,7 @@ backlog_record_reconcile() {
       fi
     fi
     fm_lock_release "$meta_lock"
+    fm_lock_release "$control_lock"
   done
 }
 
