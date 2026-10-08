@@ -1651,7 +1651,7 @@ handle_paused_stale() {  # <window> <task> <hash>
   age=$(( now - mtime ))
   last=$(status_declared_wait_line "$statusf")
   min_age=$PAUSE_RESURFACE_SECS
-  declaration="declared:$(fm_wake_signal_sig "$statusf" || true)"
+  declaration=$(declared_wait_scope "$statusf")
   if status_is_captain_held "$last"; then
     if away_record_present; then
       triage_log "absorbed stale (captain-held, never rechecked while the away-posture record exists): $win"
@@ -1731,7 +1731,7 @@ busy_turn_bound_check() {  # <window> <task> <hash> <since-file> <escalation-fil
       key=$(window_key "$win")
       rm -f "$since_file" "$escalation_file"
       clear_write_tracking "$key"
-      declared="declared:$(fm_wake_signal_sig "$statusf" || true)"
+      declared=$(declared_wait_scope "$statusf")
       if captain_held_silenced "$(status_declared_wait_line "$statusf")"; then
         printf '%s' "$declared" > "$STATE/.stale-$key"
         triage_log "absorbed busy over-age pane (captain-held, never rechecked while the away-posture record exists): $win"
@@ -1869,12 +1869,23 @@ task_captain_call_open() {  # <task>
   return 0
 }
 
-# The identity a re-surface throttle is bound to: the task's whole status-log
-# signature. Any new status event - a replacement wait, a fresh delivery, a
-# blocker - changes it and so starts its own window instead of inheriting the
-# silence of the one before it.
+# The scope a declared wait's re-surface cadence is bound to, shared by every
+# path that throttles or hands off a declared wait. It is the wait's own identity
+# (status_declared_wait_identity), so a progress note restating the same keyed
+# wait stays inside the window its first sight opened, while a replacement wait or
+# a key re-declared after its resolution starts its own. When no identity can be
+# read it falls back to the task's whole status-log signature, under which any new
+# event starts a fresh window: that can only re-alarm more, never swallow an alarm.
+declared_wait_scope() {  # <status-file>
+  local identity
+  identity=$(status_declared_wait_identity "$1") || identity=
+  [ -n "$identity" ] || identity=$(fm_wake_signal_sig "$1" || true)
+  printf 'declared:%s' "$identity"
+}
+
+# The scope the stale re-surface throttle of a declared wait is bound to.
 stale_wait_declaration() {  # <task>
-  printf 'declared:%s' "$(fm_wake_signal_sig "$STATE/$1.status" || true)"
+  declared_wait_scope "$STATE/$1.status"
 }
 
 # The same scope for a captain call, carrying the CALL's own lifecycle identity

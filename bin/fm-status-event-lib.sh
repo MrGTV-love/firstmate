@@ -306,3 +306,85 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
   done
   return 1
 }
+
+# The identity of the declared wait status_declared_wait_line names, for a
+# consumer that must tell a RESTATED wait from a REPLACEMENT one. Prints
+# `<key>:<cksum>:<line>` and returns 0 while a wait is declared; returns 1 when
+# none is, so the caller falls back to the whole-log signature and can only ever
+# re-alarm more, never less.
+# A worker restates a long wait with fresh progress text under the same phase key,
+# and the log signature changes on every such append, so a throttle bound to the
+# signature treated each restatement as a new wait and re-opened its first-sight
+# alarm. The identity is the FIRST line of the contiguous episode instead: the
+# declared line plus the earlier lines of the same verb and key, reaching back past
+# resolved lines for other keys, and stopping at any other event or at a resolved
+# line for this key. A key re-declared after its own resolved line is therefore a
+# new episode even when both landed between two polls. A keyless line has no key
+# to compare, so it is its own episode (key `-`) and any new keyless text is a
+# replacement. <cksum> and <line> bind the identity to that first line's text and
+# position, so two identical lines in different episodes stay distinct.
+status_declared_wait_identity() {  # <status-file>
+  local f=$1 declared verb key resolve legacy_re total window rec idx text
+  declared=$(status_declared_wait_line "$f")
+  [ -n "$declared" ] && [ -f "$f" ] && [ -r "$f" ] || return 1
+  status_line_verb "$declared" verb
+  key=$(_fm_decision_key "$declared" '') || key=
+  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
+  total=$(grep -c '' "$f" 2>/dev/null) || return 1
+  window=$FM_CLASSIFY_EVENT_WINDOW_LINES
+  [ "$window" -le "$total" ] || window=$total
+  # Read the bounded tail first and widen to the whole file only when the episode
+  # may reach back past the window.
+  rec=$(tail -n "$window" "$f" 2>/dev/null \
+    | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || return 1
+  if [ "${rec%%$'\t'*}" = open ]; then
+    rec=$(_fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key" < "$f") || return 1
+    window=$total
+  fi
+  rec=${rec#*$'\t'}
+  idx=${rec%%$'\t'*}
+  text=${rec#*$'\t'}
+  printf '%s:%s:%s' "${key:--}" "$(printf '%s' "$text" | cksum | cut -d' ' -f1)" "$(( total - window + idx ))"
+}
+
+# Walk the status lines on stdin back from the newest event to the first line of
+# the declared wait's episode and print `<state>\t<1-based line index>\t<line>`,
+# where <state> is `open` when the episode reached the end of the input without a
+# closing event, so a caller reading a bounded window must widen it, and `closed`
+# otherwise. Returns 1 when the stream holds no declared wait.
+_fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <key>
+  local resolve=$1 legacy_re=$2 want_verb=$3 want_key=$4 line verb key i=0 first='' first_line='' state=open
+  local -a lines=()
+  while IFS= read -r line || [ -n "$line" ]; do
+    lines[i]=$line
+    i=$((i + 1))
+  done
+  while [ "$i" -gt 0 ]; do
+    i=$((i - 1))
+    line=${lines[i]}
+    case "$line" in *[![:space:]]*) ;; *) continue ;; esac
+    _fm_status_line_is_event "$line" "$legacy_re" || continue
+    status_line_verb "$line" verb
+    key=$(_fm_decision_key "$line" '') || key=
+    if [ -z "$first" ]; then
+      [ "$verb" != "$resolve" ] || continue
+      [ "$verb" = "$want_verb" ] || return 1
+      first=$((i + 1)); first_line=$line
+      [ -n "$want_key" ] || { state=closed; break; }
+      continue
+    fi
+    if [ "$verb" = "$resolve" ]; then
+      [ "$key" != "$want_key" ] || { state=closed; break; }
+      continue
+    fi
+    if [ "$verb" = "$want_verb" ] && [ "$key" = "$want_key" ]; then
+      first=$((i + 1)); first_line=$line
+      continue
+    fi
+    state=closed
+    break
+  done
+  [ -n "$first" ] || return 1
+  printf '%s\t%s\t%s\n' "$state" "$first" "$first_line"
+}

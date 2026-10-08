@@ -603,6 +603,36 @@ test_status_is_paused_classifier() {
   pass "status_is_paused: only the leading paused verb matches, paused is not captain-relevant, and the two declared-wait verbs stay separable"
 }
 
+# status_declared_wait_identity: a restated keyed wait keeps one identity, while a
+# replacement, a different key, or a key re-declared after its resolution does not.
+test_status_declared_wait_identity() {
+  local dir f one two
+  dir=$(make_case wait-identity); f="$dir/t.status"
+  ident() { status_declared_wait_identity "$f" || printf 'NONE'; }
+  printf 'paused [key=k] [at=1]: a\n' > "$f"; one=$(ident)
+  printf 'More prose.\n\npaused [key=k] [at=2]: b\nresolved [key=other] [at=3]: x\npaused [key=k] [at=4]: c\n' >> "$f"; two=$(ident)
+  [ "$one" = "$two" ] || fail "restating a keyed wait changed its identity: $one vs $two"
+  printf 'paused [key=j] [at=5]: d\n' >> "$f"; two=$(ident)
+  [ "$one" != "$two" ] || fail "a different key kept the previous wait's identity"
+  printf 'resolved [key=j] [at=6]: x\npaused [key=j] [at=7]: e\n' >> "$f"; one=$(ident)
+  [ "$one" != "$two" ] || fail "a key re-declared after its resolution kept the earlier episode's identity"
+  printf 'working [at=8]: resumed\npaused [key=j] [at=9]: f\n' >> "$f"; two=$(ident)
+  [ "$one" != "$two" ] || fail "a pause re-declared after the worker resumed kept the earlier identity"
+  printf 'paused [at=10]: keyless one\n' > "$f"; one=$(ident)
+  printf 'paused [at=11]: keyless two\n' >> "$f"; two=$(ident)
+  [ "$one" != "$two" ] || fail "new keyless text was treated as a restatement"
+  printf 'paused [key=k] [at=12]: g\nresolved [key=k] [at=13]: done\n' > "$f"
+  [ "$(ident)" = NONE ] || fail "a resolved wait still reported an identity"
+  # The episode reaches back past the bounded read window, so the whole file decides.
+  printf 'paused [key=k] [at=1]: a\n' > "$f"; one=$(FM_CLASSIFY_EVENT_WINDOW_LINES=3 ident)
+  printf 'paused [key=k] [at=2]: b\npaused [key=k] [at=3]: c\npaused [key=k] [at=4]: d\npaused [key=k] [at=5]: e\n' >> "$f"
+  two=$(FM_CLASSIFY_EVENT_WINDOW_LINES=3 ident)
+  [ "$(printf '%s' "$one" | cut -d: -f1,2)" = "$(printf '%s' "$two" | cut -d: -f1,2)" ] \
+    || fail "an episode longer than the read window lost its first line: $one vs $two"
+  unset -f ident
+  pass "status_declared_wait_identity: restatements share an identity; new keys, re-declared keys, and keyless text do not"
+}
+
 # crew_absorb_class: the single fm-crew-state.sh read that returns BOTH absorb
 # reasons - working (active run/busy pane), paused (declared external wait), or none
 # (surface it) - so the watcher's stale path gets both for one bounded call.
@@ -2966,6 +2996,72 @@ test_live_declared_wait_churn_honors_the_resurface_throttle() {
     [ "$bare" -eq 1 ] || fail "[$name] elapsed re-surface changed the wake identity: $(cat "$state/.wake-queue")"
   done
   pass "a parked live worker surfaces once, absorbs pane churn for the whole re-surface window, then re-surfaces when it elapses"
+}
+
+# --- a progress line under the SAME keyed wait is not a new wait --------------
+# The 2026-10-08 d2 lane: one keyed wait (`paused [key=main913-native-approve-wait]`)
+# restated with fresh progress text every ~8 minutes, and a stale alarm for the
+# parked live worker about a minute after EACH restatement. The throttle was bound
+# to the whole status-log signature, so any append - even the same wait's own
+# progress note - read as a replacement wait and re-opened the first-sight alarm.
+# The contract pinned here: the declared wait's identity is its phase key within
+# one contiguous episode, so a restatement stays inside the window its first sight
+# opened, while a different key, or the same key re-declared after it was resolved,
+# is a new wait whose first sight still surfaces.
+test_live_keyed_wait_restatement_is_not_a_new_wait() {
+  local dir state fakebin out capture_file statusf window key sig wakes throttle
+  dir=$(make_case keyed-wait-restatement); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/parked.status"
+  window="test:fm-parked"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  throttle="$state/.paused-resurfaced-$key"
+  printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/parked.meta"
+  printf 'paused [key=run-wait] [at=1]: waiting on the validation run (check 1)\n' > "$statusf"
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-parked_status"
+  printf 'parked, elapsed 1s' > "$capture_file"
+  printf '%s' "$(hash_text "$(cat "$capture_file")")" > "$state/.hash-$key"
+  printf '1\n' > "$state/.count-$key"
+
+  parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" exit \
+    || fail "first sight of a keyed wait on a parked live worker did not surface"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the keyed wait's first surface"
+  [ -e "$throttle" ] || fail "the keyed wait's first surface recorded no re-surface throttle"
+
+  # The same wait restated twice with new progress text, the pane churning each time.
+  for sig in 2 3; do
+    printf 'paused [key=run-wait] [at=%s]: waiting on the validation run (check %s)\n' "$sig" "$sig" >> "$statusf"
+    printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+    printf 'parked, restated %ss' "$sig" > "$capture_file"
+    parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" absorb \
+      || fail "watcher exited on restatement $sig of a keyed wait instead of absorbing it"
+    wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' \
+      "$state/.wake-queue" 2>/dev/null || echo 0)
+    [ "$wakes" -eq 0 ] || fail "restating the same keyed wait (check $sig) re-alarmed $wakes time(s)"
+    [ -e "$throttle" ] || fail "restating the same keyed wait (check $sig) cleared the re-surface throttle"
+  done
+
+  # A different key is a different wait: its first sight surfaces.
+  printf 'paused [key=release-wait] [at=4]: waiting on the release\n' >> "$statusf"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+  printf 'parked, other wait' > "$capture_file"
+  parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" exit \
+    || fail "a different keyed wait did not surface on its first sight"
+  wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' \
+    "$state/.wake-queue" 2>/dev/null || echo 0)
+  [ "$wakes" -eq 1 ] || fail "a different keyed wait produced $wakes first wakes instead of one"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the second keyed wait's first surface"
+
+  # The same key re-declared after it was resolved is a new episode, even when
+  # both lines land between two polls and the watcher never sees the gap.
+  printf 'resolved [key=release-wait] [at=5]: the release shipped\npaused [key=release-wait] [at=6]: waiting on the next release\n' >> "$statusf"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+  printf 'parked, same key again' > "$capture_file"
+  parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" exit \
+    || fail "a key re-declared after its resolution inherited the earlier episode's throttle"
+  wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' \
+    "$state/.wake-queue" 2>/dev/null || echo 0)
+  [ "$wakes" -eq 1 ] || fail "a re-declared keyed wait produced $wakes first wakes instead of one"
+  pass "restating a keyed wait stays inside its window, while a new key or a re-declared resolved key still surfaces"
 }
 
 test_live_paused_until_controls_recheck_time() {
@@ -6686,6 +6782,7 @@ test_classifier_primitives
 test_unrecognized_status_prefix_is_visible
 test_crew_is_provably_working_classifier
 test_status_is_paused_classifier
+test_status_declared_wait_identity
 test_crew_absorb_class_classifier
 test_crew_worktree_written_since_classifier
 test_empty_write_prune_widens_the_probe
@@ -6769,6 +6866,7 @@ test_exited_declared_pause_is_bounded_but_live_gate_surfaces
 test_own_work_wait_keeps_first_alert_then_long_cadence
 test_absorbed_replacement_wait_does_not_inherit_the_old_throttle
 test_live_declared_wait_churn_honors_the_resurface_throttle
+test_live_keyed_wait_restatement_is_not_a_new_wait
 test_live_paused_until_controls_recheck_time
 test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
 test_wedge_threshold_keeps_a_wait_past_a_default_key_answer
