@@ -213,7 +213,7 @@ EOF
 #!/usr/bin/env bash
 if [ "${1:-}" = send-keys ]; then
   touch "$FM_RECONCILE_RACE_ENTERED"
-  while [ ! -f "$FM_RECONCILE_RACE_RELEASE" ]; do sleep 0.02; done
+  while [ ! -f "$FM_RECONCILE_RACE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
   exit 1
 fi
 exec "$FM_BASE_TMUX" "$@"
@@ -562,7 +562,7 @@ case "$*" in
   *"Firstmate instruction waiting:"*)
     if mkdir "$FM_BLOCK_WAKE_ONCE" 2>/dev/null; then
       touch "$FM_BLOCK_WAKE_ENTERED"
-      while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
+      while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
     fi
     ;;
 esac
@@ -635,7 +635,7 @@ EOF
 case "$*" in
   *"Firstmate instruction waiting:"*)
     touch "$FM_BLOCK_WAKE_ENTERED"
-    while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
+    while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
     ;;
 esac
 exec "$FM_BASE_TMUX" "$@"

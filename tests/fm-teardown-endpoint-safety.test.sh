@@ -9,6 +9,23 @@ TEARDOWN="$ROOT/bin/fm-teardown.sh"
 TMP_ROOT=$(fm_test_tmproot fm-teardown-endpoint-safety)
 REAL_TMUX=$(command -v tmux || true)
 
+# Cases that start a real tmux server on a case-local socket kill it inline, so a
+# failed or interrupted case would leave the server and its shells running. Stop
+# any that survive before the shared cleanup removes the sockets.
+reap_isolated_tmux() {
+  local sock
+  [ -n "$REAL_TMUX" ] || return 0
+  for sock in "$TMP_ROOT"/*/dedicated.sock; do
+    [ -S "$sock" ] || continue
+    env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$sock" kill-server 2>/dev/null || true
+  done
+}
+trap 'reap_isolated_tmux; fm_test_cleanup' EXIT
+trap 'reap_isolated_tmux; fm_test_cleanup; exit 130' INT
+trap 'reap_isolated_tmux; fm_test_cleanup; exit 143' TERM
+trap 'reap_isolated_tmux; fm_test_cleanup; exit 129' HUP
+trap 'reap_isolated_tmux; fm_test_cleanup; exit 131' QUIT
+
 make_case() {  # <name>
   local dir=$1
   mkdir -p "$TMP_ROOT/$dir/home/state" "$TMP_ROOT/$dir/home/data" \

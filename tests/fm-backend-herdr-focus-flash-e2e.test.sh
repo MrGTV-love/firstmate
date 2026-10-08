@@ -143,9 +143,10 @@ B_SAMPLER_READY="$TMP_ROOT/sampler.ready"
 SAMPLER_STOP="$TMP_ROOT/sampler.stop"
 : > "$CALL_LOG"
 : > "$B_FOCUS_SAMPLES"
+SAMPLER_DEADLINE=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
 (
   : > "$B_SAMPLER_READY"
-  while [ ! -e "$SAMPLER_STOP" ]; do
+  while [ ! -e "$SAMPLER_STOP" ] && [ "$SECONDS" -lt "$SAMPLER_DEADLINE" ]; do
     if [ -e "$B_OPERATION_ACTIVE" ]; then
       if B_SAMPLE=$(focus_snapshot); then
         printf '%s\n' "$B_SAMPLE" >> "$B_FOCUS_SAMPLES"
@@ -273,9 +274,10 @@ C_SAMPLER_READY="$TMP_ROOT/sampler-c.ready"
 SAMPLER_STOP="$TMP_ROOT/sampler-c.stop"
 : > "$C_CALL_LOG"
 : > "$C_FOCUS_SAMPLES"
+SAMPLER_DEADLINE=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
 (
   : > "$C_SAMPLER_READY"
-  while [ ! -e "$SAMPLER_STOP" ]; do
+  while [ ! -e "$SAMPLER_STOP" ] && [ "$SECONDS" -lt "$SAMPLER_DEADLINE" ]; do
     if [ -e "$C_OPERATION_ACTIVE" ]; then
       if C_SAMPLE=$(focus_snapshot); then
         printf '%s\n' "$C_SAMPLE" >> "$C_FOCUS_SAMPLES"

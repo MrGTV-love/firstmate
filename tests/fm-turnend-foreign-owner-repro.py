@@ -11,6 +11,7 @@ import pathlib
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -144,11 +145,14 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+# A default SIGTERM would skip the finally below and strand the lock owners.
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+
 try:
     root, env = make("nonowner")
     owner = start(
         env,
-        '"$FM_ROOT_OVERRIDE/bin/fm-lock.sh" && touch "$FM_HOME/state/owner-ready" && while :; do sleep 1; done',
+        '"$FM_ROOT_OVERRIDE/bin/fm-lock.sh" && touch "$FM_HOME/state/owner-ready" && { i=0; while [ "$i" -lt 120 ]; do sleep 1; i=$((i+1)); done; }',
         "owner-idle.txt",
     )
     lock_path = root / "state/.lock"
@@ -219,7 +223,7 @@ try:
     same_env["CLAUDE_CODE_SESSION_ID"] = "synthetic-same"
     same_owner = start(
         same_env,
-        'export CLAUDE_PID=$$; "$FM_ROOT_OVERRIDE/bin/fm-lock.sh" && touch "$FM_HOME/state/owner-ready" && while :; do sleep 1; done',
+        'export CLAUDE_PID=$$; "$FM_ROOT_OVERRIDE/bin/fm-lock.sh" && touch "$FM_HOME/state/owner-ready" && { i=0; while [ "$i" -lt 120 ]; do sleep 1; i=$((i+1)); done; }',
         "same-owner.txt",
     )
     same_lock = same / "state/.lock"

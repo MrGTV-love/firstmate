@@ -143,8 +143,13 @@ hold_publish_lock() {  # <home>
   FM_STATE_OVERRIDE="$1/state" FM_ROOT_OVERRIDE="$ROOT" bash -c '
     . "$1/fm-wake-lib.sh"
     fm_lock_try_acquire "$2" || exit 1
-    exec sleep 120' _ "$ROOT/bin" "$lock" >/dev/null 2>&1 </dev/null &
+    while [ "$SECONDS" -lt 120 ]; do sleep 1; done' _ "$ROOT/bin" "$lock" >/dev/null 2>&1 </dev/null &
   holder=$!
+  # The caller captures this function in a command substitution, so the holder
+  # is not a job of the test shell: register it for the shared reap instead.
+  fm_test_record_process "$1/.publish-holder.$holder.pid" "$holder" \
+    || fail "could not record the publish lock holder identity"
+  fm_test_track_process "$1/.publish-holder.$holder.pid" "$lock"
   while [ "$(cat "$lock/pid" 2>/dev/null || true)" != "$holder" ] && [ "$waited" -lt 50 ]; do
     sleep 0.1
     waited=$((waited + 1))

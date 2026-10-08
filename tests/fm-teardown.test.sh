@@ -3745,9 +3745,8 @@ test_parked_own_run_refuses_when_abort_is_unconfirmed() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  ( cd "$case_dir/wt" && exec sleep 300 ) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
 
   cat > "$case_dir/fakebin/treehouse" <<EOF
 #!/usr/bin/env bash

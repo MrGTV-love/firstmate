@@ -76,6 +76,7 @@ rc=$?
 [ "$rc" = 124 ] || exit 21
 ! kill -0 "$pid" 2>/dev/null || exit 22
 '''
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
 p = subprocess.Popen([os.environ.get("BASH", "bash"), "-c", script, "_", sys.argv[1]],
                      start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 try:
@@ -84,6 +85,11 @@ except subprocess.TimeoutExpired:
     os.killpg(p.pid, signal.SIGKILL)
     p.communicate()
     raise SystemExit("wait_for_exit hung after its deadline on a stopped child")
+except BaseException:
+    # The child stops itself and ignores TERM, so an interrupt here would strand
+    # it for good. Its session is separate, so no terminal signal reaches it.
+    os.killpg(p.pid, signal.SIGKILL)
+    raise
 if p.returncode or "survived TERM; sending KILL" not in err:
     raise SystemExit(f"cleanup rc={p.returncode}, stdout={out}, stderr={err}")
 PY
@@ -276,7 +282,11 @@ test_slow_check_beats_but_stopped_poll_goes_stale() {
   cat > "$state/slow.check.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FM_HOME/state/check-started"
-while [ ! -e "$FM_HOME/state/check-release" ]; do sleep 0.1; done
+n=0
+while [ ! -e "$FM_HOME/state/check-release" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 10 )) ]; do
+  sleep 0.1
+  n=$((n + 1))
+done
 touch "$FM_HOME/state/check-finished"
 SH
   chmod 0700 "$state/slow.check.sh"
@@ -1157,7 +1167,11 @@ case "$last" in
       i=$((i + 1))
     done
     kill -TERM "$(cat "$FM_TEST_ARM_PID_FILE")" 2>/dev/null || true
-    while [ ! -e "$FM_TEST_RELEASE" ]; do sleep 0.05; done
+    n=0
+    while [ ! -e "$FM_TEST_RELEASE" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      n=$((n + 1))
+    done
     ;;
 esac
 exec /bin/ln "$@"

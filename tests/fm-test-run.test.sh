@@ -1653,8 +1653,8 @@ test_per_script_timeout_bounds_a_hang() {
   cat >"$repo/$hang" <<'SH'
 #!/usr/bin/env bash
 echo "ok - fixture is about to hang"
-sh -c 'trap "" TERM; echo $$ >"$1"; sleep 600' _ "$GRANDCHILD_PID" &
-sleep 600
+sh -c 'trap "" TERM; echo $$ >"$1"; sleep 25' _ "$GRANDCHILD_PID" &
+sleep 25
 SH
   chmod +x "$runner" "$repo/$hang"
 

@@ -71,7 +71,7 @@ test_term_ends_a_cooperative_command_at_the_bound() {
   dir="$TMP_ROOT/term"
   mkdir -p "$dir"
   started=$SECONDS
-  exec_timed "$PERL_ONLY" 1 30 bash -c 'echo $$ > "$1"; exec sleep 300' _ "$dir/pid" || rc=$?
+  exec_timed "$PERL_ONLY" 1 30 bash -c 'echo $$ > "$1"; exec sleep 25' _ "$dir/pid" || rc=$?
   elapsed=$((SECONDS - started))
   [ "$rc" -eq 124 ] || fail "an expired bound did not report 124 (rc=$rc)"
   [ "$elapsed" -ge 1 ] || fail "the bound fired before it elapsed (${elapsed}s)"
@@ -88,7 +88,7 @@ test_kill_ends_a_term_ignoring_command_after_the_grace() {
   dir="$TMP_ROOT/kill"
   mkdir -p "$dir"
   started=$SECONDS
-  exec_timed "$PERL_ONLY" 1 2 bash -c 'trap "" TERM; echo $$ > "$1"; exec sleep 300' _ "$dir/pid" || rc=$?
+  exec_timed "$PERL_ONLY" 1 2 bash -c 'trap "" TERM; echo $$ > "$1"; exec sleep 25' _ "$dir/pid" || rc=$?
   elapsed=$((SECONDS - started))
   [ "$rc" -eq 124 ] || fail "a KILL-forced expiry did not report 124 (rc=$rc)"
   [ "$elapsed" -ge 3 ] || fail "a TERM-ignoring command ended before bound plus grace (${elapsed}s): the grace was skipped"
@@ -131,7 +131,7 @@ test_a_descendant_holding_the_output_cannot_outlast_the_bound() {
   # The positional parameter belongs to the bounded shell.
   # shellcheck disable=SC2016
   out=$(exec_timed "$PERL_ONLY" 1 30 bash -c '
-    ( trap "" TERM; exec sleep 300 ) &
+    ( trap "" TERM; exec sleep 25 ) &
     echo $! > "$1"
     wait
   ' _ "$dir/pid") || rc=$?
@@ -187,7 +187,7 @@ test_a_named_owner_that_is_gone_ends_the_command() {
   (
     . "$ROOT/bin/fm-timeout-lib.sh"
     PATH=$PERL_ONLY FM_EXEC_TIMED_OWNER_PID=$gone \
-      fm_exec_timed 60 1 bash -c 'echo $$ > "$1"; exec sleep 300' _ "$dir/pid"
+      fm_exec_timed 60 1 bash -c 'echo $$ > "$1"; exec sleep 25' _ "$dir/pid"
   ) || rc=$?
   elapsed=$((SECONDS - started))
   [ "$elapsed" -lt 15 ] || fail "a watchdog whose named owner was gone ran to its bound (${elapsed}s)"
@@ -213,7 +213,7 @@ test_an_owner_that_dies_during_startup_ends_the_command() {
     (
       echo "$BASHPID" > "$2/watchdog"
       while kill -0 "$$" 2>/dev/null; do sleep 0.05; done
-      fm_exec_timed 60 1 bash -c "exec sleep 300"
+      fm_exec_timed 60 1 bash -c "exec sleep 25"
     ) >/dev/null 2>&1 &
     exit 0
   ' _ "$ROOT" "$dir"
@@ -291,7 +291,7 @@ test_gnu_timeout_kills_a_term_ignoring_command_after_the_grace() {
     ln -s "$(command -v "$tool")" "$fb/$tool"
   done
   started=$SECONDS
-  exec_timed "$fb" 1 2 bash -c 'trap "" TERM; exec sleep 300' || rc=$?
+  exec_timed "$fb" 1 2 bash -c 'trap "" TERM; exec sleep 25' || rc=$?
   elapsed=$((SECONDS - started))
   verdict=$( . "$ROOT/bin/fm-timeout-lib.sh"; fm_timed_out "$rc" && echo expired)
   [ "$verdict" = expired ] || fail "the GNU path's expiry status $rc is not a timed-out status"
@@ -327,6 +327,159 @@ test_run_timed_passes_a_natural_exit_through_a_fired_bound() {
   pass 'fm_run_timed passes a natural exit through when the bound fired after completion'
 }
 
+# A busy host schedules a freshly forked child late. SlowPgrp.pm delays only the
+# child's own setpgrp(0, 0), by longer than the bound, which is that lateness on
+# demand: the bound then fires before the child has made its process group.
+# With the parent creating the group too, the bound still reaches the child and
+# it never gets to run; without it the TERM and KILL reach nothing and the
+# command runs on, orphaned, in a group nothing will ever signal.
+SLOW_PGRP="$TMP_ROOT/slow-pgrp-lib"
+mkdir -p "$SLOW_PGRP"
+cat > "$SLOW_PGRP/SlowPgrp.pm" <<'PM'
+package SlowPgrp;
+BEGIN {
+  no warnings 'once';
+  *CORE::GLOBAL::setpgrp = sub {
+    select undef, undef, undef, 1.5 if @_ == 2 && $_[0] == 0;
+    CORE::setpgrp($_[0], $_[1]);
+  };
+}
+1;
+PM
+
+# A stub that records its pid and then blocks, capped at the suite's stub ceiling.
+write_blocking_stub() {  # <path>
+  cat > "$1" <<'SH'
+#!/usr/bin/env bash
+fm_test_record_process "$FM_STUB_PIDFILE" || exit 1
+while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
+SH
+  chmod +x "$1"
+}
+
+assert_stub_never_ran_or_is_gone() {  # <pidfile> <needle> <what>
+  local i
+  # Wait out the child's injected delay: a command the bound missed starts after it.
+  sleep 2.5
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    fm_test_process_alive "$1" "$2" || return 0
+    sleep 0.2
+  done
+  fail "$3 was left running after the bound fired"
+}
+
+test_run_timed_perl_bound_reaches_a_child_slow_to_start() {
+  local dir rc=0 stub
+  dir="$TMP_ROOT/slow-run-timed"
+  mkdir -p "$dir"
+  stub="$dir/stub"
+  write_blocking_stub "$stub"
+  fm_test_track_process "$dir/pid" "$stub"
+  (
+    . "$ROOT/bin/fm-timeout-lib.sh"
+    PATH="$PERL_ONLY" PERL5LIB="$SLOW_PGRP" PERL5OPT=-MSlowPgrp FM_STUB_PIDFILE="$dir/pid" \
+      fm_run_timed 1 "$stub"
+  ) || rc=$?
+  [ "$rc" -eq 124 ] || fail "the expired perl bound did not report 124 (rc=$rc)"
+  assert_stub_never_ran_or_is_gone "$dir/pid" "$stub" "a command slow to start"
+  pass "fm_run_timed's perl bound reaches a child that was slow to make its process group"
+}
+
+test_nm_bounded_perl_bound_reaches_a_child_slow_to_start() {
+  local fixture rc=0 stub
+  fixture="$TMP_ROOT/slow-nm-bounded"
+  mkdir -p "$fixture/bin"
+  stub="$fixture/bin/no-mistakes"
+  write_blocking_stub "$stub"
+  for tool in perl bash sleep; do
+    ln -s "$(command -v "$tool")" "$fixture/bin/$tool"
+  done
+  fm_test_track_process "$fixture/pid" "$stub"
+  (
+    . "$ROOT/bin/fm-nm-run-lib.sh"
+    PATH="$fixture/bin" PERL5LIB="$SLOW_PGRP" PERL5OPT=-MSlowPgrp FM_STUB_PIDFILE="$fixture/pid" \
+      fm_nm_run_bounded "$fixture" 1 axi status
+  ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 124 ] || fail "the expired no-mistakes bound did not report 124 (rc=$rc)"
+  assert_stub_never_ran_or_is_gone "$fixture/pid" "$stub" "a no-mistakes call slow to start"
+  pass "fm_nm_bounded's perl bound reaches a child that was slow to make its process group"
+}
+
+# The owner torn down by a TERM must not strand the bounded command in the process
+# group of its own that it was put in: the bound forwards the signal and exits 143.
+test_perl_bound_forwards_a_term_to_the_command() {
+  local dir rc=0 stub owner bound i
+  dir="$TMP_ROOT/term-forward"
+  mkdir -p "$dir"
+  stub="$dir/stub"
+  write_blocking_stub "$stub"
+  fm_test_track_process "$dir/pid" "$stub"
+  (
+    . "$ROOT/bin/fm-timeout-lib.sh"
+    PATH="$PERL_ONLY" FM_STUB_PIDFILE="$dir/pid" fm_timeout_perl_bound 60 "$stub"
+  ) &
+  owner=$!
+  wait_for_file "$dir/pid"
+  bound=$(pgrep -P "$owner" perl | head -1)
+  [ -n "$bound" ] || fail "could not find the bounding process under its owner"
+  kill -TERM "$bound"
+  wait "$owner" || rc=$?
+  [ "$rc" -eq 143 ] || fail "a TERMed bounding process did not report 143 (rc=$rc)"
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    fm_test_process_alive "$dir/pid" "$stub" || break
+    sleep 0.2
+  done
+  ! fm_test_process_alive "$dir/pid" "$stub" || fail "a TERMed bounding process left its command running"
+  pass "the perl bound forwards a TERM to its command's group"
+}
+
+test_nested_perl_bound_reaps_a_term_resistant_child() {
+  local dir stub out rc=0 started elapsed i
+  dir="$TMP_ROOT/nested-bound"
+  mkdir -p "$dir"
+  stub="$dir/stub"
+  cat > "$dir/SlowStop.pm" <<'PM'
+package SlowStop;
+BEGIN {
+  no warnings 'once';
+  *CORE::GLOBAL::select = sub {
+    my $delay = $_[3];
+    $delay = 0.8 if $ENV{FM_TEST_SLOW_STOP} && defined($delay) && $delay == 0.2;
+    CORE::select($_[0], $_[1], $_[2], $delay);
+  };
+}
+1;
+PM
+  cat > "$stub" <<'SH'
+#!/usr/bin/env bash
+trap "" TERM
+fm_test_record_process "$FM_STUB_PIDFILE" || exit 1
+echo nested-child-started
+while [ "$SECONDS" -lt 6 ]; do sleep 0.1; done
+SH
+  chmod +x "$stub"
+  fm_test_track_process "$dir/pid" "$stub"
+  started=$SECONDS
+  out=$(
+    . "$ROOT/bin/fm-timeout-lib.sh"
+    PATH="$PERL_ONLY" PERL5LIB="$dir" PERL5OPT=-MSlowStop FM_STUB_PIDFILE="$dir/pid" \
+      fm_run_timed 1 bash -c '
+        . "$1/bin/fm-nm-run-lib.sh"
+        FM_TEST_SLOW_STOP=1 fm_nm_bounded "$2" 30 "$3"
+      ' _ "$ROOT" "$dir" "$stub"
+  ) || rc=$?
+  elapsed=$((SECONDS - started))
+  [ "$rc" -eq 124 ] || fail "the outer nested bound did not report 124 (rc=$rc)"
+  assert_contains "$out" nested-child-started "the nested command never started"
+  [ "$elapsed" -lt 5 ] || fail "the nested command held stdout after the outer bound (${elapsed}s)"
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    fm_test_process_alive "$dir/pid" "$stub" || break
+    sleep 0.1
+  done
+  ! fm_test_process_alive "$dir/pid" "$stub" || fail "the outer bound left its nested command running"
+  pass "an outer Perl bound reaps a TERM-resistant nested command"
+}
+
 test_passes_the_command_status_and_output_through
 test_run_timed_reports_the_bound_when_the_wrapper_records_a_signal_death
 test_run_timed_passes_a_natural_exit_through_a_fired_bound
@@ -342,3 +495,7 @@ test_refuses_rather_than_running_unbounded
 test_rejects_malformed_bounds_before_running_anything
 test_gnu_timeout_kills_a_term_ignoring_command_after_the_grace
 test_timed_out_names_exactly_the_bound_statuses
+test_run_timed_perl_bound_reaches_a_child_slow_to_start
+test_nm_bounded_perl_bound_reaches_a_child_slow_to_start
+test_perl_bound_forwards_a_term_to_the_command
+test_nested_perl_bound_reaps_a_term_resistant_child

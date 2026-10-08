@@ -220,6 +220,15 @@ The kill test's fake `ps` walks real `/proc` ancestry to TERM the digest bash it
 Both process-tree cases therefore need a readable `/proc` and print a skip line without it, and the companion case that pins a signal death to a nonzero status on the perl timeout mechanism skips when `perl` is absent.
 These guarantees are process semantics, not vendor-emitted signals, so no live-harness guard is owed; the same suite is the refresh command.
 
+### Nested command bounds
+
+[`bin/fm-timeout-lib.sh`](../../bin/fm-timeout-lib.sh)'s header owns the shared Perl bound's process-group, signal, and owner-death contract.
+[`tests/fm-timeout-lib.test.sh`](../../tests/fm-timeout-lib.test.sh) exercises delayed child process-group creation through both `fm_run_timed` and `fm_nm_bounded`, TERM forwarding, and an outer deadline expiring before an inner bound with a TERM-resistant child and delayed inner cleanup.
+The nested-bound case checks that captured stdout closes promptly and the child is no longer running.
+[`tests/fm-crew-state.test.sh`](../../tests/fm-crew-state.test.sh)'s no-timeout case checks that the fake no-mistakes call actually ran and did not survive its bound before asserting the pane-state fallback.
+
+[`tests/lib.sh`](../../tests/lib.sh) owns registered fixture identity checks, stopped-watcher resumption, cleanup ordering, and the default blocking-stub ceiling.
+
 ## Semantic busy state
 
 The per-adapter semantic sources behind [`bin/fm-busy-lib.sh`](../../bin/fm-busy-lib.sh) were live-verified on 2026-07-28 against firstmate-launched workers wired exactly as `fm-spawn` writes them.

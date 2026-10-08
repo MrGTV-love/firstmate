@@ -636,7 +636,7 @@ test_remote_send_budget_bounds_busy_lane() {
 
   began=$(date +%s)
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=60 FM_SEND_REMOTE_BUDGET=2 \
+  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=25 FM_SEND_REMOTE_BUDGET=2 \
     "$SEND" rsm --key Enter >"$dir/key.out" 2>"$dir/key.err" || rc=$?
   elapsed=$(( $(date +%s) - began ))
   expect_code 1 "$rc" "a bounded remote key must preserve the existing failure contract"
@@ -651,7 +651,7 @@ test_remote_send_budget_bounds_busy_lane() {
   # unconfirmed result within its own budget instead of waiting the lane out.
   began=$(date +%s)
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=60 FM_SEND_REMOTE_BUDGET=2 \
+  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=25 FM_SEND_REMOTE_BUDGET=2 \
     "$SEND" rsm --fire-and-forget "$delivery" "reconcile your own books" \
     >"$dir/out" 2>"$dir/err" || rc=$?
   elapsed=$(( $(date +%s) - began ))
@@ -675,7 +675,7 @@ test_remote_send_budget_bounds_busy_lane() {
   # A reply-bearing send names the budget and prints the correlation-reusing
   # resend command, with the expectation preserved as delivery-unknown.
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=60 FM_SEND_REMOTE_BUDGET=2 \
+  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=25 FM_SEND_REMOTE_BUDGET=2 \
     "$SEND" rsm "please rename the metric" >"$dir/reply.out" 2>"$dir/reply.err" || rc=$?
   err=$(cat "$dir/reply.err")
   [ "$rc" -ne 0 ] || fail "a budget-bounded reply-bearing send must not claim confirmed delivery"
