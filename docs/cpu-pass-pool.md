@@ -23,7 +23,8 @@ Any language with `flock` can join the protocol below without calling a Firstmat
 Every participant on a host follows these rules, so one pool is shared by every Firstmate home, worktree, and repository of the same user.
 
 1. **Directory:** `FM_CPU_POOL_DIR` when set, else `$HOME/.cache/fm-cpu-pool`, created with mode `0700` and owned by the user.
-2. **Size:** `FM_CPU_POOL_SIZE` when set to a positive integer, else the host's logical CPU count (`os.cpu_count()`, which is `hw.ncpu` on macOS).
+2. **Size:** `FM_CPU_POOL_SIZE` when it is a positive integer; only an unset or blank value falls back to the host's logical CPU count (`os.cpu_count()`, which is `hw.ncpu` on macOS).
+   Any other value is a usage error: the participant rejects it and does not run the work, rather than silently using the CPU count.
    Load average does not shrink the pool: it includes interactive sessions that never take passes, so a load-based gate would hold tests back indefinitely on a host whose baseline load comes from idle sessions.
 3. **Passes:** pass `i` is an exclusive, non-blocking `flock` on `slot-<i>.lock` for `i` in `0..size-1`.
    A holder may write one line into each slot it holds, `pid=<pid> passes=<k> since=<epoch> label=<text>`, for status display.
