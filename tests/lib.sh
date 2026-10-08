@@ -197,10 +197,17 @@ fm_test_reap_watchers() {
     [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" != "$$" ] || continue
     lock_home=$(cat "$state/.watch.lock/fm-home" 2>/dev/null || true)
     [ -n "$lock_home" ] || continue
-    # A test that SIGSTOPs the watcher and fails before it resumes leaves TERM
-    # pending forever; continue it so the --stop below can end it.
     lock_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
-    case "$lock_pid" in '' | *[!0-9]*) ;; *) kill -CONT "$lock_pid" 2>/dev/null || true ;; esac
+    case "$lock_pid" in
+      '' | *[!0-9]*) ;;
+      *)
+        if FM_HOME="$lock_home" FM_STATE_OVERRIDE="$state" bash -c \
+          '. "$1"; fm_watcher_lock_matches_pid "$2" "$3" "$4" "$5"' \
+          _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$ROOT/bin/fm-watch.sh" "$lock_pid" "$lock_home"; then
+          kill -CONT "$lock_pid" 2>/dev/null || true
+        fi
+        ;;
+    esac
     FM_HOME="$lock_home" FM_STATE_OVERRIDE="$state" \
       "$ROOT/bin/fm-watch-arm.sh" --stop >/dev/null 2>&1 || true
   done < "$FM_TEST_WATCHER_REGISTRY"
@@ -214,13 +221,6 @@ fm_test_reap_watchers() {
 # (every perl bound does) puts it out of reach of a group-kill aimed at the test
 # run. Left behind by a failed or interrupted test, such a stub spins on as an
 # orphan, and many suites in parallel turned that into a host-wide CPU storm.
-#
-# The stub records its own pid (`echo $$ > "$pidfile"`) and the test registers
-# the pidfile with a needle that appears in the stub's command line, normally
-# the stub's own path. Registration goes through a `$$`-keyed registry file for
-# the same reason the runners above do. The reap kills the recorded process
-# group only while the pid still shows that needle, so a recycled pid is never
-# signalled, and it never matches on a process name alone.
 
 FM_TEST_PROCESS_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-process.$$.XXXXXX") || return 1
 
@@ -229,13 +229,34 @@ fm_test_track_process() {  # <pidfile> <command-needle>
   printf '%s\t%s\n' "$1" "$2" >> "$FM_TEST_PROCESS_REGISTRY"
 }
 
-# 0 iff the pid recorded in <pidfile> is alive and its command line holds <needle>.
-fm_test_process_alive() {  # <pidfile> <command-needle>
-  local pid command
-  pid=$(cat "$1" 2>/dev/null) || return 1
+fm_test_process_start() {
+  local pid=$1 ps_bin=/bin/ps start
   case "$pid" in '' | *[!0-9]*) return 1 ;; esac
-  command=$(ps -o command= -p "$pid" 2>/dev/null) || return 1
-  case "$command" in *"$2"*) return 0 ;; esac
+  [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
+  start=$(LC_ALL=C "$ps_bin" -o lstart= -p "$pid" 2>/dev/null) || return 1
+  [ -n "$start" ] || return 1
+  printf '%s\n' "$start"
+}
+
+fm_test_record_process() {
+  local pid=${2:-$$} start
+  start=$(fm_test_process_start "$pid") || return 1
+  printf '%s\t%s\n' "$pid" "$start" > "$1"
+}
+
+export -f fm_test_process_start fm_test_record_process
+
+fm_test_process_alive() {  # <pidfile> <command-needle>
+  local pid start current_start command ps_bin=/bin/ps
+  FM_TEST_PROCESS_PID=
+  IFS=$'\t' read -r pid start 2>/dev/null < "$1" || return 1
+  case "$pid" in '' | *[!0-9]*) return 1 ;; esac
+  [ -n "$start" ] || return 1
+  current_start=$(fm_test_process_start "$pid") || return 1
+  [ "$current_start" = "$start" ] || return 1
+  [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
+  command=$("$ps_bin" -o command= -p "$pid" 2>/dev/null) || return 1
+  case "$command" in *"$2"*) FM_TEST_PROCESS_PID=$pid; return 0 ;; esac
   return 1
 }
 
@@ -244,7 +265,7 @@ fm_test_reap_processes() {
   [ -f "$FM_TEST_PROCESS_REGISTRY" ] || return 0
   while IFS=$'\t' read -r pidfile needle; do
     fm_test_process_alive "$pidfile" "$needle" || continue
-    pid=$(cat "$pidfile")
+    pid=$FM_TEST_PROCESS_PID
     pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
     # Only a group the stub leads is its own to take down; a stub that shares
     # the test's group is signalled alone.

@@ -199,12 +199,25 @@ fm_run_external_timeout() {
 # A TERM, INT, or HUP delivered to the bounding process stops the group the
 # same way, so an owner torn down by a group-kill does not strand the command.
 fm_timeout_perl_bound() {  # <seconds> <command...>
+  local owner=${BASHPID:-$$}
   # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
-  perl -e '
-    my $t = shift;
+  perl -MPOSIX=WNOHANG -e '
+    my ($owner, $t) = (shift, shift);
+    my $parent = getppid();
+    my $pending = 0;
+    $SIG{ALRM} = sub { $pending ||= 124 };
+    $SIG{TERM} = sub { $pending ||= 143 };
+    $SIG{INT} = sub { $pending ||= 130 };
+    $SIG{HUP} = sub { $pending ||= 129 };
+    setpgrp(0, 0) or die "setpgrp: $!";
     my $pid = fork;
     die "fork failed" unless defined $pid;
-    if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127 }
+    if (!$pid) {
+      $SIG{$_} = "DEFAULT" for qw(ALRM TERM INT HUP);
+      setpgrp(0, 0);
+      exec @ARGV;
+      exit 127;
+    }
     setpgrp($pid, $pid);
     my $stop = sub {
       my $code = shift;
@@ -215,14 +228,17 @@ fm_timeout_perl_bound() {  # <seconds> <command...>
       waitpid $pid, 0;
       exit $code;
     };
-    $SIG{ALRM} = sub { $stop->(124) };
-    $SIG{TERM} = sub { $stop->(143) };
-    $SIG{INT} = sub { $stop->(130) };
-    $SIG{HUP} = sub { $stop->(129) };
     alarm $t;
-    waitpid $pid, 0;
-    exit(($? & 127) ? 128 + ($? & 127) : $? >> 8);
-  ' "$@"
+    while (1) {
+      $stop->($pending) if $pending;
+      my $done = waitpid $pid, WNOHANG;
+      exit(($? & 127) ? 128 + ($? & 127) : $? >> 8) if $done == $pid;
+      exit 127 if $done == -1;
+      $stop->(143) if getppid() != $parent || !kill(0, $owner);
+      select undef, undef, undef, 0.05;
+    }
+  ' "$owner" "$@"
+  return $?
 }
 
 fm_run_timed() {  # <seconds> <command...>

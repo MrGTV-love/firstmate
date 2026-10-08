@@ -351,7 +351,7 @@ PM
 write_blocking_stub() {  # <path>
   cat > "$1" <<'SH'
 #!/usr/bin/env bash
-echo $$ > "$FM_STUB_PIDFILE"
+fm_test_record_process "$FM_STUB_PIDFILE" || exit 1
 while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
 SH
   chmod +x "$1"
@@ -433,6 +433,53 @@ test_perl_bound_forwards_a_term_to_the_command() {
   pass "the perl bound forwards a TERM to its command's group"
 }
 
+test_nested_perl_bound_reaps_a_term_resistant_child() {
+  local dir stub out rc=0 started elapsed i
+  dir="$TMP_ROOT/nested-bound"
+  mkdir -p "$dir"
+  stub="$dir/stub"
+  cat > "$dir/SlowStop.pm" <<'PM'
+package SlowStop;
+BEGIN {
+  no warnings 'once';
+  *CORE::GLOBAL::select = sub {
+    my $delay = $_[3];
+    $delay = 0.8 if $ENV{FM_TEST_SLOW_STOP} && defined($delay) && $delay == 0.2;
+    CORE::select($_[0], $_[1], $_[2], $delay);
+  };
+}
+1;
+PM
+  cat > "$stub" <<'SH'
+#!/usr/bin/env bash
+trap "" TERM
+fm_test_record_process "$FM_STUB_PIDFILE" || exit 1
+echo nested-child-started
+while [ "$SECONDS" -lt 6 ]; do sleep 0.1; done
+SH
+  chmod +x "$stub"
+  fm_test_track_process "$dir/pid" "$stub"
+  started=$SECONDS
+  out=$(
+    . "$ROOT/bin/fm-timeout-lib.sh"
+    PATH="$PERL_ONLY" PERL5LIB="$dir" PERL5OPT=-MSlowStop FM_STUB_PIDFILE="$dir/pid" \
+      fm_run_timed 1 bash -c '
+        . "$1/bin/fm-nm-run-lib.sh"
+        FM_TEST_SLOW_STOP=1 fm_nm_bounded "$2" 30 "$3"
+      ' _ "$ROOT" "$dir" "$stub"
+  ) || rc=$?
+  elapsed=$((SECONDS - started))
+  [ "$rc" -eq 124 ] || fail "the outer nested bound did not report 124 (rc=$rc)"
+  assert_contains "$out" nested-child-started "the nested command never started"
+  [ "$elapsed" -lt 5 ] || fail "the nested command held stdout after the outer bound (${elapsed}s)"
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    fm_test_process_alive "$dir/pid" "$stub" || break
+    sleep 0.1
+  done
+  ! fm_test_process_alive "$dir/pid" "$stub" || fail "the outer bound left its nested command running"
+  pass "an outer Perl bound reaps a TERM-resistant nested command"
+}
+
 test_passes_the_command_status_and_output_through
 test_run_timed_reports_the_bound_when_the_wrapper_records_a_signal_death
 test_run_timed_passes_a_natural_exit_through_a_fired_bound
@@ -451,3 +498,4 @@ test_timed_out_names_exactly_the_bound_statuses
 test_run_timed_perl_bound_reaches_a_child_slow_to_start
 test_nm_bounded_perl_bound_reaches_a_child_slow_to_start
 test_perl_bound_forwards_a_term_to_the_command
+test_nested_perl_bound_reaps_a_term_resistant_child

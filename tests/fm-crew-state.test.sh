@@ -3111,7 +3111,7 @@ test_no_timeout_uses_perl_bound() {
   cat > "$d/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${FM_FAKE_NM_CALLS:-/dev/null}"
-printf '%s\n' "$$" > "$FM_FAKE_NM_PIDFILE"
+fm_test_record_process "$FM_FAKE_NM_PIDFILE" || exit 1
 while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
 SH
   chmod +x "$d/fakebin/no-mistakes"

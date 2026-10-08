@@ -220,6 +220,16 @@ The kill test's fake `ps` walks real `/proc` ancestry to TERM the digest bash it
 Both process-tree cases therefore need a readable `/proc` and print a skip line without it, and the companion case that pins a signal death to a nonzero status on the perl timeout mechanism skips when `perl` is absent.
 These guarantees are process semantics, not vendor-emitted signals, so no live-harness guard is owed; the same suite is the refresh command.
 
+### Nested command bounds
+
+The shared Perl runner in `bin/fm-timeout-lib.sh` serves both `fm_run_timed` and `fm_nm_bounded`.
+It installs deferred signal handlers before forking and isolates its watchdog from the caller's process group.
+If an outer bound kills the caller, the watchdog detects owner death and completes TERM-to-KILL cleanup of its command group without being killed by the outer escalation.
+`tests/fm-timeout-lib.test.sh` exercises an outer deadline expiring before an inner bound, with a TERM-resistant child and delayed inner cleanup; it checks that captured stdout closes promptly and no child survives.
+
+Blocking test fixtures publish their PID and birth identity before waiting; shared cleanup checks that identity and a fixture-specific command needle before signalling the process or its group.
+Watcher cleanup also verifies the lock's recorded identity before resuming a stopped watcher.
+
 ## Semantic busy state
 
 The per-adapter semantic sources behind [`bin/fm-busy-lib.sh`](../../bin/fm-busy-lib.sh) were live-verified on 2026-07-28 against firstmate-launched workers wired exactly as `fm-spawn` writes them.
