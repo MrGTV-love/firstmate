@@ -128,13 +128,18 @@ function roster(catalogs) {
       let skill = null;
       let reason = null;
       try {
-        if (!lstatSync(join(dir, child)).isDirectory()) continue;
-        if (!lstatSync(path, { throwIfNoEntry: false })) continue;
-        if (!lstatSync(path).isFile()) {
+        const entry = lstatSync(join(dir, child));
+        if (entry.isSymbolicLink()) {
           reason = 'not a Git-tracked file in this project';
         } else {
-          const text = readHead(path);
-          try { skill = frontmatter(text); } catch { reason = 'no readable description'; }
+          if (!entry.isDirectory()) continue;
+          if (!lstatSync(path, { throwIfNoEntry: false })) continue;
+          if (!lstatSync(path).isFile()) {
+            reason = 'not a Git-tracked file in this project';
+          } else {
+            const text = readHead(path);
+            try { skill = frontmatter(text); } catch { reason = 'no readable description'; }
+          }
         }
       } catch (error) {
         throw new Error(`could not read skill catalog entry ${path}: ${error.message}`);

@@ -4614,9 +4614,9 @@ spawn_assert_agent_worktree
 # record say plainly why.
 SKILL_SELECTION_BOUND=30
 SKILL_SELECTION_STATUS='' SKILL_SELECTION_REASON='' SKILL_SELECTION_PICKED=''
-if { [ "$KIND" = ship ] || [ "$KIND" = scout ]; } && [ "$RAW_LAUNCH" = 1 ] && [[ "$LAUNCH" != *'__BRIEF__'* ]]; then
+if { [ "$KIND" = ship ] || [ "$KIND" = scout ]; } && [ "$RAW_LAUNCH" = 1 ] && [[ "$LAUNCH" != *'__BRIEF__'* ]] && [[ "$LAUNCH" != *'__BRIEFDOORBELL__'* ]] && [ "$HARNESS" != kimi ] && [ "$HARNESS" != rovo ]; then
   SKILL_SELECTION_STATUS=undelivered
-  SKILL_SELECTION_REASON="raw launch command has no __BRIEF__ placeholder"
+  SKILL_SELECTION_REASON="raw launch command has no supported brief transport"
   echo "skill selection for $ID: $SKILL_SELECTION_STATUS - $SKILL_SELECTION_REASON" >&2
 elif [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   skill_section="$DATA/$ID/.skill-selection.md.${BASHPID:-$$}"

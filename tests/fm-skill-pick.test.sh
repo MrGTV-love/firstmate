@@ -212,6 +212,52 @@ for roster_case in absent empty untracked undescribed partial; do
     assert_equals "$count" "$(requests)" "the $roster_case $threshold request count"
   done
 done
+
+linked_target="$TMP_ROOT/linked-target"
+skill "$linked_target" TARGET-FRONTMATTER-SENTINEL 'description: LINKED-DESCRIPTION-SENTINEL'
+printf 'LINKED-BODY-SENTINEL\n' >> "$linked_target/TARGET-FRONTMATTER-SENTINEL/SKILL.md"
+for linked_case in entirely mixed precedence; do
+  reset; keys
+  roster="$TMP_ROOT/linked-$linked_case"
+  git init -q "$roster"
+  mkdir -p "$roster/.agents/skills" "$roster/.claude/skills"
+  ln -s "$linked_target/TARGET-FRONTMATTER-SENTINEL" "$roster/.agents/skills/agents-link"
+  ln -s "$linked_target/TARGET-FRONTMATTER-SENTINEL" "$roster/.claude/skills/claude-link"
+  if [ "$linked_case" != entirely ]; then
+    skill "$roster/.agents/skills" alpha 'description: Use for alpha work.'
+  fi
+  if [ "$linked_case" = precedence ]; then
+    skill "$roster/.claude/skills" agents-link 'description: LATER-DUPLICATE-SENTINEL'
+  fi
+  git -C "$roster" add -- .agents .claude
+  roster_json=$(node "$ROOT/bin/fm-skill-pick.mjs" roster "$roster/.agents/skills" "$roster/.claude/skills")
+  printf '%s\n' "$roster_json" | jq -e '
+    (.not_judged | map(.name) | sort) == ["agents-link","claude-link"]
+    and all(.not_judged[]; .reason == "not a Git-tracked file in this project")
+    and all(.skills[]; .name == "alpha")' >/dev/null \
+    || fail "linked directories keep their local names and exclusion reasons in the public roster"
+  assert_not_contains "$roster_json" SENTINEL "the roster never reads linked target frontmatter or body"
+  out=$(env FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FM_HOME="$HOME_DIR" FAKE_PICK=alpha \
+    bash "$TOOL" --brief "$TMP_ROOT/brief.md" --catalog "$roster/.agents/skills" \
+    --catalog "$roster/.claude/skills" --record "$TMP_ROOT/record")
+  for name in agents-link claude-link; do
+    assert_contains "$out" "$name (not a Git-tracked file in this project)" "linked skills remain visible for local checking"
+  done
+  if [ "$linked_case" = entirely ]; then
+    grep -qx 'status=unavailable' "$TMP_ROOT/record" || fail "entirely linked catalogs are unavailable"
+    assert_contains "$out" "no project skills could be judged:" "entirely linked catalogs report their exclusions"
+    assert_equals 0 "$(requests)" "entirely linked catalogs make no requests"
+  else
+    grep -qx 'status=picked' "$TMP_ROOT/record" || fail "normal tracked skills can still be selected"
+    grep -qx 'picked=alpha' "$TMP_ROOT/record" || fail "only the normal skill is picked"
+    assert_contains "$out" "- Picked for this task: alpha" "mixed catalogs deliver the normal skill"
+    assert_equals 2 "$(requests)" "mixed catalogs judge the normal tracked skill"
+    jq -se 'all(.[]; (.body.questions.which.criteria | keys) == ["alpha"])' "$LOG" >/dev/null \
+      || fail "links and later duplicates never enter ranking or reranking"
+  fi
+  assert_not_contains "$(cat "$LOG")" SENTINEL "no linked target or shadowed duplicate content reaches transport"
+done
+pass "linked skill directories are visible but never read or judged, with earlier catalog precedence"
 pass "empty, excluded and partially judged rosters have distinct outcomes"
 
 reset; keys
@@ -562,6 +608,134 @@ for raw in plain brief; do
   esac
 done
 pass "raw launch records match delivery capability"
+
+raw_pointer_fake() {
+  mv "$SPAWN_FAKEBIN/tmux" "$SPAWN_FAKEBIN/tmux-base"
+  fm_fake_exit0 "$SPAWN_FAKEBIN" rovo
+  cat > "$SPAWN_FAKEBIN/tmux" <<'SH'
+#!/usr/bin/env bash
+set -eu
+state=$(cat "$POINTER_STATE" 2>/dev/null || true)
+screen() {
+  if [ "$state" = delivered ]; then
+    printf 'Read the brief at %s and follow it exactly.\nContext: | 3.3%% 30.1K/922K\n' "$POINTER_BRIEF"
+  else
+    printf 'Welcome to Rovo!\nContext: | 0.0%% 0/922K\n? for shortcuts.\n'
+  fi
+  printf '╭────────────────────────────────╮\n'
+  if [ "$state" = typed ]; then printf '│ > Read the brief and follow it │\n'
+  else printf '│ >                              │\n'; fi
+  printf '╰────────────────────────────────╯\n'
+}
+case "$*" in
+  *"#{cursor_y}"*) printf '4\n'; exit 0 ;;
+esac
+case "${1:-}" in
+  send-keys)
+    prev=
+    for arg in "$@"; do
+      if [ "$prev" = -l ] && [[ "$arg" = 'Read the brief at '* ]]; then
+        printf '%s\n' "$arg" >> "$POINTER_LOG"
+        printf 'typed\n' > "$POINTER_STATE"
+        exit 0
+      fi
+      prev=$arg
+    done
+    if [ "$state" = typed ]; then
+      case " $* " in *' Enter '*) printf 'delivered\n' > "$POINTER_STATE" ;; esac
+    fi
+    ;;
+  capture-pane)
+    start= end= prev=
+    for arg in "$@"; do
+      case "$prev" in -S) start=$arg ;; -E) end=$arg ;; esac
+      case "$arg" in -S|-E) prev=$arg ;; *) prev= ;; esac
+    done
+    case "$start:$end" in
+      *[!0-9:]*|'':*|*:'') screen ;;
+      *) screen | awk -v start="$start" -v end="$end" 'NR - 1 >= start && NR - 1 <= end' ;;
+    esac
+    exit 0
+    ;;
+esac
+exec "$(dirname "$0")/tmux-base" "$@"
+SH
+  chmod +x "$SPAWN_FAKEBIN/tmux"
+}
+
+for transport in doorbell pointer; do
+  for outcome in picked none unavailable; do
+    reset
+    id="raw-$transport-$outcome"
+    spawn_case "$id"
+    printf 'TYPESAFE_API_KEY=ts-spawn-key\n' > "$SPAWN_HOME/.env"
+    gate=0.8
+    case "$outcome" in
+      none) gate=0.1 ;;
+      unavailable) rm "$SPAWN_HOME/.env" ;;
+    esac
+    brief="$SPAWN_HOME/data/$id/launch-brief.md"
+    pointer_log="$TMP_ROOT/$id.pointer"
+    case "$transport" in
+      doorbell) harness='custom-agent --brief __BRIEFDOORBELL__' ;;
+      pointer) harness='rovo run --yolo'; raw_pointer_fake ;;
+    esac
+    launch_log="$TMP_ROOT/$id.launch"
+    out=$(FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FAKE_PICK=alpha FAKE_GATE="$gate" \
+      FM_FAKE_LAUNCH_LOG="$launch_log" POINTER_LOG="$pointer_log" POINTER_STATE="$TMP_ROOT/$id.pointer-state" \
+      POINTER_BRIEF="$brief" FM_ROVO_READY_POLLS=3 FM_ROVO_DELIVERY_POLLS=3 FM_ROVO_POLL_INTERVAL=0 \
+      FM_ROVO_SUBMIT_SLEEP=0 \
+      fm_test_run_spawn "$SPAWN_HOME" "$SPAWN_POOL" "$SPAWN_FAKEBIN" "$id" "$SPAWN_PROJECT" \
+      --harness "$harness" --mode no-mistakes --yolo off)
+    assert_contains "$out" "spawned $id" "the raw $transport $outcome launch succeeds"
+    meta="$SPAWN_HOME/state/$id.meta"
+    grep -qx "skill_selection=$outcome" "$meta" || fail "raw $transport metadata records $outcome"
+    payload=$(cat "$brief")
+    case "$transport" in
+      doorbell)
+        probe="$TMP_ROOT/$id.argv"
+        mkdir -p "$probe"
+        cat > "$probe/custom-agent" <<'SH'
+#!/bin/sh
+[ "$1" = --brief ] || exit 1
+printf '%s' "$2"
+SH
+        chmod +x "$probe/custom-agent"
+        doorbell=$(fm_eval_launch "$(cat "$launch_log")" "$SPAWN_POOL" "$probe")
+        record=$(printf '%s' "$doorbell" | sed -n "s/.*Firstmate operational input waiting: read '\\([^']*\\)'.*/\\1/p")
+        [ -f "$record" ] || fail "raw doorbell command names a published inbox record"
+        payload=$(FM_STATE_OVERRIDE="$SPAWN_HOME/state" "$ROOT/bin/fm-operational-input.sh" open "$record")
+        assert_equals "$(cat "$brief")" "$payload" "raw doorbell inbox holds the generated brief"
+        ;;
+      pointer)
+        assert_contains "$(cat "$launch_log")" 'rovo run --yolo' "the raw pointer launch command is retained"
+        assert_equals "Read the brief at $brief and follow it exactly." "$(cat "$pointer_log")" "the pointer names the generated brief"
+        ;;
+    esac
+    case "$outcome" in
+      picked)
+        assert_contains "$payload" "- Picked for this task: alpha - read $SPAWN_POOL/.agents/skills/alpha/SKILL.md" "raw $transport delivers the project pick"
+        grep -qx 'skill_selection_picked=alpha' "$meta" || fail "raw $transport metadata carries the delivered pick"
+        assert_equals 2 "$(requests)" "raw $transport picked outcome uses normal selection"
+        ;;
+      none)
+        assert_contains "$payload" "Skill selection found no fit among the judged project skills" "raw $transport delivers the no-fit outcome"
+        assert_equals 1 "$(requests)" "raw $transport no-fit outcome stops after gating"
+        ;;
+      unavailable)
+        assert_contains "$payload" "Skill selection was unavailable for this task (no TypeSafe or OpenRouter key)" "raw $transport delivers the unavailable reason"
+        assert_equals 0 "$(requests)" "raw $transport without keys sends nothing"
+        ;;
+    esac
+    if [ "$outcome" != picked ]; then
+      reason=$(sed -n 's/^skill_selection_reason=//p' "$meta")
+      [ -n "$reason" ] || fail "raw $transport metadata has an outcome reason"
+      assert_contains "$payload" "$reason" "raw $transport brief and metadata agree on the reason"
+      assert_not_contains "$(cat "$meta")" 'skill_selection_picked=' "raw $transport without a pick claims none"
+    fi
+  done
+done
+pass "raw doorbell and pointer transports deliver picked, none and unavailable outcomes"
 
 reset
 spawn_case failed-overlay
