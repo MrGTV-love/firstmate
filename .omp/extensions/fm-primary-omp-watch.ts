@@ -48,17 +48,15 @@
 //
 // Delivery versus consumption (stated once here):
 // A main wake is delivered once omp accepts it (sendUserMessage returns).
-// While main is streaming it is queued as a follow-up. While main is idle it is
-// sent through the prompt flow instead, because omp leaves an idle explicit
-// follow-up queued with no turn whenever its context tail is not an assistant
-// or tool result, such as an advisor note posted after the turn ended
-// (verified, omp 18.8.1); the prompt flow starts the turn and flushes any
-// follow-up already stranded there.
+// docs/watcher-continuity.md#omp-idle-wake-delivery owns idle delivery and
+// composer safety. An idle explicit follow-up may never start a turn behind a
+// custom context tail (verified, omp 18.8.1), so positive idle proof must use
+// the prompt flow.
 // The successor pipeline never waits for the model to read it: a follow-up
 // queued while main is streaming joins the running run without ever raising
 // before_agent_start, so waiting on that event stalls every later close.
-// Consumption is tracked only so a replacement can replay a follow-up omp had
-// not consumed. Consumption matches the accepted user message_start exactly.
+// Consumption tracks which accepted wakes remain eligible for recovery or
+// replacement replay; docs/watcher-continuity.md owns the consumption contract.
 //
 // Restored-wake recovery is documented in docs/watcher-continuity.md.
 // Recovery must use the real editor and resend only this extension's unchanged
@@ -128,10 +126,10 @@ type SessionGeneration = {
   seq: number;
   pendingActionables: PendingActionableClose[];
   cleanupFailure: string;
-  // Main follow-ups omp has accepted but not yet consumed, by pending token.
+  // Main wakes omp has accepted but not yet consumed, by pending token.
   // Never cleared at shutdown: a delivery continuation that runs after the
-  // replacement began reads it to tell a main-queued wake (replayed) from a
-  // branch-handled one (finished).
+  // replacement began still needs to distinguish unconsumed wakes from
+  // consumed ones.
   unconsumedWakes: Map<string, UnconsumedWake>;
   // A verified successor's failure close that arrived while the pipeline was
   // still delivering the wake it was started for; its bounded retry runs once
@@ -580,7 +578,7 @@ export default function (pi: ExtensionAPI) {
     }
     // Accepted by omp (sendUserMessage returns synchronously there; awaiting a
     // non-promise resolves at once). A generation replaced while omp was
-    // accepting it may have lost the follow-up with the old session, so report
+    // accepting it may have lost the wake with the old session, so report
     // it undelivered and let the replacement replay the still-pending record.
     return generationIsLive(owner);
   }
@@ -841,7 +839,7 @@ export default function (pi: ExtensionAPI) {
           }
           const awaitingConsumption = owner.unconsumedWakes.has(pending.token);
           if (awaitingConsumption && !generationIsLive(owner)) {
-            // omp accepted the follow-up, then the session was replaced before
+            // omp accepted the wake, then the session was replaced before
             // this continuation ran: the shutdown persisted the still-pending
             // record, so a replacement waiting on this claim must replay it.
             settleClaim("failed");
