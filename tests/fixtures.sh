@@ -322,6 +322,9 @@ fm_test_make_spawn_fakebin() {
   fakebin=$(fm_fakebin "$dir")
   fm_test_fake_tmux_spawn "$fakebin"
   fm_fake_exit0 "$fakebin" treehouse "$@"
+  if [ -x "$fakebin/omp" ]; then
+    fm_fake_version_tool "$fakebin" omp FM_FAKE_OMP_VERSION 18.1.20
+  fi
   printf '%s\n' "$fakebin"
 }
 

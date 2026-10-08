@@ -126,6 +126,9 @@ make_fake_omp() {  # <fakebin>
   cat > "$1/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
+  --version)
+    printf 'omp/%s\n' "${FM_FAKE_OMP_VERSION:-18.1.20}"
+    ;;
   models)
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
@@ -161,6 +164,34 @@ run_scout_spawn() {  # <home> <wt> <fakebin> <launch-log> <spawn-args...>
   local home=$1 wt=$2 fakebin=$3 launchlog=$4
   shift 4
   FM_FAKE_LAUNCH_LOG="$launchlog" fm_test_run_spawn "$home" "$wt" "$fakebin" "$@" --scout
+}
+
+test_spawn_refuses_unsupported_omp_before_launch() {
+  local kind version rec id out status
+  local -a args
+  for kind in ship scout secondmate; do
+    for version in 18.1.11 18.1.19; do
+      id="omp-old-$kind-${version##*.}"
+      rec=$(make_spawn_case "$id" omp "$id")
+      read_case_record "$rec"
+      case "$kind" in
+        ship) args=(--mode local-only --yolo off) ;;
+        scout) args=(--scout) ;;
+        secondmate) args=(--secondmate) ;;
+      esac
+      out=$(FM_BACKEND=tmux FM_FAKE_OMP_VERSION="$version" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+        fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --harness omp "${args[@]}")
+      status=$?
+      expect_code 1 "$status" "unsupported omp must refuse $kind: $out"
+      assert_contains "$out" "installed omp version 'omp/$version'" "refusal must name installed version"
+      assert_contains "$out" "minimum supported version is 18.1.20" "refusal must name minimum"
+      assert_contains "$out" "omp update" "refusal must name upgrade step"
+      [ ! -s "$LAUNCH_LOG" ] || fail "unsupported omp reached $kind launch"
+      assert_absent "$HOME_DIR/state/$id.meta" "refused launch must not publish task metadata"
+      assert_absent "$HOME_DIR/state/$id.omp-ext.ts" "refused launch must not install task extension"
+    done
+  done
+  pass "fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch"
 }
 
 test_spawn_launch_line_and_worker_wiring() {
@@ -1034,6 +1065,7 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
 fi
 
 test_task_session_proof_tracks_active_session
+test_spawn_refuses_unsupported_omp_before_launch
 # omp puts a queued user follow-up back into the composer when a run is
 # interrupted (Esc, including fm-control interrupt) or dequeued (Alt+Up), which
 # leaves a delivered watcher wake unsubmitted. The watch extension must find that

@@ -2594,6 +2594,7 @@ omp)
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1
   }
+  fm_control_omp_launch_check "$OMP_BIN" || exit 1
   OMP_SESSION_CFG="$FM_ROOT/.omp/fm-session-overlay.yml"
   OMP_WORKER_CFG="$FM_ROOT/.omp/fm-worker-overlay.yml"
   [ -f "$OMP_SESSION_CFG" ] || {

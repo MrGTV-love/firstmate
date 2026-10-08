@@ -103,6 +103,27 @@ fm_control_harness_family() {  # <recorded-harness>
   esac
 }
 
+fm_control_omp_launch_check() {
+  local executable=${1:-} reported version
+  if [ -z "$executable" ]; then
+    executable=$(type -P omp 2>/dev/null) || {
+      echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
+      return 1
+    }
+  fi
+  if reported=$(OMP_SKIP_SETUP=1 "$executable" --version 2>/dev/null); then
+    version=${reported#omp/}
+    if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] &&
+       (( 10#${BASH_REMATCH[1]} > 18 ||
+          (10#${BASH_REMATCH[1]} == 18 && 10#${BASH_REMATCH[2]} > 1) ||
+          (10#${BASH_REMATCH[1]} == 18 && 10#${BASH_REMATCH[2]} == 1 && 10#${BASH_REMATCH[3]} >= 20) )); then
+      return 0
+    fi
+  fi
+  echo "error: installed omp version '${reported:-unknown}' is unsupported; minimum supported version is 18.1.20; run 'omp update' to upgrade before launching or relaunching" >&2
+  return 1
+}
+
 # Which task kinds an adapter is verified to run. muse, gemini, rovo, agy, and devin
 # are crewmate/scout adapters only: none has a primary supervision protocol,
 # and bin/fm-spawn.sh refuses a --secondmate launch on any of them. The control

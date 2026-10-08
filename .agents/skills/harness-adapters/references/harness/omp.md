@@ -1,6 +1,8 @@
 # omp (Oh My Pi)
 
-Verified for crew, scout, secondmate, and primary work on Herdr on 2026-09-05 with omp 18.1.11, building on the 2026-09-02 adapter investigation against 18.1.2.
+Minimum supported omp is 18.1.20: session-proof restoration requires [`AgentSession.waitForSessionTransition()` introduced in v18.1.20](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/session/agent-session.ts#L4368) (tag commit `1bd60c6fbd`), absent in v18.1.19 and v18.1.11.
+On 2026-10-08, `omp --version` verified the installed CLI as 18.8.1; this version check does not renew live crew, scout, secondmate, or primary verification on Herdr.
+Historical verification covered crew, scout, secondmate, and primary work on Herdr on 2026-09-05 with omp 18.1.11, building on the 2026-09-02 adapter investigation against 18.1.2; those versions are no longer supported.
 omp is a Pi fork, so `references/harness/pi.md` is the nearest relative; every difference from Pi is stated here.
 Cross-harness provider and credential identity is owned by `references/common/model-and-effort.md`.
 
@@ -8,7 +10,7 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 
 | Fact | Value |
 |---|---|
-| Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/fm-spawn.sh`; a missing binary refuses the spawn. |
+| Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/fm-spawn.sh`; a missing binary or version below 18.1.20 refuses every worker, scout, local secondmate, and relaunch before launch; `../../../bin/fm-control.sh` checks the replacement before stopping the current agent; upgrade with `omp update`. |
 | Launch | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns launch flags, session posture, worker memory scope, and secondmate extension loading. |
 | Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the crewmate/scout per-task extension marks busy at `agent_start`, and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). Secondmates do not load a parent-task busy adapter. |
 | Exit command | `/quit` (`/exit` and `/q` are aliases). |

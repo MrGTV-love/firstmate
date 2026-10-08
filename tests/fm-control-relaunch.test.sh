@@ -674,6 +674,43 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   pass "fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree"
 }
 
+test_relaunch_refuses_unsupported_omp_before_stopping() {
+  local dir out rc version
+  for version in 18.1.11 18.1.19; do
+    dir=$(new_case "omp-old-${version##*.}" omp-old)
+    add_ship_task "$dir" omp-old claude
+    cp "$dir/home/state/omp-old.meta" "$dir/prior.meta"
+    cp "$dir/home/data/omp-old/brief.md" "$dir/prior-brief.md"
+    cat > "$dir/fakebin/omp" <<SH
+#!/bin/sh
+if [ "\${1:-}" = --version ]; then
+  printf 'omp/$version\n'
+  exit 0
+fi
+printf 'unexpected omp invocation\n' >> '$dir/fake/keys'
+exit 1
+SH
+    chmod +x "$dir/fakebin/omp"
+    out=$(run_control "$dir" omp-old relaunch --harness omp --note "preserve current agent"); rc=$?
+    expect_code 1 "$rc" "unsupported omp replacement must refuse before stopping: $out"
+    assert_contains "$out" "installed omp version 'omp/$version'" "refusal must name installed version"
+    assert_contains "$out" "minimum supported version is 18.1.20" "refusal must name minimum"
+    assert_contains "$out" "omp update" "refusal must name upgrade step"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "refusal stopped the original agent"
+    [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "refusal sent lifecycle or launch input"
+    cmp -s "$dir/prior.meta" "$dir/home/state/omp-old.meta" || fail "refusal changed task metadata"
+    cmp -s "$dir/prior-brief.md" "$dir/home/data/omp-old/brief.md" || fail "refusal changed task instructions"
+    assert_absent "$dir/home/state/omp-old.control-relaunch" "refusal must precede relaunch transaction"
+    printf 'bash' > "$dir/fake/command"
+    out=$(run_spawn "$dir" omp-old --relaunch --harness omp); rc=$?
+    expect_code 1 "$rc" "direct relaunch must also refuse unsupported omp: $out"
+    assert_contains "$out" "installed omp version 'omp/$version'" "direct relaunch must name installed version"
+    [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "direct refusal sent launch input"
+    cmp -s "$dir/prior.meta" "$dir/home/state/omp-old.meta" || fail "direct refusal changed task metadata"
+  done
+  pass "fm-control relaunch: unsupported omp preserves the running agent and task"
+}
+
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text() {
   local dir out rc
   dir=$(new_case pending-exit rl43)
@@ -4247,6 +4284,7 @@ prepare_herdr_recovery() {  # <case-dir> <id> <kind>
   cat > "$dir/fakebin/omp" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
+  --version) printf 'omp/18.1.20\n' ;;
   models)
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"}]}'
     ;;
@@ -4973,6 +5011,7 @@ else
   echo "skip - recovery admission fixtures require compatible tasks-axi"
 fi
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
+test_relaunch_refuses_unsupported_omp_before_stopping
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
 test_relaunch_from_linked_home_preserves_recorded_worktree
