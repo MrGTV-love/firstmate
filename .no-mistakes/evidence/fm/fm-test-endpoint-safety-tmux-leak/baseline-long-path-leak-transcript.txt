@@ -1,0 +1,41 @@
+Command: TMPDIR=<worktree-local long path> bash tests/.endpoint-safety-baseline.sh
+Fault injection: failure
+
+STDOUT
+ok - fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call
+ok - fm-teardown: a concurrent lifecycle action refuses before mutation
+ok - fm-teardown: non-pool cleanup ignores unrelated task publication locks
+ok - fm-teardown: destructive cleanup serializes with metadata writers
+ok - cleanup identity: valid tmux, Herdr, Zellij, Orca, and cmux records validate while every empty backend target refuses
+ok - cleanup identity: an Orca record's real composite worktree id validates while a separatorless or newline-carrying id refuses
+ok - tmux backend: direct empty target returns nonzero without invoking tmux
+ok - process cleanup: creation-time PID identity removes only the exact child and preserves the control child
+ok - fm-teardown: exact tmux cleanup preserves invalid and prefix-matched neighbors while removing only the recorded target
+
+STDERR
+
+OBSERVED PROCESS AND FILESYSTEM STATE
+{
+  "label": "baseline-long-path-leak",
+  "mode": "failure",
+  "exit_status": 73,
+  "expected_status": 73,
+  "duration_seconds": 58.94,
+  "server_and_initial_pane_pids": [
+    22863,
+    22889,
+    40165,
+    40185
+  ],
+  "surviving_pids_after_exit": [
+    40165,
+    40185
+  ],
+  "temporary_entries_after_exit": [],
+  "socket_path_lengths": [
+    289
+  ],
+  "leak_diagnostic": false,
+  "expected_survivor_observed": true,
+  "survivors_after_safety_cleanup": []
+}

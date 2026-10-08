@@ -1,0 +1,42 @@
+Command: TMPDIR=<worktree-local long path> bash tests/fm-teardown-endpoint-safety.test.sh
+Fault injection: unreapable
+
+STDOUT
+ok - fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call
+ok - fm-teardown: a concurrent lifecycle action refuses before mutation
+ok - fm-teardown: non-pool cleanup ignores unrelated task publication locks
+ok - fm-teardown: destructive cleanup serializes with metadata writers
+ok - cleanup identity: valid tmux, Herdr, Zellij, Orca, and cmux records validate while every empty backend target refuses
+ok - cleanup identity: an Orca record's real composite worktree id validates while a separatorless or newline-carrying id refuses
+ok - tmux backend: direct empty target returns nonzero without invoking tmux
+ok - process cleanup: creation-time PID identity removes only the exact child and preserves the control child
+ok - fm-teardown: exact tmux cleanup preserves invalid and prefix-matched neighbors while removing only the recorded target
+
+STDERR
+not ok - isolated tmux server outlived the test: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DVMRC7TRN3SWV67P4B0VHR/.endpoint-validation/unreapable-server-diagnostic/long-isolated-temporary-directory-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/fm-teardown-endpoint-safety.JraFfj/close-failure/dedicated.sock
+
+OBSERVED PROCESS AND FILESYSTEM STATE
+{
+  "label": "unreapable-server-diagnostic",
+  "mode": "unreapable",
+  "exit_status": 1,
+  "expected_status": 1,
+  "duration_seconds": 66.17,
+  "server_and_initial_pane_pids": [
+    3660,
+    3674,
+    88461,
+    88514
+  ],
+  "surviving_pids_after_exit": [
+    3660,
+    3674
+  ],
+  "temporary_entries_after_exit": [],
+  "socket_path_lengths": [
+    294
+  ],
+  "leak_diagnostic": true,
+  "expected_survivor_observed": true,
+  "survivors_after_safety_cleanup": []
+}

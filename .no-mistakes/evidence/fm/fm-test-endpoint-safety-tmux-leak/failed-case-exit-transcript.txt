@@ -1,0 +1,36 @@
+Command: TMPDIR=<worktree-local long path> bash tests/fm-teardown-endpoint-safety.test.sh
+Fault injection: failure
+
+STDOUT
+ok - fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call
+ok - fm-teardown: a concurrent lifecycle action refuses before mutation
+ok - fm-teardown: non-pool cleanup ignores unrelated task publication locks
+ok - fm-teardown: destructive cleanup serializes with metadata writers
+ok - cleanup identity: valid tmux, Herdr, Zellij, Orca, and cmux records validate while every empty backend target refuses
+ok - cleanup identity: an Orca record's real composite worktree id validates while a separatorless or newline-carrying id refuses
+ok - tmux backend: direct empty target returns nonzero without invoking tmux
+ok - process cleanup: creation-time PID identity removes only the exact child and preserves the control child
+ok - fm-teardown: exact tmux cleanup preserves invalid and prefix-matched neighbors while removing only the recorded target
+
+STDERR
+
+OBSERVED PROCESS AND FILESYSTEM STATE
+{
+  "label": "failed-case-exit",
+  "mode": "failure",
+  "exit_status": 73,
+  "expected_status": 73,
+  "duration_seconds": 34.87,
+  "server_and_initial_pane_pids": [
+    5200,
+    5248,
+    44949,
+    44970
+  ],
+  "surviving_pids_after_exit": [],
+  "temporary_entries_after_exit": [],
+  "socket_path_lengths": [
+    282
+  ],
+  "leak_diagnostic": false
+}

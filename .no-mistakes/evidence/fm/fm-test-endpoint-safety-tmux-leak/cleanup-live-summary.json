@@ -1,0 +1,186 @@
+{
+  "scenarios": [
+    {
+      "label": "baseline-long-path-leak",
+      "mode": "failure",
+      "exit_status": 73,
+      "expected_status": 73,
+      "duration_seconds": 58.94,
+      "server_and_initial_pane_pids": [
+        22863,
+        22889,
+        40165,
+        40185
+      ],
+      "surviving_pids_after_exit": [
+        40165,
+        40185
+      ],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        289
+      ],
+      "leak_diagnostic": false,
+      "expected_survivor_observed": true,
+      "survivors_after_safety_cleanup": []
+    },
+    {
+      "label": "normal-long-path",
+      "mode": "normal",
+      "exit_status": 0,
+      "expected_status": 0,
+      "duration_seconds": 97.26,
+      "server_and_initial_pane_pids": [
+        2448,
+        2474,
+        12446,
+        12474,
+        34558,
+        34574,
+        57201,
+        57225,
+        74030,
+        74045,
+        83594,
+        83607,
+        86608,
+        86624
+      ],
+      "surviving_pids_after_exit": [],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        281,
+        282,
+        289,
+        290,
+        295,
+        299
+      ],
+      "leak_diagnostic": false
+    },
+    {
+      "label": "failed-case-exit",
+      "mode": "failure",
+      "exit_status": 73,
+      "expected_status": 73,
+      "duration_seconds": 34.87,
+      "server_and_initial_pane_pids": [
+        5200,
+        5248,
+        44949,
+        44970
+      ],
+      "surviving_pids_after_exit": [],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        282
+      ],
+      "leak_diagnostic": false
+    },
+    {
+      "label": "interrupted-int",
+      "mode": "signal-INT",
+      "exit_status": 130,
+      "expected_status": 130,
+      "duration_seconds": 35.79,
+      "server_and_initial_pane_pids": [
+        88204,
+        88216,
+        99830,
+        99858
+      ],
+      "surviving_pids_after_exit": [],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        281
+      ],
+      "leak_diagnostic": false
+    },
+    {
+      "label": "interrupted-term",
+      "mode": "signal-TERM",
+      "exit_status": 143,
+      "expected_status": 143,
+      "duration_seconds": 34.77,
+      "server_and_initial_pane_pids": [
+        3549,
+        3567,
+        28965,
+        29016
+      ],
+      "surviving_pids_after_exit": [],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        282
+      ],
+      "leak_diagnostic": false
+    },
+    {
+      "label": "interrupted-hup",
+      "mode": "signal-HUP",
+      "exit_status": 129,
+      "expected_status": 129,
+      "duration_seconds": 34.82,
+      "server_and_initial_pane_pids": [
+        13651,
+        13675,
+        42963,
+        42999
+      ],
+      "surviving_pids_after_exit": [],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        281
+      ],
+      "leak_diagnostic": false
+    },
+    {
+      "label": "interrupted-quit",
+      "mode": "signal-QUIT",
+      "exit_status": 131,
+      "expected_status": 131,
+      "duration_seconds": 44.16,
+      "server_and_initial_pane_pids": [
+        76043,
+        76052,
+        87722,
+        87744
+      ],
+      "surviving_pids_after_exit": [],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        282
+      ],
+      "leak_diagnostic": false
+    },
+    {
+      "label": "unreapable-server-diagnostic",
+      "mode": "unreapable",
+      "exit_status": 1,
+      "expected_status": 1,
+      "duration_seconds": 66.17,
+      "server_and_initial_pane_pids": [
+        3660,
+        3674,
+        88461,
+        88514
+      ],
+      "surviving_pids_after_exit": [
+        3660,
+        3674
+      ],
+      "temporary_entries_after_exit": [],
+      "socket_path_lengths": [
+        294
+      ],
+      "leak_diagnostic": true,
+      "expected_survivor_observed": true,
+      "survivors_after_safety_cleanup": []
+    }
+  ],
+  "unrelated_server": {
+    "unrelated_server_pid": 70340,
+    "sessions_after_all_scenarios": "validation-sentinel",
+    "survived_all_fixture_cleanup": true
+  }
+}
