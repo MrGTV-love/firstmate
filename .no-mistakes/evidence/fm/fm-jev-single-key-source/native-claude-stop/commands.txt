@@ -1,0 +1,18 @@
+# Executed from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T
+bash .native-stop-lab/setup.sh
+env FM_HERDR_LAB_STATE_DIR="$PWD/.native-stop-lab/helper-state" bin/fm-herdr-lab.sh provision fm-lab-native-stop-65931
+# provision internally performs prepare (explicit prepare would duplicate tripwire ownership)
+env FM_HERDR_LAB_STATE_DIR="$PWD/.native-stop-lab/helper-state" bin/fm-herdr-lab.sh run fm-lab-native-stop-65931 workspace create --cwd "$PWD/.native-stop-lab/case/wt" --label native-stop --no-focus
+# Observe + launch for each of three attempts:
+node .native-stop-lab/observe.mjs
+env FM_HERDR_LAB_STATE_DIR="$PWD/.native-stop-lab/helper-state" bin/fm-herdr-lab.sh run fm-lab-native-stop-65931 pane run w1:p1 "bash '$PWD/.native-stop-lab/launch-native.sh'"
+# Attempt 1 unset HTTPS_PROXY HTTP_PROXY ALL_PROXY NODE_USE_ENV_PROXY NODE_EXTRA_CA_CERTS, in addition to CLAUDECODE FM_TASK_ID ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN.
+# Attempt 2 retained machine transport and only unset CLAUDECODE FM_TASK_ID ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN.
+# Attempt 3 retained machine transport and added NODE_USE_SYSTEM_CA=1 and NODE_OPTIONS="${NODE_OPTIONS:-} --use-system-ca". Final exact launch script is launch-native.sh in this evidence directory.
+# Observer exact snapshot command, invoked on native exit per attempt:
+env FM_HERDR_LAB_STATE_DIR="$PWD/.native-stop-lab/helper-state" bin/fm-herdr-lab.sh run fm-lab-native-stop-65931 pane read w1:p1 --source visible
+env FM_HERDR_LAB_STATE_DIR="$PWD/.native-stop-lab/helper-state" bin/fm-herdr-lab.sh run fm-lab-native-stop-65931 status --json
+env FM_HERDR_LAB_STATE_DIR="$PWD/.native-stop-lab/helper-state" bin/fm-herdr-lab.sh teardown fm-lab-native-stop-65931
+rm -rf .native-stop-lab
+# First removal partially succeeded but readonly production-generated git-hooks directory refused file deletion. Corrective cleanup succeeded:
+chmod -R u+w .native-stop-lab && rm -rf .native-stop-lab

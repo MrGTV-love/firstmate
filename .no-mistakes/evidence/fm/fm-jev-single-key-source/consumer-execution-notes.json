@@ -1,0 +1,23 @@
+{
+  "driver_command": "/usr/bin/python3 .live-validation/consumers.py",
+  "driver_invocations": [
+    {"outer_deadline_seconds": 300, "per_cli_deadline_seconds": 20, "outcome": "outer harness deadline after privacy hook; five skill invocations separately reached local harness deadline before sending HTTP"},
+    {"outer_deadline_seconds": 1800, "per_cli_deadline_seconds": 120, "outcome": "exit 0; resumed only five unsuccessful skill invocations and two not-yet-run privacy invocations; original transcripts preserved"}
+  ],
+  "recorded_cli_attempts": 59,
+  "completed_scenario_consumer_combinations": 54,
+  "actual_https_requests": 36,
+  "baseline_seven_hook_judged": 7,
+  "baseline_hook_key_label": "primary-fixture-v1",
+  "skill_baseline_caveat": "Six lanes received valid live no-fit advice with v1; lane 4 and nested descendant initial skill catalog traversals hit the driver deadline before HTTP and were resumed successfully using the then-current primary v2. Hook and dispatch baselines for all seven lanes and nested descendant succeeded with v1. No successful CLI calls were repeated.",
+  "rotation": "Only primary/.env changed to primary-fixture-v2. The next hook and dispatch calls used v2; successful resumed skill calls also used v2. No seven-lane or nested .env exists.",
+  "precedence": "Actual hook, resolver and skill CLIs sent own-fixture-key from isolated own-env-precedence/.env over primary v2, and environment-fixture-key from process environment over both files.",
+  "zero_network_cases": ["missing key", "remote parent without own key", "malformed duplicate-route parent", "cyclic parent", "unreachable local parent", "literal dispatch-never-send privacy withholding"],
+  "zero_network_coverage": "All three consumers in each case (18 actual invocations). Hook status missing_key or withheld, dispatch/skill status off; fixture receipt deltas zero.",
+  "dispatch_scope": "Key sourcing and real HTTPS request/accepted Choice response only. Isolated PATH /usr/bin:/bin:/usr/sbin:/sbin intentionally excludes installed quota-axi; actual unchanged resolver reports quota-axi not installed after accepted response. No routing success is claimed and no quota process was launched.",
+  "endpoint": "Fixed product URL https://api.typesafe.ai/v1/systemone reached through real curl, real loopback CONNECT proxy and certificate verification via supplied CA. Responses are disposable TLS fixture data, not actual TypeSafe service judgments.",
+  "sanitization": "Dedicated receipts omit raw Authorization header and request text; retain synthetic key label, request path, model, question types and state field names. CLI transcripts use synthetic fixtures only.",
+  "cleanup": ["Parent removes .live-validation/consumers.py", "Parent removes .live-validation/consumers including synthetic credentials, inputs, product logs, isolated HOME and TMPDIR directories", "Retain dedicated evidence JSON/JSONL/TXT files"],
+  "source_edits": false,
+  "builds_linters_static_analysis_full_suite_package_installs": false
+}

@@ -1,0 +1,6 @@
+ok - a home without .env resolves the key from the primary home
+ok - precedence is environment, then own .env, then primary .env
+ok - remote, malformed and absent bindings stay off
+ok - the Jev guardrail resolves the primary key and stays off without one
+ok - the wrapper hands the primary key to belay only, with redirecting variables cleared
+not ok - absent policy must allow both actual fetch requests

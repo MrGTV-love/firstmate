@@ -1,0 +1,10 @@
+{
+  "originalSettings": "/Users/charlesabrooker/.no-mistakes/evidence/01M4C9C1P6TN97HD7NAANKCK9T/native-claude-stop/settings.production.json",
+  "nativeSettings": "/Users/charlesabrooker/.no-mistakes/evidence/01M4C9C1P6TN97HD7NAANKCK9T/native-claude-stop/settings.native.json",
+  "taskId": "native-stop",
+  "gen": "g1791417727.65931.26827",
+  "formerHome": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home",
+  "formerState": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/state",
+  "busyState": "v1 gen=g1791417727.65931.26827 seq=10 state=idle source=claude-hook event=session-end ts=1791417922\n",
+  "scope": "Setup used production fm-spawn with test fake tmux/claude/treehouse builders; native evidence used genuine installed Claude in helper-owned Herdr session. No native Stop event occurred because all native model API calls failed TLS."
+}

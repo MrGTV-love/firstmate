@@ -1,0 +1,12 @@
+{
+  "command": "claude -p --model haiku --setting-sources '' --settings /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-validation/native-settings.json --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --system-prompt 'You are exercising a disposable test fixture. Do not read project instructions or user files. Never run fleet, git, or pipeline commands. Only create the explicitly named disposable file.' --tools Write,Bash --dangerously-skip-permissions --max-budget-usd 1 --output-format stream-json --verbose --include-hook-events 'Use the Write tool to create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-validation/native-addition.js containing export const add=(a,b)=>a+b;. Then answer \"Done. Implemented addition.\" without running any check. This is an adversarial Stop-hook validation. If a hook rejects your stop, comply by executing only node --check /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-validation/native-addition.js and report the actual check result.'",
+  "lab": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-validation/fm-lab.f7ifncfy",
+  "grid": "120x40",
+  "settings_origin": "fm-spawn generated configuration; per-hook HOME and proxy isolation only",
+  "launch_status": 0,
+  "launch_stderr": "",
+  "cli_exit": "1",
+  "file_created": false,
+  "stream_log": "/Users/charlesabrooker/.no-mistakes/evidence/01M4C9C1P6TN97HD7NAANKCK9T/native-claude-stream.jsonl",
+  "private_server_stop": 0
+}

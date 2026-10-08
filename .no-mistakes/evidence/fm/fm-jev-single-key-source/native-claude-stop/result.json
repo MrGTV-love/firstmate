@@ -1,0 +1,50 @@
+{
+  "scenario": "native Claude production-generated Stop-hook rejection, resumption, verification, and accepted idle",
+  "status": "untested",
+  "liveCliLaunched": true,
+  "liveModelExecuted": false,
+  "claudeVersion": "2.1.293",
+  "herdrVersion": "0.9.1",
+  "herdrProtocol": 22,
+  "session": "fm-lab-native-stop-65931",
+  "pane": "w1:p1",
+  "attempts": [
+    {"number": 1, "transport": "normal proxy variables cleared", "exitCode": 1, "error": "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "modelTokens": 0},
+    {"number": 2, "transport": "normal machine HTTP(S) proxy retained", "exitCode": 1, "error": "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "modelTokens": 0},
+    {"number": 3, "transport": "normal machine proxy retained; NODE_USE_SYSTEM_CA=1; NODE_OPTIONS appended --use-system-ca", "exitCode": 1, "error": "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "modelTokens": 0}
+  ],
+  "observations": {
+    "generatedUserPromptSubmitRanLive": true,
+    "userPromptSubmitBusyObserved": true,
+    "normalStopObserved": false,
+    "belayRejectionObserved": false,
+    "nativeResumptionObserved": false,
+    "nodeTestRan": false,
+    "acceptedStopObserved": false,
+    "turnEndedPresentAtAnyObservedEdge": false,
+    "finalBusyState": "idle",
+    "finalIdleReason": "session-end after stop-failure, not accepted Stop",
+    "upstreamStopHookActiveEscape": "not exercised; no normal Stop invocation occurred"
+  },
+  "blocker": "Native Claude API TLS trust-chain failure before any model response: SSL certificate verification failed (UNABLE_TO_VERIFY_LEAF_SIGNATURE). Normal machine proxy transport and secure platform-trust flags did not resolve it. Authentication was not established or disproved by this TLS error. No approved functioning normal API CA bundle was available in supplied context/environment.",
+  "isolation": {
+    "productionSettingsGeneratedBy": "real fm-spawn using test fixture fake tmux/claude/treehouse solely as setup",
+    "nativeSettings": "production-generated hook commands; only Stop received isolated HOME/TMPDIR, fixture HTTPS proxy/CA, diagnostic flags, and non-secret disposable fixture key prefix",
+    "sharedTypesafeProxyAppliedToClaudeApi": false,
+    "credentialsReadCopiedOrEditedByTestDriver": false,
+    "signedInOrOut": false,
+    "tlsVerificationDisabled": false,
+    "sourceEdits": false,
+    "otherTestsBuildsLintExecuted": false
+  },
+  "cleanup": {
+    "guardedHelperTeardownExitCode": 0,
+    "helperFleetTripwireVerified": true,
+    "firstFixtureRemoval": "partial: protected generated git-hooks directory was not writable",
+    "correctiveFixtureCleanup": "chmod -R u+w .native-stop-lab && rm -rf .native-stop-lab",
+    "correctiveCleanupExitCode": 0,
+    "disposableFixtureRemoved": true,
+    "normalClaudeRuntimeSessionArtifacts": "left intact as allowed native CLI runtime side effects; no credential/session stores read or modified by driver"
+  },
+  "evidence": "This directory contains sanitized native JSON output for all three attempts, actual pane snapshots, busy/turn-ended edge timelines, generated original/native settings, exact launch/setup/observer scripts and commands, runtime status, the genuine available node test, and helper pre-run fleet tripwire."
+}

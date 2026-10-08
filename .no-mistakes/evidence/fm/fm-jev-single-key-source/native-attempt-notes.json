@@ -1,0 +1,19 @@
+{
+  "native_attempts": [
+    {
+      "configuration": "Default login and TLS trust, private 120x40 tmux session",
+      "result": "UNABLE_TO_VERIFY_LEAF_SIGNATURE before first model turn"
+    },
+    {
+      "configuration": "NODE_USE_SYSTEM_CA=1 and NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem",
+      "result": "Same TLS verification failure"
+    },
+    {
+      "configuration": "Existing public /Library/Keychains/System.keychain certificates plus /etc/ssl/cert.pem copied into disposable CA bundle; TLS verification enabled",
+      "result": "Same TLS verification failure"
+    }
+  ],
+  "socket_setup": "Initial worktree-rooted socket exceeded macOS Unix socket path limit; supported fm-lab-home.sh tmux-dir supplied a private short runtime socket; every successful launch killed its private server and ran fm-lab-home.sh teardown in the same driver invocation. No default server touched.",
+  "remaining_prerequisite": "Correct trusted issuer CA for the API/gateway Claude reaches, supplied as a readable per-run PEM via NODE_EXTRA_CA_CERTS; no sign-in/out, credential copy, TLS-disable flag, or system trust change attempted.",
+  "cleanup": "All native marked homes and private sockets were removed by each attempt."
+}

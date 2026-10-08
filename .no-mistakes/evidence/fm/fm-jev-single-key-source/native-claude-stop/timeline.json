@@ -1,0 +1,42 @@
+[
+  {
+    "ts": "2026-10-08T00:05:16.441Z",
+    "elapsedMs": 5,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=7 state=idle source=claude-hook event=session-end ts=1791417887",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:05:22.532Z",
+    "elapsedMs": 6093,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=8 state=busy source=claude-hook event=user-prompt-submit ts=1791417922",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:05:22.735Z",
+    "elapsedMs": 6296,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=9 state=idle source=claude-hook event=stop-failure ts=1791417922",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:05:22.836Z",
+    "elapsedMs": 6397,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=10 state=idle source=claude-hook event=session-end ts=1791417922",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:05:23.447Z",
+    "elapsedMs": 7008,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=10 state=idle source=claude-hook event=session-end ts=1791417922",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": "1"
+  }
+]

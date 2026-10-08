@@ -1,0 +1,604 @@
+[
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 2,
+    "elapsedMs": 587,
+    "stdout": "",
+    "stderr": "jev-belay: reports completion (0.99) after 1 file change with no test, build, or lint run since the last change. Run the project's tests, build, or lint (whatever exists) on what you changed. Then report the actual result. If no check exists or can run, say so plainly instead of presenting the work as done.\n",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "Reject unverified completion"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 335,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Verified completion skips network"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 4767,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Withhold confidential task"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 4993,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Withhold confidential final message"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 4864,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Withhold confidential failing check"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 4479,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Invalid policy withholds"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 2787,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Unreadable policy withholds"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 2990,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "error"
+      },
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "error"
+      },
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "error"
+      }
+    ],
+    "name": "TypeSafe HTTP failure allows stop"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 124,
+    "elapsedMs": 20375,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "stall"
+      }
+    ],
+    "name": "Ambient 60 second request cannot exceed wrapper budget"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 867,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Tampered vendor stays off"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 109,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Missing vendor stays off"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 311,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Missing key stays off"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 2,
+    "elapsedMs": 326,
+    "stdout": "",
+    "stderr": "jev-belay: reports completion (0.99) after 1 file change with no test, build, or lint run since the last change. Run the project's tests, build, or lint (whatever exists) on what you changed. Then report the actual result. If no check exists or can run, say so plainly instead of presenting the work as done.\n",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "First allowed request through nonmatching policy"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 2,
+    "elapsedMs": 307,
+    "stdout": "",
+    "stderr": "jev-belay: reports completion (0.99) after 1 file change with no test, build, or lint run since the last change. Run the project's tests, build, or lint (whatever exists) on what you changed. Then report the actual result. If no check exists or can run, say so plainly instead of presenting the work as done.\n",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "Second allowed request through nonmatching policy"
+  },
+  {
+    "command": [
+      "bin/fm-jev-belay-hook.sh"
+    ],
+    "home": "lane-1",
+    "returncode": 2,
+    "elapsedMs": 2038,
+    "stdout": "",
+    "stderr": "jev-belay: reports completion (0.99) after 1 file change with no test, build, or lint run since the last change. Run the project's tests, build, or lint (whatever exists) on what you changed. Then report the actual result. If no check exists or can run, say so plainly instead of presenting the work as done.\n",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-private-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "task": "Change the disposable JavaScript module",
+            "final_message": "Done, implemented the requested change",
+            "run": {
+              "file_changes": 1,
+              "checks_run": []
+            }
+          },
+          "questions": {
+            "claims_done": {
+              "type": "noul",
+              "instructions": "Does `final_message` present the requested work as finished or working?",
+              "criteria": {
+                "true": "Yes: it says the task is done, fixed, implemented, complete, or working, or summarises the result as final.",
+                "false": "No: it reports partial progress, names remaining work, reports a blocker, asks the user a question, or only describes a plan."
+              }
+            },
+            "claims_verified": {
+              "type": "noul",
+              "instructions": "Does `final_message` claim that tests, a build, or other checks were run and passed?",
+              "criteria": {
+                "true": "Yes: it states that a test suite, build, type check, or lint was run and came back clean.",
+                "false": "No: it makes no claim about running checks, or says checks were not run."
+              }
+            },
+            "verification_applies": {
+              "type": "noul",
+              "instructions": "Would running the project's tests, build, or lint be a meaningful way to check the work that `task` asks for?",
+              "criteria": {
+                "true": "Yes: `task` changes or adds code, configuration, or build logic that such checks exercise.",
+                "false": "No: `task` is about documentation, prose, file housekeeping, deleting or moving files, answering a question, or something the project's checks would not cover."
+              }
+            },
+            "outcome": {
+              "type": "choice",
+              "instructions": "What does `final_message` report about `task`?",
+              "criteria": {
+                "complete": "The work is finished",
+                "partial": "Progress was made and remaining work is named",
+                "blocked": "A blocker is reported or the user is asked something",
+                "other": "None of these"
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "Exported credential reaches vendor but not preflight utilities"
+  }
+]

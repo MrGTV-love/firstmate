@@ -1,0 +1,275 @@
+[
+  {
+    "command": [
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-key-validation/public-task",
+      "--project",
+      "disposable-pager"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 390,
+    "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 3   tokens: 100/1\n  rule: rule_1 (A pagination boundary fix)   confidence: 0.99\n  probabilities: rule_1=0.99 default=0.01\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9  runway=through_reset  -> eligible\n  timings: api_ms=3 quota_ms=18 local_ms=295 total_ms=316\n  usage: input_tokens=100 output_tokens=1 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-latest",
+          "state": {
+            "task": {
+              "project": "disposable-pager",
+              "brief": "Fix the pagination off-by-one boundary.\n"
+            }
+          },
+          "questions": {
+            "rule": {
+              "type": "choice",
+              "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+              "criteria": {
+                "rule_1": "A pagination boundary fix",
+                "default": "No listed rule applies to this task."
+              }
+            }
+          }
+        },
+        "mode": "advice"
+      }
+    ]
+  },
+  {
+    "command": [
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-key-validation/public-task",
+      "--project",
+      "disposable-pager"
+    ],
+    "home": "lane-2",
+    "returncode": 0,
+    "elapsedMs": 351,
+    "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 2   tokens: 100/1\n  rule: rule_1 (A pagination boundary fix)   confidence: 0.99\n  probabilities: rule_1=0.99 default=0.01\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9  runway=through_reset  -> eligible\n  timings: api_ms=2 quota_ms=17 local_ms=254 total_ms=273\n  usage: input_tokens=100 output_tokens=1 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-latest",
+          "state": {
+            "task": {
+              "project": "disposable-pager",
+              "brief": "Fix the pagination off-by-one boundary.\n"
+            }
+          },
+          "questions": {
+            "rule": {
+              "type": "choice",
+              "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+              "criteria": {
+                "rule_1": "A pagination boundary fix",
+                "default": "No listed rule applies to this task."
+              }
+            }
+          }
+        },
+        "mode": "advice"
+      }
+    ]
+  },
+  {
+    "command": [
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-key-validation/public-task",
+      "--project",
+      "disposable-pager"
+    ],
+    "home": "lane-3",
+    "returncode": 0,
+    "elapsedMs": 461,
+    "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 5   tokens: 100/1\n  rule: rule_1 (A pagination boundary fix)   confidence: 0.99\n  probabilities: rule_1=0.99 default=0.01\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9  runway=through_reset  -> eligible\n  timings: api_ms=5 quota_ms=22 local_ms=349 total_ms=376\n  usage: input_tokens=100 output_tokens=1 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-latest",
+          "state": {
+            "task": {
+              "project": "disposable-pager",
+              "brief": "Fix the pagination off-by-one boundary.\n"
+            }
+          },
+          "questions": {
+            "rule": {
+              "type": "choice",
+              "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+              "criteria": {
+                "rule_1": "A pagination boundary fix",
+                "default": "No listed rule applies to this task."
+              }
+            }
+          }
+        },
+        "mode": "advice"
+      }
+    ]
+  },
+  {
+    "command": [
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-key-validation/public-task",
+      "--project",
+      "disposable-pager"
+    ],
+    "home": "lane-4",
+    "returncode": 0,
+    "elapsedMs": 433,
+    "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 3   tokens: 100/1\n  rule: rule_1 (A pagination boundary fix)   confidence: 0.99\n  probabilities: rule_1=0.99 default=0.01\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9  runway=through_reset  -> eligible\n  timings: api_ms=3 quota_ms=18 local_ms=308 total_ms=329\n  usage: input_tokens=100 output_tokens=1 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-latest",
+          "state": {
+            "task": {
+              "project": "disposable-pager",
+              "brief": "Fix the pagination off-by-one boundary.\n"
+            }
+          },
+          "questions": {
+            "rule": {
+              "type": "choice",
+              "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+              "criteria": {
+                "rule_1": "A pagination boundary fix",
+                "default": "No listed rule applies to this task."
+              }
+            }
+          }
+        },
+        "mode": "advice"
+      }
+    ]
+  },
+  {
+    "command": [
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-key-validation/public-task",
+      "--project",
+      "disposable-pager"
+    ],
+    "home": "lane-5",
+    "returncode": 0,
+    "elapsedMs": 401,
+    "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 4   tokens: 100/1\n  rule: rule_1 (A pagination boundary fix)   confidence: 0.99\n  probabilities: rule_1=0.99 default=0.01\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9  runway=through_reset  -> eligible\n  timings: api_ms=4 quota_ms=22 local_ms=291 total_ms=317\n  usage: input_tokens=100 output_tokens=1 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-latest",
+          "state": {
+            "task": {
+              "project": "disposable-pager",
+              "brief": "Fix the pagination off-by-one boundary.\n"
+            }
+          },
+          "questions": {
+            "rule": {
+              "type": "choice",
+              "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+              "criteria": {
+                "rule_1": "A pagination boundary fix",
+                "default": "No listed rule applies to this task."
+              }
+            }
+          }
+        },
+        "mode": "advice"
+      }
+    ]
+  },
+  {
+    "command": [
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-key-validation/public-task",
+      "--project",
+      "disposable-pager"
+    ],
+    "home": "lane-6",
+    "returncode": 0,
+    "elapsedMs": 540,
+    "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 3   tokens: 100/1\n  rule: rule_1 (A pagination boundary fix)   confidence: 0.99\n  probabilities: rule_1=0.99 default=0.01\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9  runway=through_reset  -> eligible\n  timings: api_ms=3 quota_ms=32 local_ms=383 total_ms=418\n  usage: input_tokens=100 output_tokens=1 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-latest",
+          "state": {
+            "task": {
+              "project": "disposable-pager",
+              "brief": "Fix the pagination off-by-one boundary.\n"
+            }
+          },
+          "questions": {
+            "rule": {
+              "type": "choice",
+              "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+              "criteria": {
+                "rule_1": "A pagination boundary fix",
+                "default": "No listed rule applies to this task."
+              }
+            }
+          }
+        },
+        "mode": "advice"
+      }
+    ]
+  },
+  {
+    "command": [
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.live-key-validation/public-task",
+      "--project",
+      "disposable-pager"
+    ],
+    "home": "lane-7",
+    "returncode": 0,
+    "elapsedMs": 472,
+    "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-1.13.0   latency_ms: 3   tokens: 100/1\n  rule: rule_1 (A pagination boundary fix)   confidence: 0.99\n  probabilities: rule_1=0.99 default=0.01\n  reason: rule requires the captain's explicit approval before dispatch\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9  runway=through_reset  -> eligible\n  timings: api_ms=3 quota_ms=23 local_ms=345 total_ms=371\n  usage: input_tokens=100 output_tokens=1 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-latest",
+          "state": {
+            "task": {
+              "project": "disposable-pager",
+              "brief": "Fix the pagination off-by-one boundary.\n"
+            }
+          },
+          "questions": {
+            "rule": {
+              "type": "choice",
+              "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+              "criteria": {
+                "rule_1": "A pagination boundary fix",
+                "default": "No listed rule applies to this task."
+              }
+            }
+          }
+        },
+        "mode": "advice"
+      }
+    ]
+  }
+]

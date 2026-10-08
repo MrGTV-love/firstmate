@@ -1,0 +1,1042 @@
+{
+  "all_passed": true,
+  "scenarios": [
+    {
+      "scenario": "lane-1-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-1",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415793575,
+        "mode": "shadow",
+        "event": "result",
+        "id": "7c0660c1-03bc-40e9-9133-1572a65d40ea",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 1678.65,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 254.928
+      }
+    },
+    {
+      "scenario": "lane-1-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-1",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-1-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-1",
+      "exit_code": 0,
+      "status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-2-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-2",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415817467,
+        "mode": "shadow",
+        "event": "result",
+        "id": "1aee3461-71ac-47e6-973d-f00ef82a55f6",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 1128.998,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 210.617
+      }
+    },
+    {
+      "scenario": "lane-2-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-2",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-2-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-2",
+      "exit_code": 0,
+      "status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-3-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-3",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415829332,
+        "mode": "shadow",
+        "event": "result",
+        "id": "1fb0869f-5c8b-405b-8793-151792cd7298",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 419.972,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 34.913
+      }
+    },
+    {
+      "scenario": "lane-3-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-3",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-3-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-3",
+      "exit_code": 0,
+      "status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-4-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-4",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415836030,
+        "mode": "shadow",
+        "event": "result",
+        "id": "2e423d2f-7dd9-4dbf-af56-252958109252",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 189.013,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 51.792
+      }
+    },
+    {
+      "scenario": "lane-4-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-4",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-4-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-4",
+      "exit_code": 124,
+      "status": null,
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": false
+    },
+    {
+      "scenario": "lane-5-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-5",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415866565,
+        "mode": "shadow",
+        "event": "result",
+        "id": "57b9fd47-aa32-4738-9e27-84df1db1a89a",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 1114.972,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 370.173
+      }
+    },
+    {
+      "scenario": "lane-5-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-5",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-5-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-5",
+      "exit_code": 0,
+      "status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-6-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-6",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415884188,
+        "mode": "shadow",
+        "event": "result",
+        "id": "384cf294-8acc-439b-be0f-0811cb7d4427",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 102.719,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 31.889
+      }
+    },
+    {
+      "scenario": "lane-6-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-6",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-6-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-6",
+      "exit_code": 0,
+      "status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-7-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-7",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415893169,
+        "mode": "shadow",
+        "event": "result",
+        "id": "f8fc66c7-37d7-40de-bc00-8e0fdb00a5ed",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 150.18,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 62.881
+      }
+    },
+    {
+      "scenario": "lane-7-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-7",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "lane-7-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-7",
+      "exit_code": 0,
+      "status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nested-primary-v1",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415907945,
+        "mode": "shadow",
+        "event": "result",
+        "id": "fa11911b-4a08-47de-912c-1a48a99d7ce2",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 2159.578,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 63.072
+      }
+    },
+    {
+      "scenario": "nested-primary-v1",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v1"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nested-primary-v1",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 124,
+      "status": null,
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": false
+    },
+    {
+      "scenario": "rotation-next-call-v2",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/lane-1",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415939014,
+        "mode": "shadow",
+        "event": "result",
+        "id": "39600dc8-0de7-4150-bb4a-51b5ea4ca1b8",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 3161.102,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 73.863
+      }
+    },
+    {
+      "scenario": "rotation-next-call-v2",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/lane-1",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "rotation-next-call-v2",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-1",
+      "exit_code": 124,
+      "status": null,
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": false
+    },
+    {
+      "scenario": "nested-rotation-v2",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791415971780,
+        "mode": "shadow",
+        "event": "result",
+        "id": "e23124b8-0514-47d5-a0b3-267bfcc40393",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 1321.876,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 54.733
+      }
+    },
+    {
+      "scenario": "nested-rotation-v2",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nested-rotation-v2",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 124,
+      "status": null,
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": false
+    },
+    {
+      "scenario": "own-env-over-primary",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/own-env-precedence",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "own-fixture-key"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416000620,
+        "mode": "shadow",
+        "event": "result",
+        "id": "c9eb016e-6ba4-4660-abc2-eb484d52a8d6",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 1331.949,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 58.863
+      }
+    },
+    {
+      "scenario": "own-env-over-primary",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/own-env-precedence",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "own-fixture-key"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "own-env-over-primary",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/own-env-precedence",
+      "exit_code": 124,
+      "status": null,
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": false
+    },
+    {
+      "scenario": "process-env-over-own-and-primary",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/own-env-precedence",
+      "exit_code": 0,
+      "status": "judged",
+      "network_calls": 1,
+      "key_labels": [
+        "environment-fixture-key"
+      ],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416033740,
+        "mode": "shadow",
+        "event": "result",
+        "id": "b22b121e-000a-4eb8-aa9c-d00ce3a67569",
+        "host": "claude",
+        "selected": true,
+        "status": "judged",
+        "latency_ms": 1193.863,
+        "verdict": "risky",
+        "confidence": 0.99,
+        "input_tokens": 100,
+        "output_tokens": 1,
+        "estimated_usd": 4.2000000000000004e-06,
+        "cost_source": "typesafe_models_input_estimate",
+        "model": "jev-1.13.0",
+        "api_ms": 986.948
+      }
+    },
+    {
+      "scenario": "process-env-over-own-and-primary",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/own-env-precedence",
+      "exit_code": 0,
+      "status": "error",
+      "network_calls": 1,
+      "key_labels": [
+        "environment-fixture-key"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "process-env-over-own-and-primary",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/own-env-precedence",
+      "exit_code": 0,
+      "status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "environment-fixture-key"
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "missing-key",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/missing-key",
+      "exit_code": 0,
+      "status": "missing_key",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416052686,
+        "mode": "shadow",
+        "event": "result",
+        "id": "528552a7-d132-4420-95ef-b2e61d62f0bb",
+        "host": "claude",
+        "selected": true,
+        "status": "missing_key",
+        "latency_ms": 270.638,
+        "verdict": null,
+        "confidence": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "estimated_usd": null,
+        "cost_source": "unknown"
+      }
+    },
+    {
+      "scenario": "missing-key",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/missing-key",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "missing-key",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/missing-key",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "remote-parent-key-absent",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/remote-parent",
+      "exit_code": 0,
+      "status": "missing_key",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416066979,
+        "mode": "shadow",
+        "event": "result",
+        "id": "796b6401-6cd2-4779-8d8a-724d23f73f21",
+        "host": "claude",
+        "selected": true,
+        "status": "missing_key",
+        "latency_ms": 794.438,
+        "verdict": null,
+        "confidence": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "estimated_usd": null,
+        "cost_source": "unknown"
+      }
+    },
+    {
+      "scenario": "remote-parent-key-absent",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/remote-parent",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "remote-parent-key-absent",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/remote-parent",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "malformed-parent",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/malformed-parent",
+      "exit_code": 0,
+      "status": "missing_key",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416075650,
+        "mode": "shadow",
+        "event": "result",
+        "id": "ea2f476d-34d4-4d46-9429-1ea19991e9fe",
+        "host": "claude",
+        "selected": true,
+        "status": "missing_key",
+        "latency_ms": 109.239,
+        "verdict": null,
+        "confidence": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "estimated_usd": null,
+        "cost_source": "unknown"
+      }
+    },
+    {
+      "scenario": "malformed-parent",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/malformed-parent",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "malformed-parent",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/malformed-parent",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "cyclic-parent",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/cycle-a",
+      "exit_code": 0,
+      "status": "missing_key",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416078876,
+        "mode": "shadow",
+        "event": "result",
+        "id": "fb426b4f-8305-460d-bbe1-fdb2c2efed51",
+        "host": "claude",
+        "selected": true,
+        "status": "missing_key",
+        "latency_ms": 108.5,
+        "verdict": null,
+        "confidence": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "estimated_usd": null,
+        "cost_source": "unknown"
+      }
+    },
+    {
+      "scenario": "cyclic-parent",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/cycle-a",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "cyclic-parent",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/cycle-a",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "unreachable-parent",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/unreachable-parent",
+      "exit_code": 0,
+      "status": "missing_key",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416081704,
+        "mode": "shadow",
+        "event": "result",
+        "id": "8ed720dc-04ac-4bc4-bd4e-ab86e57c9022",
+        "host": "claude",
+        "selected": true,
+        "status": "missing_key",
+        "latency_ms": 86.998,
+        "verdict": null,
+        "confidence": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "estimated_usd": null,
+        "cost_source": "unknown"
+      }
+    },
+    {
+      "scenario": "unreachable-parent",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/unreachable-parent",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "unreachable-parent",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/unreachable-parent",
+      "exit_code": 0,
+      "status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true
+    },
+    {
+      "scenario": "privacy-withheld",
+      "consumer": "hook",
+      "home": ".live-validation/consumers/privacy-withheld",
+      "exit_code": 0,
+      "status": "withheld",
+      "network_calls": 0,
+      "key_labels": [],
+      "passed": true,
+      "hook_result": {
+        "version": 1,
+        "policy": 8,
+        "at": 1791416087520,
+        "mode": "shadow",
+        "event": "result",
+        "id": "60334308-d987-49c4-aa4b-ebed179c5414",
+        "host": "claude",
+        "selected": true,
+        "status": "withheld",
+        "latency_ms": 2.935,
+        "verdict": null,
+        "confidence": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "estimated_usd": null,
+        "cost_source": "unknown"
+      }
+    },
+    {
+      "scenario": "lane-4-primary-v1-retry-current-v2",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-4",
+      "exit_code": 0,
+      "status": "none",
+      "expected_status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "expected_key_label": "primary-fixture-v2",
+      "passed": true
+    },
+    {
+      "scenario": "nested-primary-v1-retry-current-v2",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 0,
+      "status": "none",
+      "expected_status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "expected_key_label": "primary-fixture-v2",
+      "passed": true
+    },
+    {
+      "scenario": "rotation-next-call-v2-retry",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/lane-1",
+      "exit_code": 0,
+      "status": "none",
+      "expected_status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "expected_key_label": "primary-fixture-v2",
+      "passed": true
+    },
+    {
+      "scenario": "nested-rotation-v2-retry",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/nested-descendant",
+      "exit_code": 0,
+      "status": "none",
+      "expected_status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "primary-fixture-v2"
+      ],
+      "expected_key_label": "primary-fixture-v2",
+      "passed": true
+    },
+    {
+      "scenario": "own-env-over-primary-retry",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/own-env-precedence",
+      "exit_code": 0,
+      "status": "none",
+      "expected_status": "none",
+      "network_calls": 1,
+      "key_labels": [
+        "own-fixture-key"
+      ],
+      "expected_key_label": "own-fixture-key",
+      "passed": true
+    },
+    {
+      "scenario": "privacy-withheld",
+      "consumer": "dispatch",
+      "home": ".live-validation/consumers/privacy-withheld",
+      "exit_code": 0,
+      "status": "off",
+      "expected_status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "expected_key_label": null,
+      "passed": true
+    },
+    {
+      "scenario": "privacy-withheld",
+      "consumer": "skill",
+      "home": ".live-validation/consumers/privacy-withheld",
+      "exit_code": 0,
+      "status": "off",
+      "expected_status": "off",
+      "network_calls": 0,
+      "key_labels": [],
+      "expected_key_label": null,
+      "passed": true
+    }
+  ],
+  "baseline_seven_hook_judged": 7,
+  "seven_lane_dotenv_absent": true,
+  "nested_dotenv_absent": true,
+  "only_primary_rotated": "primary/.env changed v1 to v2; no lane/nested key copies created",
+  "dispatch_scope": "Real resolver posts accepted Choice response; then intentionally reports quota-axi not installed under isolated PATH. No dispatch routing claim; no quota process or operator config touched.",
+  "executable_policy": "Actual /usr/bin/curl, /opt/homebrew/bin/node, /usr/bin/jq and unchanged product CLIs; no substitutions or package installs.",
+  "artifacts": [
+    "/Users/charlesabrooker/.no-mistakes/evidence/01M4C9C1P6TN97HD7NAANKCK9T/consumer-command-transcripts.jsonl",
+    "/Users/charlesabrooker/.no-mistakes/evidence/01M4C9C1P6TN97HD7NAANKCK9T/consumer-sanitized-request-receipts.jsonl",
+    "/Users/charlesabrooker/.no-mistakes/evidence/01M4C9C1P6TN97HD7NAANKCK9T/consumer-scenario-results.json",
+    "/Users/charlesabrooker/.no-mistakes/evidence/01M4C9C1P6TN97HD7NAANKCK9T/consumer-exact-commands.txt"
+  ],
+  "cleanup": "Parent must remove .live-validation/consumers.py and .live-validation/consumers (disposable synthetic homes, .env files, logs, input files, empty TMPDIRs). Evidence retained. No source edits."
+}

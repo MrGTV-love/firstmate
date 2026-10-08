@@ -1,0 +1,23 @@
+{
+  "original_command": "env TMPDIR=\"$PWD/.live-validation\" bash tests/fm-typesafe-key-source.test.sh",
+  "original_exit": 1,
+  "original_failure": "absent policy must allow both actual fetch requests",
+  "focused_diagnostic_command": "env TMPDIR=\"$PWD/.live-validation\" bash .live-validation/diagnose-policy.sh",
+  "policy_children": [
+    {
+      "elapsed_ms": 671.1086250000001,
+      "status": 0,
+      "signal": null
+    },
+    {
+      "elapsed_ms": 249.12295799999993,
+      "status": 0,
+      "signal": null
+    }
+  ],
+  "transport_receipts": [
+    "transport",
+    "transport"
+  ],
+  "interpretation": "Original cause was not captured because fixture cleanup removed its receipts. Focused reproduction exercised successful policy children and completed both requests. Deadline/contention remains an inference, not an observed root cause."
+}

@@ -1,0 +1,615 @@
+[
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "lane-1",
+    "returncode": 0,
+    "elapsedMs": 1193,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "status": "judged",
+    "copiedEnv": false
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "lane-2",
+    "returncode": 0,
+    "elapsedMs": 699,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "status": "judged",
+    "copiedEnv": false
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "lane-3",
+    "returncode": 0,
+    "elapsedMs": 365,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "status": "judged",
+    "copiedEnv": false
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "lane-4",
+    "returncode": 0,
+    "elapsedMs": 1510,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "status": "judged",
+    "copiedEnv": false
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "lane-5",
+    "returncode": 0,
+    "elapsedMs": 301,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "status": "judged",
+    "copiedEnv": false
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "lane-6",
+    "returncode": 0,
+    "elapsedMs": 619,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "status": "judged",
+    "copiedEnv": false
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "lane-7",
+    "returncode": 0,
+    "elapsedMs": 1012,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "status": "judged",
+    "copiedEnv": false
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "local-precedence",
+    "returncode": 0,
+    "elapsedMs": 883,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-local-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "Local home key wins",
+    "status": "judged"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "env-precedence",
+    "returncode": 0,
+    "elapsedMs": 354,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-environment-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "Environment key wins",
+    "status": "judged"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "nested",
+    "returncode": 0,
+    "elapsedMs": 407,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-primary-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "Nested crew reaches primary",
+    "status": "judged"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "remote",
+    "returncode": 0,
+    "elapsedMs": 877,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Remote route remains local and off",
+    "status": "missing_key"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "malformed",
+    "returncode": 0,
+    "elapsedMs": 1223,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Malformed binding off",
+    "status": "missing_key"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "cycle-a",
+    "returncode": 0,
+    "elapsedMs": 546,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Cyclic binding off",
+    "status": "missing_key"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "missing",
+    "returncode": 0,
+    "elapsedMs": 1093,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "Unreachable parent off",
+    "status": "missing_key"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "absent",
+    "returncode": 0,
+    "elapsedMs": 585,
+    "stdout": "",
+    "stderr": "",
+    "requests": [],
+    "name": "No key anywhere stays off",
+    "status": "missing_key"
+  },
+  {
+    "command": [
+      "node",
+      "bin/fm-jev-guardrail.mjs",
+      "hook",
+      "--host",
+      "claude"
+    ],
+    "home": "rotated",
+    "returncode": 0,
+    "elapsedMs": 275,
+    "stdout": "",
+    "stderr": "",
+    "requests": [
+      {
+        "request": "POST /v1/systemone HTTP/1.1",
+        "authorization": "Bearer disposable-rotated-key",
+        "body": {
+          "model": "jev-1.13.0",
+          "state": {
+            "operations": [
+              {
+                "operation": "delete",
+                "scope": "local",
+                "recursive": true,
+                "force": true
+              }
+            ],
+            "syntax_uncertain": false
+          },
+          "questions": {
+            "risk": {
+              "type": "choice",
+              "instructions": "Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.",
+              "criteria": {
+                "risky": "Safety-sensitive operation requiring existing authority checks.",
+                "routine": "Only bounded local or explicitly non-production operations.",
+                "uncertain": "Unresolved scope for delete/deploy, without an always-risky operation."
+              }
+            }
+          }
+        },
+        "mode": "reject"
+      }
+    ],
+    "name": "Primary key rotation reaches next call",
+    "status": "judged"
+  }
+]

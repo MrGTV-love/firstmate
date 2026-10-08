@@ -1,0 +1,21 @@
+ok - a home without .env resolves the key from the primary home
+ok - precedence is environment, then own .env, then primary .env
+ok - remote, malformed and absent bindings stay off
+ok - the Jev guardrail resolves the primary key and stays off without one
+ok - the wrapper hands the primary key to belay only, with redirecting variables cleared
+ok - exported keys retain private/public precedence and never reach wrapper or policy children
+ok - actual task, final_message and checks_run JSON is gated with case and whitespace normalization
+ok - each fetch attempt is checked against its own request body
+ok - config override selects the effective policy
+ok - stalled policy work is bounded, reaped, and withheld without blocking Stop
+ok - invalid and unreadable policy refuse before transport
+ok - belay's own exit status reaches Claude
+ok - pin mismatch, missing clone and missing key exit 0 without running belay
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":1,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}

@@ -1,0 +1,42 @@
+[
+  {
+    "ts": "2026-10-08T00:03:29.331Z",
+    "elapsedMs": 4,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=1 state=busy source=fm-spawn event=launch-brief ts=1791417727",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:03:35.705Z",
+    "elapsedMs": 6377,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=2 state=busy source=claude-hook event=user-prompt-submit ts=1791417815",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:03:36.585Z",
+    "elapsedMs": 7257,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=3 state=idle source=claude-hook event=stop-failure ts=1791417816",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:03:37.019Z",
+    "elapsedMs": 7691,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=4 state=idle source=claude-hook event=session-end ts=1791417816",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": null
+  },
+  {
+    "ts": "2026-10-08T00:03:38.637Z",
+    "elapsedMs": 9309,
+    "busy": "v1 gen=g1791417727.65931.26827 seq=4 state=idle source=claude-hook event=session-end ts=1791417816",
+    "turnEnded": false,
+    "decisions": [],
+    "exitCode": "1"
+  }
+]

@@ -1,0 +1,57 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|Read)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FM_HOME='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home' FM_CONFIG_OVERRIDE='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/config' FM_STATE_OVERRIDE='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/state' node '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/bin/fm-jev-guardrail.mjs' hook --host claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/bin/fm-busy-event.sh' apply '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/state' 'native-stop' busy --gen 'g1791417727.65931.26827' --source claude-hook --event user-prompt-submit 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FM_HOME='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home' FM_CONFIG_OVERRIDE='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/config' '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/bin/fm-jev-belay-hook.sh'; belay_status=$?; [ \"$belay_status\" -ne 2 ] || exit 2; touch '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/state/native-stop.turn-ended'; '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/bin/fm-busy-event.sh' apply '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/state' 'native-stop' idle --gen 'g1791417727.65931.26827' --source claude-hook --event stop 2>/dev/null || true",
+            "timeout": 25
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/bin/fm-busy-event.sh' apply '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/state' 'native-stop' idle --gen 'g1791417727.65931.26827' --source claude-hook --event stop-failure 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/bin/fm-busy-event.sh' apply '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4C9C1P6TN97HD7NAANKCK9T/.native-stop-lab/case/home/state' 'native-stop' idle --gen 'g1791417727.65931.26827' --source claude-hook --event session-end 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

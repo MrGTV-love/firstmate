@@ -1,0 +1,7 @@
+{
+  "removedNormalHTTPProxy": true,
+  "removedNormalHTTPSProxy": true,
+  "modelTokens": 0,
+  "terminalReason": "api_error",
+  "error": "SSL certificate verification failed (UNABLE_TO_VERIFY_LEAF_SIGNATURE)"
+}
