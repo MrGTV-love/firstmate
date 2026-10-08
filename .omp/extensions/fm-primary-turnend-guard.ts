@@ -84,12 +84,11 @@ function lockOwnership(): LockOwnership {
   return pidAlive(lockPid) ? "other" : "missing";
 }
 
-// Record this build and this session pid. Runs at load, at session start, and
-// again at every turn boundary below: the lock is first claimed by the
-// session-start hook after the load-time write, and a marker that the lock
-// owner finds stale or foreign is rewritten here instead of waiting for the
-// next restart. Writes only on a change, and only for the lock owner or while
-// no live session holds the lock.
+// Record this build and this session pid at session start and turn boundaries.
+// Discovery alone never publishes ownership. Once the session-start hook claims
+// the lock, a stale or foreign marker is rewritten without waiting for a restart.
+// Writes only on a change, and only for the lock owner or while no live session
+// holds the lock.
 function markLoaded(): void {
   if (lockOwnership() === "other") return;
   mkdirSync(state, { recursive: true });

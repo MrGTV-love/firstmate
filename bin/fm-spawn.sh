@@ -2498,7 +2498,9 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
-if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+if { [ -n "$MODEL" ] && [ "$MODEL" != default ]; } ||
+  { [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ] && [ -f "$CONFIG/crew-dispatch.json" ] &&
+    { [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; }; }; then
   SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
   FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
     fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" || exit 1
@@ -2530,8 +2532,8 @@ fi
 # may replace a proven exhausted route; unknown OMP quota is never single-account
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
 if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
-  if [ -f "$CONFIG/crew-dispatch.json" ]; then
-    dispatch_set=$(fm_dispatch_fallbacks "$CONFIG" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
+  if [ -f "${SPAWN_ROUTING_PAIR:-$CONFIG}/crew-dispatch.json" ]; then
+    dispatch_set=$(fm_dispatch_fallbacks "${SPAWN_ROUTING_PAIR:-$CONFIG}" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
     DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
     DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
   else
@@ -2646,9 +2648,15 @@ spawn_profile_preflight() {
         MODEL=$(jq -r .profile.model <<<"$dispatch_result")
         EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
         LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
+        if [ -e "$SPAWN_ROUTING_PAIR/model-index.json" ] || [ -L "$SPAWN_ROUTING_PAIR/model-index.json" ]; then
+          MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+          MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
+          if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+        fi
       fi
     fi
   fi
+  fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
   COMPACT_ADVISER_MODE=off
   if [ "$COMPACT_ADVISER_PRESENT" = 1 ]; then
     COMPACT_ADVISER_MODE=$(jq -r --arg harness "$HARNESS" '.[$harness] // "off"' <<<"$COMPACT_ADVISER_CONFIG")
@@ -4755,7 +4763,7 @@ SPAWN_DISPATCH_ENDPOINT_READY=1
 if [ "$SPAWN_PREFLIGHT_DEFERRED" = 1 ]; then
   spawn_profile_preflight "$WT"
 fi
-if [ "$HARNESS" = omp ]; then
+if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
   omp_model_validate "$OMP_BIN" "$MODEL" "$CONFIG" "$WT" "$dispatch_tmux_session" || exit 1
 fi
 

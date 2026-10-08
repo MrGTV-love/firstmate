@@ -687,6 +687,28 @@ for mutation in '.rules[0].use.model="opus"' '.rules[0].use.harness="omp"' '.rul
 done
 pass "explicit no-fallback rules permit effort completion without borrowing stand-ins"
 
+mkdir -p "$TMP_ROOT/role-config"
+printf '%s\n' '{"version":1,"roles":{"worker":{"omp":{"model":"openai-codex/gpt-6-luna","stand_in":"openai-codex/gpt-6.1-sol"}}},"retired":[]}' \
+  > "$TMP_ROOT/role-config/model-index.json"
+for container in scalar array; do
+  for stand_in in false true; do
+    jq -n --arg container "$container" --argjson stand_in "$stand_in" --argjson fallback "$allowed" '
+      {harness:"omp",role:"worker",stand_in:$stand_in,effort:"high"} |
+      (if $container == "array" then [.] else . end) as $use |
+      {rules:[{use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' \
+      > "$TMP_ROOT/role-config/crew-dispatch.json"
+    model=openai-codex/gpt-6-luna
+    [ "$stand_in" = false ] || model=openai-codex/gpt-6.1-sol
+    for rule in rule_1 default; do
+      set=$(fm_dispatch_fallbacks "$TMP_ROOT/role-config" "$rule" omp "$model" high) ||
+        fail "$rule $container role profile must match its resolved selector"
+      assert_equals "$rule" "$(jq -r .rule <<<"$set")" "role matching preserves selected rule identity"
+      assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "role matching preserves fallback permission"
+    done
+  done
+done
+pass "role and stand-in profiles match concrete selectors in scalar and array rules"
+
 cat > "$QUOTA_FIXTURE" <<'JSON'
 {"schemaVersion":6,"providers":[
  {"provider":"claude","accountKey":"other","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":0}]}},

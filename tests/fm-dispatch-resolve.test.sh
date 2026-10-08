@@ -1902,8 +1902,7 @@ assert_absent "$LOG/argv" "duplicate candidates must refuse before the rule requ
 rm "$HOME_DIR/config/model-index.json"
 pass "typed intake resolves roles before quota ranking and detects concrete duplicates"
 
-# The chosen id is checked against the catalog of the account a pinned worker
-# would launch under, not the intake's ambient account.
+# A projected pinned account cannot establish quota or justify catalog discovery.
 mkdir -p "$TMP_ROOT/pinned-claude" "$TMP_ROOT/ambient-claude"
 printf 'pinned-only\n' > "$TMP_ROOT/pinned-claude/catalog"
 printf 'ambient-only\n' > "$TMP_ROOT/ambient-claude/catalog"
@@ -1923,12 +1922,14 @@ JSON
 reset_log
 CLAUDE_CONFIG_DIR="$TMP_ROOT/ambient-claude" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 0 "$code" "pinned-account intake exits 0"
-assert_contains "$out" "  profile: --harness 'claude' --model 'pinned-only'" "the pinned account's catalog must decide the chosen id: $err"
-[ "$(cat "$TMP_ROOT/claude-catalog-roots")" = "$TMP_ROOT/pinned-claude" ] \
-  || fail "the chosen-id catalog must be read from the pinned root only: $(cat "$TMP_ROOT/claude-catalog-roots")"
+assert_contains "$out" "  status: escalate" "a projected pinned Claude account remains unranked"
+assert_contains "$out" "candidate: claude:pinned-only" "role resolution retains the concrete pinned candidate"
+assert_contains "$out" "no established native default-account quota mapping" "typed intake discloses unbound quota"
+assert_not_contains "$out" "  profile:" "unknown pinned capacity cannot authorize a profile"
+assert_absent "$TMP_ROOT/claude-catalog-roots" "unranked projected accounts must not trigger catalog discovery"
 rm "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/claude-account" "$FAKEBIN/claude"
 cp "$BASE_RULES" "$RULES"
-pass "typed intake checks the chosen id against the pinned worker account's catalog"
+pass "typed intake resolves pinned roles without binding projected quota or probing their catalogs"
 
 mkdir -p "$TMP_ROOT/supervisor-account"
 printf '%s\n' '{"models":[{"slug":"supervisor-only"}]}' > "$TMP_ROOT/supervisor-account/models_cache.json"

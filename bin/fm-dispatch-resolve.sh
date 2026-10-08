@@ -661,7 +661,7 @@ if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" 
   (.candidates | length) > 0 and all(.candidates[]; .exhausted == true)' <<<"$RESULT" >/dev/null; then
   dispatch_rule=$(jq -r .dispatch_rule <<<"$RESULT")
   primary=$(jq -c '.candidates[0].profile' <<<"$RESULT")
-  fallbacks=$(fm_dispatch_fallbacks "$CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
+  fallbacks=$(fm_dispatch_fallbacks "$MODEL_CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
     "$(jq -r '.model // ""' <<<"$primary")" "$(jq -r '.effort // ""' <<<"$primary")" "$RULES") || emit_error "invalid fallback configuration"
   if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' 2>/dev/null); then
     if [ "$(jq -r .switched <<<"$selected")" = true ]; then

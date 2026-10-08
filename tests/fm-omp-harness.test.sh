@@ -970,6 +970,9 @@ for (const { markerPath, evidence } of loaded) {
   } else if (existsSync(markerPath)) throw new Error(`discovery created ownership evidence: ${markerPath}`);
 }
 if (fresh && existsSync(state)) throw new Error("discovery created the state directory");
+// Existing homes must transfer the live lock before this process initializes
+// its owning session; discovery above remains read-only under the parent lock.
+if (!fresh) writeFileSync(`${state}/.lock`, `${process.pid}\n`);
 try {
   for (const { handlers } of loaded) {
     await handlers.get("session_start")({ type: "session_start" }, { sessionManager: { getSessionId: () => "discovery-session" } });

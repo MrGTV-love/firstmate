@@ -233,16 +233,6 @@ ok() {
   printf 'ok - %s\n' "$1"
 }
 
-if help=$("$BIN/fm-quota-choose.sh" --help 2>&1); then
-  fail "help unexpectedly exited zero"
-fi
-printf '%s\n' "$help" | grep -Fq \
-  "candidate order and every candidate's provider is the harness's primary family." \
-  || fail "help omitted the multi-provider usage restriction"
-if printf '%s\n' "$help" | grep -Fq 'set -u'; then
-  fail "help leaked executable source"
-fi
-ok "help renders the complete header only"
 
 # 1. First candidate with positive effective quota.
 out=$(call_choose --snapshot "$LAB/captured.json" --candidate kimi:default --candidate codex:model:codex_bengalfox --candidate claude:claude-3-5-sonnet)

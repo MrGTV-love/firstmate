@@ -182,9 +182,11 @@ fm_dispatch_capacity() {
 }
 
 fm_dispatch_fallbacks() {
-  local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file result
+  local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file result profiles_json
   file=${6:-"$config/crew-dispatch.json"}
   [ -f "$file" ] || { printf '%s\n' '{"rule":"","fallback":[]}'; return; }
+  profiles_json=$(FM_CONFIG_OVERRIDE="$config" \
+    "$FM_DISPATCH_CAPACITY_DIR/fm-model-index.sh" profiles "$file") || return 1
   result=$(jq -ce --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" '
     def profiles: if type == "array" then . else [.] end;
     def default_axis: if . == null or . == "" or . == "default" then "" else . end;
@@ -212,7 +214,7 @@ fm_dispatch_fallbacks() {
       else {rule: "", fallback: []} end
     elif ($matches | map(.fallback) | unique | length) > 1 then error("different fallback lists match this profile; pass --dispatch-rule")
     else {rule: (if ($matches | length) == 1 then $matches[0].rule else "" end), fallback: $matches[0].fallback} end
-  ' "$file" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
+  ' <<<"$profiles_json" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
   printf '%s\n' "$result"
 }
 

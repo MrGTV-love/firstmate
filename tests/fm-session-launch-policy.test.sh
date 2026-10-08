@@ -95,7 +95,13 @@ case "$1" in
       printf '%s' "$@" >> "$buffer"
     else
       for key in "$@"; do
-        [ "$key" = Enter ] || continue
+        if [ "$key" != Enter ] && [ "$key" != C-m ]; then
+          case "$key" in
+            C-*|Escape|BSpace) ;;
+            *) printf '%s' "$key" >> "$buffer" ;;
+          esac
+          continue
+        fi
         payload=
         [ ! -f "$buffer" ] || payload=$(cat "$buffer")
         rm -f "$buffer"
@@ -106,7 +112,7 @@ case "$1" in
             printf 'zsh\n' > "$FM_POLICY_CASE/command" ;;
           ". '"*"'")
             staged=${payload#". '"}; staged=${staged%"'"}
-            /bin/bash "$staged" ;;
+            (cd -- "$FM_FAKE_PANE_PATH" && /bin/bash "$staged") ;;
         esac
       done
     fi
@@ -122,6 +128,9 @@ set -eu
 if [ "${0##*/}" = omp ] && [ "${1:-}" = models ] && [ "${2:-}" = --json ]; then
   printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}'
   exit 0
+fi
+if [ "${0##*/}" = omp ] && [ "${1:-}" = usage ]; then
+  exit 1
 fi
 if [ -n "${FM_POLICY_CHILD:-}" ]; then
   printf 'launch-attempt:%s\n' "${0##*/}" >> "$FM_POLICY_CASE/effects"

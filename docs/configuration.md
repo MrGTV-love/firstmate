@@ -1417,6 +1417,7 @@ The operator must preserve the task's required reasoning class in each list; an 
 Natural-language `why` text does not authorize an executable fallback.
 
 `fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
+Role-backed primary profiles are resolved through the same model-index snapshot before rule matching; a selected stand-in still obeys the model index and session launch policy.
 Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
 Spawn and recovery validate fallback fields even when typed resolution is off.
 The rule identifier is recorded with the task and follows recovery; without it, identical matching lists are safe, but differing lists require an explicit `--dispatch-rule`.

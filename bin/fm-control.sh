@@ -997,10 +997,14 @@ resolve_relaunch_profile() {
   fi
   # A role reference, or a model the index has since retired, is resolved or
   # refused here, before the stop, exactly as the launch owner would.
-  if [ "$TARGET_MODEL" != default ]; then
+  if [ "$TARGET_MODEL" != default ] ||
+    { [ "$KIND" != secondmate ] && [ -f "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/crew-dispatch.json" ] &&
+      { [ -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/model-index.json" ] || [ -L "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/model-index.json" ]; }; }; then
     RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
     FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
       fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR" || return 1
+  fi
+  if [ "$TARGET_MODEL" != default ]; then
     TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
       "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
   fi
@@ -1016,8 +1020,8 @@ resolve_relaunch_profile() {
     elif [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
       TARGET_DISPATCH_RULE=
     fi
-    if [ -f "$config_dir/crew-dispatch.json" ]; then
-      dispatch_set=$(fm_dispatch_fallbacks "$config_dir" "$TARGET_DISPATCH_RULE" \
+    if [ -f "${RELAUNCH_PAIR_DIR:-$config_dir}/crew-dispatch.json" ]; then
+      dispatch_set=$(fm_dispatch_fallbacks "${RELAUNCH_PAIR_DIR:-$config_dir}" "$TARGET_DISPATCH_RULE" \
         "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
       TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
       dispatch_fallback=$(jq -c .fallback <<<"$dispatch_set")
@@ -1037,6 +1041,7 @@ resolve_relaunch_profile() {
       TARGET_EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
     fi
   fi
+  fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$TARGET_HARNESS" || return 1
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
   fi
