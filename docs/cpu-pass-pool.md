@@ -29,6 +29,7 @@ Every participant on a host follows these rules, so one pool is shared by every 
 3. **Passes:** pass `i` is an exclusive, non-blocking `flock` on `slot-<i>.lock` for `i` in `0..size-1`.
    The work inherits the slot lock descriptors, so wrapper death cannot release its reservation while it still runs.
    A holder may write one line into each slot it holds, `pid=<pid> passes=<k> since=<epoch> label=<text>`, for status display.
+   Firstmate publishes that record as each slot is acquired, including while a request is still collecting passes.
 4. **Turnstile:** a request first takes an exclusive `flock` on `turnstile.lock`, then collects slots until it holds all it asked for, keeping the slots it already holds, then releases the turnstile.
    Only the turnstile holder collects, so two multi-pass requests cannot deadlock and a large request is not starved by small ones.
    Both locks are polled with backoff; a request queues and never fails for lack of a pass.
@@ -60,14 +61,14 @@ Firstmate's own `bin/fm-test-run.sh` takes one pass per executed test script, ou
 
 F6 is installed and live on this host since 2026-10-08 00:54 in the private no-mistakes build `v1.86.1-private.f6.20261008`.
 Its gate overlay disables the omp advisor and eager sub-agents for pipeline agents only.
-The coordinated F2/F6 cutover is satisfied by this Firstmate pool change and that live overlay; it is not an independent rollout without an F6 dependency.
-Vernant participation in the pool is a separate Vernant-repository change tracked as follow-up under lane d7, `vernant-pytest-worker-sizing`.
+This change delivers the Firstmate side of Phase 1: the pool, `fm-test-run.sh` wiring, the cross-repository contract, and the measurement recipe.
+Phase 1 completes only when the Vernant participant lands as a separate Vernant-repository change, tracked as backlog item `vernant-cpu-pass-pool-participation`, alongside this Firstmate change and the live F6 overlay.
 
 ## Judging the pool
 
 `bin/fm-load-report.sh` records host load and reads pipeline agent durations so a change to the pool can be judged on data; its engine header owns the sample format and verdict rules.
 
-1. When the change lands, note the time with `date +%s` and start one recorder per host: `nohup bin/fm-load-report.sh watch --interval 60 >/dev/null 2>&1 &`.
+1. Only once Phase 1 is complete, note the time with `date +%s` and start one recorder per host: `nohup bin/fm-load-report.sh watch --interval 60 >/dev/null 2>&1 &`.
 2. After 24 to 48 hours of normal fleet work, run `bin/fm-load-report.sh report --since <that epoch>`.
 3. Read its two verdicts: `load_within_2x_cpus` (1-minute load p95 at or under twice the CPU count) and `converged_within_2_fix_rounds` (the fixed first ten pipeline runs that reached review and were created after the recorded cutover epoch, ordered by creation time then run id, completed successfully with at most two review-fix rounds and none hit a timeout).
    Failed and cancelled cohort members count as not converged.

@@ -186,6 +186,8 @@ def acquire(directory: str, size: int, passes: int, label: str, log_fd: int) -> 
         held_slots = set()
         delay = POLL_MIN_SECS
         order = list(range(size))
+        record = ("pid=%d passes=%d since=%d label=%s\n" % (
+            os.getpid(), passes, int(time.time()), label.replace("\n", " "))).encode("utf-8", "replace")
         while True:
             random.shuffle(order)
             for index in order:
@@ -197,6 +199,11 @@ def acquire(directory: str, size: int, passes: int, label: str, log_fd: int) -> 
                 if try_lock(fd):
                     held.append(fd)
                     held_slots.add(index)
+                    try:
+                        os.ftruncate(fd, 0)
+                        os.pwrite(fd, record, 0)
+                    except OSError:
+                        pass
                 else:
                     os.close(fd)
             if len(held) >= passes:
@@ -212,14 +219,6 @@ def acquire(directory: str, size: int, passes: int, label: str, log_fd: int) -> 
     if noticed:
         log(log_fd, "got %d CPU pass(es) for %s after %ds" % (
             passes, label, int(time.monotonic() - started)))
-    record = "pid=%d passes=%d since=%d label=%s\n" % (
-        os.getpid(), passes, int(time.time()), label.replace("\n", " "))
-    for fd in held:
-        try:
-            os.ftruncate(fd, 0)
-            os.pwrite(fd, record.encode("utf-8", "replace"), 0)
-        except OSError:
-            pass
     return held
 
 

@@ -179,26 +179,60 @@ test_passes_are_exclusive_and_waiters_queue() {
 }
 
 test_multi_pass_request_collects_all() {
-  local pool dir holder big
+  local pool dir holder big waiter
   dir="$TMP_ROOT/multi"
   mkdir -p "$dir"
   pool=$(new_pool multi)
-  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 start_bg "$PASS_TOOL" run -- \
+  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 start_bg "$PASS_TOOL" run --label active-holder -- \
     bash -c 'touch "$1/one"; while [ ! -e "$1/release" ]; do sleep 0.05; done' _ "$dir" &
   holder=$!
   BG_PIDS+=("$holder")
   wait_file "$dir/one" "single holder"
-  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 start_bg "$PASS_TOOL" run --passes 2 --log-fd 3 -- \
-    bash -c 'echo "big=$FM_CPU_PASS_HELD"' >"$dir/big.out" 2>&1 3>/dev/null &
+  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 "$PASS_TOOL" run --label finished-earlier -- true \
+    || fail "earlier reservation failed"
+  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 start_bg "$PASS_TOOL" run --passes 2 --label current-collector --log-fd 3 -- \
+    bash -c 'echo "big=$FM_CPU_PASS_HELD"' >"$dir/big.out" 2>&1 3>"$dir/collector.log" &
   big=$!
   BG_PIDS+=("$big")
   wait_held "$pool" 2 2 "multi-pass collector holding its first slot"
   [ ! -s "$dir/big.out" ] || fail "a two-pass request ran with one pass"
+  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 "$PASS_TOOL" status >"$dir/status"
+  assert_grep "label=current-collector" "$dir/status" "partial status must name the current collector"
+  assert_no_grep "label=finished-earlier" "$dir/status" "partial status must not name the finished earlier run"
+  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 "$PASS_TOOL" status --json >"$dir/status.json"
+  python3 - "$dir/status.json" <<'PY' || fail "partial JSON status must identify the current reservations"
+import json, sys
+with open(sys.argv[1]) as handle:
+    status = json.load(handle)
+assert status["held"] == 2 and status["free"] == 0, status
+assert {item["holder"].split("label=", 1)[1] for item in status["holders"]} == {
+    "active-holder", "current-collector"
+}, status
+PY
+  FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 start_bg "$PASS_TOOL" run --label queued-behind-collector --log-fd 3 -- \
+    bash -c 'echo "small=$FM_CPU_PASS_HELD"' >"$dir/small.out" 2>&1 3>"$dir/waiter.log" &
+  waiter=$!
+  BG_PIDS+=("$waiter")
+  for _ in $(seq 1 600); do
+    if grep -q "waiting" "$dir/collector.log" && grep -q "waiting" "$dir/waiter.log"; then break; fi
+    sleep 0.05
+  done
+  assert_re 'all passes in use; pool size 2; holders: .*label=current-collector' \
+    "$dir/collector.log" "a partial collector's notice must identify its own held slot"
+  assert_re 'another request is collecting passes; pool size 2; holders: .*label=current-collector' \
+    "$dir/waiter.log" "a turnstile waiter's notice must identify the current collector"
+  assert_no_grep "label=finished-earlier" "$dir/collector.log" "collector notices must not name the finished earlier run"
+  assert_no_grep "label=finished-earlier" "$dir/waiter.log" "turnstile notices must not name the finished earlier run"
+  [ ! -s "$dir/big.out" ] || fail "a partial collector ran while waiting"
+  [ ! -s "$dir/small.out" ] || fail "a queued request bypassed the collecting request"
   touch "$dir/release"
   wait "$holder" || fail "single holder failed"
   wait "$big" || fail "two-pass run failed"
+  wait "$waiter" || fail "queued single-pass run failed"
   BG_PIDS=()
   assert_equals big=2 "$(cat "$dir/big.out")" "the two-pass request must run with both passes"
+  assert_equals small=1 "$(cat "$dir/small.out")" "the queued request must run with its requested pass"
+  assert_equals 0 "$(held_count "$pool" 2)" "all passes must be free after queued reservations end"
   pass "a multi-pass request keeps collected passes and runs once it holds all"
 }
 
