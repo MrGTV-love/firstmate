@@ -1,0 +1,28 @@
+{
+  "isolation": "All disposable homes, Git repositories, metadata, status streams and request tracing lived under the worktree. GitHub calls were read-only public API requests through the installed gh-axi; the tracer delegates with exec and does not alter responses. No harness, Herdr, default tmux server, production fleet home, or pipeline lifecycle was driven.",
+  "backlog": {
+    "ledger": "queue-dispatch-ledger.json",
+    "metadata_selection": "metadata-dispatch-selection.json",
+    "watcher": "watcher-dispatch-proof.json",
+    "bearings": "bearings-dispatch-proof.json"
+  },
+  "ownership": {
+    "foreign_fork": "foreign-fork-exclusion.json",
+    "backlog_url": "recorded-url-ownership.json",
+    "repository_casing": "case-insensitive-head-repository.json",
+    "branch_casing": "case-sensitive-branch-exclusion.json",
+    "exact_url": "exact-recorded-url-boundary.json",
+    "task_red_check": "owned-task-red-check.json",
+    "main_home": "main-home-owned-prs.json",
+    "lane_marker": "invalid-lane-marker-main-discovery.json",
+    "watcher": "unowned-pr-watcher-proof.json"
+  },
+  "worker_stops": {
+    "mixed": "stopped-workers-ledger.json",
+    "stopped_only": "only-stopped-ledger.json",
+    "configured_pause": "custom-pause-ledger.json",
+    "unpublished_work": "stopped-unlanded-ledger.json"
+  },
+  "generation_race": "generation-race-transitions.json",
+  "setup_adjustments": "The initial absent tmux socket used an overlong absolute Unix-socket pathname; switching to a worktree-relative private absent socket corrected endpoint observation. A ship fixture initially omitted its worktree metadata field; supplying the public field exposed its unpublished commit. Initial done/paused status events correctly produced unrelated completion/signal wakes; a fresh paused fixture and real fm-wake-drain acknowledgment isolated the subsequent no-ledger-wake observation."
+}

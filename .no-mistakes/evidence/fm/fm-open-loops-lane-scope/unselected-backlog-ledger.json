@@ -1,0 +1,20 @@
+{
+  "schema": "fm-open-loops.v1",
+  "generated_epoch": 1791467181,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/quiet-lane",
+  "complete": true,
+  "rows": [
+    {
+      "id": "02ce97426cc39ebd970aafa7",
+      "category": "ready_not_started",
+      "subject": "idle-ready",
+      "owner": "firstmate",
+      "next_action": "informational: queued and not selected for dispatch",
+      "age_seconds": 844782381,
+      "limit_seconds": 1800,
+      "overdue": false,
+      "evidence": "",
+      "informational": true
+    }
+  ]
+}

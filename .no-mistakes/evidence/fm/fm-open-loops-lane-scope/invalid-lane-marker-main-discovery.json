@@ -1,0 +1,19 @@
+{
+  "schema": "fm-open-loops.v1",
+  "generated_epoch": 1791467362,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/pr-lane",
+  "complete": false,
+  "rows": [
+    {
+      "id": "356ebb94f902b717273d377a",
+      "category": "coverage",
+      "subject": "ledger degraded",
+      "owner": "firstmate",
+      "next_action": "restore the unreadable sources and rerun the reconciler",
+      "age_seconds": null,
+      "limit_seconds": 0,
+      "overdue": true,
+      "evidence": "project origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/pr-lane/projects/unrelated: unsupported non-GitHub origin: https://gitlab.com/fixture/not-owned.git"
+    }
+  ]
+}

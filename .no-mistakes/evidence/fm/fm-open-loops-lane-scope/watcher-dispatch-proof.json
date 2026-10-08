@@ -1,0 +1,10 @@
+{
+  "quiet_watcher_running_after_seconds": 6,
+  "quiet_queue": "",
+  "quiet_stdout": "",
+  "quiet_stderr": "",
+  "selected_exit": 0,
+  "selected_stdout": "check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\n",
+  "selected_stderr": "",
+  "selected_queue": "1791467198\t1\tcheck\topen-loop-ledger\tcheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\n"
+}

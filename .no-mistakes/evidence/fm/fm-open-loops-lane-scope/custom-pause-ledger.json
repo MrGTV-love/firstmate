@@ -1,0 +1,30 @@
+{
+  "schema": "fm-open-loops.v1",
+  "generated_epoch": 1791467274,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane",
+  "complete": false,
+  "rows": [
+    {
+      "id": "3208e695d4f14bb7bcd960cf",
+      "category": "coverage",
+      "subject": "ledger degraded",
+      "owner": "firstmate",
+      "next_action": "restore the unreadable sources and rerun the reconciler",
+      "age_seconds": null,
+      "limit_seconds": 0,
+      "overdue": true,
+      "evidence": "worker current state custom-resumed: worktree gone (torn down?)"
+    },
+    {
+      "id": "594ba655ca3d34496652e985",
+      "category": "missing_worker",
+      "subject": "custom-resumed",
+      "owner": "firstmate",
+      "next_action": "recover the assigned worker without discarding work",
+      "age_seconds": 0,
+      "limit_seconds": 600,
+      "overdue": false,
+      "evidence": ""
+    }
+  ]
+}

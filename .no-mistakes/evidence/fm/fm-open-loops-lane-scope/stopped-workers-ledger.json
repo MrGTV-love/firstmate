@@ -1,0 +1,63 @@
+{
+  "schema": "fm-open-loops.v1",
+  "generated_epoch": 1791467250,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane",
+  "complete": false,
+  "rows": [
+    {
+      "id": "3208e695d4f14bb7bcd960cf",
+      "category": "coverage",
+      "subject": "ledger degraded",
+      "owner": "firstmate",
+      "next_action": "restore the unreadable sources and rerun the reconciler",
+      "age_seconds": null,
+      "limit_seconds": 0,
+      "overdue": true,
+      "evidence": "worker current state blocked-again: worktree gone (torn down?); worker current state resumed: worktree gone (torn down?); worker current state silent-loss: worktree gone (torn down?)"
+    },
+    {
+      "id": "9b925f2bfc03e2d6facb0d0b",
+      "category": "missing_worker",
+      "subject": "blocked-again",
+      "owner": "firstmate",
+      "next_action": "recover the assigned worker without discarding work",
+      "age_seconds": 14,
+      "limit_seconds": 600,
+      "overdue": false,
+      "evidence": ""
+    },
+    {
+      "id": "035a8957f55c7856b531ae02",
+      "category": "missing_worker",
+      "subject": "resumed",
+      "owner": "firstmate",
+      "next_action": "recover the assigned worker without discarding work",
+      "age_seconds": 14,
+      "limit_seconds": 600,
+      "overdue": false,
+      "evidence": ""
+    },
+    {
+      "id": "7a8b4e047207fcdda68f96c0",
+      "category": "missing_worker",
+      "subject": "silent-loss",
+      "owner": "firstmate",
+      "next_action": "recover the assigned worker without discarding work",
+      "age_seconds": 14,
+      "limit_seconds": 600,
+      "overdue": false,
+      "evidence": ""
+    },
+    {
+      "id": "b2076736b281bf53623be98c",
+      "category": "unanswered_question",
+      "subject": "blocked-again:default",
+      "owner": "firstmate",
+      "next_action": "answer or close this question, or record why it no longer applies",
+      "age_seconds": null,
+      "limit_seconds": 1800,
+      "overdue": true,
+      "evidence": "blocked: new blocker"
+    }
+  ]
+}

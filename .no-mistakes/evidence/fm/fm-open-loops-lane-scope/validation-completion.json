@@ -1,0 +1,8 @@
+{
+  "ledger_contract_suite_exit": 0,
+  "watcher_integration_suite_exit": 0,
+  "live_scenarios": "passed",
+  "disposable_fixture_removed": true,
+  "remaining_fixture_addressed_processes": [],
+  "source_changes": false
+}

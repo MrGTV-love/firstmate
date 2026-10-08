@@ -1,0 +1,29 @@
+{
+  "real_public_forge": true,
+  "ledger": {
+    "schema": "fm-open-loops.v1",
+    "generated_epoch": 1791467525,
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/unowned-watch-lane",
+    "complete": true,
+    "rows": [
+      {
+        "id": "a1e50b11ca7bc8d3f147db99",
+        "category": "ready_not_started",
+        "subject": "idle-ready",
+        "owner": "firstmate",
+        "next_action": "informational: queued and not selected for dispatch",
+        "age_seconds": 844782725,
+        "limit_seconds": 1800,
+        "overdue": false,
+        "evidence": "",
+        "informational": true
+      }
+    ]
+  },
+  "initial_signal_output": "1791467532\t2\tsignal\tforeign-branch.status\tsignal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/unowned-watch-lane/state/foreign-branch.status\nwake annotation: latest wake-EVENT observed at drain, not current state: foreign-branch.status: paused: waiting for independent CI\n",
+  "ack_command": "bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 35939.1791467532.FgpuFK",
+  "watcher_running_after_seconds": 6,
+  "wake_queue": "",
+  "stdout": "",
+  "stderr": ""
+}

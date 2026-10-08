@@ -1,0 +1,38 @@
+[
+  {
+    "status": "done",
+    "generation_changes": 17,
+    "invalidated_coverage": "worker liveness relaunching: worker liveness is inconclusive: unknown; worker current state relaunching: task generation changed during snapshot",
+    "stable_ledger": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791467384,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/generation-lane",
+      "complete": true,
+      "rows": []
+    }
+  },
+  {
+    "status": "paused",
+    "generation_changes": 22,
+    "invalidated_coverage": "worker liveness relaunching: worker liveness is inconclusive: unknown; worker current state relaunching: task generation changed during snapshot",
+    "stable_ledger": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791467385,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/generation-lane",
+      "complete": true,
+      "rows": []
+    }
+  },
+  {
+    "status": "unrelated-resolution",
+    "generation_changes": 31,
+    "invalidated_coverage": "worker liveness relaunching: worker liveness is inconclusive: unknown; worker current state relaunching: task generation changed during snapshot",
+    "stable_ledger": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791467386,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/generation-lane",
+      "complete": true,
+      "rows": []
+    }
+  }
+]

@@ -1,0 +1,42 @@
+{
+  "schema": "fm-open-loops.v1",
+  "generated_epoch": 1791467480,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/queue-lane",
+  "complete": true,
+  "rows": [
+    {
+      "id": "e4d4f39dd69d1263a199045d",
+      "category": "ready_not_started",
+      "subject": "idle-ready",
+      "owner": "firstmate",
+      "next_action": "informational: queued and not selected for dispatch",
+      "age_seconds": 844782680,
+      "limit_seconds": 1800,
+      "overdue": false,
+      "evidence": "",
+      "informational": true
+    },
+    {
+      "id": "c7e0aaf6efe4bf000b2454d3",
+      "category": "ready_not_started",
+      "subject": "meta-ready",
+      "owner": "firstmate",
+      "next_action": "dispatch the dependency-cleared work",
+      "age_seconds": 844782680,
+      "limit_seconds": 1800,
+      "overdue": true,
+      "evidence": ""
+    },
+    {
+      "id": "be63a0c32ec18cbb5a1159c1",
+      "category": "ready_not_started",
+      "subject": "started-ready",
+      "owner": "firstmate",
+      "next_action": "dispatch the dependency-cleared work",
+      "age_seconds": 844782680,
+      "limit_seconds": 1800,
+      "overdue": true,
+      "evidence": ""
+    }
+  ]
+}

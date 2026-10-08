@@ -1,0 +1,36 @@
+PASS: ordinary categories, PR proof, ages and configuration
+PASS: correction coverage and landed/drop exclusions
+PASS: recorded task-only PR classification, fork landing, and correction coverage
+PASS: patch-equivalent delivery
+PASS: approved local landing and qualified defaults
+PASS: independent failed delivery and worker liveness axes
+PASS: unknown current state degrades independently of live verdict
+PASS: future pipeline stamps do not mask older valid progress
+PASS: future status commit and reflog cannot hide unknown-age stalls
+PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
+PASS: collection leaves Git index and object inventory unchanged
+PASS: last-error JSON and human representations
+PASS: exact GitHub host admission and PR projection
+PASS: unreadable shared state inventory cannot publish complete empty coverage
+PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
+PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
+PASS: generation-invalidated snapshots retain coverage failures despite live stop events
+PASS: only dispatched ready work is overdue
+PASS: ordinary recovery adapters and source degradation
+PASS: publication suppression reset success/failure/skip
+PASS: held-gate singleflight and child cleanup
+PASS: unset and empty address overrides share shell defaults before collection
+PASS: command deadline owns resistant descendant cleanup
+PASS: collection deadline owns resistant descendant cleanup
+PASS: deadline escapes origins source recovery
+PASS: deadline escapes pr-checks source recovery
+PASS: deadline escapes pr-state source recovery
+PASS: deadline escapes questions source recovery
+PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+PASS: home-input carries a large inventory, skips secondmates, and marks a captain drop
+PASS: live and aged captain holds share unresolved-question coverage with status decisions
+PASS: unreadable tmux degrades coverage without fabricating missing worker
+PASS: current-state timeout retains independent observation failure
+PASS: real snapshot unreadable metadata/status inventory stays degraded
+PASS: real snapshot cancellation reaps nested groups and removes temporary inventory
+ok - open-work reconciliation reports owned obligations from live records

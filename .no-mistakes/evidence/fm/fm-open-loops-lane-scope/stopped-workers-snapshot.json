@@ -1,0 +1,708 @@
+{
+  "schema": "fm-fleet-home-input.v1",
+  "fm_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane",
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "order": 1,
+        "state": "in_flight",
+        "structured": true,
+        "id": "finished",
+        "checked": false,
+        "title": "Worker finished",
+        "repo": "fixture",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2000-01-01",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] finished - Worker finished (repo: fixture) (kind: scout) (since 2000-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 9777,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 2,
+        "state": "in_flight",
+        "structured": true,
+        "id": "paused",
+        "checked": false,
+        "title": "Worker paused",
+        "repo": "fixture",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2000-01-01",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] paused - Worker paused (repo: fixture) (kind: scout) (since 2000-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 9777,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 3,
+        "state": "in_flight",
+        "structured": true,
+        "id": "paused-answer",
+        "checked": false,
+        "title": "Worker paused-answer",
+        "repo": "fixture",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2000-01-01",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] paused-answer - Worker paused-answer (repo: fixture) (kind: scout) (since 2000-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 9777,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 4,
+        "state": "in_flight",
+        "structured": true,
+        "id": "silent-loss",
+        "checked": false,
+        "title": "Worker silent-loss",
+        "repo": "fixture",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2000-01-01",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] silent-loss - Worker silent-loss (repo: fixture) (kind: scout) (since 2000-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 9777,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 5,
+        "state": "in_flight",
+        "structured": true,
+        "id": "resumed",
+        "checked": false,
+        "title": "Worker resumed",
+        "repo": "fixture",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2000-01-01",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] resumed - Worker resumed (repo: fixture) (kind: scout) (since 2000-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 9777,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 6,
+        "state": "in_flight",
+        "structured": true,
+        "id": "blocked-again",
+        "checked": false,
+        "title": "Worker blocked-again",
+        "repo": "fixture",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2000-01-01",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] blocked-again - Worker blocked-again (repo: fixture) (kind: scout) (since 2000-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 9777,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "blocked-again",
+      "kind": "scout",
+      "harness": "",
+      "mode": "normal",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/blocked-again.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/blocked-again.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "blocked",
+            "note": "new blocker",
+            "raw": "blocked: new blocker",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/data/blocked-again/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab:fm-blocked-again",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": true,
+        "open_decisions": [
+          {
+            "key": "default",
+            "verb": "blocked",
+            "summary": "new blocker"
+          }
+        ],
+        "scout_report_present": false,
+        "last_event_text": "blocked: new blocker"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-blocked-again",
+        "steer": "bin/fm-send.sh fm-blocked-again '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "finished",
+      "kind": "scout",
+      "harness": "",
+      "mode": "normal",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/finished.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/finished.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "delivered",
+            "raw": "done: delivered",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/data/finished/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab:fm-finished",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "done: delivered"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-finished",
+        "steer": "bin/fm-send.sh fm-finished '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "paused",
+      "kind": "scout",
+      "harness": "",
+      "mode": "normal",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/paused.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/paused.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "Continuation prose with no event.",
+            "note": "Continuation prose with no event.",
+            "raw": "Continuation prose with no event.",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/data/paused/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab:fm-paused",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "Continuation prose with no event."
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-paused",
+        "steer": "bin/fm-send.sh fm-paused '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "paused-answer",
+      "kind": "scout",
+      "harness": "",
+      "mode": "normal",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/paused-answer.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/paused-answer.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "resolved",
+            "note": "answered",
+            "raw": "resolved [key=choice]: answered",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/data/paused-answer/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab:fm-paused-answer",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "resolved [key=choice]: answered"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-paused-answer",
+        "steer": "bin/fm-send.sh fm-paused-answer '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "resumed",
+      "kind": "scout",
+      "harness": "",
+      "mode": "normal",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/resumed.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/resumed.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "resolved",
+            "note": "resumed",
+            "raw": "resolved [key=ci]: resumed",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/data/resumed/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab:fm-resumed",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "resolved [key=ci]: resumed"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-resumed",
+        "steer": "bin/fm-send.sh fm-resumed '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "silent-loss",
+      "kind": "scout",
+      "harness": "",
+      "mode": "normal",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/silent-loss.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/state/silent-loss.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "building",
+            "raw": "working: building",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DSD4R6N2HB2ZR3P1ED6V1G/.live-ledger-c1vtiqpg/stopped-lane/data/silent-loss/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab:fm-silent-loss",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T13:47:29Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working: building"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-silent-loss",
+        "steer": "bin/fm-send.sh fm-silent-loss '<instruction>'",
+        "return_channel_note": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": ".live-ledger-c1vtiqpg/queue-lane",
+  "generated": "2026-10-08T13:46:39Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": true,
+    "proven_clear": true,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [],
+  "landed": [],
+  "gates": [
+    {
+      "id": "idle-ready",
+      "title": "Not selected",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2000-01-01"
+    },
+    {
+      "id": "started-ready",
+      "title": "Dispatch started",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2000-01-01"
+    },
+    {
+      "id": "held-ready",
+      "title": "Await decision",
+      "blocked_by": "-",
+      "reason": "decision",
+      "owner": "(main)",
+      "filed": "2000-01-01"
+    },
+    {
+      "id": "blocked-ready",
+      "title": "Dependency",
+      "blocked_by": "idle-ready",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2000-01-01"
+    },
+    {
+      "id": "dated-ready",
+      "title": "Future",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2000-01-01"
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ],
+  "open_loops": {
+    "generated_epoch": 1791467180,
+    "complete": true,
+    "rows": [
+      {
+        "id": "be63a0c32ec18cbb5a1159c1",
+        "category": "ready_not_started",
+        "subject": "started-ready",
+        "owner": "firstmate",
+        "next_action": "dispatch the dependency-cleared work",
+        "age_seconds": 844782380,
+        "evidence": ""
+      }
+    ]
+  }
+}
