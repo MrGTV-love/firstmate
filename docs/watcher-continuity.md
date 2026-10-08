@@ -258,6 +258,16 @@ A concurrently appended wake has a higher sequence, remains queued, and keeps th
 Consequently, a watcher close during handling republishes the same generation as pending and forces one recovery turn even when no queue row remains, while the outstanding generation-bound acknowledgement stays valid.
 An acknowledged episode does not freeze the generation, because the next downtime after it opens an episode of its own.
 
+### Who presents queued wakes between turns
+
+While an auto-arm claim is open, the Claude Stop hook is the only deliverer of queued wakes between turns.
+Its rewake commit accepts only a downtime marker, so a drain that moves the marker to handling makes the hook drop its wake in silence.
+The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) therefore checks `fm_autoarm_claim_open` before it drains.
+When the claim is open, the re-emit reports how many records are queued and leaves both the queue and the marker alone.
+The handling turn the hook starts then drains and enters handling through the ordinary `--ack-through` path.
+Once the claim is finished or absent, the re-emit drains as before.
+A rewake the commit refuses leaves `outcome=refused` in the epoch ledger.
+
 ## Per-actor acknowledgement
 
 `bin/fm-wake-drain.sh` consumes the queue per actor, not per whole-queue cutoff.

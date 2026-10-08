@@ -361,6 +361,9 @@ An owned terminal commit therefore decides the exit:
 A generation whose required marker cannot be created is refused and exits 0 silently even after printing.
 Its terminal ledger entry is superseded by a later firing, which retries the notice.
 
+A rewake commit is also refused when the recovery marker is not downtime or the session lock is no longer this session's.
+The hook then exits 0 and records `outcome=refused` best-effort, which an owned write cannot clobber if a newer generation already took over.
+
 #### Why the claim boundaries exist
 
 Without those boundaries, two failures occurred:

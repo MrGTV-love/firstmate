@@ -2419,6 +2419,62 @@ EOF
   pass "--reemit reprints the digest without repeating startup's mutating sweeps and still drains queued wakes"
 }
 
+# 2026-10-08: a compaction at Stop re-emitted the digest while the Stop hook was
+# still arming. The digest's drain moved the recovery marker to handling, the
+# hook's rewake commit then refused it, and queued worker events sat unread for
+# two hours. An open Stop-hook claim makes the hook the only deliverer, so the
+# re-emit must report the queue and leave both queue and marker alone.
+test_reemit_leaves_queue_and_marker_alone_while_a_stop_hook_claim_is_open() {
+  local rec root home fakebin owner identity reemit again
+  rec=$(new_world reemit-open-claim)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  # The claim's pid-identity is read through ps (lstart + command), which the
+  # fake does not answer; hand exactly that question to the real ps.
+  awk '{ print } !done && /^case "\$\*" in$/ { print "  *\"lstart=\"*) exec /bin/ps \"$@\" ;;"; done = 1 }' \
+    "$fakebin/ps" > "$fakebin/ps.new" && mv "$fakebin/ps.new" "$fakebin/ps" && chmod +x "$fakebin/ps"
+  grep -q 'lstart=' "$fakebin/ps" || fail "could not route the fake ps identity question to the real ps"
+  append_wake "$home/state" signal task-c "done: queued while the hook arms" || fail "seed wake failed"
+  printf 'pending:downtime:claim-test-generation\n' > "$home/state/.watcher-down"
+  touch "$home/state/.last-watcher-beat"
+  sleep 60 &
+  owner=$!
+  identity=$(fm_test_pid_identity "$owner") || fail "could not compute the claim owner identity"
+  printf 'epoch=3 owner_pid=%s outcome=arming updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \
+    > "$home/state/.claude-autoarm-epoch"
+
+  reemit=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    "$SESSION_START" --reemit)
+  assert_contains "$reemit" "deferred (context re-emit while the Stop hook owns wake delivery) - 1 record(s) are queued" \
+    "--reemit did not report the queue it deferred"
+  assert_not_contains "$reemit" "done: queued while the hook arms" "--reemit presented a wake the Stop hook must deliver"
+  assert_not_contains "$reemit" "WAKE_ACK_REQUIRED: after handling" "--reemit demanded an acknowledgement for wakes it did not present"
+  [ "$(cat "$home/state/.watcher-down")" = pending:downtime:claim-test-generation ] \
+    || fail "--reemit moved the recovery marker while a Stop-hook claim was open: $(cat "$home/state/.watcher-down")"
+  [ -s "$home/state/.wake-queue" ] || fail "--reemit consumed the queue while a Stop-hook claim was open"
+
+  # Control: once the claim is finished, the same re-emit drains as before.
+  printf 'epoch=3 owner_pid=%s outcome=rewake updated_at=%s\n%s\n' "$owner" "$(date +%s)" "$identity" \
+    > "$home/state/.claude-autoarm-epoch"
+  again=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    "$SESSION_START" --reemit)
+  assert_contains "$again" "done: queued while the hook arms" "--reemit stopped draining once the claim was finished"
+  assert_contains "$again" "WAKE_ACK_REQUIRED: after handling" "--reemit omitted the acknowledgement once the claim was finished"
+  case "$(cat "$home/state/.watcher-down")" in
+    pending:handling:*) ;;
+    *) fail "the drain after a finished claim must enter handling, got: $(cat "$home/state/.watcher-down")" ;;
+  esac
+  kill "$owner" 2>/dev/null || true
+  wait "$owner" 2>/dev/null || true
+
+  pass "--reemit defers the drain while a Stop-hook claim is open and drains normally after it finishes"
+}
+
 test_agents_baseline_stays_at_true_start_and_reemits_on_every_drifted_pi_compact() {
   local rec root home fakebin startup compact_equal compact_first compact_second clear_out resume_out reset_out baseline baseline_after expected_hash refresh_line bootstrap_line
   rec=$(new_world agents-refresh)
@@ -3061,6 +3117,7 @@ test_portable_timeout_escalates_term_resistant_process
 test_runtime_bound_leaves_a_healthy_digest_untouched
 test_runtime_bound_leaves_harness_ancestry_headroom
 test_reemit_skips_startup_sweeps_but_keeps_the_wake_drain
+test_reemit_leaves_queue_and_marker_alone_while_a_stop_hook_claim_is_open
 test_agents_baseline_stays_at_true_start_and_reemits_on_every_drifted_pi_compact
 test_read_only_pi_compact_refreshes_against_its_own_session_identity
 test_codex_unreachable_reset_sources_do_not_claim_instruction_refresh

@@ -119,6 +119,7 @@ The requested session start remains idempotent.
 - Its supported stale-instruction refresh pairs.
 
 The `bin/fm-session-start.sh` header is the single owner of those mechanics.
+One re-emit rule is a recovery safety boundary: while a Claude Stop-hook auto-arm claim is open, the re-emit leaves the wake queue and recovery marker untouched, and [`watcher-continuity.md`](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns why.
 
 ## Runtime bound
 

@@ -100,6 +100,9 @@
 # state/.claude-autoarm-failure-notified deduplicates the last-resort notice,
 # and state/.claude-autoarm-failure-alarmed bounds the attended fail-open and
 # suppresses any later automatic continuation in that unresolved episode.
+# A rewake the commit refuses (the recovery marker is not downtime, or the
+# session lock is no longer this session's) is dropped with exit 0; the ledger
+# then reads outcome=refused so the next forensic read needs no replay.
 #
 # In hook mode it never blocks the Stop decision itself or prints to stdout:
 # exit 0 is silent, and exit 2 carries the rewake banner on stderr.
@@ -530,6 +533,9 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 2
   fi
+  # Refused (marker not downtime, lock lost) or superseded: the wake is dropped
+  # in silence, so leave a forensic trace. A superseded generation cannot write.
+  autoarm_record refused
   [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
   exit 0
 fi

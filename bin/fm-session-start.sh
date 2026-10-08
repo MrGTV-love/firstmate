@@ -214,7 +214,13 @@
 #             re-emit the rest. Wake-queue presentation is NOT skipped: queued
 #             records are this turn's work queue, they arrived after startup,
 #             and a session that owns the lock is exactly the session that must
-#             handle and acknowledge them. Lock acquisition still runs, because
+#             handle and acknowledge them. The one exception is an open Stop-hook
+#             auto-arm claim (fm_autoarm_claim_open in bin/fm-wake-lib.sh): that
+#             hook is then the sole deliverer of queued wakes between turns, and
+#             a drain here would move the recovery marker to handling, which makes
+#             the hook's rewake commit refuse and drop the wake. The re-emit then
+#             reports the queued count and leaves the queue and marker untouched
+#             for the handling turn the hook starts. Lock acquisition still runs, because
 #             ownership must be re-verified rather than assumed: fm-lock.sh
 #             already treats a lock owned through shared ancestry or a trusted
 #             same-session Claude id as its own, so the re-emit proceeds, while
@@ -671,7 +677,7 @@ if [ "$REEMIT" -eq 1 ]; then
   printf 'reprinted, but the sweeps startup already reconciled - project clone refresh,\n'
   printf 'secondmate convergence and liveness, pending remote handoff\n'
   printf 'retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.\n'
-  printf 'Queued wakes ARE still drained: they arrived after startup and are this turn work.\n'
+  printf 'Queued wakes ARE still drained: they arrived after startup and are this turn work, unless an open Stop-hook claim owns their delivery (the WAKE QUEUE section says so).\n'
 else
   section "SESSION START - $FM_HOME"
 fi
@@ -772,6 +778,18 @@ if [ "$READ_ONLY" -eq 1 ]; then
   QLEN=0
   [ -s "$STATE/.wake-queue" ] && QLEN=$(grep -c . "$STATE/.wake-queue" 2>/dev/null || printf '0')
   printf 'skipped (read-only session) - %s record(s) remain queued because this session lacks verified fleet-lock ownership.\n' "$QLEN"
+  GUARD_OUT=$(FM_GUARD_READ_ONLY=1 "$SCRIPT_DIR/fm-guard.sh" 2>&1)
+  [ -n "$GUARD_OUT" ] && printf '%s\n' "$GUARD_OUT"
+elif [ "$REEMIT" -eq 1 ] && fm_autoarm_claim_open "$STATE" "${FM_GUARD_GRACE:-$(fm_poll_derived_grace)}"; then
+  # An open Stop-hook claim means the Stop hook is the only deliverer of queued
+  # wakes between turns. A drain here would move the recovery marker to
+  # handling, and the hook's rewake commit refuses any marker that is not
+  # downtime, so the hook would drop the wake in silence and nothing would
+  # follow (2026-10-08). Report the queue and leave the marker alone; the next
+  # drain happens in the handling turn the hook starts.
+  QLEN=0
+  [ -s "$STATE/.wake-queue" ] && QLEN=$(grep -c . "$STATE/.wake-queue" 2>/dev/null || printf '0')
+  printf 'deferred (context re-emit while the Stop hook owns wake delivery) - %s record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.\n' "$QLEN"
   GUARD_OUT=$(FM_GUARD_READ_ONLY=1 "$SCRIPT_DIR/fm-guard.sh" 2>&1)
   [ -n "$GUARD_OUT" ] && printf '%s\n' "$GUARD_OUT"
 else
