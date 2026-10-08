@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.294
+▝▜██████▀  Sonnet 5.5 with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4
+
+
+❯ Reply exactly "Error: lab diagnostic for stalled-worker evidence". This is a validation fixture, not a real provider
+  error. Do not use tools, read files, or modify anything.
+
+⏺ Error: lab diagnostic for stalled-worker evidence
+
+✻ Worked for 8s · done 1:13 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 6% 66k/1.0M 01M4D1H184R6TQSQ9R3SMA5QQ4:27dfda22
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents

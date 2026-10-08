@@ -1,0 +1,52 @@
+{
+  "schema": "fm-open-loops.v1",
+  "generated_epoch": 1791439787,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home",
+  "complete": false,
+  "rows": [
+    {
+      "id": "290c3248347cbb304703b3ab",
+      "category": "coverage",
+      "subject": "ledger degraded",
+      "owner": "firstmate",
+      "next_action": "restore the unreadable sources and rerun the reconciler",
+      "age_seconds": null,
+      "limit_seconds": 0,
+      "overdue": true,
+      "evidence": "state inventory: [Errno 13] Permission denied: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/unreadable-state'"
+    },
+    {
+      "id": "62e7b6c1b3d1688e0feee8d4",
+      "category": "missing_worker",
+      "subject": "lost",
+      "owner": "firstmate",
+      "next_action": "recover the assigned worker without discarding work",
+      "age_seconds": 22187,
+      "limit_seconds": 0,
+      "overdue": true,
+      "evidence": ""
+    },
+    {
+      "id": "7264d98fe599ee4a303fc9b4",
+      "category": "ready_not_started",
+      "subject": "ready",
+      "owner": "firstmate",
+      "next_action": "dispatch the dependency-cleared work",
+      "age_seconds": 22187,
+      "limit_seconds": 0,
+      "overdue": true,
+      "evidence": ""
+    },
+    {
+      "id": "1adf734c8bd95ba7da87fb92",
+      "category": "unanswered_question",
+      "subject": "held:captain-hold",
+      "owner": "captain",
+      "next_action": "resolve the captain hold or record its next decision date",
+      "age_seconds": 22187,
+      "limit_seconds": 0,
+      "overdue": true,
+      "evidence": "Approve the production engine upgrade"
+    }
+  ]
+}

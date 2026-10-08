@@ -1,0 +1,709 @@
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add ship-proof 'Ship no proof' --kind ship --repo lab
+ok: added ship-proof (ship, repo lab) -> Queued
+task:
+  id: ship-proof
+  title: Ship no proof
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: lab
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start ship-proof` to move it to in flight
+  - Run `tasks-axi block ship-proof --by <other>` to record a dependency
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done ship-proof
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+
+[exit 2]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add scout-report 'Scout report' --kind scout --repo lab
+ok: added scout-report (scout, repo lab) -> Queued
+task:
+  id: scout-report
+  title: Scout report
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: lab
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start scout-report` to move it to in flight
+  - Run `tasks-axi block scout-report --by <other>` to record a dependency
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done scout-report --report data/scout-report/report.md
+fm-tasks-axi: the report has not been written: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-report/report.md
+
+[exit 2]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/findings.txt /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-report/report-link.md
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done scout-report --report data/scout-report/report-link.md
+fm-tasks-axi: the report has not been written: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-report/report-link.md
+
+[exit 2]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done scout-report --report data/scout-report/report.md
+ok: done scout-report -> Done (report data/scout-report/report.md)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done ship-proof --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/captain-words.txt
+ok: done ship-proof -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/captain-words.txt /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/ship-proof/captain-drop.md
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/ship-proof/captain-drop.md
+# Backlog
+
+## In flight
+## Queued
+## Done
+- [x] ship-proof - Ship no proof (repo: lab) (kind: ship) (done 2026-10-08)
+  dropped
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+Drop this lab assignment: its premise is gone.
+Keep these exact words, including punctuation.
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh reopen ship-proof
+ok: reopen ship-proof -> Queued
+help[1]:
+  - Run `tasks-axi start ship-proof` to move it to in flight
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md
+# Backlog
+
+## In flight
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+## Done
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool find /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/ship-proof -maxdepth 2 -type f
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/ship-proof/captain-drop.md
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done ship-proof --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/captain-words.txt
+ok: done ship-proof -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439702, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home", "complete": true, "rows": []}
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh reopen ship-proof
+ok: reopen ship-proof -> Queued
+help[1]:
+  - Run `tasks-axi start ship-proof` to move it to in flight
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439705, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home", "complete": true, "rows": [{"id": "7aa581d0d227afaf88917c2c", "category": "ready_not_started", "subject": "ship-proof", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": null, "limit_seconds": 1800, "overdue": true, "evidence": ""}]}
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab commit -q --allow-empty -m 'Lab baseline'
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/state/.last-watcher-beat
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add missing-copy missing-copy --kind ship --repo lab
+ok: added missing-copy (ship, repo lab) -> Queued
+task:
+  id: missing-copy
+  title: missing-copy
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: lab
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start missing-copy` to move it to in flight
+  - Run `tasks-axi block missing-copy --by <other>` to record a dependency
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh start missing-copy
+ok: start missing-copy -> In flight
+help[1]:
+  - Run `tasks-axi done missing-copy --pr <url>` when it ships
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh missing-copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task missing-copy has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh missing-copy --force
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/state/missing-copy.meta /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md
+backend=tmux
+window=
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/missing-copy
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab
+kind=ship
+mode=local-only
+# Backlog
+
+## In flight
+- [ ] missing-copy - missing-copy (repo: lab) (kind: ship) (since 2026-10-08)
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+  Historical captain disposition: dropped
+## Done
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+
+[exit 0]
+
+$ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab && FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool treehouse get --lease --no-fetch
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab. Run 'treehouse return ~/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab' to release it.
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab checkout -q -b fm/live-ship
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab add deliverable.txt
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab commit -q -m 'Unlanded lab work'
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add unlanded-ship unlanded-ship --kind ship --repo lab
+ok: added unlanded-ship (ship, repo lab) -> Queued
+task:
+  id: unlanded-ship
+  title: unlanded-ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: lab
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start unlanded-ship` to move it to in flight
+  - Run `tasks-axi block unlanded-ship --by <other>` to record a dependency
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh start unlanded-ship
+ok: start unlanded-ship -> In flight
+help[1]:
+  - Run `tasks-axi done unlanded-ship --pr <url>` when it ships
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh unlanded-ship
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 11s ago, grace 300s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ec16490 Unlanded lab work
+7ed006b Lab baseline
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh unlanded-ship --force
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git init -q --bare /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/origin.git
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/origin.git
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab push -q origin main
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab push -q origin fm/live-ship
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab fetch -q origin
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab remote set-head origin main
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh unlanded-ship
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 31s ago, grace 300s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/state/unlanded-ship.meta /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md
+backend=tmux
+window=
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab
+kind=ship
+mode=local-only
+# Backlog
+
+## In flight
+- [ ] unlanded-ship - unlanded-ship (repo: lab) (kind: ship) (since 2026-10-08)
+- [ ] missing-copy - missing-copy (repo: lab) (kind: ship) (since 2026-10-08)
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+  Historical captain disposition: dropped
+## Done
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab log -1 '--format=%H %s'
+ec16490780106c963d051c37dc35a2fd63ab03e4 Unlanded lab work
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab remote remove origin
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/projects/lab merge -q --ff-only fm/live-ship
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh unlanded-ship
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 36s ago, grace 300s) - full banner already printed this episode.
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown unlanded-ship complete (window none, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool/.treehouse/lab-225f8d/1/lab, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261008T060902Z-65915)
+Backlog: unlanded-ship is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md
+# Backlog
+
+## In flight
+- [ ] missing-copy - missing-copy (repo: lab) (kind: ship) (since 2026-10-08)
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+  Historical captain disposition: dropped
+## Done
+- [x] unlanded-ship - unlanded-ship (repo: lab) (kind: ship) (done 2026-10-08)
+  local main
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool gh api 'repos/cli/cli/pulls?state=closed&per_page=5' --jq '.[] | select(.merged_at != null) | .html_url'
+https://github.com/cli/cli/pull/14616
+https://github.com/cli/cli/pull/14592
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool gh pr view https://github.com/cli/cli/pull/14616 --json state,url -q '.state + " " + .url'
+MERGED https://github.com/cli/cli/pull/14616
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh missing-copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 67s ago, grace 300s) - full banner already printed this episode.
+teardown missing-copy complete (window none, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/missing-copy, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261008T060932Z-47125)
+Backlog: missing-copy is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md
+# Backlog
+
+## In flight
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+  Historical captain disposition: dropped
+## Done
+- [x] missing-copy - missing-copy https://github.com/cli/cli/pull/14616 (repo: lab) (kind: ship) (merged 2026-10-08)
+- [x] unlanded-ship - unlanded-ship (repo: lab) (kind: ship) (done 2026-10-08)
+  local main
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add public-merged 'Public merged PR proof' --kind ship --repo lab
+ok: added public-merged (ship, repo lab) -> Queued
+task:
+  id: public-merged
+  title: Public merged PR proof
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: lab
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start public-merged` to move it to in flight
+  - Run `tasks-axi block public-merged --by <other>` to record a dependency
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done public-merged --pr https://github.com/cli/cli/pull/14616
+ok: done public-merged -> Done (pr https://github.com/cli/cli/pull/14616)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add forced-drop forced-drop --kind ship --repo lab
+ok: added forced-drop (ship, repo lab) -> Queued
+task:
+  id: forced-drop
+  title: forced-drop
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: lab
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start forced-drop` to move it to in flight
+  - Run `tasks-axi block forced-drop --by <other>` to record a dependency
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh start forced-drop
+ok: start forced-drop -> In flight
+help[1]:
+  - Run `tasks-axi done forced-drop --pr <url>` when it ships
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh forced-drop --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/captain-words.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 85s ago, grace 300s) - full banner already printed this episode.
+teardown forced-drop complete (window none, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/forced-missing, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261008T060951Z-97628)
+Backlog: forced-drop is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/captain-words.txt /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/forced-drop/captain-drop.md
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/forced-drop/captain-drop.md
+# Backlog
+
+## In flight
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+  Historical captain disposition: dropped
+## Done
+- [x] forced-drop - forced-drop (repo: lab) (kind: ship) (done 2026-10-08)
+  dropped
+- [x] public-merged - Public merged PR proof https://github.com/cli/cli/pull/14616 (repo: lab) (kind: ship) (merged 2026-10-08)
+- [x] missing-copy - missing-copy https://github.com/cli/cli/pull/14616 (repo: lab) (kind: ship) (merged 2026-10-08)
+- [x] unlanded-ship - unlanded-ship (repo: lab) (kind: ship) (done 2026-10-08)
+  local main
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+Drop this lab assignment: its premise is gone.
+Keep these exact words, including punctuation.
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439793, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home", "complete": true, "rows": [{"id": "7aa581d0d227afaf88917c2c", "category": "ready_not_started", "subject": "ship-proof", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": null, "limit_seconds": 1800, "overdue": true, "evidence": ""}]}
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh reopen forced-drop
+ok: reopen forced-drop -> Queued
+help[1]:
+  - Run `tasks-axi start forced-drop` to move it to in flight
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439796, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home", "complete": true, "rows": [{"id": "3613523f2493dad717b7156d", "category": "ready_not_started", "subject": "forced-drop", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": null, "limit_seconds": 1800, "overdue": true, "evidence": ""}, {"id": "7aa581d0d227afaf88917c2c", "category": "ready_not_started", "subject": "ship-proof", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": null, "limit_seconds": 1800, "overdue": true, "evidence": ""}]}
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add scout-teardown 'Scout teardown' --kind scout --repo lab
+ok: added scout-teardown (scout, repo lab) -> Queued
+task:
+  id: scout-teardown
+  title: Scout teardown
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: lab
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start scout-teardown` to move it to in flight
+  - Run `tasks-axi block scout-teardown --by <other>` to record a dependency
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh start scout-teardown
+ok: start scout-teardown -> In flight
+help[1]:
+  - Run `tasks-axi done scout-teardown --pr <url>` when it ships
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh scout-teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 101s ago, grace 300s) - full banner already printed this episode.
+REFUSED: scout task scout-teardown has no report at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-teardown/report.md.
+The report is the work product. Have the crewmate write it, or use --force after explicit discard approval.
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool rm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-teardown/report.md
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/findings.txt /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-teardown/report.md
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh scout-teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 106s ago, grace 300s) - full banner already printed this episode.
+REFUSED: scout task scout-teardown has no report at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-teardown/report.md.
+The report is the work product. Have the crewmate write it, or use --force after explicit discard approval.
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool rm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-teardown/report.md
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh scout-teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 108s ago, grace 300s) - full banner already printed this episode.
+fm-captain-hold: origin scout-teardown has no completed captain-call inventory
+REFUSED: scout task scout-teardown has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+
+[exit 1]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md
+# Backlog
+
+## In flight
+- [ ] scout-teardown - Scout teardown (repo: lab) (kind: scout) (since 2026-10-08)
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+  Historical captain disposition: dropped
+- [ ] forced-drop - forced-drop (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+## Done
+- [x] public-merged - Public merged PR proof https://github.com/cli/cli/pull/14616 (repo: lab) (kind: ship) (merged 2026-10-08)
+- [x] missing-copy - missing-copy https://github.com/cli/cli/pull/14616 (repo: lab) (kind: ship) (merged 2026-10-08)
+- [x] unlanded-ship - unlanded-ship (repo: lab) (kind: ship) (done 2026-10-08)
+  local main
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-captain-hold.sh complete scout-teardown --none
+complete: scout-teardown captain-call inventory reviewed
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh scout-teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+WARNING: watcher still down (same stale episode; last beat: 127s ago, grace 300s) - full banner already printed this episode.
+teardown scout-teardown complete (window none, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/scout-missing, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261008T061033Z-32486)
+Backlog: scout-teardown is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/backlog.md
+# Backlog
+
+## In flight
+## Queued
+- [ ] ship-proof - Ship no proof (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+  Historical captain disposition: dropped
+- [ ] forced-drop - forced-drop (repo: lab) (kind: ship)
+  Historical captain disposition: dropped
+## Done
+- [x] scout-teardown - Scout teardown data/scout-teardown/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+- [x] public-merged - Public merged PR proof https://github.com/cli/cli/pull/14616 (repo: lab) (kind: ship) (merged 2026-10-08)
+- [x] missing-copy - missing-copy https://github.com/cli/cli/pull/14616 (repo: lab) (kind: ship) (merged 2026-10-08)
+- [x] unlanded-ship - unlanded-ship (repo: lab) (kind: ship) (done 2026-10-08)
+  local main
+- [x] scout-report - Scout report data/scout-report/report.md (repo: lab) (kind: scout) (reported 2026-10-08)
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/ship-proof/captain-drop.md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/forced-drop/captain-drop.md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/data/scout-teardown/report.md
+Drop this lab assignment: its premise is gone.
+Keep these exact words, including punctuation.
+Drop this lab assignment: its premise is gone.
+Keep these exact words, including punctuation.
+# Completed scout findings
+A real written nonempty report.
+
+[exit 0]
+
+SETUP: metadata fixtures were ordinary endpoint-less legacy records, created in marked disposable home using write tool; no executable doubles, no fake login. Real public merged PR was read-only https://github.com/cli/cli/pull/14616; it was recorded solely as fixture evidence, not asserted as lab authorship. All git pushes above targeted the local disposable origin.git only.
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+
+[exit 0]
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home/pool rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.completion-live-home
+
+[exit 0]
+
+CLEANUP_HOME_EXISTS=False
+SETUP ENV (every logged command): GIT_AUTHOR_NAME=Lab Captain; GIT_AUTHOR_EMAIL=lab@example.invalid; GIT_COMMITTER_NAME=Lab Captain; GIT_COMMITTER_EMAIL=lab@example.invalid; inherited FM_*_OVERRIDE variables removed.
+FIXTURE WRITE CONTENT: captain-words.txt = 'Drop this lab assignment: its premise is gone.\nKeep these exact words, including punctuation.\n'
+FIXTURE WRITE CONTENT: scout-report/report.md = '# Findings\nThe disposable lifecycle report is written.\n'
+FIXTURE WRITE CONTENT: scout-teardown/report.md = '# Completed scout findings\nA real written nonempty report.\n'
+FIXTURE METADATA TEMPLATE: backend=tmux\nwindow=\nworktree=<logged path>\nproject=<lab projects/lab>\nkind=<ship|scout>\nmode=local-only\n; missing-copy alternative appends pr=https://github.com/cli/cli/pull/14616\n. No spawn_gen: actual supported missing-endpoint legacy cleanup path.
+REGRESSION: not run; live cases exercised completion behavior, targeted timeout regression left to main agent to avoid duplicate checks.

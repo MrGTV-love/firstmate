@@ -1,0 +1,30 @@
+lavish-axi end /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+  status: ended
+
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-procevent-lavish.sh retire /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+retired: lavish-c40ed87ea23994a3
+
+exit=0
+lavish-axi stop
+server:
+  status: stopped
+  port: 56999
+
+exit=0
+tmux -L fm-lab kill-server
+no server running on /Users/charlesabrooker/.no-mistakes/evidence/01M4D1H184R6TQSQ9R3SMA5QQ4/t/tmux-501/fm-lab
+
+exit=1
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home
+
+exit=0
+Remaining owned world processes:
+25161     1 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-procevent.sh _owner-watchdog lavish-c40ed87ea23994a3 13576 Thu Oct  8 01:16:25 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-procevent.sh _start lavish-c40ed87ea23994a3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/procevent/.owner-guard-ready.gup9YB 16777232 121025024
+
+Owned watchdog explicitly terminated. World directory removed=True; completion fixture removed=True; private socket directory removed=True; remaining owned watchdog=[]

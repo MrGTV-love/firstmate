@@ -1,0 +1,46 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home
+
+exit=0
+
+$ FM_HOME=<watch-home> FM_POLL=1 FM_OPEN_LOOPS_INTERVAL=1209600 bin/fm-watch.sh
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh
+1791440068	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 6745.1791440068.TpuVwC
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh
+1791440068	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 6745.1791440068.TpuVwC
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 6745.1791440068.TpuVwC
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440360, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home", "complete": true, "rows": [{"id": "96d249c048c00d92bd74f525", "category": "ready_not_started", "subject": "ready-watcher", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22760, "limit_seconds": 0, "overdue": true, "evidence": ""}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440367, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home", "complete": true, "rows": []}
+
+exit=0
+
+$ FM_HOME=<watch-home> FM_OPEN_LOOPS_INTERVAL=1 watcher with live collection lock and aged missing publication
+check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh
+1791440369	2	check	open-loop-ledger-stale	check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 13968.1791440369.UIhDV8
+
+exit=0

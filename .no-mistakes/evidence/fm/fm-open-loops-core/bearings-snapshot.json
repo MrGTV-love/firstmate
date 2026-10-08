@@ -1,0 +1,209 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": ".livevalidation/home",
+  "generated": "2026-10-08T06:20:28Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": true,
+    "proven_clear": true,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [
+    {
+      "id": "primary",
+      "kind": "scout",
+      "state": "working",
+      "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "name": "primary",
+      "doing": "inspecting the isolated assignment"
+    },
+    {
+      "id": "unlanded",
+      "kind": "ship",
+      "state": "unknown",
+      "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "name": "unlanded",
+      "doing": "harness state unavailable (unknown missing)"
+    }
+  ],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [
+    {
+      "id": "held",
+      "key": "held",
+      "verb": "captain-hold",
+      "summary": "Captain engine decision: Approve the production engine upgrade",
+      "owner": "(main)"
+    }
+  ],
+  "landed": [],
+  "gates": [
+    {
+      "id": "ready",
+      "title": "Start this approved fix",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-10-08"
+    },
+    {
+      "id": "blocked",
+      "title": "Wait for assigned work",
+      "blocked_by": "lost",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-10-08"
+    },
+    {
+      "id": "future",
+      "title": "Not due yet",
+      "blocked_by": "-",
+      "reason": "Not until the launch",
+      "owner": "(main)",
+      "filed": "2026-10-08"
+    },
+    {
+      "id": "(main-inventory)",
+      "title": "in-flight backlog item has no child metadata",
+      "blocked_by": "-",
+      "reason": "main inventory",
+      "owner": "(main)",
+      "filed": null
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "unhealthy_endpoints": [
+    {
+      "id": "unlanded",
+      "backend": "tmux",
+      "target": "gone:unlanded",
+      "exists": false,
+      "agent": "missing"
+    }
+  ],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "main in-flight backlog item(s) have no child metadata: 1",
+      "reveal": "inspect main data/backlog.md In flight vs state/*.meta"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ],
+  "open_loops": {
+    "generated_epoch": 1791440158,
+    "complete": false,
+    "rows": [
+      {
+        "id": "290c3248347cbb304703b3ab",
+        "category": "coverage",
+        "subject": "ledger degraded",
+        "owner": "firstmate",
+        "next_action": "restore the unreadable sources and rerun the reconciler",
+        "age_seconds": null,
+        "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"
+      },
+      {
+        "id": "62e7b6c1b3d1688e0feee8d4",
+        "category": "missing_worker",
+        "subject": "lost",
+        "owner": "firstmate",
+        "next_action": "recover the assigned worker without discarding work",
+        "age_seconds": 22558,
+        "evidence": ""
+      },
+      {
+        "id": "c60952d2387dc33f612cd149",
+        "category": "missing_worker",
+        "subject": "unlanded",
+        "owner": "firstmate",
+        "next_action": "recover the assigned worker without discarding work",
+        "age_seconds": 428,
+        "evidence": ""
+      },
+      {
+        "id": "7264d98fe599ee4a303fc9b4",
+        "category": "ready_not_started",
+        "subject": "ready",
+        "owner": "firstmate",
+        "next_action": "dispatch the dependency-cleared work",
+        "age_seconds": 22558,
+        "evidence": ""
+      },
+      {
+        "id": "0e332e4ffe296a113dbb55ea",
+        "category": "stalled_worker",
+        "subject": "primary",
+        "owner": "firstmate",
+        "next_action": "inspect and recover the stalled-but-alive worker",
+        "age_seconds": 428,
+        "evidence": "\u23fa Error: lab diagnostic for stalled-worker evidence"
+      },
+      {
+        "id": "9ee728aa2095436c8875451c",
+        "category": "unanswered_question",
+        "subject": "asker:engine",
+        "owner": "firstmate",
+        "next_action": "answer or close this question, or record why it no longer applies",
+        "age_seconds": 36454,
+        "evidence": "needs-decision: production engine upgrade unanswered"
+      },
+      {
+        "id": "1adf734c8bd95ba7da87fb92",
+        "category": "unanswered_question",
+        "subject": "held:captain-hold",
+        "owner": "captain",
+        "next_action": "resolve the captain hold or record its next decision date",
+        "age_seconds": 22558,
+        "evidence": "Approve the production engine upgrade"
+      },
+      {
+        "id": "ef665d3501dd55fd85d374c8",
+        "category": "unlanded_commit",
+        "subject": "unlanded",
+        "owner": "firstmate",
+        "next_action": "land this work through its PR, or obtain the captain's drop",
+        "age_seconds": 428,
+        "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"
+      }
+    ]
+  }
+}

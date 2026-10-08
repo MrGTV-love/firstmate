@@ -1,0 +1,1811 @@
+ISOLATION: Actual product commands; disposable marked FM_HOME and Git copies in worktree. Private tmux socket in evidence directory, 120x40 grid. Real Claude normal login with per-launch worktree-local lifecycle hooks. Diagnostic error text was intentionally requested fixture data, not a provider failure. GitHub operations were read-only public API calls. SQLite progress store was a genuine disposable store held open during read-only progress proof.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add lost Assigned work lost its worker --kind ship --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "lost",
+    "title": "Assigned work lost its worker",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add ready Start this approved fix --kind ship --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "ready",
+    "title": "Start this approved fix",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add blocked Wait for assigned work --kind ship --json --blocked-by lost
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "blocked",
+    "title": "Wait for assigned work",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [
+      {
+        "type": "blocked-by",
+        "id": "lost"
+      }
+    ],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": true,
+    "blocked_by": [
+      "lost"
+    ],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add held Captain engine decision --kind ship --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "held",
+    "title": "Captain engine decision",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add future Not due yet --kind ship --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "future",
+    "title": "Not due yet",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh start lost --json
+{
+  "ok": true,
+  "action": "start",
+  "task": {
+    "id": "lost",
+    "title": "Assigned work lost its worker",
+    "state": "in_flight",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh hold held --kind captain --reason Approve the production engine upgrade --json
+{
+  "ok": true,
+  "action": "hold",
+  "task": {
+    "id": "held",
+    "title": "Captain engine decision",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": {
+      "reason": "Approve the production engine upgrade",
+      "kind": "captain",
+      "until": null
+    },
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": true
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh hold future --kind future --reason Not until the launch --until 2999-01-01 --json
+{
+  "ok": true,
+  "action": "hold",
+  "task": {
+    "id": "future",
+    "title": "Not due yet",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": {
+      "reason": "Not until the launch",
+      "kind": "future",
+      "until": "2999-01-01"
+    },
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": true
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439704, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": true, "rows": [{"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22104, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22104, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36000, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22104, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}]}
+
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local add baseline
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local commit -q -m baseline
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local worktree add -q -b fm/unlanded /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy add fix
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy commit -q -m reviewed launcher fix; push failed
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439730, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker liveness unlanded: worker liveness is inconclusive: unreadable; worker current state unlanded: backend unreachable (tmux endpoint state: unreadable)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22130, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22130, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36026, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22130, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 0, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439747, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": true, "rows": [{"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22147, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 17, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22147, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36043, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22147, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 17, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1791439770
+rows[6]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","lost","firstmate","recover the assigned worker without discarding work",22170,true,""
+  "missing_worker","unlanded","firstmate","recover the assigned worker without discarding work",40,true,""
+  "ready_not_started","ready","firstmate","dispatch the dependency-cleared work",22170,true,""
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",36066,true,"needs-decision: production engine upgrade unanswered"
+  "unanswered_question","held:captain-hold","captain","resolve the captain hold or record its next decision date",22170,true,"Approve the production engine upgrade"
+  "unlanded_commit","unlanded","firstmate","land this work through its PR, or obtain the captain's drop",40,true,"1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local remote add origin https://notgithub.com/team/repo.git
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439772, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "project origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local: unsupported non-GitHub origin: https://notgithub.com/team/repo.git"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22172, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 42, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22172, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36068, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22172, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 42, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local remote remove origin
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+error: "[Errno 17] File exists: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/unreadable-state'"
+
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439787, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "state inventory: [Errno 13] Permission denied: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/unreadable-state'"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22187, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22187, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22187, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}]}
+
+exit=0
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4 -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home claude
+error connecting to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/tmux/tmux-501/fm-lab (File name too long)
+
+exit=1
+
+$ tmux -f /dev/null -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4 -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home claude
+
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary -l Reply only "isolated validation". Do not use tools, read files, or modify anything.
+
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+exit=0
+
+$ tmux -L fm-lab rename-window -t primary:0 claude
+
+exit=0
+
+$ tmux -L fm-lab set-window-option -t primary:claude automatic-rename off
+
+exit=0
+
+$ gh-axi api /repos/jqlang/jq-web/pulls?state=open&per_page=100 --paginate --jq @base64 --full
+error: "gh: Not Found (HTTP 404)"
+code: NOT_FOUND
+
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-crew-state.sh primary
+state: unknown · source: none · worktree gone (torn down?)
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439883, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker current state primary: worktree gone (torn down?); worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22283, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 153, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22283, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36179, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22283, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 153, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-crew-state.sh primary
+state: unknown · source: pane · harness state unavailable (unknown missing)
+
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/public-forge
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/public-forge remote add origin https://github.com/cli/go-gh.git
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791439902, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker current state primary: harness state unavailable (unknown missing); worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22302, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 172, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "94cf91e54c03493d4e59f915", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/177", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 48411762, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "76ab5c491d4aa27143062057", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/178", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 21042427, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "d8dba9e3a37021c8aabce1b2", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/209", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 19359899, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "0bfc6f372b5f25107b4dd150", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/211", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 19358374, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "ea61b2e81f1fe8b326b5cdaf", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/214", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 12140759, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "bdfc1212f9caa0caeaf78dda", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/218", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 16792696, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "71d0215d7bd2dd2912e123aa", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/221", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 12757908, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "3a4d454f227e3ad563f61417", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/222", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 12758066, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "3345b12f2be05fe9fdb91187", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/223", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 12479008, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "59737f8ea913ccdbc808d344", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/255", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 9182278, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "59a4894f109d9cd7d9e1f97b", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/274", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 56341, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "2101cb7265642ede70639d8b", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/280", "owner": "babakks", "next_action": "complete the requested PR review", "age_seconds": 3503028, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "8474e6ceced462cbca0d6d90", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/281", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 2939010, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "c0424d467e358929b6852e7a", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/298", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 507618, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "713515080bff2434d1d9ed3f", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/300", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1997092, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "fd2a61df8e5b491fcd8b9f4c", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/302", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1450602, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "00c3d7e5c6842a7b3251e61e", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/304", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1448431, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22302, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "f2e37ad8c26b69c6a1d47b15", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/291", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2528921, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "ae6365b523a0feee3dbba612", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/294", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2269679, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "072a011d8abb6f63a45d72c2", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/295", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2269683, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36198, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22302, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 172, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-crew-state.sh primary
+state: unknown · source: pane · harness state unavailable (unknown missing)
+
+exit=0
+
+$ tmux -L fm-lab kill-server
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state primary
+g1791439989.93051.15303
+
+exit=0
+
+$ tmux -f /dev/null -L fm-lab new-session -d -s primary -n claude -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4 -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home claude --settings /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/claude-lifecycle.json 'Reply exactly "Error: lab diagnostic for stalled-worker evidence". This is a validation fixture, not a real provider error. Do not use tools, read files, or modify anything.'
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/public-forge remote remove origin
+
+exit=0
+
+$ lavish-axi --version
+0.1.79
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-crew-state.sh primary
+state: working · source: pane · harness busy (fm-spawn)
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440012, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22412, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 282, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22412, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "0e332e4ffe296a113dbb55ea", "category": "stalled_worker", "subject": "primary", "owner": "firstmate", "next_action": "inspect and recover the stalled-but-alive worker", "age_seconds": 282, "limit_seconds": 0, "overdue": true, "evidence": "error. Do not use tools, read files, or modify anything."}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36308, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22412, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 282, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add ready-watcher Approved work must start --kind ship --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "ready-watcher",
+    "title": "Approved work must start",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ FM_HOME=<watch-home> FM_POLL=1 FM_OPEN_LOOPS_INTERVAL=1209600 bin/fm-watch.sh
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh
+1791440068	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 6745.1791440068.TpuVwC
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-crew-state.sh primary
+state: working · source: status-log · inspecting the isolated assignment
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440089, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22489, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 359, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22489, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "0e332e4ffe296a113dbb55ea", "category": "stalled_worker", "subject": "primary", "owner": "firstmate", "next_action": "inspect and recover the stalled-but-alive worker", "age_seconds": 359, "limit_seconds": 0, "overdue": true, "evidence": "\u23fa Error: lab diagnostic for stalled-worker evidence"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36385, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22489, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 359, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440118, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22518, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 388, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22518, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "0e332e4ffe296a113dbb55ea", "category": "stalled_worker", "subject": "primary", "owner": "firstmate", "next_action": "inspect and recover the stalled-but-alive worker", "age_seconds": 388, "limit_seconds": 0, "overdue": true, "evidence": "\u23fa Error: lab diagnostic for stalled-worker evidence"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36414, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22518, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 388, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-fleet-snapshot.sh --home-input
+{
+  "schema": "fm-fleet-home-input.v1",
+  "fm_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home",
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "order": 1,
+        "state": "in_flight",
+        "structured": true,
+        "id": "lost",
+        "checked": false,
+        "title": "Assigned work lost its worker",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] lost - Assigned work lost its worker (kind: ship) (since 2026-10-08)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 2,
+        "state": "queued",
+        "structured": true,
+        "id": "ready",
+        "checked": false,
+        "title": "Start this approved fix",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] ready - Start this approved fix (kind: ship) (since 2026-10-08)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 3,
+        "state": "queued",
+        "structured": true,
+        "id": "blocked",
+        "checked": false,
+        "title": "Wait for assigned work",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": "lost",
+        "blocked_by_ids": [
+          "lost"
+        ],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] blocked - Wait for assigned work blocked-by: lost (kind: ship) (since 2026-10-08)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [
+          "lost"
+        ],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 4,
+        "state": "queued",
+        "structured": true,
+        "id": "held",
+        "checked": false,
+        "title": "Captain engine decision",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": "Approve the production engine upgrade",
+        "hold_kind": "captain",
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] held - Captain engine decision (kind: ship) (since 2026-10-08) (hold: Approve the production engine upgrade) (hold-kind: captain)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": "live",
+        "captain_actionable": true
+      },
+      {
+        "order": 5,
+        "state": "queued",
+        "structured": true,
+        "id": "future",
+        "checked": false,
+        "title": "Not due yet",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": "Not until the launch",
+        "hold_kind": "future",
+        "hold_until": "2999-01-01",
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] future - Not due yet (kind: ship) (since 2026-10-08) (hold: Not until the launch) (hold-kind: future) (hold-until: 2999-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "primary",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": "fm/unlanded",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/primary.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/primary.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "inspecting the isolated assignment",
+            "raw": "working: inspecting the isolated assignment",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/data/primary/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "working",
+        "source": "status-log",
+        "detail": "inspecting the isolated assignment",
+        "raw": "state: working · source: status-log · inspecting the isolated assignment",
+        "observed_at": "2026-10-08T06:15:40Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "primary:claude",
+        "exists": true,
+        "agent_alive": "alive",
+        "status": "alive",
+        "observed_at": "2026-10-08T06:15:40Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working: inspecting the isolated assignment"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-primary",
+        "steer": "bin/fm-send.sh fm-primary '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "unlanded",
+      "kind": "ship",
+      "harness": "",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": "fm/unlanded",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/unlanded.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/unlanded.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "failed",
+            "note": "push failed; deliverable still owed",
+            "raw": "failed: push failed; deliverable still owed",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/data/unlanded/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown missing)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown missing)",
+        "observed_at": "2026-10-08T06:15:40Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "gone:unlanded",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T06:15:40Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "failed: push failed; deliverable still owed"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-unlanded",
+        "steer": "bin/fm-send.sh fm-unlanded '<instruction>'",
+        "return_channel_note": null
+      }
+    }
+  ]
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-fleet-snapshot.sh --home-input
+{
+  "schema": "fm-fleet-home-input.v1",
+  "fm_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home",
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "order": 1,
+        "state": "in_flight",
+        "structured": true,
+        "id": "lost",
+        "checked": false,
+        "title": "Assigned work lost its worker",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] lost - Assigned work lost its worker (kind: ship) (since 2026-10-08)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 2,
+        "state": "queued",
+        "structured": true,
+        "id": "ready",
+        "checked": false,
+        "title": "Start this approved fix",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] ready - Start this approved fix (kind: ship) (since 2026-10-08)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 3,
+        "state": "queued",
+        "structured": true,
+        "id": "blocked",
+        "checked": false,
+        "title": "Wait for assigned work",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": "lost",
+        "blocked_by_ids": [
+          "lost"
+        ],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] blocked - Wait for assigned work blocked-by: lost (kind: ship) (since 2026-10-08)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [
+          "lost"
+        ],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 4,
+        "state": "queued",
+        "structured": true,
+        "id": "held",
+        "checked": false,
+        "title": "Captain engine decision",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": "Approve the production engine upgrade",
+        "hold_kind": "captain",
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] held - Captain engine decision (kind: ship) (since 2026-10-08) (hold: Approve the production engine upgrade) (hold-kind: captain)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": "live",
+        "captain_actionable": true
+      },
+      {
+        "order": 5,
+        "state": "queued",
+        "structured": true,
+        "id": "future",
+        "checked": false,
+        "title": "Not due yet",
+        "repo": null,
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": "Not until the launch",
+        "hold_kind": "future",
+        "hold_until": "2999-01-01",
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-10-08",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] future - Not due yet (kind: ship) (since 2026-10-08) (hold: Not until the launch) (hold-kind: future) (hold-until: 2999-01-01)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "captain_drop": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": 0,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "primary",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": "fm/unlanded",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/primary.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/primary.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "inspecting the isolated assignment",
+            "raw": "working: inspecting the isolated assignment",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/data/primary/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "working",
+        "source": "status-log",
+        "detail": "inspecting the isolated assignment",
+        "raw": "state: working · source: status-log · inspecting the isolated assignment",
+        "observed_at": "2026-10-08T06:15:50Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "primary:claude",
+        "exists": true,
+        "agent_alive": "alive",
+        "status": "alive",
+        "observed_at": "2026-10-08T06:15:50Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working: inspecting the isolated assignment"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-primary",
+        "steer": "bin/fm-send.sh fm-primary '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "unlanded",
+      "kind": "ship",
+      "harness": "",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": "fm/unlanded",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/unlanded.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/unlanded.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "failed",
+            "note": "push failed; deliverable still owed",
+            "raw": "failed: push failed; deliverable still owed",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/data/unlanded/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown missing)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown missing)",
+        "observed_at": "2026-10-08T06:15:50Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "gone:unlanded",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-08T06:15:50Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "failed: push failed; deliverable still owed"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-unlanded",
+        "steer": "bin/fm-send.sh fm-unlanded '<instruction>'",
+        "return_channel_note": null
+      }
+    }
+  ]
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440152, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22552, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 422, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22552, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "0e332e4ffe296a113dbb55ea", "category": "stalled_worker", "subject": "primary", "owner": "firstmate", "next_action": "inspect and recover the stalled-but-alive worker", "age_seconds": 422, "limit_seconds": 0, "overdue": true, "evidence": "\u23fa Error: lab diagnostic for stalled-worker evidence"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36448, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22552, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 422, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440155, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "b8c49f1d4c05614e8de40fd6", "category": "failed_task", "subject": "primary", "owner": "firstmate", "next_action": "recover the failed work or record why it ends", "age_seconds": 0, "limit_seconds": 1800, "overdue": false, "evidence": ""}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22555, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 425, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22555, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36451, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22555, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 425, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1791440158
+rows[8]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"
+  "missing_worker","lost","firstmate","recover the assigned worker without discarding work",22558,true,""
+  "missing_worker","unlanded","firstmate","recover the assigned worker without discarding work",428,true,""
+  "ready_not_started","ready","firstmate","dispatch the dependency-cleared work",22558,true,""
+  "stalled_worker","primary","firstmate","inspect and recover the stalled-but-alive worker",428,true,"⏺ Error: lab diagnostic for stalled-worker evidence"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",36454,true,"needs-decision: production engine upgrade unanswered"
+  "unanswered_question","held:captain-hold","captain","resolve the captain hold or record its next decision date",22558,true,"Approve the production engine upgrade"
+  "unlanded_commit","unlanded","firstmate","land this work through its PR, or obtain the captain's drop",428,true,"1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-bearings-board.sh build /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/board-payload.json
+board: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+  url: "http://127.0.0.1:56999/session/c40ed87ea23994a3"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html --reopen`."
+session: live
+served: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+bound: lavish-c40ed87ea23994a3
+error: listener is not running: lavish-c40ed87ea23994a3
+fm-bearings-board: cannot arm the board as a process-event source
+
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-c40ed87ea23994a3      lavish       live       0
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-bearings-board.sh build /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/board-payload.json
+board: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+  url: "http://127.0.0.1:56999/session/c40ed87ea23994a3"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html --reopen`."
+session: live
+served: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+bound: lavish-c40ed87ea23994a3
+already-armed: lavish-c40ed87ea23994a3
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh
+1791440068	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 6745.1791440068.TpuVwC
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 6745.1791440068.TpuVwC
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440360, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home", "complete": true, "rows": [{"id": "96d249c048c00d92bd74f525", "category": "ready_not_started", "subject": "ready-watcher", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22760, "limit_seconds": 0, "overdue": true, "evidence": ""}]}
+
+exit=0
+
+$ restart watcher unchanged acknowledged overdue set for 5 seconds
+
+exit=-15
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done ready-watcher --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watcher-drop.md --json
+{
+  "ok": true,
+  "action": "done",
+  "pruned": 0,
+  "task": {
+    "id": "ready-watcher",
+    "title": "Approved work must start",
+    "state": "done",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": "2026-10-08",
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": "dropped",
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440367, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home", "complete": true, "rows": []}
+
+exit=0
+
+$ FM_HOME=<watch-home> FM_OPEN_LOOPS_INTERVAL=1 watcher with live collection lock and aged missing publication
+check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-wake-drain.sh
+1791440369	2	check	open-loop-ledger-stale	check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 13968.1791440369.UIhDV8
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-bearings-snapshot.sh --json
+{
+  "schema": "fm-bearings.v1",
+  "home": ".livevalidation/home",
+  "generated": "2026-10-08T06:20:28Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": true,
+    "proven_clear": true,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [
+    {
+      "id": "primary",
+      "kind": "scout",
+      "state": "working",
+      "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "name": "primary",
+      "doing": "inspecting the isolated assignment"
+    },
+    {
+      "id": "unlanded",
+      "kind": "ship",
+      "state": "unknown",
+      "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local",
+      "name": "unlanded",
+      "doing": "harness state unavailable (unknown missing)"
+    }
+  ],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [
+    {
+      "id": "held",
+      "key": "held",
+      "verb": "captain-hold",
+      "summary": "Captain engine decision: Approve the production engine upgrade",
+      "owner": "(main)"
+    }
+  ],
+  "landed": [],
+  "gates": [
+    {
+      "id": "ready",
+      "title": "Start this approved fix",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-10-08"
+    },
+    {
+      "id": "blocked",
+      "title": "Wait for assigned work",
+      "blocked_by": "lost",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-10-08"
+    },
+    {
+      "id": "future",
+      "title": "Not due yet",
+      "blocked_by": "-",
+      "reason": "Not until the launch",
+      "owner": "(main)",
+      "filed": "2026-10-08"
+    },
+    {
+      "id": "(main-inventory)",
+      "title": "in-flight backlog item has no child metadata",
+      "blocked_by": "-",
+      "reason": "main inventory",
+      "owner": "(main)",
+      "filed": null
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "unhealthy_endpoints": [
+    {
+      "id": "unlanded",
+      "backend": "tmux",
+      "target": "gone:unlanded",
+      "exists": false,
+      "agent": "missing"
+    }
+  ],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "main in-flight backlog item(s) have no child metadata: 1",
+      "reveal": "inspect main data/backlog.md In flight vs state/*.meta"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ],
+  "open_loops": {
+    "generated_epoch": 1791440158,
+    "complete": false,
+    "rows": [
+      {
+        "id": "290c3248347cbb304703b3ab",
+        "category": "coverage",
+        "subject": "ledger degraded",
+        "owner": "firstmate",
+        "next_action": "restore the unreadable sources and rerun the reconciler",
+        "age_seconds": null,
+        "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"
+      },
+      {
+        "id": "62e7b6c1b3d1688e0feee8d4",
+        "category": "missing_worker",
+        "subject": "lost",
+        "owner": "firstmate",
+        "next_action": "recover the assigned worker without discarding work",
+        "age_seconds": 22558,
+        "evidence": ""
+      },
+      {
+        "id": "c60952d2387dc33f612cd149",
+        "category": "missing_worker",
+        "subject": "unlanded",
+        "owner": "firstmate",
+        "next_action": "recover the assigned worker without discarding work",
+        "age_seconds": 428,
+        "evidence": ""
+      },
+      {
+        "id": "7264d98fe599ee4a303fc9b4",
+        "category": "ready_not_started",
+        "subject": "ready",
+        "owner": "firstmate",
+        "next_action": "dispatch the dependency-cleared work",
+        "age_seconds": 22558,
+        "evidence": ""
+      },
+      {
+        "id": "0e332e4ffe296a113dbb55ea",
+        "category": "stalled_worker",
+        "subject": "primary",
+        "owner": "firstmate",
+        "next_action": "inspect and recover the stalled-but-alive worker",
+        "age_seconds": 428,
+        "evidence": "⏺ Error: lab diagnostic for stalled-worker evidence"
+      },
+      {
+        "id": "9ee728aa2095436c8875451c",
+        "category": "unanswered_question",
+        "subject": "asker:engine",
+        "owner": "firstmate",
+        "next_action": "answer or close this question, or record why it no longer applies",
+        "age_seconds": 36454,
+        "evidence": "needs-decision: production engine upgrade unanswered"
+      },
+      {
+        "id": "1adf734c8bd95ba7da87fb92",
+        "category": "unanswered_question",
+        "subject": "held:captain-hold",
+        "owner": "captain",
+        "next_action": "resolve the captain hold or record its next decision date",
+        "age_seconds": 22558,
+        "evidence": "Approve the production engine upgrade"
+      },
+      {
+        "id": "ef665d3501dd55fd85d374c8",
+        "category": "unlanded_commit",
+        "subject": "unlanded",
+        "owner": "firstmate",
+        "next_action": "land this work through its PR, or obtain the captain's drop",
+        "age_seconds": 428,
+        "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"
+      }
+    ]
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1791440432
+rows[8]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"
+  "missing_worker","lost","firstmate","recover the assigned worker without discarding work",22832,true,""
+  "missing_worker","unlanded","firstmate","recover the assigned worker without discarding work",702,true,""
+  "ready_not_started","ready","firstmate","dispatch the dependency-cleared work",22832,true,""
+  "stalled_worker","primary","firstmate","inspect and recover the stalled-but-alive worker",702,true,"⏺ Error: lab diagnostic for stalled-worker evidence"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",36728,true,"needs-decision: production engine upgrade unanswered"
+  "unanswered_question","held:captain-hold","captain","resolve the captain hold or record its next decision date",22832,true,"Approve the production engine upgrade"
+  "unlanded_commit","unlanded","firstmate","land this work through its PR, or obtain the captain's drop",702,true,"1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy commit --amend -q --no-edit --reset-author
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy rev-parse --absolute-git-dir
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local/.git/worktrees/copy
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440436, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: run inventory unreadable; run ids: , unavailable"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22836, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 706, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22836, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "0e332e4ffe296a113dbb55ea", "category": "stalled_worker", "subject": "primary", "owner": "firstmate", "next_action": "inspect and recover the stalled-but-alive worker", "age_seconds": 7201, "limit_seconds": 3600, "overdue": true, "evidence": "\u23fa Error: lab diagnostic for stalled-worker evidence"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36732, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22836, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 7201, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ python3 -c import os,sqlite3,pathlib; p=(pathlib.Path(os.environ["NM_HOME"])).resolve()/"state.sqlite"; print(p); c=sqlite3.connect(p.as_uri()+"?mode=ro",uri=True); print(c.execute("SELECT name FROM sqlite_master").fetchall())
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/task-progress/state.sqlite
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import os,sqlite3,pathlib; p=(pathlib.Path(os.environ["NM_HOME"])).resolve()/"state.sqlite"; print(p); c=sqlite3.connect(p.as_uri()+"?mode=ro",uri=True); print(c.execute("SELECT name FROM sqlite_master").fetchall())
+                                                                                                                                                                    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: unable to open database file
+
+exit=1
+
+$ python3 -c import sqlite3,pathlib,os; p=pathlib.Path(os.environ["NM_HOME"])/"state.sqlite"; print(p.as_uri()); c=sqlite3.connect(str(p)); print(c.execute("SELECT name FROM sqlite_master").fetchall())
+file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/task-progress/state.sqlite
+[('repos',), ('runs',), ('step_results',), ('step_rounds',), ('sqlite_autoindex_step_rounds_1',), ('agent_invocations',), ('sqlite_autoindex_agent_invocations_1',), ('idx_agent_invocations_run_started_id',), ('recovery_archives',), ('sqlite_autoindex_recovery_archives_1',), ('sqlite_autoindex_recovery_archives_2',), ('idx_recovery_archives_owner_created_id',), ('run_agent_sessions',), ('sqlite_autoindex_run_agent_sessions_1',), ('run_media_attachments',), ('sqlite_autoindex_run_media_attachments_1',), ('intent_cache',), ('sqlite_autoindex_intent_cache_1',), ('review_questions',), ('sqlite_autoindex_review_questions_1',), ('uncertified_pipeline_ranges',), ('sqlite_autoindex_uncertified_pipeline_ranges_1',), ('runs_verification_plan_immutable',), ('runs_pi_profile_immutable',), ('idx_runs_repo_branch_launch_nonce',)]
+
+exit=0
+
+$ python3 -c from pathlib import Path; import sys, os; sys.path.insert(0,"bin"); from fm_open_loops import Collector; c=Collector(os.environ["FM_HOME"],int(__import__("time").time())); print(c.pipeline_progress(sys.argv[1])) /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/copy
+{('/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local', 'fm/unlanded'): 1791440435}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440488, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker current state unlanded: run inventory unreadable; run ids: , unavailable"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22888, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 758, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22888, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36784, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22888, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 7253, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440492, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 22892, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 762, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 22892, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "0e332e4ffe296a113dbb55ea", "category": "stalled_worker", "subject": "primary", "owner": "firstmate", "next_action": "inspect and recover the stalled-but-alive worker", "age_seconds": 7257, "limit_seconds": 3600, "overdue": true, "evidence": "\u23fa Error: lab diagnostic for stalled-worker evidence"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36788, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 22892, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 7257, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-bearings-snapshot.sh
+schema: fm-bearings.v1
+home: .livevalidation/home
+generated: "2026-10-08T06:22:31Z"
+prs: "not_requested (run: /bearings include PRs)"
+contributions: 
+  scope: owned contributions per home
+  known: 0
+  checked: 0
+  counts: 
+    captain: 0
+    fleet: 0
+    maintainer: 0
+    nobody: 0
+  complete: true
+  proven_clear: true
+  unmeasured_homes: 0
+  unreadable_records: 0
+  unmeasured: 0
+  stale_verdicts: 0
+  missing_verdicts: 0
+  captain_omitted: 0
+  captain: []
+in_flight[2]{id,kind,state,repo,name,doing}:
+  primary,scout,working,/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local,primary,inspecting the isolated assignment
+  unlanded,ship,unknown,/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local,unlanded,harness state unavailable (unknown missing)
+secondmates: []
+secondmate_reconcile: []
+decisions_open[1]{id,key,verb,summary,owner}:
+  held,held,captain-hold,"Captain engine decision: Approve the production engine upgrade",(main)
+landed: []
+gates[4]{id,title,blocked_by,reason,owner,filed}:
+  ready,Start this approved fix,"-","-",(main),2026-10-08
+  blocked,Wait for assigned work,lost,"-",(main),2026-10-08
+  future,Not due yet,"-",Not until the launch,(main),2026-10-08
+  (main-inventory),in-flight backlog item has no child metadata,"-",main inventory,(main),null
+reports: []
+recorded_prs: []
+unhealthy_endpoints[1]{id,backend,target,exists,agent}:
+  unlanded,tmux,"gone:unlanded",false,missing
+omitted[7]{surface,reveal}:
+  backlog item bodies,"--fields bodies"
+  task paths,"--fields paths"
+  watch/steer actions,"--fields actions"
+  healthy endpoint detail,"--fields endpoints"
+  full scout-report inventory,"--all-reports"
+  "main in-flight backlog item(s) have no child metadata: 1",inspect main data/backlog.md In flight vs state/*.meta
+  live PR discovery + checks,"--include-prs"
+open_loops: 
+  generated_epoch: 1791440158
+  complete: false
+  rows[8]{id,category,subject,owner,next_action,age_seconds,evidence}:
+    290c3248347cbb304703b3ab,coverage,ledger degraded,firstmate,restore the unreadable sources and rerun the reconciler,null,"no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"
+    62e7b6c1b3d1688e0feee8d4,missing_worker,lost,firstmate,recover the assigned worker without discarding work,22558,""
+    c60952d2387dc33f612cd149,missing_worker,unlanded,firstmate,recover the assigned worker without discarding work,428,""
+    7264d98fe599ee4a303fc9b4,ready_not_started,ready,firstmate,dispatch the dependency-cleared work,22558,""
+    0e332e4ffe296a113dbb55ea,stalled_worker,primary,firstmate,inspect and recover the stalled-but-alive worker,428,"⏺ Error: lab diagnostic for stalled-worker evidence"
+    9ee728aa2095436c8875451c,unanswered_question,"asker:engine",firstmate,"answer or close this question, or record why it no longer applies",36454,"needs-decision: production engine upgrade unanswered"
+    1adf734c8bd95ba7da87fb92,unanswered_question,"held:captain-hold",captain,resolve the captain hold or record its next decision date,22558,Approve the production engine upgrade
+    ef665d3501dd55fd85d374c8,unlanded_commit,unlanded,firstmate,"land this work through its PR, or obtain the captain's drop",428,"1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh add primary Private live endpoint cleanup --kind ship --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "primary",
+    "title": "Private live endpoint cleanup",
+    "state": "queued",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh start primary --json
+{
+  "ok": true,
+  "action": "start",
+  "task": {
+    "id": "primary",
+    "title": "Private live endpoint cleanup",
+    "state": "in_flight",
+    "kind": "ship",
+    "repo": null,
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh primary
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+error: task primary's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/primary.meta has 0 spawn generation fields; exactly one is required); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less
+
+exit=1
+
+$ tmux -L fm-lab has-session -t primary
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh primary --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/live-primary-drop.md
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+error: task primary's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/state/primary.meta has 0 spawn generation fields; exactly one is required); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less
+
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh primary
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+REFUSED: tmux endpoint 'primary:claude' is malformed or does not belong to task primary; preserving task state.
+
+exit=1
+
+$ tmux -L fm-lab has-session -t primary
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh primary --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/live-primary-drop.md
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+REFUSED: tmux endpoint 'primary:claude' is malformed or does not belong to task primary; preserving task state.
+
+exit=1
+
+$ tmux -L fm-lab rename-window -t primary:claude fm-primary
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh primary
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: task primary has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+
+exit=1
+
+$ tmux -L fm-lab has-session -t primary
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-teardown.sh primary --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/live-primary-drop.md
+teardown primary complete (window primary:fm-primary, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/missing-live-copy)
+Backlog: primary is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440676, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker current state recorded-pr: worktree gone (torn down?)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 23076, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "97f10a88403fb1404fb7d043", "category": "missing_worker", "subject": "recorded-pr", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 0, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 946, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "94cf91e54c03493d4e59f915", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/177", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 48412536, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "76ab5c491d4aa27143062057", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/178", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 21043201, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "d8dba9e3a37021c8aabce1b2", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/209", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 19360673, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "0bfc6f372b5f25107b4dd150", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/211", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 19359148, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "ea61b2e81f1fe8b326b5cdaf", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/214", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 12141533, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "bdfc1212f9caa0caeaf78dda", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/218", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 16793470, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "71d0215d7bd2dd2912e123aa", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/221", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 12758682, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "3a4d454f227e3ad563f61417", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/222", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 12758840, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "3345b12f2be05fe9fdb91187", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/223", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 12479782, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "59737f8ea913ccdbc808d344", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/255", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 9183052, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "59a4894f109d9cd7d9e1f97b", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/274", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 57115, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "2101cb7265642ede70639d8b", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/280", "owner": "babakks", "next_action": "complete the requested PR review", "age_seconds": 3503802, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "8474e6ceced462cbca0d6d90", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/281", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 2939784, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "c0424d467e358929b6852e7a", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/298", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 508392, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "713515080bff2434d1d9ed3f", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/300", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1997866, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "fd2a61df8e5b491fcd8b9f4c", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/302", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1451376, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "00c3d7e5c6842a7b3251e61e", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/304", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1449205, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 23076, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "f2e37ad8c26b69c6a1d47b15", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/291", "owner": "worker:recorded-pr", "next_action": "diagnose: code or test", "age_seconds": 2529695, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "ae6365b523a0feee3dbba612", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/294", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2270453, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "072a011d8abb6f63a45d72c2", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/295", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2270457, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36972, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 23076, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 7441, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-tasks-axi.sh done held --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/live-primary-drop.md --json
+fm-tasks-axi: held is an open captain call; resolve it with bin/fm-captain-hold.sh answer or reconcile close before completing the deliverable
+
+exit=2
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791440716, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home", "complete": false, "rows": [{"id": "290c3248347cbb304703b3ab", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker current state recorded-pr: worktree gone (torn down?)"}, {"id": "62e7b6c1b3d1688e0feee8d4", "category": "missing_worker", "subject": "lost", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 23116, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "97f10a88403fb1404fb7d043", "category": "missing_worker", "subject": "recorded-pr", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 40, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "c60952d2387dc33f612cd149", "category": "missing_worker", "subject": "unlanded", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 986, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "94cf91e54c03493d4e59f915", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/177", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 48412576, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "76ab5c491d4aa27143062057", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/178", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 21043241, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "d8dba9e3a37021c8aabce1b2", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/209", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 19360713, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "0bfc6f372b5f25107b4dd150", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/211", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 19359188, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "ea61b2e81f1fe8b326b5cdaf", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/214", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 12141573, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "bdfc1212f9caa0caeaf78dda", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/218", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 16793510, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "71d0215d7bd2dd2912e123aa", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/221", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 12758722, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "3a4d454f227e3ad563f61417", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/222", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 12758880, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "3345b12f2be05fe9fdb91187", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/223", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 12479822, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "59737f8ea913ccdbc808d344", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/255", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 9183092, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "59a4894f109d9cd7d9e1f97b", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/274", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 57155, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "2101cb7265642ede70639d8b", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/280", "owner": "babakks", "next_action": "complete the requested PR review", "age_seconds": 3503842, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "8474e6ceced462cbca0d6d90", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/281", "owner": "BagToad", "next_action": "complete the requested PR review", "age_seconds": 2939824, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "c0424d467e358929b6852e7a", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/298", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 508432, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "713515080bff2434d1d9ed3f", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/300", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1997906, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "fd2a61df8e5b491fcd8b9f4c", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/302", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1451416, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "00c3d7e5c6842a7b3251e61e", "category": "open_pr", "subject": "https://github.com/cli/go-gh/pull/304", "owner": "firstmate", "next_action": "monitor CI and route its result", "age_seconds": 1449245, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "7264d98fe599ee4a303fc9b4", "category": "ready_not_started", "subject": "ready", "owner": "firstmate", "next_action": "dispatch the dependency-cleared work", "age_seconds": 23116, "limit_seconds": 0, "overdue": true, "evidence": ""}, {"id": "f2e37ad8c26b69c6a1d47b15", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/291", "owner": "worker:recorded-pr", "next_action": "diagnose: code or test", "age_seconds": 2529735, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "ae6365b523a0feee3dbba612", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/294", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2270493, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "072a011d8abb6f63a45d72c2", "category": "red_check", "subject": "https://github.com/cli/go-gh/pull/295", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2270497, "limit_seconds": 0, "overdue": true, "evidence": "lint"}, {"id": "9ee728aa2095436c8875451c", "category": "unanswered_question", "subject": "asker:engine", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 37012, "limit_seconds": 0, "overdue": true, "evidence": "needs-decision: production engine upgrade unanswered"}, {"id": "1adf734c8bd95ba7da87fb92", "category": "unanswered_question", "subject": "held:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 23116, "limit_seconds": 0, "overdue": true, "evidence": "Approve the production engine upgrade"}, {"id": "ef665d3501dd55fd85d374c8", "category": "unlanded_commit", "subject": "unlanded", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 7481, "limit_seconds": 0, "overdue": true, "evidence": "1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"}]}
+
+exit=0
+
+$ lavish-axi end /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+  status: ended
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-procevent-lavish.sh retire /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/.lavish/bearings-board.html
+retired: lavish-c40ed87ea23994a3
+
+exit=0
+
+$ lavish-axi stop
+server:
+  status: stopped
+  port: 56999
+
+exit=0
+
+$ tmux -L fm-lab kill-server
+no server running on /Users/charlesabrooker/.no-mistakes/evidence/01M4D1H184R6TQSQ9R3SMA5QQ4/t/tmux-501/fm-lab
+
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/watch-home
+
+exit=0

@@ -1,0 +1,59 @@
+schema: fm-bearings.v1
+home: .livevalidation/home
+generated: "2026-10-08T06:22:31Z"
+prs: "not_requested (run: /bearings include PRs)"
+contributions: 
+  scope: owned contributions per home
+  known: 0
+  checked: 0
+  counts: 
+    captain: 0
+    fleet: 0
+    maintainer: 0
+    nobody: 0
+  complete: true
+  proven_clear: true
+  unmeasured_homes: 0
+  unreadable_records: 0
+  unmeasured: 0
+  stale_verdicts: 0
+  missing_verdicts: 0
+  captain_omitted: 0
+  captain: []
+in_flight[2]{id,kind,state,repo,name,doing}:
+  primary,scout,working,/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local,primary,inspecting the isolated assignment
+  unlanded,ship,unknown,/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/.livevalidation/home/projects/local,unlanded,harness state unavailable (unknown missing)
+secondmates: []
+secondmate_reconcile: []
+decisions_open[1]{id,key,verb,summary,owner}:
+  held,held,captain-hold,"Captain engine decision: Approve the production engine upgrade",(main)
+landed: []
+gates[4]{id,title,blocked_by,reason,owner,filed}:
+  ready,Start this approved fix,"-","-",(main),2026-10-08
+  blocked,Wait for assigned work,lost,"-",(main),2026-10-08
+  future,Not due yet,"-",Not until the launch,(main),2026-10-08
+  (main-inventory),in-flight backlog item has no child metadata,"-",main inventory,(main),null
+reports: []
+recorded_prs: []
+unhealthy_endpoints[1]{id,backend,target,exists,agent}:
+  unlanded,tmux,"gone:unlanded",false,missing
+omitted[7]{surface,reveal}:
+  backlog item bodies,"--fields bodies"
+  task paths,"--fields paths"
+  watch/steer actions,"--fields actions"
+  healthy endpoint detail,"--fields endpoints"
+  full scout-report inventory,"--all-reports"
+  "main in-flight backlog item(s) have no child metadata: 1",inspect main data/backlog.md In flight vs state/*.meta
+  live PR discovery + checks,"--include-prs"
+open_loops: 
+  generated_epoch: 1791440158
+  complete: false
+  rows[8]{id,category,subject,owner,next_action,age_seconds,evidence}:
+    290c3248347cbb304703b3ab,coverage,ledger degraded,firstmate,restore the unreadable sources and rerun the reconciler,null,"no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"
+    62e7b6c1b3d1688e0feee8d4,missing_worker,lost,firstmate,recover the assigned worker without discarding work,22558,""
+    c60952d2387dc33f612cd149,missing_worker,unlanded,firstmate,recover the assigned worker without discarding work,428,""
+    7264d98fe599ee4a303fc9b4,ready_not_started,ready,firstmate,dispatch the dependency-cleared work,22558,""
+    0e332e4ffe296a113dbb55ea,stalled_worker,primary,firstmate,inspect and recover the stalled-but-alive worker,428,"⏺ Error: lab diagnostic for stalled-worker evidence"
+    9ee728aa2095436c8875451c,unanswered_question,"asker:engine",firstmate,"answer or close this question, or record why it no longer applies",36454,"needs-decision: production engine upgrade unanswered"
+    1adf734c8bd95ba7da87fb92,unanswered_question,"held:captain-hold",captain,resolve the captain hold or record its next decision date,22558,Approve the production engine upgrade
+    ef665d3501dd55fd85d374c8,unlanded_commit,unlanded,firstmate,"land this work through its PR, or obtain the captain's drop",428,"1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"

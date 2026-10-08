@@ -1,0 +1,14 @@
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1791440432
+rows[8]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"no-mistakes run store primary: unable to open database file; worker current state unlanded: harness state unavailable (unknown missing)"
+  "missing_worker","lost","firstmate","recover the assigned worker without discarding work",22832,true,""
+  "missing_worker","unlanded","firstmate","recover the assigned worker without discarding work",702,true,""
+  "ready_not_started","ready","firstmate","dispatch the dependency-cleared work",22832,true,""
+  "stalled_worker","primary","firstmate","inspect and recover the stalled-but-alive worker",702,true,"⏺ Error: lab diagnostic for stalled-worker evidence"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",36728,true,"needs-decision: production engine upgrade unanswered"
+  "unanswered_question","held:captain-hold","captain","resolve the captain hold or record its next decision date",22832,true,"Approve the production engine upgrade"
+  "unlanded_commit","unlanded","firstmate","land this work through its PR, or obtain the captain's drop",702,true,"1 commit(s) not on refs/heads/main; newest: reviewed launcher fix; push failed"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
