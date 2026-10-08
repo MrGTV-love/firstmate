@@ -731,6 +731,9 @@ tests/fm-codex-continuity-live-e2e.test.sh 71
 tests/fm-codex-hook-layer-live-e2e.test.sh 47
 tests/fm-composer-codex-idle-live-e2e.test.sh 229
 tests/fm-composer-matrix-live-e2e.test.sh 47
+tests/fm-composer-native-band.test.sh 139054
+tests/fm-composer-native-continuation.test.sh 688995
+tests/fm-composer-native-idle-hint.test.sh 4023
 tests/fm-contributions.test.sh 35676
 tests/fm-control-relaunch.test.sh 137013
 tests/fm-control.test.sh 39524
@@ -763,6 +766,7 @@ tests/fm-herdr-version-floor-live-e2e.test.sh 72
 tests/fm-home-summary-refresh.test.sh 37264
 tests/fm-inactive-reconcile.test.sh 53178
 tests/fm-kimi-harness.test.sh 19151
+tests/fm-launch-proof.test.sh 79431
 tests/fm-lint-workflows.test.sh 785
 tests/fm-live-gate.test.sh 1755
 tests/fm-mail-check.test.sh 9162
@@ -823,6 +827,7 @@ tests/fm-send-remote-delivery.test.sh 27717
 tests/fm-send-resolve-key.test.sh 28685
 tests/fm-send-secondmate-marker-herdr-e2e.test.sh 52
 tests/fm-send-secondmate-marker.test.sh 5309
+tests/fm-session-end-relaunch.test.sh 50972
 tests/fm-session-launch-policy-inherit.test.sh 16144
 tests/fm-session-launch-policy-receipt.test.sh 2166
 tests/fm-session-launch-policy.test.sh 229671
@@ -833,6 +838,7 @@ tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh 46
 tests/fm-sessionstart-nudge.test.sh 66247
 tests/fm-shared-captain-inheritance.test.sh 5687
 tests/fm-spawn-dispatch-profile.test.sh 138433
+tests/fm-spawn-herdr-launch-shell.test.sh 60679
 tests/fm-spawn-pool-base-freshen.test.sh 62249
 tests/fm-spawn-worktree-settle.test.sh 8482
 tests/fm-startup-memory-budget.test.sh 7392
