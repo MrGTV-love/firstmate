@@ -23,15 +23,17 @@ host-wide file serves every home.
     2x cpus, and pool use. Verdict load_within_2x_cpus is true when load1 p95
     is at most 2x cpus.
   - pipeline: from the no-mistakes state database (read-only; default
-    ~/.no-mistakes/state.sqlite), the most recent --runs (default 10) runs
-    created since --since with terminal status and reached review, each with
+    ~/.no-mistakes/state.sqlite), the first --runs (default 10) eligible runs
+    created since --since, ordered oldest first (then by run id for ties).
+    Eligible runs have completed, failed or cancelled and reached review, each with
     its review-fix and test-fix round counts, agent minutes, and whether
     it converged: completed successfully with at most 2 review-fix rounds and
     no timeout-class run error (wall-clock limit, WaitDelay, did not reply, timed out);
     per-purpose agent duration p50/p95; agent failures by category; and every
     timeout-class run error in the window. Verdict
     converged_within_2_fix_rounds is true when --runs such runs exist and all
-    converged; null when fewer exist.
+    converged; null when fewer exist. Later-created runs do not change the cohort
+    or its verdict once it is full.
 --since defaults to the first sample's epoch.
 
 Read-only toward everything except the samples file; no network or model call.
@@ -141,8 +143,8 @@ def pipeline_section(db_path: str, since: int, runs: int) -> Dict[str, Any]:
             "WHERE created_at >= ? AND status IN ('completed', 'failed', 'cancelled') AND EXISTS ("
             "SELECT 1 FROM agent_invocations a WHERE a.run_id = runs.id "
             "AND a.purpose = 'review') "
-            "ORDER BY created_at DESC LIMIT ?", (since, runs)).fetchall()
-        recent = []
+            "ORDER BY created_at ASC, id ASC LIMIT ?", (since, runs)).fetchall()
+        cohort = []
         for run_id, status, created_at, error in run_rows:
             purposes = dict(cur.execute(
                 "SELECT purpose, COUNT(*) FROM agent_invocations WHERE run_id = ? "
@@ -152,7 +154,7 @@ def pipeline_section(db_path: str, since: int, runs: int) -> Dict[str, Any]:
                 (run_id,)).fetchone()[0] / 60000.0
             review_fix = purposes.get("review-fix", 0)
             timed_out = any(marker in error for marker in TIMEOUT_MARKERS)
-            recent.append({
+            cohort.append({
                 "run": run_id,
                 "status": status,
                 "created_at": created_at,
@@ -192,12 +194,12 @@ def pipeline_section(db_path: str, since: int, runs: int) -> Dict[str, Any]:
     finally:
         conn.close()
     verdict: Optional[bool] = None
-    if len(recent) >= runs:
-        verdict = all(item["converged"] for item in recent)
+    if len(cohort) >= runs:
+        verdict = all(item["converged"] for item in cohort)
     return {
-        "runs_considered": len(recent),
+        "runs_considered": len(cohort),
         "runs_wanted": runs,
-        "recent_runs": recent,
+        "cohort_runs": cohort,
         "agent_minutes_by_purpose": by_purpose,
         "agent_failures": failures,
         "timeout_class_run_errors": timeout_errors,
@@ -220,9 +222,9 @@ def print_text(report: Dict[str, Any]) -> None:
     if pipe is None:
         print("pipeline: unavailable (%s)" % report.get("pipeline_error", "no database"))
         return
-    print("pipeline: runs=%d of %d converged_within_2_fix_rounds=%s" % (
+    print("pipeline: first eligible runs=%d of %d converged_within_2_fix_rounds=%s" % (
         pipe["runs_considered"], pipe["runs_wanted"], pipe["converged_within_2_fix_rounds"]))
-    for item in pipe["recent_runs"]:
+    for item in pipe["cohort_runs"]:
         print("  run %s %s review_fix=%d test_fix=%d agent_minutes=%.1f converged=%s" % (
             item["run"], item["status"], item["review_fix_rounds"],
             item["test_fix_rounds"], item["agent_minutes"], item["converged"]))

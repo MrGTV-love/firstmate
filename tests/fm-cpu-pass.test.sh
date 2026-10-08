@@ -116,22 +116,26 @@ test_run_passes_status_and_marks_child() {
 }
 
 test_invalid_pass_counts_never_run_work() {
-  local pool count rc marker
+  local pool count rc marker form
+  local options
   pool=$(new_pool invalid-count)
   marker="$TMP_ROOT/invalid-ran"
-  for count in 0 -1 3; do
-    rc=0
-    FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 "$PASS_TOOL" run --passes "$count" -- \
-      touch "$marker" >/dev/null 2>&1 || rc=$?
-    assert_equals 125 "$rc" "an invalid pass count must be a usage error"
-    [ ! -e "$marker" ] || fail "an invalid pass count started work"
-    rc=0
-    FM_CPU_PASS_HELD=1 FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 "$PASS_TOOL" run --passes "$count" -- \
-      touch "$marker" >/dev/null 2>&1 || rc=$?
-    assert_equals 125 "$rc" "nested work must also reject an invalid count"
-    [ ! -e "$marker" ] || fail "invalid nested work started"
+  for count in 0 -1 3 invalid 1.5 ''; do
+    for form in split equals; do
+      if [ "$form" = split ]; then options=(--passes "$count"); else options=("--passes=$count"); fi
+      rc=0
+      FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 "$PASS_TOOL" run "${options[@]}" -- \
+        touch "$marker" >/dev/null 2>&1 || rc=$?
+      assert_equals 125 "$rc" "an invalid pass count must be a usage error"
+      [ ! -e "$marker" ] || fail "an invalid pass count started work"
+      rc=0
+      FM_CPU_PASS_HELD=1 FM_CPU_POOL_DIR=$pool FM_TEST_CPU_COUNT=2 "$PASS_TOOL" run "${options[@]}" -- \
+        touch "$marker" >/dev/null 2>&1 || rc=$?
+      assert_equals 125 "$rc" "nested work must also reject an invalid count"
+      [ ! -e "$marker" ] || fail "invalid nested work started"
+    done
   done
-  pass "nonpositive and oversized reservations refuse work, including nested calls"
+  pass "invalid reservations refuse work in both option forms, including nested calls"
 }
 
 test_passes_are_exclusive_and_waiters_queue() {
@@ -332,6 +336,49 @@ test_unusable_pool_degrades_with_notice() {
   pass "an unusable pool or missing python3 runs the command without a pass and says so"
 }
 
+test_no_python_validates_pass_counts() {
+  local fakebin detector count form nested rc marker out env_tool
+  local options counts environment
+  marker="$TMP_ROOT/no-python-invalid-ran"
+  env_tool=$(command -v env)
+  for detector in unknown sysctl getconf; do
+    fakebin="$TMP_ROOT/no-python-$detector"
+    mkdir -p "$fakebin"
+    ln -s "$(command -v bash)" "$fakebin/bash"
+    ln -s "$(command -v dirname)" "$fakebin/dirname"
+    counts=(0 -1 invalid 1.5 '')
+    if [ "$detector" != unknown ]; then
+      printf '#!%s\nprintf "2\\n"\n' "$(command -v bash)" >"$fakebin/$detector"
+      chmod +x "$fakebin/$detector"
+      counts+=(3 0003 9999999999999999999999999999999999)
+    fi
+    for nested in ordinary nested; do
+      environment=(-u FM_CPU_PASS_HELD "PATH=$fakebin")
+      if [ "$nested" = nested ]; then environment+=(FM_CPU_PASS_HELD=1); fi
+      for form in split equals; do
+        for count in "${counts[@]}"; do
+          if [ "$form" = split ]; then options=(--passes "$count"); else options=("--passes=$count"); fi
+          rc=0
+          "$env_tool" "${environment[@]}" "$PASS_TOOL" run "${options[@]}" -- \
+            bash -c 'printf ran >"$1"' _ "$marker" >/dev/null 2>&1 || rc=$?
+          assert_equals 125 "$rc" "without Python $detector $nested $form count '$count' must be refused"
+          [ ! -e "$marker" ] || fail "invalid no-Python work started"
+        done
+        if [ "$form" = split ]; then options=(--passes 02); else options=(--passes=02); fi
+        rc=0
+        out=$("$env_tool" "${environment[@]}" "$PASS_TOOL" run "${options[@]}" --log-fd 3 -- \
+          bash -c 'echo "held=$FM_CPU_PASS_HELD"; exit 5' 3>/dev/null) || rc=$?
+        assert_equals 5 "$rc" "a valid no-Python request must preserve the command's exit status"
+        assert_equals held=0 "$out" "a valid no-Python request must run without a pass"
+      done
+    done
+    rc=0
+    PATH="$fakebin" "$PASS_TOOL" run --passes >/dev/null 2>&1 || rc=$?
+    assert_equals 125 "$rc" "a missing no-Python pass count must be a usage error"
+  done
+  pass "no-Python execution rejects invalid counts and preserves valid degraded work"
+}
+
 make_runner_repo() {  # <repo>
   local repo=$1
   mkdir -p "$repo/bin" "$repo/tests"
@@ -429,5 +476,6 @@ test_term_to_holder_keeps_pass_with_running_work
 test_term_to_waiter_never_runs_command
 test_nested_runs_directly
 test_unusable_pool_degrades_with_notice
+test_no_python_validates_pass_counts
 test_runner_waits_for_pass_outside_script_bound
 test_runner_inside_pass_holder_takes_none

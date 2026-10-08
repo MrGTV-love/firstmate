@@ -33,12 +33,12 @@ for index, count in enumerate(rounds):
         conn.execute("INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, 'ok', NULL)",
                      ("i%d" % inv, run, purpose, 2000 + index, 600000))
 # A run that never reached review is not a convergence sample.
-conn.execute("INSERT INTO runs VALUES ('no-review', 'cancelled', 3000, NULL)")
+conn.execute("INSERT INTO runs VALUES ('no-review', 'cancelled', 1997, NULL)")
 for index, status in enumerate(("pending", "running")):
     run = "live-" + status
-    conn.execute("INSERT INTO runs VALUES (?, ?, ?, NULL)", (run, status, 3001 + index))
+    conn.execute("INSERT INTO runs VALUES (?, ?, ?, NULL)", (run, status, 1998 + index))
     conn.execute("INSERT INTO agent_invocations VALUES (?, ?, 'review', ?, 1, 'ok', NULL)",
-                 (run + "-review", run, 3001 + index))
+                 (run + "-review", run, 1998 + index))
 # A run from before the window is ignored.
 conn.execute("INSERT INTO runs VALUES ('old', 'completed', 10, NULL)")
 conn.execute("INSERT INTO agent_invocations VALUES ('old-r', 'old', 'review', 10, 1, 'ok', NULL)")
@@ -72,22 +72,25 @@ test_report_load_and_convergence_verdicts() {
   samples="$TMP_ROOT/samples.tsv"
   printf '1000\t10.00\t9.00\t8.00\t4\t4\t1\n1100\t6.00\t6.00\t6.00\t4\t4\t3\n1200\t7.00\t7.00\t7.00\t4\t4\t2\n' >"$samples"
   db="$TMP_ROOT/ok.sqlite"
-  make_db "$db" 0 1 2 0 1 2 0 1 2 0
+  make_db "$db" 0 1 2 0 1 2 0 1 2 0 3 3 3 3 3 3 3 3 3 3
   out=$("$TOOL" report --samples "$samples" --since 1100 --nm-db "$db" --json) || fail "report failed: $out"
   assert_equals 2 "$(field "$out" 'r["load"]["samples"]')" "--since must bound the load window"
   assert_equals 7.0 "$(field "$out" 'r["load"]["load1_max"]')" "load max must cover the window only"
   assert_equals True "$(field "$out" 'r["load"]["load_within_2x_cpus"]')" "p95 at or under 2x cpus must pass"
   assert_equals 3 "$(field "$out" 'r["load"]["pool_held_max"]')" "pool use must be reported"
   assert_equals 10 "$(field "$out" 'r["pipeline"]["runs_considered"]')" "live runs, runs without review, and runs before --since must be skipped"
-  assert_equals True "$(field "$out" 'all(x["status"] == "completed" for x in r["pipeline"]["recent_runs"])')" "pending and running runs that reached review must not enter the window"
-  assert_equals True "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "ten successful runs with at most 2 fix rounds converge"
+  assert_equals True "$(field "$out" 'all(x["status"] == "completed" for x in r["pipeline"]["cohort_runs"])')" "pending and running runs that reached review must not enter the window"
+  assert_equals True "$(field "$out" '[x["run"] for x in r["pipeline"]["cohort_runs"]] == ["run-%02d" % i for i in range(10)]')" "the cohort must contain the first ten eligible runs, oldest first"
+  assert_equals True "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "later nonconverging runs must not change a successful first-ten verdict"
+  out=$("$TOOL" report --samples "$samples" --since 1100 --nm-db "$db") || fail "text report failed: $out"
+  assert_contains "$out" "first eligible runs=10 of 10 converged_within_2_fix_rounds=True" "text output must report the first-ten verdict"
 
   printf '1300\t9.00\t9.00\t9.00\t4\t4\t0\n' >>"$samples"
   db="$TMP_ROOT/bad.sqlite"
-  make_db "$db" 0 1 3 0 1 2 0 1 2 0
+  make_db "$db" 0 1 3 0 1 2 0 1 2 0 0 1 2 0 1 2 0 1 2 0
   out=$("$TOOL" report --samples "$samples" --since 1100 --nm-db "$db" --json) || fail "report failed: $out"
   assert_equals False "$(field "$out" 'r["load"]["load_within_2x_cpus"]')" "p95 above 2x cpus must fail"
-  assert_equals False "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "a run with 3 fix rounds must fail"
+  assert_equals False "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "later successful runs must not hide a first-ten run with 3 fix rounds"
 
   db="$TMP_ROOT/timeout.sqlite"
   make_db "$db" 0 1 -1 0 1 2 0 1 2 0
@@ -115,8 +118,8 @@ with sqlite3.connect(sys.argv[1]) as conn:
     conn.execute("UPDATE runs SET status = ? WHERE id = 'run-09'", (sys.argv[2],))
 PY
     out=$("$TOOL" report --samples "$samples" --nm-db "$db" --json) || fail "report failed: $out"
-    assert_equals "$status" "$(field "$out" 'r["pipeline"]["recent_runs"][0]["status"]')" "unsuccessful terminal runs must remain in the convergence window"
-    assert_equals False "$(field "$out" 'r["pipeline"]["recent_runs"][0]["converged"]')" "a non-timeout unsuccessful run cannot converge"
+    assert_equals "$status" "$(field "$out" 'r["pipeline"]["cohort_runs"][-1]["status"]')" "unsuccessful terminal runs must remain in the convergence window"
+    assert_equals False "$(field "$out" 'r["pipeline"]["cohort_runs"][-1]["converged"]')" "a non-timeout unsuccessful run cannot converge"
     assert_equals False "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "one unsuccessful run must fail the window"
     out=$("$TOOL" report --samples "$samples" --nm-db "$db") || fail "text report failed: $out"
     assert_contains "$out" "converged_within_2_fix_rounds=False" "text output must retain the unsuccessful verdict"
