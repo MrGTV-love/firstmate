@@ -5,7 +5,7 @@ fm-load-report.py - record host load and judge it with pipeline agent durations.
 Usage:
   fm-load-report.sh record [--out FILE]
   fm-load-report.sh watch [--interval SECONDS] [--out FILE]
-  fm-load-report.sh report [--samples FILE] [--since EPOCH] [--runs N]
+  fm-load-report.sh report [--samples FILE] [--since EPOCH]
                            [--nm-db PATH] [--json]
 
 `record` appends one tab-separated sample line:
@@ -23,17 +23,18 @@ host-wide file serves every home.
     2x cpus, and pool use. Verdict load_within_2x_cpus is true when load1 p95
     is at most 2x cpus.
   - pipeline: from the no-mistakes state database (read-only; default
-    ~/.no-mistakes/state.sqlite), the first --runs (default 10) eligible runs
-    created since --since, ordered oldest first (then by run id for ties).
-    Eligible runs have completed, failed or cancelled and reached review, each with
-    its review-fix and test-fix round counts, agent minutes, and whether
-    it converged: completed successfully with at most 2 review-fix rounds and
-    no timeout-class run error (wall-clock limit, WaitDelay, did not reply, timed out);
-    per-purpose agent duration p50/p95; agent failures by category; and every
-    timeout-class run error in the window. Verdict
-    converged_within_2_fix_rounds is true when --runs such runs exist and all
-    converged; null when fewer exist. Later-created runs do not change the cohort
-    or its verdict once it is full.
+    ~/.no-mistakes/state.sqlite), the first 10 runs that reached review
+    created since --since, ordered oldest first (then by run id for ties),
+    each with its review-fix and test-fix round counts, agent minutes, and
+    whether it converged: completed successfully with at most 2 review-fix
+    rounds and no timeout-class run error (wall-clock limit, WaitDelay,
+    did not reply, timed out); per-purpose agent duration p50/p95; agent
+    failures by category; and every timeout-class run error in the window.
+    Verdict converged_within_2_fix_rounds is null (pending) until 10 such runs
+    exist and no pending or running run created since --since sorts at or before
+    the tenth member, including runs that have not yet reached review.
+    Once settled, it is true when all members converged, otherwise false;
+    later-created runs cannot change the cohort or verdict.
 --since defaults to the first sample's epoch.
 
 Read-only toward everything except the samples file; no network or model call.
@@ -52,6 +53,7 @@ from typing import Any, Dict, List, Optional
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TIMEOUT_MARKERS = ("wall-clock", "WaitDelay", "did not reply", "timed out")
+COHORT_SIZE = 10
 
 
 def default_samples_path() -> str:
@@ -134,16 +136,27 @@ def load_section(rows: List[List[str]], since: int) -> Dict[str, Any]:
     }
 
 
-def pipeline_section(db_path: str, since: int, runs: int) -> Dict[str, Any]:
+def pipeline_section(db_path: str, since: int) -> Dict[str, Any]:
     conn = sqlite3.connect("file:%s?mode=ro" % db_path, uri=True, timeout=10)
     try:
+        conn.execute("BEGIN")
         cur = conn.cursor()
         run_rows = cur.execute(
             "SELECT id, status, created_at, COALESCE(error, '') FROM runs "
-            "WHERE created_at >= ? AND status IN ('completed', 'failed', 'cancelled') AND EXISTS ("
+            "WHERE created_at >= ? AND EXISTS ("
             "SELECT 1 FROM agent_invocations a WHERE a.run_id = runs.id "
             "AND a.purpose = 'review') "
-            "ORDER BY created_at ASC, id ASC LIMIT ?", (since, runs)).fetchall()
+            "ORDER BY created_at ASC, id ASC LIMIT ?", (since, COHORT_SIZE)).fetchall()
+        verdict: Optional[bool] = None
+        if len(run_rows) == COHORT_SIZE:
+            last_id, _, last_created_at, _ = run_rows[-1]
+            live_before_cutoff = cur.execute(
+                "SELECT 1 FROM runs WHERE created_at >= ? "
+                "AND status IN ('pending', 'running') "
+                "AND (created_at < ? OR (created_at = ? AND id <= ?)) LIMIT 1",
+                (since, last_created_at, last_created_at, last_id)).fetchone()
+        else:
+            live_before_cutoff = True
         cohort = []
         for run_id, status, created_at, error in run_rows:
             purposes = dict(cur.execute(
@@ -193,12 +206,11 @@ def pipeline_section(db_path: str, since: int, runs: int) -> Dict[str, Any]:
                     break
     finally:
         conn.close()
-    verdict: Optional[bool] = None
-    if len(cohort) >= runs:
+    if not live_before_cutoff:
         verdict = all(item["converged"] for item in cohort)
     return {
         "runs_considered": len(cohort),
-        "runs_wanted": runs,
+        "runs_wanted": COHORT_SIZE,
         "cohort_runs": cohort,
         "agent_minutes_by_purpose": by_purpose,
         "agent_failures": failures,
@@ -222,8 +234,9 @@ def print_text(report: Dict[str, Any]) -> None:
     if pipe is None:
         print("pipeline: unavailable (%s)" % report.get("pipeline_error", "no database"))
         return
+    verdict = pipe["converged_within_2_fix_rounds"]
     print("pipeline: first eligible runs=%d of %d converged_within_2_fix_rounds=%s" % (
-        pipe["runs_considered"], pipe["runs_wanted"], pipe["converged_within_2_fix_rounds"]))
+        pipe["runs_considered"], pipe["runs_wanted"], "pending" if verdict is None else verdict))
     for item in pipe["cohort_runs"]:
         print("  run %s %s review_fix=%d test_fix=%d agent_minutes=%.1f converged=%s" % (
             item["run"], item["status"], item["review_fix_rounds"],
@@ -248,7 +261,7 @@ def report(args: argparse.Namespace) -> int:
     result: Dict[str, Any] = {"since": since, "load": load_section(rows, since)}
     code = 0
     try:
-        result["pipeline"] = pipeline_section(args.nm_db, since, args.runs)
+        result["pipeline"] = pipeline_section(args.nm_db, since)
     except sqlite3.Error as exc:
         result["pipeline"] = None
         result["pipeline_error"] = str(exc)
@@ -273,7 +286,6 @@ def build_parser() -> argparse.ArgumentParser:
     rep = sub.add_parser("report", help="summarize load and pipeline agents")
     rep.add_argument("--samples", default=default_samples_path())
     rep.add_argument("--since", type=int, default=None)
-    rep.add_argument("--runs", type=int, default=10)
     rep.add_argument("--nm-db", default=os.path.join(
         os.environ.get("HOME", ""), ".no-mistakes", "state.sqlite"))
     rep.add_argument("--json", action="store_true")
@@ -294,9 +306,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 2
         return watch(args.out, args.interval)
     if args.action == "report":
-        if args.runs < 1:
-            print("--runs must be at least 1", file=sys.stderr)
-            return 2
         return report(args)
     parser.print_help(sys.stderr)
     return 2

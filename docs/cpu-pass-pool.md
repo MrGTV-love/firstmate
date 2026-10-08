@@ -69,8 +69,9 @@ Vernant participation in the pool is a separate Vernant-repository change tracke
 
 1. When the change lands, note the time with `date +%s` and start one recorder per host: `nohup bin/fm-load-report.sh watch --interval 60 >/dev/null 2>&1 &`.
 2. After 24 to 48 hours of normal fleet work, run `bin/fm-load-report.sh report --since <that epoch>`.
-3. Read its two verdicts: `load_within_2x_cpus` (1-minute load p95 at or under twice the CPU count) and `converged_within_2_fix_rounds` (the first ten eligible pipeline runs created after the recorded cutover epoch, ordered oldest first, completed successfully with at most two review-fix rounds and none hit a timeout).
-   Eligibility requires terminal status (`completed`, `failed`, or `cancelled`) and having reached review; pending and running runs are excluded, while failed and cancelled runs count as not converged.
-   The verdict remains unset until ten eligible runs exist, then later-created runs do not change the cohort or its verdict.
+3. Read its two verdicts: `load_within_2x_cpus` (1-minute load p95 at or under twice the CPU count) and `converged_within_2_fix_rounds` (the fixed first ten pipeline runs that reached review and were created after the recorded cutover epoch, ordered by creation time then run id, completed successfully with at most two review-fix rounds and none hit a timeout).
+   Failed and cancelled cohort members count as not converged.
+   The convergence verdict is pending (`null` in JSON, `pending` in text) until ten review-reaching runs exist and every pending or running run that sorts at or before the tenth member is terminal, including runs that have not reached review yet.
+   Once those earlier runs are terminal, cohort membership and the true or false verdict are fixed; later-created runs do not change them.
    Its list of timeout-class run errors should be empty.
 4. Stop the recorder when the window closes.
