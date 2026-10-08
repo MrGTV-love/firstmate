@@ -157,8 +157,9 @@
 # rule, and the starter's src/core/ client, which bin/fm-skill-pick.mjs imports.
 # tests/lib.sh, tests/fixtures.sh, tests/*-helpers.sh and tests/*-fixture.sh are
 # shared files that map to the suites naming them; a fixture under
-# tests/fixtures/<dir>/ is mapped by that directory instead. Curated family arms
-# above those also name individual tests/ files explicitly.
+# tests/fixtures/<dir>/ is mapped by that directory instead. The flat omp ANSI
+# captures select their exact composer consumer. Curated family arms above
+# those also name individual tests/ files explicitly.
 set -eu
 
 now_ms() {
@@ -1765,6 +1766,12 @@ families_for_changed_path() {
       # source this one as well: most suites inherit it only through them.
       families_for_test_reference git-config-helpers.sh lib.sh herdr-test-safety.sh \
         || printf '%s\n' "__unmapped__:$path"
+      ;;
+    tests/fixtures/omp-bordered-empty.ansi|tests/fixtures/omp-bordered-pending.ansi)
+      printf '%s\n' "__script__:fm-composer-lib.test.sh"
+      ;;
+    tests/fixtures/omp-native-band-empty.ansi|tests/fixtures/omp-native-band-pending.ansi)
+      printf '%s\n' "__script__:fm-composer-native-band.test.sh"
       ;;
     tests/fixtures/*/*)
       # A fixture belongs to whichever suite reads its directory, found by the

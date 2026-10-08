@@ -421,8 +421,7 @@ For spawn-capable adapters, the runtime session-provider backend controls where 
 Treehouse remains the worktree provider for tmux, herdr, zellij, and cmux, since herdr, zellij, and cmux are session providers only; Orca provides both the task worktree and terminal endpoint.
 
 Every admitted Herdr runtime requires `python3` on its runtime PATH to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform.
-On macOS, remote Herdr also requires `python3` on the Aqua launch agent PATH to prove server ownership.
-Missing Python is a human prerequisite gap: doctor/readiness will not reload the server to repair it, and the launch guard refuses server start or takeover until it is available.
+Remote launch-agent prerequisites and repair refusals are owned by [remote readiness](remote-secondmates.md#required-remote-tools).
 Ownership remains unproven rather than being accepted from an unreadable environment.
 
 ### Backend selection order
@@ -2951,7 +2950,7 @@ FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30       # min mtime age before fm-fleet
 FM_BUSY_REGEX=          # optional override for rendered delivery guards and Grok's isolated task-state fallback; converted worker state ignores it
 FM_COMPOSER_IDLE_RE=    # optional fleet-wide idle-placeholder regex override (bin/fm-composer-lib.sh); a match alone does not prove emptiness because shape-specific position and ANSI de-emphasis safety gates still apply
 FM_COMPOSER_CAPTURE_LINES=20   # fleet-wide bound for tail-capture composer reads; it no longer bounds the adapter composer state/content reads on tmux or herdr, which supply their bounded visible pane instead, while the cmux, orca, and Zellij adapters use this small window so stale scrollback banners stay out of the candidate set; it still bounds the shared inbox composer read (bin/fm-task-inbox-lib.sh) on every backend, and on herdr it also floors how many Ctrl+U presses a refused leftover may take
-FM_COMPOSER_PI_MAX_LINES=8     # fleet-wide: maximum rows admitted between Pi's identity-corroborated separator pair; taller or ambiguous candidates stay unknown
+FM_COMPOSER_PI_MAX_LINES=8     # fleet-wide: maximum rows admitted between Pi's identity-corroborated separator pair; bin/fm-composer-lib.sh owns the verdict contract
 FM_COMPOSER_GHOST_LUMA_MAX=128   # fleet-wide: truecolor ghost luminance ceiling; shared mechanics owned by bin/fm-composer-lib.sh's fm_composer_strip_ghost, Herdr exception by docs/herdr-backend.md "Claude composer proof"
 GROK_HOME=              # optional Grok config home for firstmate's global grok turn-end hook; defaults to ~/.grok
 FM_SEND_RETRIES=3       # fm-send typed-plane Enter-retry attempts after typing the line once; agy typed targets use a longer per-harness default owned by bin/fm-send.sh

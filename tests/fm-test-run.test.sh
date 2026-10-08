@@ -1914,6 +1914,44 @@ test_changed_shared_fixture_selects_its_readers() {
   pass "a changed shared test fixture selects its readers while an unread tests/ path still refuses"
 }
 
+test_changed_omp_composer_captures_select_their_consumers() {
+  local tmp repo fixture listed expected rc
+  tmp=$(fm_test_tmproot fm-test-run-omp-captures)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-composer-lib.test.sh"
+  chmod +x "$repo/tests/fm-composer-lib.test.sh"
+  mkdir -p "$repo/tests/fixtures"
+  for fixture in omp-bordered-empty omp-bordered-pending omp-native-band-empty omp-native-band-pending; do
+    : >"$repo/tests/fixtures/$fixture.ansi"
+  done
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm capture-baseline
+
+  for fixture in omp-bordered-empty omp-bordered-pending omp-native-band-empty omp-native-band-pending; do
+    printf '\n' >>"$repo/tests/fixtures/$fixture.ansi"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "changed omp capture was refused: $fixture"
+    case "$fixture" in
+      omp-bordered-*) expected=tests/fm-composer-lib.test.sh ;;
+      omp-native-band-*) expected=tests/fm-composer-native-band.test.sh ;;
+    esac
+    [ "$listed" = "$expected" ] \
+      || fail "$fixture must select exactly its consumer, got: $listed"
+    git -C "$repo" add "tests/fixtures/$fixture.ansi"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm capture-change
+  done
+
+  : >"$repo/tests/fixtures/unmapped.ansi"
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    >"$tmp/out" 2>"$tmp/err" || rc=$?
+  expect_code 2 "$rc" "an unrelated flat capture must remain unmapped"
+  assert_contains "$(cat "$tmp/err")" "tests/fixtures/unmapped.ansi" \
+    "the refusal must identify the unrelated capture"
+  pass "changed omp captures select their exact consumers without admitting unrelated fixtures"
+}
+
 # Workers are handed scripts in order, so the slowest script must start first or
 # it runs alone at the tail and throws away most of the concurrency.
 test_concurrent_runs_are_ordered_longest_first() {
@@ -2315,6 +2353,12 @@ assert len(doc["scripts"])==3
   pass "aggregate-json merges lane timing artifacts"
 }
 
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
+  "$FM_TEST_ONLY"
+  exit $?
+fi
+
 test_list_all_exact_suite_coverage
 test_family_selection
 test_single_script_selection
@@ -2356,6 +2400,7 @@ test_jobs_requires_proven_isolated
 test_jobs_admits_a_concurrent_safe_family
 test_unmapped_new_test_never_inherits_family_concurrency
 test_changed_shared_fixture_selects_its_readers
+test_changed_omp_composer_captures_select_their_consumers
 test_concurrent_runs_are_ordered_longest_first
 test_per_script_timeout_bounds_a_hang
 test_changed_bound_gives_slow_watcher_suites_headroom

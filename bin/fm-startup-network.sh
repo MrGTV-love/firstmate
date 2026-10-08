@@ -19,14 +19,14 @@
 # to the durable wake queue.
 #
 # WHAT IS PRESERVED. Nothing is dropped. bin/fm-bootstrap.sh remains the single
-# owner of every network sweep and still runs all of them, unchanged, via its
+# owner of deferred bootstrap membership and runs those steps via its
 # FM_BOOTSTRAP_NETWORK=only phase. bin/fm-inactive-reconcile.sh remains the
 # owner of the startup scan and its separate watcher cadence. Deferral changes
 # WHEN they run, not WHETHER, and three properties make the later run safe:
 #   - The work is idempotent reconciliation. A run whose report is lost can
 #     re-read current state on the next run, including whether a native-restored
 #     launch is already managed. There is no once-only signal to miss.
-#   - Results are durable and always surface. Network sweep output lands in
+#   - Results are durable and always surface. Deferred bootstrap output lands in
 #     state/.startup-network.report and reaches the agent either inline in the
 #     digest or, when it finishes too late for the digest to inline it, as a
 #     `check: startup-network` wake. Inactive-scan findings land directly in the

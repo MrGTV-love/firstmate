@@ -1129,14 +1129,16 @@ Typed text appears in the folded row (`╰─ hello world typed text ─╯`), w
 The current classification and plain-hint safety boundary is owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety); exact container predicates are owned by `bin/fm-composer-lib.sh`.
 `test_matrix_omp_box_composer` and `test_omp_box_requires_omp_identity_and_complete_shape` in `tests/fm-composer-lib.test.sh` carry the captured idle screen and the captured typed, wrapped, and hint rows.
 
-The live guard launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands. It now verifies that direct native launches remain unmanaged and that interrupt, exit, and ordinary relaunch preserve their live PID, screen, draft, endpoint, instructions, and dirty work.
+The live guard launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands.
+It now verifies that direct native launches remain unmanaged and that interrupt, exit, and ordinary relaunch preserve their live PID, screen, draft, endpoint, instructions, and dirty work.
 The default-on checks spend no tokens wherever omp, herdr, jq, and python3 are installed:
 
 ```sh
 FM_OMP_COMPOSER_BOX_LIVE=1 tests/fm-omp-composer-box-live-e2e.test.sh
 ```
 
-The shared capability gate owns explicit enable/disable and missing-tool behavior. The historical lifecycle-success output below predates the current ownership boundary; the model-consuming relaunch option has been removed.
+The shared capability gate owns explicit enable/disable and missing-tool behavior.
+The historical lifecycle-success output below predates the current ownership boundary; the model-consuming relaunch option has been removed.
 
 Observed output:
 
@@ -1317,8 +1319,9 @@ The [inbox ring owner](../../bin/fm-task-inbox-lib.sh) defines the current advis
 Kimi was not installed on the verification machine; its receive path is the same one-line-plus-shell contract, and the portable ladder and enqueue regressions in `tests/fm-task-inbox.test.sh` and `tests/fm-send-inbox.test.sh` cover every harness-independent half.
 This guard is the refresh command after any harness upgrade; it spends a small number of real tokens per installed harness, reports an absent harness explicitly, and refuses a run that verified nothing.
 
-The focused portable draft-risk refresh passed the shared composer, native-band, native-continuation, native-idle-hint, send-inbox, task-inbox, tmux-submit and Herdr-adapter suites, plus all four TeamClaude launch-path cases using the shared assertion. Executed watcher child-ring cases preserved the draft and parent alarm while ordinary unknown-idle rings still drained the child queue. The classifier smoke returned `unknown-draft` for the reported nested draft, `unknown` for an unfamiliar idle screen, and `empty` for an empty prompt.
-Changed-selection regressions passed within the runner self-test, but its complete invocation failed the existing portable duration-hint coverage guard; the complete wake-queue invocation also hit the existing secondmate-home restriction when temporary fixtures were placed beneath the checkout. These focused checks are not a repository-wide green result. The native doorbell guard was explicitly disabled with `FM_SEND_INBOX_LIVE_E2E=0`, so this refresh supplies no new live-harness evidence.
+Portable draft-risk coverage lives in `tests/fm-composer-lib.test.sh`, `tests/fm-composer-native-band.test.sh`, `tests/fm-composer-native-continuation.test.sh`, and `tests/fm-composer-native-idle-hint.test.sh`.
+`tests/fm-send-inbox.test.sh`, `tests/fm-task-inbox.test.sh`, `tests/fm-tmux-submit-busy.test.sh`, and `tests/fm-wake-queue.test.sh` cover consumer deferral, retained drafts, ordinary unknown-idle rings, and parent alerts.
+These portable checks do not renew the live-harness evidence above.
 
 ## Gemini
 
@@ -2217,14 +2220,14 @@ ok - real herdr: a stale registration no longer blocks relaunch, and the endpoin
 ok - real herdr: an agent that does not stop fails closed instead of being reported as stopped
 ```
 
-The registry read through `herdr pane report-agent` is the same source `fm_backend_herdr_agent_state` classifies, and since 2026-09-10 that registration counts as an agent only while `pane process-info` shows a harness process behind it, so the guard backs the registration with a real process named like a harness (a symlink to `sleep`) and then stops that process, with no real harness launched.
+The lifecycle guard backs its synthetic registration with an inert Python interpreter symlinked as `claude` and launched with the recorded `FM_SPAWN_GEN`, then stops that process without launching a real harness.
 That command is the guard that refreshes this record; run it after every Herdr upgrade rather than trusting the version above.
 
 For Pi on Herdr 0.9.0, `herdr agent get` reflects whether the agent process remains live; its registration does not persist merely because the pane and parent shell do.
 A Pi launched as a child of the pane shell (not via `exec`) that then `/quit`s or is SIGKILL'd leaves the pane and shell in place, and `agent get` returns `agent_not_found`.
 A sibling live idle Pi stays `agent=pi` with `agent_status=idle`.
-`fm_backend_herdr_pane_agent_state` maps that `agent_not_found` leftover shell to `no-agent` and `fm_backend_herdr_agent_state` maps it to `dead` (relaunch-allowed), while the live idle pane stays `alive`.
-`herdr pane get` `.agent_status` can still read `idle` after the occupant is gone; liveness is `agent get`, never that pane field.
+The [process-backed liveness contract](../herdr-backend.md#stale-agent-registrations) owns how those registered and unregistered panes are classified now.
+The historical `herdr pane get` `.agent_status` could still read `idle` after the occupant was gone, so that field alone never established liveness.
 
 ```sh
 tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh
@@ -2394,110 +2397,70 @@ The read that supplies the reference is `bin/backends/herdr.sh`'s `fm_backend_he
 
 ### Native omp default-band composer
 
-The lifecycle result below is historical: the current ownership boundary refuses lifecycle actions on bare native-restored omp processes without a Firstmate spawn pin read from the live PID and matching the recorded launch generation.
+The [live task-attribution contract](../agent-control.md#live-herdr-task-attribution) owns lifecycle authorization independently of composer classification.
 
 Measured 2026-10-06 on macOS aarch64 with omp 18.6.3 in a fresh guarded, named non-default Herdr lab.
 The shared classifier recognized the native status-band header and adjacent `╰─` input row without a Firstmate composer overlay.
 Actual empty captures classified `empty` and extracted no draft; unsubmitted `!git diff` classified `pending`, extracted completely, and ordinary exit refused without changing the screen or recorded task identity.
 An unsubmitted multiline draft containing literal borders, status-shaped text, and a pasted band remained pending and fully extractable, including cursor-on-root and cursor-on-continuation checks.
 These public-API checks passed in both default-locale and fresh `LC_ALL=C` Bash processes.
-A positively attributed bare `omp --resume=<ref>` returned launch proof `unmanaged`; `fm-control.sh native-band-exit exit` changed from status 1 with unknown-composer refusal to status 0 with `stopped native-band-exit`, leaving only the pane's shell process.
 No model input was submitted, and guarded lab teardown succeeded.
 The saved actual renderer captures and focused portable checks are refreshed with `bash tests/fm-composer-native-band.test.sh` and `LC_ALL=C bash tests/fm-composer-native-band.test.sh`; these checks do not themselves launch the live lab.
 
 ### Bare native omp restoration and managed recovery
 
-The native-restored recovery results below predate the current safety decision and are not current recovery authorization.
-The [live task-attribution contract](../agent-control.md#live-herdr-task-attribution) owns the current boundary.
+The [live task-attribution contract](../agent-control.md#live-herdr-task-attribution) owns the current inspection-only boundary.
+Older native-restored lifecycle-success measurements do not authorize recovery under that boundary.
 
-Measured 2026-10-04 on macOS aarch64 (Darwin 25.5.0), Herdr 0.9.1 protocol 22, and omp 18.6.1.
-The earlier composer captures in `tests/fixtures/omp-bordered-{empty,pending}.ansi` are real omp 18.6.0 frames from the same guarded named-lab procedure.
+#### Captured renderer evidence
+
+The compact composer fixtures in `tests/fixtures/omp-bordered-{empty,pending}.ansi` were captured from real omp 18.6.0 in a guarded named Herdr lab.
+The native-band fixtures were measured on 2026-10-06 with omp 18.6.3 on macOS aarch64; the preceding [default-band record](#native-omp-default-band-composer) owns those observations.
+Real omp 18.6.1 borderless captures established the two-space continuation gutter for quote, heading, and pasted-frame input.
+The renderer's [editor layout](https://github.com/can1357/oh-my-pi/blob/v18.6.1/packages/tui/src/components/editor.ts#L2557-L2587) and [borderless style](https://github.com/can1357/oh-my-pi/blob/v18.6.1/packages/tui/src/components/composer/borderless.ts) corroborate that geometry.
+Unsubmitted `preface\n\n╭── π > model > path ─╮\n│ │\n╰─  ─╯` and its `> quote` / trailing `❯ ` variants demonstrated that a pasted frame can resemble an empty composer inside a draft.
+The historical classifier refused those ambiguous captures and content extraction returned status 1 without output; the shared classifier's current verdict contract, including `unknown-draft`, is owned by [`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh).
+`tests/fm-composer-native-continuation.test.sh` covers quote and heading continuations, literal borders, blank boundaries, status-shaped rows, cursor and cursorless selection, normalized extraction, and both UTF-8 and `LC_ALL=C`.
+`tests/fm-composer-native-band.test.sh` covers owned blank and braille continuations and unproven-gutter refusal.
+`tests/fm-composer-lib.test.sh` covers braille gutter blockers and captured roots, enclosing Pi ownership, and standalone boxed composers.
+These captured-frame regressions do not themselves launch a live harness.
+
+#### Current native-restoration guard
 
 ```sh
 FM_OMP_REBOOT_LIVE=1 HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
   bash bin/fm-test-run.sh tests/fm-launch-proof.test.sh tests/fm-omp-reboot-live-e2e.test.sh
 ```
 
-The live test starts actual `omp --resume=<ref>` with a valid native session header and a fixture-seeded initial user message carrying the public Firstmate launch-brief encoder's output in an isolated named Herdr lab, not a mocked screen or a metadata-only agent.
-It exercises the native command used by Herdr restoration, rather than rebooting the host or claiming a full OS-reboot test.
-All Herdr calls, including production-adapter calls through the test's session-pinning shim, use the guarded lab helper.
-The helper's default-session tripwire remains unchanged through cleanup.
-The historical recovery run observed both replacement agents answer their instructions before stopping them; the current live test instead checks preservation of unmanaged task and local-secondmate agents without lifecycle input.
+The live guard starts actual `omp --resume=<ref>` task and local-secondmate processes in a guarded named Herdr lab.
+Its native session fixtures contain a valid header and an initial user message encoded by the public Firstmate launch-brief encoder.
+It exercises the native restore command, not a host reboot, and submits no model request.
+The private boxed-composer profile, built-in model, and fixture-only placeholder key allow rendering without operator settings or credentials.
+All Herdr calls, including production-adapter calls, pass through the session-pinning lab helper.
+The native processes use private HOME and XDG roots, config and agent directories, and profile selectors; Firstmate's state, data, config, and projects overrides point at the private fixture home.
+The guard checks that unmanaged task and secondmate agents remain unchanged for empty, prose, `!git diff`, and `$ print(1)` composers across interrupt, exit, relaunch, direct launch inspection, and reboot sweeps.
+Preservation assertions cover live PID, screen, busy generation/state, task metadata and instructions, recorded profile, charter and child records, branch, HEAD, and dirty work.
+The [destructive lab safety contract](../herdr-backend.md#destructive-lab-safety) owns teardown-gated dependency cleanup and the default-session tripwire.
+This guard does not modify remote secondmates, unrelated panes, shared worktree pools, or global Herdr configuration.
 
-The fixture pins `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, `FM_CONFIG_OVERRIDE`, and `FM_PROJECTS_OVERRIDE` to its private home before lifecycle calls and profile setup.
-Both native task and secondmate launches also use an owned HOME and private XDG config, data, state, and cache roots. Their omp config directory, agent directory, and profile selectors are pinned independently of inherited operator settings; the real Herdr omp integration is installed into that private profile.
-The private profile selects the native boxed composer, and the seeded session selects a built-in model with a fixture-only placeholder key, so it can render without operator settings or authentication; the preservation check never submits a model request.
-The current fixture stages native launch commands inside its private tree and does not allocate production spawn namespaces.
-A historical live recovery rerun with all four inherited overrides pointing at operator-owned sentinel directories preserved those directories and removed both owned staging namespaces after task and local-secondmate recovery.
-The [destructive lab safety contract](../herdr-backend.md#destructive-lab-safety) owns the fixture's teardown-gated dependency cleanup.
-A focused actual-script smoke with a controlled helper and worktree-local resources verified retention on teardown refusal, removal on success, and both outcomes after an injected fresh-claim provision failure; it did not contact Herdr or launch an agent.
+#### Recorded-task attribution
 
-Observed guarantees:
+`tests/fm-launch-proof.test.sh` covers matching and missing kernel environment pins, versioned and legacy records, foreground ancestry, shells and helpers, interpreter-based harnesses, and rejection of argv, cwd, and initial-message shortcuts.
+Its `test_launch_proof_pinned_personal_switch` case changes only the active session proof and verifies that a same-PID personal-session switch loses managed authority.
+`test_reboot_recovery_inspects_without_native_attribution` in `tests/fm-control-relaunch.test.sh` covers inspection without lifecycle input or task-record mutation.
+`tests/fm-omp-harness.test.sh` covers activation, cancelled and rolled-back transitions, shutdown, and child-event preservation with both minimum-runtime and newer context shapes.
+The token-free installed-runtime refresh for the production proof extension is:
 
-- The complete compact bordered composer reads empty, while real typed input reads pending.
-- Direct recovery and recovery sweeps refuse prose, `!git diff`, and `$ print(1)` drafts even with retained busy state, preserving draft bytes, busy generation/state, metadata, instructions, branch, HEAD, and dirty work without beginning a lifecycle transaction. A separate native omp 18.6.1 reproduction confirmed that Escape clears the two execution-mode drafts, so this proof precedes any interrupt. Unknown and incomplete geometry also refuse in captured-frame regressions.
-- Complete omp-looking boxes nested inside Pi composer rules remain enclosing Pi draft content, not independent proof of an empty omp composer. The focused parser regression fails before the shared ownership correction and passes afterward, covering cursor and cursorless classification, lazy identity probing, content extraction, later separator pairs, and both UTF-8 and `LC_ALL=C`.
-- Indented compact and multirow omp-looking frames inside a contiguous bare multiline draft remain literal draft text for cursor and cursorless classification and normalized extraction, including literal body borders and after an earlier Pi transcript. Standalone boxes and Pi containment retain their existing behavior. Focused parser tests and actual omp 18.6.1 borderless rendering cover the multirow frame; owned running/stopped named-lab collisions preserve session state and tripwires.
-- Native `❯ ` drafts retain quote, heading, and other prompt-looking continuation text using the renderer's two-space gutter. `tests/fm-composer-native-continuation.test.sh` passed for compact/multirow frames, cursor/cursorless classification, plain-capture refusal, and normalized extraction in both locales. Real omp 18.6.1 in owned non-default named labs rendered the quoted multirow and heading compact drafts as pending with preserved extraction, without submitting input; quoted-draft exit reached the pending-input guard. Live recovery did not reach that guard because endpoint attribution was unreadable, and no attribution behavior was changed.
-- Separator-enclosed native continuations retain complete ownership for non-Pi identity fallback. The shared runtime classifier changed the empty-root/nested-glyph reproduction from `empty` to `pending`; normalized extraction retained the nested glyph and every compact/multirow frame row. The focused continuation and composer-library tests passed across the accepted glyphs, cursor positions, identity profiles, and both locales, preserving genuine Pi containment, shell refusal, and standalone empty boxes.
-- A real unsubmitted `preface\n\n╭── π > model > path ─╮\n│ │\n╰─  ─╯` draft in omp 18.6.1 rendered the blank logical line and two-space continuation gutter in an exclusively owned private tmux lab.
-  Classification of that same live surface changed from `empty` to `unknown`, and extraction changed from successful empty output to refusal (status 1), without assuming ownership across blanks.
-  The pinned [editor layout](https://github.com/can1357/oh-my-pi/blob/v18.6.1/packages/tui/src/components/editor.ts#L2557-L2587) and [borderless style](https://github.com/can1357/oh-my-pi/blob/v18.6.1/packages/tui/src/components/composer/borderless.ts) support this shape.
-  The lab used worktree-local HOME, agent state, and cache directories, a valid empty resume header, and the existing borderless overlay; no models were configured and bracketed paste was not followed by Enter.
-  This is renderer/classifier evidence, not a Claude live measurement or additional recovery-transport proof.
-- The real unsubmitted draft `preface\n\n> quote\n╭── π > model > path ─╮\n│ │\n╰─  ─╯\n❯ ` rendered both prompt-looking transitions in omp 18.6.1's two-space continuation gutter on a fresh, exclusively owned private tmux surface.
-  Cursor and cursorless classification returned `unknown`; extraction refused with status 1 and no output.
-  Through `fm-control.sh` against a marked worktree-local lab home, exit and ordinary relaunch reached the not-proven-empty guard and preserved the rendered draft; interrupt preserved the idle draft and reported cancellation unconfirmed.
-  Launch recovery refused because that surface was tmux, not Herdr; this does not establish live Herdr recovery transport.
-  No draft was submitted.
-- Gutter-backed unowned edges, status-shaped text, and braille-only rows end positive bare-draft ownership without making a later indented omp-looking frame independent.
-  Focused composer regressions cover compact/multirow frames and native-gutter prompt continuations, cursor/cursorless classification, extraction refusal, both locales, and preserved independent margin boundaries.
-  A fresh guarded named Herdr lab ran three actual omp 18.6.1 panes with private HOME/cache/config/data directories and no models configured.
-  Each unsubmitted draft placed one blocker family before compact and multirow literal frames; its captured native two-space gutter returned `unknown` cursorlessly and with a floor cursor, while extraction refused with status 1 and no output in both locales.
-  No input was submitted. Every named-session and lifecycle command used the designated lab helper; guarded teardown succeeded with the default-session tripwire unchanged.
-- The normal control-plane transaction replaces the bare-resumed task in the same pane and local copy, preserving its branch, HEAD, dirty-file checksum, recorded `openai-codex/gpt-6.1-sol` model, and `low` effort.
-- A repeated recovery sweep leaves the managed incarnation unchanged.
-- A later bare resume in the same persistent shell does **not** inherit the previous managed incarnation.
-- Local-secondmate recovery preserves that same recorded profile even after its configured pin changes to Claude, and preserves its charter, child record, and dirty work.
-- The real replacement argv and cwd retain the managed worker configuration, `--auto-approve`, selected model, thinking effort, and recorded local copy; these checks read Herdr's actual foreground processes, not the published metadata.
-- Real omp helper workers share the foreground process group; the launcher may itself be a shell, so kernel ancestry attributes the primary non-shell process rather than assuming one foreground entry or authenticating a helper.
-
-```text
-ok - foreground agent ancestry owns launch proof, independently of shells, helpers and executable packaging
-ok - omp omp/18.6.1: task and local secondmate bare resumes recovered with exact profiles, same pane/branch/worktree, preserved dirty and child work, and no inherited launch proof
-FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0
+```sh
+FM_OMP_TASK_SESSION_LIVE=1 bash tests/fm-omp-task-session-live-e2e.test.sh
 ```
 
-The minimal secondmate test home deliberately has no inherited Firstmate code revision or gitignored configuration destinations, so the existing sync/inheritance owners report their skips.
-The actual recorded-profile replacement and preserved-work assertions still pass.
+For focused real-native cleanup proof without the lifecycle matrix:
 
-The focused relaunch fixtures also passed with all five inherited state/data/config/projects/source-root overrides pointing at separate owned poison paths, which remained untouched. Actual cleanup preserved pre-existing task and home-hashed launch directories while removing only exclusively claimed namespaces; unique fixture task IDs retained bounded-scan fairness and interruption progress.
-
-No remote secondmate, unrelated pane, shared worktree pool, or global Herdr configuration is modified.
-The [Herdr restart guide](../herdr-backend.md#ownership-after-native-restoration) owns the decision to retain global auto-resume and the scope of recorded-fleet inspection.
-
-#### Recorded-task attribution (2026-10-06)
-
-Historical focused executable regressions reproduced lifecycle input to stale recorded panes before the ownership correction, then passed after it. The maintained ownership regression and launch-proof check can now be selected with:
-
-```bash
-mkdir -p "$PWD/state/.ownership-regression-tmp"
-TMPDIR="$PWD/state/.ownership-regression-tmp" \
-  FM_TEST_ONLY=test_reboot_recovery_inspects_without_native_attribution \
-  bash tests/fm-control-relaunch.test.sh
-TMPDIR="$PWD/state/.ownership-regression-tmp" \
-  FM_TEST_ONLY=test_launch_proof_recorded_native_identity \
-  bash tests/fm-launch-proof.test.sh
+```sh
+FM_OMP_REBOOT_LIVE=1 FM_OMP_REBOOT_CLEANUP_SMOKE=1 \
+  bash tests/fm-omp-reboot-live-e2e.test.sh
 ```
-
-The historical first check failed 16 negative scenarios before the correction and passed all 22 scenarios afterward, covering direct and sweep recovery, versioned and legacy records, unrecorded personal panes, preserved work and drafts, legitimate recorded native recovery, and managed no-op behavior.
-The second check passed six groups covering native startup provenance, malformed and unrelated conversations, local-secondmate startup sources, kernel environments, and foreground ancestry.
-On actual omp 18.6.3 and Herdr 0.9.1 protocol 22, `fm_launch_proof_herdr "$meta"` returned `unmanaged` for a bare resume whose fixture-seeded native initial message contained the owner-generated task launch envelope, and `managed` for a process launched with the matching incarnation.
-These positive native records were generated protocol fixtures rendered by omp, not user messages emitted by a submitted model turn.
-Actual unrelated native resumes returned `unknown` both with a different cwd and with the same cwd but a different conversation.
-For both unrelated cases, `bin/fm-control.sh <id> relaunch --recover-launch` and `bin/fm-reboot-recover.sh recover` exited 1 without lifecycle input; foreground processes, visible ANSI, pending drafts, records, and fixture work remained identical.
-The guarded named-lab teardown succeeded with the default-session tripwire unchanged, removed the named runtime, and preceded removal of all owned transient worktree resources.
-This focused proof did not rerun the submitting recovery guard or claim a host-reboot test.
 
 ### Away-mode transport
 

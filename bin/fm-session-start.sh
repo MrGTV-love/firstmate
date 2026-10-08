@@ -30,12 +30,9 @@
 #                       mutating step runs.
 #   2. bootstrap      - home-local stale Herdr projection cleanup runs only
 #                       when this session actually holds the lock. Detect-only
-#                       diagnostics always run. Bootstrap's MUTATING sweeps
-#                       (same-home backlog reconciliation,
-#                       secondmate convergence, secondmate liveness, pending remote
-#                       handoff retry, X-mode artifact writes, fleet sync, recorded
-#                       Herdr launch recovery) also run only when locked; recovery
-#                       and network sweeps run in the deferred stage.
+#                       diagnostics always run. Bootstrap's mutating sweeps also
+#                       run only when locked; bin/fm-bootstrap.sh's header owns
+#                       their membership and deferred-phase selection.
 #   3. wake-drain     - presents durable wakes and advances recovery handling
 #                       state, so it only runs when locked. The local bounded
 #                       inactive-outcome startup scan runs in the deferred worker.
@@ -206,12 +203,10 @@
 #
 #   --reemit  This process ALREADY took the helm at its own startup and has
 #             only lost its context (a /clear or a compaction). Skip the
-#             mutating sweeps that startup already reconciled - the stale Herdr
-#             projection cleanup and bootstrap's seven mutating sweeps (fleet
-#             sync, same-home backlog reconciliation, secondmate convergence and
-#             liveness, pending remote handoff retry, X-mode
-#             artifact writes, recorded Herdr launch recovery) - and
-#             re-emit the rest. Wake-queue records normally still need presentation:
+#             startup work already reconciled - the stale Herdr projection
+#             cleanup and bootstrap's sweeps - and re-emit the rest.
+#             bin/fm-bootstrap.sh's header owns sweep membership.
+#             Wake-queue records normally still need presentation:
 #             they arrived after startup and are this turn's work queue.
 #             --reemit passes that presentation to fm-wake-drain.sh --reemit;
 #             docs/watcher-continuity.md's "Who presents queued wakes between

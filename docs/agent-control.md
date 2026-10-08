@@ -52,12 +52,8 @@ The clear is refused before anything is sent when the recorded backend cannot de
 omp sends no clear key; queued follow-ups can return to its composer, with watcher-specific handling owned by [restored-wake recovery](watcher-continuity.md#omp-restored-wake-recovery).
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `unknown-draft`, `pending-unproven`, or an unreadable read) refuses as not proven empty.
-The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, cursor-owned ambiguity across later frames, complete literal blank and braille continuation extraction, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
-Cursorless classification and extraction rank every candidate before refusing a selected ambiguous native band, so an older ambiguous band cannot veto a newer independent composer.
-- For native-band containment and draft extraction, consult the [shared composer classifier and its shape catalogue](../bin/fm-composer-lib.sh).
-For an unstyled prompt-bearing rule pair, only literal-owned rows inside that selected pair can make its pending verdict `unknown-draft`; historical literal frames outside the pair do not affect it.
-- For pasted omp frames inside drafts, see the [documented composer-scanner known limit](#live-herdr-task-attribution) tracked by follow-up `fm-omp-composer-pasted-frame-variants`.
-`unknown-draft` retains conservative uncertainty while identifying draft risk in literal continuations or selected ambiguous input. Ordinary inbox doorbells, watcher re-rings, and secondmate child-drain rings defer without typing for this verdict. Ordinary `unknown` idle screens and `pending-unproven` remain advisory on the inbox plane; exact pending text still defers unless it is solely the inbox's own stuck doorbell.
+The [shared composer classifier and its shape catalogue](../bin/fm-composer-lib.sh) own continuation containment, draft-risk verdicts, extraction, and known limits; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
+The [inbox ring owner](../bin/fm-task-inbox-lib.sh) separately defines the advisory doorbell pre-check.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
@@ -111,17 +107,14 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 Herdr can resume a live omp harness after reboot without the Firstmate launch command.
 That native restore is unmanaged: neither its resume path nor the original launch message proves which conversation the live process currently owns.
 `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and reports unmanaged live launches without lifecycle input or task-record mutation.
-Use an explicit `FM_HOME` with `recover` to inspect every eligible recorded live agent.
-`recover --one` bounds an automatic supervision tick to one selected local Herdr record.
-The script's [header and help](../bin/fm-reboot-recover.sh) own bounded-scan scheduling and its durable cursor, which advances before inspection even when that inspection is interrupted or refuses.
+The script's [header and help](../bin/fm-reboot-recover.sh) own invocation, bounded-scan scheduling, and its durable cursor.
 Deferred startup inspection follows the existing bootstrap sweeps, which keep their recovery responsibilities.
 The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and emits each sweep's diagnostics as an independently keyed `check` wake.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
 Unreadable endpoint inspection is reported as a task-specific failure without lifecycle action, not silently treated as a missing or stopped agent.
 The sweep never discovers other homes' panes or recursively enters a secondmate home.
 
-`bin/fm-control.sh <id> relaunch --recover-launch` is also inspection-only.
-The option is exclusive of profile overrides, notes, and debug options.
+The [control script's header and help](../bin/fm-control.sh) own its inspection-only relaunch option and argument exclusions.
 Under the task's control lock it inspects the live launch and reports unmanaged proof without interrupting, exiting, checkpointing, noting, or replacing the agent.
 It leaves managed and stopped agents untouched.
 Unknown versioned proof refuses; legacy-unproven proof skips.
@@ -129,7 +122,7 @@ Drafts, busy state, task instructions, profile axes, charters, child records, an
 
 ### Live Herdr task attribution
 
-`bin/fm-launch-proof-lib.sh` owns launch attribution, and every control-plane path to a live Herdr agent uses one shared positive task-attribution guard before lifecycle input or a task checkpoint, note, or record mutation.
+`bin/fm-launch-proof-lib.sh` owns launch attribution, and runtime lifecycle paths to a live Herdr agent use one shared positive task-attribution guard before lifecycle input or a relaunch checkpoint, note, or record mutation.
 A recorded endpoint or matching cwd alone never proves live task ownership.
 The stopped-agent exception requires process-backed absence even when Herdr has not registered an agent; a live process still requires launch attribution, and unreadable process evidence refuses recovery.
 Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch.
@@ -153,11 +146,11 @@ The normal failed-launch and published-record reconciliation rules below still a
 
 The omp task record binds its initial session pathname once per launch generation and updates the active pathname and PID synchronously on session activation or switch, including before JSONL persistence under an existing canonical session directory; managed authority still requires persisted task and active files identifying the same file.
 The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation; missing, invalid, or personal-session proof refuses lifecycle action.
-- The composer scanner family "pasted omp frame inside a draft / unsafe Enter variants" is a documented known limit tracked by follow-up fm-omp-composer-pasted-frame-variants.
 Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
 Cancelled or rolled-back switches and branches restore the predecessor proof only after omp's session transition settles and only if no newer transition or shutdown intervened.
-Every proof callback requires a unique registered top-level session sharing its context's session manager, and settled restoration rechecks that owner, so delegated or unregistered sessions cannot mutate the parent proof and omp 18.1.20 contexts need no agent identity.
-The proof installer uses the live registry exposed by omp's extension API rather than importing an on-disk SDK package; `FM_OMP_TASK_SESSION_LIVE=1 bash tests/fm-omp-task-session-live-e2e.test.sh` verifies production extension loading and session proof in the installed executable without model calls.
+Every proof callback requires a unique registered top-level session sharing its context's session manager, and settled restoration rechecks that owner, so delegated or unregistered sessions cannot mutate the parent proof without relying on a context agent field.
+The proof installer uses the live registry exposed by omp's extension API rather than importing an on-disk SDK package.
+[`tests/fm-omp-harness.test.sh`](../tests/fm-omp-harness.test.sh) covers session transitions and child preservation with both minimum-runtime and newer context shapes; [`tests/fm-omp-task-session-live-e2e.test.sh`](../tests/fm-omp-task-session-live-e2e.test.sh) provides the installed-runtime refresh command without model calls.
 This inspection does not change Herdr's session-wide auto-resume setting.
 The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
 

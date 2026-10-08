@@ -423,7 +423,7 @@ An existing journal suppresses another projected create.
 Before any recovery mutation, Firstmate holds both the task spawn lock and the named-session presentation lock.
 
 A same-identity version 2 binding may replace one exact agent-free restart husk in place.
-A husk is a restored same-labeled tab with a missing pane or no registered agent, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
+The [restart and liveness contract](#restart-and-liveness-behavior) owns husk proof; registration absence alone is not enough.
 The replacement is allowed only when all of these agree:
 
 - The physical home.
@@ -717,16 +717,12 @@ For the Herdr-specific exception, see [Claude composer proof](#claude-composer-p
 omp's box has no prompt glyph, so typed `>`, `❯`, and `─` remain draft text and read `pending`, not `empty`.
 Its last-row `⇧⇥ to change thinking effort` hint proves emptiness only when styling distinguishes the dim hint from typed text.
 A plain capture of those exact bytes stays `unknown` and preserves them during content extraction; a bright typed copy stays `pending` even in a styled capture.
-The verified shape and live exit/relaunch refresh command are recorded in [omp box composer through Herdr](verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr).
+The verified shape and current native-launch refusal guard are recorded in [omp box composer through Herdr](verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr).
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 Unpaired bare agent-glyph rows and left-bar rows carrying trailing non-idle text then degrade to `unknown` instead of misreading ghost suggestions as typed input.
 That refusal defers injection and eventually raises the wedge alarm.
-A proven prompt-bearing rule pair instead retains its entire interior: any nonblank content surviving the capture's styling policy and removal of the single proving prompt glyph reads `pending`, even in a plain capture.
-The one exception is an unstyled capture whose interior holds literal-owned native omp rows when the identity is not exactly Pi: that reads `unknown-draft`, and the shared classifier's verdict contract in `bin/fm-composer-lib.sh` owns it.
-Complete pasted containers, literal side characters, later prompt glyphs, and Braille remain draft content rather than nested-composer or animation furniture.
-Rendered rule pairs may be indented, provided the opening and closing rules have the same indentation.
-Ambiguous rule continuations and unsafe geometry still refuse proof; exact selection and refusal predicates are owned by `bin/fm-composer-lib.sh`.
+The [shared classifier's rule-pair contract](../bin/fm-composer-lib.sh) owns interior content, literal draft containment, indentation, and ambiguity refusal.
 The captured Claude shape, focused regression pointers, and live lifecycle refresh command are recorded in [Claude titled top border through Herdr](verification/runtime-backends.md#2026-10-06-claude-titled-top-border-through-herdr).
 
 ### Away-mode injection
@@ -764,7 +760,7 @@ The supported 0.9.x interface has no verified per-pane switch or custom resume-a
 Changing a user's global configuration is therefore not the scoped repair.
 
 The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's extension-recorded current-session proof; bare native restores remain unmanaged and inspection-only.
-The [runtime verification record](verification/runtime-backends.md) records captured bordered composers and historical recovery evidence; native-restored lifecycle acceptance described there predates this safety boundary.
+The [runtime verification record](verification/runtime-backends.md) owns captured composer evidence and the current native-restoration preservation guard.
 
 ### Stale agent registrations
 
@@ -922,11 +918,8 @@ Its before/after tripwire requires the live default-session snapshot to remain b
 Fixtures must successfully `prepare` a fresh name before claiming cleanup authority, and must call `teardown` only after that claim succeeds.
 `provision` accepts the prepared tripwire after checking it against the current default-session snapshot.
 A refused claim leaves existing running or stopped sessions and their tripwires untouched.
-The reboot live fixture must retain its private home, worktree, and resume file until guarded teardown succeeds and every captured native omp PID/start identity has exited.
-It waits up to 10 seconds for those children after teardown; an uncaptured launch, unconfirmed exit, or teardown refusal/failure reports the named session and retained paths for manual cleanup and exits unsuccessfully without deleting the private tree.
-This also applies after provision fails following a fresh ownership claim; successful cleanup removes only owned resources and preserves the original exit status unless resource removal fails.
-[`tests/fm-omp-reboot-live-e2e.test.sh`](../tests/fm-omp-reboot-live-e2e.test.sh) implements that dependency-preserving cleanup order.
-For focused real-native cleanup proof without rerunning the lifecycle matrix, use `FM_OMP_REBOOT_LIVE=1 FM_OMP_REBOOT_CLEANUP_SMOKE=1 bash tests/fm-omp-reboot-live-e2e.test.sh`; it launches the task and secondmate fixtures and reports guarded teardown, each child exit, and private-tree removal.
+The [reboot live fixture](../tests/fm-omp-reboot-live-e2e.test.sh) owns its dependency-preserving cleanup order: private resources remain until guarded teardown succeeds and native child exit is confirmed.
+The [runtime verification record](verification/runtime-backends.md#current-native-restoration-guard) owns its refresh commands.
 
 The helper's header and `--help` own exact commands.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.

@@ -65,8 +65,8 @@
 #                header, one column inset from its `╰─` input row, followed by
 #                literal three-space-gutter continuations. The floor and every
 #                owned continuation are input; no right closing border exists.
-#                Blank-boundary or insufficient-gutter continuations remain
-#                unknown; enclosing bare drafts and Pi separator pairs retain
+#                Blank-boundary or insufficient-gutter continuations retain
+#                draft uncertainty; enclosing bare drafts and Pi separator pairs retain
 #                ownership of pasted band-looking rows.
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
 #                codex `›`, muse `⟩`, cursor `→`). The agent glyph is itself the container
@@ -106,6 +106,11 @@
 #                (`──── <title> ─`); that TITLED rule opens the pair the same
 #                way, but only with the glyph row inside it, and never closes
 #                one (see _fm_composer_titled_rule_row).
+#
+# KNOWN LIMIT: pasted omp frames inside drafts have unsafe Enter variants
+# tracked by follow-up fm-omp-composer-pasted-frame-variants. The native-band
+# and native-continuation regressions cover the currently supported containment
+# boundaries, not every possible pasted-frame variant.
 #
 # THE COMPOSER FOOTER ZONE (task firstmate-doorbell-vals-pending-p1): a
 # harness draws its own furniture BELOW the composer - a user statusLine, a
@@ -797,6 +802,10 @@ fm_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
 # identity result was supplied, and the verdict depends on it. Adapters answer
 # `need-identity` by running their identity probe once and re-calling with
 # either its result or `probe-absent`; the sentinel never escapes an adapter.
+# `unknown-draft` refuses positive composer proof while identifying input risk
+# in literal continuations or selected ambiguous input. Ordinary `unknown`
+# carries no such draft attribution. Neither verdict proves emptiness.
+# fm-task-inbox-lib.sh owns their distinct advisory doorbell treatment.
 # Identity stays a lazy second pass so the common non-pi read never pays for
 # the probe.
 #
@@ -1906,9 +1915,8 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
 # _fm_composer_classify_bare_wrap: the bare composer plus its wrap region.
 # Content is the glyph row (glyph stripped) plus every continuation row down
 # to the cursor. Ghost-stripped-to-nothing rows are an empty composer whose
-# suggestion happened to wrap; any surviving text is pending when styling can
-# prove it real and unknown otherwise (the same styled=0 degradation as the
-# glyph row itself).
+# suggestion happened to wrap; surviving text requires styling for positive
+# pending proof, while unstyled literal continuations retain draft uncertainty.
 _fm_composer_classify_bare_wrap() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 g=$3 cy=$4 row raw content glyph='' text_seen=0 literal_seen=0
   row=$g

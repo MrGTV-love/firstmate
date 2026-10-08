@@ -102,10 +102,10 @@
 #          The `code-root <file>` variant is a detect-only local check that runs
 #          even in a read-only session; detect_code_root_backlog_fork owns what
 #          it reports.
-#          Set FM_BOOTSTRAP_DETECT_ONLY=1 to skip the MUTATING sweeps
+#          Set FM_BOOTSTRAP_DETECT_ONLY=1 to skip the lock-gated sweeps
 #          (backlog_record_reconcile, secondmate_sync,
 #          secondmate_liveness_sweep, secondmate_handoff_resume, x_mode_setup,
-#          fleet_sync, recorded Herdr launch recovery) while still
+#          fleet_sync, plus read-only recorded Herdr launch inspection) while still
 #          printing every read-only detect line
 #          above; the TANGLE line switches to advisory-only wording with no
 #          checkout command. Used by
@@ -113,7 +113,7 @@
 #          the fleet lock, so a second concurrent session never race-mutates
 #          secondmate homes, pending handoff outboxes and receiver wakes,
 #          X-mode artifacts, project clones, or repair instructions.
-#          Unset/0 (the default) runs all mutating sweeps - this flag is purely
+#          Unset/0 (the default) runs all lock-gated sweeps - this flag is purely
 #          additive.
 #          Set FM_BOOTSTRAP_NETWORK to split synchronous local work from the
 #          deferred phase, so a session start can print its digest from local
