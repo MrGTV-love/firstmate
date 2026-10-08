@@ -64,6 +64,9 @@ Three supplemental hints come from completed successful shards of the partial [r
 All three shard summaries report `failed=0`, and each measured row reports `exit=0` and `gate_skip=false`.
 The new `tests/fm-omp-wake-restore-live-e2e.test.sh` hint is its successful 51 ms record from portable serial shard 3 of [run 37663635202](https://github.com/MrGTV-love/firstmate/actions/runs/37663635202) on 2026-10-07.
 That shard completed with zero failures; the live test took its opt-in capability skip, so this hint models ordinary portable CI gate evaluation, not live wake-recovery runtime.
+Thirteen further hints come from the complete green [run 37404365422](https://github.com/MrGTV-love/firstmate/actions/runs/37404365422), whose nine serial shard summaries all report `failed=0`: every then-unhinted serial script that run measured with `exit=0` and `gate_skip=false`, added when the lane gained `tests/fm-cpu-pass.test.sh` and `tests/fm-load-report.test.sh`.
+The `tests/fm-supervision-host.test.sh` hint is refreshed to its slow-mode CI maximum of 877426 ms from main [run 37774962436](https://github.com/MrGTV-love/firstmate/actions/runs/37774962436), compared with 562966 ms in main [run 37772520915](https://github.com/MrGTV-love/firstmate/actions/runs/37772520915), 853538 ms in main [run 37764027766](https://github.com/MrGTV-love/firstmate/actions/runs/37764027766), 549 s in this PR's [run 37774432736](https://github.com/MrGTV-love/firstmate/actions/runs/37774432736), and 859832 ms in this PR's [run 37778222434](https://github.com/MrGTV-love/firstmate/actions/runs/37778222434).
+The new `tests/fm-skill-pick.test.sh` hint is its completed 120549 ms CI measurement from [run 37778222434](https://github.com/MrGTV-love/firstmate/actions/runs/37778222434).
 An unfinished or failed invocation is not a healthy duration sample.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.
@@ -75,8 +78,7 @@ That is not hypothetical: by 2026-09-01 the lane had grown from 116 to 139 scrip
 Refresh the hints whenever the serial lane gains scripts, rather than waiting for that bound to trip.
 
 `bin/fm-test-run.sh` owns the per-shard packing, so its `--check-coverage` output is the current account of lane size and coverage rather than a copied inventory.
-Nine serial runners pack the refreshed measurements into a longest modeled script sum of 697969 ms (11m38s), with other shards near 10m36s.
-The longest script, `tests/fm-watch-triage.test.sh`, legitimately occupies one whole shard and is the indivisible floor for this layout.
+The longest indivisible script sets a floor for the layout, regardless of how evenly the remaining work is packed.
 This is a packing estimate, not measured new-workflow execution or an end-to-end latency guarantee.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.

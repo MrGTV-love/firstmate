@@ -25,6 +25,10 @@ if (@ARGV && $ARGV[0] eq 'handoff') {
     && defined $host && $host =~ m{\A/};
   my ($result_id, $sequence) = $result_name =~ /\A\.\/([A-Za-z0-9._-]{1,64})\.(\d+)\.result\z/;
   die "invalid handoff\n" unless $result_id eq $id && getppid() == $claim_pid;
+  # Reserve every handoff destination before allocating input handles: an
+  # inherited CPU slot fd can otherwise shift a live handle onto fd 7 or 9.
+  dup2($reservation_fd, 7) >= 0 or die "cannot reserve capability descriptor\n";
+  dup2($inbox_fd, 9) >= 0 or die "cannot reserve result descriptor\n";
   open(my $inbox, "<&$inbox_fd") or die "cannot retain inbox\n";
   chdir($inbox) or die "cannot enter inbox\n";
   my $inbox_root = getcwd();
@@ -60,7 +64,6 @@ if (@ARGV && $ARGV[0] eq 'handoff') {
   chdir($reservation) or die "cannot enter reservation root\n";
   my @reservation_stat = lstat('.');
   die "unsafe reservation root\n" unless @reservation_stat && -d _ && !-l _ && $reservation_stat[4] == $< && ($reservation_stat[2] & 07777) == 0700;
-  dup2(fileno($reservation), 7) >= 0 or die "cannot reserve capability descriptor\n";
   my $capability_name = ".extension-capture-capability-$claim_token.$reservation_token";
   sysopen(my $capability, $capability_name, O_CREAT | O_EXCL | O_NOFOLLOW | O_RDWR, 0600) or die "cannot create capability\n";
   my $record = encode_json({
