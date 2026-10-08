@@ -71,7 +71,7 @@
 #              `endpoint-gone`; a surviving idle pane is `already-stopped`.
 #              A surviving agent takes the ordinary interrupt-then-exit path.
 #              fm_control_endpoint_absence_verdict owns the backend evidence,
-#              including the machine-wide no-tmux-server proof.
+#              including the tmux proof scoped to the recorded session and worktree.
 #   relaunch   Transactionally replace the running agent with a new one, in the
 #              SAME worktree - and the same endpoint whenever that endpoint
 #              still exists - on the same or a newly chosen
@@ -698,7 +698,7 @@ do_exit() {
       # "destroyed" with "unreachable from this seat". Route it through the
       # control plane's one absence proof - the same one the relaunch gate uses
       # - and report what that proof actually established, never more.
-      absence=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
+      absence=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T" "$WT")
       case "${absence%%$'\t'*}" in
         gone)
           # Proven gone, so the agent that lived in it went with it: exit's
@@ -1205,7 +1205,7 @@ do_relaunch() {
     case "$state" in
       dead) ;;
       missing)
-        state=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
+        state=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T" "$WT")
         case "${state%%$'\t'*}" in
           dead|gone) ;;
           *) die "reconciliation-only recovery requires a proven exited owner (endpoint reads $state)" ;;

@@ -283,7 +283,7 @@ SH
 make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
   local dir=$1 tb="$1/notimeoutbin" tool real
   mkdir -p "$tb"
-  for tool in bash git grep sed head cut tail dirname perl; do
+  for tool in bash git grep sed head cut tail dirname perl sleep; do
     real=$(command -v "$tool" || true)
     [ -n "$real" ] || fail "missing tool for no-timeout path: $tool"
     ln -s "$real" "$tb/$tool"
@@ -3097,18 +3097,25 @@ test_dead_window_still_reports_active_run_step() {
 
 test_no_timeout_uses_perl_bound() {
   reset_fakes
-  local d toolbin out start elapsed calls_file calls
+  local d toolbin out start elapsed calls_file calls pidfile i
   d=$(new_case no-timeout)
   make_repo_on_branch "$d/wt" fm/feat-timeout
   make_fakebin "$d" >/dev/null
   calls_file="$d/no-mistakes.calls"
   : > "$calls_file"
+  # The fake blocks past the bound, so the bound is what ends it. It records its
+  # pid so the test can prove the bound left nothing behind and reap it even when
+  # an assertion fails or the run is interrupted, and it stops itself at the
+  # suite's stub ceiling so a leaked one costs no CPU and ends on its own.
+  pidfile="$d/no-mistakes.pid"
   cat > "$d/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${FM_FAKE_NM_CALLS:-/dev/null}"
-while :; do :; done
+fm_test_record_process "$FM_FAKE_NM_PIDFILE" || exit 1
+while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
 SH
   chmod +x "$d/fakebin/no-mistakes"
+  fm_test_track_process "$pidfile" "$d/fakebin/no-mistakes"
   toolbin=$(make_no_timeout_toolbin "$d")
   fm_write_meta "$d/state/feat-timeout.meta" "window=fm:fm-feat-timeout" "worktree=$d/wt" "kind=ship" \
     "harness=claude"
@@ -3117,8 +3124,16 @@ SH
   "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-timeout busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
   start=$SECONDS
-  out=$(FM_FAKE_NM_CALLS="$calls_file" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-timeout)
+  out=$(FM_FAKE_NM_CALLS="$calls_file" FM_FAKE_NM_PIDFILE="$pidfile" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-timeout)
   elapsed=$((SECONDS - start))
+  [ -s "$pidfile" ] || fail "the fake no-mistakes never ran, so the bound proved nothing"
+  # The bound must take the fake down with it, not merely stop waiting for it.
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" || break
+    sleep 0.1
+  done
+  ! fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" \
+    || fail "the timed-out no-mistakes call was left running after the bound"
   assert_contains "$out" "state: working" "timed-out no-mistakes falls back to pane"
   assert_contains "$out" "source: pane" "timed-out no-mistakes -> pane source"
   [ "$elapsed" -lt 5 ] || fail "perl timeout did not bound no-mistakes calls (elapsed ${elapsed}s)"

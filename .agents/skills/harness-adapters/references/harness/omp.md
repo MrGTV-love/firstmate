@@ -10,15 +10,15 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 |---|---|
 | Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/fm-spawn.sh`; a missing binary refuses the spawn. |
 | Launch | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns launch flags, session posture, worker memory scope, and secondmate extension loading. |
-| Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the per-task extension marks busy at `agent_start` and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). |
+| Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the crewmate/scout per-task extension marks busy at `agent_start`, and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). Secondmates do not load a parent-task busy adapter. |
 | Exit command | `/quit` (`/exit` and `/q` are aliases). |
-| Interrupt | Single Escape; the composer is left empty, no clear key. |
+| Interrupt | Single Escape, no clear key; queued follow-ups can return to the composer (see [restored-wake recovery](../../../docs/watcher-continuity.md#omp-restored-wake-recovery)). |
 | Skill invocation | No separate verified form beyond normal command behavior; use natural language when the exact command is uncertain. |
 | Model flag | `--model <provider>/<id>`; omp also accepts fuzzy patterns. Firstmate selection follows the [fleet model-index contract](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson), and native non-entry validation is owned by [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh). |
 | Effort flag | `--thinking <off\|minimal\|low\|medium\|high\|xhigh\|max\|auto>`, a superset of the shared vocabulary, so every level including `max` maps straight across. |
 | Model discovery | `omp models [--json]` lists built-in and auto-discovered providers only; extension-registered providers such as `claude-bridge` never appear. `omp usage` shows provider windows; `quota-axi` covers the `claude` provider when the bridge is in use. |
 | Marker | None of omp's own (verified: `PI_CODING_AGENT` absent from the binary, no `PI_CODING_AGENT_DIR` or `OMP_PROFILE` in the default profile). `FM_OMP_HARNESS=omp` is Firstmate's launch marker; ancestry matches the exact process name `omp`. |
-| Composer | See [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) for the composer posture pin. The [shared classifier's shape catalogue](../../../bin/fm-composer-lib.sh) owns compact-box and default-band native-resume recognition and literal-draft containment, with default-band consumer regressions in [`tests/fm-composer-native-band.test.sh`](../../../tests/fm-composer-native-band.test.sh). Busy text is `Working…` (U+2026), the only spelling the omp busy regex accepts (the three-dot form its headless `-p` mode writes never reaches a supervised pane), with the status row's braille spinner plus elapsed cell as the second signal. Box-shape support and overlay live-reload evidence are recorded in [omp box composer through Herdr](../../../docs/verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr). |
+| Composer | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns the composer posture pin; `../../../bin/fm-composer-lib.sh` owns rendered delivery-busy signals and composer shapes, including compact-box and default-band native-resume recognition and literal-draft containment (default-band consumer regressions in [`tests/fm-composer-native-band.test.sh`](../../../tests/fm-composer-native-band.test.sh)), with box-shape and overlay live-reload evidence in [omp box composer through Herdr](../../../docs/verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr) and working-composer evidence in [omp injected text through Herdr](../../../docs/verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr). |
 | Autonomy | Approval and unattended-session posture are owned by [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh). |
 | Trust | No project-trust gate at all; a fresh profile shows a provider-login wizard instead, suppressed by `OMP_SKIP_SETUP=1`. |
 | Resume | `-c/--continue` and `-r/--resume` exist; the [native-restoration inspection contract](../../../docs/agent-control.md#inspecting-a-bare-native-restore) owns Firstmate's refusal boundary. |
@@ -41,7 +41,8 @@ The optional claude-bridge extension runs a nested executable literally named `c
 ## Extension loading
 
 omp auto-discovers `<cwd>/.omp/extensions/*.ts` (top level only, cwd only, no ancestor walk, no trust dialog) and the active profile's `agent/extensions/`; `.pi/extensions/` is not a discovery root.
-A file that is both auto-discovered and named with `-e` loads twice, so the per-task worker extension lives in `state/` and a secondmate launch names no `-e` at all.
+A file that is both auto-discovered and named with `-e` loads twice, so a canonical crewmate/scout launch loads its semantic busy extension explicitly from the parent's `state/`.
+Ordinary secondmate launches use home-local auto-discovery for their tracked primary extensions, without a parent-task busy adapter or explicit duplicate loading.
 There is no `agent_settled` event; `agent_end` plus `willContinue` replaces it.
 
 ## Primary integration
@@ -51,5 +52,6 @@ The same file ports the `tool_call` seatbelts and delivers the session-start dig
 omp has no asynchronous Stop-hook equivalent, so the Claude auto-arm model does not apply; `fm_supervision_model` classifies omp as `extension`, and `fm_omp_extension_owns_supervision` in `../../../bin/fm-wake-lib.sh` is the ownership proof that tolerates the extension's own watcher hand-off.
 The Pi supervision branch does not run on omp; without the supervision host every actionable wake is delivered to main, and in a home with `config/supervision-host` the watch extension spawns the host instead of the arm, with Claude's print mode as its headless engine ([`supervision-host.md`](../../../docs/supervision-host.md)).
 Launch a primary with plain `omp` inside the home (`FM_OMP_HARNESS=omp omp` when starting from a Claude pane); `../../../bin/fm-session-start.sh` prints `OMP_WATCH_EXTENSION: not loaded` when the running session has not loaded both tracked supervision extensions.
+[Watcher continuity](../../../docs/watcher-continuity.md#omp-restored-wake-recovery) owns restored-wake recovery, editor normalization, draft preservation, and known limits.
 `FM_OMP_LIVE_E2E=1 ../../../tests/fm-omp-primary-live-e2e.test.sh` is the opt-in live guard; `../../../tests/fm-omp-harness.test.sh` is the portable regression.
 A secondmate registered with `remote=1` in `data/secondmates.md`, spawned through the ordinary `../../../bin/fm-spawn.sh <id> <home> --secondmate` path, is refused on omp until a remote host verifies it, as is `../../../bin/fm-remote-secondmate-control.sh launch`; there is no `--remote` flag.

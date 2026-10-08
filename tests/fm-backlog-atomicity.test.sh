@@ -307,7 +307,7 @@ if [ "\${1:-}" = start ]; then
     kill -TERM "\$spawn_pid"
     exit 0
   fi
-  sleep 300
+  sleep "\${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
 fi
 exec "$real" "\$@"
 SH
@@ -347,8 +347,9 @@ run_bounded_fm_tasks_axi() {  # <fallback-bin> <bound> [args...]
 test_fm_tasks_axi_fallback_bounds_the_call_without_a_timeout_binary() {
   local case_dir fb out rc=0 started
   case_dir=$(make_home fm-tasks-axi-fallback)
+  # shellcheck disable=SC2016 # The stub expands its own block ceiling.
   fb=$(make_fallback_bin "$case_dir" '#!/bin/bash
-exec sleep 300')
+exec sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"')
   started=$SECONDS
   out=$(run_bounded_fm_tasks_axi "$fb" 2 show never-answers) || rc=$?
   [ "$rc" -eq 124 ] \
@@ -404,7 +405,8 @@ test_fm_tasks_axi_gnu_timeout_forces_termination_of_a_sigterm_ignoring_child() {
   mkdir -p "$fb"
   ln -s "$(command -v timeout)" "$fb/timeout"
   ln -s "$(command -v sleep)" "$fb/sleep"
-  printf '#!/bin/bash\ntrap "" TERM\nexec sleep 300\n' > "$fb/tasks-axi"
+  # shellcheck disable=SC2016 # The stub expands its own block ceiling.
+  printf '#!/bin/bash\ntrap "" TERM\nexec sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"\n' > "$fb/tasks-axi"
   chmod +x "$fb/tasks-axi"
   started=$SECONDS
   out=$(run_bounded_fm_tasks_axi "$fb" 2 show never-answers) || rc=$?
@@ -584,8 +586,8 @@ write_task_meta() {  # <case-dir> <id> <kind> <mode> [extra-line...]
   fm_write_meta "$(home_of "$case_dir")/state/$id.meta" \
     "window=firstmate:fm-$id" \
     "endpoint_task_id=$id" \
-    "worktree=$case_dir/absent-worktree" \
-    "project=$case_dir/absent-project" \
+    "worktree=$case_dir/wt" \
+    "project=$case_dir/project" \
     "harness=claude" \
     "kind=$kind" \
     "mode=$mode" \
@@ -612,9 +614,6 @@ run_ship_spawn() {  # <case-dir> <id>
   run_spawn "$case_dir" "$id" "$case_dir/project" --mode no-mistakes --yolo off
 }
 
-# Teardown against a recorded worktree that no longer exists: the landed-work and
-# worktree-return steps are then no-ops, which keeps these cases about the
-# backlog transition rather than re-testing tests/fm-teardown.test.sh's matrix.
 run_teardown() {  # <case-dir> <id> [args...]
   local case_dir=$1
   shift
@@ -2999,11 +2998,295 @@ test_a_persistent_secondmate_is_never_a_backlog_item() {
   pass "dispatching a persistent secondmate needs no backlog item"
 }
 
+test_dispatch_retires_drop_only_after_commit() (
+  local case_dir home id initial stored before rc
+  case_dir=$(make_home dispatch-drop-provenance)
+  home=$(home_of "$case_dir")
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  printf '%s\n' 'Body café 航海' ' dropped ' ' Deliverable of the finished work: dropped ' \
+    'Question: keep this?' 'dropped later' > "$case_dir/body.txt"
+  for initial in queued in_flight; do
+    id="drop-$initial"
+    add_item "$case_dir" "$id"
+    [ "$initial" = queued ] || start_item "$case_dir" "$id"
+    tasks-axi update "$id" --body-file "$case_dir/body.txt" --file "$(backlog_of "$case_dir")" >/dev/null \
+      || fail "could not attach dispatch body"
+    mkdir -p "$home/data/$id"
+    printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+    cp "$home/data/$id/captain-drop.md" "$case_dir/words-$id"
+    before=$(cat "$(backlog_of "$case_dir")")
+    fm_backlog_relaunch_admission "$home/config" "$home/data" ship "$id" 0 \
+      || fail "ordinary admission failed: $FM_BACKLOG_TRANSITION_ERROR"
+    assert_equals "$before" "$(cat "$(backlog_of "$case_dir")")" "admission retired active provenance"
+    printf 'spawn_gen=fixture\n' > "$home/state/$id.meta"
+    fm_backlog_dispatch_transition "$home/state/$id.meta" "$home/data" "$id" "$home/state" \
+      || fail "dispatch failed: $FM_BACKLOG_TRANSITION_ERROR"
+    stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") || fail "dispatch row disappeared"
+    assert_contains "$stored" "state: in_flight" "dispatch did not start the row"
+    assert_contains "$stored" "Historical captain disposition: dropped" "dispatch left active disposition"
+    assert_contains "$stored" "Historical deliverable of the finished work: dropped" "dispatch left active deliverable"
+    assert_contains "$stored" "Body café 航海" "dispatch changed Unicode bytes"
+    assert_contains "$stored" "Question: keep this?" "dispatch changed the question"
+    assert_contains "$stored" "dropped later" "dispatch rewrote non-exact text"
+    cmp -s "$case_dir/words-$id" "$home/data/$id/captain-drop.md" || fail "dispatch changed captain words"
+  done
+  id=drop-failure
+  add_item "$case_dir" "$id"
+  tasks-axi update "$id" --body-file "$case_dir/body.txt" --file "$(backlog_of "$case_dir")" >/dev/null \
+    || fail "could not attach failed dispatch body"
+  mkdir -p "$home/data/$id"
+  printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+  cp "$home/data/$id/captain-drop.md" "$case_dir/words-$id"
+  printf 'spawn_gen=fixture\n' > "$home/state/$id.meta"
+  before=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
+    || fail "could not read failed dispatch body before transition"
+  before=$(printf '%s\n' "$before" | sed -n 's/^  body: //p')
+  [ -n "$before" ] || fail "failed dispatch fixture exposed no complete task body"
+  break_verb "$case_dir" start
+  rc=0
+  PATH="$case_dir/fakebin:$PATH" fm_backlog_dispatch_transition \
+    "$home/state/$id.meta" "$home/data" "$id" "$home/state" || rc=$?
+  [ "$rc" -ne 0 ] || fail "failed start reported dispatch success"
+  stored=$(PATH="$case_dir/fakebin:$PATH" tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
+    || fail "failed dispatch row disappeared"
+  assert_equals "$before" "$(printf '%s\n' "$stored" | sed -n 's/^  body: //p')" \
+    "failed dispatch did not restore the complete original task body"
+  assert_contains "$stored" "state: queued" "failed dispatch changed the original row state"
+  assert_contains "$stored" "Deliverable of the finished work: dropped" "failed dispatch retired the active deliverable"
+  assert_not_contains "$stored" "Historical captain disposition:" "failed dispatch retired the active disposition"
+  assert_not_contains "$stored" "Historical deliverable of the finished work:" "failed dispatch retired the active deliverable"
+  cmp -s "$case_dir/words-$id" "$home/data/$id/captain-drop.md" || fail "failed dispatch changed retained captain words"
+  pass "queued and in-flight dispatch retire drop provenance only at successful commit"
+)
+
+test_spawn_retires_queued_and_inflight_drop_provenance() {
+  local initial case_dir home id out stored
+  for initial in queued in_flight; do
+    id="spawn-drop-$initial"
+    case_dir=$(make_home "$id" "$id")
+    home=$(home_of "$case_dir")
+    add_item "$case_dir" "$id"
+    [ "$initial" = queued ] || start_item "$case_dir" "$id"
+    printf '%s\n' 'dropped' 'Deliverable of the finished work: dropped' 'Body café 航海' > "$case_dir/body"
+    tasks-axi update "$id" --body-file "$case_dir/body" --file "$(backlog_of "$case_dir")" >/dev/null \
+      || fail "could not prepare spawn provenance"
+    mkdir -p "$home/data/$id"
+    printf 'Captain words\n' > "$home/data/$id/captain-drop.md"
+    out=$(run_ship_spawn "$case_dir" "$id") || fail "resumed spawn failed: $out"
+    stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") || fail "spawn row disappeared"
+    assert_contains "$stored" "Historical captain disposition: dropped" "spawn kept active disposition"
+    assert_contains "$stored" "Historical deliverable of the finished work: dropped" "spawn kept active deliverable"
+    assert_contains "$stored" "Body café 航海" "spawn changed Unicode body"
+    assert_present "$home/state/$id.meta" "spawn did not publish worker record"
+    assert_equals "Captain words" "$(cat "$home/data/$id/captain-drop.md")" "spawn changed retained words"
+  done
+  pass "actual queued and in-flight spawn retire old drop provenance"
+}
+
+test_failed_restart_preserves_uncertain_drop_provenance() (
+  local outcome case_dir home id real rc stored error expected
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  real=$(command -v tasks-axi)
+  for outcome in committed unreadable; do
+    id="restart-drop-$outcome"
+    case_dir=$(make_home "$id" "$id")
+    home=$(home_of "$case_dir")
+    add_item "$case_dir" "$id"
+    printf '%s\n' 'Body café 航海' ' dropped ' ' Deliverable of the finished work: dropped ' \
+      'Question: keep this?' 'dropped later' > "$case_dir/body"
+    tasks-axi update "$id" --body-file "$case_dir/body" --file "$(backlog_of "$case_dir")" >/dev/null \
+      || fail "could not prepare failed restart provenance"
+    printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+    cp "$home/data/$id/captain-drop.md" "$case_dir/captain-before"
+    stored=$("$real" show "$id" --full --file "$(backlog_of "$case_dir")") \
+      || fail "could not read failed restart fixture body"
+    expected=$(printf '%s\n' "$stored" | sed -n 's/^  body: //p')
+    [ -n "$expected" ] || fail "failed restart fixture exposed no complete body"
+    expected=${expected//'\n dropped \n'/'\n Historical captain disposition: dropped \n'}
+    expected=${expected//'\n Deliverable of the finished work: dropped \n'/'\n Historical deliverable of the finished work: dropped \n'}
+    printf 'spawn_gen=fixture\n' > "$home/state/$id.meta"
+    cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/tasks-axi-calls"
+if [ "\${1:-}" = start ]; then
+  if [ "$outcome" = committed ]; then
+    "$real" "\$@" >/dev/null || exit \$?
+  fi
+  : > "$case_dir/start-returned"
+  printf '%s\n' 'error: distinctive restart failure' >&2
+  exit 47
+fi
+if [ "\${1:-}" = show ] && [ "$outcome" = unreadable ] && [ -f "$case_dir/start-returned" ]; then
+  printf '%s\n' 'error: distinctive post-start read failure' >&2
+  exit 53
+fi
+exec "$real" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/tasks-axi"
+    rc=0
+    if [ "$outcome" = committed ]; then
+      PATH="$case_dir/fakebin:$PATH" fm_backlog_dispatch_transition \
+        "$home/state/$id.meta" "$home/data" "$id" "$home/state" || rc=$?
+    else
+      PATH="$case_dir/fakebin:$PATH" fm_backlog_start "$home/data" "$id" || rc=$?
+    fi
+    error=$FM_BACKLOG_TRANSITION_ERROR
+    assert_equals 47 "$rc" "$outcome restart replaced the original command status"
+    assert_contains "$error" 'error: distinctive restart failure' \
+      "$outcome restart replaced the original command error"
+    assert_present "$case_dir/start-returned" "$outcome restart never attempted start"
+    stored=$("$real" show "$id" --full --file "$(backlog_of "$case_dir")") \
+      || fail "$outcome restart row disappeared"
+    if [ "$outcome" = committed ]; then
+      assert_contains "$stored" 'state: in_flight' "committed start was rolled back"
+    else
+      assert_contains "$stored" 'state: queued' "failed start unexpectedly mutated the row state"
+      assert_contains "$error" 'restart outcome could not be verified' \
+        "unreadable readback did not explain preservation"
+      assert_contains "$error" 'distinctive post-start read failure' \
+        "unreadable readback did not retain its read error"
+    fi
+    assert_equals "$expected" "$(printf '%s\n' "$stored" | sed -n 's/^  body: //p')" \
+      "$outcome restart restored active provenance or changed unrelated body bytes"
+    cmp -s "$case_dir/captain-before" "$home/data/$id/captain-drop.md" \
+      || fail "$outcome restart changed retained captain words"
+    assert_present "$home/state/$id.meta" "$outcome restart removed the paired record"
+  done
+  pass "committed and unreadable failed starts retain historical provenance and original failures"
+)
+
+observe_tasks_axi_mutations() {
+  local case_dir=$1 real
+  real=$(command -v tasks-axi)
+  cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  start|update|reopen|done|mv|rm|hold|release)
+    case "\${2:-}" in
+      --help|-h) ;;
+      *) : > "$case_dir/tasks-mutation-attempted" ;;
+    esac
+    ;;
+esac
+exec "$real" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/tasks-axi"
+}
+
+test_fresh_spawn_respects_task_control_custody() (
+  local case_dir home id lock out rc=0
+  id=atomic-fresh-control-custody
+  case_dir=$(make_home fresh-control-custody "$id")
+  home=$(home_of "$case_dir")
+  add_item "$case_dir" "$id"
+  observe_tasks_axi_mutations "$case_dir"
+  cp "$(backlog_of "$case_dir")" "$case_dir/backlog-before"
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *new-window*) : > "$case_dir/task-endpoint-created" ;;
+  *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
+  *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+esac
+case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  FM_HOME=$home
+  FM_STATE_OVERRIDE=$home/state
+  . "$ROOT/bin/fm-wake-lib.sh"
+  lock="$home/state/.control-$id.lock"
+  fm_lock_try_acquire "$lock" || fail "could not hold fresh task control custody"
+  trap 'fm_lock_release "$lock"' EXIT
+  out=$(run_ship_spawn "$case_dir" "$id") || rc=$?
+  [ "$rc" -ne 0 ] || fail "fresh spawn ignored another process's task control custody"
+  cmp -s "$case_dir/backlog-before" "$(backlog_of "$case_dir")" \
+    || fail "control-refused fresh spawn mutated backlog bytes"
+  assert_absent "$case_dir/tasks-mutation-attempted" \
+    "control-refused fresh spawn attempted a tasks mutation"
+  assert_absent "$home/state/$id.meta" "control-refused fresh spawn published a worker record"
+  assert_absent "$home/state/$id.busy-state" "control-refused fresh spawn published busy state"
+  assert_absent "$home/state/$id.busy-gen" "control-refused fresh spawn published a busy generation"
+  assert_absent "$case_dir/task-endpoint-created" "control-refused fresh spawn created an endpoint"
+  assert_absent "$case_dir/local-copy-requested" "control-refused fresh spawn requested a local copy"
+  assert_present "$lock" "control-refused fresh spawn removed foreign custody"
+  fm_lock_release "$lock"
+  out=$(run_ship_spawn "$case_dir" "$id") || fail "fresh spawn failed after control release: $out"
+  assert_contains "$out" "spawned $id" "released fresh spawn did not report success"
+  assert_equals in_flight "$(row_state "$case_dir" "$id")" "released fresh spawn did not start the row"
+  assert_present "$home/state/$id.meta" "released fresh spawn did not publish its worker record"
+  assert_present "$case_dir/tasks-mutation-attempted" "released fresh spawn bypassed the mutation observer"
+  assert_present "$case_dir/task-endpoint-created" "released fresh spawn did not create its endpoint"
+  pass "fresh spawn refuses task control contention without mutation or publication, then succeeds"
+)
+
+test_bootstrap_healing_respects_task_control_custody() (
+  local case_dir home id lock out stored
+  id=atomic-heal-control-custody
+  case_dir=$(make_home heal-control-custody "$id")
+  home=$(home_of "$case_dir")
+  add_item "$case_dir" "$id"
+  printf '%s\n' 'dropped' 'Deliverable of the finished work: dropped' 'Body café 航海' > "$case_dir/body"
+  tasks-axi update "$id" --body-file "$case_dir/body" --file "$(backlog_of "$case_dir")" >/dev/null \
+    || fail "could not prepare queued healing provenance"
+  printf 'Exact captain words café 航海\n' > "$home/data/$id/captain-drop.md"
+  cp "$home/data/$id/captain-drop.md" "$case_dir/captain-before"
+  write_task_meta "$case_dir" "$id" ship no-mistakes
+  cp "$home/state/$id.meta" "$case_dir/meta-before"
+  cp "$(backlog_of "$case_dir")" "$case_dir/backlog-before"
+  observe_tasks_axi_mutations "$case_dir"
+  FM_HOME=$home
+  FM_STATE_OVERRIDE=$home/state
+  . "$ROOT/bin/fm-wake-lib.sh"
+  lock="$home/state/.control-$id.lock"
+  fm_lock_try_acquire "$lock" || fail "could not hold queued worker control custody"
+  trap 'fm_lock_release "$lock"' EXIT
+  out=$(run_bootstrap "$case_dir") || fail "control-contended healing failed: $out"
+  cmp -s "$case_dir/backlog-before" "$(backlog_of "$case_dir")" \
+    || fail "control-contended healing mutated or retired the queued body"
+  cmp -s "$case_dir/meta-before" "$home/state/$id.meta" \
+    || fail "control-contended healing changed its worker record"
+  assert_absent "$case_dir/tasks-mutation-attempted" \
+    "control-contended healing attempted a tasks mutation"
+  assert_present "$lock" "control-contended healing removed foreign custody"
+  fm_lock_release "$lock"
+  out=$(run_bootstrap "$case_dir") || fail "healing failed after control release: $out"
+  stored=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")") \
+    || fail "released healing lost the row"
+  assert_contains "$stored" 'state: in_flight' "released healing did not start the queued worker row"
+  assert_contains "$stored" 'Historical captain disposition: dropped' "released healing did not retire disposition"
+  assert_contains "$stored" 'Historical deliverable of the finished work: dropped' "released healing did not retire deliverable"
+  assert_contains "$stored" 'Body café 航海' "released healing changed unrelated body bytes"
+  cmp -s "$case_dir/captain-before" "$home/data/$id/captain-drop.md" \
+    || fail "healing changed retained captain words"
+  assert_present "$home/state/$id.meta" "released healing removed the worker record"
+  assert_present "$case_dir/tasks-mutation-attempted" "released healing bypassed the mutation observer"
+  pass "bootstrap skips control-held queued workers and heals their historical provenance after release"
+)
+
+if [ "$#" -gt 0 ]; then
+  for test_name in "$@"; do
+    case "$test_name" in
+      test_*) declare -F "$test_name" >/dev/null || fail "unknown test: $test_name" ;;
+      *) fail "expected a test function name: $test_name" ;;
+    esac
+    "$test_name" || exit $?
+  done
+  exit 0
+fi
+
+test_spawn_retires_queued_and_inflight_drop_provenance
 test_backend_resolution_preserves_config_errors
 test_backend_resolution_preserves_precedence_and_defaults
 test_backlog_callers_refuse_unreadable_backend_config
 test_captain_hold_preserves_relocated_backlog_on_backend_error
 test_dispatch_moves_the_item_in_flight_in_the_same_run
+test_dispatch_retires_drop_only_after_commit
+test_failed_restart_preserves_uncertain_drop_provenance || exit $?
+test_fresh_spawn_respects_task_control_custody || exit $?
+test_bootstrap_healing_respects_task_control_custody || exit $?
 test_dispatch_omits_the_file_for_a_beads_show
 test_a_leftover_markdown_symlink_does_not_brick_a_beads_home
 test_completion_omits_the_file_for_a_beads_done

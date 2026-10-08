@@ -30,14 +30,13 @@
 # lift the deferral (it authorizes discarding unlanded WORK, never the
 # captain's question), and bin/fm-captain-hold.sh answer stays the only act
 # that closes the call.
-# REFUSES if the worktree holds work that has not LANDED, because cleanup
-# hard-resets/removes the worktree and kills its processes. Work has landed when it is
-# reachable from any remote-tracking branch (a fork counts as a remote, so
-# upstream-contribution PRs pushed to a fork satisfy this in any mode), OR - for a
-# normal ship task whose commits are not so reachable - when its PR is merged and
+# REFUSES if a ship's deliverable has not LANDED, because cleanup
+# hard-resets/removes the worktree and kills its processes.
+# A pushed branch is recoverable work, not a delivered result.
+# A ship has landed only when its PR is merged and
 # GitHub reports a PR head that contains the current local work, or its content is
-# already present in the up-to-date default branch. This recognizes the common
-# squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
+# already present in the up-to-date default branch.
+# This recognizes the common squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
 # on a remote yet the change is fully in main.
 # Squash merges collapse the branch's commits, so per-commit patch ids against main
 # no longer match, and a pipeline rebase can leave the local worktree diverged from
@@ -55,13 +54,15 @@
 # A gh lookup error falls back to the content check; if that is also inconclusive,
 # teardown refuses rather than risk discarding unlanded work.
 # Uncommitted changes are never landed.
-# local-only projects additionally accept work merged into the local default
-# branch (firstmate performs that merge after configured approval) as a fallback
-# for the common case where there is no remote at all.
+# local-only projects additionally accept a clean existing copy whose HEAD is
+# contained in refs/heads/<default>, regardless of remote reachability.
+# An absent recorded copy or one that is not a Git worktree completes only
+# when its recorded GitHub PR is confirmed merged by the forge, or through
+# captain-authorized forced discard below; otherwise the backlog stays open.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
-# declared scratch and the report at data/<task-id>/report.md is the work
-# product. Teardown proceeds only once the report exists and the shared
-# unresolved-decision completion gate verifies its captain-held inventory.
+# declared scratch and the regular, nonsymlink, nonempty report at
+# data/<task-id>/report.md is the work product. Non-forced teardown also requires
+# the shared unresolved-decision completion gate to verify its captain-held inventory.
 # Before destructive cleanup, teardown validates task check artifacts as
 # ordinary single-link files on the state device. It refuses and preserves
 # task state when that proof fails; otherwise it removes the task's check,
@@ -97,15 +98,7 @@
 # slot is taken and dropped here once it is genuinely returned; bin/fm-wake-lib.sh
 # owns the claim, its location, and its states. A claim naming another task is
 # proof of reassignment: the slot is no longer this task's, so teardown warns,
-# names the claimant, and then finishes only this task's own cleanup - endpoint,
-# status, records, checks, backlog - while every step that would read or touch
-# that slot is skipped: no process kill under it, no dirty or landed-work
-# inspection of it, no branch or hook removal in it, no Treehouse return, and
-# never the other task's claim. Skipping the inspection discards nothing of this
-# task's: whatever unlanded work it had in that slot was already destroyed when
-# the pool handed the slot on. Refusing instead would strand the record, because
-# bin/fm-backend.sh's endpoint validation refuses an empty or missing worktree=
-# unconditionally, so there is no line an operator could clear to get past it.
+# names the claimant, and then finishes only this task's own endpoint and records.
 # A claim that cannot be read proves nothing either way and refuses; inspect or
 # repair the claim file at the printed path and re-run - never remove it, since
 # an absent claim proceeds and would return a slot that may be another task's. An
@@ -132,8 +125,6 @@
 # These refusals are not relaxed by --force: --force authorizes discarding THIS
 # task's unlanded work, never another task's live work. Nothing of this task's
 # own is removed by a refusal; reconcile whichever record is wrong and re-run.
-# Orca is not a pool slot and proves its path through
-# require_orca_worktree_path_match instead.
 # Orca tasks use the same safety checks, then close the recorded terminal and
 # remove the recorded worktree through `orca worktree rm`; teardown never guesses
 # an Orca target from ambient CLI state.
@@ -162,17 +153,22 @@
 # leased home releases its durable treehouse lease so the pool slot is freed,
 # never left leased forever. If the treehouse return fails, teardown leaves the
 # leased home and state in place instead of hiding a still-held lease.
-# Usage: fm-teardown.sh <task-id> [--force] [--legacy-record]
+# Usage: fm-teardown.sh <task-id> [--force [--drop-file <path>]] [--legacy-record]
 #   --force skips ordinary-task dirty and landed-work checks, skips scout report
 #   checks, and discards secondmate child work for kind=secondmate. Only use it
-#   when the captain has explicitly said to discard the work.
+#   when the captain has explicitly said to discard the work. Ordinary work
+#   additionally requires --drop-file satisfying the words-file contract in
+#   bin/fm-tasks-axi.sh's header: the exact words are retained before discard.
+#   A forced ship records the fixed note "dropped" without a landing probe.
+#   A forced scout with a regular, nonsymlink, nonempty report keeps report
+#   completion instead; either retains the captain's exact words.
 #   --legacy-record accepts a task record that predates the spawn_gen field:
 #   teardown then proceeds only when the recorded endpoint is confirmed dead or
 #   agent-less (bin/fm-backend.sh's recovery-grade classifier), and without
 #   --force the worktree still passes the ordinary landed-work checks. The
 #   accepted legacy incarnation is stamped into the record before its close is
 #   recorded and named in the teardown line; the flag never relaxes the
-#   unlanded-work refusal, which --force alone can authorize. A legacy- stamp
+#   unlanded-work refusal, which requires authorized forced discard to bypass. A legacy- stamp
 #   an abandoned attempt left behind never counts as a published incarnation:
 #   the record still reads as a legacy record, so a recorded endpoint runs the
 #   endpoint gate again and the retry still needs --legacy-record. The safe
@@ -188,8 +184,8 @@
 #   endpoint validator as if it named the task's own window) is accepted as a
 #   missing-endpoint legacy record with or without --legacy-record; the shared
 #   endpoint validator is skipped so it cannot be read as the current window,
-#   kill is skipped, and a still-present worktree still faces the ordinary
-#   landed-work checks. Every other windowless record, including one with a
+#   kill is skipped, and ship completion still faces the ordinary landed-work
+#   or missing-copy admission above. Every other windowless record, including one with a
 #   spawn_gen, a non-tmux backend, or an ambiguous field, still faces the
 #   validator and refuses.
 #
@@ -384,10 +380,16 @@ fi
 ID=$1
 FORCE=
 LEGACY_RECORD_GIVEN=0
+DROP_FILE=
 shift
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --force) FORCE=--force ;;
+    --drop-file)
+      shift
+      DROP_FILE=${1:-}
+      [ -n "$DROP_FILE" ] || { echo "error: --drop-file requires a path" >&2; exit 2; }
+      ;;
     --legacy-record) LEGACY_RECORD_GIVEN=1 ;;
     *)
       echo "error: invalid teardown request" >&2
@@ -522,6 +524,15 @@ fm_backlog_record_present "$META" "task record" "$STATE" || {
 }
 TEARDOWN_META_KIND=$(fm_meta_get "$META" kind)
 [ -n "$TEARDOWN_META_KIND" ] || TEARDOWN_META_KIND=ship
+if [ "$FORCE" = --force ] && { [ "$TEARDOWN_META_KIND" != secondmate ] || [ -n "$DROP_FILE" ]; }; then
+  if ! fm_backlog_drop_words_file_valid "$DROP_FILE"; then
+    echo "REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes)." >&2
+    exit 1
+  fi
+elif [ -n "$DROP_FILE" ]; then
+  echo "error: --drop-file is only valid with --force" >&2
+  exit 2
+fi
 # Retiring a persistent secondmate is main's alone in both postures; the kind
 # is read under the metadata lock (role partition: bin/fm-lease-lib.sh).
 [ "$TEARDOWN_META_KIND" != secondmate ] || fm_lease_forbid_branch "secondmate retirement (fm-teardown)"
@@ -1144,7 +1155,6 @@ if [ -z "$BUSY_GEN" ]; then
   BUSY_GEN=$(cat "$STATE/$ID.busy-gen" 2>/dev/null || true)
 fi
 ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
-ORCA_PATH_MATCH_VERIFIED=0
 CLEANUP_RECOVERY=$TEARDOWN_CLEANUP_RECOVERY
 
 KIND=$TEARDOWN_META_KIND
@@ -1541,6 +1551,7 @@ EOF
 # occurs - the caller then falls back to the content check.
 pr_is_merged() {
   local branch=$1 target view state remainder head resolved_url current landed=0
+  [ -d "$WT" ] || return 1
   if [ -n "$PR_URL" ]; then
     target=$PR_URL
   else
@@ -1583,6 +1594,7 @@ pr_is_merged() {
 # so the caller refuses rather than guesses.
 content_in_default() {
   local name ref default_tree merged_tree
+  [ -d "$WT" ] || return 1
   name=$(default_branch) || return 1
   if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
     git -C "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
@@ -1599,31 +1611,51 @@ content_in_default() {
   [ "$merged_tree" = "$default_tree" ]
 }
 
-# Has the worktree's committed work actually LANDED, though its commits are not
-# reachable from any remote-tracking branch? True when a merged PR proves the
-# current local work is contained in the PR head, OR the content is already in the
-# default branch (fallback, which also covers the no-PR and gh-error paths). False
-# only for genuinely unlanded work.
+# A pushed branch proves recoverability, not delivery: require the landing
+# proofs documented in this script's header even when every commit is pushed.
 work_is_landed() {
   local branch=$1
+  if [ "$MODE" = local-only ]; then
+    local name
+    name=$(default_branch) || name=
+    if [ -n "$name" ] && git -C "$WT" merge-base --is-ancestor HEAD "refs/heads/$name" 2>/dev/null; then
+      return 0
+    fi
+  fi
   pr_is_merged "$branch" && return 0
   content_in_default
+}
+
+TEARDOWN_DROPPING=0
+teardown_is_dropping() {
+  local report="$DATA/$ID/report.md"
+  [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ] || return 1
+  if [ "$KIND" = scout ]; then
+    [ -f "$report" ] && [ ! -L "$report" ] && [ -s "$report" ] && return 1
+    return 0
+  fi
+  return 0
 }
 
 # The completion links this teardown already holds locally. A scout's
 # deliverable is its report, a local-only ship lands on local main, and every
 # other ship carries the PR recorded on its own record.
 BACKLOG_DONE_ARGS=()
+TEARDOWN_RECORDED_PR_ONLY=0
 backlog_done_args() {
   local data_relative
   BACKLOG_DONE_ARGS=()
+  if [ "$TEARDOWN_DROPPING" = 1 ]; then
+    BACKLOG_DONE_ARGS=(--note dropped)
+    return 0
+  fi
   case "$KIND" in
     scout)
       data_relative=$(fm_backlog_data_relative "$DATA") || return 1
       BACKLOG_DONE_ARGS=(--report "$data_relative/$ID/report.md")
       ;;
     *)
-      if [ "$MODE" = local-only ]; then
+      if [ "$MODE" = local-only ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 0 ]; then
         BACKLOG_DONE_ARGS=(--note "local main")
       elif [ -n "$PR_URL" ]; then
         BACKLOG_DONE_ARGS=(--pr "$PR_URL")
@@ -1697,16 +1729,6 @@ worktree_registered_for_project() {
 $listed
 EOF
   return 1
-}
-
-inspectable_git_worktree() {
-  local target=$1 top
-  [ -n "$target" ] || return 1
-  [ -d "$target" ] || return 1
-  top=$(git -C "$target" rev-parse --show-toplevel 2>/dev/null) || return 1
-  [ -n "$top" ] || return 1
-  [ -d "$top" ] || return 1
-  git -C "$top" rev-parse --git-dir >/dev/null 2>&1
 }
 
 canonical_existing_dir() {
@@ -1874,12 +1896,22 @@ teardown_treehouse_return() {
 }
 
 validate_worktree_teardown_safety() {
-  local dirty_raw dirty unpushed_raw unpushed DEFAULT unmerged_raw unmerged branch
-  [ -d "$WT" ] || return 0
+  local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
     secondmate|scout) return 0 ;;
   esac
+  if [ ! -d "$WT" ] || [ "$(git -C "$WT" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
+    if [[ "$PR_URL" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
+        && recorded_pr_state=$(gh pr view "$PR_URL" --json state -q '.state' 2>/dev/null) \
+        && [ "$recorded_pr_state" = MERGED ]; then
+      TEARDOWN_RECORDED_PR_ONLY=1
+      return 0
+    fi
+    echo "REFUSED: task $ID has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge." >&2
+    echo "Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+    return 1
+  fi
 
   if ! dirty_raw=$(git -C "$WT" status --porcelain 2>/dev/null); then
     if worktree_safety_blocked_by_lock "uncommitted changes"; then
@@ -1901,39 +1933,25 @@ validate_worktree_teardown_safety() {
   fi
   unpushed=$(printf '%s\n' "$unpushed_raw" | head -5)
 
-  if [ -n "$unpushed" ] && [ "$MODE" = local-only ]; then
-    DEFAULT=$(default_branch) || { echo "REFUSED: cannot determine default branch for $PROJ; expected origin/HEAD, main, or master." >&2; return 1; }
-    if ! unmerged_raw=$(git -C "$WT" log --oneline HEAD --not "$DEFAULT" -- 2>/dev/null); then
-      if worktree_safety_blocked_by_lock "commits not on $DEFAULT"; then
-        return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
-      fi
-      echo "REFUSED: cannot inspect worktree $WT for commits not on $DEFAULT." >&2
-      echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
-      return 1
-    fi
-    unmerged=$(printf '%s\n' "$unmerged_raw" | head -5)
-    if [ -n "$dirty" ] || [ -n "$unmerged" ]; then
-      echo "REFUSED: local-only worktree $WT has work not yet merged into $DEFAULT and not on any remote." >&2
-      [ -n "$dirty" ] && echo "uncommitted changes present" >&2
-      [ -n "$unmerged" ] && printf 'commits not yet on %s:\n%s\n' "$DEFAULT" "$unmerged" >&2
-      echo "Merge the branch into local $DEFAULT first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force." >&2
-      return 1
-    fi
-  elif [ -n "$dirty" ]; then
+  if [ -n "$dirty" ]; then
     echo "REFUSED: worktree $WT has uncommitted changes." >&2
     echo "uncommitted changes present" >&2
     echo "Commit them (or get the captain's explicit OK to discard, then --force)." >&2
     return 1
-  elif [ -n "$unpushed" ]; then
+  else
     branch=${TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY:-}
     if [ -z "$branch" ]; then
       branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
       TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=$branch
     fi
     if ! work_is_landed "$branch"; then
-      echo "REFUSED: worktree $WT has work not on any remote and not landed." >&2
-      printf 'unpushed commits:\n%s\n' "$unpushed" >&2
-      echo "Push the branch, land its PR, or get the captain's explicit OK to discard, then --force." >&2
+      echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
+      [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
+      if [ "$MODE" = local-only ]; then
+        echo "Merge the branch into local $(default_branch 2>/dev/null || echo main) first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+      else
+        echo "Land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+      fi
       return 1
     fi
   fi
@@ -2401,32 +2419,6 @@ EOF
   return 1
 }
 
-require_orca_worktree_path_match() {
-  local worktree_id=$1 inspected=$2 resolved inspected_abs resolved_abs
-  resolved=$(fm_backend_worktree_path orca "$worktree_id") || {
-    echo "REFUSED: cannot resolve Orca worktree id $worktree_id to a path; preserving metadata." >&2
-    return 1
-  }
-  inspected_abs=$(canonical_existing_dir "$inspected") || {
-    echo "REFUSED: cannot canonicalize inspected worktree ${inspected:-<missing>}; preserving metadata." >&2
-    return 1
-  }
-  resolved_abs=$(canonical_existing_dir "$resolved") || {
-    echo "REFUSED: Orca worktree id $worktree_id resolved to uninspectable path ${resolved:-<missing>}; preserving metadata." >&2
-    return 1
-  }
-  if [ "$resolved_abs" != "$inspected_abs" ]; then
-    echo "REFUSED: Orca worktree id $worktree_id resolves to $resolved_abs, not inspected worktree $inspected_abs." >&2
-    echo "Cannot verify dirty or unlanded work for the worktree Orca would remove; preserving metadata." >&2
-    return 1
-  fi
-}
-
-require_orca_worktree_path_match_if_present() {
-  local worktree_id=$1 inspected=$2
-  [ -n "$inspected" ] && [ -e "$inspected" ] || return 0
-  require_orca_worktree_path_match "$worktree_id" "$inspected"
-}
 
 # The task's own live slot, canonicalized, or empty when this record has no slot
 # to release (a secondmate home, a record with no worktree=, or a path that is
@@ -2558,9 +2550,6 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree>
   return 1
 }
 
-# The one ownership determination for this task's recorded slot. Every later
-# step that would read or touch $WT consults teardown_owns_worktree, so a
-# reassigned slot is skipped consistently rather than by each step's own guess.
 TEARDOWN_SLOT_REASSIGNED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
 TEARDOWN_SLOT_REASSIGNED_HOME=
@@ -3115,7 +3104,7 @@ preflight_descendant_treehouse_slots() {
 }
 
 validate_firstmate_home_children_removal() {
-  local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend child_orca_worktree_id
+  local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -3134,11 +3123,10 @@ validate_firstmate_home_children_removal() {
       validate_firstmate_home_for_removal "$child_home" "child firstmate home" "$child_id" >/dev/null || return 1
       validate_firstmate_home_children_removal "$child_home" || return 1
     elif [ "$child_backend" = orca ]; then
-      child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
+      require_orca_worktree_id "$child_meta" >/dev/null || return 1
       if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         child_proj=$(meta_value "$child_meta" project)
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
-        require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" || return 1
       fi
     elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
       child_proj=$(meta_value "$child_meta" project)
@@ -3458,8 +3446,8 @@ cleanup_firstmate_home_children() {
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
+        fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
       fi
-      fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       # The same ownership determination as the parent's own slot: a child
       # slot reassigned to another task is not this child's to kill, reset,
@@ -3584,7 +3572,7 @@ fi
 
 if [ "$KIND" = scout ] && [ "$FORCE" != "--force" ]; then
   REPORT="$DATA/$ID/report.md"
-  if [ ! -f "$REPORT" ]; then
+  if [ ! -f "$REPORT" ] || [ -L "$REPORT" ] || [ ! -s "$REPORT" ]; then
     echo "REFUSED: scout task $ID has no report at $REPORT." >&2
     echo "The report is the work product. Have the crewmate write it, or use --force after explicit discard approval." >&2
     exit 1
@@ -3635,17 +3623,7 @@ if [ -n "$X_REQUEST" ]; then
   echo "warning: task $ID still carries an unreconciled Relay request link ($X_REQUEST) on its task record." >&2
 fi
 
-if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$FORCE" != "--force" ]; then
-  if ! inspectable_git_worktree "$WT"; then
-    echo "REFUSED: Orca ship task $ID has no inspectable git worktree at ${WT:-<missing>}." >&2
-    echo "Cannot verify dirty or unlanded work; restore the worktree path or get explicit OK to discard, then --force." >&2
-    exit 1
-  fi
-  require_orca_worktree_path_match "$ORCA_WORKTREE_ID" "$WT" || exit 1
-  ORCA_PATH_MATCH_VERIFIED=1
-fi
-
-if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
+if [ "$FORCE" != "--force" ]; then
   if validate_worktree_teardown_safety; then
     :
   else
@@ -3671,6 +3649,16 @@ teardown_release_herdr_locks
 # Prepare the non-authoritative close record and retire any previous marker
 # outside presentation custody. The EXIT trap retires this stage on refusal;
 # the legacy stamp and authoritative publication wait for exact reacquisition.
+if teardown_is_dropping; then
+  TEARDOWN_DROPPING=1
+fi
+if [ "$FORCE" = "--force" ] && [ -n "$DROP_FILE" ] && [ "$KIND" != secondmate ]; then
+  fm_backlog_drop_record "$DATA" "$ID" "$DROP_FILE" || {
+    echo "REFUSED: cannot retain the captain's words for $ID; nothing was discarded." >&2
+    exit 1
+  }
+fi
+
 BACKLOG_CLOSED=0
 BACKLOG_TRANSITION=$TEARDOWN_BACKLOG_TRANSITION
 BACKLOG_TRANSITION_FLAGS=()
@@ -3857,11 +3845,7 @@ teardown_release_herdr_locks
 
 # Best-effort: drop the local task branch so the shared repo does not accumulate refs.
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
-  if [ "$ORCA_PATH_MATCH_VERIFIED" != 1 ]; then
-    require_orca_worktree_path_match_if_present "$ORCA_WORKTREE_ID" "$WT" || exit 1
-    ORCA_PATH_MATCH_VERIFIED=1
-  fi
-  if [ -d "$WT" ]; then
+  if teardown_owns_worktree && [ -d "$WT" ]; then
     branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
     if [ "$branch" != "HEAD" ]; then
       if git -C "$WT" checkout --detach -q 2>/dev/null; then
@@ -3876,7 +3860,9 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
     fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
       || { endpoint_close_refusal "$ID" "$BACKEND" "$T" 0; exit 1; }
   fi
-  fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
+  if teardown_owns_worktree && [ -d "$WT" ]; then
+    fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
+  fi
 elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
   :
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then

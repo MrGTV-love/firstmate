@@ -183,7 +183,7 @@ fm_test_track_watcher_state() {  # <state-dir>
 }
 
 fm_test_reap_watchers() {
-  local state lock_home seen=$'\n'
+  local state lock_home lock_pid seen=$'\n'
   [ -f "$FM_TEST_WATCHER_REGISTRY" ] || return 0
   while IFS= read -r state; do
     [ -n "$state" ] || continue
@@ -197,19 +197,91 @@ fm_test_reap_watchers() {
     [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" != "$$" ] || continue
     lock_home=$(cat "$state/.watch.lock/fm-home" 2>/dev/null || true)
     [ -n "$lock_home" ] || continue
+    lock_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+    case "$lock_pid" in
+      '' | *[!0-9]*) ;;
+      *)
+        if FM_HOME="$lock_home" FM_STATE_OVERRIDE="$state" bash -c \
+          '. "$1"; fm_watcher_lock_matches_pid "$2" "$3" "$4" "$5"' \
+          _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$ROOT/bin/fm-watch.sh" "$lock_pid" "$lock_home"; then
+          kill -CONT "$lock_pid" 2>/dev/null || true
+        fi
+        ;;
+    esac
     FM_HOME="$lock_home" FM_STATE_OVERRIDE="$state" \
       "$ROOT/bin/fm-watch-arm.sh" --stop >/dev/null 2>&1 || true
   done < "$FM_TEST_WATCHER_REGISTRY"
   rm -f "$FM_TEST_WATCHER_REGISTRY"
 }
 
-# Ceiling on how long a fixture's blocking stub may keep polling. A stub that
-# waits for a trigger file by re-running `sleep` is a high-frequency source of
-# process spawns, and one that outlives its test - because the test was killed
-# before any cleanup ran - is what turned leftover fixtures into a host-wide
-# process storm. Every blocking stub this suite writes stops itself at this
-# bound, so an escaped one is bounded in duration and cost on its own, before
-# its owner's guard reaps it.
+# --- stub process reaping ---------------------------------------------------
+#
+# Removing a temp root does not terminate a blocking process. Register fixtures
+# outside the test shell's job table with fm_test_track_process, and publish
+# their PID and start time with fm_test_record_process before blocking.
+# Reaping requires that birth identity and the registered command needle to
+# match, so a reused PID cannot authorize killing an unrelated process.
+
+FM_TEST_PROCESS_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-process.$$.XXXXXX") || return 1
+
+fm_test_track_process() {  # <pidfile> <command-needle>
+  [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
+  printf '%s\t%s\n' "$1" "$2" >> "$FM_TEST_PROCESS_REGISTRY"
+}
+
+fm_test_process_start() {
+  local pid=$1 ps_bin=/bin/ps start
+  case "$pid" in '' | *[!0-9]*) return 1 ;; esac
+  [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
+  start=$(LC_ALL=C "$ps_bin" -o lstart= -p "$pid" 2>/dev/null) || return 1
+  [ -n "$start" ] || return 1
+  printf '%s\n' "$start"
+}
+
+fm_test_record_process() {
+  local pid=${2:-$$} start
+  start=$(fm_test_process_start "$pid") || return 1
+  printf '%s\t%s\n' "$pid" "$start" > "$1"
+}
+
+export -f fm_test_process_start fm_test_record_process
+
+fm_test_process_alive() {  # <pidfile> <command-needle>
+  local pid start live_start command ps_bin=/bin/ps
+  FM_TEST_PROCESS_PID=
+  IFS=$'\t' read -r pid start 2>/dev/null < "$1" || return 1
+  case "$pid" in '' | *[!0-9]*) return 1 ;; esac
+  [ -n "$start" ] || return 1
+  live_start=$(fm_test_process_start "$pid") || return 1
+  [ "$live_start" = "$start" ] || return 1
+  [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
+  command=$("$ps_bin" -o command= -p "$pid" 2>/dev/null) || return 1
+  case "$command" in *"$2"*) FM_TEST_PROCESS_PID=$pid; return 0 ;; esac
+  return 1
+}
+
+fm_test_reap_processes() {
+  local pidfile needle pid pgid
+  [ -f "$FM_TEST_PROCESS_REGISTRY" ] || return 0
+  while IFS=$'\t' read -r pidfile needle; do
+    fm_test_process_alive "$pidfile" "$needle" || continue
+    pid=$FM_TEST_PROCESS_PID
+    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+    # Only a group the stub leads is its own to take down; a stub that shares
+    # the test's group is signalled alone.
+    if [ -n "$pgid" ] && [ "$pgid" = "$pid" ]; then
+      kill -KILL -- "-$pgid" 2>/dev/null || true
+    fi
+    kill -KILL "$pid" 2>/dev/null || true
+  done < "$FM_TEST_PROCESS_REGISTRY"
+  rm -f "$FM_TEST_PROCESS_REGISTRY"
+}
+
+# Default ceiling for blocking fixtures that use this exported setting.
+# Polling stubs must sleep between probes and stop themselves at a finite bound:
+# SIGKILL can bypass the test's traps, and removing a fixture root cannot stop
+# its processes. Choose a ceiling longer than the deadline under test, so the
+# stub's natural exit cannot masquerade as successful timeout enforcement.
 FM_TEST_STUB_MAX_BLOCK_SECONDS=${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}
 export FM_TEST_STUB_MAX_BLOCK_SECONDS
 
@@ -223,9 +295,27 @@ fm_test_remove_tree() {
   rm -rf "$dir"
 }
 
+# A fixture started with `cmd &` in the test shell and killed inline after its
+# assertions is left running when an assertion fails or the run is interrupted,
+# because `fail` only exits. Cleanup takes down the shell's own background jobs
+# and their direct children (a `bash -c '... sleep N'` job leaves the sleep).
+# This cannot cover a SIGKILLed test, so a stub that waits still bounds itself.
+fm_test_reap_jobs() {
+  local pid
+  for pid in $(jobs -p 2>/dev/null); do
+    kill -CONT "$pid" 2>/dev/null || true
+    pkill -KILL -P "$pid" 2>/dev/null || true
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+}
+
 fm_test_cleanup() {
   local d
+  # Stop watchers gracefully before forced job reaping: watcher_cleanup owns
+  # check groups that are outside the test shell's job tree.
   fm_test_reap_watchers
+  fm_test_reap_jobs
+  fm_test_reap_processes
   fm_test_reap_procevent_homes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
     [ -n "$d" ] && fm_test_remove_tree "$d"
@@ -251,6 +341,20 @@ fm_test_tmproot() {
   fi
   printf '%s\n' "$root"
 }
+
+# Ordinary-work teardown --force needs the captain's own words. One fixture words file serves every
+# case; it is created here, in the sourcing shell, so command substitutions reuse it.
+fm_test_drop_file() {
+  if [ ! -f "${FM_TEST_DROP_WORDS:-}" ]; then
+    FM_TEST_DROP_WORDS=$(fm_test_tmproot fm-drop-words)/captain-words.txt
+    printf 'Fixture: the captain approved discarding this work.\n' > "$FM_TEST_DROP_WORDS"
+    export FM_TEST_DROP_WORDS
+  fi
+  printf '%s\n' "$FM_TEST_DROP_WORDS"
+}
+fm_test_drop_file >/dev/null
+
+export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
 
 trap fm_test_cleanup EXIT
 trap 'fm_test_cleanup; exit 130' INT

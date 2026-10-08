@@ -370,6 +370,18 @@ fleet_sync() {
   rm -f "$tmp"
 }
 
+# Focused config push reports successful enqueues; bootstrap reports only
+# actionable reread diagnostics, including partial-batch delivery failures.
+print_config_reread_diagnostics() {
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      ''|'  config-reread: sent') ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done <<< "$1"
+}
+
 secondmate_sync() {
   # shellcheck source=bin/fm-wake-lib.sh disable=SC1091
   . "$SCRIPT_DIR/fm-wake-lib.sh"
@@ -559,7 +571,8 @@ secondmate_sync() {
     esac
     if [ "$reread_skip_pending" -eq 0 ] \
       && fm_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
-      fm_config_reread_retry_pending "$id" "$home_real" || true
+      reread_out=$(fm_config_reread_retry_pending "$id" "$home_real" 2>&1) || true
+      print_config_reread_diagnostics "$reread_out"
       if fm_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
         echo "CONFIG_REREAD: secondmate $id: send failed: retry instruction queue is full"
         fm_lock_release "$home_lock" || true
@@ -582,12 +595,12 @@ secondmate_sync() {
       FM_CONFIG_REREAD_SKIP_PENDING="$reread_skip_pending" \
       fm_config_send_reread_nudge "$id" "$home_real" "$report" 2>&1); then
       if [ -n "$reread_out" ]; then
-        printf '%s\n' "$reread_out"
+        print_config_reread_diagnostics "$reread_out"
       else
         echo "CONFIG_REREAD: secondmate $id: send failed: unknown error"
       fi
     elif [ -n "$reread_out" ]; then
-      printf '%s\n' "$reread_out"
+      print_config_reread_diagnostics "$reread_out"
     fi
     rm -f "$report"
     fm_lock_release "$home_lock" || true
@@ -1270,15 +1283,22 @@ backlog_record_reconcile() {
       return 2
     fi
     id=$(basename "$meta" .meta)
+    control_lock="$STATE/.control-$id.lock"
     meta_lock=$(fm_meta_lock_path "$meta") || continue
-    fm_lock_try_acquire "$meta_lock" || continue
+    fm_lock_try_acquire "$control_lock" || continue
+    if ! fm_lock_try_acquire "$meta_lock"; then
+      fm_lock_release "$control_lock"
+      continue
+    fi
     if [ -e "$STATE/$id.backlog-close" ] || [ -L "$STATE/$id.backlog-close" ]; then
       fm_lock_release "$meta_lock"
+      fm_lock_release "$control_lock"
       continue
     fi
     if ! fm_backlog_record_present "$meta" "task record" "$STATE"; then
       echo "BACKLOG_RECONCILE: $id: post-lock worker record check refused: $FM_BACKLOG_TRANSITION_ERROR"
       fm_lock_release "$meta_lock"
+      fm_lock_release "$control_lock"
       return 2
     fi
     if [ "$(fm_meta_get "$meta" kind)" != secondmate ] \
@@ -1301,6 +1321,7 @@ backlog_record_reconcile() {
       fi
     fi
     fm_lock_release "$meta_lock"
+    fm_lock_release "$control_lock"
   done
 }
 

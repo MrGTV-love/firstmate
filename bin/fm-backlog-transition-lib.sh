@@ -112,6 +112,25 @@ fm_backlog_control_bytes_valid() {  # <allow-newline: 0|1> <od-bytes>
   '
 }
 
+# A captain's drop is a completion deliverable, like a scout report: the exact
+# words are retained at data/<id>/captain-drop.md and the row records only the
+# fixed note "dropped". The words must exist before any state is discarded.
+fm_backlog_drop_words_file_valid() {  # <path>
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  perl -0777 -e 'my $s = <>; exit(defined($s) && length($s) <= 8192 && $s =~ /\S/ && index($s, "\0") == -1 ? 0 : 1)' < "$1"
+}
+
+fm_backlog_drop_record() {  # <data> <id> <words-file>
+  local dir="$1/$2" target="$1/$2/captain-drop.md" tmp
+  case "$2" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  fm_backlog_drop_words_file_valid "$3" || return 1
+  [ ! -L "$dir" ] && [ ! -L "$target" ] && { [ ! -e "$target" ] || [ -f "$target" ]; } || return 1
+  (umask 077; mkdir -p "$dir") || return 1
+  tmp=$(umask 077; mktemp "$dir/.captain-drop.XXXXXXXX") || return 1
+  cp -- "$3" "$tmp" && mv -f -- "$tmp" "$target" && [ -f "$target" ] && [ ! -L "$target" ] \
+    || { rm -f -- "$tmp"; return 1; }
+}
+
 fm_backlog_directory_present() {
   local path=$1 label=$2 check=$1
   while [ "$check" != / ] && [ "${check%/}" != "$check" ]; do
@@ -435,6 +454,7 @@ fm_backlog_row_probe() {  # <data-dir> <id>
   FM_BACKLOG_ROW_RESULT=error
   FM_BACKLOG_ROW_STATE=
   FM_BACKLOG_ROW_HOLD_KIND=
+  FM_BACKLOG_ROW_KIND=
   FM_BACKLOG_ROW_ERROR=
   fm_backlog_source_present "$data" "$authorized_data"
   source_status=$?
@@ -464,6 +484,7 @@ fm_backlog_row_probe() {  # <data-dir> <id>
   held=$(printf '%s\n' "$out" | sed -n 's/^  held: *//p' | head -1)
   blocked=$(printf '%s\n' "$out" | sed -n 's/^  blocked: *//p' | head -1)
   hold_kind=$(printf '%s\n' "$out" | sed -n 's/^  hold_kind: *//p' | head -1)
+  FM_BACKLOG_ROW_KIND=$(printf '%s\n' "$out" | sed -n 's/^  kind: *//p' | head -1 | tr -d '"')
   if [ -z "$state" ]; then
     FM_BACKLOG_ROW_ERROR="tasks-axi show $id returned no state"
     return 1
@@ -513,8 +534,89 @@ fm_backlog_mutate() {  # <data-dir> <verb> <id> [flag...]
   return "$command_status"
 }
 
+fm_backlog_new_work_transition() {
+  local data=$1 id=$2 target_state=$3 out status tmp saved_error prior_row prior_state
+  shift 3
+  FM_BACKLOG_TRANSITION_ERROR=
+  out=$(fm_backlog_row_show "$data" "$id" --full)
+  status=$?
+  [ "$status" -ne 124 ] || FM_BACKLOG_ROW_SHOW_WEDGED=1
+  if [ "$status" -ne 0 ]; then
+    FM_BACKLOG_TRANSITION_ERROR=${out%%$'\n'*}
+    return "$status"
+  fi
+  prior_row=$(printf '%s\n' "$out" | awk '
+    /^  state: / { state=$2 }
+    /^  held: / { held=$2 }
+    /^  blocked: / { blocked=$2 }
+    /^  hold_kind: / { kind=$2 }
+    END {
+      if (kind == "-" || kind == "\"-\"") kind=""
+      printf "%s %s %s %s", state, held ? held : "no", blocked ? blocked : "no", kind
+    }
+  ')
+  prior_state=${prior_row%% *}
+  tmp=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-backlog-new-work.XXXXXX") || {
+    FM_BACKLOG_TRANSITION_ERROR="cannot stage the task body of $id"
+    return 1
+  }
+  if ! printf '%s\n' "$out" | LC_ALL=C perl -MJSON::PP -e '
+    local $/;
+    my $shown = <STDIN>;
+    my $value = $shown =~ /^  body: (.*)$/m ? $1 : "";
+    $value = $value =~ /\A"/
+      ? JSON::PP->new->utf8->allow_nonref->decode($value) : $value;
+    $value = "" if $value eq "-";
+    my $prior_value = $value;
+    utf8::encode($prior_value) if utf8::is_utf8($prior_value);
+    open my $prior, ">:raw", "$ARGV[0]/prior" or die $!;
+    print {$prior} $prior_value;
+    close $prior or die $!;
+    $value =~ s/^([^\S\n]*)dropped([^\S\n]*)$/${1}Historical captain disposition: dropped${2}/mg;
+    $value =~ s/^([^\S\n]*)Deliverable of the finished work: dropped([^\S\n]*)$/${1}Historical deliverable of the finished work: dropped${2}/mg;
+    utf8::encode($value) if utf8::is_utf8($value);
+    open my $next, ">:raw", "$ARGV[0]/next" or die $!;
+    print {$next} $value;
+    close $next or die $!;
+  ' "$tmp"; then
+    rm -rf -- "$tmp"
+    FM_BACKLOG_TRANSITION_ERROR="could not decode the task body of $id"
+    return 1
+  fi
+  if cmp -s "$tmp/prior" "$tmp/next"; then
+    rm -rf -- "$tmp"
+    "$@"
+    return $?
+  fi
+  if ! fm_backlog_mutate "$data" update "$id" --body-file "$tmp/next"; then
+    rm -rf -- "$tmp"
+    return 1
+  fi
+  "$@"
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    saved_error=$FM_BACKLOG_TRANSITION_ERROR
+    if fm_backlog_row_probe "$data" "$id"; then
+      if [ -n "$prior_state" ] && [ "$prior_state" != "$target_state" ] \
+        && [ "$FM_BACKLOG_ROW_STATE $FM_BACKLOG_ROW_HOLD_KIND" = "$prior_row" ]; then
+        if fm_backlog_mutate "$data" update "$id" --body-file "$tmp/prior"; then
+          FM_BACKLOG_TRANSITION_ERROR=$saved_error
+        else
+          FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }could not restore prior drop provenance: $FM_BACKLOG_TRANSITION_ERROR"
+        fi
+      else
+        FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }prior drop provenance was not restored: new work applied or the row changed"
+      fi
+    else
+      FM_BACKLOG_TRANSITION_ERROR="${saved_error:+$saved_error; }prior drop provenance was not restored: restart outcome could not be verified (${FM_BACKLOG_ROW_ERROR:-$FM_BACKLOG_ROW_RESULT})"
+    fi
+  fi
+  rm -rf -- "$tmp"
+  return "$status"
+}
+
 fm_backlog_start() {  # <data-dir> <id>
-  fm_backlog_mutate "$1" start "$2"
+  fm_backlog_new_work_transition "$1" "$2" in_flight fm_backlog_mutate "$1" start "$2"
 }
 
 fm_backlog_done() {  # <data-dir> <id> [flag...]
@@ -831,7 +933,7 @@ fm_backlog_dispatch_transition() {
     return 1
   fi
   case "$row" in
-    in_flight\ no\ no) return 0 ;;
+    in_flight\ no\ no) fm_backlog_new_work_transition "$data" "$id" in_flight : ;;
     queued\ no\ no) fm_backlog_start "$data" "$id" ;;
   esac
 }
@@ -988,7 +1090,7 @@ fm_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
     0) ;;
     2)
       case "${args[0]}" in
-        --note) [ "${args[1]}" = "local%20main" ] ;;
+        --note) [ "${args[1]}" = "local%20main" ] || [ "${args[1]}" = dropped ] ;;
         --pr)
           arg_value=${args[1]}
           [ "${#arg_value}" -le 2048 ] \
@@ -1151,7 +1253,7 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
   mode=$FM_BACKLOG_CLOSE_VALIDATED_MODE
   [ "$mode" = close ] || mode_flags=(--retain)
   args=("${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
-  if [ "${args[0]-}" = --note ]; then
+  if [ "${args[0]-}" = --note ] && [ "${args[1]}" = "local%20main" ]; then
     args[1]="local main"
   fi
   meta="$state/$id.meta"

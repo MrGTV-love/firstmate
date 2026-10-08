@@ -312,7 +312,7 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -368,7 +368,7 @@ family_for_basename() {
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
-    fm-omp-composer-box-live-e2e.test.sh|\
+    fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\
@@ -401,7 +401,7 @@ family_for_basename() {
       ;;
     fm-check-unregister.test.sh|fm-pr-check-security.test.sh|fm-pr-merge.test.sh|\
     fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
-    fm-review-diff.test.sh|fm-teardown.test.sh|fm-x-mode.test.sh)
+    fm-review-diff.test.sh|fm-teardown.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -623,12 +623,20 @@ standalone
 EOF
 }
 
-family_is_concurrent_safe() {
-  local want=$1 line
-  while IFS= read -r line; do
-    [ "$line" = "$want" ] && return 0
-  done < <(list_concurrent_safe_families)
+# Exact whole-line membership of <want> in the newline-separated <list>, with no
+# process substitution. macOS /bin/bash 3.2 loses lines from later reads once one
+# long-lived shell has run enough per-item "while read ... done < <(cmd)" loops
+# (see list_portable_serial), so per-item membership tests must not use them.
+list_has_line() {
+  local want=$1 list=$2
+  case $'\n'"$list"$'\n' in
+    *$'\n'"$want"$'\n'*) return 0 ;;
+  esac
   return 1
+}
+
+family_is_concurrent_safe() {
+  list_has_line "$1" "$(list_concurrent_safe_families)"
 }
 
 concurrent_safe_family_jobs_max() {
@@ -642,22 +650,15 @@ concurrent_safe_family_jobs_max() {
 # A script may run under --jobs when it is individually proven isolated or is
 # an exact repository member of a family carrying a recorded concurrent proof.
 script_allows_concurrency() {
-  local s=$1 family repo_script
+  local s=$1 family
   is_proven_isolated_script "$s" && return 0
   family=$(family_for_basename "$(basename "$s")")
   family_is_concurrent_safe "$family" || return 1
-  while IFS= read -r repo_script; do
-    [ "$repo_script" = "$s" ] && return 0
-  done < <(all_repo_tests)
-  return 1
+  list_has_line "$s" "$(all_repo_tests)"
 }
 
 is_proven_isolated_script() {
-  local want=$1 line
-  while IFS= read -r line; do
-    [ "$line" = "$want" ] && return 0
-  done < <(list_proven_isolated)
-  return 1
+  list_has_line "$1" "$(list_proven_isolated)"
 }
 
 # The portable serial remainder: every tests/*.test.sh that is neither
@@ -666,19 +667,21 @@ is_proven_isolated_script() {
 # and other unproven work stays here. Derived rather than enumerated so a newly added test
 # lands here by default instead of falling out of every lane.
 list_portable_serial() {
-  local s base fam
+  local s base fam proven_set all
+  proven_set=$(list_proven_isolated)
+  all=$(all_repo_tests) || return 1
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    base=$(basename "$s")
+    base=${s##*/}
     fam=$(family_for_basename "$base")
     if [ "$fam" = "real-herdr-gated" ]; then
       continue
     fi
-    if is_proven_isolated_script "$s"; then
+    if list_has_line "$s" "$proven_set"; then
       continue
     fi
-    printf '%s\n' "$s"
-  done < <(all_repo_tests)
+    printf '%s\n' "$s" || return 1
+  done <<<"$all"
 }
 
 # Measured portable-serial script durations in milliseconds, from the CI timing
@@ -777,7 +780,9 @@ tests/fm-nm-test-contract.test.sh 128
 tests/fm-no-mistakes-required.test.sh 247
 tests/fm-omp-harness.test.sh 47734
 tests/fm-omp-primary-live-e2e.test.sh 46
+tests/fm-omp-wake-restore-live-e2e.test.sh 51
 tests/fm-on.test.sh 11001
+tests/fm-open-loops.test.sh 12000
 tests/fm-opencode-primary-live-e2e.test.sh 48
 tests/fm-operational-input.test.sh 221
 tests/fm-peek-remote.test.sh 964
@@ -876,6 +881,7 @@ tests/fm-wake-drain-unread-status.test.sh 16169
 tests/fm-wake-queue.test.sh 85252
 tests/fm-watch-arm.test.sh 68479
 tests/fm-watch-checkpoint.test.sh 6076
+tests/fm-watch-open-loops.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 58946
 tests/fm-watch-triage.test.sh 697969
 tests/fm-watcher-lock.test.sh 108940
@@ -905,49 +911,40 @@ portable_parallel_weight_for() {
 }
 
 portable_serial_weight_for() {
-  local want=$1 path ms
-  while read -r path ms; do
-    if [ "$path" = "$want" ]; then
-      printf '%s\n' "$ms"
-      return 0
-    fi
-  done < <(portable_serial_weight_hints)
-  printf '%s\n' "$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS"
+  local want=$1
+  portable_serial_weight_hints | awk -v want="$want" -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+    $1 == want { print $2; found = 1; exit }
+    END { if (!found) print def }
+  '
 }
 
 # Longest-processing-time assignment of the serial remainder to
 # PORTABLE_SERIAL_SHARDS bins, printing "<shard>\t<script>" for every script.
 # Deterministic: candidates are ordered by hint descending then path, and ties
 # between equally loaded bins always take the lowest bin index.
-portable_serial_assignments() {
-  local ms script i best best_load
-  local -a loads=()
-  i=1
-  while [ "$i" -le "$PORTABLE_SERIAL_SHARDS" ]; do
-    loads[i]=0
-    i=$((i + 1))
-  done
-  while IFS=$'\t' read -r ms script; do
-    [ -n "$script" ] || continue
-    best=1
-    best_load=${loads[1]}
-    i=2
-    while [ "$i" -le "$PORTABLE_SERIAL_SHARDS" ]; do
-      if [ "${loads[i]}" -lt "$best_load" ]; then
-        best_load=${loads[i]}
-        best=$i
-      fi
-      i=$((i + 1))
-    done
-    loads[best]=$((best_load + ms))
-    printf '%s\t%s\n' "$best" "$script"
-  done < <(
-    while IFS= read -r script; do
-      [ -n "$script" ] || continue
-      printf '%s\t%s\n' "$(portable_serial_weight_for "$script")" "$script"
-    done < <(list_portable_serial) | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2
-  )
-}
+portable_serial_assignments() (
+  # Keep pipeline failures visible without changing the caller's shell options.
+  # Bash 3.2 builtin writes to an asynchronous pipe can fail with EINTR; let awk
+  # own assignment output and require the complete producer to succeed.
+  set -o pipefail
+  { portable_serial_weight_hints || return 1; printf '%s\n' '--' || return 1; list_portable_serial; } \
+    | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+        $0 == "--" { scripts = 1; next }
+        !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
+        NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
+      ' \
+    | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2 \
+    | awk -F '\t' -v shards="$PORTABLE_SERIAL_SHARDS" '
+        BEGIN { for (i = 1; i <= shards; i++) loads[i] = 0 }
+        {
+          best = 1
+          for (i = 2; i <= shards; i++)
+            if (loads[i] < loads[best]) best = i
+          loads[best] += $1
+          printf "%s\t%s\n", best, $2
+        }
+      '
+)
 
 # Parse "<k>of<n>" from a portable-serial shard lane and echo <k>, refusing when
 # <n> disagrees with this script's configured count so a CI matrix built for a
@@ -985,7 +982,7 @@ select_proven_isolated() {
 }
 
 select_lane() {
-  local want=$1 s shard idx found=0
+  local want=$1 s shard idx assignments found=0
   case "$want" in
     portable-parallel-1)
       while IFS= read -r s; do
@@ -1011,13 +1008,15 @@ select_lane() {
     portable-serial-*)
       # One separate-runner shard of the same remainder, still serial in itself.
       shard=$(portable_serial_shard_index "$want")
+      assignments=$(portable_serial_assignments) \
+        || die "could not generate complete portable serial shard assignments"
       while IFS=$'\t' read -r idx s; do
         [ -n "$s" ] || continue
         if [ "$idx" = "$shard" ]; then
           add_script "$s"
           found=1
         fi
-      done < <(portable_serial_assignments)
+      done <<<"$assignments"
       ;;
     real-herdr-gated)
       select_family real-herdr-gated
@@ -1250,7 +1249,7 @@ all_repo_tests() {
   # shellcheck disable=SC2035
   for f in tests/*.test.sh; do
     [ -f "$f" ] || continue
-    printf '%s\n' "$f"
+    printf '%s\n' "$f" || return 1
   done | LC_ALL=C sort
 }
 
@@ -1462,6 +1461,10 @@ families_for_changed_path() {
       if [ "$path" = bin/fm-utc-lib.sh ]; then
         printf '%s\n' "__script__:fm-afk-launch.test.sh"
       fi
+      ;;
+    bin/fm-open-loops.sh|bin/fm_open_loops.py)
+      printf '%s\n' "__script__:fm-open-loops.test.sh"
+      printf '%s\n' "__script__:fm-watch-open-loops.test.sh"
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)
@@ -1678,6 +1681,9 @@ families_for_changed_path() {
     bin/fm-bearings-snapshot.sh|bin/fm-fleet-snapshot.sh|bin/fm-fleet-view.sh|bin/fm-contributions.sh|bin/fm-contributions.jq|\
     bin/fm-home-summary-refresh.sh)
       printf '%s\n' snapshot-bearings
+      if [ "$path" = bin/fm-fleet-snapshot.sh ]; then
+        printf '%s\n' __script__:fm-open-loops.test.sh
+      fi
       ;;
     bin/fm-install-herdr.sh|bin/fm-install-treehouse.sh|bin/fm-herdr-ci-cleanup.sh)
       printf '%s\n' pure-contract-unit

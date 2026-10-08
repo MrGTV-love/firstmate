@@ -519,7 +519,7 @@ test_record_changes_refuse_while_a_reader_holds_the_lock() {
     . "$1"
     fm_lock_acquire_wait "$2" || exit 10
     printf "ready\n" > "$3"
-    while [ ! -e "$4" ]; do sleep 0.05; done
+    while [ ! -e "$4" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
     fm_lock_release "$2"
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$home/holder.ready" "$home/release" &
   holder_pid=$!

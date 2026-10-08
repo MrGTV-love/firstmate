@@ -861,16 +861,6 @@ fm_backend_remove_worktree() {  # <backend> <worktree-id>
   esac
 }
 
-fm_backend_worktree_path() {  # <backend> <worktree-id>
-  local backend=$1
-  shift
-  fm_backend_source "$backend" || return 1
-  case "$backend" in
-    orca) fm_backend_orca_worktree_path "$@" ;;
-    *) echo "error: backend '$backend' does not own task worktrees" >&2; return 1 ;;
-  esac
-}
-
 # fm_backend_busy_state: semantic busy/idle/unknown for backends that expose
 # native agent-state (herdr-addendum "busy state" row - the first backend
 # where this gets real semantics beyond pane-regex). Backends with no such

@@ -39,6 +39,11 @@ cleanup() {
     kill "$watch_pid" 2>/dev/null || true
     wait "$watch_pid" 2>/dev/null || true
   fi
+  # The liveness-lock holder is otherwise stopped only by an inline kill.
+  if [ -n "${liveness_holder_pid:-}" ]; then
+    kill "$liveness_holder_pid" 2>/dev/null || true
+    wait "$liveness_holder_pid" 2>/dev/null || true
+  fi
   FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
     "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true
   if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then
@@ -1621,6 +1626,7 @@ assert_grep '- ios ' "$PARENT/data/secondmates.md" "a liveness-busy retirement r
   || fail "a liveness-busy retirement removed or took the episode's lock"
 kill "$liveness_holder_pid" 2>/dev/null || true
 wait "$liveness_holder_pid" 2>/dev/null || true
+liveness_holder_pid=
 handoff_lock="$PARENT/state/.backlog-handoff-ios.lock"
 FM_HOME="$PARENT" /bin/bash -c '
   . "$1"
@@ -1651,17 +1657,33 @@ while [ ! -f "$TMP_ROOT/launch.entered" ]; do
   [ "$launch_wait" -le 1500 ] || fail "remote respawn never reached its blocked launch"
   sleep 0.02
 done
-remote_env "$ROOT/bin/fm-teardown.sh" ios > "$TMP_ROOT/teardown-serialized.out" 2>&1 &
-teardown_pid=$!
-sleep 0.2
-kill -0 "$teardown_pid" 2>/dev/null || fail "remote retirement bypassed an active remote respawn"
+cp "$PARENT/state/ios.meta" "$TMP_ROOT/respawn-blocked.meta"
+cp "$PARENT/data/secondmates.md" "$TMP_ROOT/respawn-blocked.registry"
+if remote_env "$ROOT/bin/fm-teardown.sh" ios > "$TMP_ROOT/teardown-respawn-busy.out" 2>&1; then
+  fail "remote retirement accepted an active remote respawn"
+fi
+assert_grep 'another lifecycle action is already running for task ios' "$TMP_ROOT/teardown-respawn-busy.out" \
+  "remote retirement did not refuse at the respawn lifecycle boundary"
+cmp -s "$TMP_ROOT/respawn-blocked.meta" "$PARENT/state/ios.meta" \
+  || fail "respawn-busy retirement changed the parent metadata"
+cmp -s "$TMP_ROOT/respawn-blocked.registry" "$PARENT/data/secondmates.md" \
+  || fail "respawn-busy retirement changed the registry route"
 assert_present "$REMOTE_HOME" "remote retirement removed the home during an active remote respawn"
 touch "$TMP_ROOT/launch.release"
 if ! wait "$spawn_retirement_pid"; then
   printf 'serialized respawn output:\n%s\n' "$(cat "$TMP_ROOT/spawn-retirement.out")" >&2
   fail "serialized remote respawn failed"
 fi
-sleep 0.2
+remote_env "$ROOT/bin/fm-teardown.sh" ios > "$TMP_ROOT/teardown-serialized.out" 2>&1 &
+teardown_pid=$!
+retirement_wait=0
+while [ ! -f "$PARENT/state/.control-ios.lock/pid" ]; do
+  kill -0 "$teardown_pid" 2>/dev/null \
+    || fail "remote retirement exited before handoff serialization: $(cat "$TMP_ROOT/teardown-serialized.out")"
+  retirement_wait=$((retirement_wait + 1))
+  [ "$retirement_wait" -le 250 ] || fail "remote retirement never acquired its lifecycle lock"
+  sleep 0.02
+done
 kill -0 "$teardown_pid" 2>/dev/null || fail "remote retirement bypassed an active backlog handoff"
 touch "$TMP_ROOT/handoff.release"
 wait "$handoff_holder_pid" || fail "handoff lock holder failed to release"

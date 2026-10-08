@@ -1069,7 +1069,7 @@ test_concurrent_stale_lease_claims_have_one_winner() {
 last=${!#}
 if [ "$last" = "$FM_TEST_LEASE_PATH" ] && mkdir "$FM_TEST_GATE.once" 2>/dev/null; then
   : > "$FM_TEST_GATE.ready"
-  while [ ! -e "$FM_TEST_GATE.release" ]; do sleep 0.01; done
+  while [ ! -e "$FM_TEST_GATE.release" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
 fi
 exec "$FM_TEST_REAL_MV" "$@"
 SH
@@ -1107,7 +1107,7 @@ test_guard_stale_clear_cannot_delete_a_new_claim() {
 last=${!#}
 if [ "$last" = "$FM_TEST_STALE_PATH" ] && mkdir "$FM_TEST_GATE.once" 2>/dev/null; then
   : > "$FM_TEST_GATE.ready"
-  while [ ! -e "$FM_TEST_GATE.release" ]; do sleep 0.01; done
+  while [ ! -e "$FM_TEST_GATE.release" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
 fi
 exec "$FM_TEST_REAL_RM" "$@"
 SH
@@ -1148,7 +1148,8 @@ test_guard_holds_exclusivity_through_mutation() {
       fm_lease_guard task-race "probe"
       trap "fm_lease_guard_release" EXIT
       : > "$FM_TEST_READY"
-      while [ ! -e "$FM_TEST_RELEASE" ]; do sleep 0.01; done
+      i=0
+      while [ ! -e "$FM_TEST_RELEASE" ] && [ "$i" -lt 1500 ]; do sleep 0.01; i=$((i + 1)); done
     ' _ "$ROOT/bin/fm-lease-lib.sh" &
   operation_pid=$!
   while [ ! -e "$home/operation-ready" ]; do sleep 0.01; done
@@ -1222,7 +1223,7 @@ test_branch_cannot_force_teardown_or_directly_relaunch() {
   ln -s "$ROOT/bin" "$root/bin"
 
   # Forced teardown discards work; the branch never discards anything.
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch "$ROOT/bin/fm-teardown.sh" task-x --force 2>&1)
+  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch "$ROOT/bin/fm-teardown.sh" task-x --force --drop-file "$(fm_test_drop_file)" 2>&1)
   status=$?
   [ "$status" -eq 6 ] || fail "branch forced teardown exited $status, not 6: $out"
   assert_contains "$out" "cannot discard work" "forced-teardown refusal lost its wording"

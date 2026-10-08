@@ -397,7 +397,8 @@ fm_operational_input_encode() {
   local kind=${1-} body=${2-} result_var=${3-}
   [ -n "$result_var" ] && fm_operational_kind_is_current "$kind" && [ -n "$body" ] || return 2
   if ( set -C; : > "$FM_HOME/state/commit-entered" ) 2>/dev/null; then
-    while [ ! -e "$FM_HOME/state/commit-release" ]; do sleep 0.05; done
+    local stub_deadline=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
+    while [ ! -e "$FM_HOME/state/commit-release" ] && [ "$SECONDS" -lt "$stub_deadline" ]; do sleep 0.05; done
   fi
   printf -v "$result_var" '%s%s: %s' "$FM_OPERATIONAL_HEADER_PREFIX" "$kind" "$body"
 }
@@ -432,7 +433,7 @@ test_superseded_park_does_not_consume_nag_budget() {
   cat > "$dir/bin/fm-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
 if ( set -C; : > "$FM_HOME/state/first-guard-entered" ) 2>/dev/null; then
-  while [ ! -e "$FM_HOME/state/first-guard-release" ]; do sleep 0.05; done
+  while [ ! -e "$FM_HOME/state/first-guard-release" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
 fi
 printf 'fixture supervision failure\n' >&2
 exit 2
@@ -612,8 +613,9 @@ test_park_stands_down_when_away_mode_activates_before_commit() {
 fm_operational_input_encode() {
   local kind=${1-} body=${2-} result_var=${3-}
   [ -n "$result_var" ] && fm_operational_kind_is_current "$kind" && [ -n "$body" ] || return 2
+  local stub_deadline=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
   : > "$FM_HOME/state/afk-commit-entered"
-  while [ ! -e "$FM_HOME/state/afk-commit-release" ]; do sleep 0.05; done
+  while [ ! -e "$FM_HOME/state/afk-commit-release" ] && [ "$SECONDS" -lt "$stub_deadline" ]; do sleep 0.05; done
   printf -v "$result_var" '%s%s: %s' "$FM_OPERATIONAL_HEADER_PREFIX" "$kind" "$body"
 }
 SH

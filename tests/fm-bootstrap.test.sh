@@ -156,7 +156,7 @@ make_fake_fleet_sync_root() {
 [ -z "${FM_FAKE_FLEET_SYNC_STARTED_MARKER:-}" ] || : > "$FM_FAKE_FLEET_SYNC_STARTED_MARKER"
 printf '%s\n' 'alpha: synced'
 printf '%s\n' 'beta: skipped: no origin remote'
-exec perl -e 'sleep 300'
+exec perl -e 'sleep($ENV{FM_TEST_STUB_MAX_BLOCK_SECONDS} || 120)'
 SH
   chmod +x "$fake_root/bin/fm-fleet-sync.sh"
   printf '%s\n' "$fake_root"

@@ -24,6 +24,7 @@ TMP_ROOT=$(fm_test_tmproot fm-bearings)
 FM_ROOT_OVERRIDE="$TMP_ROOT/fixture-root"
 mkdir -p "$FM_ROOT_OVERRIDE"
 export FM_ROOT_OVERRIDE
+export FM_BEARINGS_NOW=2026-07-11T18:00:00Z FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z FM_SNAPSHOT_NOW_EPOCH=1783792800
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 
@@ -41,6 +42,22 @@ SH
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
+  list-windows)
+    # Inventories belong to the observed home, including registered child homes.
+    session=${3#=}
+    state=${FM_STATE_OVERRIDE:-"$FM_HOME/state"}
+    for meta in "$state"/*.meta; do
+      [ -f "$meta" ] || continue
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+          window="$session:"*)
+            window=${line#*:}
+            case "$window" in *dead-*) ;; *) printf '%s\n' "$window" ;; esac
+            ;;
+        esac
+      done < "$meta"
+    done
+    ;;
   display-message) case "$*" in *dead-*) exit 1 ;; *) printf '%%1\n' ;; esac ;;
   capture-pane)
     case "$*" in
@@ -189,7 +206,7 @@ EOF
 }
 
 refresh_local_secondmate_ledgers() {  # <parent-home>
-  local parent=$1 registry line mate refresh_path=$PATH
+  local parent=$1 require_success=${2:-0} registry line mate refresh_path=$PATH
   registry="$parent/data/secondmates.md"
   [ -f "$registry" ] && [ -r "$registry" ] || return 0
   # Once this fixture's fake backend exists, ledger production must use it too;
@@ -201,9 +218,11 @@ refresh_local_secondmate_ledgers() {  # <parent-home>
     mate=$SECONDMATE_REGISTRY_HOME
     [ -f "$mate/.fm-secondmate-home" ] && [ -f "$mate/AGENTS.md" ] \
       && [ -d "$mate/bin" ] && [ -d "$mate/data" ] && [ -d "$mate/state" ] || continue
-    PATH="$refresh_path" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    if ! PATH="$refresh_path" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
       FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z FM_SNAPSHOT_NOW_EPOCH=1783792800 \
-      "$ROOT/bin/fm-home-summary-refresh.sh" >/dev/null 2>&1 || true
+      "$ROOT/bin/fm-home-summary-refresh.sh" >/dev/null 2>&1; then
+      [ "$require_success" -eq 0 ] || fail "could not prepare secondmate ledger: $mate"
+    fi
   done < "$registry"
 }
 
@@ -213,6 +232,11 @@ run() {  # <home> <fakebin> <args...>
     *" --all-landed "*) PATH="$fakebin:$PATH" FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=0 refresh_local_secondmate_ledgers "$home" ;;
     *) PATH="$fakebin:$PATH" refresh_local_secondmate_ledgers "$home" ;;
   esac
+  run_prepared "$home" "$fakebin" "$@"
+}
+
+run_prepared() {
+  local home=$1 fakebin=$2; shift 2
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_BEARINGS_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" "$BEARINGS" "$@"
 }
 
@@ -285,7 +309,7 @@ if [ -f "$remote_home/state/slow-ledger-read" ]; then
   active_marker="$FM_TEST_LEDGER_ACTIVE_DIR/collector-$$"
   : > "$active_marker"
   trap 'rm -f "$active_marker"' EXIT
-  while [ ! -f "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved" ]; do
+  while [ ! -f "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     set -- "$FM_TEST_LEDGER_ACTIVE_DIR"/collector-*
     if [ "$#" -ge 5 ] && [ -e "$1" ]; then
       : > "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved"
@@ -1037,8 +1061,9 @@ test_current_landed_baseline_is_repeatable_and_prior_report_independent() {
 - Phase 7 started
 EOF
   fakebin=$(make_fakebin "$home")
-  one=$(run "$home" "$fakebin" --json)
-  two=$(run "$home" "$fakebin" --json)
+  PATH="$fakebin:$PATH" refresh_local_secondmate_ledgers "$home" 1
+  one=$(run_prepared "$home" "$fakebin" --json)
+  two=$(run_prepared "$home" "$fakebin" --json)
   [ "$(printf '%s' "$one" | jq -c '.landed')" = "$(printf '%s' "$two" | jq -c '.landed')" ] \
     || fail "the same structured state produced different recent-completion baselines"
   printf '%s' "$two" | jq -e '
@@ -1077,12 +1102,44 @@ test_default_is_bounded_and_local_only() {
   pass "default output is bounded, local-only, and marks omitted surfaces"
 }
 
+test_open_work_ledger_is_dated_evidence_from_the_effective_state_root() {
+  local home fakebin json toon
+  home=$(make_home open-loops-ledger); write_fixture "$home"
+  fakebin=$(make_fakebin "$home"); : > "$home/net.log"
+  PATH="$fakebin:$PATH" refresh_local_secondmate_ledgers "$home" 1
+  mkdir -p "$home/special-state"
+  jq -n '{schema:"fm-open-loops.v1",generated_epoch:1783792800,home:"lane",complete:false,rows:[
+    {id:"late",category:"red_check",subject:"failing PR",owner:"firstmate",next_action:"diagnose: code or test",age_seconds:3600,overdue:true,limit_seconds:0},
+    {id:"stalled",category:"stalled_worker",subject:"disk worker",owner:"firstmate",next_action:"inspect stalled worker",age_seconds:7200,overdue:true,limit_seconds:3600,evidence:"Error: ENOSPC: no space left on device"},
+    {id:"fine",category:"open_pr",subject:"fresh PR",owner:"firstmate",next_action:"route review",age_seconds:5,overdue:false,limit_seconds:3600}]}' \
+    > "$home/special-state/open-loops.json"
+  json=$(FM_STATE_OVERRIDE="$home/special-state" run_prepared "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    .open_loops.generated_epoch == 1783792800 and .open_loops.complete == false
+    and (.open_loops.rows | map(.id) == ["late","stalled"])
+    and .open_loops.rows[0].evidence == ""
+    and .open_loops.rows[1].evidence == "Error: ENOSPC: no space left on device"' >/dev/null \
+    || fail "ledger rows were not projected from the effective state root with their observation time: $json"
+  toon=$(FM_STATE_OVERRIDE="$home/special-state" run_prepared "$home" "$fakebin")
+  printf '%s\n' "$toon" | grep -Fq 'rows[2]{id,category,subject,owner,next_action,age_seconds,evidence}:' \
+    || fail "TOON ledger rows omitted the evidence column: $toon"
+  printf '%s\n' "$toon" | grep -Fq 'late,red_check,failing PR,firstmate,"diagnose: code or test",3600,""' \
+    || fail "TOON ledger rows omitted evidence-less compatibility: $toon"
+  printf '%s\n' "$toon" | grep -Fq 'stalled,stalled_worker,disk worker,firstmate,inspect stalled worker,7200,"Error: ENOSPC: no space left on device"' \
+    || fail "TOON ledger rows omitted the recorded error: $toon"
+  printf '{"schema":"other.v9","rows":[]}\n' > "$home/special-state/open-loops.json"
+  FM_STATE_OVERRIDE="$home/special-state" run_prepared "$home" "$fakebin" --json >/dev/null 2>&1 \
+    && fail "an unsupported ledger schema was projected as if it were valid"
+  pass "the open-work ledger is projected as dated evidence from the effective state root"
+}
+
 test_toon_json_parity() {
   local home fakebin toon json keys k
   home=$(make_home parity); write_fixture "$home"
   fakebin=$(make_fakebin "$home")
-  toon=$(run "$home" "$fakebin")
-  json=$(run "$home" "$fakebin" --json)
+  PATH="$fakebin:$PATH" refresh_local_secondmate_ledgers "$home" 1
+  toon=$(run_prepared "$home" "$fakebin")
+  json=$(run_prepared "$home" "$fakebin" --json)
   # Same top-level keys in both representations.
   keys=$(printf '%s' "$json" | jq -r 'keys_unsorted[]')
   for k in $keys; do
@@ -2939,7 +2996,7 @@ for arg in "$@"; do
   case "$arg" in
     */a-hold.meta)
       : > "$FAKE_CP_STARTED"
-      while [ ! -e "$FAKE_CP_RELEASE" ]; do sleep 0.01; done
+      while [ ! -e "$FAKE_CP_RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.01; done
       break
       ;;
   esac
@@ -3042,6 +3099,10 @@ EOF
   printf 'working: old generation\n' > "$home/state/generation-race.status"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = list-windows ]; then
+  printf 'fm-generation-race\n'
+  exit 0
+fi
 if [ "${1:-}" = display-message ]; then
   if mkdir "$RACE_ONCE" 2>/dev/null; then
     tmp="$RACE_META.tmp.$$"
@@ -3073,6 +3134,8 @@ SH
     RACE_REPORT="$home/data/generation-race/report.md" RACE_WORKTREE="$worktree" \
     "$ROOT/bin/fm-fleet-snapshot.sh" --json) \
     || fail "fleet snapshot failed during endpoint generation race"
+  grep -qx 'spawn_gen=new-generation' "$home/state/generation-race.meta" \
+    || fail "endpoint generation race fixture did not publish the replacement generation"
   printf '%s' "$json" | jq -e '
     .tasks[] | select(.id == "generation-race")
     | .spawn_gen == "old-generation"
@@ -3092,8 +3155,7 @@ SH
 }
 
 test_large_local_snapshot_overlaps_local_reads_without_projection_drift() {
-  local home fakebin worktree serial parallel parallel_file snapshot_pid i
-  local serial_started serial_elapsed parallel_started parallel_elapsed saved
+  local home fakebin worktree serial parallel i
   home=$(make_home large-local-snapshot)
   worktree="$home/projects/shared-worktree"
   fm_git_init_commit "$worktree"
@@ -3102,8 +3164,21 @@ test_large_local_snapshot_overlaps_local_reads_without_projection_drift() {
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 if [ "$*" = "axi status" ] && [ "${FAKE_NM_DELAY:-0}" = 1 ]; then
-  [ -z "${FAKE_NM_SIGNAL:-}" ] || : > "$FAKE_NM_SIGNAL"
-  sleep 1
+  : > "$FAKE_NM_READERS/$$"
+  : > "$FAKE_NM_READERS/.entered"
+  trap 'rm -f "$FAKE_NM_READERS/$$"' EXIT
+  for reader in "$FAKE_NM_READERS/"*; do
+    [ -f "$reader" ] || continue
+    pid=${reader##*/}
+    if [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null; then
+      : > "$FAKE_NM_OVERLAP"
+    fi
+  done
+  if [ "${FAKE_NM_EXPECT_OVERLAP:-0}" = 1 ]; then
+    while [ ! -f "$FAKE_NM_OVERLAP" ]; do sleep 0.05; done
+  else
+    sleep 1
+  fi
 fi
 exit 0
 SH
@@ -3132,44 +3207,20 @@ SH
     i=$((i + 1))
   done
 
-  serial=$(FAKE_NM_DELAY=0 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=1 run "$home" "$fakebin" --json)
+  PATH="$fakebin:$PATH" refresh_local_secondmate_ledgers "$home" 1
+  mkdir -p "$home/serial-readers" "$home/parallel-readers"
+  serial=$(FAKE_NM_DELAY=1 FAKE_NM_READERS="$home/serial-readers" \
+    FAKE_NM_OVERLAP="$home/serial-overlap" FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=1 \
+    run_prepared "$home" "$fakebin" --json) || fail "serialized local snapshot failed"
+  [ -e "$home/serial-readers/.entered" ] || fail "serialized local snapshot did not read current state"
+  [ ! -e "$home/serial-overlap" ] || fail "serialized local snapshot overlapped readers"
 
-  # Serialized reads pay every worker's delay end to end while concurrent reads
-  # overlap them. Time both runs and compare, because the two pay the same
-  # composition overhead: the difference isolates the overlap this change
-  # delivers, where an absolute wall-clock budget would instead measure how
-  # loaded the host happens to be and flake on a busy runner.
-  serial_started=$(date +%s)
-  FAKE_NM_DELAY=1 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=1 \
-    run "$home" "$fakebin" --json >/dev/null \
-    || fail "serialized local snapshot failed"
-  serial_elapsed=$(( $(date +%s) - serial_started ))
-
-  parallel_started=$(date +%s)
-  parallel_file="$home/parallel-snapshot.json"
-  FAKE_NM_DELAY=1 FAKE_NM_SIGNAL="$home/nm-started" \
+  parallel=$(FAKE_NM_DELAY=1 FAKE_NM_READERS="$home/parallel-readers" \
+    FAKE_NM_OVERLAP="$home/parallel-overlap" FAKE_NM_EXPECT_OVERLAP=1 \
     FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=8 \
-    run "$home" "$fakebin" --json > "$parallel_file" &
-  snapshot_pid=$!
-  i=0
-  while [ ! -e "$home/nm-started" ] && [ "$i" -lt 100 ]; do
-    sleep 0.05
-    i=$((i + 1))
-  done
-  if [ ! -e "$home/nm-started" ]; then
-    kill "$snapshot_pid" 2>/dev/null || true
-    wait "$snapshot_pid" 2>/dev/null || true
-    fail "concurrent local snapshot never began a current-state read"
-  fi
-  wait "$snapshot_pid" || fail "concurrent local snapshot failed"
-  parallel=$(<"$parallel_file")
-  parallel_elapsed=$(( $(date +%s) - parallel_started ))
-  # Five one-second reads serialize into five seconds and overlap into about
-  # one, so at least two of those four seconds must show up as real savings.
-  # Serializing the reads again collapses that difference to roughly zero.
-  saved=$(( serial_elapsed - parallel_elapsed ))
-  [ "$saved" -ge 2 ] \
-    || fail "concurrent local reads saved no measurable time (serial ${serial_elapsed}s vs concurrent ${parallel_elapsed}s)"
+    run_prepared "$home" "$fakebin" --json) || fail "concurrent local snapshot failed"
+  [ -e "$home/parallel-overlap" ] \
+    || fail "concurrent local snapshot did not overlap current-state readers"
   [ "$parallel" = "$serial" ] \
     || fail "concurrent local observation changed the fm-bearings.v1 projection"
   printf '%s' "$parallel" | jq -e '
@@ -3374,6 +3425,7 @@ test_nonprogressing_child_states_are_explicit
 test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
+test_open_work_ledger_is_dated_evidence_from_the_effective_state_root
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_accepts_only_kind_owned_delivery_artifacts

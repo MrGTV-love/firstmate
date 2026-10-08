@@ -968,17 +968,101 @@ test_matrix_omp_box_composer() {
   pass "matrix: omp's box composer (status in the top border, folded last row) reads empty, pending, and never a typed glyph as empty"
 }
 
+# While a turn runs, omp's box top border carries a spinner frame and the elapsed
+# time where the idle border carries its identity glyph. These are real omp
+# 18.6.3 captures through Herdr of a worker running `sleep 60`: the empty
+# composer, a draft typed while the turn ran, and the same draft wrapped onto a
+# second row. Reading the border as unknown hid a typed line that never
+# submitted from every busy caller.
+omp_box_busy_top() {  # <spinner> <elapsed>
+  printf '╭── %s %s > ◔ GPT-6-Astra 👁 > 🗑 …lab.m13m2O/project > ⑂ fm/fm-omp-lane-wake-unsubmitted *7 > S0.27 + 👁 0.05 ▶─7%%─┃272K───╮' "$1" "$2"
+}
+
+test_omp_box_busy_status_border_reads_the_composer() {
+  local busy empty_last typed wrapped frame elapsed
+  busy=$'transcript\n\n  ⎋ Waiting requested sixty seconds\n\n'
+  empty_last=$(omp_box_last '')
+  assert_screen "omp busy box empty on herdr" empty "$CAPS_STYLED" \
+    "$busy$(omp_box_busy_top ⠦ 13s)"$'\n'"$empty_last" '' probe-absent
+  assert_screen "omp busy box empty on plain backends" empty "$CAPS_PLAIN" \
+    "$busy$(omp_box_busy_top ⠦ 13s)"$'\n'"$empty_last"
+  typed=$busy$(omp_box_busy_top ⠦ 13s)$'\n'$(omp_box_last 'half typed draft while busy')
+  assert_screen "omp busy box typed on herdr" pending "$CAPS_STYLED" "$typed" '' probe-absent
+  assert_screen "omp busy box typed on plain backends" pending "$CAPS_PLAIN" "$typed"
+  [ "$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$typed")" = 'half typed draft while busy' ] \
+    || fail "omp busy box extraction must return the typed draft"
+  wrapped=$busy$(omp_box_busy_top ⠹ 16s)$'\n│  half typed draft while busy and a long wrapped continuation that goes on and on and on and on  │\n'$(omp_box_last 'on and on and on and on')
+  assert_screen "omp busy box wrapped draft" pending "$CAPS_STYLED" "$wrapped" '' probe-absent
+  # Every spinner frame and a minutes-long elapsed cell keep the identity.
+  for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏ ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷; do
+    assert_screen "omp busy box frame $frame" empty "$CAPS_STYLED" \
+      "$busy$(omp_box_busy_top "$frame" 5s)"$'\n'"$empty_last" '' probe-absent
+  done
+  for elapsed in 59s 1m3s 2h5m; do
+    assert_screen "omp busy box elapsed $elapsed" empty "$CAPS_STYLED" \
+      "$busy$(omp_box_busy_top ⠧ "$elapsed")"$'\n'"$empty_last" '' probe-absent
+  done
+  pass "matrix: omp's box composer is readable while a turn runs (spinner and elapsed time in the top border), so a typed line that never submitted reads pending"
+}
+
+test_omp_box_working_renders_match_delivery_busy() {
+  local top empty typed wrapped screen frame elapsed separator harness invalid
+  local waiting=$'  ⎋ Waiting requested sixty seconds'
+  top=$(omp_box_busy_top ⠦ 13s)
+  empty=$'transcript\n\n'"$waiting"$'\n\n'"$top"$'\n'"$(omp_box_last '')"
+  typed=$'transcript\n\n'"$waiting"$'\n\n'"$top"$'\n'"$(omp_box_last 'half typed draft while busy')"
+  wrapped=$'transcript\n\n'"$waiting"$'\n\n'"$(omp_box_busy_top ⠹ 16s)"$'\n│  half typed draft while busy and a long wrapped continuation that goes on and on and on and on  │\n'"$(omp_box_last 'on and on and on and on')"
+  for screen in "$top" "$waiting" "$empty" "$typed" "$wrapped"; do
+    for harness in omp ''; do
+      printf '%s\n' "$screen" | fm_busy_lines_match "$harness" \
+        || fail "omp working render must match delivery busy for harness '$harness': $screen"
+    done
+    for harness in claude devin codex opencode pi pi-signed grok agy kimi cursor unregistered; do
+      if printf '%s\n' "$screen" | fm_busy_lines_match "$harness"; then
+        fail "omp working render must not match another harness '$harness': $screen"
+      fi
+    done
+  done
+  for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏ ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷; do
+    for elapsed in 59s 1m3s 2h5m; do
+      for separator in '>' '·'; do
+        top=$(omp_box_busy_top "$frame" "$elapsed")
+        top=${top/ > / $separator }
+        for harness in omp ''; do
+          printf '%s\n' "$top" | fm_busy_lines_match "$harness" \
+            || fail "omp busy border $frame $elapsed $separator must match delivery busy for harness '$harness'"
+        done
+      done
+    done
+  done
+  for invalid in \
+    "$(omp_box_top)" \
+    '╭── 13s > ◔ GPT-6-Astra ──╮' \
+    '╭── ⠦ > ◔ GPT-6-Astra ──╮' \
+    '╭── ⠦ 13s ◔ GPT-6-Astra ──╮' \
+    '╭── x 13s > ◔ GPT-6-Astra ──╮'; do
+    for harness in omp ''; do
+      if printf '%s\n' "$invalid" | fm_busy_lines_match "$harness"; then
+        fail "idle or incomplete omp border must not match delivery busy for harness '$harness': $invalid"
+      fi
+    done
+  done
+  pass "omp working borders and waiting rows are delivery busy independently of empty or pending composer contents"
+}
+
 test_omp_box_requires_omp_identity_and_complete_shape() {
   local top empty_last
   top=$(omp_box_top)
   empty_last=$(omp_box_last '')
   # Only omp's own status identity proves the container; an arbitrary titled
-  # rounded border, a busy spinner status, or the ascii preset's `pi` stays
-  # an unprovable shape and reads unknown, never empty.
+  # rounded border, a spinner with no elapsed cell, or the ascii preset's `pi`
+  # stays an unprovable shape and reads unknown, never empty.
   assert_screen "titled non-omp border" unknown "$CAPS_STYLED" \
     $'transcript\n\n╭── some other title ──╮\n'"$empty_last" '' probe-absent
-  assert_screen "omp busy spinner status" unknown "$CAPS_STYLED" \
-    $'transcript\n\n╭── ⠧ 11s > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "spinner without an elapsed cell" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── ⠧ > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "elapsed cell without a spinner" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── 11s > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
   assert_screen "omp ascii-preset status" unknown "$CAPS_STYLED" \
     $'transcript\n\n╭── pi - GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
   # A bare rule closing the box is not the folded last row.
@@ -2104,6 +2188,8 @@ test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_omp_effort_hint_remnant
 test_matrix_omp_box_composer
+test_omp_box_busy_status_border_reads_the_composer
+test_omp_box_working_renders_match_delivery_busy
 test_omp_box_requires_omp_identity_and_complete_shape
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
@@ -2130,16 +2216,16 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells
 
 test_queued_enter_verdict_busy_pending_is_empty() {
   local out
-  out=$(fm_composer_queued_enter_verdict pending busy)
+  out=$(fm_composer_queued_enter_verdict pending busy opencode)
   [ "$out" = empty ] || fail "busy + proven pending must be queued delivery (empty), got '$out'"
   pass "fm_composer_queued_enter_verdict: pending + busy returns empty (queued Enter)"
 }
 
 test_queued_enter_verdict_idle_pending_stays_pending() {
   local out
-  out=$(fm_composer_queued_enter_verdict pending idle)
+  out=$(fm_composer_queued_enter_verdict pending idle opencode)
   [ "$out" = pending ] || fail "idle + proven pending must stay a genuine swallow, got '$out'"
-  out=$(fm_composer_queued_enter_verdict pending unknown)
+  out=$(fm_composer_queued_enter_verdict pending unknown opencode)
   [ "$out" = pending ] || fail "unknown busy is not proof of a queue, got '$out'"
   pass "fm_composer_queued_enter_verdict: pending + idle/unknown stays pending"
 }
@@ -2147,14 +2233,70 @@ test_queued_enter_verdict_idle_pending_stays_pending() {
 test_queued_enter_verdict_does_not_convert_other_states() {
   local state out
   for state in empty pending-unproven unknown unknown-draft send-failed future-state; do
-    out=$(fm_composer_queued_enter_verdict "$state" busy)
+    out=$(fm_composer_queued_enter_verdict "$state" busy opencode)
     [ "$out" = "$state" ] || fail "busy must not convert '$state', got '$out'"
-    out=$(fm_composer_queued_enter_verdict "$state" idle)
+    out=$(fm_composer_queued_enter_verdict "$state" idle opencode)
     [ "$out" = "$state" ] || fail "idle must not convert '$state', got '$out'"
   done
   pass "fm_composer_queued_enter_verdict: only proven pending is converted"
 }
 
+test_queued_enter_requires_supported_harness() {
+  local harness out
+  for harness in omp claude codex unknown ''; do
+    out=$(fm_composer_queued_enter_verdict pending busy "$harness")
+    [ "$out" = pending ] || fail "unsupported '$harness' must retain pending, got '$out'"
+  done
+  out=$(fm_composer_queued_enter_verdict pending busy)
+  [ "$out" = pending ] || fail "missing harness must not confirm delivery"
+  pass "queued Enter requires positive OpenCode identity"
+}
+test_queued_enter_requires_supported_harness
+
 test_queued_enter_verdict_busy_pending_is_empty
 test_queued_enter_verdict_idle_pending_stays_pending
 test_queued_enter_verdict_does_not_convert_other_states
+
+test_cursorless_submit_refreshes_pending_before_retry() (
+  local dir backend initial final out
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-composer-retry.XXXXXX")
+  trap 'rm -rf "$dir"' EXIT
+  for backend in cmux orca zellij; do
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/backends/$backend.sh"
+    eval "fm_backend_${backend}_send_literal() { printf 'literal\n' >> \"\$dir/literals\"; }"
+    eval "fm_backend_${backend}_send_key() { printf '%s\n' \"\$2\" >> \"\$dir/enters\"; }"
+    eval "fm_backend_${backend}_composer_state() { retry_test_state; }"
+    # Called indirectly by the dynamically sourced backends.
+    # shellcheck disable=SC2329
+    fm_backend_cmux_parse_target() { return 0; }
+    # shellcheck disable=SC2329
+    fm_backend_orca_tool_check() { return 0; }
+    # shellcheck disable=SC2329
+    fm_backend_zellij_composer_content() { printf ''; }
+    # shellcheck disable=SC2329
+    fm_backend_zellij_composer_observed_append() { return 0; }
+    for initial in pending pending-unproven; do
+      for final in empty unknown pending; do
+        : > "$dir/enters"; : > "$dir/literals"; printf '0' > "$dir/reads"
+        # Called by the eval-defined composer-state function.
+        # shellcheck disable=SC2329
+        retry_test_state() {
+          local n
+          n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
+          if [ "$n" -eq 1 ]; then printf '%s' "$initial"; else printf '%s' "$final"; fi
+        }
+        out=$("fm_backend_${backend}_send_text_submit" target payload 2 0 0 label)
+        [ "$out" = "$final" ] || fail "$backend $initial then $final returned '$out'"
+        [ "$(wc -l < "$dir/literals" | tr -d ' ')" -eq 1 ] || fail "$backend must type only once"
+        if [ "$final" = pending ]; then
+          [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 2 ] || fail "$backend must retry fresh pending"
+        else
+          [ "$(wc -l < "$dir/enters" | tr -d ' ')" -eq 1 ] || fail "$backend must not retry fresh $final"
+        fi
+      done
+    done
+  done
+  pass "cmux orca and zellij submit refresh pending frames without retyping"
+)
+test_cursorless_submit_refreshes_pending_before_retry

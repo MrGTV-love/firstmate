@@ -26,6 +26,11 @@ HERDR_ORIGINAL_PATH=$PATH
 # daemon did not inherit the controller's TREEHOUSE_ROOT.
 mkdir -p "$ROOT/.no-mistakes/test-tmp"
 TMP_ROOT=$(mktemp -d "$ROOT/.no-mistakes/test-tmp/fm-herdr-presentation.XXXXXX")
+# This standalone suite does not source tests/lib.sh; ordinary-work teardown --force needs the captain's words.
+fm_test_drop_file() {
+  [ -f "$TMP_ROOT/captain-words.txt" ] || printf 'Fixture: the captain approved discarding this work.\n' > "$TMP_ROOT/captain-words.txt"
+  printf '%s\n' "$TMP_ROOT/captain-words.txt"
+}
 # The code root and operational homes must be siblings: secondmate safety
 # correctly refuses homes inside the declared Firstmate repository.
 FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
@@ -294,12 +299,18 @@ export HERDR_SESSION="$HERDR_LAB_SESSION" HERDR_LAB_SESSION
 LAB_READY=0
 RECORDED_WORKTREES=""
 LOCK_CONTENTION_OWNER_PID=
+CROSS_LOCK_PID=
 cleanup_all() {
   local wt
   if [ -n "$LOCK_CONTENTION_OWNER_PID" ]; then
     kill "$LOCK_CONTENTION_OWNER_PID" 2>/dev/null || true
     wait "$LOCK_CONTENTION_OWNER_PID" 2>/dev/null || true
     LOCK_CONTENTION_OWNER_PID=
+  fi
+  if [ -n "$CROSS_LOCK_PID" ]; then
+    kill "$CROSS_LOCK_PID" 2>/dev/null || true
+    wait "$CROSS_LOCK_PID" 2>/dev/null || true
+    CROSS_LOCK_PID=
   fi
   while IFS= read -r wt; do
     [ -n "$wt" ] || continue
@@ -498,7 +509,7 @@ teardown_task() {  # <id> <home>
   FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" \
-    "$FIXTURE_ROOT/bin/fm-teardown.sh" "$id" --force
+    "$FIXTURE_ROOT/bin/fm-teardown.sh" "$id" --force --drop-file "$(fm_test_drop_file)"
 }
 
 finish_concurrent_teardown() {  # <id> <status> <stdout> <stderr>
@@ -771,7 +782,7 @@ ROOT="$ROOT" READY="$LOCK_CONTENTION_READY" RELEASE="$LOCK_CONTENTION_RELEASE" \
   . "$ROOT/bin/fm-wake-lib.sh"
   fm_lock_try_acquire "$LOCK" || exit 1
   : > "$READY"
-  while [ ! -e "$RELEASE" ]; do sleep 0.05; done
+  while [ ! -e "$RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
   fm_lock_release "$LOCK"
 ' &
 LOCK_CONTENTION_OWNER_PID=$!
@@ -1202,7 +1213,7 @@ ROOT="$ROOT" READY="$CROSS_LOCK_READY" RELEASE="$CROSS_LOCK_RELEASE" LOCK="$CROS
   . "$ROOT/bin/fm-wake-lib.sh"
   fm_lock_try_acquire "$LOCK" || exit 1
   : > "$READY"
-  while [ ! -e "$RELEASE" ]; do sleep 0.05; done
+  while [ ! -e "$RELEASE" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
   fm_lock_release "$LOCK"
 ' &
 CROSS_LOCK_PID=$!
@@ -1217,6 +1228,7 @@ else
 fi
 : > "$CROSS_LOCK_RELEASE"
 wait "$CROSS_LOCK_PID" || fail "cross-home session lock owner failed"
+CROSS_LOCK_PID=
 [ "$AFLAT_STATUS" -eq 0 ] \
   || fail "cross-home lock contention did not fall back flat: $(cat "$TMP_ROOT/aflat.err")"
 grep -F "presentation focus lock unavailable; using the ordinary flat layout without projection" "$TMP_ROOT/aflat.err" >/dev/null 2>&1 \

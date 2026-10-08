@@ -71,9 +71,10 @@
 #   worktree and the republished record rebinds the task to it. That proof is
 #   its own step, because a backend's `missing` also covers an endpoint that is
 #   merely unreachable from here. fm_control_endpoint_absence_verdict owns the
-#   proof for Herdr and the tmux no-user-server case. Herdr keeps its recorded
-#   session; a gone tmux endpoint requires the home's current configured spawn
-#   backend to resolve to Herdr and pass spawn validation.
+#   proof for Herdr and for a tmux endpoint scoped to the recorded session and
+#   worktree. Herdr keeps its recorded session; a gone tmux endpoint requires
+#   the home's current configured spawn backend to resolve to Herdr and pass
+#   spawn validation.
 #   The validated worktree is reused untouched either way;
 #   a rebind is a recovery, never a teardown. Only a crewmate or scout rebinds: a
 #   secondmate whose endpoint is gone is respawned by its own owner
@@ -682,8 +683,6 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
-# shellcheck source=bin/fm-classify-lib.sh
-. "$SCRIPT_DIR/fm-classify-lib.sh"
 fm_backlog_directory_present "$STATE" "state directory" || {
   echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
@@ -700,16 +699,12 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-cursor-lib.sh
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
-# shellcheck source=bin/fm-pr-lib.sh
-. "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
 # shellcheck source=bin/fm-trace-context-lib.sh
 . "$SCRIPT_DIR/fm-trace-context-lib.sh"
 # shellcheck source=bin/fm-remote-readiness-lib.sh
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
-# shellcheck source=bin/fm-timeout-lib.sh
-. "$SCRIPT_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
@@ -1820,6 +1815,12 @@ if [ "$RELAUNCH" -eq 0 ]; then
     exit 1
   fi
   SPAWN_TASK_SET_LOCK_HELD=1
+  SPAWN_CONTROL_LOCK="$STATE/.control-$ID.lock"
+  if ! fm_lock_try_acquire "$SPAWN_CONTROL_LOCK"; then
+    echo "error: another lifecycle action is already running for task $ID" >&2
+    exit 1
+  fi
+  SPAWN_CONTROL_LOCK_HELD=1
   spawn_refuse_if_away_spend_cap
   spawn_require_relocated_queued_work
 fi
@@ -1917,7 +1918,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # which proven-gone endpoints may be replaced.
   RELAUNCH_STATE=$(fm_backend_agent_state "$BACKEND" "$RELAUNCH_TARGET")
   if [ "$RELAUNCH_STATE" = missing ]; then
-    RELAUNCH_ABSENCE=$(fm_control_endpoint_absence_verdict "$BACKEND" "$RELAUNCH_TARGET")
+    RELAUNCH_ABSENCE=$(fm_control_endpoint_absence_verdict "$BACKEND" "$RELAUNCH_TARGET" "$(fm_meta_get "$RELAUNCH_META" worktree)")
     case "${RELAUNCH_ABSENCE%%$'\t'*}" in
       gone) RELAUNCH_STATE=missing ;;
       dead) RELAUNCH_STATE=dead ;;
@@ -2247,10 +2248,7 @@ launch_template() {
   # against the fresh-profile provider wizard, --auto-approve so no approval
   # prompt can park an unattended worker, the tracked posture overlay so a
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
-  # pinned to the worktree because omp's extension discovery is cwd-only. A
-  # secondmate loads its two primary extensions by that discovery alone:
-  # naming them with -e as well loads each twice (verified), doubling every
-  # session_stop continuation.
+  # pinned to the worktree because omp's extension discovery is cwd-only.
   omp)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
@@ -4927,7 +4925,7 @@ EOF
     guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
       '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
-// Firstmate semantic busy-state events + turn-end notification for omp (Oh My
+// Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
 // Semantic state: "agent_start" -> busy when a low-level agent run begins;
 // "agent_end" -> idle only when event.willContinue is not true. omp has no
@@ -4937,9 +4935,7 @@ EOF
 // queued follow-ups, and a session_stop-forced continuation. ctx.isIdle() is
 // deliberately NOT consulted: at a natural TUI agent_end it still reads false
 // because session_stop is awaited before the session settles, so gating on it
-// would leave every completed turn recorded busy. "turn_end" fires at every
-// inner turn boundary and stays a wake NOTIFICATION touch for the watcher,
-// never current-state truth.
+// would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
 import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-session.ts";

@@ -83,13 +83,25 @@ The isolated rendered-tail busy fallbacks that remain are harness-scoped, so one
 The submit acknowledgement and away-mode supervisor-pane busy guard below still consult rendered output, but only to decide whether input can be delivered, never to decide recorded task state.
 The supervisor guard selects only the detected primary harness's signature rather than a global union of vendor patterns.
 
-[`bin/fm-tmux-lib.sh`](../bin/fm-tmux-lib.sh) owns exact type-and-submit mechanics, Enter retry limits, and submission acknowledgement.
+`bin/fm-tmux-lib.sh` owns exact type-and-submit mechanics.
+It types a message once and retries Enter only until the composer clears.
+Only a positively identified omp foreground process receives the pre-retry refresh: after pending or unproven pending, a fresh empty or unreadable composer receives no further Enter. Identification uses tmux's foreground command and the existing foreground-process-group probe, and remains attached to the submission attempt.
+The submit primitive returns `empty` only after composer-clearance proof or one of the delivery-proof exceptions below.
+Text left in established structure remains `pending`, text in ambiguous structure remains unproven, and unreadable or unsafe state remains unknown except that an unconfirmed omp submit or unavailable initial identity returns `pending`.
+A verdict that identifies draft risk (`unknown-draft`) is preserved untouched by every busy conversion, and a positively identified omp foreground process keeps that more specific verdict instead of `pending`.
 An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
 
-The [shared queued-Enter policy](../bin/fm-composer-lib.sh) owns acceptance of structurally proven pending text in a busy pane after retries.
-The [tmux submit owner](../bin/fm-tmux-lib.sh) also defines baseline-gated idle-to-busy confirmation and preservation of unconfirmed verdicts, including `unknown-draft`.
-`tests/fm-tmux-submit-busy.test.sh` covers busy and idle panes with proven, ambiguous, and cleared composers.
+[Watcher continuity](watcher-continuity.md#omp-restored-wake-recovery) owns omp editor recovery and its known limits; [architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary.
+
+OpenCode 1.18.4 has one busy-queue exception.
+While OpenCode is mid-turn, Enter queues the message but leaves its text visible until the turn completes.
+The legacy non-omp tmux path accepts structurally proven pending text in a busy pane as queued after the normal retry budget; idle panes and ambiguous pending text remain unconfirmed.
+It also preserves main's baseline-gated conversion for an unreadable mid-turn composer (including Pi's `pi-launcher`): an idle baseline before typing and a busy footer after Enter confirm delivery, using the same legacy matcher on both sides.
+The legacy matcher excludes omp's spinner-only, spinner-box, and Waiting signals; the widened omp matcher remains available to positively identified omp and identityless delivery guards.
+All non-omp harnesses retain main's Enter retry behavior without the new refresh.
+omp and unavailable initial identity never receive either busy-only conversion: an independent watcher turn cannot prove that Enter consumed the typed payload, so an unreadable composer returns `pending` even when busy. There is no omp busy-baseline confirmation boundary; only a positively empty composer confirms submission.
+`tests/fm-tmux-submit-busy.test.sh` covers busy and idle panes with proven, ambiguous, and cleared composers, including a dropped Enter followed by an independent omp watcher turn and a cursor/screen redraw race.
 
 ## Limits and regression entry points
 

@@ -119,16 +119,10 @@
 #                          while the mate was not in an active turn (a busy mate
 #                          is exempt only until the queue has been frozen for
 #                          BUSY_TURN_MAX_SECS); declared external-wait pause
-#                          rows do not feed this escalation; a mate whose
-#                          semantic busy class is exactly idle, whose agent is
-#                          alive, and whose composer has no pending text or
-#                          identified draft risk is rung once so its home drains;
-#                          the parent notification waits until that row stays
-#                          frozen for another stall interval; unknown or
-#                          ring-unsafe panes keep the parent alarm; empty
-#                          inbox and a fresh child beacon are not idle proof;
-#                          the foreign queue itself stays read-only, and one
-#                          parent notification covers each no-progress episode
+#                          rows do not feed this escalation; docs/architecture.md
+#                          "Event-driven supervision" owns idle-ring eligibility
+#                          and the one-alarm no-progress episode contract;
+#                          the foreign queue itself stays read-only
 #   check: secondmate <id> auto-relaunched after <cause> (<where>)
 #                          the liveness tick probed a registered secondmate's
 #                          recorded endpoint, got the recovery-grade `dead` or
@@ -356,6 +350,21 @@ HOME_SUMMARY_INTERVAL=${FM_HOME_SUMMARY_INTERVAL:-300}
 case "$HOME_SUMMARY_INTERVAL" in
   ''|*[!0-9]*|0) HOME_SUMMARY_INTERVAL=300 ;;
 esac
+# The open-work ledger (docs/configuration.md "Open-work ledger") is refreshed by a detached
+# helper at this cadence and re-surfaced to firstmate when it still lists the same overdue rows.
+OPEN_LOOPS_INTERVAL=${FM_OPEN_LOOPS_INTERVAL:-600}
+case "$OPEN_LOOPS_INTERVAL" in
+  ''|*[!0-9]*) OPEN_LOOPS_INTERVAL=600 ;;
+  *) OPEN_LOOPS_INTERVAL=$((10#$OPEN_LOOPS_INTERVAL)) ;;
+esac
+[ "$OPEN_LOOPS_INTERVAL" -gt 0 ] || OPEN_LOOPS_INTERVAL=600
+OPEN_LOOPS_RESURFACE=${FM_OPEN_LOOPS_RESURFACE:-21600}
+case "$OPEN_LOOPS_RESURFACE" in
+  ''|*[!0-9]*) OPEN_LOOPS_RESURFACE=21600 ;;
+  *) OPEN_LOOPS_RESURFACE=$((10#$OPEN_LOOPS_RESURFACE)) ;;
+esac
+[ "$OPEN_LOOPS_RESURFACE" -gt 0 ] || OPEN_LOOPS_RESURFACE=21600
+OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-$SCRIPT_DIR/fm-open-loops.sh}
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
@@ -938,19 +947,16 @@ secondmate_busy_class() {  # <window>
   printf '%s' "${verdict%% *}"
 }
 
-# A child ring requires exact semantic idle and a live agent; unknown busy
-# state is not idle proof. The composer rejects pending and unknown-draft,
-# while ordinary unknown remains advisory, as in fm-task-inbox-lib.sh.
 secondmate_idle_ring_safe() {  # <window>
   local w=$1 backend agent_state cstate
   [ -n "$w" ] || return 1
+  [ "$(window_harness "$w")" != omp ] || return 1
   [ "$(secondmate_busy_class "$w")" = idle ] || return 1
   backend=$(window_backend "$w")
   agent_state=$(fm_backend_agent_state "$backend" "$w" 2>/dev/null || true)
   [ "$agent_state" = alive ] || return 1
   cstate=$(fm_backend_composer_state "$backend" "$w" "$(window_label "$w")" 2>/dev/null) || cstate=unknown
-  case "$cstate" in pending|unknown-draft) return 1 ;; esac
-  return 0
+  [ "$cstate" = empty ]
 }
 
 # Write one fire-and-forget drain steer and ring the child's doorbell. The
@@ -984,11 +990,9 @@ secondmate_ring_to_drain() {  # <task> <window>
 # a later genuine freeze remains visible. A mate demonstrably inside an active
 # turn defers its escalation, but only while this same interval is under
 # BUSY_TURN_MAX_SECS, so a turn that never ends cannot hide a frozen queue.
-# A mate whose busy class is exactly idle, whose agent is alive, and whose
-# composer has no pending text or identified draft risk is rung once to drain, and the
-# parent notification is withheld until that same row stays frozen for another
-# stall interval. Unknown, busy-over-bound, and ring-unsafe panes keep the
-# parent alarm. Empty inbox and a fresh child beacon are not idle proof.
+# Idle-ring eligibility and parent alarm policy are owned by
+# docs/architecture.md "Event-driven supervision"; secondmate_idle_ring_safe enforces the
+# no-draft boundary before any drain steer.
 # Receipts close the append-before-marker crash window without changing the
 # foreign queue.
 secondmate_wake_stall_tick() {
@@ -2131,8 +2135,10 @@ run_check_process() {
   elif [ "${FM_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v gtimeout >/dev/null 2>&1; then
     exec gtimeout "$CHECK_TIMEOUT" bash "$c" "$@"
   else
+    # Both sides setpgrp (unowned case) so a child slow to be scheduled on a loaded host
+    # still has its group before the bound fires; see fm_timeout_perl_bound.
     # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
-    exec perl -e 'my $t = shift; my $owned = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0) unless $owned; exec @ARGV } my $group = $owned ? getpgrp(0) : $pid; my $stop = sub { $SIG{HUP} = $SIG{INT} = $SIG{TERM} = "IGNORE"; kill "TERM", -$group; select undef, undef, undef, 0.2; kill "KILL", -$group; waitpid $pid, 0; exit 124 }; local $SIG{ALRM} = $stop; local $SIG{HUP} = $stop; local $SIG{INT} = $stop; local $SIG{TERM} = $stop; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$CHECK_TIMEOUT" "${FM_CHECK_OWNED_GROUP:-0}" bash "$c" "$@"
+    exec perl -e 'my $t = shift; my $owned = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0) unless $owned; exec @ARGV } setpgrp($pid, $pid) unless $owned; my $group = $owned ? getpgrp(0) : $pid; my $stop = sub { $SIG{HUP} = $SIG{INT} = $SIG{TERM} = "IGNORE"; kill "TERM", -$group; select undef, undef, undef, 0.2; kill "KILL", -$group; waitpid $pid, 0; exit 124 }; local $SIG{ALRM} = $stop; local $SIG{HUP} = $stop; local $SIG{INT} = $stop; local $SIG{TERM} = $stop; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$CHECK_TIMEOUT" "${FM_CHECK_OWNED_GROUP:-0}" bash "$c" "$@"
   fi
 }
 
@@ -2563,6 +2569,75 @@ home_summary_refresh_detached() {
   HOME_SUMMARY_PID=$!
 }
 
+# Open-work ledger refresh, detached for the same reason as the home summary: the
+# reconciler can outlast the beacon grace, and the poll must keep advancing the
+# beacon while it runs. The helper publishes state/open-loops.json atomically; the
+# surfacing below reads that file, so a slow or failing helper never blocks a poll.
+OPEN_LOOPS_PID=
+open_loops_refresh_detached() {
+  if [ -n "$OPEN_LOOPS_PID" ]; then
+    if kill -0 "$OPEN_LOOPS_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$OPEN_LOOPS_PID" 2>/dev/null || true
+    OPEN_LOOPS_PID=
+  fi
+  "$OPEN_LOOPS_BIN" --heartbeat </dev/null >/dev/null 2>&1 &
+  OPEN_LOOPS_PID=$!
+  [ -e "$STATE/.open-loops-started" ] || : > "$STATE/.open-loops-started"
+}
+
+# Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
+# wakes firstmate at once; an unchanged overdue set repeats only every
+# OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
+# The durable row is appended before wake() exits, and firstmate's acknowledgement clears it.
+open_loops_stale_wake() {  # <ledger-path>
+  local marker="$STATE/.open-loops-stale-surfaced" reason
+  [ ! -e "$marker" ] || [ "$(age_of "$marker")" -ge "$OPEN_LOOPS_RESURFACE" ] || return 0
+  reason="check: open-loop-ledger-stale (reconciler stopped publishing; run bin/fm-open-loops.sh)"
+  fm_wake_append check open-loop-ledger-stale "$reason" || exit 1
+  : > "$marker"
+  wake "$reason"
+}
+open_loops_surface() {
+  local ledger="$STATE/open-loops.json" marker="$STATE/.open-loops-surfaced" ids digest previous overdue reason
+  if [ -f "$ledger" ] && [ ! -L "$ledger" ]; then
+    [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ] || open_loops_stale_wake "$ledger"
+  else
+    # No ledger yet: only a helper that was started and never published is stale.
+    [ ! -e "$STATE/.open-loops-started" ] \
+      || [ "$(age_of "$STATE/.open-loops-started")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ] \
+      || open_loops_stale_wake "$ledger"
+    return 0
+  fi
+  ids=$(jq -rs '
+    if length == 1 then .[0] else error("expected one open-loop ledger") end
+    | if type == "object" and .schema == "fm-open-loops.v1"
+        and (.generated_epoch | type) == "number"
+        and (.home | type) == "string" and (.home | length) > 0
+        and (.complete | type) == "boolean" and (.rows | type) == "array"
+        and all(.rows[]; type == "object" and (.id | type) == "string"
+          and (.id | length) > 0 and (.overdue | type) == "boolean")
+      then [.rows[] | select(.overdue) | .id] | sort | .[]
+      else error("invalid open-loop ledger") end
+  ' "$ledger" 2>/dev/null) || return 0
+  if [ -f "$ledger" ] && [ ! -L "$ledger" ] \
+    && [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ]; then
+    rm -f "$STATE/.open-loops-stale-surfaced"
+  fi
+  [ -n "$ids" ] || { rm -f "$marker"; return 0; }
+  digest=$(printf '%s\n' "$ids" | cksum | awk '{print $1 "-" $2}')
+  previous=$(cat "$marker" 2>/dev/null || true)
+  if [ "$previous" = "$digest" ] && [ "$(age_of "$marker")" -lt "$OPEN_LOOPS_RESURFACE" ]; then
+    return 0
+  fi
+  overdue=$(printf '%s\n' "$ids" | wc -l | tr -d '[:space:]')
+  reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
+  fm_wake_append check open-loop-ledger "$reason" || exit 1
+  printf '%s\n' "$digest" > "$marker"
+  wake "$reason"
+}
+
 # One reconcile pass can wait on a single shared launch-confirmation window of up
 # to FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS (600 s), longer than the beacon
 # grace. Results are durable and observed below on every poll, so restarting
@@ -2761,6 +2836,15 @@ while :; do
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
     home_summary_refresh_detached
   fi
+
+  # Ledger refresh and surfacing run before any signal or check exit below, so a chatty
+  # fleet can never starve the obligation scan (wake() exits the cycle).
+  if [ ! -e "$STATE/open-loops.json" ] \
+    || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
+    open_loops_refresh_detached
+  fi
+  open_loops_surface
+  watcher_beat
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;

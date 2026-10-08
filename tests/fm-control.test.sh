@@ -198,6 +198,38 @@ fi
 exit 0
 SH
   chmod +x "$fb/sleep"
+  # The working-directory table the absence proof reads, canned so a case never
+  # depends on the machine's real processes: unrelated tmux servers and shells,
+  # plus (holder-cwd present) one staged agent process holding that directory.
+  cat > "$fb/lsof" <<'SH'
+#!/usr/bin/env bash
+D=$FM_FAKE_DIR
+encode_cwd() {
+  local path=$1
+  path=${path//\\/\\\\}
+  path=${path//$'\xc3\xa9'/\\xc3\\xa9}
+  printf '%s' "$path"
+}
+excluded=
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -p ]; then excluded=${2:-}; shift; fi
+  shift
+done
+if [ "$excluded" != "^$$" ]; then
+  printf 'p%s\nn%s\n' "$$" "$(encode_cwd "$(pwd -P)")"
+fi
+printf 'p111\nn/\np222\nn/private/tmp\n'
+[ ! -f "$D/holder-cwd" ] || printf 'p4343\nn%s\n' "$(encode_cwd "$(cat "$D/holder-cwd")")"
+exit 0
+SH
+  chmod +x "$fb/lsof"
+  cat > "$fb/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = '-p 4343 -o comm=' ]; then printf 'claude\n'; exit 0; fi
+if [ "$*" = '-p 4343 -o args=' ]; then printf 'claude --resume\n'; exit 0; fi
+exec /bin/ps "$@"
+SH
+  chmod +x "$fb/ps"
   printf '%s\n' "$fb"
 }
 
@@ -919,23 +951,42 @@ test_already_stopped_exit_is_idempotent() {
   pass "fm-control exit: an already-stopped agent is idempotent success with no bytes sent"
 }
 
-test_missing_tmux_endpoint_refuses_rather_than_claiming_a_stop() {
+test_missing_tmux_endpoint_is_proven_gone_for_the_recorded_task() {
   local dir out rc
-  dir=$(new_case gone)
+  dir=$(new_case 'gone-café\lane')
   add_task "$dir" t1 claude
   : > "$dir/fake/windows"
-  out=$(run_control "$dir" t1 exit); rc=$?
-  # `missing` on tmux is not a finding about the endpoint. A task record carries
-  # no socket identity for it, and any inventory describes only the tmux server
-  # this process addresses, so a window that is merely on a server this seat
-  # cannot reach is indistinguishable from one that was destroyed. exit refuses
-  # rather than claim a stop it cannot see, and sends nothing to an address it
-  # cannot trust. Reclaim of a destroyed endpoint is Herdr-only
-  # (docs/agent-control.md "Reclaiming a task whose endpoint is gone").
-  expect_code 1 "$rc" "a tmux endpoint whose absence cannot be proven must refuse"
-  assert_not_contains "$out" "endpoint-gone" "exit must not report a stop it could not prove"
-  [ -z "$(literals "$dir")" ] || fail "nothing may be sent into an endpoint exit cannot trust"
-  pass "fm-control exit: an unprovable tmux endpoint refuses instead of claiming the agent stopped"
+  mkdir -p "$dir/wt-t1/sub"
+  out=$(cd "$dir/wt-t1/sub" && run_control "$dir" t1 exit); rc=$?
+  # The recorded window is absent from its session's inventory and no agent
+  # holds the task's worktree, so the endpoint is proven gone even though
+  # unrelated tmux servers keep running (the canned lsof lists some).
+  expect_code 0 "$rc" "a destroyed tmux endpoint must be provable: $out"
+  assert_contains "$out" "endpoint-gone t1" "exit should report the proven absence"
+  [ -z "$(literals "$dir")" ] || fail "nothing may be sent into an endpoint that does not exist"
+  pass "fm-control exit: a tmux endpoint gone for the recorded task is proven despite unrelated servers"
+}
+
+test_missing_tmux_endpoint_refuses_while_an_agent_holds_the_worktree() {
+  local dir real shape out rc
+  for shape in logical-root logical-child physical-root physical-child; do
+    real=$(new_case "gone-held-$shape-café\\lane")
+    dir="$real-alias"
+    ln -s "$real" "$dir"
+    add_task "$dir" t1 claude
+    : > "$dir/fake/windows"
+    case "$shape" in
+      logical-root) cp "$dir/fake/cwd" "$dir/fake/holder-cwd" ;;
+      logical-child) printf '%s/sub' "$(cat "$dir/fake/cwd")" > "$dir/fake/holder-cwd" ;;
+      physical-root) printf '%s/wt-t1' "$real" > "$dir/fake/holder-cwd" ;;
+      physical-child) printf '%s/wt-t1/sub' "$real" > "$dir/fake/holder-cwd" ;;
+    esac
+    out=$(run_control "$dir" t1 exit); rc=$?
+    expect_code 1 "$rc" "a tmux endpoint with a $shape holder must refuse"
+    assert_not_contains "$out" "endpoint-gone" "exit must not report a stop it could not prove"
+    [ -z "$(literals "$dir")" ] || fail "nothing may be sent into an endpoint exit cannot trust"
+  done
+  pass "fm-control exit: escaped logical and physical worktree holders refuse instead of claiming a stop"
 }
 
 test_interrupt_refuses_when_no_agent_runs() {
@@ -1240,7 +1291,8 @@ test_herdr_exit_refuses_a_colored_claude_draft_before_typing
 test_herdr_exit_foreign_text_during_proof_is_a_known_send_failure
 test_herdr_exit_unproven_timeout_removes_marker_without_clearing
 test_failed_exit_send_leaves_no_deliberate_exit_marker
-test_missing_tmux_endpoint_refuses_rather_than_claiming_a_stop
+test_missing_tmux_endpoint_is_proven_gone_for_the_recorded_task
+test_missing_tmux_endpoint_refuses_while_an_agent_holds_the_worktree
 test_interrupt_refuses_when_no_agent_runs
 test_ambiguous_endpoint_refuses
 test_busy_agent_is_interrupted_before_the_exit_command

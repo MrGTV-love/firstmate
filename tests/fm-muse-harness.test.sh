@@ -434,7 +434,7 @@ EOF
   printf 'binding_id=retired\nsession_log=%s\n' "$prior" > "$home/state/$id.muse-session-current"
 
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    PATH="$fakebin:$PATH" "$TEARDOWN" "$id" --force >/dev/null 2>&1 \
+    PATH="$fakebin:$PATH" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>&1 \
     || fail "muse teardown failed"
   assert_absent "$binding" "muse session binding survived teardown"
   assert_absent "$home/state/$id.muse-session-current" "muse session cache survived teardown"

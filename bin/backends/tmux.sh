@@ -221,43 +221,6 @@ fm_backend_tmux_current_command() {  # <target>
 # shared with the Herdr adapter so both backends mean the same thing by
 # `agent`, `shell`, and `other`.
 
-# fm_backend_tmux_foreground_comms: the kernel-side names of every process in
-# <target>'s pane tty foreground process group, one full value per line.
-# Empty on any failure.
-#
-# This is the foreground-process-group half of the liveness probe, and it exists
-# because `#{pane_current_command}` and `ps -o comm=` expose different name
-# fields whose roles vary by platform. On macOS the tmux field can carry a
-# harness-rewritten title (Claude Code 2.1.220 reports `2.1.220`) while `comm`
-# retains executable identity; the portable Linux regression observes the
-# reverse for its version-named executable. Reading both `comm` and argv[0]
-# preserves an identifying install path without making either platform's field
-# assignment load-bearing.
-#
-# Scoping to the foreground process group rather than to the pane's descendants
-# is what keeps the probe honest in the other direction: a harness-named process
-# left running in the background of an otherwise idle pane is deliberately NOT
-# reported, so a genuinely agent-free pane still classifies `dead`. It also
-# reports every member of a multi-process launcher (the Pi Launcher path runs a
-# `pi-signed` wrapper and a `pi` engine in one group), so no launcher needs its
-# own special case here.
-#
-# Like fm_backend_tmux_current_command this is a RAW pane read: tmux answers an
-# absent target from the client's active window rather than failing, so callers
-# must confirm exact window membership first, exactly as the classifier below
-# does, or they will describe some other pane entirely.
-fm_backend_tmux_foreground_comms() {  # <target>
-  local target=$1 tty pid pgid tpgid comm
-  tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || return 0
-  [ -n "$tty" ] || return 0
-  LC_ALL=C ps -t "${tty#/dev/}" -o pid=,pgid=,tpgid=,comm= 2>/dev/null \
-    | while read -r pid pgid tpgid comm; do
-        [ -n "$comm" ] || continue
-        [ "$pgid" = "$tpgid" ] || continue
-        printf '%s\n' "$comm"
-      done
-}
-
 # The foreground group's full command lines. Needed because a node-bundle
 # harness carries its identity in argv[1] rather than in its command name or
 # argv[0]; bin/fm-gemini-lib.sh owns what counts as evidence inside one.

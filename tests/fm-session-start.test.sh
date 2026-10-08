@@ -545,7 +545,7 @@ make_fake_herdr_hanging_read() {
 #!/usr/bin/env bash
 set -u
 if [ "\${1:-}" = pane ] && [ "\${2:-}" = get ]; then
-  [ "\${3:-}" = "$hangpane" ] && sleep 300
+  [ "\${3:-}" = "$hangpane" ] && sleep 25
   [ "\${3:-}" = "$live" ] && exit 0
   exit 1
 fi
@@ -2171,7 +2171,7 @@ make_hanging_tool() {
   cat > "$fakebin/$name" <<'SH'
 #!/usr/bin/env bash
 trap '' TERM
-sleep 600
+sleep 25
 SH
   chmod +x "$fakebin/$name"
 }
@@ -2278,7 +2278,7 @@ SH
     waitpid $pid, 0;
     exit($? >> 8);
   ' env PATH="$fakebin:$BASE_PATH" "$driver" "$ROOT/bin/fm-timeout-lib.sh" \
-    perl -e '$SIG{TERM} = "IGNORE"; sleep 600' || status=$?
+    perl -e '$SIG{TERM} = "IGNORE"; sleep 25' || status=$?
 
   expect_code 124 "$status" "portable timeout TERM-resistant escalation"
   status=0

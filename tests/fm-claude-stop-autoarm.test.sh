@@ -100,7 +100,7 @@ if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
     exit 1
   fi
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
-  while [ -e "$FM_HOME/state/successor-park" ]; do sleep 0.05; done
+  while [ -e "$FM_HOME/state/successor-park" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.05; done
   exit 0
 fi
 echo "$$" >> "$FM_HOME/state/arm-ran"
@@ -145,7 +145,7 @@ SH
     reset-boundary)
       cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
 : > "$FM_HOME/state/arm-waiting"
-while [ ! -e "$FM_HOME/state/arm-release" ]; do sleep 0.02; done
+while [ ! -e "$FM_HOME/state/arm-release" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 0.02; done
 printf 'watcher: FAILED - cycle ended without an actionable reason\n'
 exit 1
 SH

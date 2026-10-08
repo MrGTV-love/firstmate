@@ -53,7 +53,7 @@ The installed pi-signed 0.82.0 wrapper repeated the shared Pi primary extension 
 The omp Run-tier adapter was verified on 2026-09-05 with omp 18.1.11 and the openai-codex `gpt-6-astra` model through `FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh`, which drives a real omp in its JSON-RPC stdio mode inside an isolated lab clone.
 Both tracked `.omp/extensions/*.ts` files loaded by auto-discovery alone (no `-e`, no trust dialog), `before_agent_start` returned the digest as a persistent context message, the model quoted the lab's `SESSION START -` heading back on its first turn, `state/.session-start-complete` was recorded, and `state/.lock` named the omp process, so ancestry detection identified the markerless binary.
 omp's `session_start` payload carries no reason field, so the adapter derives the source: the first start of the process is `startup` (or `resume` from a `--continue`/`--resume` launch line) and a later in-process start is `clear`; `tests/fm-omp-harness.test.sh` pins that mapping over a fake omp API.
-A file named both by `-e` and by auto-discovery loads twice (two factory calls, doubled `session_stop` continuations), which is why the secondmate launch names no `-e` and the per-task worker extension lives in `state/`.
+A file named both by `-e` and auto-discovery loaded twice (two factory calls, doubled `session_stop` continuations); the current launch separation is owned by [the omp adapter reference](../../.agents/skills/harness-adapters/references/harness/omp.md#extension-loading).
 
 ### Run-tier source vocabulary and context-reset injection
 
@@ -219,6 +219,15 @@ tests/fm-session-start.test.sh
 The kill test's fake `ps` walks real `/proc` ancestry to TERM the digest bash itself mid-lock-stage, so the parent-wrapper banner path is exercised end to end rather than asserted from output shape alone.
 Both process-tree cases therefore need a readable `/proc` and print a skip line without it, and the companion case that pins a signal death to a nonzero status on the perl timeout mechanism skips when `perl` is absent.
 These guarantees are process semantics, not vendor-emitted signals, so no live-harness guard is owed; the same suite is the refresh command.
+
+### Nested command bounds
+
+[`bin/fm-timeout-lib.sh`](../../bin/fm-timeout-lib.sh)'s header owns the shared Perl bound's process-group, signal, and owner-death contract.
+[`tests/fm-timeout-lib.test.sh`](../../tests/fm-timeout-lib.test.sh) exercises delayed child process-group creation through both `fm_run_timed` and `fm_nm_bounded`, TERM forwarding, and an outer deadline expiring before an inner bound with a TERM-resistant child and delayed inner cleanup.
+The nested-bound case checks that captured stdout closes promptly and the child is no longer running.
+[`tests/fm-crew-state.test.sh`](../../tests/fm-crew-state.test.sh)'s no-timeout case checks that the fake no-mistakes call actually ran and did not survive its bound before asserting the pane-state fallback.
+
+[`tests/lib.sh`](../../tests/lib.sh) owns registered fixture identity checks, stopped-watcher resumption, cleanup ordering, and the default blocking-stub ceiling.
 
 ## Semantic busy state
 

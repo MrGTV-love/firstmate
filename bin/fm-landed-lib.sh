@@ -28,6 +28,8 @@
 # The retained hold-kind alone keeps answered calls out of the section.
 # Merged PRs and reported scouts remain distinct.
 #
+# A row closed by a captain's drop carries the fixed note "dropped" and is never
+# a delivery, whatever other links it retains.
 # The backlog-selection compatibility fallback keeps a structured Done row
 # whose three parsed artifact fields are absent when it does not retain
 # hold-kind captain.
@@ -56,7 +58,8 @@ FM_LANDED_JQ_DEFS='
   # Pinned by tests/fm-captain-hold-lifecycle.test.sh on "released, retained, or
   # rejected deliveries were misclassified".
   def landed_delivery:
-    scout_report
+    (.captain_drop // false) == false
+    and (scout_report
     or (.kind != "scout"
       and .kind != "captain"
       and .hold_kind != "captain"
@@ -66,9 +69,10 @@ FM_LANDED_JQ_DEFS='
       and .kind != "captain"
       and .hold_kind != "captain"
       and .completion.verb == "done"
-      and (.local_note // null) != null);
+      and (.local_note // null) != null));
   def landed_record:
     .state == "done" and .structured
+    and (.captain_drop // false) == false
     and (landed_delivery
       or (.kind != "scout"
         and .kind != "captain"

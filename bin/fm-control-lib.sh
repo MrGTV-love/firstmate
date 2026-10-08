@@ -12,12 +12,10 @@
 # verbs addressed to an exact task id, with the per-harness mechanics owned
 # here rather than improvised per harness in agent prose.
 #
-# This file owns three capability tables plus their pure artifact-path tables,
-# and ONE named exception to that purity - fm_control_endpoint_absence_verdict,
-# the single owner of the per-backend endpoint-absence proof, which does run
-# backend reads. Everything else has no side effects, runs no backend command,
-# and reads no state, so sourcing this file is still free and the tables can be
-# read by a test as a pure contract:
+# This file owns three capability tables plus their pure artifact-path tables.
+# fm_control_endpoint_absence_verdict and its worktree-holder helper perform
+# backend and process reads; the tables remain pure, and sourcing this file
+# performs no probes:
 #
 #   1. Verb allowlist. There is no arbitrary-text and no generic raw-key entry
 #      point on the control plane; a caller either names an allowlisted verb or
@@ -127,9 +125,9 @@ fm_control_harness_supports_kind() {  # <harness> <kind>
 # rovo cancels on a single Escape too, printing "Agent cancelled" (verified,
 # 202609.1.2). agy cancels on a single Escape, printing the Interrupted row
 # with an idle composer and no repollution (verified live, agy 1.2.0 through
-# Herdr). omp (Oh My Pi) shares Pi's single Escape, empty composer
-# afterwards, and /quit exit (verified omp 18.1.2 in a PTY, re-verified 18.1.11
-# through Herdr).
+# Herdr). omp (Oh My Pi) shares Pi's single Escape and /quit exit.
+# Its queued follow-ups can return to the composer; the recovery contract is
+# owned by docs/watcher-continuity.md "omp restored-wake recovery".
 fm_control_interrupt_key() {  # <harness>
   case "${1-}" in
     claude|codex|opencode|pi|pi-signed|omp|kimi|cursor|gemini|muse|rovo|agy|devin) printf 'Escape' ;;
@@ -191,17 +189,19 @@ fm_control_interrupt_hazard_signal() {  # <harness>
   esac
 }
 
-# The key that must follow the interrupt key to leave the composer empty, or
-# nothing when the adapter needs none. muse is the one verified adapter that
-# RESTORES the cancelled prompt into its composer as real bright text, so an
-# interrupt is not complete until Ctrl+U has cleared it; leaving it there would
+# The adapter-owned post-interrupt clear key, or nothing when none is configured.
+# muse restores the cancelled prompt as real bright text, so its interrupt
+# sequence includes Ctrl+U; leaving it there would
 # make the next submitted line - a steer, or this plane's own exit command -
 # concatenate onto it. cursor was checked for exactly that behaviour and does
 # NOT repollute: after a single Escape its composer shows only the `Add a
 # follow-up` placeholder, so it needs no clear key. gemini was checked the
 # same way and also does not repollute: after a single Escape it prints
 # `Request cancelled.` and its composer shows only the `Type your message
-# or @path/to/file` placeholder. Prints the key or nothing;
+# or @path/to/file` placeholder. omp sends no clear key even though queued
+# follow-ups can return to the composer; watcher recovery is owned by
+# docs/watcher-continuity.md "omp restored-wake recovery".
+# Prints the key or nothing;
 # a harness with no verified mechanics returns nonzero, matching the tables
 # above.
 fm_control_interrupt_clear_key() {  # <harness>
@@ -302,6 +302,85 @@ fm_control_backend_state_verified() {  # <backend>
   return 1
 }
 
+fm_control_lsof_path() (
+  set -o pipefail
+  printf '%s' "$1" | LC_ALL=C od -An -v -tu1 | LC_ALL=C awk '
+    {
+      for (i = 1; i <= NF; i++) {
+        c = $i + 0
+        if (c == 255) exit 1
+        if (c == 8) printf "\\b"
+        else if (c == 9) printf "\\t"
+        else if (c == 10) printf "\\n"
+        else if (c == 12) printf "\\f"
+        else if (c == 13) printf "\\r"
+        else if (c < 32) printf "^%c", c + 64
+        else if (c == 92) printf "\\\\"
+        else if (c >= 127) printf "\\x%02x", c
+        else printf "%c", c
+      }
+    }
+  '
+)
+
+# fm_control_worktree_agent_holder: whether a harness agent process has the
+# recorded worktree (or a directory under it) as its working directory.
+# Prints `none`, `held`, or `unknown`; only `none` is absence evidence.
+# Unresolved evidence must stay `unknown`, never become a negative finding.
+# docs/agent-control.md "Reclaiming a task whose endpoint is gone" owns the
+# proof requirements; fm_agent_process_classify owns holder attribution.
+fm_control_worktree_agent_holder() {  # <worktree>
+  local wt=${1-} wt_real records rc line pid="" path root comm args argv0 holders="" seen=0 has_cwd=1
+  case "$wt" in /*) ;; *) printf 'unknown'; return 0 ;; esac
+  wt=${wt%/}
+  [ -n "$wt" ] || { printf 'unknown'; return 0; }
+  wt_real=$(cd "$wt" 2>/dev/null && pwd -P) || wt_real=$wt
+  wt=$(fm_control_lsof_path "$wt") || { printf 'unknown'; return 0; }
+  wt_real=$(fm_control_lsof_path "$wt_real") || { printf 'unknown'; return 0; }
+  command -v lsof >/dev/null 2>&1 || { printf 'unknown'; return 0; }
+  # Move the command-substitution shell as well as lsof out of the worktree:
+  # either can disappear before the subsequent holder identity reads.
+  records=$(cd / && LC_ALL=C lsof -w +c 0 -d cwd -F pn 2>/dev/null)
+  rc=$?
+  [ "$rc" -eq 0 ] || { printf 'unknown'; return 0; }
+  while IFS= read -r line; do
+    case "$line" in
+      p*)
+        [ "$has_cwd" -eq 1 ] || { printf 'unknown'; return 0; }
+        pid=${line#p}
+        seen=1
+        has_cwd=0
+        ;;
+      n*)
+        path=${line#n}
+        case "$path" in /*) ;; *) printf 'unknown'; return 0 ;; esac
+        has_cwd=1
+        for root in "$wt" "$wt_real"; do
+          case "$path/" in
+            "$root"/*) holders="$holders $pid" ;;
+          esac
+        done
+        ;;
+    esac
+  done <<HOLDERS
+$records
+HOLDERS
+  [ "$seen" -eq 1 ] && [ "$has_cwd" -eq 1 ] || { printf 'unknown'; return 0; }
+  for pid in $holders; do
+    case "$pid" in ''|*[!0-9]*) printf 'unknown'; return 0 ;; esac
+    comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) || { printf 'unknown'; return 0; }
+    args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || { printf 'unknown'; return 0; }
+    [ -n "$comm" ] && [ -n "$args" ] || { printf 'unknown'; return 0; }
+    argv0=${args%% *}
+    case "$(fm_agent_process_classify "$comm" "$argv0" "$args" "$pid")" in
+      agent) printf 'held'; return 0 ;;
+      shell) ;;
+      *) printf 'unknown'; return 0 ;;
+    esac
+  done
+  printf 'none'
+}
+
 # fm_control_endpoint_absence_verdict: the ONE owner of the per-backend proof
 # that an endpoint reading `missing` is actually GONE rather than merely
 # unreachable from this seat. Call it only for a `missing` raw state.
@@ -326,61 +405,47 @@ fm_control_backend_state_verified() {  # <backend>
 # re-creating the endpoint - must come through here rather than trusting the
 # raw verdict.
 #
-# Whether absence is provable AT ALL is a property of the backend, not of the
-# reading:
-#   herdr CAN prove it. Every read goes through fm_backend_herdr_cli, which
-#     passes `--session <session>`, so the recheck starts and reads the session
-#     the RECORD names, through that session's own socket. The answer is about
-#     the task's endpoint and nothing else.
-#   tmux CAN prove the machine-wide no-server case only. Its record has no
-#     socket identity, so any tmux process owned by the current uid prevents
-#     proof, even on another socket. Two readable full process snapshots must
-#     contain none, and the addressed socket must independently report no
-#     server on each pass. Empty, malformed, failed, or contradictory reads
-#     refuse. Counting clients too is intentionally conservative.
-#
-# Both control-plane callers share this one implementation so the proof cannot
-# drift into two answers for the same endpoint.
-fm_control_endpoint_absence_verdict() {  # <backend> <target>
-  local backend=${1-} target=${2-} uid snapshot inventory pass=0
+# docs/agent-control.md "Reclaiming a task whose endpoint is gone" owns the
+# backend proof requirements and reclaim policy. tmux callers must supply the
+# recorded worktree as well as the target; a socket-local read alone cannot
+# rule out a live owner on another socket.
+fm_control_endpoint_absence_verdict() {  # <backend> <target> [worktree]
+  local backend=${1-} target=${2-} worktree=${3-} session window inventory status holder pass=0
   fm_backend_source "$backend" \
     || { printf 'unproven\tbackend %s could not be loaded to prove anything about that endpoint' "'$backend'"; return 0; }
   case "$backend" in
     tmux)
-      uid=$(id -u) || uid=
-      case "$uid" in
-        ''|*[!0-9]*) printf 'unproven\tthe current uid could not be read'; return 0 ;;
+      case "$target" in
+        *:*:*|'':*|*:'') printf 'unproven\tthe recorded tmux endpoint is not a session:window pair'; return 0 ;;
+        *:*) ;;
+        *) printf 'unproven\tthe recorded tmux endpoint is not a session:window pair'; return 0 ;;
       esac
+      session=${target%%:*}
+      window=${target#*:}
+      # Read the recorded session's inventory before and after the worktree
+      # scan, so a window that appears between the two reads is caught.
       while [ "$pass" -lt 2 ]; do
         pass=$((pass + 1))
-        snapshot=$(LC_ALL=C ps -axww -o uid=,pid=,comm= 2>/dev/null) || {
-          printf 'unproven\tthe machine process table could not be read'
-          return 0
-        }
-        if ! printf '%s\n' "$snapshot" | LC_ALL=C awk -v uid="$uid" '
-          NF < 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ { invalid = 1 }
-          $1 == uid {
-            seen = 1
-            comm = $0
-            sub(/^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/, "", comm)
-            sub(/^.*\//, "", comm)
-            if (comm ~ /^tmux($|[ :])/) live = 1
-          }
-          END { exit (invalid || !seen || live) ? 1 : 0 }
-        '; then
-          printf 'unproven\tthe process table does not positively show zero tmux processes owned by the current uid; a server on another socket may still hold the endpoint'
-          return 0
-        fi
-        # A readable server inventory contradicts the zero-process snapshot,
-        # even if it omits this window. A transient error is not absence.
-        if inventory=$(LC_ALL=C tmux list-windows -t "=${target%%:*}" -F '#{window_name}' 2>&1); then
-          printf 'unproven\ttmux answered from a server despite the zero-process snapshot'
-          return 0
-        fi
-        case "$inventory" in
-          *"no server running on "*|*"error connecting to "*" (No such file or directory)"|*"error connecting to "*" (Connection refused)") ;;
-          *) printf 'unproven\ttmux did not corroborate the no-server process snapshot'; return 0 ;;
+        inventory=$(fm_backend_tmux_window_inventory "=$session")
+        status=$?
+        case "$status" in
+          0)
+            if printf '%s\n' "$inventory" | grep -Fqx -- "$window"; then
+              printf 'unproven\tthe recorded tmux window answers on the addressed server'
+              return 0
+            fi
+            ;;
+          2) ;;
+          *) printf 'unproven\ttmux did not answer definitively about the recorded session'; return 0 ;;
         esac
+        if [ "$pass" -eq 1 ]; then
+          holder=$(fm_control_worktree_agent_holder "$worktree")
+          case "$holder" in
+            none) ;;
+            held) printf 'unproven\tan agent process still holds the recorded worktree, so its endpoint may live on a server this process does not address'; return 0 ;;
+            *) printf 'unproven\tthe processes holding the recorded worktree could not be read'; return 0 ;;
+          esac
+        fi
       done
       printf 'gone\t'
       ;;
