@@ -10,7 +10,7 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 |---|---|
 | Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/fm-spawn.sh`; a missing binary refuses the spawn. |
 | Launch | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns launch flags, session posture, worker memory scope, and secondmate extension loading. |
-| Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the parent-owned per-task extension marks busy at `agent_start`, and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). The same generation-bound evidence is installed for local secondmate spawns and relaunches. |
+| Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the crewmate/scout per-task extension marks busy at `agent_start`, and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). Secondmates do not load a parent-task busy adapter. |
 | Exit command | `/quit` (`/exit` and `/q` are aliases). |
 | Interrupt | Single Escape, no clear key; queued follow-ups can return to the composer (see [restored-wake recovery](../../../docs/watcher-continuity.md#omp-restored-wake-recovery)). |
 | Skill invocation | No separate verified form beyond normal command behavior; use natural language when the exact command is uncertain. |
@@ -41,8 +41,8 @@ The optional claude-bridge extension runs a nested executable literally named `c
 ## Extension loading
 
 omp auto-discovers `<cwd>/.omp/extensions/*.ts` (top level only, cwd only, no ancestor walk, no trust dialog) and the active profile's `agent/extensions/`; `.pi/extensions/` is not a discovery root.
-A file that is both auto-discovered and named with `-e` loads twice, so every canonical crew, scout, or local secondmate launch loads its semantic busy extension explicitly from the parent's `state/`.
-Secondmates retain home-local auto-discovery for their tracked primary extensions; the explicit parent extension contains only semantic busy events, without another primary guard, guardrail, or turn-end wake handler.
+A file that is both auto-discovered and named with `-e` loads twice, so a canonical crewmate/scout launch loads its semantic busy extension explicitly from the parent's `state/`.
+Ordinary secondmate launches use home-local auto-discovery for their tracked primary extensions, without a parent-task busy adapter or explicit duplicate loading.
 There is no `agent_settled` event; `agent_end` plus `willContinue` replaces it.
 
 ## Primary integration

@@ -22,8 +22,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
 | `fm-secondmate-reconcile.sh` | Queue Bearings reconcile requests for later supervision delivery and ask each mismatched home through its durable inbox with a per-home cooldown |
 | `fm-update.sh`           | Guarded self-update of firstmate and local or remote secondmate homes, reconciling redundant divergence and classifying every live mate left on the target commit for restart or fallback nudge |
-| `fm-secondmate-restart.sh` | Persist open conversational work, then restart mates with current-launch turn-end producers once they confirm and their turn ends; nudge unwired, unverified, or remote mates without queueing a restart |
-| `fm-secondmate-restart-lib.sh` | Shared producer-aware second-mate restart admission, persistence-request contract, and the recorded event-driven restart supervision finishes |
+| `fm-secondmate-restart.sh` | Persist open conversational work, then restart eligible second mates or report the fallback outcome |
+| `fm-secondmate-restart-lib.sh` | Shared second-mate restart capability and persistence-request contract |
 | `fm-on.sh`               | Execute one tracked Firstmate command in a configured remote secondmate home, using its job worker except for the doctor bootstrap |
 | `fm-remote-job-lib.sh`   | Shared bounded remote job queue, worker readiness, LaunchAgent contract, and filesystem-composed PATH |
 | `fm-remote-job-worker.sh` | Long-lived remote queue worker for tracked `fm-*.sh` commands in the account runtime |
@@ -169,11 +169,3 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-voice-client.py`     | The laptop end of the spoken interface: capture, playback, and turn timing over SSH; audio devices unverified |
 | `fm_voice_frame.py`      | The wire format both machines share, copied to the laptop beside the client          |
 | `fm_voice_records.py`    | What a spoken answer may read, and the handover that queues real work                |
-
-`fm-secondmate-restart.sh` holds each mate's liveness lock from admission through its service attempt and result capture; an existing outcome is captured and consumed during admission. SIGINT, SIGTERM, and exit cleanup stop the restart workers and their lifecycle descendants before releasing those locks, including supervised request processing. Overlapping fleet requests acquire mate locks in a consistent order. Deferred completions retain the request correlation in their outcome record, so watcher retries use the same per-outcome wake key. Wake append and outcome retirement share the wake-queue lock; both main and branch acknowledgement refuse to consume a completion notification while its matching outcome remains unretired.
-
-Each secondmate restart follows admission → delivered → answered → turn-ended → relaunched(incarnation) → outcome published → consumed under that same per-mate lock. Admission publishes the request before delivering the persist message; cancellation or uncertain delivery retains it, while definite rejection discards it. The request holds the correlation and routing fields, not a duplicate launch profile. Confirmed relaunch records the replacement's busy generation, or its existing spawn generation for adapters without a push busy record, before outcome publication. Servicing and automatic recovery reconcile that recorded incarnation without relaunching again if publication fails. Long-turn notices also acquire the lock and recheck the request before publishing.
-
-Recorded restart servicing rechecks affirmative turn-end evidence at `fm-control.sh`'s stop boundary, before interrupting or submitting the exit command. If a new turn starts during profile resolution, checkpointing, or composer inspection, the request stays queued without a completion record until a later turn end.
-
-Restart release accepts adapter turn-completion evidence, not synthetic idle resets from interrupt, recovery, or initial spawn bookkeeping. The admission check still accepts a spawn-owned busy record for a wired adapter; that seed never proves a turn ended.
