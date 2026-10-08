@@ -290,7 +290,27 @@
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
 #     vanished; a live matching target or uncertain result refuses, as do authorization
 #     and write failures. Idempotent: nothing left to find is a silent no-op.
-# After Fix 1 and Fix 2, when config/pipeline-spend opts this home in, a ship
+#   Fix 3 - retire task-private no-mistakes launch agents (runs after Fix 1 and
+#     BEFORE Fix 2, because Fix 2 can neither prove custody of nor durably stop
+#     what an agent owns). A worker that points NO_MISTAKES_HOME inside its task
+#     copy makes no-mistakes install a KeepAlive launchd agent,
+#     com.kunchenguid.no-mistakes.daemon.<hash>, that survives reboots and
+#     relaunches its daemon (`daemon run --root <copy>/.no-mistakes/h`) after
+#     every kill; that daemon's cwd sits beneath the scan root, so Fix 2
+#     refuses it (observed 2026-10-06, six days of uptime).
+#     retire_task_private_nm_launch_agents reads every such plist in
+#     $FM_LAUNCH_AGENTS_DIR (default ~/Library/LaunchAgents) and acts only on
+#     one whose Label matches its file name and whose `--root` is the task copy
+#     or inside it after canonicalization (`..` and `.` segments, and lookalike
+#     prefixes such as <copy>-x, never match). It then runs `launchctl bootout
+#     gui/<uid>/<label>`, requires `launchctl print` to report the service gone
+#     (exit 113), and moves the plist to data/<id>/launchagent-backup/. The
+#     shared daemon's agent (root ~/.no-mistakes), another task's agent, and any
+#     plist that cannot be parsed are left exactly as found; teardown never runs
+#     `no-mistakes daemon stop`, which targets the shared daemon. An agent that
+#     stays loaded, an unreadable load state, or a failed archive refuses even
+#     with --force, preserving the plist and the copy.
+# After Fix 1, Fix 3, and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
 # ledger. It runs before the task branch it attributes runs by is deleted and
@@ -2450,6 +2470,90 @@ EOF
 }
 
 
+# Fix 3 (see script header): "label<TAB>root" for a no-mistakes daemon launch
+# agent plist, from its Label and the `--root` of its `daemon run` arguments.
+# Fails for anything that is not that exact, parsable shape.
+nm_launch_agent_fields() {  # <plist>
+  perl -e '
+    local $/;
+    my $x = <STDIN>;
+    my ($label) = $x =~ m{<key>Label</key>\s*<string>([^<]*)</string>} or exit 1;
+    $x =~ m{<key>ProgramArguments</key>\s*<array>(.*?)</array>}s or exit 1;
+    my @a = $1 =~ m{<string>([^<]*)</string>}g;
+    my $root;
+    for my $i (0 .. $#a - 3) {
+      next unless $a[$i] eq "daemon" && $a[$i + 1] eq "run" && $a[$i + 2] eq "--root";
+      $root = $a[$i + 3];
+      last;
+    }
+    defined $root && length $root or exit 1;
+    my %e = (amp => "&", lt => "<", gt => ">", quot => "\"", apos => "\x27");
+    for ($label, $root) { s/&(amp|lt|gt|quot|apos);/$e{$1}/g }
+    exit 1 if $label =~ /[^A-Za-z0-9._-]/ || $root =~ /[\t\n\r]/;
+    print "$label\t$root\n";
+  ' < "$1"
+}
+
+# Fix 3 (see script header): bootout, then archive, every no-mistakes daemon
+# launch agent whose `--root` is the task copy or inside it. Anything else, an
+# unparsable plist included, is left exactly as found.
+retire_task_private_nm_launch_agents() {  # <worktree>
+  local wt=$1 dir plist label root canon_wt canon_root fields uid backup dest rc attempt
+  dir=${FM_LAUNCH_AGENTS_DIR:-${HOME:-}/Library/LaunchAgents}
+  [ -d "$dir" ] || return 0
+  canon_wt=$(task_canonical_path "$wt") || return 0
+  uid=$(id -u)
+  backup="$DATA/$ID/launchagent-backup"
+  for plist in "$dir"/com.kunchenguid.no-mistakes.daemon.*.plist; do
+    [ -f "$plist" ] || continue
+    if [ -L "$plist" ] || ! fields=$(nm_launch_agent_fields "$plist"); then
+      echo "teardown: leaving unreadable no-mistakes launch agent $plist as found; its root cannot be proven to be $ID's" >&2
+      continue
+    fi
+    label=${fields%%$'\t'*}
+    root=${fields#*$'\t'}
+    [ "$plist" = "$dir/$label.plist" ] || continue
+    case "$root" in /*) ;; *) continue ;; esac
+    case "$root/" in */../*|*/./*|*//*) continue ;; esac
+    canon_root=$(task_canonical_path "$root") || continue
+    case "$canon_root" in "$canon_wt"|"$canon_wt"/*) ;; *) continue ;; esac
+    if ! command -v launchctl >/dev/null 2>&1; then
+      echo "REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable, so it cannot be unloaded; preserving the worktree and $plist." >&2
+      return 1
+    fi
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      rc=0
+      launchctl print "gui/$uid/$label" >/dev/null 2>&1 || rc=$?
+      case "$rc" in
+        113) break ;;
+        0) ;;
+        *)
+          echo "REFUSED: cannot tell whether no-mistakes launch agent $label (rooted in $ID's copy) is loaded (launchctl print exited $rc); preserving the worktree and $plist." >&2
+          return 1
+          ;;
+      esac
+      if [ "$attempt" = 1 ]; then
+        launchctl bootout "gui/$uid/$label" >/dev/null 2>&1 || true
+      else
+        sleep 0.25
+      fi
+      rc=0
+    done
+    if [ "$rc" != 113 ]; then
+      echo "REFUSED: no-mistakes launch agent $label (rooted in $ID's copy) is still loaded after launchctl bootout; preserving the worktree and $plist." >&2
+      return 1
+    fi
+    dest="$backup/$label.plist"
+    [ ! -e "$dest" ] || dest="$dest.$(date +%s)"
+    if ! mkdir -p "$backup" || ! mv -- "$plist" "$dest"; then
+      echo "REFUSED: could not archive no-mistakes launch agent plist $plist to $dest; preserving the worktree." >&2
+      return 1
+    fi
+    echo "teardown: retired task-private no-mistakes launch agent $label (root $root); plist archived to $dest" >&2
+  done
+}
+
+
 # The task's own live slot, canonicalized, or empty when this record has no slot
 # to release (a secondmate home, a record with no worktree=, or a path that is
 # already gone). Every slot-ownership check below is scoped to that value, so a
@@ -3705,6 +3809,7 @@ fi
 # not by task-worktree cleanup.
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   conclude_task_no_mistakes_run "$WT"
+  retire_task_private_nm_launch_agents "$WT" || exit 1
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"

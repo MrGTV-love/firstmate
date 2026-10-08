@@ -1468,6 +1468,46 @@ test_crewmate_scaffolds_forbid_pool_administration() {
   pass "fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool"
 }
 
+test_crewmate_scaffolds_require_stopping_private_services() {
+  local home mode id brief ship_rule scout_rule
+  home="$TMP_ROOT/private-service-home"
+  mkdir -p "$home/data"
+
+  for mode in no-mistakes direct-PR local-only; do
+    id="brief-private-$mode"
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh --mode $mode exited non-zero"
+    brief="$home/data/$id/brief.md"
+    assert_grep "8. Stop every private service you start." "$brief" \
+      "$mode ship brief lacks the private-service rule"
+    assert_grep "NO_MISTAKES_HOME" "$brief" \
+      "$mode ship brief does not name the private no-mistakes home"
+    assert_grep "name it in that status line" "$brief" \
+      "$mode ship brief does not require naming the service in the status line"
+    # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+    assert_grep 'launchctl bootout gui/$(id -u)/<label>' "$brief" \
+      "$mode ship brief does not say how to stop the launchd agent"
+    assert_grep "Never use \`no-mistakes daemon stop\` for this" "$brief" \
+      "$mode ship brief does not forbid stopping the shared daemon"
+  done
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-private-scout alpha --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh --scout exited non-zero"
+  brief="$home/data/brief-private-scout/brief.md"
+  ship_rule=$(awk '/^8\. Stop every private service/,/^$/' "$home/data/brief-private-no-mistakes/brief.md")
+  scout_rule=$(awk '/^8\. Stop every private service/,/^$/' "$brief")
+  [ -n "$ship_rule" ] || fail "ship brief emitted no private-service rule to compare"
+  [ "$ship_rule" = "$scout_rule" ] || fail "ship and scout private-service rules have drifted apart"
+
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-private-mate --secondmate alpha >/dev/null 2>&1 \
+    || fail "fm-brief.sh --secondmate exited non-zero"
+  assert_no_grep "Stop every private service you start." "$home/data/brief-private-mate/brief.md" \
+    "secondmate charter must not inherit the crewmate private-service rule"
+
+  pass "fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
@@ -1505,3 +1545,4 @@ test_branch_prefix_is_refused_where_it_does_not_apply
 test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_crewmate_scaffolds_forbid_pool_administration
+test_crewmate_scaffolds_require_stopping_private_services
