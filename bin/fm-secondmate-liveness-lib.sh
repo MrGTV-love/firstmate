@@ -133,10 +133,10 @@ fm_sm_live_finish_restart_request() {  # <id>
   [ -f "$STATE/.secondmate-restart-$1.request" ] || return 0
   if ! command -v fm_secondmate_restart_request_finish >/dev/null 2>&1; then
     # shellcheck source=bin/fm-secondmate-restart-lib.sh
-    . "$FM_SM_LIVE_LIB_DIR/fm-secondmate-restart-lib.sh" || return 0
+    . "$FM_SM_LIVE_LIB_DIR/fm-secondmate-restart-lib.sh" || return 1
   fi
   fm_secondmate_restart_request_finish "$STATE" "$1" \
-    "restarted: $1 (its endpoint had stopped, so the automatic relaunch brought it up on the current instructions)" || true
+    "restarted: $1 (its endpoint had stopped, so the automatic relaunch brought it up on the current instructions)"
 }
 
 # fm_secondmate_liveness_probe <meta> <id> <full|poll>
@@ -361,7 +361,14 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   FM_SM_LIVE_RC=$rc
   if [ "$rc" -eq 0 ]; then
     fm_secondmate_liveness_ledger_add "$id" relaunched || true
-    fm_sm_live_finish_restart_request "$id"
+    if ! fm_sm_live_finish_restart_request "$id"; then
+      FM_SM_LIVE_STATUS=skipped
+      FM_SM_LIVE_REASON="the endpoint was relaunched but its restart completion could not be recorded"
+      FM_SM_LIVE_OUT="$FM_SM_LIVE_REASON${FM_SM_LIVE_OUT:+
+$FM_SM_LIVE_OUT}"
+      FM_SM_LIVE_RC=1
+      return 1
+    fi
   else
     fm_secondmate_liveness_ledger_add "$id" failed || true
   fi

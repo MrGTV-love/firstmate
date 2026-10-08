@@ -87,30 +87,17 @@ status_paused_until() {  # <status-line> -> epoch on stdout
 # Any decision the fold still holds open wins over unrelated events, and the
 # fold's most recently opened record supplies it; a standing declared wait, then
 # the latest recognized event, stands when nothing is open.
-# One exception: a standing `paused` declaration for the very key a decision
-# opened is that decision's current state. A standing declared wait is always
-# newer than every open decision (a later opener ends it), and a worker that
-# re-declares its own open key as a wait is waiting on that answer, not asking
-# again. The decision stays open in the fold, so OPEN DECISIONS and the fleet
-# snapshot still surface it; only a still-open decision under ANOTHER key keeps
-# precedence over the pause. A captain-held line closes its own key in the fold,
-# so it never takes this exception.
 # Actual run/pane evidence is still reconciled by fm-crew-state.sh.
 status_current_line() {  # <status-file> <kind>
-  local open key verb note current='' wait wait_key=''
+  local open key verb note current=''
   open=$(status_open_decisions "$1" "$2")
-  wait=$(status_declared_wait_line "$1")
-  if status_is_paused "$wait"; then
-    wait_key=$(_fm_decision_key "$wait") || wait_key=''
-  fi
   while IFS=$'\t' read -r key verb note; do
     case "$verb" in ?*) ;; *) continue ;; esac
-    [ -n "$wait_key" ] && [ "$key" = "$wait_key" ] && continue
     current="$verb [key=$key]: $note"
   done <<EOF
 $open
 EOF
-  [ -n "$current" ] || current=$wait
+  [ -n "$current" ] || current=$(status_declared_wait_line "$1")
   [ -n "$current" ] || current=$(last_status_line "$1")
   printf '%s\n' "$current"
 }
@@ -299,7 +286,7 @@ EOF
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
   local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
-  local target_cursor kind fold_version
+  local target_cursor kind fold_version partial_line='' LC_ALL=C
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_fm_status_kind "$f")
   fold_version=$(_fm_open_decisions_fold_signature "$kind")
@@ -359,11 +346,12 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
       && printf '%s\t%s\n' "$f" "$chunk_size" >> "$FM_OPEN_DECISIONS_READ_PROBE"
     resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
     held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-    while IFS= read -r line || [ -n "$line" ]; do
+    while IFS= read -r line; do
       open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+      offset=$((offset + ${#line} + 1))
     done < "$chunk_file"
+    partial_line=$line
     rm -f "$chunk_file"
-    offset=$size
     cursor_dirty=1
   fi
   if [ "$cursor_dirty" -eq 1 ]; then
@@ -375,6 +363,9 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
       if [ -n "$open" ]; then printf '%s' "$open"; fi
     } > "$target_cursor" || return 1
     mv -f "$target_cursor" "$cf" || return 1
+  fi
+  if [ -n "$partial_line" ]; then
+    open=$(_fm_decision_fold_line "$open" "$partial_line" "$resolve" "$held" "$kind")
   fi
   printf '%s' "$open"
 }
@@ -392,7 +383,7 @@ status_open_decisions_checkpoint_carry() {  # <live-status> <captured-status> <l
   local live=$1 copy=$2 live_ident=$3 now_ident copy_ident copy_size target
   [ -n "$live_ident" ] || return 0
   [ -f "$copy" ] && [ ! -L "$copy" ] || return 0
-  _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$live")" || return 0
+  _fm_open_decisions_checkpoint_seed "$live" "$(_fm_status_kind "$live")" || return 0
   [ "$_FM_ODC_IDENT" = "$live_ident" ] || return 0
   now_ident=$(_fm_open_decisions_file_ident "$live" 2>/dev/null) || return 0
   [ "$now_ident" = "$live_ident" ] || return 0

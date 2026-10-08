@@ -486,20 +486,18 @@ test_seeded_whole_file_fold_matches_a_fold_from_line_one() {
         [ "$k" -le "$size" ] || continue
         rm -f "$cf"
         status_open_decisions_incremental "$f" "$k" >/dev/null
-        grep -qx "offset=$k" "$cf" || { echo "writer did not checkpoint at $k"; exit 1; }
+        checkpoint=$(sed -n "s/^offset=//p" "$cf")
+        expected=0
+        for boundary in $offsets; do
+          [ "$boundary" -le "$k" ] && [ "$boundary" -le "$size" ] && expected=$boundary
+        done
+        [ "$checkpoint" = "$expected" ] || { echo "writer checkpointed at $checkpoint instead of complete boundary $expected"; exit 1; }
         : > "$spanlog"
         seeded=$(FM_STATUS_SPAN_READER=$reader status_open_decisions "$f")
         [ "$seeded" = "$reference" ] || { printf "offset %s diverged:\n%s\n--- reference:\n%s\n" "$k" "$seeded" "$reference"; exit 1; }
-        case " $offsets " in
-          *" $k "*)
-            if [ "$k" -lt "$size" ]; then
-              grep -qx "$k $((size - k))" "$spanlog" || { echo "offset $k: seeded fold did not read only the tail: $(cat "$spanlog")"; exit 1; }
-            fi
-            ;;
-          *)
-            ! grep -q "^$k " "$spanlog" || { echo "offset $k: a mid-line checkpoint seeded the fold"; exit 1; }
-            ;;
-        esac
+        if [ "$checkpoint" -lt "$size" ]; then
+          grep -qx "$checkpoint $((size - checkpoint))" "$spanlog" || { echo "offset $checkpoint: seeded fold did not read only the tail: $(cat "$spanlog")"; exit 1; }
+        fi
       done
       rm -f "$cf"
       [ "$(status_open_decisions "$f")" = "$reference" ] || { echo "fold without a checkpoint changed"; exit 1; }
@@ -622,6 +620,46 @@ test_golden_fold_equivalence_on_real_status_logs() {
   pass "golden fold: $count real status logs fold identically from line 1, seeded, and incrementally"
 }
 
+test_successive_appends_replay_unfinished_lines() {
+  local dir state status out
+  dir=$(make_case unfinished-lines); state="$dir/state"; status="$state/task.status"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  mkdir -p "$dir/copy"
+  out=$(bash -c '
+    . "$1"
+    f=$2 copy=$3 cf="$(dirname "$2")/.task.open-decisions-cursor"
+    printf "needs-decision [key=api]: REST" > "$f"
+    [ "$(status_open_decisions_incremental "$f")" = $'"'"'api\tneeds-decision\tREST'"'"' ] || exit 1
+    grep -qx "offset=0" "$cf" || { echo "partial opener was checkpointed"; exit 1; }
+    printf " or RPC\n" >> "$f"
+    expected=$'"'"'api\tneeds-decision\tREST or RPC'"'"'
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "completed opener lost its suffix"; exit 1; }
+    [ "$(status_open_decisions "$f")" = "$expected" ] || exit 1
+    printf "resolved [key=api]: settled" >> "$f"
+    [ -z "$(status_open_decisions_incremental "$f")" ] || exit 1
+    printf "\nneeds-decision [key=utf8]: café" >> "$f"
+    expected=$'"'"'utf8\tneeds-decision\tcafé'"'"'
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || exit 1
+    printf " or thé\n" >> "$f"
+    expected=$'"'"'utf8\tneeds-decision\tcafé or thé'"'"'
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "multibyte partial opener diverged"; exit 1; }
+    ident=$(_fm_open_decisions_file_ident "$f")
+    cp "$f" "$copy"; cp "${f%.status}.meta" "${copy%.status}.meta"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ "$(status_open_decisions "$copy")" = "$expected" ] || { echo "snapshot carried a partial fold"; exit 1; }
+    size=$(wc -c < "$f" | tr -d "[:space:]")
+    printf "version=9:secondmate\noffset=%s\nident=%s\napi\tneeds-decision\tREST\n" "$size" "$ident" > "$cf"
+    [ "$(status_open_decisions "$f")" = "$expected" ] || { echo "whole-file read reused poisoned legacy checkpoint"; exit 1; }
+    rm -f "$(dirname "$copy")/.task.open-decisions-cursor"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ ! -e "$(dirname "$copy")/.task.open-decisions-cursor" ] || { echo "legacy checkpoint carried onto snapshot"; exit 1; }
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "incremental reused poisoned legacy checkpoint"; exit 1; }
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$status" "$dir/copy/task.status" 2>&1) \
+    || fail "successive unfinished lines: $out"
+  pass "successive appends replay partial lines and reject poisoned legacy checkpoints"
+}
+
+test_successive_appends_replay_unfinished_lines
 test_terminal_supersession_reaches_cached_drains
 test_kind_changes_invalidate_folded_decisions
 test_seeded_whole_file_fold_matches_a_fold_from_line_one

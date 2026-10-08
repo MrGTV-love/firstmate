@@ -30,12 +30,11 @@
 #      All requests go out before any restart, so a slow mate delays only its own
 #      restart instead of serializing the fleet behind it.
 #   B. RESTART. Only after that mate's own correlated answer lands on the parent
-#      channel and, for a local mate, the turn that answered has ended. Both
-#      gates are events, never a wall clock: a mate can sit inside one turn for
-#      hours, so this command records a durable restart request, tries it once,
-#      and returns. A mate whose answer has not arrived yet is reported as
-#      queued, and supervision finishes its restart whenever both events have
-#      happened (bin/fm-secondmate-restart-lib.sh owns the request record, the
+#      channel and affirmative evidence proves its turn ended. Both gates are
+#      events, never a wall clock: this command records a durable restart
+#      request, tries it once, and returns. Missing or inconclusive turn evidence,
+#      including a remote route without turn evidence, leaves the restart queued
+#      for supervision (bin/fm-secondmate-restart-lib.sh owns the request record,
 #      gates, and the lock shared with the watcher's automatic relaunch). An
 #      unanswered request stays a genuine open loop owned by the ordinary
 #      pending-reply recovery ladder, not state this restart pass may close.
@@ -77,15 +76,15 @@
 #   FM_SECONDMATE_PERSIST_POLL  seconds between checks of in-flight restarts (5)
 #
 # Exit status: 0 every named mate restarted or is queued for its event-driven
-# restart; 3 at least one was nudged or left unreached and every mate was still
-# accounted for; 1 the input itself is unusable; 2 invalid use.
+# restart; 3 at least one was nudged or left unreached, or request processing
+# could not record completion; 1 the input itself is unusable; 2 invalid use.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
-  sed -n '2,81{s/^# \{0,1\}//;p;}' "$0"
+  sed -n '2,80{s/^# \{0,1\}//;p;}' "$0"
 }
 
 PROCESS_REQUESTS=0
@@ -120,16 +119,18 @@ PERSIST_POLL=${FM_SECONDMATE_PERSIST_POLL:-5}
 case "$PERSIST_POLL" in ''|*[!0-9]*|0) echo "error: FM_SECONDMATE_PERSIST_POLL must be a positive integer: $PERSIST_POLL" >&2; exit 2 ;; esac
 
 # Supervision half: try every recorded request once and leave each finished
-# outcome for the watcher to surface. Silent; the outcome files are the result.
+# outcome for the watcher to surface. Completion errors remain visible.
 if [ "$PROCESS_REQUESTS" -eq 1 ]; then
+  process_rc=0
   for request in "$STATE"/.secondmate-restart-*.request; do
     [ -f "$request" ] && [ ! -L "$request" ] || continue
     id=${request##*/.secondmate-restart-}
     id=${id%.request}
     case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
-    fm_secondmate_restart_service "$STATE" "$id" >/dev/null 2>&1 || true
+    fm_secondmate_restart_service "$STATE" "$id" >/dev/null
+    [ "$?" -ne 3 ] || process_rc=3
   done
-  exit 0
+  exit "$process_rc"
 fi
 
 IDS=()
@@ -193,10 +194,9 @@ fall_back_to_nudge() {  # <id> <reason>
 service_mate() {  # <array-index>
   local i=$1 id line rc
   id=${IDS[$i]}
-  line=$(fm_secondmate_restart_service "$STATE" "$id"); rc=$?
+  line=$(fm_secondmate_restart_service "$STATE" "$id" consume); rc=$?
   case "$rc" in
-    0)
-      rm -f "$(fm_secondmate_restart_outcome_path "$STATE" "$id")"
+    0|3)
       printf '%s\n' "$line"
       ;;
     1)
@@ -275,8 +275,13 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   HARNESS[i]=""
   MODEL[i]=""
   EFFORT[i]=""
+  if ! fm_secondmate_liveness_lock "$id"; then
+    printf 'waiting: %s: supervision is probing or relaunching its endpoint; waiting to record its restart request\n' "$id" >&2
+    fm_lock_acquire_wait "$STATE/.secondmate-liveness-$id.lock"
+  fi
   if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))
     continue
   fi
@@ -301,11 +306,13 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     resolved_model=${MODEL[i]}
     if [ -n "${MODEL[i]}" ] && ! resolved_model=$("$SCRIPT_DIR/fm-model-index.sh" model "${HARNESS[i]}" "${MODEL[i]}" 2>/dev/null); then
       REASON[i]="its configured model does not resolve through the model index (a retired id or an unconfigured role)"
+      fm_secondmate_liveness_unlock "$id"
       i=$((i + 1))
       continue
     fi
     if [ "${EFFORT[i]}" = ultra ] && ! "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "${HARNESS[i]}" "$resolved_model" "${EFFORT[i]}"; then
       REASON[i]="the configured Ultra profile does not select native Codex through Pi"
+      fm_secondmate_liveness_unlock "$id"
       i=$((i + 1))
       continue
     fi
@@ -314,8 +321,10 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   # A restart already recorded for this mate is still waiting on that mate's
   # own events; asking again would only queue a second persist request behind
   # the first, so the recorded request is tried instead.
-  if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ]; then
+  if [ -f "$(fm_secondmate_restart_request_path "$STATE" "$id")" ] \
+    || [ -f "$(fm_secondmate_restart_outcome_path "$STATE" "$id")" ]; then
     PLAN[i]="recorded"
+    fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))
     continue
   fi
@@ -323,6 +332,7 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   if ! corr=$(fm_pending_reply_create "$FM_HOME" "$STATE" "$id" \
     "$FM_SECONDMATE_PERSIST_REQUEST"); then
     REASON[i]="its answer about the open work cannot be tracked, so a clean reload could not be proven"
+    fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))
     continue
   fi
@@ -331,16 +341,19 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     "$SCRIPT_DIR/fm-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
     fm_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true
     REASON[i]="the request to write down its open work could not be delivered: $(first_reported_line "$send_out")"
+    fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))
     continue
   fi
   if ! fm_secondmate_restart_request_write "$STATE" "$id" "$corr" "${PLACEMENT[i]}" \
     "${HOST[i]}" "${HARNESS[i]}" "${MODEL[i]}" "${EFFORT[i]}"; then
     REASON[i]="its restart request could not be recorded, so it was asked to write down its open work but will not be restarted"
+    fm_secondmate_liveness_unlock "$id"
     i=$((i + 1))
     continue
   fi
   PLAN[i]="recorded"
+  fm_secondmate_liveness_unlock "$id"
   i=$((i + 1))
 done
 

@@ -156,6 +156,87 @@ EOF
   pass "Pi replacement with no successor heals once; a real successor never double-arms; quit never heals"
 }
 
+test_pi_factory_replacement_retires_and_hands_off() {
+  local repo home out status
+  repo="$TMP_ROOT/pi-factory-root"; home="$TMP_ROOT/pi-factory-home"
+  install_pi_watch_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+first=0
+[ -e "$FM_ARM_LOG" ] || first=1
+printf 'arm=%s\n' "$$" >> "$FM_ARM_LOG"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+if [ "$first" -eq 1 ]; then
+  printf 'check: factory replacement wake\n'
+  exit 0
+fi
+exec sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$repo/.pi/extensions/fm-primary-pi-watch.ts" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$home/arms.log" FM_PI_SUCCESSOR_GRACE_MS=400 \
+    FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" node --input-type=module 2>&1 <<'EOF'
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const waitFor = async (predicate) => {
+  for (let i = 0; i < 100 && !predicate(); i++) await sleep(50);
+  if (!predicate()) throw new Error("timed out waiting for fixture event");
+};
+const makePi = () => {
+  const handlers = new Map(), sent = [], box = {};
+  return { handlers, sent, box, pi: {
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { if (t.name === "fm_watch_arm_pi") box.tool = t; },
+    sendUserMessage: async (text) => { sent.push(text); },
+    events: { on() {}, emit() {} },
+  } };
+};
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").length : 0;
+const handoff = `${process.env.FM_HOME}/state/extensions/pi-primary-watch/session-replacement-actionable.json`;
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const url = pathToFileURL(process.env.PLUGIN).href;
+const mod = await import(url);
+const first = makePi(); mod.default(first.pi);
+await first.handlers.get("session_start")({}, {});
+await waitFor(() => first.sent.length === 1);
+await waitFor(() => arms() === 2);
+const successorMod = await import(`${url}?replacement`);
+const second = makePi(); successorMod.default(second.pi);
+if (!existsSync(handoff)) throw new Error("factory replacement lost unconsumed wake");
+await second.handlers.get("session_start")({}, {});
+await waitFor(() => second.sent.length === 1);
+if (second.sent[0] !== first.sent[0]) throw new Error("factory replacement changed the pending wake");
+await second.handlers.get("message_start")({ message: { role: "user", content: second.sent[0] } }, {});
+if (existsSync(handoff)) throw new Error("consumed replay remained pending");
+await first.handlers.get("session_shutdown")({ reason: "quit" }, {});
+await sleep(600);
+if (first.sent.length !== 1 || arms() !== 3) throw new Error("superseded module still owns delivery or rearm");
+const shutdown = second.handlers.get("session_shutdown")({ reason: "resume" }, {});
+const repair = second.box.tool.execute();
+const third = makePi(); successorMod.default(third.pi);
+await third.handlers.get("session_start")({}, {});
+const stale = await repair;
+await shutdown;
+if (stale.details.ok !== false) throw new Error("superseded arm continuation activated a generation");
+await waitFor(() => arms() === 4);
+await sleep(600);
+if (arms() !== 4) throw new Error("stale continuation or heal created another arm");
+const owned = await third.box.tool.execute();
+if (!owned.details.ok || !owned.details.message.includes("unchanged")) throw new Error("successor lost its ordinary arm path");
+await third.handlers.get("session_shutdown")({ reason: "quit" }, {});
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "Pi factory replacement: $out"
+  [ -z "$out" ] || fail "Pi factory replacement printed output: $out"
+  pass "Pi factory replacement transfers pending wakes and refuses superseded arm continuations"
+}
+
 test_pi_extension_reports_external_healthy_watcher() {
   local repo home plugin out status
   repo="$TMP_ROOT/pi-external-healthy-root"
@@ -4485,6 +4566,7 @@ EOF
 
 test_pi_extension_reports_external_healthy_watcher
 test_pi_replacement_without_successor_heals_once
+test_pi_factory_replacement_retires_and_hands_off
 test_pi_tool_returns_agent_tool_result
 test_pi_redundant_tool_call_is_owned_noop
 test_pi_scheduled_retry_call_is_owned_noop

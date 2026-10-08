@@ -66,14 +66,16 @@ This touches only the firstmate repo and its own worktrees, never anything under
    This is automatic and needs no per-mate confirmation from the captain.
    Local and remote mates go in the same list; the command owns the transport, the profile each replacement runs on, and the wait.
 
-   It asks every listed mate first to write down the open work it holds only in its conversation, and restarts one only after that mate's own answer comes back and the turn that answered has ended.
-   A mate that is mid-turn queues the request behind that turn, so the command records the restart and returns instead of waiting on a clock.
+   It asks every listed mate first to write down the open work it holds only in its conversation, and restarts one only after that mate's own answer comes back and affirmative semantic evidence proves the turn that answered has ended.
+   Busy, missing, unknown, failed, or generation-mismatched evidence keeps the request recorded and queued. A remote route with no affirmative remote turn-end evidence also stays queued; a mirrored answer or turn-end wake notification alone does not release it.
    That is the whole point of the step, so do not work around it: it is what keeps a captain call the mate had formed but never registered from being lost with the conversation.
    Its header owns the request and the outcome lines, and `bin/fm-secondmate-restart-lib.sh` owns the recorded restart that supervision finishes.
+   Admission, restart, and outcome retirement share the automatic-relaunch lock. If supervision holds it during admission, the command prints `waiting:` and waits to record the request rather than dropping the intent or sending a fallback nudge.
+   A published outcome is the completion marker: recovery retires any leftover request without restarting again, and outcome consumers retire the request under that lock before removing the marker. Completion-record failures are reported, including after an automatic relaunch.
 
    Read its per-mate lines and its closing `summary:` line as the outcome:
    - `restarted: <id>` - that mate is now genuinely running the current instructions and launch-time settings.
-   - `queued: <id>: <what it waits for>` - the mate has not confirmed yet; its restart is recorded, supervision finishes it once the mate confirms and its turn ends, and a later notification reports that outcome.
+   - `queued: <id>: <what it waits for>` - its restart is recorded but its answer or affirmative turn-end evidence is still missing; supervision finishes it when both arrive, and a later notification reports that outcome.
      Report it as on its way, never as reloaded.
    - `nudged: <id>: <reason>` - the restart was not safe, so the mate got the older re-read message instead and is still running the conversation and launch-time settings it started with.
      Never report one of these as a clean reload.

@@ -1412,7 +1412,19 @@ const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycl
 for (const needle of ["event=factory-bind", "superseded=1", "event=instance-retired", "event=session_start-ignored", "event=arm-forwarded", "event=session_shutdown-ignored"]) {
   if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
 }
-await second.handlers.get("session_shutdown")({}, {});
+const shutdown = second.handlers.get("session_shutdown")({}, {});
+const repair = second.box.tool.execute();
+const third = makePi(); mod.default(third.pi);
+await third.handlers.get("session_start")({}, {});
+const repaired = await repair;
+await shutdown;
+if (!/^watcher: unchanged/.test(repaired.content[0].text)) throw new Error(`stale continuation did not reach successor: ${repaired.content[0].text}`);
+for (let i = 0; i < 50 && arms() < 2; i++) await sleep(50);
+await sleep(900);
+if (arms() !== 2) throw new Error(`arm continuation stole ownership from successor: ${arms()} arms`);
+const current = await third.box.tool.execute();
+if (!/^watcher: unchanged/.test(current.content[0].text)) throw new Error(`successor lost ordinary arm ownership: ${current.content[0].text}`);
+await third.handlers.get("session_shutdown")({}, {});
 process.exit(0);
 EOF
 )
