@@ -18,6 +18,11 @@
 # A closed or merged pull request reports that terminal state and nothing else.
 # Unresolved review-thread state is out of this command's scope.
 #
+# The one REST read (the review list) is a conditional GET through
+# fm-gh-rest.sh: unchanged data is answered from its per-URL ETag cache under
+# state/ without counting against the rate limit. The pr view and pr checks
+# reads are GraphQL and stay unconditional.
+#
 # Usage: fm-pr-state.sh <pr-url>
 #   Prints one line per blocker it can see and nothing when it sees none.
 #   Blockers do not change the successful exit status; lookup or usage refusal
@@ -44,6 +49,7 @@ if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
 fi
 [ "$#" -eq 1 ] || die "usage: fm-pr-state.sh <pr-url>"
 command -v gh >/dev/null 2>&1 || die "gh is required"
+command -v jq >/dev/null 2>&1 || die "jq is required"
 
 URL=$1
 if ! fm_pr_url_parse "$URL" || [ "$FM_PR_PROVIDER" != github ]; then
@@ -128,8 +134,10 @@ fi
 
 if [ "$REVIEW_DECISION" = CHANGES_REQUESTED ]; then
   printf 'REVIEW DECISION: CHANGES_REQUESTED\n'
-  REVIEWS=$(gh api "$ENDPOINT/reviews?per_page=100" --paginate --jq '
-    .[]
+  REVIEW_PAGES=$("$SCRIPT_DIR/fm-gh-rest.sh" get "$ENDPOINT/reviews?per_page=100" --paginate --slurp) \
+    || die "could not read reviews for $URL"
+  REVIEWS=$(printf '%s\n' "$REVIEW_PAGES" | jq -r '
+    .[][]
     | select(.user.login != null and .commit_id != null and .submitted_at != null)
     | [.user.login, .state, .commit_id, .submitted_at]
     | @tsv') || die "could not read reviews for $URL"

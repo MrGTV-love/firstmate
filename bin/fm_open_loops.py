@@ -6,7 +6,6 @@ ordinary tasks), status logs, task worktrees, the no-mistakes run store, and ope
 A source that cannot be read becomes one degraded row; it never reads as "nothing owed".
 """
 import argparse
-import base64
 import fcntl
 import datetime as dt
 import hashlib
@@ -22,6 +21,7 @@ import tempfile
 import time
 
 BIN = Path(__file__).resolve().parent
+GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota floor
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
@@ -43,6 +43,10 @@ SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, RuntimeError, subproc
 
 class CollectionDeadline(Exception):
     pass
+
+
+class QuotaLow(Exception):
+    """The recorded GitHub quota is below the floor; the sweep stops instead of publishing partial rows."""
 
 
 def epoch(value):
@@ -79,6 +83,8 @@ class Collector:
                         GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
         self.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.rows = {}
+        self.stale_reason = None
+        self.stale_generated = None
         self.degraded = []
         self.tasks = []
         self.backlog = []
@@ -470,14 +476,24 @@ class Collector:
                  oldest, evidence=f"{len(pending)} commit(s) not on {base}; newest: {title}")
 
     def forge(self, path):
-        # gh-axi renders parsed JSON as TOON, so the body travels as base64 lines (one per page).
-        raw = self.run(["gh-axi", "api", path, "--paginate", "--jq", "@base64", "--full"])
-        match = re.search(r"^  body: (.+)$", raw, re.M)
-        if not match or re.search(r"^  truncated: true$", raw, re.M):
-            raise ValueError("forge response body unavailable or truncated")
-        body = json.loads(match[1]) if match[1].startswith('"') else match[1]
-        pages = [json.loads(base64.b64decode(line, validate=True)) for line in body.splitlines()]
+        """Pages of one conditional REST read, flattened; fm-gh-rest.sh owns the ETag cache and quota headers."""
+        reason = self.quota_low()
+        if reason:
+            raise QuotaLow(reason)
+        pages = json.loads(self.run([GH_REST, "get", path, "--paginate", "--slurp"]))
         return [row for page in pages for row in (page if isinstance(page, list) else [page])]
+
+    def quota_low(self):
+        """The reason when the recorded GitHub quota is below the floor and its window is open (no network)."""
+        done = subprocess.run([str(GH_REST), "guard"], env=self.env, capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL, timeout=self.timeout)
+        return done.stdout.strip() if done.returncode == 75 else None
+
+    def quota_reset(self):
+        try:
+            return int(json.loads((self.state / "gh-ratelimit.core.json").read_text())["reset"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
 
     def pr_state(self, url):
         if url in self.prs:
@@ -633,10 +649,41 @@ class Collector:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))
 
+    def hold_last(self, reason):
+        """Quota is below the floor: keep the last published rows, each marked stale, and say when it resets."""
+        self.stale_reason = reason
+        self.rows = {}
+        self.degraded = []
+        previous = None
+        try:
+            target = self.state / "open-loops.json"
+            if not target.is_symlink():
+                previous = json.loads(target.read_text())
+            if not (isinstance(previous, dict) and previous.get("schema") == "fm-open-loops.v1"
+                    and isinstance(previous.get("rows"), list) and isinstance(previous.get("generated_epoch"), int)):
+                previous = None
+        except (OSError, ValueError):
+            previous = None
+        if previous is None:  # nothing to hold: say so rather than read as "nothing owed"
+            self.degraded.append(reason)
+            self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
+                     None, evidence=reason)
+            return
+        self.stale_generated = previous["generated_epoch"]
+        for row in previous["rows"]:
+            if isinstance(row, dict) and isinstance(row.get("id"), str) and row.get("subject") != "ledger stale":
+                self.rows[row["id"]] = dict(row, stale=True)
+        self.add("coverage", "ledger stale", "wait for the GitHub quota window to reset; the next run refreshes every row",
+                 None, evidence=reason, informational=True)
+
     def result(self):
         rows = sorted(self.rows.values(), key=lambda r: (r["category"], r["subject"]))
-        return dict(schema="fm-open-loops.v1", generated_epoch=self.now, home=str(self.home),
-                    complete=not self.degraded, rows=rows)
+        report = dict(schema="fm-open-loops.v1", generated_epoch=self.stale_generated or self.now,
+                      home=str(self.home), complete=not self.degraded and not self.stale_reason, rows=rows)
+        if self.stale_reason:
+            report.update(stale=True, stale_reason=self.stale_reason,
+                          stale_until_epoch=self.quota_reset())
+        return report
 
     def publish(self):
         self.state.mkdir(parents=True, exist_ok=True)
@@ -707,6 +754,8 @@ def main():
     signal.alarm(collector.timeout * 10)
     try:
         collector.collect()
+    except QuotaLow as low:
+        collector.hold_last(str(low))
     except (CollectionDeadline, *SOURCE_ERRORS) as error:
         collector.degraded.insert(0, "reconciler: " + str(error)[:160])
         collector.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",

@@ -422,7 +422,7 @@ test_retained_collector_survives_watcher_restart_without_overlap() {
   dir=$(make_case ledger-retained-collector)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
-  cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$dir/collector-bin/"
+  cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
   cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2
@@ -607,7 +607,7 @@ test_real_publication_rearms_stale_incidents_without_resetting_overdue() {
     dir=$(make_case "ledger-recovery-$second")
     state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
     mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
-    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$dir/collector-bin/"
+    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
     cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2
@@ -671,7 +671,7 @@ test_fresh_observation_rearms_recovery_during_blocked_stale_append() {
     dir=$(make_case "ledger-blocked-recovery-$kind")
     state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
     mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
-    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$dir/collector-bin/"
+    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
     cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2

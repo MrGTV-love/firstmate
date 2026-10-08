@@ -48,14 +48,19 @@ def rows(report, category=None):
 script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Codex usage limit reached; retrying\\n"\n')
 script(code / 'bin/fm-fleet-snapshot.sh', '#!/usr/bin/env bash\n[ "$1" = --home-input ] || exit 2\n'
        '[ -f "$FM_HOME/snapshot-fails" ] && { echo snapshot unavailable >&2; exit 1; }\ncat "$FM_HOME/snapshot.json"\n')
-script(fake / 'gh-axi', r'''#!/usr/bin/env python3
-import base64, json, os, re, sys
+script(fake / 'gh', r'''#!/usr/bin/env python3
+# `gh api -i` double: the helper bin/fm-gh-rest.sh sends conditional GETs and reads the HTTP response.
+# GH_REQUESTS logs every request; GH_REQUESTS_304 additionally logs those answered 304 (uncounted).
+import hashlib, json, os, re, sys, time
+args = sys.argv[1:]
+assert args[:2] == ['api', '-i'], args
 double = json.load(open(os.environ['GH_DOUBLE']))
+path = '/' + args[-1].lstrip('/')
+conditional = next((args[i + 1].split(':', 1)[1].strip() for i, a in enumerate(args) if a == '-H'), None)
 with open(os.environ['GH_REQUESTS'], 'a') as stream:
-    stream.write(sys.argv[2] + '\n')
+    stream.write(path + '\n')
 if double.get('fail'):
     sys.exit(1)
-path = sys.argv[2]
 if '/check-runs' in path:
     value = {'check_runs': double['checks'].get(path.split('/commits/')[1].split('/')[0], [])}
 elif '/statuses' in path:
@@ -64,7 +69,17 @@ elif re.search(r'/pulls\?', path):
     value = double.get('pulls_by_repo', {}).get(path.split('/pulls?')[0], double['pulls'])
 else:
     value = double['single'][path.rsplit('/', 1)[1]]
-print('api_response:\n  body: ' + base64.b64encode(json.dumps(value).encode()).decode() + '\n  truncated: false')
+body = json.dumps(value)
+etag = '"' + hashlib.sha1(body.encode()).hexdigest()[:16] + '"'
+rate = (f"X-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: {os.environ.get('GH_REMAINING', '4000')}\r\n"
+        f"X-Ratelimit-Reset: {os.environ.get('GH_RESET', str(int(time.time()) + 3600))}\r\nX-Ratelimit-Resource: core\r\n")
+if conditional == etag:
+    with open(os.environ['GH_REQUESTS'] + '_304', 'a') as stream:
+        stream.write(path + '\n')
+    sys.stdout.write('HTTP/2.0 304 Not Modified\r\nEtag: ' + etag + '\r\n' + rate + '\r\n')
+    sys.stderr.write('gh: HTTP 304\n')
+    sys.exit(1)
+sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: ' + etag + '\r\n' + rate + '\r\n' + body)
 ''')
 
 # Git: an origin with one landed baseline, plus separate task copies.
@@ -1132,11 +1147,10 @@ if command == 'git' and reader != 'origins':
 if command == 'git' and '--get' not in sys.argv:
     print('.git')
     sys.exit(0)
-if command == 'gh-axi' and '/pulls?' in sys.argv[2]:
+if command == 'gh' and '/pulls?' in sys.argv[-1]:
     pulls = [] if reader == 'pr-state' else [dict(number=i, html_url='https://github.com/test/project/pull/' + str(i),
                   head=dict(sha='a' * 40), state='open') for i in range(24)]
-    print('api_response:\n  body: ' + base64.b64encode(json.dumps(pulls).encode()).decode()
-          + '\n  truncated: false')
+    sys.stdout.write('HTTP/2.0 200 OK\r\n\r\n' + json.dumps(pulls))
     sys.exit(0)
 attempts = Path(os.environ['FM_HOME']) / 'attempts'
 with attempts.open('a') as stream:
@@ -1147,7 +1161,7 @@ time.sleep(0.7)
 print('source command failure', file=sys.stderr)
 sys.exit(1)
 '''
-    for command in ('git', 'gh-axi', 'cat'):
+    for command in ('git', 'gh', 'cat'):
         script(deadline_bin / command, driver)
     deadline_env = dict(env, FM_HOME=str(deadline_home), DEADLINE_READER=reader,
                         PATH=f'{deadline_bin}:{env["PATH"]}')
@@ -1159,6 +1173,62 @@ sys.exit(1)
     assert len(attempts) == 2, (reader, attempts)
     assert json.loads((deadline_home / 'state/open-loops.json').read_text()) == deadline_report
     print('PASS: deadline escapes ' + reader + ' source recovery', flush=True)
+# Conditional reads and the quota floor: a repeated run over unchanged forge data is answered with 304s, and a run
+# that finds the recorded quota below the floor publishes the last rows marked stale with the reset time.
+double.pop('pulls_by_repo', None)
+(world / 'gh.json').write_text(json.dumps(double))
+requests, not_modified = world / 'gh-requests', world / 'gh-requests_304'
+state_dir = home / 'state'
+shutil.rmtree(state_dir / 'gh-rest-cache', ignore_errors=True)
+for record in state_dir.glob('gh-ratelimit.*.json'):
+    record.unlink()
+requests.write_text('')
+not_modified.unlink(missing_ok=True)
+first = json.loads(out([code / 'bin/fm-open-loops.sh', '--json']))
+first_requests = requests.read_text().splitlines()
+assert first_requests and not not_modified.exists(), 'the first run must read the forge normally'
+requests.write_text('')
+second = json.loads(out([code / 'bin/fm-open-loops.sh', '--json']))
+second_requests = requests.read_text().splitlines()
+assert second_requests == first_requests, (first_requests, second_requests)
+assert not_modified.read_text().splitlines() == second_requests, 'unchanged reads were not answered with 304'
+assert second == first, 'a cached read changed the ledger'
+
+low = dict(env, GH_REMAINING='500')
+published = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
+assert published['complete'] is True and 'stale' not in published, published
+# A run whose own responses report 500 of 5000 left crosses the floor mid-sweep: it stops reading and keeps the
+# last published rows instead of publishing a partial set.
+requests.write_text('')
+crossing = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'], env=low))
+assert crossing['stale'] is True and len(requests.read_text().splitlines()) == 1, (crossing, requests.read_text())
+reset = json.loads((state_dir / 'gh-ratelimit.core.json').read_text())['reset']
+requests.write_text('')
+held = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
+assert requests.read_text() == '', 'a run below the floor still read the forge'
+assert held['stale'] is True and held['complete'] is False and held['stale_until_epoch'] == reset, held
+assert 'quota low (500 of 5000' in held['stale_reason'] and iso(reset) in held['stale_reason'], held['stale_reason']
+assert held['generated_epoch'] == published['generated_epoch']
+kept = {r['id']: r for r in held['rows'] if r['subject'] != 'ledger stale'}
+assert set(kept) == {r['id'] for r in published['rows']} and all(r['stale'] is True for r in kept.values()), held['rows']
+marker_row = rows(held, 'coverage')['ledger stale']
+assert marker_row['informational'] is True and marker_row['overdue'] is False and iso(reset) in marker_row['evidence'], marker_row
+assert json.loads((state_dir / 'open-loops.json').read_text()) == held, 'the stale ledger was not published'
+again = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
+assert again['rows'] == held['rows'], 'a second stale run must not stack stale rows'
+
+(state_dir / 'open-loops.json').unlink()
+orphaned = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
+degraded = rows(orphaned, 'coverage')['ledger degraded']
+assert orphaned['complete'] is False and 'quota low' in degraded['evidence'] and iso(reset) in degraded['evidence'], orphaned
+assert requests.read_text() == ''
+
+(state_dir / 'gh-ratelimit.core.json').write_text(json.dumps(dict(resource='core', limit=5000, remaining=0, reset=now - 5,
+                                                                 observed=now - 3600)))
+recovered = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
+assert recovered['complete'] is True and 'stale' not in recovered and not any(r.get('stale') for r in recovered['rows'])
+assert requests.read_text(), 'the sweep did not resume after the window reset'
+print('PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time')
 print('PASS: owned-work categories, owners, ages, degraded row, and atomic publication')
 PY
 

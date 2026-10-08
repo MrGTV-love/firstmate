@@ -91,6 +91,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
+- The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -104,6 +105,8 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 - `bin/fm-spawn.sh` owns the base task-metadata fields it emits, while the runtime-backend section below owns backend-specific fields and selector interpretation.
 
 - `bin/fm-contributions.sh` owns durable published-contribution records under each task, observation bounds, equivalent triage-label configuration, and the authenticated contribution check.
+
+- `bin/fm-gh-rest.sh` owns conditional GitHub REST reads and the shared quota floor: its header and `--help` own the commands, file formats, and exit codes, and the section below owns the behavior.
 
 - The producing PR and Relay helpers own the fields they append, [`bin/fm-status-event-lib.sh`](../bin/fm-status-event-lib.sh) owns status-event vocabulary, [`bin/fm-status-record-lib.sh`](../bin/fm-status-record-lib.sh) owns optional emission-time syntax and legacy unknown-time handling, and `bin/fm-crew-state.sh` owns current-state reconciliation.
 
@@ -635,6 +638,12 @@ The human ledger table and both Bearings representations preserve recorded evide
 Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
 No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
 
+When the recorded GitHub core quota is below the floor, the reconciler makes no further forge read.
+It republishes the last published rows, each marked `stale: true`, with `complete: false`, top-level `stale`, `stale_reason`, and `stale_until_epoch`, and one informational `ledger stale` coverage row stating the reset time.
+The rows keep the generation time of the run that produced them, and the republication tells the watcher the reconciler is alive.
+A home with no earlier ledger gets the ordinary `ledger degraded` coverage row carrying the same reason.
+The next run after the window resets collects normally and clears every mark.
+
 Create the optional local `config/open-loops.json` to override the limits:
 
 ```json
@@ -650,6 +659,20 @@ On either deadline, cancellation freezes the owned command group while capturing
 It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
 An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
 A malformed configuration is reported as an error rather than ignored.
+
+### GitHub REST reads and the quota floor
+
+`bin/fm-contributions.sh`, `bin/fm_open_loops.py`, `bin/fm-pr-state.sh`, and `bin/fm-pr-reviewers.sh` read GitHub REST through `bin/fm-gh-rest.sh`.
+It sends `If-None-Match` from a per-URL ETag cache under the home's `state/gh-rest-cache/` and serves the cached body on a 304, which GitHub does not count against the rate limit.
+A missing, corrupt, or unparsable cache entry is a normal GET, and entries unused for a week are pruned.
+Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent and are unchanged.
+Every response, including a 304 and an error, records its `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers in `state/gh-ratelimit.<resource>.json`, keeping the lowest remaining value within one window.
+`gh api rate_limit` is not evidence: on the fleet's account it has reported an unused core bucket while the enforcing headers showed thousands of calls spent.
+
+When the recorded core remaining quota is below `FM_GH_RATE_FLOOR_PERCENT` of its limit (default 15) and its window has not reset, the contributions poll and the open-work ledger make no forge read.
+The contributions poll keeps each row's last observation, marks it unverified with the reset time as its reason, and reports that once per episode.
+The ledger behavior is in the open-work ledger section above.
+The check needs no call of its own because it reads headers from calls the sweeps were already making.
 
 ### Completion and discard
 
@@ -2841,6 +2864,7 @@ FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
+FM_GH_RATE_FLOOR_PERCENT=15   # percent of GitHub's core limit below which contribution and ledger sweeps stop reading the forge until the window resets; values outside 0..100 use 15
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding the complete best-effort home-summary refresh, including lock acquisition, validation, atomic publication, and worker-side failure logging; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
