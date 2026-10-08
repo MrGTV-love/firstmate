@@ -16,8 +16,8 @@ The pool bounds CPU-heavy bursts (test suites and their workers), not agents
 or sessions: interactive work never asks for a pass and is never queued.
 docs/cpu-pass-pool.md owns the cross-repository protocol this command
 implements: pool directory and size, slot and turnstile locks, the
-FM_CPU_PASS_HELD nested marker, the FM_CPU_POOL=off opt-out, and degrading
-without a pass. This header owns the command's own behavior below.
+FM_CPU_PASS_HELD nested marker, and degrading without a pass.
+This header owns the command's own behavior below.
 
 Waiting:
   - A waiter polls with backoff (50 ms growing to 500 ms) and never times out:
@@ -27,7 +27,7 @@ Waiting:
   - After 2 s of waiting it writes one notice, then one every 60 s, to the log
     fd, naming the pool size and the current holders; on acquisition after a
     notice it writes the wait time.
-  - K is clamped to 1..size.
+  - K must be a positive integer no larger than size; otherwise exit 125.
   - SIGTERM or SIGHUP while waiting ends the waiter with 128+n; SIGINT with 130.
 
 Running:
@@ -36,9 +36,9 @@ Running:
     the child runs and keeps the passes until the child exits: passes stay with
     running work and are never forwarded or doubled.
   - The child's environment gains FM_CPU_PASS_HELD=<K> (0 when degraded).
-  - The log fd and every lock fd are closed in the child; COMMAND's stdout and
-    stderr carry only COMMAND's own output.
-  - A degraded run (the protocol's rule 8) writes one notice to the log fd.
+  - The child inherits the slot lock fds so passes survive a killed wrapper.
+    The log fd is closed; stdout and stderr carry only COMMAND's own output.
+  - A degraded run (the protocol's rule 7) writes one notice to the log fd.
 
 Exit status of `run`: COMMAND's own status; 126 when COMMAND cannot be
 executed, 127 when it is not found, 125 for a usage error.
@@ -80,11 +80,6 @@ def log(fd: int, message: str) -> None:
 
 
 def pool_size() -> int:
-    raw = os.environ.get("FM_CPU_POOL_SIZE", "").strip()
-    if raw:
-        if raw.isdigit() and int(raw) >= 1:
-            return int(raw)
-        raise ValueError("FM_CPU_POOL_SIZE must be a positive integer, got %r" % raw)
     return max(1, os.cpu_count() or 1)
 
 
@@ -234,14 +229,14 @@ def exit_code_for(returncode: int) -> int:
     return returncode
 
 
-def run_child(command: List[str], env: dict, log_fd: int) -> int:
+def run_child(command: List[str], env: dict, log_fd: int, held: List[int]) -> int:
     previous = {}
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         previous[signum] = signal.signal(signum, signal.SIG_IGN)
     try:
         try:
             child = subprocess.Popen(
-                command, env=env, close_fds=True,
+                command, env=env, close_fds=True, pass_fds=tuple(held),
                 preexec_fn=_restore_default_signals)
         except FileNotFoundError:
             log(log_fd, "command not found: %s" % command[0])
@@ -290,15 +285,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 125
     log_fd = args.log_fd
     env = dict(os.environ)
-    if env.get("FM_CPU_POOL", "").strip().lower() == "off" or HELD_ENV in env:
+    size = pool_size()
+    passes = args.passes
+    if not 1 <= passes <= size:
+        log(log_fd, "--passes must be between 1 and the pool size (%d)" % size)
+        return 125
+    if HELD_ENV in env:
         return exec_direct(command, env, log_fd)
     label = args.label or os.path.basename(command[0])
-    try:
-        size = pool_size()
-    except ValueError as exc:
-        log(log_fd, str(exc))
-        return 125
-    passes = max(1, min(args.passes, size))
     try:
         directory = pool_dir()
         ensure_pool_dir(directory)
@@ -318,7 +312,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         return exec_direct(command, env, log_fd)
     env[HELD_ENV] = str(passes)
     try:
-        return run_child(command, env, log_fd)
+        return run_child(command, env, log_fd, held)
     finally:
         for fd in held:
             try:
@@ -332,7 +326,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         size = pool_size()
         directory = pool_dir()
         ensure_pool_dir(directory)
-    except (ValueError, PoolUnavailable) as exc:
+    except PoolUnavailable as exc:
         if args.json:
             print(json.dumps({"available": False, "reason": str(exc)}, sort_keys=True))
         else:
@@ -357,11 +351,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_size(_args: argparse.Namespace) -> int:
-    try:
-        print(pool_size())
-    except ValueError as exc:
-        log(2, str(exc))
-        return 125
+    print(pool_size())
     return 0
 
 
@@ -372,7 +362,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="action")
     run = sub.add_parser("run", help="hold passes while running a command")
-    run.add_argument("--passes", type=int, default=1, help="passes to hold (default 1, clamped to the pool size)")
+    run.add_argument("--passes", type=int, default=1, help="exact passes to hold (default 1; must be between 1 and the pool size)")
     run.add_argument("--label", default="", help="holder label shown in status and notices")
     run.add_argument("--log-fd", type=int, default=2, help="fd for wait notices (default 2)")
     run.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")

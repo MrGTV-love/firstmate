@@ -10,7 +10,7 @@ set -u
 TOOL="$ROOT/bin/fm-load-report.sh"
 TMP_ROOT=$(fm_test_tmproot fm-load-report)
 export FM_CPU_POOL_DIR="$TMP_ROOT/pool"
-unset FM_LOAD_SAMPLES FM_CPU_POOL_SIZE FM_CPU_POOL FM_CPU_PASS_HELD
+unset FM_LOAD_SAMPLES FM_CPU_PASS_HELD
 
 make_db() {  # <path> <review-fix rounds per run...>; -1 marks a run that hit the wall-clock limit
   python3 - "$@" <<'PY'
@@ -34,6 +34,11 @@ for index, count in enumerate(rounds):
                      ("i%d" % inv, run, purpose, 2000 + index, 600000))
 # A run that never reached review is not a convergence sample.
 conn.execute("INSERT INTO runs VALUES ('no-review', 'cancelled', 3000, NULL)")
+for index, status in enumerate(("pending", "running")):
+    run = "live-" + status
+    conn.execute("INSERT INTO runs VALUES (?, ?, ?, NULL)", (run, status, 3001 + index))
+    conn.execute("INSERT INTO agent_invocations VALUES (?, ?, 'review', ?, 1, 'ok', NULL)",
+                 (run + "-review", run, 3001 + index))
 # A run from before the window is ignored.
 conn.execute("INSERT INTO runs VALUES ('old', 'completed', 10, NULL)")
 conn.execute("INSERT INTO agent_invocations VALUES ('old-r', 'old', 'review', 10, 1, 'ok', NULL)")
@@ -73,8 +78,9 @@ test_report_load_and_convergence_verdicts() {
   assert_equals 7.0 "$(field "$out" 'r["load"]["load1_max"]')" "load max must cover the window only"
   assert_equals True "$(field "$out" 'r["load"]["load_within_2x_cpus"]')" "p95 at or under 2x cpus must pass"
   assert_equals 3 "$(field "$out" 'r["load"]["pool_held_max"]')" "pool use must be reported"
-  assert_equals 10 "$(field "$out" 'r["pipeline"]["runs_considered"]')" "runs without review or before --since must be skipped"
-  assert_equals True "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "ten runs with at most 2 fix rounds converge"
+  assert_equals 10 "$(field "$out" 'r["pipeline"]["runs_considered"]')" "live runs, runs without review, and runs before --since must be skipped"
+  assert_equals True "$(field "$out" 'all(x["status"] == "completed" for x in r["pipeline"]["recent_runs"])')" "pending and running runs that reached review must not enter the window"
+  assert_equals True "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "ten successful runs with at most 2 fix rounds converge"
 
   printf '1300\t9.00\t9.00\t9.00\t4\t4\t0\n' >>"$samples"
   db="$TMP_ROOT/bad.sqlite"
@@ -96,6 +102,28 @@ test_report_load_and_convergence_verdicts() {
   pass "report gives load and convergence verdicts over the window"
 }
 
+test_unsuccessful_runs_do_not_converge() {
+  local samples db out status
+  samples="$TMP_ROOT/unsuccessful.tsv"
+  printf '1000\t1.00\t1.00\t1.00\t4\t4\t0\n' >"$samples"
+  for status in failed cancelled; do
+    db="$TMP_ROOT/$status.sqlite"
+    make_db "$db" 0 1 2 0 1 2 0 1 2 0
+    python3 - "$db" "$status" <<'PY'
+import sqlite3, sys
+with sqlite3.connect(sys.argv[1]) as conn:
+    conn.execute("UPDATE runs SET status = ? WHERE id = 'run-09'", (sys.argv[2],))
+PY
+    out=$("$TOOL" report --samples "$samples" --nm-db "$db" --json) || fail "report failed: $out"
+    assert_equals "$status" "$(field "$out" 'r["pipeline"]["recent_runs"][0]["status"]')" "unsuccessful terminal runs must remain in the convergence window"
+    assert_equals False "$(field "$out" 'r["pipeline"]["recent_runs"][0]["converged"]')" "a non-timeout unsuccessful run cannot converge"
+    assert_equals False "$(field "$out" 'r["pipeline"]["converged_within_2_fix_rounds"]')" "one unsuccessful run must fail the window"
+    out=$("$TOOL" report --samples "$samples" --nm-db "$db") || fail "text report failed: $out"
+    assert_contains "$out" "converged_within_2_fix_rounds=False" "text output must retain the unsuccessful verdict"
+  done
+  pass "failed and cancelled runs cannot produce successful convergence"
+}
+
 test_report_missing_database_is_an_error() {
   local samples rc out
   samples="$TMP_ROOT/samples-missing.tsv"
@@ -109,4 +137,5 @@ test_report_missing_database_is_an_error() {
 
 test_record_appends_one_sample
 test_report_load_and_convergence_verdicts
+test_unsuccessful_runs_do_not_converge
 test_report_missing_database_is_an_error

@@ -123,9 +123,9 @@
 # Every executed script first takes one pass from the host-wide CPU pass pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so test bursts from every worktree on the host take turns.
-# A runner already inside a pass (FM_CPU_PASS_HELD set), opted out with
-# FM_CPU_POOL=off, without python3, or copied without the pool tool beside it
-# runs its scripts directly. --jobs above the pool size still starts that many
+# A runner already inside a pass (FM_CPU_PASS_HELD set), without python3,
+# or copied without the pool tool beside it runs its scripts directly.
+# --jobs above the pool size still starts that many
 # workers, but only pool-size scripts run at once.
 #
 # Family labels, the changed-file map, and production portable-shard composition
@@ -2399,7 +2399,7 @@ fi
 # fd 8 keeps the pool's wait notices on this runner's stderr.
 CPU_PASS_ACTIVE=1
 CPU_PASS_LOG_FD=8
-if [ -n "${FM_CPU_PASS_HELD+x}" ] || [ "${FM_CPU_POOL:-}" = off ] \
+if [ -n "${FM_CPU_PASS_HELD+x}" ] \
   || [ ! -x "$ROOT/bin/fm-cpu-pass.sh" ] || [ ! -r "$ROOT/bin/fm-cpu-pass.py" ]; then
   CPU_PASS_ACTIVE=0
 elif ! command -v python3 >/dev/null 2>&1; then

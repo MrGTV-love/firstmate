@@ -24,10 +24,10 @@ host-wide file serves every home.
     is at most 2x cpus.
   - pipeline: from the no-mistakes state database (read-only; default
     ~/.no-mistakes/state.sqlite), the most recent --runs (default 10) runs
-    created since --since that are no longer running and reached review, each
-    with its review-fix and test-fix round counts, agent minutes, and whether
-    it converged: at most 2 review-fix rounds and no run error naming a
-    timeout class (wall-clock limit, WaitDelay, did not reply, timed out);
+    created since --since with terminal status and reached review, each with
+    its review-fix and test-fix round counts, agent minutes, and whether
+    it converged: completed successfully with at most 2 review-fix rounds and
+    no timeout-class run error (wall-clock limit, WaitDelay, did not reply, timed out);
     per-purpose agent duration p50/p95; agent failures by category; and every
     timeout-class run error in the window. Verdict
     converged_within_2_fix_rounds is true when --runs such runs exist and all
@@ -138,7 +138,7 @@ def pipeline_section(db_path: str, since: int, runs: int) -> Dict[str, Any]:
         cur = conn.cursor()
         run_rows = cur.execute(
             "SELECT id, status, created_at, COALESCE(error, '') FROM runs "
-            "WHERE created_at >= ? AND status != 'running' AND EXISTS ("
+            "WHERE created_at >= ? AND status IN ('completed', 'failed', 'cancelled') AND EXISTS ("
             "SELECT 1 FROM agent_invocations a WHERE a.run_id = runs.id "
             "AND a.purpose = 'review') "
             "ORDER BY created_at DESC LIMIT ?", (since, runs)).fetchall()
@@ -160,7 +160,7 @@ def pipeline_section(db_path: str, since: int, runs: int) -> Dict[str, Any]:
                 "test_fix_rounds": purposes.get("test-fix", 0),
                 "agent_minutes": round(minutes, 1),
                 "timed_out": timed_out,
-                "converged": review_fix <= 2 and not timed_out,
+                "converged": status == "completed" and review_fix <= 2 and not timed_out,
             })
         durations: Dict[str, List[float]] = {}
         for purpose, duration_ms in cur.execute(
