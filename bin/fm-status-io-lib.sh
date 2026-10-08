@@ -25,8 +25,8 @@ unset _fm_classify_nounset
 # Parameter expansion rather than dirname and basename: every presentation scan
 # asks for the cursor path of every task, and two child processes per call were
 # the largest process count in a wake drain.
-_fm_open_decisions_cursor_path() {  # <status-file>
-  local f=$1 dir base
+_fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
+  local f=$1 dir base path
   case "$f" in
     */*)
       dir=${f%/*}
@@ -36,50 +36,117 @@ _fm_open_decisions_cursor_path() {  # <status-file>
     *) dir=. ;;
   esac
   base=${f##*/}
-  printf '%s/.%s.open-decisions-cursor' "$dir" "${base%.status}"
+  path="$dir/.${base%.status}.open-decisions-cursor"
+  if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$path"; else printf '%s' "$path"; fi
 }
 
 
-# Portable device:inode identity for the rotation/recreation check below.
-_fm_open_decisions_file_ident() {  # <file> -> strongest available identity
-  local f=$1 epoch birth ident
+# One stat per file: the device:inode identity, the size, and the mtime come
+# back from a single child process, because the drain reads them for every
+# status log several times per run and each separate stat was a fork.
+# The three values also describe the same instant, which two separate stats
+# cannot promise.
+# <ident-var>, <size-var>, and <mtime-var> name the variables to set; an empty
+# name skips that value. A value this host cannot read fails the whole call.
+# Every local below carries the __fm_ prefix because an out-var named like an
+# unprefixed local would be assigned here and lost under bash's dynamic scope.
+_fm_status_stat_raw() {  # <file> <ident-var> <size-var> <mtime-var>
+  local __fm_st_facts __fm_st_dev_ino __fm_st_epoch __fm_st_birth __fm_st_rest __fm_st_size __fm_st_mtime
+  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+    __fm_st_facts=$(LC_ALL=C /usr/bin/stat -f '%d:%i|%B|%FB|%z|%m' "$1" 2>/dev/null) || return 1
+  else
+    __fm_st_facts=$(LC_ALL=C stat -c '%d:%i|%W|%w|%s|%Y' "$1" 2>/dev/null) || return 1
+  fi
+  __fm_st_dev_ino=${__fm_st_facts%%|*}; __fm_st_rest=${__fm_st_facts#*|}
+  __fm_st_epoch=${__fm_st_rest%%|*}; __fm_st_rest=${__fm_st_rest#*|}
+  # The birth text can hold spaces but never a bar, so the last two bars end it.
+  __fm_st_mtime=${__fm_st_rest##*|}; __fm_st_rest=${__fm_st_rest%|*}
+  __fm_st_size=${__fm_st_rest##*|}; __fm_st_birth=${__fm_st_rest%|*}
+  [ "$__fm_st_epoch" != 0 ] || __fm_st_birth=''
+  if [ -n "${2-}" ]; then
+    case "$__fm_st_dev_ino$__fm_st_birth" in *$'\t'*|*$'\n'*|'') return 1 ;; esac
+    if [ -n "$__fm_st_birth" ]; then
+      printf -v "$2" 'strong:%s:%s' "$__fm_st_dev_ino" "$__fm_st_birth"
+    else
+      printf -v "$2" 'weak:%s' "$__fm_st_dev_ino"
+    fi
+  fi
+  if [ -n "${3-}" ]; then printf -v "$3" '%s' "$__fm_st_size"; fi
+  if [ -n "${4-}" ]; then printf -v "$4" '%s' "$__fm_st_mtime"; fi
+}
+
+# Printed, or assigned to <out-var> when one is given, so a per-task caller can
+# take the identity without forking a command substitution around the stat.
+_fm_open_decisions_file_ident() {  # <file> [<out-var>] -> strongest available identity
+  local __fm_id_value
   if [ -n "${FM_STATUS_IDENTITY_READER:-}" ]; then
-    "$FM_STATUS_IDENTITY_READER" "$f"
+    if [ "$#" -le 1 ]; then "$FM_STATUS_IDENTITY_READER" "$1"; return; fi
+    __fm_id_value=$("$FM_STATUS_IDENTITY_READER" "$1") || return
+    printf -v "$2" '%s' "$__fm_id_value"
     return
   fi
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-    ident=$(LC_ALL=C /usr/bin/stat -f '%d:%i' "$f" 2>/dev/null) || return 1
-    epoch=$(LC_ALL=C /usr/bin/stat -f '%B' "$f" 2>/dev/null) || epoch=0
-    if [ "$epoch" != 0 ]; then birth=$(LC_ALL=C /usr/bin/stat -f '%FB' "$f" 2>/dev/null) || birth=''; else birth=''; fi
+  if [ "$#" -gt 1 ]; then
+    _fm_status_stat_raw "$1" "$2" '' ''
   else
-    ident=$(LC_ALL=C stat -c '%d:%i' "$f" 2>/dev/null) || return 1
-    epoch=$(LC_ALL=C stat -c '%W' "$f" 2>/dev/null) || epoch=0
-    if [ "$epoch" != 0 ]; then birth=$(LC_ALL=C stat -c '%w' "$f" 2>/dev/null) || birth=''; else birth=''; fi
+    _fm_status_stat_raw "$1" __fm_id_value '' '' || return 1
+    printf '%s' "$__fm_id_value"
   fi
-  case "$ident$birth" in *$'\t'*|*$'\n'*|'') return 1 ;; esac
-  if [ -n "$birth" ]; then printf 'strong:%s:%s' "$ident" "$birth"; else printf 'weak:%s' "$ident"; fi
 }
 
-_fm_status_file_size() {  # <status-file>
-  local f=$1
+_fm_status_file_size() {  # <status-file> [<out-var>]
+  local __fm_sz_value
   if [ -n "${FM_STATUS_SIZE_READER:-}" ]; then
-    "$FM_STATUS_SIZE_READER" "$f"
+    if [ "$#" -le 1 ]; then "$FM_STATUS_SIZE_READER" "$1"; return; fi
+    __fm_sz_value=$("$FM_STATUS_SIZE_READER" "$1") || return
+    printf -v "$2" '%s' "$__fm_sz_value"
     return
   fi
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-    LC_ALL=C /usr/bin/stat -f '%z' "$f" 2>/dev/null
+  if [ "$#" -gt 1 ]; then
+    _fm_status_stat_raw "$1" '' "$2" ''
   else
-    LC_ALL=C stat -c '%s' "$f" 2>/dev/null
+    _fm_status_stat_raw "$1" '' __fm_sz_value '' || return 1
+    printf '%s' "$__fm_sz_value"
   fi
 }
 
-_fm_status_file_mtime() {  # <status-file>
-  local f=$1
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-    LC_ALL=C /usr/bin/stat -f '%m' "$f" 2>/dev/null
-  else
-    LC_ALL=C stat -c '%Y' "$f" 2>/dev/null
+_fm_status_file_mtime() {  # <status-file> [<out-var>]
+  if [ "$#" -gt 1 ]; then
+    _fm_status_stat_raw "$1" '' '' "$2"
+    return
   fi
+  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+    LC_ALL=C /usr/bin/stat -f '%m' "$1" 2>/dev/null
+  else
+    LC_ALL=C stat -c '%Y' "$1" 2>/dev/null
+  fi
+}
+
+# Identity, size, and mtime together for a caller that needs more than one: a
+# single stat unless a test seam replaces the identity or size reader.
+_fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
+  if [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
+    if [ -n "${2-}" ]; then _fm_open_decisions_file_ident "$1" "$2" || return 1; fi
+    if [ -n "${3-}" ]; then _fm_status_file_size "$1" "$3" || return 1; fi
+    if [ -n "${4-}" ]; then _fm_status_file_mtime "$1" "$4" || return 1; fi
+    return 0
+  fi
+  _fm_status_stat_raw "$1" "${2-}" "${3-}" "${4-}"
+}
+
+# Whole file into <out-var> without forking cat: the fleet cursor manifest is
+# read once per task per scan, so a child per read was a measurable share of a
+# drain's processes. Fails when the file cannot be opened. Trailing newlines
+# are kept, and the line loops that consume the text skip blank rows.
+_fm_read_file_into() {  # <file> <out-var>
+  local __fm_rf_data=
+  { IFS= read -r -d '' __fm_rf_data || :; } 2>/dev/null < "$1" || return 1
+  printf -v "$2" '%s' "$__fm_rf_data"
+}
+
+# Printed, or assigned to <out-var> when one is named: the one place a value
+# leaves a function that offers both the printing and the fork-free form.
+_fm_emit_value() {  # <out-var-or-empty> <value>
+  if [ -n "${1-}" ]; then printf -v "$1" '%s' "$2"; else printf '%s' "$2"; fi
 }
 
 # Private scratch path for a one-shot span read, alongside the status file the
@@ -87,7 +154,9 @@ _fm_status_file_mtime() {  # <status-file>
 # (the watcher and the away-mode daemon both classify the same stream) never
 # truncate each other's chunk.
 _fm_status_span_scratch() {  # <status-file>
-  printf '%s.span.%s' "$(_fm_open_decisions_cursor_path "$1")" "$$"
+  local __fm_ss_cursor
+  _fm_open_decisions_cursor_path "$1" __fm_ss_cursor
+  printf '%s.span.%s' "$__fm_ss_cursor" "$$"
 }
 
 _fm_status_read_span() {  # <status-file> <start-offset> <byte-length>
@@ -130,10 +199,8 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
   case "$endpoint" in ''|*[!0-9]*|0) return 1 ;; esac
   [ -n "$expected_ident" ] || return 1
 
-  before_mtime=$(_fm_status_file_mtime "$f") || return 1
-  before_size=$(_fm_status_file_size "$f") || return 1
+  _fm_status_stat_into "$f" before_ident before_size before_mtime || return 1
   before_size=${before_size//[[:space:]]/}
-  before_ident=$(_fm_open_decisions_file_ident "$f") || return 1
   case "$before_mtime:$before_size" in *[!0-9:]*) return 1 ;; esac
   [ "$before_size" -eq "$endpoint" ] && [ "$before_ident" = "$expected_ident" ] || return 1
 
@@ -167,10 +234,8 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
   case "$event_endpoint" in ''|*[!0-9]*) return 1 ;; esac
   [ -n "$line" ] || return 1
 
-  after_mtime=$(_fm_status_file_mtime "$f") || return 1
-  after_size=$(_fm_status_file_size "$f") || return 1
+  _fm_status_stat_into "$f" after_ident after_size after_mtime || return 1
   after_size=${after_size//[[:space:]]/}
-  after_ident=$(_fm_open_decisions_file_ident "$f") || return 1
   case "$after_mtime:$after_size" in *[!0-9:]*) return 1 ;; esac
   [ "$after_mtime" = "$before_mtime" ] \
     && [ "$after_size" -eq "$endpoint" ] \
