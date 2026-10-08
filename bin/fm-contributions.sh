@@ -138,27 +138,34 @@ jq_lib() { # jq options/program via final argument
 }
 
 read_saved() {
-  local file dir task
+  local file dir task oversized base=$DATA
   : > "$TMP/saved.jsonl"
   ERRORS=0
   if [ -L "$DATA" ]; then
     ERRORS=1; printf '[]\n' > "$TMP/saved.json"; return 0
   fi
-  for file in "$DATA"/*/contributions.json; do
+  # One find names every record over the size cap, so no record needs its own wc.
+  # Find and the glob below must spell each path alike, so drop trailing slashes once.
+  while [ "${base%/}" != "$base" ] && [ "$base" != / ]; do base=${base%/}; done
+  oversized=$'\n'$(find "$base" -mindepth 2 -maxdepth 2 -name contributions.json -size +1048576c -print 2>/dev/null || true)$'\n'
+  for file in "$base"/*/contributions.json; do
     [ -e "$file" ] || [ -L "$file" ] || continue
     fm_dirname_to dir "$file"
     fm_basename_to task "$dir"
-    if [ -L "$file" ] || [ -L "$dir" ] || [ ! -f "$file" ] \
-      || [ "$(wc -c < "$file")" -gt 1048576 ] \
-      || ! jq_lib -ne --slurpfile record "$file" '($record | length) == 1 and ($record[0] | valid_record)' >/dev/null 2>&1; then
+    if [ -L "$file" ] || [ -L "$dir" ] || [ ! -f "$file" ]; then
       ERRORS=$((ERRORS + 1))
       continue
     fi
-    # A file's task identity must match its durable directory, not arbitrary JSON.
-    if ! jq -e --arg task "$task" '.task == $task' "$file" >/dev/null; then
-      ERRORS=$((ERRORS + 1)); continue
+    case "$oversized" in
+      *$'\n'"$file"$'\n'*) ERRORS=$((ERRORS + 1)); continue ;;
+    esac
+    # One read validates the record, checks that its task identity matches its
+    # durable directory rather than arbitrary JSON, and emits it compactly.
+    if ! jq_lib -nce --slurpfile record "$file" --arg task "$task" \
+        '($record | length) == 1 and ($record[0] | valid_record) and ($record[0].task == $task)
+         | if . then $record[0] else empty end' >> "$TMP/saved.jsonl" 2>/dev/null; then
+      ERRORS=$((ERRORS + 1))
     fi
-    jq -c . "$file" >> "$TMP/saved.jsonl"
   done
   jq -s . "$TMP/saved.jsonl" > "$TMP/saved.json"
 }
