@@ -378,6 +378,14 @@ test_unusable_pool_degrades_with_notice() {
   assert_equals 5 "$rc" "without python3 run must still execute the command"
   assert_equals held=0 "$out" "without python3 the command output must stay clean"
   assert_grep "python3 not found" "$log" "without python3 run must say so on the log fd"
+
+  rc=0
+  out=$(PATH="$fakebin" "$PASS_TOOL" run -- \
+    bash -c 'echo "held=$FM_CPU_PASS_HELD"; echo "child stderr" >&2; exit 5' 2>"$log") || rc=$?
+  assert_equals 5 "$rc" "the default notice fd must preserve the command's exit status"
+  assert_equals held=0 "$out" "the default notice must not leak into command stdout"
+  assert_equals $'fm-cpu-pass: running bash without a CPU pass: python3 not found\nchild stderr' \
+    "$(cat "$log")" "default stderr must contain one degradation notice and the child's stderr"
   pass "an unusable pool or missing python3 runs the command without a pass and says so"
 }
 

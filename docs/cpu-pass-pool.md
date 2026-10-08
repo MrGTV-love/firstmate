@@ -42,6 +42,7 @@ Every participant on a host follows these rules, so one pool is shared by every 
    Firstmate's runner reduces concurrency to the inherited count and reports the reduction on its notice fd; an explicit pass request above that count is a usage error.
    The marker must be a nonnegative decimal integer in both Python and no-Python execution; a malformed marker is a usage error, while `0` denotes degraded work with no reservation or concurrency limit.
 7. **Degrade, never block:** a participant that cannot use the pool (no `flock`, no pool directory, a foreign-owned directory) runs its work without a pass and says so once.
+   Degradation notices use `--log-fd` (default stderr), separate from the work's stdout, including when Python is unavailable.
    The pool governs throughput; it is not a safety boundary, and a broken pool must not stop every test on the host.
 8. **Waiting stays outside work bounds:** take passes before starting any per-test or per-worker timeout, so time spent queued never counts toward that timeout.
    A caller's own overall budget, such as a harness command limit, still includes the wait.
