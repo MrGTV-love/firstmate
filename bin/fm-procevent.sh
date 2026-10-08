@@ -56,13 +56,14 @@
 #            follows the relisten rule below.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for that capture. It then
-#            drains its owned process group in EXIT cleanup, unless
-#            the adapter's `relisten` command says to poll again in this same
-#            runner. It blocks for as long as the source blocks and is meant
-#            to run as a supervised background process, never in a conversational
-#            turn. After publishing, it asks the source's own adapter whether the
-#            captured result ends the source and normally retires the registration
-#            when it says so, so a source that has ended stops being restarted.
+#            drains its owned process group in EXIT cleanup, unless the source
+#            command is the tracked adapter script and `relisten` accepts
+#            polling again in this same runner.
+#            It blocks for the runner's lifetime and is meant to run supervised,
+#            never in a conversational turn. After publishing, it asks the
+#            source's own adapter whether the captured result ends the source
+#            and normally retires the registration when it says so, so a source
+#            that has ended stops being restarted.
 #            A task-owned source instead keeps its terminal round open and
 #            registered until its owner concludes it with `handled`.
 # reconcile  Idempotent liveness entry the watcher calls on its ordinary cycle:
@@ -181,11 +182,12 @@
 # go silent. An unhandled result stays eligible for bounded re-announcement on
 # every reconcile in both modes, exactly as before.
 #
-# Polling again is adapter-owned through the same kind of seam. Exit 0 from
-# `bin/fm-procevent-<adapter>.sh relisten` keeps this runner and its claim after
-# an empty wait or handled capture. For an unhandled firstmate-owned capture,
-# `relisten <result-file>` must explicitly accept that result; adapters exposing
-# only the no-argument command retain their stop-until-handled behavior.
+# Polling again requires filesystem identity with the tracked
+# `bin/fm-procevent-<adapter>.sh`, not an arbitrary command it classifies.
+# Exit 0 from `relisten` keeps this runner and its claim after an empty wait or
+# handled capture. For an unhandled firstmate-owned capture,
+# `relisten <result-file>` must explicitly accept that result; adapters rejecting
+# result-bearing calls retain stop-until-handled behavior.
 # Task-owned open rounds never take this unhandled continuation.
 # The runner adopts a replacement registration only when the command is
 # unchanged and the claim still belongs to it. Any other verdict releases the
@@ -1140,14 +1142,15 @@ cmd_start() {
   trap 'exit 130' INT
   trap 'exit 143' TERM
   trap 'exit 129' HUP
-  # 0 when this runner should poll again. The adapter's relisten command is the
-  # only adapter-specific signal; a replacement registration is adopted only
-  # when this claim still owns it and the registered command is unchanged.
+  # 0 when this tracked adapter source should poll again. Classification alone
+  # never permits replaying an arbitrary source command. A replacement
+  # registration is adopted only under the same claim and unchanged command.
   adopt_relisten() {
     local script registration current now_adapter i
     local -a previous=()
     [ "$extension_owner" -eq 0 ] || return 1
     script=$(adapter_script "$adapter")
+    [ "${ARGV[0]-}" -ef "$script" ] || return 1
     [ -f "$script" ] && [ ! -L "$script" ] || return 1
     "$script" relisten "$@" >/dev/null 2>&1 || return 1
     registration=$(source_file "$id")
