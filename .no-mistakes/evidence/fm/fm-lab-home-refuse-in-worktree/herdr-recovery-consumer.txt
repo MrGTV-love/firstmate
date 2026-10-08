@@ -1,0 +1,18 @@
+$ env (fleet path overrides and ambient task file removed) bash tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+tests/fm-backend-herdr-recovery-lock-e2e.test.sh: line 294: 92119 Terminated: 15          ( cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}" )
+ok - offline executable inventory and reaper remove only generated owned processes before Herdr provisioning
+# herdr 0.9.1 recovery custody lab
+ok - cross-home recovery completes while unrelated allocation is held, preserving task custody, exact binding, generation and focus
+ok - recovery and failed-setup abort cleanup complete beside a held fresh projection allocation, preserving exact custody and focus
+ok - fresh-projection abort cleanup completes beside a teardown held in its worktree return, preserving exact custody and focus
+tests/fm-backend-herdr-recovery-lock-e2e.test.sh: line 616: 73202 Terminated: 15          ( cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}" )
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned conclude, with task/meta custody, session release and exact sibling focus
+tests/fm-backend-herdr-recovery-lock-e2e.test.sh: line 616: 42779 Terminated: 15          ( cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}" )
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned reap, with task/meta custody, session release and exact sibling focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside a held forced-secondmate recursive child return, preserving descendant task/meta custody and exact sibling focus
+ok - owned conclude refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - conclude pre-mutation refusal survives actual startup; admitted deferred close replays only its exact generation
+ok - owned reap refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - reap pre-mutation refusal survives actual startup; admitted deferred retain replays only its exact generation
+
+exit=0

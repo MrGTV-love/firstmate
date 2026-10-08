@@ -1,0 +1,96 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/existing
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/existing': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+exit=1
+
+Persisted state: existing target remains empty; no marker or stock directories written.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/.gate-wake-lab/home
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/.gate-wake-lab/home': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create .idle-wake-lab-x
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf
+fm-lab-home: refusing '.idle-wake-lab-x': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+exit=1
+
+Persisted state: absent nested and relative targets remain absent, including their parent directories.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/populated
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/populated': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+exit=1
+
+Persisted state: pre-existing sentinel bytes preserved; no lab marker created.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/repository-alias/.lab-home-alias-refusal
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/repository-alias/.lab-home-alias-refusal': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/git-env-refusal
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+env: {"GIT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/invalid.git", "GIT_WORK_TREE": "/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80"}
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/git-env-refusal': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+exit=1
+
+Persisted state: symlink and inherited GIT_DIR/GIT_WORK_TREE cannot create a home in the run worktree.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/ordinary-repo/new/nested/home
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/.lab-home-live-sl5ftajf/ordinary-repo/new/nested/home': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+exit=1
+
+Persisted state: normal git repository is refused too, not just gate worktrees.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/fresh
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/fresh
+exit=0
+
+Persisted lab output: /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/fresh => marker="fm-lab-home v1", state/, data/, config/, projects/.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/new/deep/home
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/new/deep/home
+exit=0
+
+Persisted lab output: /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/new/deep/home => marker="fm-lab-home v1", state/, data/, config/, projects/.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-primary
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-primary
+exit=0
+
+Persisted lab output: /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-primary => marker="fm-lab-home v1", state/, data/, config/, projects/.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-bravo
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-bravo
+exit=0
+
+Persisted lab output: /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-bravo => marker="fm-lab-home v1", state/, data/, config/, projects/.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-forced
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-forced
+exit=0
+
+Persisted lab output: /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-forced => marker="fm-lab-home v1", state/, data/, config/, projects/.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-forced/nested
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-forced/nested
+exit=0
+
+Persisted lab output: /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/home-forced/nested => marker="fm-lab-home v1", state/, data/, config/, projects/.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/fresh
+cwd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E29DB6750VVTWDCMEWKYQB
+fm-lab-home: refusing '/Users/charlesabrooker/tmp/fm-lab-live-h7xl2j80/fresh': a lab marker is only ever stamped on a fresh empty dir
+exit=1
+
+Persisted state: repeated create refuses an already marked home without changing its marker or layout.
+
+All disposable helper fixtures removed by TemporaryDirectory cleanup on exit.

@@ -1,0 +1,6 @@
+First attempt: bash tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+Driver subprocess communication deadline: 600 seconds; exceeded. No pass claimed.
+Owned lab status observed: real Herdr client 0.9.3 / server 0.9.1, compatible protocol 22.
+Owned pane inventory showed recovery workspaces and fixture cwd /Users/charlesabrooker/tmp/fm-herdr-recovery-lock.MS7qfY.
+Guarded cleanup: TMPDIR=<fixture>/tmp bin/fm-herdr-lab.sh teardown fm-lab-recovery-lock-20960-20843
+exit=0
