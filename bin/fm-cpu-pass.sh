@@ -70,7 +70,9 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
     fi
     exec "$@"
   fi
-  { echo "fm-cpu-pass: running $1 without a CPU pass: python3 not found"; } >&"$log_fd" 2>/dev/null || true
+  if { : >&"$log_fd"; } 2>/dev/null; then
+    printf '%s\n' "fm-cpu-pass: running $1 without a CPU pass: python3 not found" >&"$log_fd" || true
+  fi
   export FM_CPU_PASS_HELD=0
   exec "$@"
 fi
