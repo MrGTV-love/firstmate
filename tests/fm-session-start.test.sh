@@ -785,6 +785,48 @@ write_omp_loaded_markers() {
   printf '%s\n%s\n' "$version" "$pid" > "$home/state/.omp-turnend-extension-loaded"
 }
 
+# --- the home summary refresh never blocks the digest -----------------------
+
+# A locked session start used to run the refresh synchronously with a 60-second
+# deadline, so a refresh that could not finish in time cost the digest the whole
+# deadline on every start and logged a failure each time. Hold the refresh lock
+# for the whole start (a refresh in flight) with a 20-second deadline: a
+# blocking call would wait it out and record "exceeded its 20-second deadline",
+# a detached one records nothing and leaves its trigger marker for the run that
+# holds the lock.
+test_home_summary_refresh_does_not_block_the_digest() {
+  local rec root home fakebin out holder marker started elapsed
+  rec=$(new_world summary-detach)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  marker="$home/state/.test-summary-lock-held"
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_acquire_wait "$2/state/.home-summary-refresh.lock"
+    : > "$3"
+    sleep 120
+  ' _ "$ROOT" "$home" "$marker" &
+  holder=$!
+  fm_test_wait_until 20 test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
+  started=$(date +%s)
+  out=$(FM_HOME_SUMMARY_TIMEOUT=20 run_session_start "$home" "$root" "$fakebin:$BASE_PATH") \
+    || { kill "$holder" 2>/dev/null; fail "session start failed with a refresh in flight"; }
+  elapsed=$(( $(date +%s) - started ))
+  fm_test_wait_until 60 test -e "$home/state/.home-summary-refresh.pending" \
+    || { kill "$holder" 2>/dev/null; fail "the session start trigger left no marker for the refresh in flight"; }
+  sleep 2
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  [ ! -s "$home/state/.home-summary-refresh.log" ] \
+    || fail "session start waited out a refresh and recorded a failure: $(cat "$home/state/.home-summary-refresh.log")"
+  [ "$elapsed" -lt 20 ] || fail "session start took $elapsed seconds with a refresh in flight"
+  assert_contains "$out" "SESSION START" "the digest did not print with a refresh in flight"
+  pass "a locked session start does not wait for the home summary refresh"
+}
+
 # --- context digest: absent vs empty vs present -----------------------------
 
 test_context_digest_absent_empty_present() {
@@ -802,11 +844,12 @@ EOF
 
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
-  jq -e --arg home "$home" '
-    .schema == "fm-secondmate-home-summary.v1"
-    and .home == $home
-    and (.generated_epoch | type) == "number"
-  ' "$home/state/home-summary.json" >/dev/null \
+  # The refresh is detached, so session start returns before it publishes.
+  fm_test_wait_until 60 jq -e --arg home "$home" "
+    .schema == \"fm-secondmate-home-summary.v1\"
+    and .home == \$home
+    and (.generated_epoch | type) == \"number\"
+  " "$home/state/home-summary.json" \
     || fail "a locked session start did not publish the home summary ledger"
   assert_contains "$out" "data/projects.md" "digest did not label the projects.md section"
   assert_contains "$out" "- demo [no-mistakes] - a demo project (added 2026-07-01)" "digest did not print projects.md content"
@@ -1479,6 +1522,10 @@ EOF
   pass "a killed per-task endpoint read becomes that task's error line and the digest completes"
 }
 
+no_stray_herdr() {  # <fakebin>
+  [ "$(pgrep -f "$1/herdr" 2>/dev/null | wc -l | tr -d ' ')" -eq 0 ]
+}
+
 test_endpoint_read_hang_is_bounded_and_reported() {
   local rec root home fakebin out status=0 stray
   rec=$(new_world endpoint-hang)
@@ -1505,8 +1552,11 @@ EOF
   assert_not_contains "$out" "STARTUP TRUNCATED - SESSION START" \
     "a bounded endpoint-read hang raised the whole-digest truncation banner"
 
-  stray=$(pgrep -f "$fakebin/herdr" 2>/dev/null | wc -l | tr -d ' ')
-  [ "$stray" -eq 0 ] || fail "the per-task read bound left $stray hung herdr process(es) behind"
+  # The detached home summary refresh reads the same hung endpoint after the
+  # digest has returned, under its own 10-second per-task bound, so "nothing
+  # stuck" means nothing survives that bound rather than nothing at this instant.
+  fm_test_wait_until 40 no_stray_herdr "$fakebin" \
+    || fail "the per-task read bound left $(pgrep -f "$fakebin/herdr" 2>/dev/null | wc -l | tr -d ' ') hung herdr process(es) behind"
 
   pass "a hung per-task endpoint read hits its configured bound, reports the task, and leaves nothing stuck"
 }
@@ -1533,8 +1583,11 @@ EOF
   assert_contains "$out" "$(printf '\nCONTEXT\n')" \
     "a padded-zero bound cost the digest its context section"
 
-  stray=$(pgrep -f "$fakebin/herdr" 2>/dev/null | wc -l | tr -d ' ')
-  [ "$stray" -eq 0 ] || fail "the fallback bound left $stray hung herdr process(es) behind"
+  # The detached home summary refresh reads the same hung endpoint after the
+  # digest has returned, under its own 10-second per-task bound, so "nothing
+  # stuck" means nothing survives that bound rather than nothing at this instant.
+  fm_test_wait_until 40 no_stray_herdr "$fakebin" \
+    || fail "the fallback bound left $(pgrep -f "$fakebin/herdr" 2>/dev/null | wc -l | tr -d ' ') hung herdr process(es) behind"
 
   pass "a padded-zero per-read bound falls back to the 10s default instead of removing the bound"
 }
@@ -3166,5 +3219,6 @@ test_read_only_pi_compact_refreshes_against_its_own_session_identity
 test_codex_unreachable_reset_sources_do_not_claim_instruction_refresh
 test_agents_baseline_requires_sha256_and_successful_completion
 test_reemit_keeps_repair_ownership_with_the_lock_holder
+test_home_summary_refresh_does_not_block_the_digest
 
 echo "# fm-session-start.test.sh: all assertions passed"

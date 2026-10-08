@@ -562,9 +562,8 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
 
 resolve_directory_input() {
-  local name=$1 path=$2 resolved raw_bytes
-  raw_bytes=$(fm_backlog_bytes_of_string "$path") || return 1
-  if ! fm_backlog_control_bytes_valid 0 "$raw_bytes"; then
+  local name=$1 path=$2 resolved
+  if ! fm_backlog_string_control_free "$path"; then
     echo "error: $name directory contains an invalid control byte" >&2
     return 1
   fi
@@ -1322,7 +1321,7 @@ spawn_remote_secondmate() {
   fm_lock_release "$remote_lock" || true
   fm_lock_release "$registry_lock" || true
   fm_lock_release "$SPAWN_TASK_LOCK" || true
-  "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
+  "$SCRIPT_DIR/fm-home-summary-refresh.sh" --detach || true
   if ! "$SCRIPT_DIR/fm-procevent-remote-reply.sh" arm "$id" >/dev/null; then
     echo "error: remote secondmate $id launched, but its reply source could not be armed; endpoint metadata is preserved" >&2
     return 1
@@ -5404,7 +5403,7 @@ if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
   SPAWN_TASK_SET_LOCK_HELD=0
   fm_lock_release "$SPAWN_TASK_SET_LOCK"
 fi
-"$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
+"$SCRIPT_DIR/fm-home-summary-refresh.sh" --detach || true
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")

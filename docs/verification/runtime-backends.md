@@ -1242,7 +1242,7 @@ If restoration is not observed, the probe retries from a fresh busy turn at most
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
-The current live guard has not been rerun for this change.
+The latest guard run stopped before restored-wake recovery was exercised; see [omp idle wake behind an advisor note](#2026-10-08-omp-idle-wake-behind-an-advisor-note).
 Historical output below predates its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
 These results do not establish the current recovery contract; output for the removed parent Enter recovery is omitted.
 
@@ -1252,6 +1252,42 @@ ok - live omp wake restore: omp (omp/18.7.0) on herdr 0.9.1 left the operator's 
 ok - live omp markers: omp (omp/18.7.0) on herdr 0.9.1 kept both loaded markers on the session pid 34771 after a descendant omp ran
 ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 reads empty and pending while a turn runs
 ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
+```
+
+### 2026-10-08 omp idle wake behind an advisor note
+
+Verified on 2026-10-08 on macOS arm64 against omp 18.8.1 in isolated Herdr 0.9.1 lab sessions, with omp's advisor enabled and every model role served by a scripted local OpenAI-compatible model, so no model tokens were spent.
+The scripted model answers "ack", except that the advisor gets one `advise` tool call, so the advisor posts its note after the turn ends.
+
+- **An idle explicit follow-up waits behind an advisor note.**
+  After an ordinary turn, and after a turn omp retried for an empty answer, `sendUserMessage(text, { deliverAs: "followUp" })` at an idle session started a turn at once.
+  After the advisor posted its note, the same call left the message queued: the extension context read `isIdle()` true and `hasPendingMessages()` true, and no request reached the model until a later prompt.
+  omp's idle auto-continue starts a follow-up-only turn only when the context ends in an assistant message or tool result, and the advisor note is a custom message.
+- **The prompt flow starts the turn.**
+  At that same idle state, `sendUserMessage(text)` without `deliverAs` started a turn at once, and omp flushed the stranded follow-up into the same turn.
+  The prompt flow left an operator draft in the composer unsent.
+
+[Watcher continuity](../watcher-continuity.md#omp-idle-wake-delivery) owns the resulting delivery contract.
+The idle step of the live guard drives the extension under review on the installed omp with that scripted model:
+
+```sh
+FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
+```
+
+```text
+ok - live omp idle wake: omp (omp/18.8.1) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
+```
+
+The same step run against the extension that queued every wake as a follow-up failed:
+
+```text
+not ok - omp (omp/18.8.1) on herdr 0.9.1: a wake reaching an idle lane behind an advisor note did not start a turn
+```
+
+On omp 18.8.1 the guard's next step, the restored-wake probe, fails before recovery is exercised, identically with and without this change, so it does not yet refresh the [omp injected text](#2026-10-06-omp-injected-text-through-herdr) entry:
+
+```text
+not ok - omp (omp/18.8.1) on herdr 0.9.1: wakelab1 was not submitted into the running turn's follow-up queue (queue rows: 3)
 ```
 
 ## Steering-inbox doorbell

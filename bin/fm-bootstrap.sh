@@ -1200,7 +1200,7 @@ crew_dispatch_validate() {
 # snapshot's classifier and bin/fm-secondmate-reconcile.sh's nudge stay as
 # backstops for what this cannot see. Never reads or writes another home.
 backlog_record_reconcile() {
-  local marker meta control_lock meta_lock id row label has_record=0 gate_status
+  local marker meta control_lock meta_lock id row label has_record=0 gate_status row_states have_row_states
   # A fresh home with no state directory has no physical task records to pair.
   # Keep bootstrap diagnostics working without creating state just for a no-op.
   [ -e "$STATE" ] || [ -L "$STATE" ] || return 0
@@ -1276,6 +1276,22 @@ backlog_record_reconcile() {
     break
   done
   [ "$has_record" = 1 ] || return 0
+  # Only a queued row is ever healed below, so one read of every row's state lets
+  # a record whose item exists and is not queued skip its own backlog read. A
+  # record with no row in the answer, or a queued one, is still probed exactly as
+  # before, and a read that cannot be trusted probes every record.
+  row_states=
+  have_row_states=0
+  if row_states=$(fm_backlog_row_states "$DATA"); then
+    have_row_states=1
+    # Command substitution drops the final newline; restore it so the last row
+    # is delimited on both sides like every other.
+    row_states=$'\n'"$row_states"$'\n'
+  else
+    # A bound hit here means the backend is wedged. Latch it, as every other
+    # bounded read does, so the per-record reads below do not wait it out again.
+    [ "$?" -ne 124 ] || FM_BACKLOG_ROW_SHOW_WEDGED=1
+  fi
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || [ -L "$meta" ] || continue
     if ! fm_backlog_record_present "$meta" "task record" "$STATE"; then
@@ -1304,6 +1320,16 @@ backlog_record_reconcile() {
     if [ "$(fm_meta_get "$meta" kind)" != secondmate ] \
        && [ "$(fm_meta_get "$meta" cleanup_recovery)" != orca ]; then
       row=
+      if [ "$have_row_states" = 1 ]; then
+        case "$row_states" in
+          *$'\n'"$id:queued"$'\n'*) ;;
+          *$'\n'"$id:"*)
+            fm_lock_release "$meta_lock"
+            fm_lock_release "$control_lock"
+            continue
+            ;;
+        esac
+      fi
       if fm_backlog_row_probe "$DATA" "$id"; then
         row=$FM_BACKLOG_ROW_STATE
       elif [ "$FM_BACKLOG_ROW_RESULT" != not_found ]; then

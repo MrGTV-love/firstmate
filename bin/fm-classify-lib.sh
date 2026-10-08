@@ -21,17 +21,17 @@
 # daemon keeps its escalation-digest seen-markers; the watcher keeps its .seen-*
 # signatures).
 #
-# There are four documented exceptions. The absorb classification
+# There are five documented exceptions. The absorb classification
 # (crew_absorb_class and its working/paused wrappers) is NOT a pure status-file
 # read: it reuses bin/fm-crew-state.sh, which may make a bounded no-mistakes call,
 # to decide whether a crew that just stopped its turn or went stale is working,
 # deliberately paused, or neither. Callers run it ONLY on no-verb signal handling
 # and first sighting of a stale hash, never on every wake, so the per-wake triage
-# stays cheap. status_open_decisions_incremental (see "incremental (cursor-backed)
-# open-decisions fold" below) also writes: it persists a per-status-file byte
-# cursor and folded open-set as a side effect, so a per-drain fleet-wide scan
-# stays bounded by new appends instead of re-reading each task's whole lifetime
-# log every time. status_home_appends_record writes the per-task home-owned
+# stays cheap. status_open_decisions_incremental writes the live fold checkpoint;
+# the "incremental (cursor-backed) open-decisions fold" section below owns that
+# persistence contract. status_open_decisions_checkpoint_carry writes only beside
+# a captured log; its comment below owns the carry contract.
+# status_home_appends_record writes the per-task home-owned
 # append ledger documented in fm-status-wake-lib.sh so the wake scan can treat
 # this home's own bookkeeping bytes as already owned.
 # crew_worktree_written_since reads the task's meta file and walks a bounded slice
@@ -222,18 +222,11 @@ EOF
 
 # --- incremental (cursor-backed) open-decisions fold ------------------------
 #
-# status_open_decisions above re-reads and re-folds a status file's ENTIRE
-# lifetime on every call, so its cost grows with total log size. A per-drain
-# fleet-wide scan using that whole-file function would pay that cost for every
-# task on every wake, which grows unbounded as tasks run longer and accumulate
-# status history. status_open_decisions_incremental and scan_open_decisions_incremental
-# below are the bounded-cost siblings used for that per-drain path: each call
-# reads only the bytes appended to a status file since its own last call (a
-# persisted per-file byte cursor) and folds just those new lines into a
-# persisted running open-set, via the exact same _fm_decision_fold_line rule
-# status_open_decisions uses - so the two strategies can never disagree on what
-# is open. Cost is bounded by NEW appends since the last drain, not by the
-# status file's total lifetime size.
+# status_open_decisions in bin/fm-status-decision-lib.sh is a read-only fold;
+# this incremental sibling persists the checkpoint that lets later readers
+# avoid re-folding consumed history. Both use the same _fm_decision_fold_line
+# rule. With a valid checkpoint, each call folds only new appends plus a
+# one-byte boundary check; a cold or refused checkpoint requires a byte-0 rebuild.
 #
 # Correctness invariant (unchanged from the whole-file fold): cursor advancement,
 # age, and being buried under later appends never drop an open decision - the
@@ -241,25 +234,17 @@ EOF
 # of how much new unrelated log content has since been folded in. Only a line the
 # shared fold rule retires removes one.
 #
-# The cursor format is `version` (FM_OPEN_DECISIONS_FOLD_VERSION plus the task
-# kind, as `<n>:<kind>`), `offset`, `ident`, then the folded open set.
-# FM_OPEN_DECISIONS_FOLD_VERSION must be bumped whenever
-# _fm_decision_fold_line semantics change, so persisted state from an older
-# interpretation is discarded and rebuilt from byte 0; the kind suffix does the
-# same when a task kind changes, because kind changes the fold below.
-#
-# Cursor invalidation is deliberately minimal, matching how status files are
-# ACTUALLY used in this repo: every one is created once (`>`) and only ever
-# appended to (`>>`) - never replaced, renamed, or rewritten in place. So the
-# ways a cursor can go stale are a fold-version mismatch, a shrink (truncated),
-# or the file at this path being a different file than before
-# (replaced/rotated/recreated), which a changed device+inode makes an O(1) check
-# via a single `stat` call - no content hashing, no re-reading the consumed
-# prefix. Any signal falls back to a full re-fold of the whole current file from
-# byte 0 - byte for byte what status_open_decisions itself would compute - and
-# rewrites the cursor from that clean baseline. A same-inode, same-size,
-# in-place byte edit is NOT detected; that is a deliberately accepted gap
-# because no code path in this repo ever does that to a status file.
+# bin/fm-status-decision-lib.sh owns the checkpoint format, fold signature,
+# version-bump rule, and read-only seed validation.
+# The incremental writer additionally rejects a checkpoint beyond its captured
+# endpoint, so a later cached result cannot leak into an earlier snapshot.
+# An unterminated final line participates in that point-in-time fold, but its
+# partial endpoint cannot seed a later fold even if the line has since completed.
+# Invalid state is rebuilt and the cursor rewritten from the clean baseline;
+# rebuilding fold state does not rewind the independent presentation manifest.
+# Regression coverage: tests/fm-wake-drain-open-decisions-cursor.test.sh.
+# Identity and size checks assume append-only logs: a same-inode, same-size,
+# in-place byte edit is NOT detected, because no repository writer does that.
 #
 # The other real failure mode is OUR OWN read failing (a stat/wc/tail I/O
 # error), not a malformed writer: every such read here is checked, and on
@@ -279,54 +264,22 @@ EOF
 # re-derives from whatever offset actually landed on disk.
 
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
-  local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open='' cursor_data first rest offset_line ident_line
+  local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
   local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
-  local target_cursor kind fold_version
+  local target_cursor kind fold_version boundary_rc verb
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_fm_status_kind "$f")
-  fold_version="$FM_OPEN_DECISIONS_FOLD_VERSION:$kind"
+  fold_version=$(_fm_open_decisions_fold_signature "$kind")
   cf=$(_fm_open_decisions_cursor_path "$f")
   offset=0
   ident=''
-  if [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ]; then
-    cursor_data=$(LC_ALL=C command cat "$cf" 2>/dev/null) || cursor_data=''
-  fi
-  if [ -n "${cursor_data:-}" ]; then
-      first=${cursor_data%%$'\n'*}
-      case "$first" in
-        version=*)
-          version=${first#version=}
-          [ "$version" = "$fold_version" ] || version=''
-          rest=${cursor_data#*$'\n'}
-          offset_line=${rest%%$'\n'*}
-          case "$offset_line" in
-            offset=*) offset=${offset_line#offset=} ;;
-            *) offset=0; version='' ;;
-          esac
-          case "$offset" in
-            ''|*[!0-9]*) offset=0; version='' ;;
-            *)
-              case "$rest" in
-                *$'\n'*)
-                  rest=${rest#*$'\n'}
-                  ident_line=${rest%%$'\n'*}
-                  case "$ident_line" in
-                    ident=*)
-                      ident=${ident_line#ident=}
-                      case "$rest" in
-                        *$'\n'*) open=${rest#*$'\n'} ;;
-                      esac
-                      if [ -n "$version" ] && [ -n "$ident" ]; then trusted_open=$open; fi
-                      ;;
-                    *) offset=0; version='' ;;
-                  esac
-                  ;;
-                *) offset=0; version='' ;;
-              esac
-              ;;
-          esac
-          ;;
-      esac
+  if _fm_open_decisions_checkpoint_parse "$cf"; then
+    version=$_FM_ODC_VERSION
+    [ "$version" = "$fold_version" ] || version=''
+    offset=$_FM_ODC_OFFSET
+    ident=$_FM_ODC_IDENT
+    open=$_FM_ODC_OPEN
+    if [ -n "$version" ]; then trusted_open=$open; fi
   fi
 
   # A stat/size-read failure is a genuine I/O error, not "the file is empty" -
@@ -348,7 +301,16 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     size=$actual_size
   fi
 
-  if [ -z "$version" ] || [ -z "$ident" ] || [ "$ident" != "$cur_ident" ] || [ "$offset" -gt "$actual_size" ]; then
+  if [ -n "$version" ] && [ -n "$ident" ] && [ "$ident" = "$cur_ident" ] && [ "$offset" -le "$size" ]; then
+    if _fm_open_decisions_checkpoint_boundary "$f" "$offset"; then
+      :
+    else
+      boundary_rc=$?
+      [ "$boundary_rc" -ne 2 ] || { printf '%s' "$trusted_open"; return 0; }
+      version=''
+    fi
+  fi
+  if [ -z "$version" ] || [ -z "$ident" ] || [ "$ident" != "$cur_ident" ] || [ "$offset" -gt "$size" ]; then
     offset=0
     open=''
     trusted_open=''
@@ -374,7 +336,12 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
     held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
     while IFS= read -r line || [ -n "$line" ]; do
-      open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+      status_line_verb "$line" verb
+      case "$verb" in
+        needs-decision|blocked|done|failed|"$resolve"|"$held")
+          open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+          ;;
+      esac
     done < "$chunk_file"
     rm -f "$chunk_file"
     offset=$size
@@ -393,11 +360,46 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   printf '%s' "$open"
 }
 
+# Carry a live log's fold checkpoint onto a point-in-time copy of that log, so
+# a whole-file fold of the copy (the fleet snapshot folds its captured copies)
+# starts from the checkpoint instead of line 1. <live-ident> is the live log's
+# identity read BEFORE the copy was taken; the checkpoint is carried only under
+# the live log's current fold signature and that same file identity, which must
+# still match now (so the copy is a prefix-preserving sample of the described
+# log). Its offset must lie within the copy at a complete-line boundary.
+# The carried checkpoint names the copy's own identity and is written only
+# beside the copy. The copy's read-only fold applies the seed-validation
+# contract owned by bin/fm-status-decision-lib.sh.
+status_open_decisions_checkpoint_carry() {  # <live-status> <captured-status> <live-ident>
+  local live=$1 copy=$2 live_ident=$3 now_ident copy_ident copy_size target
+  [ -n "$live_ident" ] || return 0
+  [ -f "$copy" ] && [ ! -L "$copy" ] || return 0
+  _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$live")" || return 0
+  [ "$_FM_ODC_VERSION" = "$(_fm_open_decisions_fold_signature "$(_fm_status_kind "$live")")" ] || return 0
+  [ "$_FM_ODC_IDENT" = "$live_ident" ] || return 0
+  now_ident=$(_fm_open_decisions_file_ident "$live" 2>/dev/null) || return 0
+  [ "$now_ident" = "$live_ident" ] || return 0
+  copy_ident=$(_fm_open_decisions_file_ident "$copy" 2>/dev/null) || return 0
+  [ -n "$copy_ident" ] || return 0
+  copy_size=$(_fm_status_file_size "$copy" 2>/dev/null) || return 0
+  copy_size=${copy_size//[[:space:]]/}
+  case "$copy_size" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$_FM_ODC_OFFSET" -le "$copy_size" ] || return 0
+  _fm_open_decisions_checkpoint_boundary "$copy" "$_FM_ODC_OFFSET" || return 0
+  target=$(_fm_open_decisions_cursor_path "$copy")
+  {
+    printf 'version=%s\n' "$_FM_ODC_VERSION"
+    printf 'offset=%s\n' "$_FM_ODC_OFFSET"
+    printf 'ident=%s\n' "$copy_ident"
+    if [ -n "$_FM_ODC_OPEN" ]; then printf '%s' "$_FM_ODC_OPEN"; fi
+  } > "$target.tmp.$$" 2>/dev/null || { rm -f "$target.tmp.$$"; return 0; }
+  mv -f "$target.tmp.$$" "$target" 2>/dev/null || rm -f "$target.tmp.$$"
+  return 0
+}
+
 # Incremental sibling of scan_open_decisions: same fleet-wide directory walk and
-# output shape ("<task>\t<key>\t<verb>\t<note>" per open decision), but folds
-# each task's status log through status_open_decisions_incremental instead of
-# the whole-file status_open_decisions, so a fleet-wide per-drain scan stays
-# bounded by new appends rather than total lifetime log size across every task.
+# output shape ("<task>\t<key>\t<verb>\t<note>" per open decision), with checkpoint
+# persistence and cold-rebuild behavior owned by status_open_decisions_incremental.
 scan_open_decisions_incremental() {  # <state>
   local state=$1 f task open line
   for f in "$state"/*.status; do

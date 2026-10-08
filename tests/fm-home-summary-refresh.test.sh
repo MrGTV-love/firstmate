@@ -21,6 +21,7 @@ LARGE_PARENT_HOME="$TMP_ROOT/large-parent-home"
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 WATCH_PID=
 SLOW_WRITER_PID=
+SUCCESS_WRITER_PID=
 SLOW_WORKER_PGID=
 SLOW_NM_PID=
 LOCK_HOLDER_PID=
@@ -31,7 +32,7 @@ cleanup() {
     ''|*[!0-9]*) ;;
     *) kill -KILL -- "-$SLOW_WORKER_PGID" >/dev/null 2>&1 || true ;;
   esac
-  for pid in "$WATCH_PID" "$SLOW_WRITER_PID" "$SLOW_NM_PID" "$LOCK_HOLDER_PID"; do
+  for pid in "$WATCH_PID" "$SLOW_WRITER_PID" "$SUCCESS_WRITER_PID" "$SLOW_NM_PID" "$LOCK_HOLDER_PID"; do
     [ -n "$pid" ] || continue
     kill -KILL "$pid" >/dev/null 2>&1 || true
   done
@@ -53,6 +54,13 @@ exit 0
 SH
 cat > "$FAKEBIN/no-mistakes" <<'SH'
 #!/usr/bin/env bash
+if [ -n "${FM_TEST_NM_COUNT:-}" ]; then
+  printf '.\n' >> "$FM_TEST_NM_COUNT"
+fi
+if [ -n "${FM_TEST_NM_HOLD:-}" ] && [ -e "$FM_TEST_NM_HOLD" ]; then
+  printf '%s\n' "$$" > "$FM_TEST_NM_HOLD.entered"
+  while [ -e "$FM_TEST_NM_HOLD" ]; do sleep 0.1; done
+fi
 if [ -n "${FM_TEST_NM_MARKER:-}" ]; then
   printf '%s\n' "$$" > "$FM_TEST_NM_MARKER"
   sleep "${FM_TEST_NM_SLEEP:-30}"
@@ -254,7 +262,7 @@ jq -e '.secondmate_current.records[0]
     and .invalidity.kind == "orphan_in_flight"
     and (.invalidity.ids | length) == 600' \
   "$TMP_ROOT/large-parent-snapshot.json" >/dev/null \
-  || fail "parent fleet snapshot did not preserve the large child invalidity"
+  || fail "parent fleet snapshot did not preserve the large child invalidity: $(jq -c '.secondmate_current.records[0]' "$TMP_ROOT/large-parent-snapshot.json")"
 pass "parent snapshot consumes large child ledgers without argument transport"
 
 mkdir -p "$CADENCE_HOME/state" "$CADENCE_HOME/data" "$CADENCE_HOME/config" \
@@ -451,6 +459,8 @@ grep -F 'summary producer failed' "$HOME_DIR/state/.home-summary-refresh.log" >/
 pass "best-effort publication logs and continues"
 
 LOCK_MARKER="$TMP_ROOT/lock-held"
+cp "$HOME_DIR/state/.home-summary-refresh.streak" "$TMP_ROOT/before-lock-timeouts.streak" \
+  || fail "the acquired producer failure left no failure streak"
 rm -f "$HOME_DIR/state/.home-summary-refresh.log"
 FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" bash -c '
   . "$1/bin/fm-wake-lib.sh"
@@ -466,17 +476,16 @@ while [ ! -e "$LOCK_MARKER" ] && [ "$i" -lt 100 ]; do
   i=$((i + 1))
 done
 [ -e "$LOCK_MARKER" ] || fail "could not hold the publication lock for timeout coverage"
-started=$(date +%s)
 PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" \
   FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort \
   || fail "lock timeout changed the best-effort caller result"
-elapsed=$(( $(date +%s) - started ))
-[ "$elapsed" -lt 4 ] || fail "best-effort refresh waited $elapsed seconds on its lock"
 PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" \
   FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort \
   || fail "repeated lock timeout changed the best-effort caller result"
 [ "$(grep -c 'refresh exceeded its 1-second deadline' "$HOME_DIR/state/.home-summary-refresh.log" 2>/dev/null || true)" -ge 2 ] \
   || fail "repeated publication lock timeouts vanished from failure reporting"
+cmp -s "$TMP_ROOT/before-lock-timeouts.streak" "$HOME_DIR/state/.home-summary-refresh.streak" \
+  || fail "lock-contention failures changed the streak without refresh ownership"
 kill "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 wait "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 LOCK_HOLDER_PID=
@@ -495,13 +504,11 @@ done
 exec "$FM_TEST_REAL_JQ" "$@"
 SH
 chmod +x "$HANGBIN/jq"
-started=$(date +%s)
+rm -f "$HOME_DIR/state/.home-summary-refresh.log"
 PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
   "$WRITER" --best-effort \
   || fail "validation timeout changed the best-effort caller result"
-elapsed=$(( $(date +%s) - started ))
-[ "$elapsed" -lt 4 ] || fail "best-effort refresh waited $elapsed seconds on validation"
 grep -F 'refresh exceeded its 1-second deadline' \
   "$HOME_DIR/state/.home-summary-refresh.log" >/dev/null \
   || fail "publication validation timeout was not logged"
@@ -514,22 +521,70 @@ cat > "$MKBIN/mkdir" <<'SH'
 #!/usr/bin/env bash
 for arg in "$@"; do
   if [ "$arg" = "$FM_TEST_STALLED_STATE" ]; then
+    if [ -n "${FM_TEST_MKDIR_MARKER:-}" ] && [ ! -e "$FM_TEST_MKDIR_MARKER" ]; then
+      printf '%s\n' "$$" > "$FM_TEST_MKDIR_MARKER"
+    fi
     sleep 30
+    [ -z "${FM_TEST_MKDIR_DONE_MARKER:-}" ] || : > "$FM_TEST_MKDIR_DONE_MARKER"
   fi
 done
 exec "$FM_TEST_REAL_MKDIR" "$@"
 SH
 chmod +x "$MKBIN/mkdir"
-started=$(date +%s)
+INIT_ENTERED="$TMP_ROOT/state-init-entered"
+INIT_DONE="$TMP_ROOT/state-init-done"
+cp "$HOME_DIR/state/home-summary.json" "$TMP_ROOT/before-state-init-ledger.json"
 PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
+  FM_TEST_MKDIR_MARKER="$INIT_ENTERED" FM_TEST_MKDIR_DONE_MARKER="$INIT_DONE" \
   FM_TEST_STALLED_STATE="$HOME_DIR/state" FM_ROOT_OVERRIDE="$ROOT" \
   FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
   "$WRITER" --best-effort >/dev/null 2>"$TMP_ROOT/stalled-state.err" \
   || fail "state initialization timeout changed the best-effort caller result"
-elapsed=$(( $(date +%s) - started ))
-[ "$elapsed" -lt 6 ] \
-  || fail "best-effort refresh waited $elapsed seconds before bounded state initialization"
+[ -s "$INIT_ENTERED" ] || fail "the refresh never attempted state initialization"
+[ ! -e "$INIT_DONE" ] || fail "the stalled initializer completed instead of being interrupted"
+init_pid=$(cat "$INIT_ENTERED")
+fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$init_pid" \
+  || fail "the refresh left its stalled initializer alive"
+cmp -s "$TMP_ROOT/before-state-init-ledger.json" "$HOME_DIR/state/home-summary.json" \
+  || fail "interrupted initialization changed the prior published ledger"
 pass "best-effort refresh bounds state initialization"
+
+DETACH_INIT_MARKER="$TMP_ROOT/detach-init-entered"
+PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
+  FM_TEST_STALLED_STATE="$HOME_DIR/state" FM_TEST_MKDIR_MARKER="$DETACH_INIT_MARKER" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
+  WRITER="$WRITER" python3 - <<'PY' \
+  || fail "detached state initialization blocked its foreground caller"
+import os
+import signal
+import subprocess
+import time
+
+started = time.monotonic()
+process = subprocess.Popen(
+    [os.environ["WRITER"], "--detach"],
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+    start_new_session=True,
+)
+try:
+    result = process.wait(timeout=3)
+except subprocess.TimeoutExpired:
+    os.killpg(process.pid, signal.SIGKILL)
+    process.wait()
+    raise SystemExit("the detached foreground caller stalled on state initialization")
+if result != 0:
+    raise SystemExit(f"detached initialization changed caller result: {result}")
+if time.monotonic() - started >= 2:
+    raise SystemExit("the detached foreground caller waited for state initialization")
+PY
+fm_test_wait_until 60 test -e "$DETACH_INIT_MARKER" \
+  || fail "the detached worker never attempted its bounded state initialization"
+detach_init_pid=$(cat "$DETACH_INIT_MARKER")
+fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$detach_init_pid" \
+  || fail "the detached worker left its stalled initialization running past the bound"
+pass "detached foreground returns before stalled bounded state initialization"
 
 SIGNALBIN="$TMP_ROOT/signalbin"
 SIGNAL_MARKER="$TMP_ROOT/worker-signaled"
@@ -558,10 +613,10 @@ rm -f "$SIGNAL_MARKER" "$HOME_DIR/state/.home-summary-refresh.log"
 mkdir "$HOME_DIR/state/.home-summary-refresh.log"
 if ! PATH="$SIGNALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_ENV="$REAL_ENV" \
   FM_TEST_SIGNAL_MARKER="$SIGNAL_MARKER" FM_TIMEOUT_MECHANISM_OVERRIDE=bash \
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" WRITER="$WRITER" python3 - <<'PY'
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
+  WRITER="$WRITER" python3 - <<'PY'
 import os
 import subprocess
-import time
 
 read_fd, write_fd = os.pipe()
 os.set_blocking(write_fd, False)
@@ -571,7 +626,6 @@ try:
 except BlockingIOError:
     pass
 os.set_blocking(write_fd, True)
-started = time.monotonic()
 try:
     result = subprocess.run(
         [os.environ["WRITER"], "--best-effort"],
@@ -579,16 +633,13 @@ try:
         stdout=subprocess.DEVNULL,
         stderr=write_fd,
         env=os.environ,
-        timeout=7,
+        timeout=21,  # 1s refresh + 4s logging + 10s accounting + 4s release + headroom
     )
 finally:
     os.close(write_fd)
     os.close(read_fd)
-elapsed = time.monotonic() - started
 if result.returncode != 0:
     raise SystemExit(f"blocked failure logger changed caller result: {result.returncode}")
-if elapsed >= 6:
-    raise SystemExit(f"blocked failure logger exceeded its bound: {elapsed:.2f}s")
 PY
 then
   fail "best-effort failure reporting was not fully bounded"
@@ -603,6 +654,55 @@ jq -e --arg now "$NOW_ONE" '.generated == $now' \
   || fail "valid publication did not replace the ledger with an unavailable failure record"
 rmdir "$HOME_DIR/state/.home-summary-refresh.log"
 pass "valid publication ignores an unavailable failure record"
+
+# mv treats a directory destination as a container and returns success. That is
+# not ledger publication: reject it while fenced, leave its contents untouched,
+# and count the best-effort attempt that acquired the refresh lock.
+DIRECTORY_HOME="$TMP_ROOT/directory-home"
+mkdir -p "$DIRECTORY_HOME/state/home-summary.json" "$DIRECTORY_HOME/data" \
+  "$DIRECTORY_HOME/config" "$DIRECTORY_HOME/projects"
+printf '# Seeded Firstmate home\n' > "$DIRECTORY_HOME/AGENTS.md"
+printf 'directory\n' > "$DIRECTORY_HOME/.fm-secondmate-home"
+cat > "$DIRECTORY_HOME/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+EOF
+printf 'prior directory contents\n' > "$DIRECTORY_HOME/state/home-summary.json/sentinel"
+cp "$DIRECTORY_HOME/state/home-summary.json/sentinel" "$TMP_ROOT/directory-sentinel"
+if PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DIRECTORY_HOME" \
+  FM_SNAPSHOT_NOW="$NOW_ONE" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
+  "$WRITER" > "$TMP_ROOT/directory.out" 2> "$TMP_ROOT/directory.err"; then
+  fail "a directory ledger destination falsely reported direct publication success"
+fi
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DIRECTORY_HOME" \
+  FM_SNAPSHOT_NOW="$NOW_ONE" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
+  "$WRITER" --best-effort \
+  || fail "a directory ledger destination changed the best-effort caller result"
+directory_streak_count=
+IFS= read -r directory_streak_count < "$DIRECTORY_HOME/state/.home-summary-refresh.streak" \
+  || fail "a directory destination did not write the acquired failure streak"
+assert_equals 'count=1' "$directory_streak_count" \
+  "a directory destination did not count exactly one acquired best-effort refresh failure"
+assert_grep 'atomic ledger replacement failed: destination is a directory:' \
+  "$DIRECTORY_HOME/state/.home-summary-refresh.log" \
+  "a directory destination did not record its publication failure"
+[ -d "$DIRECTORY_HOME/state/home-summary.json" ] \
+  || fail "a failed publication replaced the directory destination"
+cmp -s "$TMP_ROOT/directory-sentinel" "$DIRECTORY_HOME/state/home-summary.json/sentinel" \
+  || fail "a failed publication changed existing directory contents"
+for entry in "$DIRECTORY_HOME/state/home-summary.json/"* \
+  "$DIRECTORY_HOME/state/home-summary.json/".[!.]* \
+  "$DIRECTORY_HOME/state/home-summary.json/"..?*; do
+  [ -e "$entry" ] || [ -L "$entry" ] || continue
+  [ "$entry" = "$DIRECTORY_HOME/state/home-summary.json/sentinel" ] \
+    || fail "a failed publication left a false ledger inside the directory: $entry"
+done
+[ ! -e "$DIRECTORY_HOME/state/.home-summary-refresh.lock" ] \
+  || fail "a failed directory publication left the refresh lock held"
+pass "directory ledger destinations fail without false publication and count acquired attempts"
 
 # --- publication cost, beacon isolation, and failure discoverability ---------
 #
@@ -824,12 +924,23 @@ fm_write_meta "$RESTART_HOME/state/restart-task.meta" \
   "kind=ship" \
   "mode=no-mistakes" \
   "spawn_gen=fm.restart123456"
+# This is readiness setup, not a startup latency assertion. The arm contract
+# allows 10s (30s on MSYS) before declaring startup failed; give the real watcher
+# that full cold-start allowance, while still stopping immediately if it exits.
+wait_for_restart_beacon() {
+  local deadline=$((SECONDS + 30))
+  while [ ! -e "$RESTART_HOME/state/.last-watcher-beat" ]; do
+    kill -0 "$WATCH_PID" 2>/dev/null || return 1
+    [ "$SECONDS" -lt "$deadline" ] || return 1
+    sleep 0.05
+  done
+}
 RESTART_LOCK_MARKER="$TMP_ROOT/restart-lock-held"
 FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$RESTART_HOME" bash -c '
   . "$1/bin/fm-wake-lib.sh"
   fm_lock_acquire_wait "$2/state/.home-summary-refresh.lock"
   : > "$3"
-  sleep 30
+  while :; do sleep 1; done
 ' _ "$ROOT" "$RESTART_HOME" "$RESTART_LOCK_MARKER" &
 LOCK_HOLDER_PID=$!
 i=0
@@ -844,23 +955,16 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$RESTART_HOME" \
   FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=9999999 FM_HEARTBEAT=9999999 \
   "$WATCH" > "$TMP_ROOT/restart-watch-one.out" 2> "$TMP_ROOT/restart-watch-one.err" &
 WATCH_PID=$!
-i=0
-while [ ! -e "$RESTART_HOME/state/.last-watcher-beat" ] && [ "$i" -lt 100 ]; do
-  kill -0 "$WATCH_PID" 2>/dev/null || break
-  sleep 0.05
-  i=$((i + 1))
-done
-[ -e "$RESTART_HOME/state/.last-watcher-beat" ] \
-  || fail "the first restart watcher did not begin polling"
+wait_for_restart_beacon \
+  || fail "the first restart watcher did not begin polling: $(cat "$TMP_ROOT/restart-watch-one.err")"
 printf 'needs-decision [key=restart-gate]: restart the watcher\n' \
   > "$RESTART_HOME/state/restart-task.status"
-i=0
-while kill -0 "$WATCH_PID" 2>/dev/null && [ "$i" -lt 100 ]; do
+restart_signal_deadline=$((SECONDS + 30))
+while kill -0 "$WATCH_PID" 2>/dev/null && [ "$SECONDS" -lt "$restart_signal_deadline" ]; do
   sleep 0.05
-  i=$((i + 1))
 done
 kill -0 "$WATCH_PID" 2>/dev/null \
-  && fail "the first restart watcher did not surface its actionable signal"
+  && fail "the first restart watcher did not surface its actionable signal: $(cat "$TMP_ROOT/restart-watch-one.err")"
 wait "$WATCH_PID" >/dev/null 2>&1 || true
 WATCH_PID=
 rm -f "$RESTART_HOME/state/.last-watcher-beat"
@@ -869,14 +973,8 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$RESTART_HOME" \
   FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=9999999 FM_HEARTBEAT=9999999 \
   "$WATCH" > "$TMP_ROOT/restart-watch-two.out" 2> "$TMP_ROOT/restart-watch-two.err" &
 WATCH_PID=$!
-i=0
-while [ ! -e "$RESTART_HOME/state/.last-watcher-beat" ] && [ "$i" -lt 100 ]; do
-  kill -0 "$WATCH_PID" 2>/dev/null || break
-  sleep 0.05
-  i=$((i + 1))
-done
-[ -e "$RESTART_HOME/state/.last-watcher-beat" ] \
-  || fail "the replacement restart watcher did not begin polling"
+wait_for_restart_beacon \
+  || fail "the replacement restart watcher did not begin polling: $(cat "$TMP_ROOT/restart-watch-two.err")"
 sleep 4
 [ ! -s "$RESTART_HOME/state/.home-summary-refresh.log" ] \
   || fail "watcher restart queued refreshes behind a live publication lock: $(cat "$RESTART_HOME/state/.home-summary-refresh.log")"
@@ -888,15 +986,15 @@ if ! kill -0 "$WATCH_PID" 2>/dev/null; then
     FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=9999999 FM_HEARTBEAT=9999999 \
     "$WATCH" > "$TMP_ROOT/restart-watch-three.out" 2> "$TMP_ROOT/restart-watch-three.err" &
   WATCH_PID=$!
-  i=0
-  while [ ! -e "$RESTART_HOME/state/.last-watcher-beat" ] && [ "$i" -lt 100 ]; do
-    kill -0 "$WATCH_PID" 2>/dev/null || break
-    sleep 0.05
-    i=$((i + 1))
-  done
-  [ -e "$RESTART_HOME/state/.last-watcher-beat" ] \
-    || fail "the recovery replacement watcher did not begin polling"
+  wait_for_restart_beacon \
+    || fail "the recovery replacement watcher did not begin polling: $(cat "$TMP_ROOT/restart-watch-three.err")"
 fi
+# The short watcher deadline above is a contention guard, not a publication
+# budget. Stop its competing detached trigger before the direct stale-owner
+# recovery check so that trigger cannot win and time out mid-production.
+kill "$WATCH_PID" >/dev/null 2>&1 || true
+wait "$WATCH_PID" >/dev/null 2>&1 || true
+WATCH_PID=
 kill -KILL "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 wait "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
 LOCK_HOLDER_PID=
@@ -910,9 +1008,6 @@ while [ ! -e "$RESTART_HOME/state/home-summary.json" ] && [ "$i" -lt 200 ]; do
 done
 [ -e "$RESTART_HOME/state/home-summary.json" ] \
   || fail "a dead publication lock wedged publication"
-kill "$WATCH_PID" >/dev/null 2>&1 || true
-wait "$WATCH_PID" >/dev/null 2>&1 || true
-WATCH_PID=
 pass "publication remains single-flight across watcher restart"
 
 # A publication that keeps failing is deliberately non-fatal to its caller, so
@@ -1076,3 +1171,374 @@ case "$report_out" in
     ;;
 esac
 pass "repeated publication failure is reported at session start until it clears"
+
+# --- detached triggers, coalescing, and escalation of a repeating failure -----
+#
+# Session start, spawn, and teardown publish only as a side effect, so they run
+# the refresh with --detach and never wait for it. A live incident showed what
+# waiting costs: the refresh needed longer than its own deadline, so every
+# session start burned the full deadline on a call that could not succeed, and
+# 425 identical failures were recorded without anyone being told.
+
+new_bare_home() {  # <name> -> prints the home path
+  local home="$TMP_ROOT/$1"
+  mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
+  printf '# Seeded Firstmate home\n' > "$home/AGENTS.md"
+  printf '%s\n' "$1" > "$home/.fm-secondmate-home"
+  printf '## In flight\n\n## Queued\n\n## Done\n' > "$home/data/backlog.md"
+  printf '%s\n' "$home"
+}
+
+hold_refresh_lock() {  # <home> <seconds>
+  local home=$1 marker="$1/state/.test-lock-held"
+  rm -f "$marker"
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_acquire_wait "$2/state/.home-summary-refresh.lock"
+    : > "$3"
+    sleep "$4"
+  ' _ "$ROOT" "$home" "$marker" "$2" &
+  LOCK_HOLDER_PID=$!
+  fm_test_wait_until 20 test -e "$marker" || fail "could not hold the refresh lock for $home"
+}
+
+release_refresh_lock() {
+  kill "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
+  wait "$LOCK_HOLDER_PID" >/dev/null 2>&1 || true
+  LOCK_HOLDER_PID=
+}
+
+wake_rows() {  # <home>
+  awk -F '\t' '$3 == "check" && $4 == "home-summary-refresh"' "$1/state/.wake-queue" 2>/dev/null
+}
+
+wake_row_count() {  # <home>
+  wake_rows "$1" | wc -l | tr -d '[:space:]'
+}
+
+# A detached trigger must return at once even while a refresh is in flight, and
+# must leave no failure behind: a blocking caller would wait out the deadline
+# below (30 seconds) and log a failure for work it never needed to wait for.
+DETACH_HOME=$(new_bare_home detach-home)
+hold_refresh_lock "$DETACH_HOME" 120
+started=$(date +%s)
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DETACH_HOME" \
+  FM_HOME_SUMMARY_TIMEOUT=30 "$WRITER" --detach \
+  || fail "a detached trigger changed its caller's result"
+elapsed=$(( $(date +%s) - started ))
+[ "$elapsed" -lt 10 ] || fail "a detached trigger waited $elapsed seconds on an in-flight refresh"
+fm_test_wait_until 60 test -e "$DETACH_HOME/state/.home-summary-refresh.pending" \
+  || fail "a trigger that found a refresh in flight left no marker for it"
+sleep 2
+[ ! -s "$DETACH_HOME/state/.home-summary-refresh.log" ] \
+  || fail "a skipped trigger was recorded as a failure: $(cat "$DETACH_HOME/state/.home-summary-refresh.log")"
+release_refresh_lock
+pass "a detached trigger returns at once and records no failure while a refresh is in flight"
+
+# With the lock free, the same detached trigger publishes and clears its marker.
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DETACH_HOME" \
+  "$WRITER" --detach || fail "a detached trigger on an idle home failed"
+fm_test_wait_until 120 jq -e '.schema == "fm-secondmate-home-summary.v1"' \
+  "$DETACH_HOME/state/home-summary.json" \
+  || fail "a detached trigger on an idle home never published"
+[ ! -e "$DETACH_HOME/state/.home-summary-refresh.pending" ] \
+  || fail "a published refresh left its trigger marker behind"
+pass "a detached trigger on an idle home publishes and clears its marker"
+
+# Triggers that arrive during a refresh coalesce into exactly one more refresh:
+# none is lost (the published summary is never older than the last trigger) and
+# none piles up (three triggers do not become three more runs).
+COALESCE_HOME=$(new_bare_home coalesce-home)
+printf '## In flight\n- [ ] co-task - Coalesce triggers (repo: firstmate) (kind: ship) (since 2026-08-28)\n\n## Queued\n\n## Done\n' \
+  > "$COALESCE_HOME/data/backlog.md"
+mkdir -p "$COALESCE_HOME/projects/task"
+fm_git_init_commit "$COALESCE_HOME/projects/task"
+fm_write_meta "$COALESCE_HOME/state/co-task.meta" \
+  "window=fmtest:fm-co-task" "worktree=$COALESCE_HOME/projects/task" \
+  "project=firstmate" "harness=claude" "kind=ship" "mode=no-mistakes" "spawn_gen=fm.coalesce1234"
+co_busy_gen=$("$ROOT/bin/fm-busy-event.sh" arm "$COALESCE_HOME/state" co-task)
+"$ROOT/bin/fm-busy-event.sh" apply "$COALESCE_HOME/state" co-task idle \
+  --gen "$co_busy_gen" --source claude-hook --event stop
+CO_COUNT="$TMP_ROOT/coalesce-nm-count"
+: > "$CO_COUNT"
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$COALESCE_HOME" \
+  FM_TEST_NM_COUNT="$CO_COUNT" "$WRITER" || fail "the coalescing baseline refresh failed"
+per_run=$(wc -l < "$CO_COUNT" | tr -d '[:space:]')
+[ "$per_run" -gt 0 ] || fail "the producer never consulted the controlled current-state reader"
+: > "$CO_COUNT"
+CO_HOLD="$TMP_ROOT/coalesce-hold"
+: > "$CO_HOLD"
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$COALESCE_HOME" \
+  FM_TEST_NM_COUNT="$CO_COUNT" FM_TEST_NM_HOLD="$CO_HOLD" \
+  "$WRITER" --best-effort &
+SLOW_WRITER_PID=$!
+fm_test_wait_until 60 test -e "$CO_HOLD.entered" || fail "the in-flight refresh never reached its held read"
+for _ in 1 2 3; do
+  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$COALESCE_HOME" \
+    FM_TEST_NM_COUNT="$CO_COUNT" FM_TEST_NM_HOLD="$CO_HOLD" \
+    "$WRITER" --detach || fail "a trigger during a refresh failed"
+done
+fm_test_wait_until 60 test -e "$COALESCE_HOME/state/.home-summary-refresh.pending" \
+  || fail "triggers during a refresh left no marker"
+sleep 2
+rm -f "$CO_HOLD"
+wait "$SLOW_WRITER_PID" || fail "the in-flight refresh failed"
+SLOW_WRITER_PID=
+sleep 1
+[ "$(wc -l < "$CO_COUNT" | tr -d '[:space:]')" -eq $((per_run * 2)) ] \
+  || fail "three triggers during a refresh made $(wc -l < "$CO_COUNT" | tr -d '[:space:]') producer reads, expected exactly one more run ($((per_run * 2)))"
+[ ! -e "$COALESCE_HOME/state/.home-summary-refresh.pending" ] \
+  || fail "the follow-up refresh left the trigger marker behind"
+pass "triggers during a refresh coalesce into exactly one follow-up refresh"
+
+SERIALBIN="$TMP_ROOT/serialbin"
+mkdir -p "$SERIALBIN"
+cat > "$SERIALBIN/jq" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${FM_TEST_VALIDATE_DIR:-}" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      */.home-summary.json.*)
+        run=$(cat "$FM_TEST_VALIDATE_DIR/count" 2>/dev/null || printf 0)
+        run=$((run + 1))
+        printf '%s\n' "$run" > "$FM_TEST_VALIDATE_DIR/count"
+        : > "$FM_TEST_VALIDATE_DIR/entered.$run"
+        while [ ! -e "$FM_TEST_VALIDATE_DIR/release.$run" ]; do sleep 0.05; done
+        break
+        ;;
+    esac
+  done
+fi
+exec "$FM_TEST_REAL_JQ" "$@"
+SH
+cat > "$SERIALBIN/env" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${FM_TEST_WORKER_ENTERED:-}" ]; then
+  for arg in "$@"; do
+    [ "$arg" != --_worker ] || : > "$FM_TEST_WORKER_ENTERED"
+  done
+fi
+exec "$FM_TEST_REAL_ENV" "$@"
+SH
+chmod +x "$SERIALBIN/jq" "$SERIALBIN/env"
+
+DRAIN_HOME=$(new_bare_home drain-home)
+VALIDATE_DIR="$TMP_ROOT/drain-validation"
+mkdir -p "$VALIDATE_DIR"
+PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+  FM_TEST_REAL_ENV="$REAL_ENV" FM_TEST_VALIDATE_DIR="$VALIDATE_DIR" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" "$WRITER" --best-effort &
+SLOW_WRITER_PID=$!
+for run in 1 2 3 4 5 6; do
+  fm_test_wait_until 120 test -e "$VALIDATE_DIR/entered.$run" \
+    || fail "pending triggers stopped draining before successful refresh $run"
+  if [ "$run" -lt 6 ]; then
+    printf '## In flight\n\n## Queued\n- [ ] pending-%s - Latest pending trigger (repo: firstmate) (kind: ship)\n\n## Done\n' "$run" \
+      > "$DRAIN_HOME/data/backlog.md"
+    PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" \
+      "$WRITER" --detach || fail "pending trigger $run changed its caller result"
+    fm_test_wait_until 60 test -e "$DRAIN_HOME/state/.home-summary-refresh.pending" \
+      || fail "pending trigger $run left no marker"
+  fi
+  : > "$VALIDATE_DIR/release.$run"
+done
+wait "$SLOW_WRITER_PID" || fail "draining successful pending refreshes failed"
+SLOW_WRITER_PID=
+[ "$(cat "$VALIDATE_DIR/count")" -eq 6 ] \
+  || fail "successful pending refreshes did not drain through six attempts"
+[ ! -e "$DRAIN_HOME/state/.home-summary-refresh.pending" ] \
+  || fail "successful pending refreshes left an unconsumed trigger"
+jq -e 'any(.queued[]; .id == "pending-5")' "$DRAIN_HOME/state/home-summary.json" >/dev/null \
+  || fail "the final successful refresh did not cover the last pending trigger"
+pass "successful pending refreshes drain beyond four attempts"
+
+SERIAL_HOME=$(new_bare_home serial-home)
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
+  FM_SNAPSHOT_NOW="$NOW_ONE" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
+  "$WRITER" || fail "could not seed the serialized outcome ledger"
+for attempt in 1 2; do
+  PATH="$FAILBIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
+    "$WRITER" --best-effort || fail "serialization seed failure $attempt changed its caller result"
+done
+SERIAL_WAKE_MARKER="$TMP_ROOT/serial-wake-lock-held"
+FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" bash -c '
+  . "$1/bin/fm-wake-lib.sh"
+  fm_lock_acquire_wait "$2/state/.wake-queue.lock"
+  : > "$3"
+  sleep 120
+' _ "$ROOT" "$SERIAL_HOME" "$SERIAL_WAKE_MARKER" &
+LOCK_HOLDER_PID=$!
+fm_test_wait_until 60 test -e "$SERIAL_WAKE_MARKER" \
+  || fail "could not hold the wake lock for serialized timeout accounting"
+PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" FM_HOME_SUMMARY_TIMEOUT=1 \
+  "$WRITER" --best-effort &
+SLOW_WRITER_PID=$!
+fm_test_wait_until 100 grep -Fx count=3 "$SERIAL_HOME/state/.home-summary-refresh.streak" \
+  || fail "the timed-out attempt did not reach serialized wake accounting"
+SUCCESS_ENTERED="$TMP_ROOT/serial-success-entered"
+PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
+  FM_TEST_REAL_ENV="$REAL_ENV" FM_TEST_WORKER_ENTERED="$SUCCESS_ENTERED" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
+  FM_SNAPSHOT_NOW="$NOW_TWO" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_TWO" "$WRITER" &
+SUCCESS_WRITER_PID=$!
+fm_test_wait_until 60 test -e "$SUCCESS_ENTERED" \
+  || fail "the succeeding refresh never started during timeout accounting"
+sleep 1
+jq -e --arg now "$NOW_ONE" '.generated == $now' "$SERIAL_HOME/state/home-summary.json" >/dev/null \
+  || fail "a newer success published before the prior timeout finished wake accounting"
+[ "$(cat "$SERIAL_HOME/state/.home-summary-refresh.lock/pid")" = "$SLOW_WRITER_PID" ] \
+  || fail "the timeout owner released refresh ownership before its wake accounting"
+[ "$(wake_row_count "$SERIAL_HOME")" = 0 ] \
+  || fail "the blocked timeout wake bypassed the wake queue lock"
+release_refresh_lock
+wait "$SLOW_WRITER_PID" || fail "serialized timeout changed its best-effort result"
+SLOW_WRITER_PID=
+wait "$SUCCESS_WRITER_PID" || fail "the succeeding serialized refresh failed"
+SUCCESS_WRITER_PID=
+jq -e --arg now "$NOW_TWO" '.generated == $now' "$SERIAL_HOME/state/home-summary.json" >/dev/null \
+  || fail "the succeeding refresh did not publish after timeout accounting"
+[ ! -e "$SERIAL_HOME/state/.home-summary-refresh.streak" ] \
+  || fail "older timeout accounting restored a failure streak after the newer success"
+[ "$(wake_row_count "$SERIAL_HOME")" = 1 ] \
+  || fail "the serialized third failure did not publish exactly one wake"
+pass "timeout wake accounting finishes before a newer success publishes and resets the streak"
+
+# A failure that repeats must become a wake, not a logged line. Use a real
+# publication failure after acquisition rather than making host-dependent cold
+# startup fit a tiny deadline; deadline behavior is covered independently above.
+run_owned_publication_failure() {  # <home> <expected-streak-count>
+  local home=$1 count=$2 ledger="$1/state/home-summary.json"
+  if [ -f "$ledger" ]; then
+    mv "$ledger" "$home/state/.test-ledger-before-failure"
+  fi
+  mkdir -p "$ledger"
+  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    "$WRITER" --best-effort \
+    || fail "failed attempt $count changed the best-effort caller result"
+  grep -qx "count=$count" "$home/state/.home-summary-refresh.streak" \
+    || fail "attempt $count did not account for its acquired publication failure"
+  assert_grep "atomic ledger replacement failed: destination is a directory:" \
+    "$home/state/.home-summary-refresh.log" \
+    "attempt $count did not reach the real publication boundary"
+}
+ESC_HOME=$(new_bare_home escalate-home)
+for attempt in 1 2; do
+  run_owned_publication_failure "$ESC_HOME" "$attempt"
+done
+[ -z "$(wake_rows "$ESC_HOME")" ] \
+  || fail "two failures woke firstmate before the threshold: $(wake_rows "$ESC_HOME")"
+run_owned_publication_failure "$ESC_HOME" 3
+[ "$(wake_row_count "$ESC_HOME")" = 1 ] \
+  || fail "three consecutive publication failures did not raise exactly one wake: $(wake_rows "$ESC_HOME")"
+wake_row=$(wake_rows "$ESC_HOME")
+case "$wake_row" in
+  *'3 consecutive refresh failures'*'atomic ledger replacement failed: destination is a directory:'*'ran '[0-9]*s*) ;;
+  *) fail "the wake omitted the count, the reason, or the measured duration: $wake_row" ;;
+esac
+for attempt in 4 5 6; do
+  run_owned_publication_failure "$ESC_HOME" "$attempt"
+done
+[ "$(wake_row_count "$ESC_HOME")" = 1 ] \
+  || fail "an unchanged repeating failure raised another wake: $(wake_rows "$ESC_HOME")"
+pass "three consecutive publication failures raise one wake that names the reason and duration, and no more"
+
+# A real change of reason is new information and wakes again; the same reason
+# does not. Replace the publication failure with a producer that fails outright.
+PATH="$FAILBIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
+  "$WRITER" --best-effort || fail "a producer failure changed the caller result"
+[ "$(wake_row_count "$ESC_HOME")" = 2 ] \
+  || fail "a changed failure reason did not raise a new wake: $(wake_rows "$ESC_HOME")"
+wake_rows "$ESC_HOME" | tail -1 | grep -F 'summary producer' >/dev/null \
+  || fail "the second wake did not name the new reason: $(wake_rows "$ESC_HOME" | tail -1)"
+PATH="$FAILBIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
+  "$WRITER" --best-effort || fail "a repeated producer failure changed the caller result"
+[ "$(wake_row_count "$ESC_HOME")" = 2 ] \
+  || fail "a repeated producer failure raised another wake"
+pass "a changed failure reason raises a new wake and a repeated one does not"
+
+# The first success ends the streak, so the next run of failures is news again.
+rmdir "$ESC_HOME/state/home-summary.json"
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$ESC_HOME" \
+  "$WRITER" || fail "the recovering refresh failed"
+[ ! -e "$ESC_HOME/state/.home-summary-refresh.streak" ] \
+  || fail "a successful publication left its failure streak behind"
+for attempt in 1 2 3; do
+  run_owned_publication_failure "$ESC_HOME" "$attempt"
+done
+[ "$(wake_row_count "$ESC_HOME")" = 3 ] \
+  || fail "failures after a recovery were not reported as a new streak: $(wake_rows "$ESC_HOME")"
+pass "a successful publication ends the streak so a later streak wakes again"
+
+# --- publication cost on a home whose status history is large ------------------
+#
+# The recorded incident: a home with 28 status logs (5.4 MB, most lines opening
+# or closing a decision) needed 117 seconds to publish against a 60-second
+# deadline, because the producer folded every task's whole stream twice from
+# line 1 at several milliseconds a line. The fold now starts from the checkpoint
+# the wake drain keeps beside each log, so a refresh costs what was appended
+# since, not what the log has ever held. Assert that through the bytes the folds
+# read (a timing assertion would pass or fail with the host's load).
+BIG_HOME=$(new_bare_home big-history-home)
+printf '## In flight\n' > "$BIG_HOME/data/backlog.md"
+for big in 1 2; do
+  printf -- '- [ ] big-task-%s - Publish from a large history (repo: firstmate) (kind: ship) (since 2026-08-28)\n' "$big" \
+    >> "$BIG_HOME/data/backlog.md"
+  mkdir -p "$BIG_HOME/projects/task$big"
+  fm_git_init_commit "$BIG_HOME/projects/task$big"
+  fm_write_meta "$BIG_HOME/state/big-task-$big.meta" \
+    "window=fmtest:fm-big-task-$big" "worktree=$BIG_HOME/projects/task$big" \
+    "project=firstmate" "harness=claude" "kind=ship" "mode=no-mistakes" "spawn_gen=fm.bighist$big"
+  big_busy_gen=$("$ROOT/bin/fm-busy-event.sh" arm "$BIG_HOME/state" "big-task-$big")
+  "$ROOT/bin/fm-busy-event.sh" apply "$BIG_HOME/state" "big-task-$big" idle \
+    --gen "$big_busy_gen" --source claude-hook --event stop
+  python3 - "$BIG_HOME/state/big-task-$big.status" "$big" <<'PY'
+import sys
+path, task = sys.argv[1], sys.argv[2]
+note = ("the crewmate ran validation and reported checks on the branch after review " * 6)[:420]
+with open(path, "w") as handle:
+    for i in range(150):
+        handle.write(f"needs-decision [key=gate-{i}]: question {i} {note}\n")
+        handle.write(f"resolved [key=gate-{i}]: answered {i} {note}\n")
+        handle.write(f"done: step {i} {note}\n")
+    handle.write(f"needs-decision [key=still-open-{task}]: the question nobody answered\n")
+PY
+done
+printf '\n## Queued\n\n## Done\n' >> "$BIG_HOME/data/backlog.md"
+# The drain keeps these checkpoints current at every session start and wake.
+for big in 1 2; do
+  bash -c '. "$1/bin/fm-classify-lib.sh"; status_open_decisions_incremental "$2" >/dev/null' \
+    _ "$ROOT" "$BIG_HOME/state/big-task-$big.status" || fail "could not seed the checkpoint for big-task-$big"
+  [ -s "$BIG_HOME/state/.big-task-$big.open-decisions-cursor" ] \
+    || fail "the drain's fold left no checkpoint for big-task-$big"
+  printf 'working: appended after the checkpoint\nneeds-decision [key=late-%s]: opened after the checkpoint\n' "$big" \
+    >> "$BIG_HOME/state/big-task-$big.status"
+done
+BIG_SPANS="$TMP_ROOT/big-spans.log"
+BIG_READER="$TMP_ROOT/big-span-reader"
+cat > "$BIG_READER" <<'SH'
+#!/usr/bin/env bash
+printf '%s %s\n' "$2" "$3" >> "${FM_TEST_BIG_SPANS:?}"
+LC_ALL=C tail -c +"$(($2 + 1))" "$1" | LC_ALL=C head -c "$3"
+SH
+chmod +x "$BIG_READER"
+: > "$BIG_SPANS"
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$BIG_HOME" \
+  FM_STATUS_SPAN_READER="$BIG_READER" FM_TEST_BIG_SPANS="$BIG_SPANS" \
+  "$WRITER" || fail "a large-history home did not publish inside the default deadline"
+jq -e --arg home "$BIG_HOME" '.schema == "fm-secondmate-home-summary.v1" and .home == $home' \
+  "$BIG_HOME/state/home-summary.json" >/dev/null || fail "the large-history ledger is not a valid summary"
+big_size=$(wc -c < "$BIG_HOME/state/big-task-1.status" | tr -d '[:space:]')
+[ "$(wc -l < "$BIG_SPANS" | tr -d '[:space:]')" -ge 2 ] \
+  || fail "the producer never folded from a checkpoint: $(cat "$BIG_SPANS")"
+big_longest=$(awk '{ if ($2 > max) max = $2 } END { print max + 0 }' "$BIG_SPANS")
+[ "$big_longest" -lt 4096 ] \
+  || fail "a fold re-read $big_longest bytes of a $big_size-byte log instead of only what was appended"
+for big in 1 2; do
+  expected=$(printf 'late-%s\nstill-open-%s\n' "$big" "$big")
+  published=$(jq -r --arg id "big-task-$big" '.decisions_open[] | select(.id == $id) | .key' \
+    "$BIG_HOME/state/home-summary.json" | sort)
+  [ "$expected" = "$published" ] \
+    || fail "the checkpoint-seeded summary of big-task-$big lost or added decisions: published [$published], expected [$expected]"
+done
+pass "publication on a large history reads only what was appended and retains decisions from before and after the checkpoint"
