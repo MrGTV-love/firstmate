@@ -919,7 +919,6 @@ if [ -n "$ACK_THROUGH" ]; then
   chmod 0600 "$DRAIN_TMP" || exit 1
   if [ "$ACTOR" = branch ]; then
     require_branch_eligible_rows || exit 1
-    fm_wake_require_secondmate_restart_handoffs "$ACK_THROUGH" "$ELIGIBLE_ROWS_FILE" || exit 1
     # Delete a row only when its sequence is <= cutoff AND it is named in the
     # extension's eligible snapshot; every other row - including one whose
     # sequence is below cutoff but not in the snapshot - is kept untouched.
@@ -932,7 +931,6 @@ if [ -n "$ACK_THROUGH" ]; then
       exit 1
     }
   else
-    fm_wake_require_secondmate_restart_handoffs "$ACK_THROUGH" "$MAIN_ROWS_FILE" || exit 1
     awk -F '\t' -v cutoff="$ACK_THROUGH" -v seqs="$MAIN_ROWS_FILE" '
       BEGIN { while ((getline line < seqs) > 0) owned[line]=1 }
       NF < 5 || $2 !~ /^[0-9]+$/ || $2 > cutoff || !($2 in owned) { print }

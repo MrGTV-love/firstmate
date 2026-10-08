@@ -719,15 +719,6 @@ retire_busy_incarnation() {
   fi
 }
 
-require_restart_turn_end() {
-  [ "${FM_SECONDMATE_RESTART_TURN_END:-0}" = 1 ] || return 0
-  [ "$KIND" = secondmate ] && [ "$VERB" = relaunch ] || return 0
-  . "$SCRIPT_DIR/fm-secondmate-restart-lib.sh"
-  fm_secondmate_restart_turn_ended "$STATE" "$ID" && return 0
-  printf 'waiting: %s: affirmative turn-end evidence is no longer available at the stop boundary\n' "$ID" >&2
-  exit 75
-}
-
 # do_exit: stop the running agent, preserving endpoint and worktree. Prints
 # `already-stopped`, `endpoint-gone`, or `stopped`.
 do_exit() {
@@ -776,11 +767,9 @@ do_exit() {
       ;;
     *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint" ;;
   esac
-  require_restart_turn_end
   # A busy agent is interrupted first before the exit command is submitted.
   case "$(busy_verdict)" in
     busy*)
-      require_restart_turn_end
       cancel=$(deliver_interrupt) || return $?
       state=$(agent_state)
       case "$state" in
@@ -839,7 +828,6 @@ do_exit() {
     printf 'gen=%s\n' "$gen" > "$STATE/$ID.control-exit" \
       || die "could not record that this exit of $ID was deliberate; nothing was typed"
   fi
-  require_restart_turn_end
   verdict=$(fm_backend_send_text_submit "$BACKEND" "$T" "$cmd" "$EXIT_RETRIES" "$POLL" 1.2 "$LABEL") \
     || verdict=send-failed
   if [ "$verdict" = send-failed ]; then
@@ -1335,11 +1323,6 @@ do_relaunch() {
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1
-  if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_RESTART_TURN_END:-0}" = 1 ]; then
-    . "$SCRIPT_DIR/fm-secondmate-restart-lib.sh"
-    fm_secondmate_restart_request_relaunched "$STATE" "$ID" "restarted: $ID ($TARGET_HARNESS)" \
-      || die "the replacement agent for $ID is running, but its restart incarnation could not be recorded"
-  fi
 
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0

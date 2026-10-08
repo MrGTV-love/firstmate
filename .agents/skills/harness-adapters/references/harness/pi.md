@@ -56,6 +56,6 @@ Native-harness adapters can discover the same guarded FirstMate tools and operat
 The tool result and clean-exit fallback are owned by `../../../docs/supervision-protocols/pi.md`.
 `../../../bin/fm-session-start.sh` reports when the live Pi-family session has not loaded both extensions and points at the selected executable after project trust as the fix, with `-e` as a trust-free fallback.
 
-When a local secondmate is launched or relaunched on Pi or Pi-signed, `../../../bin/fm-spawn.sh` explicitly loads the generation-bound semantic busy extension from the parent's `state/`, alongside `-e .pi/extensions/fm-primary-turnend-guard.ts` and `-e .pi/extensions/fm-primary-pi-watch.ts`.
-The two primary files already exist in the secondmate home's git worktree; the parent extension observes `agent_start` and settled `agent_settled` without installing another primary guard or turn-end wake handler.
+When a secondmate is launched on Pi or Pi-signed, `../../../bin/fm-spawn.sh --secondmate` launches the selected executable with both `-e .pi/extensions/fm-primary-turnend-guard.ts` and `-e .pi/extensions/fm-primary-pi-watch.ts`.
+Both files already exist in the secondmate home's git worktree.
 The PreToolUse-equivalent watcher-arm seatbelt returns `{block: true}` from the `tool_call` event.

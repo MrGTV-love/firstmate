@@ -138,15 +138,6 @@
 #                          budget and is parked until a probe reads it live
 #                          again (FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
 #                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
-#   check: secondmate <id> restart finished: <outcome>
-#                          a restart recorded by bin/fm-secondmate-restart.sh
-#                          finished after the mate confirmed its open work and
-#                          its turn ended; <outcome> is the restart pass's own
-#                          `restarted:` or `unreached:` line
-#   check: secondmate <id> restart still waiting for its turn to end ...
-#                          the mate confirmed its open work but has stayed
-#                          inside that turn for BUSY_TURN_MAX_SECS; one wake
-#                          per request, and the restart stays recorded
 #   check: <id> auto-relaunched after session-end
 #                          an in-flight ship or scout recorded event=session-end
 #                          and its endpoint was recovery-grade dead;
@@ -251,12 +242,6 @@ WATCH_HOME_EXISTED=0
 # and wake emission (secondmate_liveness_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
-# Event-driven second-mate restart: bin/fm-secondmate-restart-lib.sh owns the
-# durable request, its two event gates, and the per-mate lock it shares with the
-# liveness relaunch above. The watcher contributes only the cadence that tries
-# recorded requests and the wake for each finished one (secondmate_restart_tick).
-# shellcheck source=bin/fm-secondmate-restart-lib.sh
-. "$SCRIPT_DIR/fm-secondmate-restart-lib.sh"
 # In-flight ship/scout session-end relaunch. The library owns eligibility,
 # the deliberate-exit skip, and the attempt caps. This watcher only scans
 # and wakes (session_end_relaunch_tick below).
@@ -1154,12 +1139,8 @@ secondmate_liveness_tick() {
             err="relaunch park marker could not be written; endpoint left $FM_SM_LIVE_STATE"
           fi
         elif fm_secondmate_liveness_relaunch "$meta" "$id" "$SECONDMATE_LIVENESS_TIMEOUT"; then
-          if [ "$FM_SM_LIVE_STATUS" = skipped ]; then
-            triage_log "secondmate $id liveness: $FM_SM_LIVE_REASON"
-          else
-            reason="check: secondmate $id auto-relaunched after $FM_SM_LIVE_CAUSE ($FM_SM_LIVE_WHERE)"
-            notify_key="secondmate-relaunch-$id-$now"
-          fi
+          reason="check: secondmate $id auto-relaunched after $FM_SM_LIVE_CAUSE ($FM_SM_LIVE_WHERE)"
+          notify_key="secondmate-relaunch-$id-$now"
         elif [ "$FM_SM_LIVE_POLICY_REFUSED" = 1 ]; then
           [ -z "$FM_SM_LIVE_WAKE" ] || [ -n "$first_reason" ] || first_reason=$FM_SM_LIVE_WAKE
         elif [ "$FM_SM_LIVE_STATUS" = skipped ]; then
@@ -1202,108 +1183,6 @@ secondmate_liveness_tick() {
   done
   [ -z "$first_reason" ] || wake "$first_reason"
   [ "$failed" -eq 0 ]
-}
-
-# The supervision half of the event-driven second-mate restart. A finished
-# restart leaves one outcome record, surfaced here as one check wake and then
-# removed. While any request is recorded, a detached
-# `fm-secondmate-restart.sh --process-requests` tries each one on the liveness
-# cadence; nothing here waits on a clock for the mate's answer. A request whose
-# answer arrived but whose turn has stayed open for BUSY_TURN_MAX_SECS wakes
-# once and stays recorded, so a turn that never ends cannot hide the restart.
-SECONDMATE_RESTART_PID=
-secondmate_restart_tick() {
-  local outcome request id line reason notify_key queued now answered age notice first_reason='' pending=0
-  fm_epoch_seconds_to now
-  for outcome in "$STATE"/.secondmate-restart-*.outcome; do
-    [ -f "$outcome" ] && [ ! -L "$outcome" ] || continue
-    id=${outcome##*/.secondmate-restart-}
-    id=${id%.outcome}
-    fm_secondmate_liveness_lock "$id" || continue
-    if [ ! -f "$outcome" ] || [ -L "$outcome" ]; then
-      fm_secondmate_liveness_unlock "$id"
-      continue
-    fi
-    line=$(sed -n '1p' "$outcome" 2>/dev/null) || line=''
-    [ -n "$line" ] || line="unreached: $id: the restart finished without a recorded outcome"
-    if ! fm_secondmate_restart_request_finish "$STATE" "$id" "$line"; then
-      fm_secondmate_liveness_unlock "$id"
-      echo "watcher: secondmate $id completed restart request could not be retired" >&2
-      return 1
-    fi
-    reason="check: secondmate $id restart finished: $line"
-    notify_key=$(fm_secondmate_restart_request_get "$outcome" corr) || notify_key=''
-    if [ -z "$notify_key" ]; then
-      fm_secondmate_liveness_unlock "$id"
-      echo "watcher: secondmate $id restart outcome has no completion identity" >&2
-      return 1
-    fi
-    notify_key="secondmate-restart-$id-$notify_key"
-    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
-    queued=$(fm_wake_queued_keys_locked check)
-    if printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1 \
-      || fm_wake_append_locked check "$notify_key" "$reason"; then
-      if ! fm_secondmate_restart_outcome_consume "$STATE" "$id"; then
-        fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-        fm_secondmate_liveness_unlock "$id"
-        echo "watcher: secondmate $id restart outcome could not be consumed" >&2
-        return 1
-      fi
-      [ -n "$first_reason" ] || first_reason=$reason
-    else
-      fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-      fm_secondmate_liveness_unlock "$id"
-      echo "watcher: secondmate $id restart outcome could not be queued" >&2
-      return 1
-    fi
-    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-    fm_secondmate_liveness_unlock "$id"
-  done
-  for request in "$STATE"/.secondmate-restart-*.request; do
-    [ -f "$request" ] && [ ! -L "$request" ] || continue
-    id=${request##*/.secondmate-restart-}
-    id=${id%.request}
-    fm_secondmate_liveness_lock "$id" || continue
-    if [ ! -f "$request" ] || [ -L "$request" ]; then
-      fm_secondmate_liveness_unlock "$id"
-      continue
-    fi
-    pending=1
-    if [ -n "$(fm_secondmate_restart_request_get "$request" relaunched_gen)" ]; then
-      fm_secondmate_liveness_unlock "$id"
-      continue
-    fi
-    notice="$STATE/.secondmate-restart-$id.turn-notice"
-    answered=$(fm_secondmate_restart_request_get "$request" answered_at 2>/dev/null) || answered=''
-    case "$answered" in ''|*[!0-9]*) fm_secondmate_liveness_unlock "$id"; continue ;; esac
-    [ ! -e "$notice" ] || { fm_secondmate_liveness_unlock "$id"; continue; }
-    age=$((now - answered))
-    [ "$age" -ge "$BUSY_TURN_MAX_SECS" ] || { fm_secondmate_liveness_unlock "$id"; continue; }
-    triage_log "bounded wait expired: waiter=watcher waited-on=secondmate $id turn end after its restart answer bound=${BUSY_TURN_MAX_SECS}s actual=${age}s"
-    reason="check: secondmate $id restart still waiting for its turn to end: it confirmed its open work ${age}s ago; the restart stays recorded"
-    notify_key="secondmate-restart-turn-$id-$answered"
-    queued=$(fm_wake_queued_keys check)
-    if printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1 \
-      || fm_wake_append check "$notify_key" "$reason"; then
-      : > "$notice"
-      [ -n "$first_reason" ] || first_reason=$reason
-    fi
-    fm_secondmate_liveness_unlock "$id"
-  done
-  if [ "$pending" -eq 1 ] && [ "$(age_of "$STATE/.secondmate-restart-tick")" -ge "$SECONDMATE_LIVENESS_SECS" ]; then
-    if [ -z "$SECONDMATE_RESTART_PID" ] || ! kill -0 "$SECONDMATE_RESTART_PID" 2>/dev/null; then
-      if [ -n "$SECONDMATE_RESTART_PID" ] && ! wait "$SECONDMATE_RESTART_PID"; then
-        SECONDMATE_RESTART_PID=
-        echo "watcher: recorded secondmate restart processing failed" >&2
-        return 1
-      fi
-      touch "$STATE/.secondmate-restart-tick" || return 1
-      FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-        "$SCRIPT_DIR/fm-secondmate-restart.sh" --process-requests </dev/null >/dev/null &
-      SECONDMATE_RESTART_PID=$!
-    fi
-  fi
-  [ -z "$first_reason" ] || wake "$first_reason"
 }
 
 # Consecutive wedge-escalation count for a window past FM_WEDGE_DEMAND_INSPECT_COUNT
@@ -3023,11 +2902,6 @@ while :; do
   # any relaunch and the restarted watcher will not re-probe early.
   secondmate_liveness_tick || {
     echo "watcher: secondmate liveness check failed" >&2
-    exit 1
-  }
-  watcher_beat
-  secondmate_restart_tick || {
-    echo "watcher: secondmate restart check failed" >&2
     exit 1
   }
   watcher_beat

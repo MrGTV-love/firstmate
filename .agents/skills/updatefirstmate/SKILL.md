@@ -64,21 +64,17 @@ This touches only the firstmate repo and its own worktrees, never anything under
    ```
    Include `FM_HOME=<this-firstmate-home>` unless `FM_HOME` is already set to the active firstmate home.
    This is automatic and needs no per-mate confirmation from the captain.
-   Local and remote mates go in the same list; the command checks whether each current launch can safely support the restart.
+   Local and remote mates go in the same list; the command owns the transport, the profile each replacement runs on, and the wait.
 
-   Only mates with a reachable verified turn-end producer are admitted. A pre-change live mate without an armed busy record, an adapter without verified busy evidence (such as Codex, Kimi or Grok), or any remote mate gets the re-read steer instead, with a concrete `nudged:` reason and no restart request queued.
-   For admitted mates, it first asks them to write down the open work they hold only in conversation, and restarts one only after its own answer comes back and affirmative semantic evidence proves the turn that answered has ended. Busy, missing, unknown, failed, or generation-mismatched evidence after admission keeps that request recorded and queued; a turn-end wake notification alone does not release it.
+   It asks every listed mate first to write down the open work it holds only in its conversation, and restarts one only after that mate's own answer comes back.
+   A mate that is mid-turn queues the request behind that turn.
    That is the whole point of the step, so do not work around it: it is what keeps a captain call the mate had formed but never registered from being lost with the conversation.
-   Its header owns the request and the outcome lines, and `bin/fm-secondmate-restart-lib.sh` owns the recorded restart that supervision finishes.
-   Admission, restart, and outcome retirement share the automatic-relaunch lock. If supervision holds it during admission, the command prints `waiting:` and waits to record the request rather than dropping the intent or sending a fallback nudge.
-   A published outcome is the completion marker: recovery retires any leftover request without restarting again, and outcome consumers retire the request under that lock before removing the marker. Completion-record failures are reported, including after an automatic relaunch.
+   Its header owns the request, the bound, and the two knobs that change them.
 
    Read its per-mate lines and its closing `summary:` line as the outcome:
    - `restarted: <id>` - that mate is now genuinely running the current instructions and launch-time settings.
-   - `queued: <id>: <what it waits for>` - this mate has a turn-end producer and its restart is recorded, but its answer or affirmative turn-end evidence is still missing; supervision finishes it when both arrive, and a later notification reports that outcome.
-     Report it as on its way, never as reloaded.
-   - `nudged: <id>: <reason>` - the restart was not safe, so the mate got the re-read message instead and is still running the conversation and launch-time settings it started with. No restart is queued or promised; it gets the full reload at its next ordinary spawn or relaunch, which installs the current busy wiring where supported.
-     Never report one of these as a clean reload or as on its way to one.
+   - `nudged: <id>: <reason>` - the restart was not safe, so the mate got the older re-read message instead and is still running the conversation and launch-time settings it started with.
+     Never report one of these as a clean reload.
    - `unreached: <id>: <reason>` - no safe running outcome could be confirmed, including an ambiguous relaunch result.
 
 4. **Send the re-read message to the rest.**
@@ -86,9 +82,9 @@ This touches only the firstmate repo and its own worktrees, never anything under
    ```sh
    FM_HOME=<this-firstmate-home> bin/fm-send.sh <id> 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
    ```
-   These are the mates that are on the latest bytes but lack verified restart mechanics or a reachable turn-end producer for their current launch, so the steer is the most this pass can honestly do for them.
+   These are the mates that are on the latest bytes but could not be restarted provably, so the steer is the most this pass can honestly do for them.
    It is a gentle steer, not an interruption: the mate already got a safe tracked-files fast-forward, and the steer never forces, tears down, or discards its work.
-   Never describe one of these as reloaded or queued for reload; its agent is still running the wiring it launched with until its next ordinary spawn or relaunch.
+   Never describe one of these as reloaded; its agent is still running the wiring it launched with.
 
 5. **Report to the captain in plain outcomes, in one line where you can.**
    Summarize what landed under `AGENTS.md` section 9 without firstmate's internal vocabulary: which parts of the fleet are now on the latest, and which were left as-is and why.

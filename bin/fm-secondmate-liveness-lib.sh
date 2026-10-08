@@ -122,35 +122,6 @@ fm_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
     "$ledger" 2>/dev/null
 }
 
-# A recorded event-driven restart (bin/fm-secondmate-restart-lib.sh) for a mate
-# this relaunch just brought back has nothing left to do: the replacement agent
-# already started on the current instructions and launch-time wiring, and the
-# conversation the restart was waiting to persist ended with the old agent.
-# Retire it with that outcome rather than leave it waiting for an answer the
-# dead agent can never give. Called with the per-mate lock held, so no restart
-# can be servicing the same request.
-fm_sm_live_finish_restart_request() {  # <id>
-  [ -f "$STATE/.secondmate-restart-$1.request" ] || return 0
-  if ! command -v fm_secondmate_restart_request_finish >/dev/null 2>&1; then
-    # shellcheck source=bin/fm-secondmate-restart-lib.sh
-    . "$FM_SM_LIVE_LIB_DIR/fm-secondmate-restart-lib.sh" || return 1
-  fi
-  local request line
-  request=$(fm_secondmate_restart_request_path "$STATE" "$1")
-  if [ -e "$(fm_secondmate_restart_outcome_path "$STATE" "$1")" ]; then
-    fm_secondmate_restart_request_finish "$STATE" "$1" ""
-    return $?
-  fi
-  if [ -n "$(fm_secondmate_restart_request_get "$request" relaunched_gen)" ]; then
-    line=$(fm_secondmate_restart_request_get "$request" relaunch_outcome) || return 1
-    [ -n "$line" ] || return 1
-  else
-    line="restarted: $1 (its endpoint had stopped, so the automatic relaunch brought it up on the current instructions)"
-    fm_secondmate_restart_request_relaunched "$STATE" "$1" "$line" || return 1
-  fi
-  fm_secondmate_restart_request_finish "$STATE" "$1" "$line"
-}
-
 # fm_secondmate_liveness_probe <meta> <id> <full|poll>
 #
 # Read-only probe of one registered secondmate's recorded endpoint. Populates:
@@ -308,23 +279,6 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-}
   FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
   local policy_error config home generation reason harness
-  if [ -f "$STATE/.secondmate-restart-$id.request" ]; then
-    if ! command -v fm_secondmate_restart_request_get >/dev/null 2>&1; then
-      . "$FM_SM_LIVE_LIB_DIR/fm-secondmate-restart-lib.sh" || return 1
-    fi
-    if [ -e "$(fm_secondmate_restart_outcome_path "$STATE" "$id")" ] \
-      || [ -n "$(fm_secondmate_restart_request_get "$STATE/.secondmate-restart-$id.request" relaunched_gen)" ]; then
-      if fm_sm_live_finish_restart_request "$id"; then
-        FM_SM_LIVE_STATUS=skipped
-        FM_SM_LIVE_REASON="its completed restart was reconciled without another relaunch"
-        return 0
-      fi
-      FM_SM_LIVE_STATUS=skipped
-      FM_SM_LIVE_REASON="the endpoint was relaunched but its restart completion could not be recorded"
-      FM_SM_LIVE_OUT=$FM_SM_LIVE_REASON FM_SM_LIVE_RC=1
-      return 1
-    fi
-  fi
   home=$(fm_meta_get "$meta" home)
   [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
   [ -n "$home" ] || home=$(secondmate_registry_field "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" home || true)
@@ -390,14 +344,6 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   FM_SM_LIVE_RC=$rc
   if [ "$rc" -eq 0 ]; then
     fm_secondmate_liveness_ledger_add "$id" relaunched || true
-    if ! fm_sm_live_finish_restart_request "$id"; then
-      FM_SM_LIVE_STATUS=skipped
-      FM_SM_LIVE_REASON="the endpoint was relaunched but its restart completion could not be recorded"
-      FM_SM_LIVE_OUT="$FM_SM_LIVE_REASON${FM_SM_LIVE_OUT:+
-$FM_SM_LIVE_OUT}"
-      FM_SM_LIVE_RC=1
-      return 1
-    fi
   else
     fm_secondmate_liveness_ledger_add "$id" failed || true
   fi
