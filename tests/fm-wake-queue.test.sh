@@ -809,7 +809,7 @@ install_secondmate_alive_tmux() {  # <fakebin>
 set -u
 case "${1:-}" in
   list-windows) printf '%s\n' 'fm-mate' ;;
-  capture-pane) exit 0 ;;
+  capture-pane) printf '❯\n' ;;
   display-message)
     case "$*" in
       *pane_current_command*) printf 'claude\n' ;;
@@ -972,6 +972,77 @@ test_secondmate_busy_and_unknown_panes_are_not_rung() {
   [ ! -s "$dir/sent-unknown" ] || fail "an unknown pane was rung: $(cat "$dir/sent-unknown")"
   [ ! -e "$state/mate.inbox" ] || fail "an unknown pane received a drain steer"
   pass "busy panes defer without a ring and unknown panes keep the parent alarm"
+}
+
+install_secondmate_idle_omp_herdr() {  # <fakebin>
+  local fakebin=$1
+  cat > "$fakebin/herdr" <<'SH'
+#!/usr/bin/env bash
+set -u
+case "${1:-} ${2:-}" in
+  'status --json')
+    printf '{"client":{"version":"0.9.1","protocol":22},"server":{"running":true}}\n'
+    ;;
+  'pane get')
+    printf '{"result":{"pane":{"pane_id":"w1:p1","tab_id":"t1","workspace_id":"w1"}}}\n'
+    ;;
+  'pane process-info')
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p1","shell_pid":10,"foreground_processes":[{"pid":11,"name":"omp","argv":["omp"],"cmdline":"omp"}]}}}\n'
+    ;;
+  'agent get')
+    printf '{"result":{"agent":{"agent":"omp","agent_status":"idle"}}}\n'
+    ;;
+  'pane read') printf '❯\n' ;;
+  'pane send-text'|'pane send-keys')
+    printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}"
+    ;;
+  *) exit 0 ;;
+esac
+SH
+  chmod +x "$fakebin/herdr"
+}
+
+test_secondmate_idle_omp_alarms_without_input() {
+  local dir state sub fakebin
+  dir=$(make_case secondmate-idle-omp)
+  state="$dir/state"
+  sub="$dir/secondmate"
+  fakebin="$dir/fakebin"
+  mkdir -p "$sub/state"
+  printf 'mate\n' > "$sub/.fm-secondmate-home"
+  printf 'window=firstmate:w1:p1\nkind=secondmate\nharness=omp\nbackend=herdr\nherdr_session=firstmate\nhome=%s\n' \
+    "$sub" > "$state/mate.meta"
+  printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
+  install_secondmate_idle_omp_herdr "$fakebin"
+  install_secondmate_stall_date "$fakebin"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
+    || fail "could not arm the mate's busy contract"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
+    --source omp-ext --event agent-end >/dev/null \
+    || fail "could not mark the mate idle"
+  printf '1000\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" first progress mate "$(printf '1000\t100-7')"
+  [ ! -s "$state/.wake-queue" ] || fail "idle omp alerted before the stall interval"
+  [ ! -e "$dir/sent" ] || fail "idle omp received input before the stall interval"
+  printf '1002\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" stall alert
+  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+    || fail "idle omp did not retain the parent alarm"
+  [ ! -e "$dir/sent" ] || fail "idle omp received automatic input: $(cat "$dir/sent")"
+  [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
+    || fail "idle omp foreign queue changed"
+  [ -s "$state/.wake-queue" ] || fail "idle omp lost the durable parent alarm"
+  [ ! -e "$state/mate.inbox" ] || fail "idle omp received a drain steer"
+  [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "idle omp recorded a ring"
+  pass "idle omp retains the bounded durable parent alarm without input or foreign queue changes"
 }
 
 # After a proven-idle ring, the same leftover row is a genuine stall if the
@@ -3422,6 +3493,7 @@ test_secondmate_long_lived_mate_mid_turn_is_not_a_stall
 test_secondmate_proven_idle_ring_lets_the_child_drain
 test_secondmate_busy_and_unknown_panes_are_not_rung
 test_secondmate_genuine_stall_after_idle_ring_still_alarms
+test_secondmate_idle_omp_alarms_without_input
 test_secondmate_stall_marker_rejects_symlink
 test_acknowledged_stall_publication_survives_pre_marker_crash
 test_empty_prefix_mate_preserves_other_mate_receipt

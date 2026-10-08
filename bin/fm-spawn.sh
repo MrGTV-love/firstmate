@@ -2245,10 +2245,7 @@ launch_template() {
   # against the fresh-profile provider wizard, --auto-approve so no approval
   # prompt can park an unattended worker, the tracked posture overlay so a
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
-  # pinned to the worktree because omp's extension discovery is cwd-only. A
-  # secondmate loads its two primary extensions by that discovery alone:
-  # naming them with -e as well loads each twice (verified), doubling every
-  # session_stop continuation.
+  # pinned to the worktree because omp's extension discovery is cwd-only.
   omp)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
@@ -4925,7 +4922,7 @@ EOF
     guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
       '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
-// Firstmate semantic busy-state events + turn-end notification for omp (Oh My
+// Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
 // Semantic state: "agent_start" -> busy when a low-level agent run begins;
 // "agent_end" -> idle only when event.willContinue is not true. omp has no
@@ -4935,9 +4932,7 @@ EOF
 // queued follow-ups, and a session_stop-forced continuation. ctx.isIdle() is
 // deliberately NOT consulted: at a natural TUI agent_end it still reads false
 // because session_stop is awaited before the session settles, so gating on it
-// would leave every completed turn recorded busy. "turn_end" fires at every
-// inner turn boundary and stays a wake NOTIFICATION touch for the watcher,
-// never current-state truth.
+// would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
 const busyEvent = (state: string, event: string) =>

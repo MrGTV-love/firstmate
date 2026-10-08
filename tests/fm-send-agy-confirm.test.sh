@@ -43,8 +43,8 @@ TMP_ROOT=$(fm_test_tmproot fm-send-agy-confirm)
 # shows the idle screen until its BUSY_AT-th call and the verified `esc to
 # cancel` busy row from then on. The BUSY_AT threshold is read from the
 # per-case dir so cases are independent.
-make_stubs() {  # <dir> <busy-at> -> echoes fakebin dir
-  local dir=$1 busy_at=$2 fb="$1/fakebin"
+make_stubs() {  # <dir> <busy-at> <harness> -> echoes fakebin dir
+  local dir=$1 busy_at=$2 harness=$3 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/tmux" <<SH
 #!/usr/bin/env bash
@@ -57,6 +57,7 @@ case "\${1:-}" in
       case "\$a" in
         *cursor_y*) printf '0\n'; exit 0 ;;
         *pane_tty*) printf '\n'; exit 0 ;;
+        *pane_current_command*) printf '%s\n' '$harness'; exit 0 ;;
       esac
     done
     printf 'fakepane\n'; exit 0 ;;
@@ -101,7 +102,7 @@ run_send() {  # <harness> <busy-at> [env=val ...]
   local harness=$1 busy_at=$2 dir fb log
   shift 2
   dir="$TMP_ROOT/case-$RANDOM-$RANDOM"; mkdir -p "$dir/state"
-  fb=$(make_stubs "$dir" "$busy_at")
+  fb=$(make_stubs "$dir" "$busy_at" "$harness")
   log="$dir/sleep.log"; : > "$log"
   fm_write_meta "$dir/state/agyw.meta" "window=sess:win" "harness=$harness"
   (

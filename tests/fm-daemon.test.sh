@@ -1880,6 +1880,86 @@ test_busy_guard_defers_when_supervisor_busy() {
   pass "busy-guard defers injection when supervisor pane is busy"
 }
 
+test_omp_busy_box_defers_afk_injection() {
+  local dir state fakebin sent capture
+  dir=$(make_supercase omp-busy-box)
+  state="$dir/state"; fakebin="$dir/fakebin"
+  sent="$dir/sent.log"; : > "$sent"
+  capture="$dir/pane.txt"
+  env -u FM_FAKE_TMUX_SWALLOW_FILE PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" \
+    bash -s -- "$ROOT" "$dir" "$state" "$sent" "$capture" <<'SH' \
+    || fail "omp busy-box injection regression failed"
+    set -u
+    ROOT=$1 dir=$2 state=$3 sent=$4 capture=$5
+    . "$ROOT/tests/lib.sh"
+    . "$ROOT/bin/fm-supervise-daemon.sh"
+    export FM_DAEMON_PRIMARY_HARNESS=omp FM_SUPERVISOR_BACKEND=tmux FM_SUPERVISOR_TARGET=fakepane
+    export FM_FAKE_TMUX_PANE_ALIVE=1 FM_FAKE_TMUX_SENT="$sent" FM_FAKE_TMUX_CAPTURE="$capture"
+    export FM_FAKE_TMUX_CURSOR_Y=3 FM_ESCALATE_BATCH_SECS=0
+    export FM_INJECT_CONFIRM_RETRIES=1 FM_INJECT_CONFIRM_SLEEP=0
+    export TMPDIR="$dir"
+    LOG="$dir/daemon.log"
+    . "$ROOT/bin/backends/herdr.sh"
+    fm_backend_herdr_capture() {
+      [ "$1" = default:w1:p2 ] && [ "$2" = 40 ] \
+        || fail "unexpected Herdr capture args: $*"
+      cat "$capture"
+    }
+    afk_enter "$state"
+    escalate_add "$state" "done: omp busy-box regression"
+    buffered=$(cat "$state/.subsuper-escalations")
+    for mode in spinner waiting both idle; do
+      top='╭── π > ◒ GPT-6.1-Sol > 🌳 firstmate ──╮'
+      waiting=''
+      expected=busy
+      case "$mode" in
+        spinner|both) top='╭── ⠋ 11s > ◒ GPT-6.1-Sol > 🌳 firstmate ──╮' ;;
+      esac
+      case "$mode" in
+        waiting|both) waiting='⎋ Waiting' ;;
+        idle) expected=idle ;;
+      esac
+      printf 'transcript\n%s\n%s\n╰─ %-48s ─╯\n' "$waiting" "$top" '' > "$capture"
+      for harness in omp ''; do
+        out=$(fm_pane_busy_state fakepane "$harness")
+        [ "$out" = "$expected" ] \
+          || fail "$mode tmux busy reader (${harness:-harnessless}): expected $expected, got $out"
+        out=$(fm_backend_herdr_rendered_busy_state default:w1:p2 "$harness")
+        [ "$out" = "$expected" ] \
+          || fail "$mode Herdr busy reader (${harness:-harnessless}): expected $expected, got $out"
+      done
+      out=$(fm_tmux_composer_state fakepane)
+      [ "$out" = empty ] || fail "$mode omp composer must remain empty, got $out"
+      if [ "$expected" = busy ]; then
+        pane_is_busy fakepane tmux || fail "$mode real pane_is_busy missed working omp"
+        if inject_msg "direct omp busy-box regression" "$state"; then
+          fail "$mode inject_msg accepted a working omp box"
+        fi
+        [ "$INJECT_LAST_FAILURE" = "deferred: supervisor pane busy (agent mid-turn)" ] \
+          || fail "$mode injection deferred for the wrong reason: $INJECT_LAST_FAILURE"
+        [ "$INJECT_SUBMIT_ATTEMPTED" = 0 ] || fail "$mode attempted a busy submit"
+        if escalate_flush "$state"; then
+          fail "$mode escalate_flush accepted a working omp box"
+        fi
+        [ ! -s "$sent" ] || fail "$mode sent bytes into a working omp box"
+        [ "$(cat "$state/.subsuper-escalations")" = "$buffered" ] \
+          || fail "$mode changed the deferred escalation buffer"
+      else
+        if pane_is_busy fakepane tmux; then
+          fail "idle omp box was classified busy"
+        fi
+        escalate_flush "$state" || fail "idle omp box did not accept the buffered escalation"
+        grep -F 'done: omp busy-box regression' "$sent" >/dev/null \
+          || fail "idle omp box did not receive the buffered digest"
+        [ "$(grep -c '^\[ENTER\]$' "$sent")" = 1 ] \
+          || fail "idle omp box did not submit exactly once"
+        [ ! -s "$state/.subsuper-escalations" ] || fail "idle omp flush retained its delivered buffer"
+      fi
+    done
+SH
+  pass "working omp empty boxes defer afk injection; idle omp boxes submit the retained digest"
+}
+
 test_marker_detection() {
   local marker_hex
   marker_hex=$(printf '%s' "$FM_INJECT_MARK" | od -An -tx1 | tr -d ' \n')
@@ -3166,6 +3246,7 @@ test_signal_escalate_marks_seen_no_catchall_refire
 test_collapse_newlines_pure
 test_afk_absent_daemon_does_not_inject
 test_busy_guard_defers_when_supervisor_busy
+test_omp_busy_box_defers_afk_injection
 test_marker_detection
 test_afk_turn_exemption
 test_should_exit_afk_when_afk_inactive

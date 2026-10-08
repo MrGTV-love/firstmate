@@ -985,16 +985,56 @@ test_send_text_submit_detects_swallowed_enter() {
   zellij_pane_response "$dir" 9 7 3
   printf '%s' $'❯ hello captain' > "$dir/responses/10.out"
   zellij_pane_response "$dir" 11 7 3
+  printf '%s' $'❯ hello captain' > "$dir/responses/12.out"
   zellij_pane_response "$dir" 13 7 3
-  printf '%s' $'❯ hello captain' > "$dir/responses/14.out"
+  zellij_pane_response "$dir" 15 7 3
+  printf '%s' $'❯ hello captain' > "$dir/responses/16.out"
   fb=$(make_zellij_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
     FM_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; fm_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = pending ] || fail "send_text_submit should report pending once retries are exhausted with the text still in the composer, got '$out'"
+  [ "$(grep -c $'\x1fsend-keys\x1f' "$dir/log")" -eq 2 ] \
+    || fail "swallowed Enter fixture must exercise both configured Enter attempts"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''send-keys' \
     "send_text_submit did not verify the pane before send-keys"
   pass "fm_backend_zellij_send_text_submit: reports 'pending' when the composer still holds the text after retried Enters (swallowed)"
+}
+
+test_send_text_submit_refreshes_busy_pending_before_retry() {
+  local mode dir fb out fresh
+  for mode in cleared unreadable; do
+    dir="$TMP_ROOT/submit-refresh-$mode"; mkdir -p "$dir/responses"
+    zellij_pane_response "$dir" 1 7 3
+    printf '%s' $'╭── π > model ──╮\n╰─              ─╯' > "$dir/responses/2.out"
+    zellij_pane_response "$dir" 3 7 3
+    zellij_pane_response "$dir" 5 7 3
+    printf '%s' $'╭── ⠧ 11s > model ──╮\n╰─ hello captain ─╯' > "$dir/responses/6.out"
+    zellij_pane_response "$dir" 7 7 3
+    zellij_pane_response "$dir" 9 7 3
+    printf '%s' $'╭── ⠧ 11s > model ──╮\n╰─ hello captain ─╯' > "$dir/responses/10.out"
+    zellij_pane_response "$dir" 11 7 3
+    case "$mode" in
+      cleared)
+        printf '%s' $'╭── ⠧ 12s > model ──╮\n╰─              ─╯' > "$dir/responses/12.out"
+        fresh=empty
+        ;;
+      unreadable)
+        printf '%s' 'Working on request...' > "$dir/responses/12.out"
+        fresh=unknown
+        ;;
+    esac
+    fb=$(make_zellij_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
+      FM_ZELLIJ_SESSION_LIST="firstmate" \
+      bash -c '. "$0/bin/backends/zellij.sh"; fm_backend_zellij_send_text_submit firstmate:7 "hello captain" 3 0 0' "$ROOT" )
+    [ "$out" = "$fresh" ] || fail "busy pending then $mode must return $fresh, got '$out'"
+    [ "$(grep -c $'\x1fsend-keys\x1f' "$dir/log")" -eq 1 ] \
+      || fail "Zellij must not retry Enter from stale busy pending"
+    [ "$(grep -c $'\x1fdump-screen\x1f' "$dir/log")" -eq 4 ] \
+      || fail "Zellij must capture before paste, after paste, after Enter and before retry"
+  done
+  pass "Zellij refreshes busy pending through the CLI before any retry Enter"
 }
 
 test_send_text_submit_unrelated_change_is_not_delivery() {
@@ -1015,14 +1055,18 @@ test_send_text_submit_unrelated_change_is_not_delivery() {
   zellij_pane_response "$dir" 9 7 3
   printf '%s' $'clock 12:00:01\n❯ hello captain' > "$dir/responses/10.out"
   zellij_pane_response "$dir" 11 7 3
+  printf '%s' $'clock 12:00:02\n❯ hello captain' > "$dir/responses/12.out"
   zellij_pane_response "$dir" 13 7 3
-  printf '%s' $'clock 12:00:02\n❯ hello captain' > "$dir/responses/14.out"
+  zellij_pane_response "$dir" 15 7 3
+  printf '%s' $'clock 12:00:03\n❯ hello captain' > "$dir/responses/16.out"
   fb=$(make_zellij_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
     FM_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; fm_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" != empty ] || fail "an unrelated pane change must never read as delivered (the content-diff false positive)"
   [ "$out" = pending ] || fail "the still-typed composer should classify pending, got '$out'"
+  [ "$(grep -c $'\x1fsend-keys\x1f' "$dir/log")" -eq 2 ] \
+    || fail "unrelated-change fixture must exercise both configured Enter attempts"
   pass "fm_backend_zellij_send_text_submit: an unrelated pane change is not a delivery confirmation (false-positive regression)"
 }
 
@@ -1372,6 +1416,7 @@ test_forced_secondmate_teardown_kills_zellij_children_with_child_home_tag
 test_send_text_submit_detects_landed_send
 test_send_text_submit_ignores_styled_effort_hint
 test_send_text_submit_detects_swallowed_enter
+test_send_text_submit_refreshes_busy_pending_before_retry
 test_send_text_submit_unrelated_change_is_not_delivery
 test_send_text_submit_rejects_unobserved_paste
 test_send_text_submit_rejects_transcript_echo_with_unrelated_draft

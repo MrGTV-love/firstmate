@@ -389,7 +389,6 @@ fm_composer_strip_ghost() {
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
 # turn-started acknowledgement that path can read.
-FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
 FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 # Devin 3000.11.1: the working composer and interrupt hint are independent
 # delivery signals. Neither is used as semantic worker-state evidence.
@@ -413,7 +412,7 @@ FM_DELIVERY_PI_BUSY_REGEX_DEFAULT='Working\.\.\.'
 # ("Invalid collation character"), so `[⠁-⣿]` compiled on macOS and failed
 # every omp busy and furniture read on Linux CI.
 FM_OMP_SPINNER_FRAMES_RE='(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|⣾|⣽|⣻|⢿|⡿|⣟|⣯|⣷)'
-FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]'
+FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]|^[[:space:]]*╭(─)+[[:space:]]+'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+([0-9]+[smh])+[[:space:]]+(>|·)[[:space:]]|^[[:space:]]*⎋[[:space:]]+Waiting([[:space:]]|$)'
 FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT='Ctrl\+c:cancel'
 # cursor-agent's busy footer. The TOKEN is matched, not the spinner verb: the
 # same version rendered both `Working` and `Running` beside its braille spinner
@@ -432,6 +431,7 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # agy-regex fold in bin/fm-busy-lib.sh.
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
+FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
 
 fm_busy_lines_match() {  # [harness]
   local harness=${1:-} lines regex
@@ -450,7 +450,8 @@ fm_busy_lines_match() {  # [harness]
       agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
       kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
       cursor) regex=$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT ;;
-      '') regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
+      legacy-tmux) regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
+      '') regex="$FM_DELIVERY_BUSY_REGEX_DEFAULT|$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT" ;;
       *)
         # A supplied harness must never borrow another harness's signature.
         # Register its verified signature explicitly before classifying it busy.
@@ -521,9 +522,15 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # The status opens with the same identity cell as the borderless status row,
 # then a `>` (or `·`) separator. That identity is the whole proof that a
 # rounded top border belongs to an omp composer; any other titled border stays
-# an ambiguous box. The ascii preset's `pi` and a busy spinner cell are left
-# out on purpose: an unverified shape must read `unknown`, never `empty`.
-FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT='^(π|󰵗)[[:space:]]+(>|·)[[:space:]]'
+# an ambiguous box. While a turn runs, omp swaps the identity cell for one of
+# its spinner frames plus the elapsed cell (`╭── ⠏ 14s > ◔ GPT-6-Astra …`,
+# verified live through Herdr on omp 18.6.3, empty and typed composers alike),
+# the same two-cell busy signal the status-row rule above accepts. Reading that
+# border as `unknown` hid a typed line that never submitted from every busy
+# caller, which is how an injected doorbell stayed in a working lane's
+# composer unnoticed. The ascii preset's `pi` is left out on purpose: an
+# unverified shape must read `unknown`, never `empty`.
+FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT='^(π|󰵗)[[:space:]]+(>|·)[[:space:]]|^'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+([0-9]+[smh])+[[:space:]]+(>|·)[[:space:]]'
 # omp draws this hint, right-aligned, in the box shape's EMPTY last row until a
 # turn has completed. Its key glyphs are bright and its words dim, so a styled
 # read keeps `⇧⇥` and a plain read cannot tell the whole hint from typed text.
@@ -2067,8 +2074,10 @@ EOF
 # retyping would duplicate it. Proven pending (and pending-unproven) retries
 # consume the budget; any other verdict returns immediately, so `unknown`
 # stays a loud refusal rather than a blind retry into an unreadable pane.
-# tmux and herdr keep richer cores that consume this same shared verdict plus
-# fm_composer_queued_enter_verdict; no shape knowledge lives in any loop.
+# A retry must recheck pending input: Enter on an editor that cleared since the
+# last frame can abort an omp turn with queued messages instead of submitting.
+# tmux and herdr keep richer identity-gated delivery cores; no shape knowledge
+# lives in any submit loop.
 fm_composer_submit_retry_core() {  # <send-key-fn> <state-fn> <target> <retries> <enter-sleep> [expected-label]
   local send_key_fn=$1 state_fn=$2 target=$3 retries=$4 sleep_s=$5 expected_label=${6:-} i=0 state
   while :; do
@@ -2081,24 +2090,23 @@ fm_composer_submit_retry_core() {  # <send-key-fn> <state-fn> <target> <retries>
     esac
     i=$((i + 1))
     [ "$i" -lt "$retries" ] || { printf '%s' "$state"; return 0; }
+    sleep "$sleep_s"
+    state=$("$state_fn" "$target" "$expected_label")
+    case "$state" in
+      pending|pending-unproven) ;;
+      *) printf '%s' "$state"; return 0 ;;
+    esac
   done
 }
 
-# fm_composer_queued_enter_verdict: the ONE busy-queued-Enter policy.
-# After Enter retries are spent, convert a structurally proven pending
-# composer given a delivery-busy signal from the adapter:
-#   pending + busy  -> empty   (Enter was accepted and queued; do not re-send)
-#   pending + idle  -> pending (genuine swallow; caller must not assume delivery)
-#   pending + unknown -> pending (unreadable busy is not proof of a queue)
-# Every other composer verdict is returned unchanged, so pending-unproven,
-# empty, and unknown never receive this conversion.
-# Adapters supply their own busy primitive (tmux: fm_pane_is_busy; herdr:
-# native agent_status=working, or a rendered busy footer on an idle native
-# baseline). This function does not read a pane.
-fm_composer_queued_enter_verdict() {  # <composer-state> <busy|idle|unknown>
-  local state=$1 busy=${2:-}
+# Busy work alone cannot prove that Enter accepted retained text.
+# Only OpenCode's verified mid-turn queue semantics permit this conversion;
+# adapters must supply positive harness identity and a generating busy signal.
+# Unproven composer content never receives a queued-delivery acknowledgement.
+fm_composer_queued_enter_verdict() {
+  local state=$1 busy=${2:-} harness=${3:-}
   [ "$state" = pending ] || { printf '%s' "$state"; return 0; }
-  if [ "$busy" = busy ]; then
+  if [ "$busy" = busy ] && [ "$harness" = opencode ]; then
     printf 'empty'
   else
     printf 'pending'
