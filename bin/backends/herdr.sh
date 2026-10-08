@@ -3497,7 +3497,7 @@ fm_backend_herdr_composer_clear() {  # <target> <text> <identity>
 
 fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep> <settle>
   local target=$1 text=$2 retries=$3 sleep_s=$4 settle=$5 i=0 verdict baseline confirm_sleep
-  local raw_status footer_baseline='' enter_sent=0 identity proof=0 content awaited=0
+  local raw_status baseline_identity footer_baseline='' enter_sent=0 identity proof=0 content awaited=0
   fm_backend_herdr_parse_target "$target" || { printf 'unknown'; return 0; }
   # Claude on Herdr is the live-verified truncation shape: Enter is withheld
   # unless the composer, empty before the send, shows this payload. A suffix
@@ -3529,7 +3529,16 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
         ;;
     esac
   fi
-  raw_status=$(fm_backend_herdr_agent_status_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE")
+  baseline_identity=$(fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE") || baseline_identity=
+  raw_status=${baseline_identity#*$'\t'}
+  case "${identity%%$'\t'*}" in
+    unknown|'')
+      case "${baseline_identity%%$'\t'*}" in
+        unknown|'') ;;
+        *) identity=$baseline_identity ;;
+      esac
+      ;;
+  esac
   baseline=$(fm_backend_herdr_classify_submit_agent_status "$raw_status")
   confirm_sleep=$(fm_backend_herdr_submit_confirm_budget "$sleep_s")
   # Typing never starts a turn, so a footer read taken after the literal send

@@ -633,6 +633,9 @@ Their pre-Enter typed-payload proof has not been live-verified; composer classif
 
 ### Submit confirmation
 
+The pre-Enter native baseline also supplies the harness identity when the initial identity probe was unavailable.
+A positive initial identity is retained; if both reads lack a positive label, identity-dependent confirmation remains conservative.
+
 On an idle or done native baseline, submit confirmation proceeds in this order:
 
 1. Wait for `working` or `blocked` across a bounded polling window.

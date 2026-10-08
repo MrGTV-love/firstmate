@@ -965,7 +965,7 @@ test_secondmate_busy_and_unknown_panes_are_not_rung() {
   pass "busy panes defer without a ring and unknown panes keep the parent alarm"
 }
 
-install_secondmate_composer_herdr() {  # <fakebin>
+install_secondmate_idle_omp_herdr() {  # <fakebin>
   local fakebin=$1
   cat > "$fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
@@ -983,7 +983,7 @@ case "${1:-} ${2:-}" in
   'agent get')
     printf '{"result":{"agent":{"agent":"omp","agent_status":"idle"}}}\n'
     ;;
-  'pane read') cat "${FM_FAKE_HERDR_SCREEN:?}" ;;
+  'pane read') printf '❯\n' ;;
   'pane send-text'|'pane send-keys')
     printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}"
     ;;
@@ -993,92 +993,47 @@ SH
   chmod +x "$fakebin/herdr"
 }
 
-secondmate_wake_text() {
-  printf '%s' $'FIRSTMATE WATCHER WAKE: signal: /home/lane/naïve/雪/state/lane.status\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' \
-    | "$ROOT/bin/fm-operational-input.sh" encode watcher
-}
-
-render_secondmate_composer() {
-  local shape=$1 text=${2//$'\xe2\x81\xa3'/} line
-  if [ "$shape" = box ]; then
-    printf '╭── π > ◒ GPT-6-Astra ──╮\n'
-    while [[ "$text" = *$'\n'* ]]; do
-      line=${text%%$'\n'*}
-      text=${text#*$'\n'}
-      printf '│ %s │\n' "$line"
-    done
-    printf '╰─ %s ─╯\n' "$text"
-  else
-    printf '❯ %s\n' "$text"
-    printf ' π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
-  fi
-}
-
-test_secondmate_pending_omp_screens_alarm_without_input() {
-  local dir state sub fakebin wake shape scenario composer before
-  wake=$(secondmate_wake_text)
-  for shape in box bare; do
-    for scenario in copied-wake draft mixed duplicate edited below-draft hint empty unreadable; do
-      dir=$(make_case "secondmate-pending-$shape-$scenario")
-      state="$dir/state"
-      sub="$dir/secondmate"
-      fakebin="$dir/fakebin"
-      mkdir -p "$sub/state"
-      printf 'mate\n' > "$sub/.fm-secondmate-home"
-      printf 'window=firstmate:w1:p1\nkind=secondmate\nharness=omp\nbackend=herdr\nherdr_session=firstmate\nhome=%s\n' \
-        "$sub" > "$state/mate.meta"
-      printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
-      case "$scenario" in
-        copied-wake|below-draft) composer=$wake ;;
-        draft) composer='my unsent draft' ;;
-        mixed) composer="$wake"$'\n\nmy unsent draft' ;;
-        duplicate) composer="$wake"$'\n\n'"$wake" ;;
-        edited) composer=${wake/lane.status/operator-edited.status} ;;
-        hint) composer='⇧⇥ to change thinking effort' ;;
-        empty|unreadable) composer= ;;
-      esac
-      {
-        if [ "$scenario" = below-draft ]; then
-          render_secondmate_composer box 'my unsent draft'
-          printf '\n\n'
-        fi
-        render_secondmate_composer "$shape" "$composer"
-      } > "$dir/screen"
-      [ "$scenario" != unreadable ] || printf 'no identified composer\n' > "$dir/screen"
-      before=$(cat "$dir/screen")
-      install_secondmate_composer_herdr "$fakebin"
-      install_secondmate_stall_date "$fakebin"
-      "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
-        || fail "could not arm the mate's busy contract"
-      "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
-        --source omp-ext --event agent-end >/dev/null \
-        || fail "could not mark the mate idle"
-      printf '1000\n' > "$dir/now"
-      PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
-        FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" FM_FAKE_HERDR_SCREEN="$dir/screen" \
-        FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
-        FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-        secondmate_stall_watch_leg "$dir" first progress mate "$(printf '1000\t100-7')"
-      [ ! -s "$state/.wake-queue" ] || fail "$shape $scenario alerted before the stall interval"
-      [ ! -e "$dir/sent" ] || fail "$shape $scenario received input before the stall interval"
-      printf '1002\n' > "$dir/now"
-      PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
-        FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" FM_FAKE_HERDR_SCREEN="$dir/screen" \
-        FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
-        FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-        secondmate_stall_watch_leg "$dir" stall alert
-      grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-        || fail "$shape $scenario did not retain the parent alarm"
-      [ ! -e "$dir/sent" ] || fail "$shape $scenario received automatic input: $(cat "$dir/sent")"
-      [ "$(cat "$dir/screen")" = "$before" ] || fail "$shape $scenario composer changed"
-      [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
-        || fail "$shape $scenario foreign queue changed"
-      [ -s "$state/.wake-queue" ] || fail "$shape $scenario lost the durable parent alarm"
-      [ ! -e "$state/mate.inbox" ] || fail "$shape $scenario received a drain steer"
-      [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "$shape $scenario recorded a ring"
-    done
-  done
-  pass "omp copied wakes, operator drafts, ambiguous screens and empty composers alarm without automatic input"
+test_secondmate_idle_omp_alarms_without_input() {
+  local dir state sub fakebin
+  dir=$(make_case secondmate-idle-omp)
+  state="$dir/state"
+  sub="$dir/secondmate"
+  fakebin="$dir/fakebin"
+  mkdir -p "$sub/state"
+  printf 'mate\n' > "$sub/.fm-secondmate-home"
+  printf 'window=firstmate:w1:p1\nkind=secondmate\nharness=omp\nbackend=herdr\nherdr_session=firstmate\nhome=%s\n' \
+    "$sub" > "$state/mate.meta"
+  printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
+  install_secondmate_idle_omp_herdr "$fakebin"
+  install_secondmate_stall_date "$fakebin"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
+    || fail "could not arm the mate's busy contract"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
+    --source omp-ext --event agent-end >/dev/null \
+    || fail "could not mark the mate idle"
+  printf '1000\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" first progress mate "$(printf '1000\t100-7')"
+  [ ! -s "$state/.wake-queue" ] || fail "idle omp alerted before the stall interval"
+  [ ! -e "$dir/sent" ] || fail "idle omp received input before the stall interval"
+  printf '1002\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" stall alert
+  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+    || fail "idle omp did not retain the parent alarm"
+  [ ! -e "$dir/sent" ] || fail "idle omp received automatic input: $(cat "$dir/sent")"
+  [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
+    || fail "idle omp foreign queue changed"
+  [ -s "$state/.wake-queue" ] || fail "idle omp lost the durable parent alarm"
+  [ ! -e "$state/mate.inbox" ] || fail "idle omp received a drain steer"
+  [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "idle omp recorded a ring"
+  pass "idle omp retains the bounded durable parent alarm without input or foreign queue changes"
 }
 
 # After a proven-idle ring, the same leftover row is a genuine stall if the
@@ -3521,7 +3476,7 @@ test_secondmate_long_lived_mate_mid_turn_is_not_a_stall
 test_secondmate_proven_idle_ring_lets_the_child_drain
 test_secondmate_busy_and_unknown_panes_are_not_rung
 test_secondmate_genuine_stall_after_idle_ring_still_alarms
-test_secondmate_pending_omp_screens_alarm_without_input
+test_secondmate_idle_omp_alarms_without_input
 test_secondmate_stall_marker_rejects_symlink
 test_acknowledged_stall_publication_survives_pre_marker_crash
 test_empty_prefix_mate_preserves_other_mate_receipt

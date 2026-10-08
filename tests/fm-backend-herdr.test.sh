@@ -6387,6 +6387,28 @@ test_submit_idle_pi_native_transition_confirms() {
 }
 test_submit_idle_pi_native_transition_confirms
 
+test_submit_recovers_pi_identity_from_baseline() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/native-pi-recovered"; mkdir -p "$dir/responses"
+  log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '1\n' > "$resp/1.exit"
+  printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/3.out"
+  printf '{"result":{"agent":{"agent":"pi","agent_status":"working"}}}\n' > "$resp/5.out"
+  printf 'Pi is processing without a composer\n' > "$resp/6.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/fm-backend.sh"; fm_backend_send_text_submit herdr default:w1:p2 "hello captain" 3 0 0' "$ROOT")
+  [ "$out" = empty ] || fail "recovered Pi identity must confirm the landed native transition, got '$out'"
+  [ "$(grep -c $'\x1fpane\x1fsend-text\x1fw1:p2' "$log")" -eq 1 ] \
+    || fail "recovered Pi submission must type the payload only once"
+  [ "$(grep -c $'\x1fpane\x1fsend-keys\x1fw1:p2\x1fenter' "$log")" -eq 1 ] \
+    || fail "recovered Pi submission must not retry Enter"
+  [ "$(grep -c $'\x1fpane\x1fread' "$log" || true)" -eq 0 ] \
+    || fail "recovered Pi submission must not require a mid-turn composer"
+  pass "Pi identity recovered from the pre-Enter baseline confirms a landed submission"
+}
+test_submit_recovers_pi_identity_from_baseline
+
 test_submit_idle_pi_delayed_native_transition_confirms() {
   local dir log resp fb out phase status cleared
   cleared=$'─────────────────────────────────────────────────────\n\n─────────────────────────────────────────────────────\n$0.000 (sub) 5.4%/272k (auto)'
