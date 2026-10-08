@@ -37,6 +37,7 @@ unset JEV_BASE_URL JEV_MODEL JEV_API_KEY CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY
 # shellcheck source=bin/fm-typesafe-lib.sh
 . "$SCRIPT_DIR/fm-typesafe-lib.sh"
 
+# shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 
 fm_jev_belay_run() {

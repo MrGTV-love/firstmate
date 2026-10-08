@@ -122,7 +122,7 @@ LEAKS="$TMP_ROOT/belay-leaks"
 COMMANDS="$TMP_ROOT/belay-commands"
 TRANSPORT_MODULE="$TMP_ROOT/belay-transport.mjs"
 DIAGNOSTICS="$TMP_ROOT/belay-diagnostics.jsonl"
-trap 'status=$?; if [ "$status" -ne 0 ] && [ -f "$DIAGNOSTICS" ]; then cat "$DIAGNOSTICS" "$COMMANDS" >&2; fi; fm_test_cleanup' EXIT
+trap 'if [ "$?" -ne 0 ] && [ -f "$DIAGNOSTICS" ]; then cat "$DIAGNOSTICS" "$COMMANDS" >&2; fi; fm_test_cleanup' EXIT
 cat > "$TRANSPORT_MODULE" <<'JS'
 import { appendFileSync } from 'node:fs';
 import childProcess from 'node:child_process';
@@ -158,6 +158,7 @@ mkdir -p "$SHIMBIN"
 # The policy child is observed at spawn; only preflight commands need shims.
 for command in dirname git; do
   real_command=$(command -v "$command") || fail "missing fixture command: $command"
+  # shellcheck disable=SC2016 # Variables expand when the generated shim runs.
   printf '#!/bin/bash\nprintf "%%s\\n" "%s" >> "$FM_TEST_BELAY_COMMANDS"\nif [ "${TYPESAFE_API_KEY+x}" = x ] || [ "${TYPESAFE_API_KEY_PRIVATE+x}" = x ]; then printf "%%s\\n" "%s" >> "$FM_TEST_BELAY_LEAKS"; fi\nexec "%s" "$@"\n' \
     "$command" "$command" "$real_command" > "$SHIMBIN/$command"
   chmod +x "$SHIMBIN/$command"
@@ -259,7 +260,7 @@ elapsed=$((SECONDS - started))
 [ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "timed-out policy reached transport"
 [ -s "$TMP_ROOT/policy-pid" ] || fail "stalled policy fixture did not run"
 policy_pid=$(cat "$TMP_ROOT/policy-pid")
-for attempt in 1 2 3 4 5; do
+for _ in 1 2 3 4 5; do
   kill -0 "$policy_pid" 2>/dev/null || break
   sleep 0.1
 done
