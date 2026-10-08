@@ -1,0 +1,12 @@
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection found no fit among the judged project skills (this project has no skills to judge); use your skill index as usual.
+
+--- persisted selection ---
+status=none
+reason=this project has no skills to judge
+picked=
+
+Observed real fetch calls: 0

@@ -1,0 +1,1820 @@
+{
+  "skills": [
+    {
+      "name": "skill-001",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-001/SKILL.md",
+      "description": "Use for synthetic task 1.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 1.\n"
+    },
+    {
+      "name": "skill-002",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-002/SKILL.md",
+      "description": "Use for synthetic task 2.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 2.\n"
+    },
+    {
+      "name": "skill-003",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-003/SKILL.md",
+      "description": "Use for synthetic task 3.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 3.\n"
+    },
+    {
+      "name": "skill-004",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-004/SKILL.md",
+      "description": "Use for synthetic task 4.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 4.\n"
+    },
+    {
+      "name": "skill-005",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-005/SKILL.md",
+      "description": "Use for synthetic task 5.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 5.\n"
+    },
+    {
+      "name": "skill-006",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-006/SKILL.md",
+      "description": "Use for synthetic task 6.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 6.\n"
+    },
+    {
+      "name": "skill-007",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-007/SKILL.md",
+      "description": "Use for synthetic task 7.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 7.\n"
+    },
+    {
+      "name": "skill-008",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-008/SKILL.md",
+      "description": "Use for synthetic task 8.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 8.\n"
+    },
+    {
+      "name": "skill-009",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-009/SKILL.md",
+      "description": "Use for synthetic task 9.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 9.\n"
+    },
+    {
+      "name": "skill-010",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-010/SKILL.md",
+      "description": "Use for synthetic task 10.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 10.\n"
+    },
+    {
+      "name": "skill-011",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-011/SKILL.md",
+      "description": "Use for synthetic task 11.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 11.\n"
+    },
+    {
+      "name": "skill-012",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-012/SKILL.md",
+      "description": "Use for synthetic task 12.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 12.\n"
+    },
+    {
+      "name": "skill-013",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-013/SKILL.md",
+      "description": "Use for synthetic task 13.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 13.\n"
+    },
+    {
+      "name": "skill-014",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-014/SKILL.md",
+      "description": "Use for synthetic task 14.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 14.\n"
+    },
+    {
+      "name": "skill-015",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-015/SKILL.md",
+      "description": "Use for synthetic task 15.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 15.\n"
+    },
+    {
+      "name": "skill-016",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-016/SKILL.md",
+      "description": "Use for synthetic task 16.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 16.\n"
+    },
+    {
+      "name": "skill-017",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-017/SKILL.md",
+      "description": "Use for synthetic task 17.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 17.\n"
+    },
+    {
+      "name": "skill-018",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-018/SKILL.md",
+      "description": "Use for synthetic task 18.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 18.\n"
+    },
+    {
+      "name": "skill-019",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-019/SKILL.md",
+      "description": "Use for synthetic task 19.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 19.\n"
+    },
+    {
+      "name": "skill-020",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-020/SKILL.md",
+      "description": "Use for synthetic task 20.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 20.\n"
+    },
+    {
+      "name": "skill-021",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-021/SKILL.md",
+      "description": "Use for synthetic task 21.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 21.\n"
+    },
+    {
+      "name": "skill-022",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-022/SKILL.md",
+      "description": "Use for synthetic task 22.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 22.\n"
+    },
+    {
+      "name": "skill-023",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-023/SKILL.md",
+      "description": "Use for synthetic task 23.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 23.\n"
+    },
+    {
+      "name": "skill-024",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-024/SKILL.md",
+      "description": "Use for synthetic task 24.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 24.\n"
+    },
+    {
+      "name": "skill-025",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-025/SKILL.md",
+      "description": "Use for synthetic task 25.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 25.\n"
+    },
+    {
+      "name": "skill-026",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-026/SKILL.md",
+      "description": "Use for synthetic task 26.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 26.\n"
+    },
+    {
+      "name": "skill-027",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-027/SKILL.md",
+      "description": "Use for synthetic task 27.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 27.\n"
+    },
+    {
+      "name": "skill-028",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-028/SKILL.md",
+      "description": "Use for synthetic task 28.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 28.\n"
+    },
+    {
+      "name": "skill-029",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-029/SKILL.md",
+      "description": "Use for synthetic task 29.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 29.\n"
+    },
+    {
+      "name": "skill-030",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-030/SKILL.md",
+      "description": "Use for synthetic task 30.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 30.\n"
+    },
+    {
+      "name": "skill-031",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-031/SKILL.md",
+      "description": "Use for synthetic task 31.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 31.\n"
+    },
+    {
+      "name": "skill-032",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-032/SKILL.md",
+      "description": "Use for synthetic task 32.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 32.\n"
+    },
+    {
+      "name": "skill-033",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-033/SKILL.md",
+      "description": "Use for synthetic task 33.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 33.\n"
+    },
+    {
+      "name": "skill-034",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-034/SKILL.md",
+      "description": "Use for synthetic task 34.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 34.\n"
+    },
+    {
+      "name": "skill-035",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-035/SKILL.md",
+      "description": "Use for synthetic task 35.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 35.\n"
+    },
+    {
+      "name": "skill-036",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-036/SKILL.md",
+      "description": "Use for synthetic task 36.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 36.\n"
+    },
+    {
+      "name": "skill-037",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-037/SKILL.md",
+      "description": "Use for synthetic task 37.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 37.\n"
+    },
+    {
+      "name": "skill-038",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-038/SKILL.md",
+      "description": "Use for synthetic task 38.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 38.\n"
+    },
+    {
+      "name": "skill-039",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-039/SKILL.md",
+      "description": "Use for synthetic task 39.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 39.\n"
+    },
+    {
+      "name": "skill-040",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-040/SKILL.md",
+      "description": "Use for synthetic task 40.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 40.\n"
+    },
+    {
+      "name": "skill-041",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-041/SKILL.md",
+      "description": "Use for synthetic task 41.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 41.\n"
+    },
+    {
+      "name": "skill-042",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-042/SKILL.md",
+      "description": "Use for synthetic task 42.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 42.\n"
+    },
+    {
+      "name": "skill-043",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-043/SKILL.md",
+      "description": "Use for synthetic task 43.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 43.\n"
+    },
+    {
+      "name": "skill-044",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-044/SKILL.md",
+      "description": "Use for synthetic task 44.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 44.\n"
+    },
+    {
+      "name": "skill-045",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-045/SKILL.md",
+      "description": "Use for synthetic task 45.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 45.\n"
+    },
+    {
+      "name": "skill-046",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-046/SKILL.md",
+      "description": "Use for synthetic task 46.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 46.\n"
+    },
+    {
+      "name": "skill-047",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-047/SKILL.md",
+      "description": "Use for synthetic task 47.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 47.\n"
+    },
+    {
+      "name": "skill-048",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-048/SKILL.md",
+      "description": "Use for synthetic task 48.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 48.\n"
+    },
+    {
+      "name": "skill-049",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-049/SKILL.md",
+      "description": "Use for synthetic task 49.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 49.\n"
+    },
+    {
+      "name": "skill-050",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-050/SKILL.md",
+      "description": "Use for synthetic task 50.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 50.\n"
+    },
+    {
+      "name": "skill-051",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-051/SKILL.md",
+      "description": "Use for synthetic task 51.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 51.\n"
+    },
+    {
+      "name": "skill-052",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-052/SKILL.md",
+      "description": "Use for synthetic task 52.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 52.\n"
+    },
+    {
+      "name": "skill-053",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-053/SKILL.md",
+      "description": "Use for synthetic task 53.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 53.\n"
+    },
+    {
+      "name": "skill-054",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-054/SKILL.md",
+      "description": "Use for synthetic task 54.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 54.\n"
+    },
+    {
+      "name": "skill-055",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-055/SKILL.md",
+      "description": "Use for synthetic task 55.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 55.\n"
+    },
+    {
+      "name": "skill-056",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-056/SKILL.md",
+      "description": "Use for synthetic task 56.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 56.\n"
+    },
+    {
+      "name": "skill-057",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-057/SKILL.md",
+      "description": "Use for synthetic task 57.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 57.\n"
+    },
+    {
+      "name": "skill-058",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-058/SKILL.md",
+      "description": "Use for synthetic task 58.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 58.\n"
+    },
+    {
+      "name": "skill-059",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-059/SKILL.md",
+      "description": "Use for synthetic task 59.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 59.\n"
+    },
+    {
+      "name": "skill-060",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-060/SKILL.md",
+      "description": "Use for synthetic task 60.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 60.\n"
+    },
+    {
+      "name": "skill-061",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-061/SKILL.md",
+      "description": "Use for synthetic task 61.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 61.\n"
+    },
+    {
+      "name": "skill-062",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-062/SKILL.md",
+      "description": "Use for synthetic task 62.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 62.\n"
+    },
+    {
+      "name": "skill-063",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-063/SKILL.md",
+      "description": "Use for synthetic task 63.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 63.\n"
+    },
+    {
+      "name": "skill-064",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-064/SKILL.md",
+      "description": "Use for synthetic task 64.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 64.\n"
+    },
+    {
+      "name": "skill-065",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-065/SKILL.md",
+      "description": "Use for synthetic task 65.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 65.\n"
+    },
+    {
+      "name": "skill-066",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-066/SKILL.md",
+      "description": "Use for synthetic task 66.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 66.\n"
+    },
+    {
+      "name": "skill-067",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-067/SKILL.md",
+      "description": "Use for synthetic task 67.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 67.\n"
+    },
+    {
+      "name": "skill-068",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-068/SKILL.md",
+      "description": "Use for synthetic task 68.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 68.\n"
+    },
+    {
+      "name": "skill-069",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-069/SKILL.md",
+      "description": "Use for synthetic task 69.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 69.\n"
+    },
+    {
+      "name": "skill-070",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-070/SKILL.md",
+      "description": "Use for synthetic task 70.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 70.\n"
+    },
+    {
+      "name": "skill-071",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-071/SKILL.md",
+      "description": "Use for synthetic task 71.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 71.\n"
+    },
+    {
+      "name": "skill-072",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-072/SKILL.md",
+      "description": "Use for synthetic task 72.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 72.\n"
+    },
+    {
+      "name": "skill-073",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-073/SKILL.md",
+      "description": "Use for synthetic task 73.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 73.\n"
+    },
+    {
+      "name": "skill-074",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-074/SKILL.md",
+      "description": "Use for synthetic task 74.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 74.\n"
+    },
+    {
+      "name": "skill-075",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-075/SKILL.md",
+      "description": "Use for synthetic task 75.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 75.\n"
+    },
+    {
+      "name": "skill-076",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-076/SKILL.md",
+      "description": "Use for synthetic task 76.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 76.\n"
+    },
+    {
+      "name": "skill-077",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-077/SKILL.md",
+      "description": "Use for synthetic task 77.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 77.\n"
+    },
+    {
+      "name": "skill-078",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-078/SKILL.md",
+      "description": "Use for synthetic task 78.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 78.\n"
+    },
+    {
+      "name": "skill-079",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-079/SKILL.md",
+      "description": "Use for synthetic task 79.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 79.\n"
+    },
+    {
+      "name": "skill-080",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-080/SKILL.md",
+      "description": "Use for synthetic task 80.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 80.\n"
+    },
+    {
+      "name": "skill-081",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-081/SKILL.md",
+      "description": "Use for synthetic task 81.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 81.\n"
+    },
+    {
+      "name": "skill-082",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-082/SKILL.md",
+      "description": "Use for synthetic task 82.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 82.\n"
+    },
+    {
+      "name": "skill-083",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-083/SKILL.md",
+      "description": "Use for synthetic task 83.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 83.\n"
+    },
+    {
+      "name": "skill-084",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-084/SKILL.md",
+      "description": "Use for synthetic task 84.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 84.\n"
+    },
+    {
+      "name": "skill-085",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-085/SKILL.md",
+      "description": "Use for synthetic task 85.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 85.\n"
+    },
+    {
+      "name": "skill-086",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-086/SKILL.md",
+      "description": "Use for synthetic task 86.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 86.\n"
+    },
+    {
+      "name": "skill-087",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-087/SKILL.md",
+      "description": "Use for synthetic task 87.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 87.\n"
+    },
+    {
+      "name": "skill-088",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-088/SKILL.md",
+      "description": "Use for synthetic task 88.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 88.\n"
+    },
+    {
+      "name": "skill-089",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-089/SKILL.md",
+      "description": "Use for synthetic task 89.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 89.\n"
+    },
+    {
+      "name": "skill-090",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-090/SKILL.md",
+      "description": "Use for synthetic task 90.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 90.\n"
+    },
+    {
+      "name": "skill-091",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-091/SKILL.md",
+      "description": "Use for synthetic task 91.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 91.\n"
+    },
+    {
+      "name": "skill-092",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-092/SKILL.md",
+      "description": "Use for synthetic task 92.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 92.\n"
+    },
+    {
+      "name": "skill-093",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-093/SKILL.md",
+      "description": "Use for synthetic task 93.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 93.\n"
+    },
+    {
+      "name": "skill-094",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-094/SKILL.md",
+      "description": "Use for synthetic task 94.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 94.\n"
+    },
+    {
+      "name": "skill-095",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-095/SKILL.md",
+      "description": "Use for synthetic task 95.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 95.\n"
+    },
+    {
+      "name": "skill-096",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-096/SKILL.md",
+      "description": "Use for synthetic task 96.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 96.\n"
+    },
+    {
+      "name": "skill-097",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-097/SKILL.md",
+      "description": "Use for synthetic task 97.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 97.\n"
+    },
+    {
+      "name": "skill-098",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-098/SKILL.md",
+      "description": "Use for synthetic task 98.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 98.\n"
+    },
+    {
+      "name": "skill-099",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-099/SKILL.md",
+      "description": "Use for synthetic task 99.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 99.\n"
+    },
+    {
+      "name": "skill-100",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-100/SKILL.md",
+      "description": "Use for synthetic task 100.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 100.\n"
+    },
+    {
+      "name": "skill-101",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-101/SKILL.md",
+      "description": "Use for synthetic task 101.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 101.\n"
+    },
+    {
+      "name": "skill-102",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-102/SKILL.md",
+      "description": "Use for synthetic task 102.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 102.\n"
+    },
+    {
+      "name": "skill-103",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-103/SKILL.md",
+      "description": "Use for synthetic task 103.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 103.\n"
+    },
+    {
+      "name": "skill-104",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-104/SKILL.md",
+      "description": "Use for synthetic task 104.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 104.\n"
+    },
+    {
+      "name": "skill-105",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-105/SKILL.md",
+      "description": "Use for synthetic task 105.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 105.\n"
+    },
+    {
+      "name": "skill-106",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-106/SKILL.md",
+      "description": "Use for synthetic task 106.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 106.\n"
+    },
+    {
+      "name": "skill-107",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-107/SKILL.md",
+      "description": "Use for synthetic task 107.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 107.\n"
+    },
+    {
+      "name": "skill-108",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-108/SKILL.md",
+      "description": "Use for synthetic task 108.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 108.\n"
+    },
+    {
+      "name": "skill-109",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-109/SKILL.md",
+      "description": "Use for synthetic task 109.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 109.\n"
+    },
+    {
+      "name": "skill-110",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-110/SKILL.md",
+      "description": "Use for synthetic task 110.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 110.\n"
+    },
+    {
+      "name": "skill-111",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-111/SKILL.md",
+      "description": "Use for synthetic task 111.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 111.\n"
+    },
+    {
+      "name": "skill-112",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-112/SKILL.md",
+      "description": "Use for synthetic task 112.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 112.\n"
+    },
+    {
+      "name": "skill-113",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-113/SKILL.md",
+      "description": "Use for synthetic task 113.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 113.\n"
+    },
+    {
+      "name": "skill-114",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-114/SKILL.md",
+      "description": "Use for synthetic task 114.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 114.\n"
+    },
+    {
+      "name": "skill-115",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-115/SKILL.md",
+      "description": "Use for synthetic task 115.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 115.\n"
+    },
+    {
+      "name": "skill-116",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-116/SKILL.md",
+      "description": "Use for synthetic task 116.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 116.\n"
+    },
+    {
+      "name": "skill-117",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-117/SKILL.md",
+      "description": "Use for synthetic task 117.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 117.\n"
+    },
+    {
+      "name": "skill-118",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-118/SKILL.md",
+      "description": "Use for synthetic task 118.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 118.\n"
+    },
+    {
+      "name": "skill-119",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-119/SKILL.md",
+      "description": "Use for synthetic task 119.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 119.\n"
+    },
+    {
+      "name": "skill-120",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-120/SKILL.md",
+      "description": "Use for synthetic task 120.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 120.\n"
+    },
+    {
+      "name": "skill-121",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-121/SKILL.md",
+      "description": "Use for synthetic task 121.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 121.\n"
+    },
+    {
+      "name": "skill-122",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-122/SKILL.md",
+      "description": "Use for synthetic task 122.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 122.\n"
+    },
+    {
+      "name": "skill-123",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-123/SKILL.md",
+      "description": "Use for synthetic task 123.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 123.\n"
+    },
+    {
+      "name": "skill-124",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-124/SKILL.md",
+      "description": "Use for synthetic task 124.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 124.\n"
+    },
+    {
+      "name": "skill-125",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-125/SKILL.md",
+      "description": "Use for synthetic task 125.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 125.\n"
+    },
+    {
+      "name": "skill-126",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-126/SKILL.md",
+      "description": "Use for synthetic task 126.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 126.\n"
+    },
+    {
+      "name": "skill-127",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-127/SKILL.md",
+      "description": "Use for synthetic task 127.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 127.\n"
+    },
+    {
+      "name": "skill-128",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-128/SKILL.md",
+      "description": "Use for synthetic task 128.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 128.\n"
+    },
+    {
+      "name": "skill-129",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-129/SKILL.md",
+      "description": "Use for synthetic task 129.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 129.\n"
+    },
+    {
+      "name": "skill-130",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-130/SKILL.md",
+      "description": "Use for synthetic task 130.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 130.\n"
+    },
+    {
+      "name": "skill-131",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-131/SKILL.md",
+      "description": "Use for synthetic task 131.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 131.\n"
+    },
+    {
+      "name": "skill-132",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-132/SKILL.md",
+      "description": "Use for synthetic task 132.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 132.\n"
+    },
+    {
+      "name": "skill-133",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-133/SKILL.md",
+      "description": "Use for synthetic task 133.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 133.\n"
+    },
+    {
+      "name": "skill-134",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-134/SKILL.md",
+      "description": "Use for synthetic task 134.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 134.\n"
+    },
+    {
+      "name": "skill-135",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-135/SKILL.md",
+      "description": "Use for synthetic task 135.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 135.\n"
+    },
+    {
+      "name": "skill-136",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-136/SKILL.md",
+      "description": "Use for synthetic task 136.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 136.\n"
+    },
+    {
+      "name": "skill-137",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-137/SKILL.md",
+      "description": "Use for synthetic task 137.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 137.\n"
+    },
+    {
+      "name": "skill-138",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-138/SKILL.md",
+      "description": "Use for synthetic task 138.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 138.\n"
+    },
+    {
+      "name": "skill-139",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-139/SKILL.md",
+      "description": "Use for synthetic task 139.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 139.\n"
+    },
+    {
+      "name": "skill-140",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-140/SKILL.md",
+      "description": "Use for synthetic task 140.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 140.\n"
+    },
+    {
+      "name": "skill-141",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-141/SKILL.md",
+      "description": "Use for synthetic task 141.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 141.\n"
+    },
+    {
+      "name": "skill-142",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-142/SKILL.md",
+      "description": "Use for synthetic task 142.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 142.\n"
+    },
+    {
+      "name": "skill-143",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-143/SKILL.md",
+      "description": "Use for synthetic task 143.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 143.\n"
+    },
+    {
+      "name": "skill-144",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-144/SKILL.md",
+      "description": "Use for synthetic task 144.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 144.\n"
+    },
+    {
+      "name": "skill-145",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-145/SKILL.md",
+      "description": "Use for synthetic task 145.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 145.\n"
+    },
+    {
+      "name": "skill-146",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-146/SKILL.md",
+      "description": "Use for synthetic task 146.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 146.\n"
+    },
+    {
+      "name": "skill-147",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-147/SKILL.md",
+      "description": "Use for synthetic task 147.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 147.\n"
+    },
+    {
+      "name": "skill-148",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-148/SKILL.md",
+      "description": "Use for synthetic task 148.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 148.\n"
+    },
+    {
+      "name": "skill-149",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-149/SKILL.md",
+      "description": "Use for synthetic task 149.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 149.\n"
+    },
+    {
+      "name": "skill-150",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-150/SKILL.md",
+      "description": "Use for synthetic task 150.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 150.\n"
+    },
+    {
+      "name": "skill-151",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-151/SKILL.md",
+      "description": "Use for synthetic task 151.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 151.\n"
+    },
+    {
+      "name": "skill-152",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-152/SKILL.md",
+      "description": "Use for synthetic task 152.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 152.\n"
+    },
+    {
+      "name": "skill-153",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-153/SKILL.md",
+      "description": "Use for synthetic task 153.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 153.\n"
+    },
+    {
+      "name": "skill-154",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-154/SKILL.md",
+      "description": "Use for synthetic task 154.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 154.\n"
+    },
+    {
+      "name": "skill-155",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-155/SKILL.md",
+      "description": "Use for synthetic task 155.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 155.\n"
+    },
+    {
+      "name": "skill-156",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-156/SKILL.md",
+      "description": "Use for synthetic task 156.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 156.\n"
+    },
+    {
+      "name": "skill-157",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-157/SKILL.md",
+      "description": "Use for synthetic task 157.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 157.\n"
+    },
+    {
+      "name": "skill-158",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-158/SKILL.md",
+      "description": "Use for synthetic task 158.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 158.\n"
+    },
+    {
+      "name": "skill-159",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-159/SKILL.md",
+      "description": "Use for synthetic task 159.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 159.\n"
+    },
+    {
+      "name": "skill-160",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-160/SKILL.md",
+      "description": "Use for synthetic task 160.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 160.\n"
+    },
+    {
+      "name": "skill-161",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-161/SKILL.md",
+      "description": "Use for synthetic task 161.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 161.\n"
+    },
+    {
+      "name": "skill-162",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-162/SKILL.md",
+      "description": "Use for synthetic task 162.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 162.\n"
+    },
+    {
+      "name": "skill-163",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-163/SKILL.md",
+      "description": "Use for synthetic task 163.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 163.\n"
+    },
+    {
+      "name": "skill-164",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-164/SKILL.md",
+      "description": "Use for synthetic task 164.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 164.\n"
+    },
+    {
+      "name": "skill-165",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-165/SKILL.md",
+      "description": "Use for synthetic task 165.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 165.\n"
+    },
+    {
+      "name": "skill-166",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-166/SKILL.md",
+      "description": "Use for synthetic task 166.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 166.\n"
+    },
+    {
+      "name": "skill-167",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-167/SKILL.md",
+      "description": "Use for synthetic task 167.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 167.\n"
+    },
+    {
+      "name": "skill-168",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-168/SKILL.md",
+      "description": "Use for synthetic task 168.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 168.\n"
+    },
+    {
+      "name": "skill-169",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-169/SKILL.md",
+      "description": "Use for synthetic task 169.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 169.\n"
+    },
+    {
+      "name": "skill-170",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-170/SKILL.md",
+      "description": "Use for synthetic task 170.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 170.\n"
+    },
+    {
+      "name": "skill-171",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-171/SKILL.md",
+      "description": "Use for synthetic task 171.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 171.\n"
+    },
+    {
+      "name": "skill-172",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-172/SKILL.md",
+      "description": "Use for synthetic task 172.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 172.\n"
+    },
+    {
+      "name": "skill-173",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-173/SKILL.md",
+      "description": "Use for synthetic task 173.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 173.\n"
+    },
+    {
+      "name": "skill-174",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-174/SKILL.md",
+      "description": "Use for synthetic task 174.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 174.\n"
+    },
+    {
+      "name": "skill-175",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-175/SKILL.md",
+      "description": "Use for synthetic task 175.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 175.\n"
+    },
+    {
+      "name": "skill-176",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-176/SKILL.md",
+      "description": "Use for synthetic task 176.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 176.\n"
+    },
+    {
+      "name": "skill-177",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-177/SKILL.md",
+      "description": "Use for synthetic task 177.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 177.\n"
+    },
+    {
+      "name": "skill-178",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-178/SKILL.md",
+      "description": "Use for synthetic task 178.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 178.\n"
+    },
+    {
+      "name": "skill-179",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-179/SKILL.md",
+      "description": "Use for synthetic task 179.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 179.\n"
+    },
+    {
+      "name": "skill-180",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-180/SKILL.md",
+      "description": "Use for synthetic task 180.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 180.\n"
+    },
+    {
+      "name": "skill-181",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-181/SKILL.md",
+      "description": "Use for synthetic task 181.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 181.\n"
+    },
+    {
+      "name": "skill-182",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-182/SKILL.md",
+      "description": "Use for synthetic task 182.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 182.\n"
+    },
+    {
+      "name": "skill-183",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-183/SKILL.md",
+      "description": "Use for synthetic task 183.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 183.\n"
+    },
+    {
+      "name": "skill-184",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-184/SKILL.md",
+      "description": "Use for synthetic task 184.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 184.\n"
+    },
+    {
+      "name": "skill-185",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-185/SKILL.md",
+      "description": "Use for synthetic task 185.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 185.\n"
+    },
+    {
+      "name": "skill-186",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-186/SKILL.md",
+      "description": "Use for synthetic task 186.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 186.\n"
+    },
+    {
+      "name": "skill-187",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-187/SKILL.md",
+      "description": "Use for synthetic task 187.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 187.\n"
+    },
+    {
+      "name": "skill-188",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-188/SKILL.md",
+      "description": "Use for synthetic task 188.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 188.\n"
+    },
+    {
+      "name": "skill-189",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-189/SKILL.md",
+      "description": "Use for synthetic task 189.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 189.\n"
+    },
+    {
+      "name": "skill-190",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-190/SKILL.md",
+      "description": "Use for synthetic task 190.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 190.\n"
+    },
+    {
+      "name": "skill-191",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-191/SKILL.md",
+      "description": "Use for synthetic task 191.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 191.\n"
+    },
+    {
+      "name": "skill-192",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-192/SKILL.md",
+      "description": "Use for synthetic task 192.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 192.\n"
+    },
+    {
+      "name": "skill-193",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-193/SKILL.md",
+      "description": "Use for synthetic task 193.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 193.\n"
+    },
+    {
+      "name": "skill-194",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-194/SKILL.md",
+      "description": "Use for synthetic task 194.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 194.\n"
+    },
+    {
+      "name": "skill-195",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-195/SKILL.md",
+      "description": "Use for synthetic task 195.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 195.\n"
+    },
+    {
+      "name": "skill-196",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-196/SKILL.md",
+      "description": "Use for synthetic task 196.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 196.\n"
+    },
+    {
+      "name": "skill-197",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-197/SKILL.md",
+      "description": "Use for synthetic task 197.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 197.\n"
+    },
+    {
+      "name": "skill-198",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-198/SKILL.md",
+      "description": "Use for synthetic task 198.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 198.\n"
+    },
+    {
+      "name": "skill-199",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-199/SKILL.md",
+      "description": "Use for synthetic task 199.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 199.\n"
+    },
+    {
+      "name": "skill-200",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-200/SKILL.md",
+      "description": "Use for synthetic task 200.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 200.\n"
+    },
+    {
+      "name": "skill-201",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-201/SKILL.md",
+      "description": "Use for synthetic task 201.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 201.\n"
+    },
+    {
+      "name": "skill-202",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-202/SKILL.md",
+      "description": "Use for synthetic task 202.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 202.\n"
+    },
+    {
+      "name": "skill-203",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-203/SKILL.md",
+      "description": "Use for synthetic task 203.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 203.\n"
+    },
+    {
+      "name": "skill-204",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-204/SKILL.md",
+      "description": "Use for synthetic task 204.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 204.\n"
+    },
+    {
+      "name": "skill-205",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-205/SKILL.md",
+      "description": "Use for synthetic task 205.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 205.\n"
+    },
+    {
+      "name": "skill-206",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-206/SKILL.md",
+      "description": "Use for synthetic task 206.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 206.\n"
+    },
+    {
+      "name": "skill-207",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-207/SKILL.md",
+      "description": "Use for synthetic task 207.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 207.\n"
+    },
+    {
+      "name": "skill-208",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-208/SKILL.md",
+      "description": "Use for synthetic task 208.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 208.\n"
+    },
+    {
+      "name": "skill-209",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-209/SKILL.md",
+      "description": "Use for synthetic task 209.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 209.\n"
+    },
+    {
+      "name": "skill-210",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-210/SKILL.md",
+      "description": "Use for synthetic task 210.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 210.\n"
+    },
+    {
+      "name": "skill-211",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-211/SKILL.md",
+      "description": "Use for synthetic task 211.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 211.\n"
+    },
+    {
+      "name": "skill-212",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-212/SKILL.md",
+      "description": "Use for synthetic task 212.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 212.\n"
+    },
+    {
+      "name": "skill-213",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-213/SKILL.md",
+      "description": "Use for synthetic task 213.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 213.\n"
+    },
+    {
+      "name": "skill-214",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-214/SKILL.md",
+      "description": "Use for synthetic task 214.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 214.\n"
+    },
+    {
+      "name": "skill-215",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-215/SKILL.md",
+      "description": "Use for synthetic task 215.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 215.\n"
+    },
+    {
+      "name": "skill-216",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-216/SKILL.md",
+      "description": "Use for synthetic task 216.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 216.\n"
+    },
+    {
+      "name": "skill-217",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-217/SKILL.md",
+      "description": "Use for synthetic task 217.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 217.\n"
+    },
+    {
+      "name": "skill-218",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-218/SKILL.md",
+      "description": "Use for synthetic task 218.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 218.\n"
+    },
+    {
+      "name": "skill-219",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-219/SKILL.md",
+      "description": "Use for synthetic task 219.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 219.\n"
+    },
+    {
+      "name": "skill-220",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-220/SKILL.md",
+      "description": "Use for synthetic task 220.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 220.\n"
+    },
+    {
+      "name": "skill-221",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-221/SKILL.md",
+      "description": "Use for synthetic task 221.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 221.\n"
+    },
+    {
+      "name": "skill-222",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-222/SKILL.md",
+      "description": "Use for synthetic task 222.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 222.\n"
+    },
+    {
+      "name": "skill-223",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-223/SKILL.md",
+      "description": "Use for synthetic task 223.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 223.\n"
+    },
+    {
+      "name": "skill-224",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-224/SKILL.md",
+      "description": "Use for synthetic task 224.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 224.\n"
+    },
+    {
+      "name": "skill-225",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-225/SKILL.md",
+      "description": "Use for synthetic task 225.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 225.\n"
+    },
+    {
+      "name": "skill-226",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-226/SKILL.md",
+      "description": "Use for synthetic task 226.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 226.\n"
+    },
+    {
+      "name": "skill-227",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-227/SKILL.md",
+      "description": "Use for synthetic task 227.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 227.\n"
+    },
+    {
+      "name": "skill-228",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-228/SKILL.md",
+      "description": "Use for synthetic task 228.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 228.\n"
+    },
+    {
+      "name": "skill-229",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-229/SKILL.md",
+      "description": "Use for synthetic task 229.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 229.\n"
+    },
+    {
+      "name": "skill-230",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-230/SKILL.md",
+      "description": "Use for synthetic task 230.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 230.\n"
+    },
+    {
+      "name": "skill-231",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-231/SKILL.md",
+      "description": "Use for synthetic task 231.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 231.\n"
+    },
+    {
+      "name": "skill-232",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-232/SKILL.md",
+      "description": "Use for synthetic task 232.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 232.\n"
+    },
+    {
+      "name": "skill-233",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-233/SKILL.md",
+      "description": "Use for synthetic task 233.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 233.\n"
+    },
+    {
+      "name": "skill-234",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-234/SKILL.md",
+      "description": "Use for synthetic task 234.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 234.\n"
+    },
+    {
+      "name": "skill-235",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-235/SKILL.md",
+      "description": "Use for synthetic task 235.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 235.\n"
+    },
+    {
+      "name": "skill-236",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-236/SKILL.md",
+      "description": "Use for synthetic task 236.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 236.\n"
+    },
+    {
+      "name": "skill-237",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-237/SKILL.md",
+      "description": "Use for synthetic task 237.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 237.\n"
+    },
+    {
+      "name": "skill-238",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-238/SKILL.md",
+      "description": "Use for synthetic task 238.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 238.\n"
+    },
+    {
+      "name": "skill-239",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-239/SKILL.md",
+      "description": "Use for synthetic task 239.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 239.\n"
+    },
+    {
+      "name": "skill-240",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-240/SKILL.md",
+      "description": "Use for synthetic task 240.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 240.\n"
+    },
+    {
+      "name": "skill-241",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-241/SKILL.md",
+      "description": "Use for synthetic task 241.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 241.\n"
+    },
+    {
+      "name": "skill-242",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-242/SKILL.md",
+      "description": "Use for synthetic task 242.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 242.\n"
+    },
+    {
+      "name": "skill-243",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-243/SKILL.md",
+      "description": "Use for synthetic task 243.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 243.\n"
+    },
+    {
+      "name": "skill-244",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-244/SKILL.md",
+      "description": "Use for synthetic task 244.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 244.\n"
+    },
+    {
+      "name": "skill-245",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-245/SKILL.md",
+      "description": "Use for synthetic task 245.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 245.\n"
+    },
+    {
+      "name": "skill-246",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-246/SKILL.md",
+      "description": "Use for synthetic task 246.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 246.\n"
+    },
+    {
+      "name": "skill-247",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-247/SKILL.md",
+      "description": "Use for synthetic task 247.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 247.\n"
+    },
+    {
+      "name": "skill-248",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-248/SKILL.md",
+      "description": "Use for synthetic task 248.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 248.\n"
+    },
+    {
+      "name": "skill-249",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-249/SKILL.md",
+      "description": "Use for synthetic task 249.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 249.\n"
+    },
+    {
+      "name": "skill-250",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-250/SKILL.md",
+      "description": "Use for synthetic task 250.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 250.\n"
+    },
+    {
+      "name": "skill-251",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-251/SKILL.md",
+      "description": "Use for synthetic task 251.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 251.\n"
+    },
+    {
+      "name": "skill-252",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-252/SKILL.md",
+      "description": "Use for synthetic task 252.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 252.\n"
+    },
+    {
+      "name": "skill-253",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-253/SKILL.md",
+      "description": "Use for synthetic task 253.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 253.\n"
+    },
+    {
+      "name": "skill-254",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-254/SKILL.md",
+      "description": "Use for synthetic task 254.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 254.\n"
+    },
+    {
+      "name": "skill-255",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-255/SKILL.md",
+      "description": "Use for synthetic task 255.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 255.\n"
+    },
+    {
+      "name": "skill-256",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-256/SKILL.md",
+      "description": "Use for synthetic task 256.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 256.\n"
+    },
+    {
+      "name": "skill-257",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-257/SKILL.md",
+      "description": "Use for synthetic task 257.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 257.\n"
+    },
+    {
+      "name": "skill-258",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-258/SKILL.md",
+      "description": "Use for synthetic task 258.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 258.\n"
+    },
+    {
+      "name": "skill-259",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-259/SKILL.md",
+      "description": "Use for synthetic task 259.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 259.\n"
+    },
+    {
+      "name": "skill-260",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-260/SKILL.md",
+      "description": "Use for synthetic task 260.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 260.\n"
+    },
+    {
+      "name": "skill-261",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-261/SKILL.md",
+      "description": "Use for synthetic task 261.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 261.\n"
+    },
+    {
+      "name": "skill-262",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-262/SKILL.md",
+      "description": "Use for synthetic task 262.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 262.\n"
+    },
+    {
+      "name": "skill-263",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-263/SKILL.md",
+      "description": "Use for synthetic task 263.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 263.\n"
+    },
+    {
+      "name": "skill-264",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-264/SKILL.md",
+      "description": "Use for synthetic task 264.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 264.\n"
+    },
+    {
+      "name": "skill-265",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-265/SKILL.md",
+      "description": "Use for synthetic task 265.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 265.\n"
+    },
+    {
+      "name": "skill-266",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-266/SKILL.md",
+      "description": "Use for synthetic task 266.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 266.\n"
+    },
+    {
+      "name": "skill-267",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-267/SKILL.md",
+      "description": "Use for synthetic task 267.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 267.\n"
+    },
+    {
+      "name": "skill-268",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-268/SKILL.md",
+      "description": "Use for synthetic task 268.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 268.\n"
+    },
+    {
+      "name": "skill-269",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-269/SKILL.md",
+      "description": "Use for synthetic task 269.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 269.\n"
+    },
+    {
+      "name": "skill-270",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-270/SKILL.md",
+      "description": "Use for synthetic task 270.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 270.\n"
+    },
+    {
+      "name": "skill-271",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-271/SKILL.md",
+      "description": "Use for synthetic task 271.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 271.\n"
+    },
+    {
+      "name": "skill-272",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-272/SKILL.md",
+      "description": "Use for synthetic task 272.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 272.\n"
+    },
+    {
+      "name": "skill-273",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-273/SKILL.md",
+      "description": "Use for synthetic task 273.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 273.\n"
+    },
+    {
+      "name": "skill-274",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-274/SKILL.md",
+      "description": "Use for synthetic task 274.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 274.\n"
+    },
+    {
+      "name": "skill-275",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-275/SKILL.md",
+      "description": "Use for synthetic task 275.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 275.\n"
+    },
+    {
+      "name": "skill-276",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-276/SKILL.md",
+      "description": "Use for synthetic task 276.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 276.\n"
+    },
+    {
+      "name": "skill-277",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-277/SKILL.md",
+      "description": "Use for synthetic task 277.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 277.\n"
+    },
+    {
+      "name": "skill-278",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-278/SKILL.md",
+      "description": "Use for synthetic task 278.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 278.\n"
+    },
+    {
+      "name": "skill-279",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-279/SKILL.md",
+      "description": "Use for synthetic task 279.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 279.\n"
+    },
+    {
+      "name": "skill-280",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-280/SKILL.md",
+      "description": "Use for synthetic task 280.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 280.\n"
+    },
+    {
+      "name": "skill-281",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-281/SKILL.md",
+      "description": "Use for synthetic task 281.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 281.\n"
+    },
+    {
+      "name": "skill-282",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-282/SKILL.md",
+      "description": "Use for synthetic task 282.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 282.\n"
+    },
+    {
+      "name": "skill-283",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-283/SKILL.md",
+      "description": "Use for synthetic task 283.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 283.\n"
+    },
+    {
+      "name": "skill-284",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-284/SKILL.md",
+      "description": "Use for synthetic task 284.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 284.\n"
+    },
+    {
+      "name": "skill-285",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-285/SKILL.md",
+      "description": "Use for synthetic task 285.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 285.\n"
+    },
+    {
+      "name": "skill-286",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-286/SKILL.md",
+      "description": "Use for synthetic task 286.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 286.\n"
+    },
+    {
+      "name": "skill-287",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-287/SKILL.md",
+      "description": "Use for synthetic task 287.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 287.\n"
+    },
+    {
+      "name": "skill-288",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-288/SKILL.md",
+      "description": "Use for synthetic task 288.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 288.\n"
+    },
+    {
+      "name": "skill-289",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-289/SKILL.md",
+      "description": "Use for synthetic task 289.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 289.\n"
+    },
+    {
+      "name": "skill-290",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-290/SKILL.md",
+      "description": "Use for synthetic task 290.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 290.\n"
+    },
+    {
+      "name": "skill-291",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-291/SKILL.md",
+      "description": "Use for synthetic task 291.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 291.\n"
+    },
+    {
+      "name": "skill-292",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-292/SKILL.md",
+      "description": "Use for synthetic task 292.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 292.\n"
+    },
+    {
+      "name": "skill-293",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-293/SKILL.md",
+      "description": "Use for synthetic task 293.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 293.\n"
+    },
+    {
+      "name": "skill-294",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-294/SKILL.md",
+      "description": "Use for synthetic task 294.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 294.\n"
+    },
+    {
+      "name": "skill-295",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-295/SKILL.md",
+      "description": "Use for synthetic task 295.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 295.\n"
+    },
+    {
+      "name": "skill-296",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-296/SKILL.md",
+      "description": "Use for synthetic task 296.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 296.\n"
+    },
+    {
+      "name": "skill-297",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-297/SKILL.md",
+      "description": "Use for synthetic task 297.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 297.\n"
+    },
+    {
+      "name": "skill-298",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-298/SKILL.md",
+      "description": "Use for synthetic task 298.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 298.\n"
+    },
+    {
+      "name": "skill-299",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-299/SKILL.md",
+      "description": "Use for synthetic task 299.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 299.\n"
+    },
+    {
+      "name": "skill-300",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.agents/skills/skill-300/SKILL.md",
+      "description": "Use for synthetic task 300.",
+      "excerpt": "# Procedure\nRead the inputs for synthetic task 300.\n"
+    },
+    {
+      "name": "claude-only",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project/.claude/skills/claude-only/SKILL.md",
+      "description": "CLAUDE COPY claude-only.",
+      "excerpt": "Do a synthetic check.\n"
+    }
+  ],
+  "not_judged": [
+    {
+      "name": "linked-skill",
+      "reason": "not a Git-tracked file in this project"
+    },
+    {
+      "name": "untracked",
+      "reason": "not a Git-tracked file in this project"
+    }
+  ]
+}

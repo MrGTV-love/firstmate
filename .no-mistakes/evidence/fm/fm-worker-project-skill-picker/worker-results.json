@@ -1,0 +1,22 @@
+[
+  {
+    "name": "live-ship automatic delivered selection",
+    "pass": true
+  },
+  {
+    "name": "live-scout automatic delivered selection",
+    "pass": true
+  },
+  {
+    "name": "scout relaunch delivers regenerated selection",
+    "pass": true
+  },
+  {
+    "name": "raw command without transport never claims a delivered pick",
+    "pass": true
+  },
+  {
+    "name": "isolated lab teardown and default fleet tripwire",
+    "pass": true
+  }
+]

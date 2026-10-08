@@ -1,0 +1,62 @@
+[
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/worker-home",
+    "exit": 0,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/worker-home\n",
+    "stderr": ""
+  },
+  {
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project add treehouse.toml",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project -c 'user.name=Live Validation' -c user.email=validation@example.invalid commit -qm 'isolate worktree pool'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "git clone --quiet --bare /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/origin.git",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project remote add origin file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/origin.git",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/bin/fm-herdr-lab.sh name skill-picker",
+    "exit": 0,
+    "stdout": "fm-lab-skill-picker-791-13922\n",
+    "stderr": ""
+  },
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/bin/fm-herdr-lab.sh provision fm-lab-skill-picker-791-13922",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/bin/fm-brief.sh live-ship project --mode local-only --herdr-lab",
+    "exit": 0,
+    "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/worker-home/data/live-ship/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})\n",
+    "stderr": ""
+  },
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/bin/fm-spawn.sh live-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/project 'cat __BRIEF__; printf '\"'\"'\\nWORKER_DELIVERY_COMPLETE\\n'\"'\"'' --backend herdr --mode local-only --yolo off",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/worker-home\nnotice: live-ship ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state\nerror: 'herdr status --json' failed; is herdr installed correctly?\n"
+  },
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/bin/fm-herdr-lab.sh teardown fm-lab-skill-picker-791-13922",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

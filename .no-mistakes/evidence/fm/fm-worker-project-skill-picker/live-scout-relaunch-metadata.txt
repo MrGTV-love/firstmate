@@ -1,0 +1,17 @@
+window=fm-lab-skill-picker-40826-9331:w1:p3
+endpoint_task_id=live-scout
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/proof/project/.treehouse/project-4cbdee/2/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/proof/project
+harness=cat
+kind=scout
+tasktmp=/tmp/fm-live-scout
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+spawn_gen=s1791443127.21190.11707
+backend=herdr
+herdr_session=fm-lab-skill-picker-40826-9331
+herdr_workspace_id=w1
+herdr_tab_id=w1:t3
+herdr_pane_id=w1:p3

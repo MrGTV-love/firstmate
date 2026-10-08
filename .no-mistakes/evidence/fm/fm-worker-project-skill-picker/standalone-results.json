@@ -1,0 +1,42 @@
+[
+  {
+    "name": "direct executable CLI help",
+    "pass": true,
+    "evidence": "picker-help.txt"
+  },
+  {
+    "name": "full project roster and excluded links",
+    "pass": true,
+    "evidence": "project-roster.json"
+  },
+  {
+    "name": "missing keys gives actionable selection instructions",
+    "pass": true,
+    "evidence": "picker-no-key.txt"
+  },
+  {
+    "name": "never-send task literal stops network delivery",
+    "pass": true,
+    "evidence": "privacy-task-refusal.txt"
+  },
+  {
+    "name": "never-send skill description stops network delivery",
+    "pass": true,
+    "evidence": "privacy-description-refusal.txt"
+  },
+  {
+    "name": "promoted legacy intent is sanitized and owner-only",
+    "pass": true,
+    "evidence": "promoted-private-task.txt"
+  },
+  {
+    "name": "real failed provider calls remain bounded",
+    "pass": true,
+    "evidence": "real-provider-failure.txt; real-provider-requests.json"
+  },
+  {
+    "name": "direct failure tries real OpenRouter fallback",
+    "pass": true,
+    "evidence": "real-provider-failure.txt; real-provider-requests.json"
+  }
+]

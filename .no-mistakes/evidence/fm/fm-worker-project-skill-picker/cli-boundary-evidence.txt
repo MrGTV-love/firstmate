@@ -1,0 +1,137 @@
+=== picker-help.txt ===
+Pick the one project skill a worker should load, for its launch instructions.
+Usage: fm-skill-pick.sh --brief <filled-brief> --catalog <skill-dir>... [--record <file>] [--kind ship|scout]
+bin/fm-skill-pick.mjs runs the TypeSafe skill-suggestion cookbook recipe on
+the vendored hyper-jev client over the catalogs' skills (an earlier catalog
+wins a duplicate name); its header owns the recipe, roster and provider order.
+This wrapper supplies what the example cannot: the brief text dispatch
+resolution may send (fm_typesafe_brief_task), the dispatch-never-send check
+over every string a request can carry, and the keys from fm-typesafe-lib.sh,
+passed to Node on stdin.
+Output: the "# Skill selection" launch-instructions section. --record also
+writes status= (picked, none or unavailable), reason= and picked= lines.
+Any failure yields status unavailable with its reason; exit 2 is a usage error.
+
+
+=== picker-no-key.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+
+--- persisted selection ---
+status=unavailable
+reason=no TypeSafe or OpenRouter key
+picked=
+
+
+=== privacy-task-refusal.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (withheld by dispatch-never-send policy: brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/home/config/dispatch-never-send line 1). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+--- selection ---
+status=unavailable
+reason=withheld by dispatch-never-send policy: brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/home/config/dispatch-never-send line 1
+picked=
+
+--- observed real fetch calls ---
+
+
+=== privacy-description-refusal.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (withheld by dispatch-never-send policy: brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/home/config/dispatch-never-send line 1). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+--- observed real fetch calls ---
+
+
+=== promoted-private-task.txt ===
+600
+Investigate synthetic task 300.
+# Current ship Firstmate spec
+Follow the current ship procedure.
+
+
+=== empty-catalog-result.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection found no fit among the judged project skills (this project has no skills to judge); use your skill index as usual.
+
+--- persisted selection ---
+status=none
+reason=this project has no skills to judge
+picked=
+
+Observed real fetch calls: 0
+
+
+=== excluded-catalog-result.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (no project skills could be judged: scratch (not a Git-tracked file in this project)). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: scratch (not a Git-tracked file in this project).
+
+--- persisted selection ---
+status=unavailable
+reason=no project skills could be judged: scratch (not a Git-tracked file in this project)
+picked=
+
+Observed real fetch calls: 0
+
+
+=== real-provider-failure.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+--- persisted selection ---
+status=unavailable
+reason=openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)
+picked=
+
+Elapsed: 1.94s
+
+
+=== missing-direct-key-fallback.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; no TypeSafe key; used OpenRouter). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+Observed endpoints: https://openrouter.ai/api/alpha/decisions
+
+
+=== primary-home-inheritance.txt ===
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+--- real request header checks (no credential values) ---
+[
+  {
+    "url": "https://api.typesafe.ai/v1/systemone",
+    "inheritedPrimaryKey": true
+  }
+]
+Lane .env exists: false
+

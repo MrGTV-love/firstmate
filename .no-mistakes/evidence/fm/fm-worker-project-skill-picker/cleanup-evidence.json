@@ -1,0 +1,29 @@
+{
+  "workspace_fixtures_removed": true,
+  "live_worker_checks": [
+    {
+      "name": "live-ship automatic delivered selection",
+      "pass": true
+    },
+    {
+      "name": "live-scout automatic delivered selection",
+      "pass": true
+    },
+    {
+      "name": "scout relaunch delivers regenerated selection",
+      "pass": true
+    },
+    {
+      "name": "raw command without transport never claims a delivered pick",
+      "pass": true
+    },
+    {
+      "name": "isolated lab teardown and default fleet tripwire",
+      "pass": true
+    }
+  ],
+  "source_or_permanent_test_changes_made": false,
+  "usable_provider_keys_present_in_process_environment": false,
+  "provider_attempts": "Synthetic invalid credentials reached real TypeSafe and OpenRouter endpoints, both returned HTTP 401. No authenticated inference was possible.",
+  "visual_evidence": "worker-transcripts.html renders actual captured terminal output; this change affects instruction text, not native visual layout."
+}

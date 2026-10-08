@@ -1,0 +1,17 @@
+Mac-Studio:project charlesabrooker$ treehouse get
+-sh: child setpgid (53039 to 53039): Operation not permitted
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/proof/projec
+t/.treehouse/project-4cbdee/3/project. Type 'exit' to return.
+sh-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation
+/proof/project/.treehouse/project-4cbdee/3/project'
+sh-3.2$ export GOTMPDIR=/tmp/fm-live-raw/gotmp
+sh-3.2$ export COMPACT_ADVISER_DISABLE=1
+sh-3.2$ export FM_TASK_ID=live-raw
+sh-3.2$ . '/tmp/fm-live-raw+3bf2ed69be0f074472121a6b2704d88245309f0a4d9410377115a1d25b7d1eb5/launch.s1791443142.48080.23
+468.sh'
+RAW_COMMAND_UNCHANGED
+sh-3.2$

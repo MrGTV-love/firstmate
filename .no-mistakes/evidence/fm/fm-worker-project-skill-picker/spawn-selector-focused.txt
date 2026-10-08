@@ -1,0 +1,1 @@
+ok - spawn changes select picker coverage without broadening sibling commands

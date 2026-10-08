@@ -1,0 +1,9 @@
+Initial command: bash tests/fm-skill-pick.test.sh && bash tests/fm-typesafe-key-source.test.sh
+The driver deadline interrupted the picker at 300 seconds after the raw doorbell/pointer cases; the chained key-source suite did not run. Retried the picker independently with a 1200-second ceiling.
+Independent command: bash tests/fm-typesafe-key-source.test.sh
+Exit 0, including primary-home inheritance, precedence, private-key transport, request privacy and bounded stalled-policy cases. These are regression checks with mocked transport, not live model-selection evidence.
+Focused runner regression: test_changed_spawn_selects_picker_without_broadening_siblings
+Exit 0.
+Final picker retry: bash tests/fm-skill-pick.test.sh
+Exit 0 after 507.47 seconds, including failed Kimi/Rovo/doorbell relaunch delivery, pre-publication record preservation and overlay-publication refusal. All picker cases passed.
+All targeted baseline checks completed successfully. No full suite, linters, formatters or static analysis were run.

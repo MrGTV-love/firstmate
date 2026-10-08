@@ -1,0 +1,13 @@
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (withheld by dispatch-never-send policy: brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/home/config/dispatch-never-send line 1). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+--- selection ---
+status=unavailable
+reason=withheld by dispatch-never-send policy: brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4D34BGQE483Q5806J9GM9AX/.fm-live-validation/home/config/dispatch-never-send line 1
+picked=
+
+--- observed real fetch calls ---

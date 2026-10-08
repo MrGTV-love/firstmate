@@ -1,0 +1,19 @@
+{
+  "verdict": "inconclusive",
+  "runtime_failures_observed": false,
+  "targeted_baselines": "Picker, key-source and focused spawn-selector checks passed. Initial 300-second picker interruption resolved with a 1200-second ceiling.",
+  "live_checks": [
+    "Direct executable help",
+    "301-skill roster and catalog precedence/exclusions",
+    "Automatic ship/scout instruction delivery",
+    "Scout relaunch regeneration",
+    "Raw command undelivered metadata",
+    "Task and skill-description privacy refusals without egress",
+    "Promoted legacy input sanitization and owner-only extraction",
+    "Empty versus wholly excluded catalogs",
+    "Real TypeSafe failure and OpenRouter fallback, including absent direct key",
+    "Primary-home key inheritance without a lane key copy"
+  ],
+  "missing_proof": "Authenticated provider selection, successful cross-chunk reranking/no-fit scoring, and a real agent following the chosen method skill could not be exercised without usable provider credentials.",
+  "cleanup": "All disposable Herdr sessions were torn down with passing default-fleet tripwires; workspace fixtures and throwaway drivers removed. No source or permanent tests modified."
+}

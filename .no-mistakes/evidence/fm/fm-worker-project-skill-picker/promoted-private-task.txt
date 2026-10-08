@@ -1,0 +1,4 @@
+600
+Investigate synthetic task 300.
+# Current ship Firstmate spec
+Follow the current ship procedure.

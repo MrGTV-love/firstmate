@@ -1,0 +1,10 @@
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+
+--- persisted selection ---
+status=unavailable
+reason=no TypeSafe or OpenRouter key
+picked=

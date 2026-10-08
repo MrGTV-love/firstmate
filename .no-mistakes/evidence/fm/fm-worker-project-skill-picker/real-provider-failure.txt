@@ -1,0 +1,13 @@
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+--- persisted selection ---
+status=unavailable
+reason=openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)
+picked=
+
+Elapsed: 1.94s

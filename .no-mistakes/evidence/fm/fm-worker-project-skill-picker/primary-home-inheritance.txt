@@ -1,0 +1,15 @@
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: linked-skill (not a Git-tracked file in this project), untracked (not a Git-tracked file in this project).
+
+--- real request header checks (no credential values) ---
+[
+  {
+    "url": "https://api.typesafe.ai/v1/systemone",
+    "inheritedPrimaryKey": true
+  }
+]
+Lane .env exists: false

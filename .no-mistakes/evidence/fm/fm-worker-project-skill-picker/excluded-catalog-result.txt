@@ -1,0 +1,13 @@
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (no project skills could be judged: scratch (not a Git-tracked file in this project)). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+Not judged, so check them yourself if relevant: scratch (not a Git-tracked file in this project).
+
+--- persisted selection ---
+status=unavailable
+reason=no project skills could be judged: scratch (not a Git-tracked file in this project)
+picked=
+
+Observed real fetch calls: 0
