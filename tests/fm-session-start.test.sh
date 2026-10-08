@@ -652,7 +652,7 @@ run_session_start_secondmate() {
 }
 
 prepare_session_start_herdr_secondmate() {
-  local name=$1 rec root home fakebin w mate log state id=$SESSION_START_HERDR_SECOND_MATE_ID
+  local name=$1 rec root home fakebin w mate log state husk_pid id=$SESSION_START_HERDR_SECOND_MATE_ID
   rec=$(new_world "$name")
   IFS='|' read -r root home fakebin <<EOF
 $rec
@@ -691,7 +691,11 @@ EOF
   # An idle process stands in for the husk pane's lone shell, so the pane's
   # process evidence names a pid that really exists and has no children.
   sleep 600 >/dev/null 2>&1 &
-  printf '%s\n' "$!" > "$state.huskpid"
+  husk_pid=$!
+  printf '%s\n' "$husk_pid" > "$state.huskpid"
+  fm_test_record_process "$state.husk-process" "$husk_pid" \
+    || fail "could not record the Herdr husk fixture identity"
+  fm_test_track_process "$state.husk-process" "sleep 600"
   printf '%s|%s|%s|%s|%s|%s\n' "$root" "$home" "$fakebin" "$mate" "$log" "$state"
 }
 
@@ -1428,7 +1432,9 @@ EOF
   run_session_start_herdr_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$state" >/dev/null
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
-  kill "$(cat "$state.huskpid")" 2>/dev/null || true
+  if fm_test_process_alive "$state.husk-process" "sleep 600"; then
+    kill "$FM_TEST_PROCESS_PID" 2>/dev/null || true
+  fi
   out=$(network_stage_report "$home" "$root")
   assert_not_contains "$out" "SECONDMATE_LIVENESS:" "successful Herdr husk recovery should stay non-actionable"
   assert_contains "$(cat "$log")" "pane close p-old" "session start did not close the confirmed Herdr husk"
