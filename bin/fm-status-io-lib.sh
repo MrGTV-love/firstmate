@@ -22,10 +22,20 @@ case $- in *u*) _fm_classify_nounset=on ;; *) _fm_classify_nounset=off ;; esac
 [ "$_fm_classify_nounset" = on ] || set +u
 unset _fm_classify_nounset
 
+# Parameter expansion rather than dirname and basename: every presentation scan
+# asks for the cursor path of every task, and two child processes per call were
+# the largest process count in a wake drain.
 _fm_open_decisions_cursor_path() {  # <status-file>
   local f=$1 dir base
-  dir=$(dirname "$f")
-  base=$(basename "$f")
+  case "$f" in
+    */*)
+      dir=${f%/*}
+      while [ "${dir%/}" != "$dir" ]; do dir=${dir%/}; done
+      [ -n "$dir" ] || dir=/
+      ;;
+    *) dir=. ;;
+  esac
+  base=${f##*/}
   printf '%s/.%s.open-decisions-cursor' "$dir" "${base%.status}"
 }
 

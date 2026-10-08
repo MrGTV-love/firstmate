@@ -408,8 +408,226 @@ test_kind_changes_invalidate_folded_decisions() {
   pass "folded decisions are rebuilt when task-kind evidence changes"
 }
 
+# A golden corpus that exercises every fold rule: keyed and keyless opens,
+# resolutions and captain-held transfers, a note-head key, corr tokens in both
+# forms, reserved pending-reply keys with and without their vocabulary, stamped
+# heads whose colons must not move the separator, a colonless keyed line,
+# continuation prose, an invalid slug, ship/scout terminal supersession, and a
+# final line with no newline.
+write_golden_corpus() {  # <status-file>
+  {
+    printf 'working: started\n'
+    printf 'needs-decision: keyless question one\n'
+    printf 'continuation prose: with a colon that is not a verb\n'
+    printf 'needs-decision [key=api-shape]: REST or RPC\n'
+    printf 'blocked [at=10:30] [key=access]: waiting on a login\n'
+    printf 'note: an informational line\n'
+    printf 'needs-decision: [key=note-head] key written after the colon\n'
+    printf 'resolved [key=api-shape]: REST\n'
+    printf 'needs-decision corr=0123456789abcdef [key=corr-open]: answered via corr\n'
+    printf 'needs-decision [key=pending-reply-abc]: unrelated takeover attempt\n'
+    printf 'needs-decision [key=pending-reply-def]: pending-reply-missed: parent owned\n'
+    printf 'blocked [key=bad slug!]: rejected slug\n'
+    printf 'blocked [key=colonless] no colon on this keyed line\n'
+    printf 'resolved: keyless closes default\n'
+    printf 'captain-held [key=access]: tracked by fm-access\n'
+    printf 'resolved corr=0123456789abcdef [key=corr-open]: closed via corr\n'
+    printf 'paused: waiting for CI\n'
+    printf 'needs-decision [key=late]: opened after the pause\n'
+    printf 'done: phase one finished\n'
+    printf 'needs-decision [key=after-done]: opened after a terminal line\n'
+    printf 'resolved [key=pending-reply-def]: pending-reply-resolved: parent closed\n'
+    printf 'failed [at=1791400000]: a failure line\n'
+    printf 'blocked [key=tail]: the last line has no newline'
+  } > "$1"
+}
+
+# Byte offsets of every line end in <file> (the boundaries a checkpoint may
+# legitimately sit on), plus 0.
+line_end_offsets() {  # <file>
+  LC_ALL=C awk 'BEGIN { n = 0; print 0 } { n += length($0) + 1; print n }' "$1"
+}
+
+# Span reader that records every span it serves, so a test can prove a seeded
+# fold read only the bytes after its checkpoint.
+make_span_probe() {  # <dir> -> path of the reader
+  cat > "$1/span-reader" <<'SH'
+#!/usr/bin/env bash
+printf '%s %s\n' "$2" "$3" >> "${FM_TEST_SPAN_LOG:?}"
+LC_ALL=C tail -c +"$(($2 + 1))" "$1" | LC_ALL=C head -c "$3"
+SH
+  chmod +x "$1/span-reader"
+  printf '%s\n' "$1/span-reader"
+}
+
+# The golden equivalence test for the checkpoint-seeded whole-file fold: for
+# every task kind and EVERY line boundary of the corpus, a checkpoint written
+# through that boundary by the real incremental writer seeds a whole-file fold
+# whose output is byte-for-byte the fold from line 1, and the seeded fold reads
+# only the bytes after the checkpoint. A checkpoint that does not sit on a line
+# boundary is refused and the fold starts from line 1, with the same output.
+test_seeded_whole_file_fold_matches_a_fold_from_line_one() {
+  local dir state status reader spanlog kind out
+  dir=$(make_case seeded-golden); state="$dir/state"; status="$state/task.status"
+  write_golden_corpus "$status"
+  reader=$(make_span_probe "$dir")
+  spanlog="$dir/spans"
+  for kind in ship scout secondmate; do
+    printf 'kind=%s\n' "$kind" > "$state/task.meta"
+    out=$(FM_TEST_SPAN_LOG="$spanlog" bash -c '
+      . "$1"
+      f=$2 reader=$3 spanlog=$4 offsets=$5
+      cf="$(dirname "$f")/.task.open-decisions-cursor"
+      size=$(LC_ALL=C wc -c < "$f" | tr -d "[:space:]")
+      rm -f "$cf"
+      reference=$(status_open_decisions "$f")
+      [ -n "$reference" ] || { echo "the corpus folded to nothing"; exit 1; }
+      for k in $offsets $((size - 7)) 3; do
+        [ "$k" -le "$size" ] || continue
+        rm -f "$cf"
+        status_open_decisions_incremental "$f" "$k" >/dev/null
+        grep -qx "offset=$k" "$cf" || { echo "writer did not checkpoint at $k"; exit 1; }
+        : > "$spanlog"
+        seeded=$(FM_STATUS_SPAN_READER=$reader status_open_decisions "$f")
+        [ "$seeded" = "$reference" ] || { printf "offset %s diverged:\n%s\n--- reference:\n%s\n" "$k" "$seeded" "$reference"; exit 1; }
+        case " $offsets " in
+          *" $k "*)
+            if [ "$k" -lt "$size" ]; then
+              grep -qx "$k $((size - k))" "$spanlog" || { echo "offset $k: seeded fold did not read only the tail: $(cat "$spanlog")"; exit 1; }
+            fi
+            ;;
+          *)
+            ! grep -q "^$k " "$spanlog" || { echo "offset $k: a mid-line checkpoint seeded the fold"; exit 1; }
+            ;;
+        esac
+      done
+      rm -f "$cf"
+      [ "$(status_open_decisions "$f")" = "$reference" ] || { echo "fold without a checkpoint changed"; exit 1; }
+    ' _ "$ROOT/bin/fm-classify-lib.sh" "$status" "$reader" "$spanlog" "$(line_end_offsets "$status" | tr '\n' ' ')" 2>&1) \
+      || fail "seeded fold diverged for kind $kind: $out"
+  done
+  pass "golden: a checkpoint-seeded whole-file fold equals the fold from line 1 at every boundary and kind"
+}
+
+# A checkpoint is reused only under the exact reading that wrote it: another
+# kind, a fold-affecting override, a replaced log, or a damaged checkpoint all
+# fold from line 1, and none of them writes anything.
+test_seeded_fold_refuses_checkpoints_from_another_reading() {
+  local dir state status out
+  dir=$(make_case seeded-refusals); state="$dir/state"; status="$state/task.status"
+  write_golden_corpus "$status"
+  # End on a newline so the full-length checkpoint sits on a line boundary.
+  printf '\n' >> "$status"
+  printf 'kind=ship\n' > "$state/task.meta"
+  out=$(bash -c '
+    . "$1"
+    f=$2 cf="$(dirname "$2")/.task.open-decisions-cursor"
+    status_open_decisions_incremental "$f" >/dev/null
+    cp "$cf" "$cf.saved"
+    # Poison the checkpoint set so any reuse would be visible in the output.
+    { sed -n 1,3p "$cf.saved"; printf "poison\tneeds-decision\tfrom the checkpoint\n"; } > "$cf"
+    poisoned=$(status_open_decisions "$f")
+    case "$poisoned" in *poison*) ;; *) echo "control: a matching checkpoint was not reused"; exit 1 ;; esac
+    for override in "FM_CLASSIFY_RESOLVE_VERB=answered" "FM_CLASSIFY_CAPTAIN_HELD_VERB=awaiting-captain" \
+      "FM_CLASSIFY_RESERVED_KEY_PREFIXES=pending-reply- secret-"; do
+      got=$(env "$override" bash -c ". \"$1\"; status_open_decisions \"$2\"" _ "$1" "$f")
+      case "$got" in *poison*) echo "override $override reused a default-reading checkpoint"; exit 1 ;; esac
+    done
+    got=$(status_open_decisions "$f" scout)
+    case "$got" in *poison*) echo "an explicit other kind reused the ship checkpoint"; exit 1 ;; esac
+    before=$(cat "$cf")
+    cp "$f" "$f.new" && mv -f "$f.new" "$f"
+    got=$(status_open_decisions "$f")
+    case "$got" in *poison*) echo "a replaced log reused the old checkpoint"; exit 1 ;; esac
+    [ "$(cat "$cf")" = "$before" ] || { echo "a whole-file read rewrote the checkpoint"; exit 1; }
+    printf "version=garbage\n" > "$cf"
+    got=$(status_open_decisions "$f")
+    case "$got" in *poison*|"") echo "a damaged checkpoint was not ignored"; exit 1 ;; esac
+    exit 0
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$status" 2>&1) || fail "seeded fold refusal: $out"
+  pass "seeded fold reuses a checkpoint only under its own kind, verbs, and file identity, and never writes one"
+}
+
+# The fleet snapshot folds point-in-time copies of each log. The checkpoint is
+# carried onto a copy only when it describes the copied file and lies within
+# the copy, so the copy's fold is the full fold of the copy's bytes either way.
+test_checkpoint_carries_onto_a_snapshot_copy_only_when_it_describes_it() {
+  local dir state status out
+  dir=$(make_case seeded-carry); state="$dir/state"; status="$state/task.status"
+  write_golden_corpus "$status"
+  printf '\n' >> "$status"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  mkdir -p "$dir/copy"
+  out=$(bash -c '
+    . "$1"
+    f=$2 copydir=$3
+    copy="$copydir/task.status"; ccf="$copydir/.task.open-decisions-cursor"
+    status_open_decisions_incremental "$f" >/dev/null
+    ident=$(_fm_open_decisions_file_ident "$f")
+    cp -p "$f" "$copy"; cp "$(dirname "$f")/task.meta" "$copydir/task.meta"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ -f "$ccf" ] || { echo "a describing checkpoint was not carried"; exit 1; }
+    grep -qx "ident=$(_fm_open_decisions_file_ident "$copy")" "$ccf" || { echo "carried checkpoint does not name the copy"; exit 1; }
+    reference=$(rm -f "$ccf.ref"; mv "$ccf" "$ccf.ref"; status_open_decisions "$copy"; mv "$ccf.ref" "$ccf")
+    [ "$(status_open_decisions "$copy")" = "$reference" ] || { echo "carried checkpoint changed the copy fold"; exit 1; }
+    rm -f "$ccf"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "strong:0:0:not-this-file"
+    [ ! -e "$ccf" ] || { echo "a checkpoint was carried under another identity"; exit 1; }
+    head -c 40 "$f" > "$copy"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ ! -e "$ccf" ] || { echo "a checkpoint past the copy end was carried"; exit 1; }
+    exit 0
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$status" "$dir/copy" 2>&1) || fail "checkpoint carry: $out"
+  pass "a fold checkpoint rides onto a snapshot copy only when it describes that copy"
+}
+
+# Opt-in golden check over real status logs: FM_FOLD_GOLDEN_DIRS names one or
+# more state directories (space separated). Each log is copied first, so the
+# check never writes beside the real log, then folded from line 1 and seeded
+# from checkpoints at several line boundaries; every result must be identical.
+test_golden_fold_equivalence_on_real_status_logs() {
+  local golden_dirs=${FM_FOLD_GOLDEN_DIRS:-} dir out count=0 f work
+  if [ -z "$golden_dirs" ]; then
+    pass "golden fold over real status logs skipped (set FM_FOLD_GOLDEN_DIRS to run it)"
+    return 0
+  fi
+  work="$TMP_ROOT/golden-real"
+  for dir in $golden_dirs; do
+    for f in "$dir"/*.status; do
+      [ -f "$f" ] && [ ! -L "$f" ] || continue
+      rm -rf "$work"; mkdir -p "$work"
+      cp "$f" "$work/task.status"
+      [ ! -f "${f%.status}.meta" ] || cp "${f%.status}.meta" "$work/task.meta"
+      out=$(bash -c '
+        . "$1"
+        f=$2 offsets=$3
+        cf="$(dirname "$f")/.task.open-decisions-cursor"
+        rm -f "$cf"
+        reference=$(status_open_decisions "$f")
+        for k in $offsets; do
+          rm -f "$cf"
+          incremental=$(status_open_decisions_incremental "$f" "$k")
+          seeded=$(status_open_decisions "$f")
+          [ "$seeded" = "$reference" ] || { echo "seeded at $k diverged"; exit 1; }
+        done
+        rm -f "$cf"
+        [ "$(status_open_decisions_incremental "$f")" = "$reference" ] || { echo "incremental diverged"; exit 1; }
+      ' _ "$ROOT/bin/fm-classify-lib.sh" "$work/task.status" \
+        "$(line_end_offsets "$work/task.status" | awk 'NR == 1 || NR % 500 == 0 { print } END { print }' | tr '\n' ' ')" 2>&1) \
+        || fail "golden fold diverged on $f: $out"
+      count=$((count + 1))
+    done
+  done
+  [ "$count" -gt 0 ] || fail "FM_FOLD_GOLDEN_DIRS named no status logs"
+  pass "golden fold: $count real status logs fold identically from line 1, seeded, and incrementally"
+}
+
 test_terminal_supersession_reaches_cached_drains
 test_kind_changes_invalidate_folded_decisions
+test_seeded_whole_file_fold_matches_a_fold_from_line_one
+test_seeded_fold_refuses_checkpoints_from_another_reading
+test_checkpoint_carries_onto_a_snapshot_copy_only_when_it_describes_it
+test_golden_fold_equivalence_on_real_status_logs
 test_truncated_log_falls_back_to_a_full_refold_not_a_dropped_decision
 test_same_size_rewrite_is_detected_via_inode_identity
 test_read_failure_preserves_state_for_retry

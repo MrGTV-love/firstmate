@@ -22,27 +22,8 @@ fi
 # shellcheck source=bin/fm-status-event-lib.sh
 . "$_FM_CLASSIFY_LIB_DIR/fm-status-event-lib.sh"
 
-# 4: verb parsing ends at the first "[name=value]" tag rather than only at a
-# "[key=...]" one, so lines carrying another bracketed tag first became opens
-# and closes.
-# 5: status_line_verb now also reads through an UNBRACKETED correlation token,
-# so lines that previously folded as ordinary status become opens and closes.
-# 6: a done/failed line on a ship or scout closes every open decision, and the
-# persisted version now carries the task kind, so cursors folded without that
-# terminal rule are discarded.
-# 7: that terminal rule now fires only for a line carrying a colon, so a cursor
-# folded when bare prose could close every open decision is discarded.
-# 8: a colonless line without a complete "[key=...]" token is no longer a
-# transition at all, so a cursor holding a phantom decision that bare prose
-# opened - which no later line could close - is discarded.
-# 9: the two colon tests read the line with its time tag stripped, so a
-# malformed worker stamp whose colons used to pose as the head/note separator
-# no longer opens or closes anything; cursors folded under that reading are
-# discarded.
-# Version 4 was already spent on the bracketed-tag parser change above, and a
-# cursor persisted under that reading predates this one, so it must still be
-# discarded and rebuilt from byte 0 under the new reading.
-FM_OPEN_DECISIONS_FOLD_VERSION=9
+# FM_OPEN_DECISIONS_FOLD_VERSION and its bump history live with the fold rule
+# they version, in bin/fm-status-decision-lib.sh.
 status_presentation_cursor_offset() {  # <status-file>
   local f=$1 state task manifest data row_task offset ident backstop extra cur_ident size legacy
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 1
@@ -145,7 +126,7 @@ status_open_decisions_cursor_offset() {  # <status-file>
   local f=$1 cf offset=0 ident='' version='' cursor_data first rest open=''
   local offset_line ident_line cur_ident size fold_version
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 1
-  fold_version="$FM_OPEN_DECISIONS_FOLD_VERSION:$(_fm_status_kind "$f")"
+  fold_version=$(_fm_open_decisions_fold_signature "$(_fm_status_kind "$f")")
   cf=$(_fm_open_decisions_cursor_path "$f")
   if [ -e "$cf" ] || [ -L "$cf" ]; then
     [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ] || return 1
@@ -246,7 +227,7 @@ status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>]
 status_line_is_unread_surface() {  # <status-line>
   local line=$1 verb key note resolve held prefix
   [ -n "$line" ] || return 1
-  verb=$(status_line_verb "$line")
+  status_line_verb "$line" verb
   [ "$verb" = note ] && return 0
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}

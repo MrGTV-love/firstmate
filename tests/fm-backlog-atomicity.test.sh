@@ -1966,6 +1966,42 @@ test_recovery_marks_an_owned_record_in_flight() {
   pass "session start marks an item In flight when this home already owns a worker for it"
 }
 
+# A locked session start used to read the backlog once per owned record, a node
+# process each, which dominated its cost on a home with many workers. One read of
+# the queued ids now tells it which records can need healing at all. Records
+# whose items are not queued are never read individually, and the last queued
+# item in the answer is still healed (a trailing delimiter was once dropped).
+test_recovery_reads_the_backlog_once_for_many_owned_records() {
+  local case_dir id n out real shows lists
+  case_dir=$(make_home heal-batched)
+  real=$(command -v tasks-axi)
+  for n in 1 2 3 4 5; do
+    id=atomic-batch-running-$n
+    add_item "$case_dir" "$id"
+    start_item "$case_dir" "$id"
+    write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-running-$n"
+  done
+  id=atomic-batch-queued-b9
+  add_item "$case_dir" "$id"
+  write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=batch-queued"
+  cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\${1:-}" >> "$case_dir/tasks-axi.calls"
+exec "$real" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/tasks-axi"
+  : > "$case_dir/tasks-axi.calls"
+
+  out=$(run_bootstrap "$case_dir")
+  [ "$(row_state "$case_dir" "$id")" = in_flight ] \
+    || fail "the last queued owned record was not healed from the batched answer: $out"
+  shows=$(grep -c '^show$' "$case_dir/tasks-axi.calls" || true)
+  lists=$(grep -c '^list$' "$case_dir/tasks-axi.calls" || true)
+  [ "$lists" = 1 ] || fail "expected one batched backlog read, saw $lists"
+  [ "$shows" -le 1 ] || fail "records whose items are not queued were still read one by one ($shows reads for six records)"
+  pass "session start reads the backlog once for many owned records and still heals a queued one"
+}
+
 test_recovery_rejects_an_internal_worker_record_symlink() {
   local case_dir home id target_id out rc=0
   id=atomic-heal-internal-symlink-b8
@@ -3339,6 +3375,7 @@ test_recovery_retries_when_a_close_marker_cannot_be_removed
 test_recovery_reports_an_owned_row_read_failure
 test_orca_cleanup_recovery_never_transitions_the_backlog
 test_recovery_marks_an_owned_record_in_flight
+test_recovery_reads_the_backlog_once_for_many_owned_records
 test_recovery_rejects_an_internal_worker_record_symlink
 test_recovery_ignores_a_symlinked_worker_record
 test_recovery_replays_a_close_an_interrupted_cleanup_left_open

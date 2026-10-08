@@ -280,6 +280,11 @@ done
 SESSION_START_STAGES='lock bootstrap wake-queue supervision-instructions read-once fleet-state network-checks context next-step'
 
 stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
+  # FM_SESSION_START_STAGE_TIMES_FILE, when set, also gets one "<seconds> <stage>"
+  # line per stage entered, where <seconds> counts from the start of this
+  # script. It exists so a slow session start can be measured stage by stage.
+  [ -z "${FM_SESSION_START_STAGE_TIMES_FILE:-}" ] \
+    || printf '%s %s\n' "$SECONDS" "$1" >> "$FM_SESSION_START_STAGE_TIMES_FILE" 2>/dev/null || true
   [ -n "${FM_SESSION_START_STAGE_FILE:-}" ] || return 0
   printf '%s\n' "$1" > "$FM_SESSION_START_STAGE_FILE" 2>/dev/null || true
 }
@@ -712,7 +717,7 @@ if [ "$READ_ONLY" -eq 0 ]; then
   # Publication is side-band and best-effort, so it can never change the
   # session-start result. A context re-emit is not another session start.
   if [ "$REEMIT" -eq 0 ]; then
-    "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
+    "$SCRIPT_DIR/fm-home-summary-refresh.sh" --detach || true
   fi
   # Every network call and the potentially slow inactive-outcome startup scan
   # are launched HERE, detached and bounded, so they run concurrently with the

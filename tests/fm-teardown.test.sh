@@ -834,12 +834,46 @@ test_local_only_fork_remote_allows() {
     || fail "fork-allow: post-teardown branch report recreated the retired task index"
   [ "$(cat "$case_dir/state/.branch-outcome-index-ready")" = 1 ] \
     || fail "fork-allow: post-teardown branch report did not publish its ready sequence"
-  jq -e --arg id task-x1 '
+  fm_test_wait_until 60 jq -e --arg id task-x1 '
     .schema == "fm-secondmate-home-summary.v1"
     and all(.endpoints[]; .id != $id)
-  ' "$case_dir/state/home-summary.json" >/dev/null \
+  ' "$case_dir/state/home-summary.json" \
     || fail "successful task teardown did not publish the task's removal from the home summary ledger"
   pass "local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed"
+}
+
+# A successful teardown publishes the home summary only as a side effect, so it
+# must not wait for a refresh already in flight. Hold the refresh lock with a
+# 20-second deadline: a blocking trigger would wait that deadline out and record
+# a failure; a detached one records nothing and leaves its marker.
+test_teardown_does_not_wait_for_the_home_summary_refresh() {
+  local case_dir rc holder marker
+  case_dir=$(make_case summary-detach)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "fix the thing"
+  add_fork_with_pushed_branch "$case_dir"
+  marker="$case_dir/state/.test-summary-lock-held"
+  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_acquire_wait "$2/state/.home-summary-refresh.lock"
+    : > "$3"
+    sleep 120
+  ' _ "$ROOT" "$case_dir" "$marker" &
+  holder=$!
+  fm_test_wait_until 20 test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
+  set +e
+  FM_HOME_SUMMARY_TIMEOUT=20 run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "teardown should succeed with a refresh in flight"
+  fm_test_wait_until 60 test -e "$case_dir/state/.home-summary-refresh.pending" \
+    || { kill "$holder" 2>/dev/null; fail "the teardown trigger left no marker for the refresh in flight"; }
+  sleep 2
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  [ ! -s "$case_dir/state/.home-summary-refresh.log" ] \
+    || fail "teardown waited out a refresh and recorded a failure: $(cat "$case_dir/state/.home-summary-refresh.log")"
+  pass "teardown does not wait for the home summary refresh"
 }
 
 test_teardown_closes_the_backlog_item_itself() {
@@ -5370,6 +5404,7 @@ test_retained_sources_still_reach_the_ordinary_refusal
 test_process_refusal_has_no_close_replay_authority
 test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_fork_remote_allows
+test_teardown_does_not_wait_for_the_home_summary_refresh
 test_teardown_closes_the_backlog_item_itself
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator
 test_local_only_truly_unpushed_refuses

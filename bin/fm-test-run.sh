@@ -777,7 +777,7 @@ tests/fm-herdr-pi-stale-registration-live-e2e.test.sh 47
 tests/fm-herdr-session-cleanup.test.sh 6828
 tests/fm-herdr-submit-confirm-live-e2e.test.sh 46
 tests/fm-herdr-version-floor-live-e2e.test.sh 72
-tests/fm-home-summary-refresh.test.sh 37264
+tests/fm-home-summary-refresh.test.sh 68000
 tests/fm-host-mirror.test.sh 10591
 tests/fm-inactive-reconcile.test.sh 53178
 tests/fm-inbox.test.sh 5227
