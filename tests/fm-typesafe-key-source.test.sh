@@ -50,6 +50,24 @@ printf 'schema=fm-secondmate-parent.v1\nroute=local\n' > "$CREW_HOME/.fm-secondm
 link_home "$CREW_HOME" "$LANE"
 pass "remote, malformed and absent bindings stay off"
 
+# resolve_openrouter <home> [env-key]: prints the resolved fallback key, or "absent".
+resolve_openrouter() {
+  # shellcheck disable=SC2016 # the child shell script is intentionally single-quoted.
+  env -u OPENROUTER_API_KEY ${2:+OPENROUTER_API_KEY=$2} bash -c '
+    . "$1/bin/fm-typesafe-lib.sh"
+    if fm_openrouter_key "$2"; then printf %s "$OPENROUTER_API_KEY_PRIVATE"; else printf absent; fi
+  ' _ "$ROOT" "$1"
+}
+
+printf 'TYPESAFE_API_KEY=primary-key\nOPENROUTER_API_KEY=primary-or\n' > "$PRIMARY/.env"
+[ "$(resolve_openrouter "$CREW_HOME")" = primary-or ] || fail "nested home without .env did not resolve the primary OpenRouter key"
+printf 'OPENROUTER_API_KEY=lane-or\n' > "$LANE/.env"
+[ "$(resolve_openrouter "$LANE")" = lane-or ] || fail "own .env did not win for the OpenRouter key"
+rm -f "$LANE/.env"
+[ "$(resolve_openrouter "$REMOTE" env-or)" = absent ] || fail "the OpenRouter key must not come from the process environment or a remote binding"
+printf 'TYPESAFE_API_KEY=primary-key\n' > "$PRIMARY/.env"
+pass "the OpenRouter fallback key resolves from own, then primary .env, never the environment"
+
 # The jev-guard hook is a separate process; it must reach the primary key too.
 cat > "$TMP_ROOT/fake-jev.mjs" <<'JS'
 import { createServer } from 'node:http';

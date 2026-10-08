@@ -1697,7 +1697,7 @@ On Claude the banner arrives as added context next to the unchanged output, beca
 
 The guard sends the command, the written content (first 4,000 characters) and the tool output (first 6,000 characters) to TypeSafe.
 It calls TypeSafe direct first, with the single primary-home `TYPESAFE_API_KEY` resolved at call time through `fm_typesafe_key`; no key ever enters the worker environment.
-Only when the direct call is unavailable or fails does it ask OpenRouter, with `OPENROUTER_API_KEY` read through `fm_openrouter_key` from the same `.env`; with no such key there is no fallback call.
+Only when the direct call is unavailable or fails does it ask OpenRouter, with `OPENROUTER_API_KEY` read through `fm_openrouter_key` from the same home and primary-home `.env` files, never from the process environment; with no such key there is no fallback call.
 A request whose text matches the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key) is withheld from both.
 A withheld request, missing keys, an exhausted upstream retry budget of 30 seconds per provider, or any other failure lets the tool call proceed, as upstream does.
 Each decision appends one line to the owning home's private `state/jev-guard.jsonl`, with answers, usage, model, answering provider and latency but without the request body.
