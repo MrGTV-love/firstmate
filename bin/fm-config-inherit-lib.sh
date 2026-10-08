@@ -1417,6 +1417,7 @@ fm_config_send_reread_nudge() {
   local dest_home_abs state source_home_abs changed_items pending_paths stage_paths delivery_paths
   local stage_path instruction_path current_stage_path exact_tmp
   local send_failures retry_report_paths retry_report_path retry_stage_path retry_record_path
+  local retry_item retry_status retry_reason retry_retired retry_unrelated retry_rebuildable
   [ -n "$id" ] || return 1
   [ -n "$dest_home" ] || return 1
   [ -n "$report" ] && [ -f "$report" ] || return 1
@@ -1452,13 +1453,26 @@ fm_config_send_reread_nudge() {
       rm -f "$retry_report_path" 2>/dev/null || send_failures=1
       continue
     fi
-    if [ -z "$(fm_config_reread_changed_items "$retry_report_path")" ]; then
+    retry_retired=0
+    retry_unrelated=0
+    retry_rebuildable=1
+    while IFS=$'\t' read -r retry_item retry_status retry_reason; do
+      [ "$retry_status" = pushed ] || continue
+      if [ "$retry_item" = keep-ai-trailers ]; then
+        retry_retired=1
+      else
+        retry_unrelated=1
+        fm_config_reread_is_allowlisted_item "$retry_item" || retry_rebuildable=0
+      fi
+    done < "$retry_report_path"
+    if [ "$retry_retired" -eq 1 ] && [ "$retry_unrelated" -eq 0 ]; then
       rm -f "$retry_report_path" 2>/dev/null || send_failures=1
       if [ -f "$retry_stage_path" ] && [ ! -L "$retry_stage_path" ] && [ ! -s "$retry_stage_path" ]; then
         rm -f "$retry_stage_path" 2>/dev/null || send_failures=1
       fi
       continue
     fi
+    [ "$retry_rebuildable" -eq 1 ] || continue
     if fm_config_write_reread_instruction "$dest_home_abs" "$retry_report_path" "$retry_stage_path"; then
       rm -f "$retry_report_path" 2>/dev/null || send_failures=1
       if [ -n "$stage_paths" ]; then

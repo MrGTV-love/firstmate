@@ -1759,6 +1759,7 @@ It uses the same live secondmate discovery and propagation helper as bootstrap; 
 
 - When an allowlisted config item changes for an already-running local home, it sends the literal-content reread pointer described in [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); unchanged allowlisted config sends no pointer unless a previous delivery is pending.
 - `config-reread: sent` reports a successfully enqueued reread pointer, not successful retirement of obsolete pending instructions; retirement without delivery is silent in both focused push and bootstrap.
+- A retained reread report retires only obsolete `keep-ai-trailers` changes. If an unrelated pushed item is temporarily excluded from propagation, the whole report and any empty retry stage remain intact until all unrelated items are eligible for reconstruction, so an invalid routing pair cannot erase or partially deliver its pending reread.
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
 - The locked bootstrap inheritance pass uses the same placement-specific behavior; see `secondmate-provisioning` for the single contract owner.
 - That live discovery starts from `state/*.meta` records with `kind=secondmate`; `data/secondmates.md` only backfills `home=` for older or incomplete meta records.

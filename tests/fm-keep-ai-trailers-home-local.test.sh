@@ -437,6 +437,91 @@ test_retained_retry_case() (
   pass "$representation $contents retry removes retained home-local ABSENT instructions and converges"
 )
 
+test_excluded_report_retry_case() (
+  local representation=$1 contents=$2 base source home bin retry_dir stage retained report original_allowlist
+  local expected out status interface item
+  base="$TMP_ROOT/excluded-report-$representation-$contents"
+  source="$base/source"
+  home="$base/lane"
+  mkdir -p "$source/state" "$source/config" "$home/state" "$home/config" "$base/tmp"
+  printf 'lane choice\n' > "$base/lane-flag.expected"
+  cp "$base/lane-flag.expected" "$home/config/$FLAG"
+  printf 'primary choice\n' > "$source/config/$FLAG"
+  printf '{\r\n  "models": ["destination"],\r\n  "spacing": "keep  two spaces"\r\n}\r\n\n' > "$home/config/model-index.json"
+  printf '{"default":{"harness":"destination"}}  \n\n' > "$home/config/crew-dispatch.json"
+  printf 'destination-harness\n' > "$home/config/crew-harness"
+  for item in model-index.json crew-dispatch.json crew-harness; do
+    printf 'different source bytes\n' > "$source/config/$item"
+  done
+  bin=$(make_retry_boundary "$base")
+  . "$bin/fm-config-inherit-lib.sh"
+  original_allowlist=$FM_INHERITABLE_CONFIG
+  export PATH="$BASE_PATH" FM_HOME="$source" FM_STATE_OVERRIDE="$source/state" FM_ROOT_OVERRIDE="$base"
+  export TMPDIR="$base/tmp" FM_DELIVERY_DIR="$base/delivery" FM_DELIVERY_FAIL=0
+  retry_dir=$(fm_config_reread_retry_dir "$source" sm) || fail 'cannot derive excluded-report retry directory'
+  mkdir -p "$retry_dir"
+  stage="$retry_dir/.fm-inherited-config-reread.retained"
+  retained="$stage.report"
+  {
+    printf 'model-index.json\tpushed\t\n'
+    printf 'crew-dispatch.json\tpushed\t\n'
+    if [ "$contents" = mixed ]; then
+      printf 'crew-harness\tpushed\t\n'
+      printf '%s\tpushed\tmirrored primary absence\n' "$FLAG"
+    fi
+  } > "$retained"
+  cp "$retained" "$base/report.expected"
+  if [ "$representation" = empty-stage ]; then
+    : > "$stage"
+    cp "$stage" "$base/stage.expected"
+  fi
+  report="$base/unchanged.report"
+  : > "$report"
+  export FM_INHERITABLE_CONFIG=crew-harness
+  for interface in convergence queue-drain; do
+    if [ "$interface" = convergence ]; then
+      out=$(fm_config_send_reread_nudge sm "$home" "$report" 2>&1); status=$?
+    else
+      out=$(fm_config_reread_retry_pending sm "$home" 2>&1); status=$?
+    fi
+    expect_code 0 "$status" "$representation $contents $interface: deferred recovery failed: $out"
+    cmp -s "$base/report.expected" "$retained" \
+      || fail "$representation $contents $interface: excluded routing report changed or disappeared"
+    if [ "$representation" = empty-stage ]; then
+      cmp -s "$base/stage.expected" "$stage" \
+        || fail "$representation $contents $interface: empty stage changed or disappeared"
+    else
+      [ ! -e "$stage" ] || fail "$representation $contents $interface: report-only recovery created a stage"
+    fi
+    [ ! -e "$FM_DELIVERY_DIR/count" ] \
+      || fail "$representation $contents $interface: deferred report delivered an excluded or partial payload"
+    ! grep -q 'config-reread: sent' <<< "$out" \
+      || fail "$representation $contents $interface: deferred recovery was reported as sent"
+    assert_flag_kept "$home" "$base/lane-flag.expected" "$representation $contents $interface"
+  done
+  expected="$base/delivery.expected"
+  {
+    printf '%s\n' "$FM_CONFIG_REREAD_FRAMING"
+    write_recorded_block config/model-index.json "$home/config/model-index.json"
+    write_recorded_block config/crew-dispatch.json "$home/config/crew-dispatch.json"
+    if [ "$contents" = mixed ]; then
+      write_recorded_block config/crew-harness "$home/config/crew-harness"
+    fi
+  } > "$expected"
+  export FM_INHERITABLE_CONFIG="$original_allowlist"
+  out=$(fm_config_reread_retry_pending sm "$home" 2>&1); status=$?
+  expect_code 0 "$status" "$representation $contents: restored allowlist retry failed: $out"
+  assert_contains "$out" '  config-reread: sent' "$representation $contents: restored retry was not reported as sent"
+  [ "$(cat "$FM_DELIVERY_DIR/count" 2>/dev/null)" = 1 ] \
+    || fail "$representation $contents: restored retry did not deliver exactly once"
+  cmp -s "$expected" "$FM_DELIVERY_DIR/attempt.1" \
+    || fail "$representation $contents: restored transport did not preserve exact destination routing/harness bytes"
+  assert_no_reread_mentions_flag "$home/state" "$representation $contents restored"
+  assert_retry_retired "$home" "$source" "$representation $contents restored"
+  assert_flag_kept "$home" "$base/lane-flag.expected" "$representation $contents restored"
+  pass "$representation $contents report recovery waits for the complete allowlist before delivering destination bytes"
+)
+
 test_retired_only_command() (
   local point=$1 rec w root home sm retained absent out status path
   rec=$(new_world "$point-retired-only")
@@ -486,6 +571,11 @@ done
 for representation in pending staged staged-pending exact-temp legacy-report; do
   for contents in mixed flag-only; do
     test_retained_retry_case "$representation" "$contents"
+  done
+done
+for representation in report-only empty-stage; do
+  for contents in routing-only mixed; do
+    test_excluded_report_retry_case "$representation" "$contents"
   done
 done
 
