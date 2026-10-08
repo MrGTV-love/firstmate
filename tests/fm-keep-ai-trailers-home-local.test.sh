@@ -340,8 +340,11 @@ test_retained_retry_case() (
   printf '{"default":{"harness":"newer-destination"}}\n' > "$home/config/crew-dispatch.json"
   printf 'even-newer-source\n' > "$source/config/crew-dispatch.json"
   bin=$(make_retry_boundary "$base")
+  # shellcheck source=/dev/null
   . "$bin/fm-config-inherit-lib.sh"
+  # shellcheck disable=SC2030 # Fixture overrides intentionally stay in this test subshell.
   export PATH="$BASE_PATH" FM_HOME="$source" FM_STATE_OVERRIDE="$source/state" FM_ROOT_OVERRIDE="$base"
+  # shellcheck disable=SC2030 # Delivery overrides intentionally stay in this test subshell.
   export FM_DELIVERY_DIR="$base/delivery" FM_DELIVERY_FAIL=1
   retry_dir=$(fm_config_reread_retry_dir "$source" sm) || fail 'cannot derive retry directory'
   mkdir -p "$retry_dir"
@@ -456,9 +459,12 @@ test_excluded_report_retry_case() (
     printf 'different source bytes\n' > "$source/config/$item"
   done
   bin=$(make_retry_boundary "$base")
+  # shellcheck source=/dev/null
   . "$bin/fm-config-inherit-lib.sh"
   original_allowlist=$FM_INHERITABLE_CONFIG
+  # shellcheck disable=SC2031 # This test sets its own environment independently of earlier subshells.
   export PATH="$BASE_PATH" FM_HOME="$source" FM_STATE_OVERRIDE="$source/state" FM_ROOT_OVERRIDE="$base"
+  # shellcheck disable=SC2031 # This test sets its own delivery environment independently of earlier subshells.
   export TMPDIR="$base/tmp" FM_DELIVERY_DIR="$base/delivery" FM_DELIVERY_FAIL=0
   retry_dir=$(fm_config_reread_retry_dir "$source" sm) || fail 'cannot derive excluded-report retry directory'
   mkdir -p "$retry_dir"

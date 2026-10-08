@@ -1417,7 +1417,7 @@ fm_config_send_reread_nudge() {
   local dest_home_abs state source_home_abs changed_items pending_paths stage_paths delivery_paths
   local stage_path instruction_path current_stage_path exact_tmp
   local send_failures retry_report_paths retry_report_path retry_stage_path retry_record_path
-  local retry_item retry_status retry_reason retry_retired retry_unrelated retry_rebuildable
+  local retry_item retry_status _retry_reason retry_retired retry_unrelated retry_rebuildable
   [ -n "$id" ] || return 1
   [ -n "$dest_home" ] || return 1
   [ -n "$report" ] && [ -f "$report" ] || return 1
@@ -1456,7 +1456,7 @@ fm_config_send_reread_nudge() {
     retry_retired=0
     retry_unrelated=0
     retry_rebuildable=1
-    while IFS=$'\t' read -r retry_item retry_status retry_reason; do
+    while IFS=$'\t' read -r retry_item retry_status _retry_reason; do
       [ "$retry_status" = pushed ] || continue
       [ "$retry_item" != "$FM_SHARED_CAPTAIN_REL" ] || continue
       if [ "$retry_item" = keep-ai-trailers ]; then
