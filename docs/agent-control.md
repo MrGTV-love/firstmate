@@ -156,6 +156,7 @@ The shared attribution guard requires that active file to resolve to the recorde
 - The composer scanner family "pasted omp frame inside a draft / unsafe Enter variants" is a documented known limit tracked by follow-up fm-omp-composer-pasted-frame-variants.
 Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
 Cancelled or rolled-back switches and branches restore the predecessor proof only after omp's session transition settles and only if no newer transition or shutdown intervened.
+The transition owner is the unique registered session sharing the extension's session manager, so cancellation recovery does not require the agent identity absent from omp 18.1.20 contexts.
 This inspection does not change Herdr's session-wide auto-resume setting.
 The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
 

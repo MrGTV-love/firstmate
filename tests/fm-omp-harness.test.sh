@@ -852,7 +852,7 @@ test_task_session_proof_tracks_active_session() {
   printf '{"type":"module","exports":{"./registry/agent-registry":"./registry.js"}}\n' > "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent/package.json"
   cat > "$case_dir/extension/node_modules/@oh-my-pi/pi-coding-agent/registry.js" <<'EOF'
 export class AgentRegistry {
-  static global() { return { get(id) { return id === "Main" ? { session: globalThis.proofSession } : undefined; } }; }
+  static global() { return { list() { return globalThis.proofRefs; } }; }
 }
 EOF
   FM_PROOF_CASE="$case_dir" EXT="$case_dir/extension/fm-task-session.ts" node --input-type=module <<'EOF'
@@ -877,18 +877,22 @@ let file = task;
 const ctx = { agent: { kind: "main", id: "Main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
 let transitionSettled = Promise.resolve();
 globalThis.proofSession = { sessionManager: ctx.sessionManager, waitForSessionTransition() { globalThis.proofWaitStarted?.(); return transitionSettled; } };
+globalThis.proofRefs = [{ session: null }, { session: { sessionManager: {} } }, { session: globalThis.proofSession }];
 const flush = () => new Promise(resolve => setImmediate(resolve));
-const start = () => handlers.get("session_start")({}, ctx);
+const start = (context = ctx) => handlers.get("session_start")({}, context);
 const stop = () => handlers.get("session_shutdown")({}, ctx);
 const beforeSwitch = () => handlers.get("session_before_switch")({ targetSessionFile: personal, reason: "resume" }, ctx);
 const afterSwitch = () => handlers.get("session_switch")({ previousSessionFile: task, reason: "resume" }, ctx);
 const record = () => JSON.parse(readFileSync(`${state}/demo.omp-session.json`, "utf8"));
-const begin = event => {
+const begin = (event, context = ctx) => {
   let settle, started;
   transitionSettled = new Promise(resolve => { settle = resolve; });
-  const waiting = new Promise(resolve => { started = resolve; });
+  const waiting = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${event} did not await its transition owner`)), 5000);
+    started = () => { clearTimeout(timeout); resolve(); };
+  });
   globalThis.proofWaitStarted = started;
-  handlers.get(event)({}, ctx);
+  handlers.get(event)({}, context);
   return { settle, waiting };
 };
 assert.equal(existsSync(task), false);
@@ -906,28 +910,30 @@ for (const childFile of [personal, undefined]) {
     assert.deepEqual(record(), parentProof, `${event} from ${childFile ? "persisted" : "in-memory"} child must preserve parent proof`);
   }
 }
-for (const event of ["session_before_switch", "session_before_branch"]) {
-  for (const outcome of ["cancel", "rollback", "rollback-after-activation"]) {
-    for (const predecessor of [task, personal]) {
-      file = predecessor; start();
-      const prior = record();
-      const { settle, waiting } = begin(event);
-      assert.equal(record().current_session_file, "");
-      await waiting;
-      assert.equal(record().current_session_file, "", `${event} must remain unproven while pending`);
-      if (outcome !== "cancel") {
-        file = predecessor === task ? personal : task;
-        if (outcome === "rollback-after-activation") {
-          handlers.get(event === "session_before_switch" ? "session_switch" : "session_branch")({}, ctx);
-          assert.equal(record().current_session_file, realpathSync(file));
+for (const context of [ctx, { sessionManager: ctx.sessionManager, ui: ctx.ui }]) {
+  for (const event of ["session_before_switch", "session_before_branch"]) {
+    for (const outcome of ["cancel", "rollback", "rollback-after-activation"]) {
+      for (const predecessor of [task, personal]) {
+        file = predecessor; start(context);
+        const prior = record();
+        const { settle, waiting } = begin(event, context);
+        assert.equal(record().current_session_file, "");
+        await waiting;
+        assert.equal(record().current_session_file, "", `${event} must remain unproven while pending`);
+        if (outcome !== "cancel") {
+          file = predecessor === task ? personal : task;
+          if (outcome === "rollback-after-activation") {
+            handlers.get(event === "session_before_switch" ? "session_switch" : "session_branch")({}, context);
+            assert.equal(record().current_session_file, realpathSync(file));
+          }
+          await flush();
+          assert.equal(record().current_session_file, outcome === "rollback" ? "" : realpathSync(file));
+          file = predecessor;
         }
+        settle();
         await flush();
-        assert.equal(record().current_session_file, outcome === "rollback" ? "" : realpathSync(file));
-        file = predecessor;
+        assert.deepEqual(record(), prior, `${event} ${outcome} must restore only the settled predecessor`);
       }
-      settle();
-      await flush();
-      assert.deepEqual(record(), prior, `${event} ${outcome} must restore only the settled predecessor`);
     }
   }
 }
@@ -968,6 +974,21 @@ file = task; handlers.get("session_branch")({ previousSessionFile: personal }, c
 assert.equal(record().current_session_file, record().task_session_file);
 const originalWarn = console.warn; console.warn = () => {};
 try {
+  await flush();
+  const registered = globalThis.proofRefs;
+  for (const event of ["session_before_switch", "session_before_branch"]) {
+    for (const refs of [registered.slice(0, 2), [...registered, { session: globalThis.proofSession }]]) {
+      start();
+      globalThis.proofRefs = refs;
+      const count = warnings.length;
+      handlers.get(event)({}, { sessionManager: ctx.sessionManager, ui: ctx.ui });
+      await flush();
+      assert.equal(record().current_session_file, "", `${event} must not restore without a unique owner`);
+      assert.equal(warnings.length, count + 1);
+      globalThis.proofRefs = registered;
+    }
+  }
+  start();
   beforeSwitch();
   file = `${linkedSessions}/absent.jsonl`;
   afterSwitch();

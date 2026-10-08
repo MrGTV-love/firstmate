@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 
-type Context = { agent?: { kind: string; id?: string }; sessionManager?: { getSessionFile?: () => string | undefined }; ui?: { notify?: (message: string, level: string) => void } };
+type Context = { agent?: { kind: string }; sessionManager?: { getSessionFile?: () => string | undefined }; ui?: { notify?: (message: string, level: string) => void } };
 type Proof = { version: 1; spawn_gen: string; pid: number; task_session_file: string; current_session_file: string };
 type API = { on?: (event: string, handler: (event: unknown, ctx: Context) => void) => void };
 
@@ -144,8 +144,9 @@ export function installTaskSessionProof(pi: API, state: string, id: string): voi
   for (const event of ["session_before_switch", "session_before_branch"]) {
     pi.on?.(event, (_event, ctx) => proof.before(ctx, async () => {
       const { AgentRegistry } = await import("@oh-my-pi/pi-coding-agent/registry/agent-registry");
-      const session = ctx.agent?.id ? AgentRegistry.global().get(ctx.agent.id)?.session : undefined;
-      if (!session || session.sessionManager !== ctx.sessionManager) throw new Error("active session transition owner is unavailable");
+      const owners = AgentRegistry.global().list().filter(ref => ref.session && ref.session.sessionManager === ctx.sessionManager);
+      const session = owners.length === 1 ? owners[0].session : undefined;
+      if (!session) throw new Error("active session transition owner is unavailable");
       await session.waitForSessionTransition();
     }));
   }
