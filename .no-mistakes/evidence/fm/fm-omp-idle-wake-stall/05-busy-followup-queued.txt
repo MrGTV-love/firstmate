@@ -1,0 +1,144 @@
+
+                                                                ████████████
+                                                                   ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                   ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                   ▒▒  ██                  █
+                                                                       ██       v18.8.1
+
+                                            Tip: Lint/type errors piling up? `omp cleanse` (or /cleanse right here)
+                                              hunts project diagnostics and fixes them with parallel subagents — ⎋
+                                                                            cancels
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.5 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ LIVE-INIT reply ack and arrange advisor note
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-lock.sh                                                                                                                                             │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ lock acquired: harness pid 33445                                                                                                                             │
+│ ⟦Wall: 3.28s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ • Arm firstmate watcher
+ watcher: started omp extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_omp again only after a later notification says the cycle…
+ ⟦⌃O: Expand⟧
+
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791474021   1   check   open-loop-ledger   check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)                             │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 85571.1791474022.I9RfaK                           │
+│ ⟦Wall: 2.71s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 85571.1791474022.I9RfaK                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                  │
+│ ⟦Wall: 0.85s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ LIVE-ADVISE-1 reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ LIVE-ADVISOR-TAIL LIVE-ADVISE-1 verify before finishing.
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.wake-live/home/state/idleempty.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791474065   3   signal   idleempty.status   signal:                                                                                                         │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.wake-live/home/state/idleempty.status                                 │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 77297.1791474063.EwFcE4                           │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idleempty.status: done: isolated wake idleempty                                     │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                   │
+│ idleempty done: isolated wake idleempty                                                                                                                      │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                   │
+│ ⟦Wall: 13.06s | Timeout: 300s⟧                                                                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 77297.1791474063.EwFcE4                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                  │
+│ ⟦Wall: 1.93s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ LIVE-ADVISE-2 reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ LIVE-ADVISOR-TAIL LIVE-ADVISE-2 verify before finishing.
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.wake-live/home/state/idledraft.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791474106   5   signal   idledraft.status   signal:                                                                                                         │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.wake-live/home/state/idledraft.status                                 │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 98715.1791474106.0vqlvn                           │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: idledraft.status: done: isolated wake idledraft                                     │
+│ STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):                                                                   │
+│ idledraft done: isolated wake idledraft                                                                                                                      │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                   │
+│ ⟦Wall: 5.42s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 98715.1791474106.0vqlvn                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                  │
+│ ⟦Wall: 0.71s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ LIVE-BUSY stream slowly
+
+
+ ack
+
+  ⎋ Working…
+ ⠧ 23s > ⬢ m1 👁 > 🌳 32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV > ⑂ detached ?1 ▶──────8%─────────────────────────────────────────────────╎───────┃───────────200K─
+╰─

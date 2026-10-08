@@ -1,0 +1,176 @@
+[
+  {
+    "at": 1791473987.823327,
+    "event": "observed",
+    "label": "omp ready"
+  },
+  {
+    "at": 1791474016.816043,
+    "event": "observed",
+    "label": "real watcher armed and beating"
+  },
+  {
+    "at": 1791474033.491286,
+    "event": "observed",
+    "label": "startup check fully acknowledged before advisor stimulus"
+  },
+  {
+    "at": 1791474046.383172,
+    "event": "observed",
+    "label": "advisor note posted after settled startup"
+  },
+  {
+    "at": 1791474051.6772459,
+    "event": "capture",
+    "label": "01-idle-advisor-before"
+  },
+  {
+    "at": 1791474051.687556,
+    "event": "status_written",
+    "name": "idleempty"
+  },
+  {
+    "at": 1791474074.975341,
+    "event": "observed",
+    "label": "empty-composer idle wake reached model"
+  },
+  {
+    "at": 1791474089.353091,
+    "event": "observed",
+    "label": "idleempty own queue acknowledged"
+  },
+  {
+    "at": 1791474089.372164,
+    "event": "capture",
+    "label": "02-idle-empty-drained"
+  },
+  {
+    "at": 1791474095.9487722,
+    "event": "observed",
+    "label": "fresh advisor tail before operator draft"
+  },
+  {
+    "at": 1791474103.3118238,
+    "event": "capture",
+    "label": "03-operator-draft-before"
+  },
+  {
+    "at": 1791474103.312413,
+    "event": "status_written",
+    "name": "idledraft"
+  },
+  {
+    "at": 1791474127.47119,
+    "event": "observed",
+    "label": "draft-composer idle wake reached model"
+  },
+  {
+    "at": 1791474133.446672,
+    "event": "observed",
+    "label": "idledraft own queue acknowledged"
+  },
+  {
+    "at": 1791474135.627949,
+    "event": "capture",
+    "label": "04-idle-draft-preserved"
+  },
+  {
+    "at": 1791474135.628059,
+    "event": "scenario_pass",
+    "name": "idle wake preserves unsent operator draft"
+  },
+  {
+    "at": 1791474137.652918,
+    "event": "stream_started",
+    "seconds": 60
+  },
+  {
+    "at": 1791474138.147393,
+    "event": "observed",
+    "label": "real omp streaming turn running"
+  },
+  {
+    "at": 1791474138.148011,
+    "event": "status_written",
+    "name": "busywake"
+  },
+  {
+    "at": 1791474141.38347,
+    "event": "observed",
+    "label": "busy own wake durable while stream remains open"
+  },
+  {
+    "at": 1791474161.693465,
+    "event": "capture",
+    "label": "05-busy-followup-queued"
+  },
+  {
+    "at": 1791474197.79261,
+    "event": "stream_finished"
+  },
+  {
+    "at": 1791474198.053958,
+    "event": "observed",
+    "label": "busy followup reached model"
+  },
+  {
+    "at": 1791474201.9454222,
+    "event": "observed",
+    "label": "busy own queue acknowledged"
+  },
+  {
+    "at": 1791474201.956574,
+    "event": "capture",
+    "label": "06-busy-followup-drained"
+  },
+  {
+    "at": 1791474201.9566321,
+    "event": "scenario_pass",
+    "name": "wake during streaming queues then drains"
+  },
+  {
+    "at": 1791474205.0797179,
+    "event": "status_written",
+    "name": "repeatone"
+  },
+  {
+    "at": 1791474209.575243,
+    "event": "observed",
+    "label": "repeatone received"
+  },
+  {
+    "at": 1791474216.115226,
+    "event": "observed",
+    "label": "repeatone acknowledged"
+  },
+  {
+    "at": 1791474219.2424572,
+    "event": "status_written",
+    "name": "repeattwo"
+  },
+  {
+    "at": 1791474254.978739,
+    "event": "observed",
+    "label": "repeattwo received"
+  },
+  {
+    "at": 1791474270.876889,
+    "event": "observed",
+    "label": "repeattwo acknowledged"
+  },
+  {
+    "at": 1791474270.918179,
+    "event": "capture",
+    "label": "07-repeated-idle-wakes"
+  },
+  {
+    "at": 1791474270.918306,
+    "event": "scenario_pass",
+    "name": "successor watcher drains consecutive idle wakes"
+  },
+  {
+    "at": 1791474271.731122,
+    "event": "teardown",
+    "private_tmux_stopped": true
+  }
+]

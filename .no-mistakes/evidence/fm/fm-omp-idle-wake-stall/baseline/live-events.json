@@ -1,0 +1,63 @@
+[
+  {
+    "at": 1791473787.9865658,
+    "event": "observed",
+    "label": "omp ready"
+  },
+  {
+    "at": 1791473844.416609,
+    "event": "observed",
+    "label": "real watcher armed and beating"
+  },
+  {
+    "at": 1791473888.8785532,
+    "event": "observed",
+    "label": "startup check fully acknowledged before advisor stimulus"
+  },
+  {
+    "at": 1791473904.6450071,
+    "event": "observed",
+    "label": "advisor note posted after settled startup"
+  },
+  {
+    "at": 1791473910.4417331,
+    "event": "capture",
+    "label": "01-idle-advisor-before"
+  },
+  {
+    "at": 1791473910.44381,
+    "event": "status_written",
+    "name": "idleempty"
+  },
+  {
+    "at": 1791473922.727256,
+    "event": "observed",
+    "label": "baseline own wake durably queued"
+  },
+  {
+    "at": 1791473967.914407,
+    "event": "capture",
+    "label": "baseline-idle-stalled"
+  },
+  {
+    "at": 1791473967.914498,
+    "event": "baseline_failure_reproduced",
+    "unread_wake": true,
+    "model_received_wake": false
+  },
+  {
+    "at": 1791473969.138806,
+    "event": "observed",
+    "label": "manual prompt releases baseline wake"
+  },
+  {
+    "at": 1791473969.148109,
+    "event": "capture",
+    "label": "baseline-manual-prompt-releases"
+  },
+  {
+    "at": 1791473969.622854,
+    "event": "teardown",
+    "private_tmux_stopped": true
+  }
+]

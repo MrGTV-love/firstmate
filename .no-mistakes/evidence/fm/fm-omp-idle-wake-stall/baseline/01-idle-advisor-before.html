@@ -1,0 +1,69 @@
+<!doctype html><meta charset="utf-8"><title>01-idle-advisor-before</title><body style="background:#151515;color:#ddd"><pre style="font:14px monospace;white-space:pre-wrap">
+                                                                ████████████
+                                                                   ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                   ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                   ▒▒  ██                  █
+                                                                       ██       v18.8.1
+
+                                                        Tip: Try task isolation to create CoW worktrees
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.5 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ LIVE-INIT reply ack and arrange advisor note
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-lock.sh                                                                                                                                             │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ lock acquired: harness pid 76201                                                                                                                             │
+│ ⟦Wall: 11.06s | Timeout: 300s⟧                                                                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ • Arm firstmate watcher
+ watcher: started omp extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_omp again only after a later notification says the cycle…
+ ⟦⌃O: Expand⟧
+
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791473861   1   check   open-loop-ledger   check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)                             │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 27472.1791473862.PDqlst                           │
+│ ⟦Wall: 11.23s | Timeout: 300s⟧                                                                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 27472.1791473862.PDqlst                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                  │
+│ ⟦Wall: 2.82s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ LIVE-ADVISE-1 reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ LIVE-ADVISOR-TAIL LIVE-ADVISE-1 verify before finishing.
+
+ π &gt; ⬢ m1 🙈 &gt; 🌳 32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV &gt; ⑂ detached ?1 ▶──────8%────────────────────────────────────────────────────╎───────┃───────────200K─
+╰─
+</pre></body>

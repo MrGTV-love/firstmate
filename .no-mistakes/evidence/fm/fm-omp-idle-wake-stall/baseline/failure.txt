@@ -1,0 +1,103 @@
+
+                                                                ████████████
+                                                                   ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                   ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                   ▒▒  ██                  █
+                                                                       ██       v18.8.1
+
+                                            Tip: omp can reconfigure and extend itself — ask any questions you have!
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.5 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ LIVE-INIT reply ack and arrange advisor note
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-lock.sh                                                                                                                                             │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ lock acquired: harness pid 54913                                                                                                                             │
+│ ⟦Wall: 1.68s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ • Arm firstmate watcher
+ watcher: started omp extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_omp again only after a later notification says the cycle…
+ ⟦⌃O: Expand⟧
+
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791473610   1   check   open-loop-ledger   check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)                             │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 83790.1791473611.LyRDTi                           │
+│ ⟦Wall: 6.44s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 83790.1791473611.LyRDTi                                                                         │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Backgrounded early to handle an incoming message; the command keeps running.                                                                                 │
+│ ⟦Backgrounded: bg_1 | Timeout: 300s⟧                                                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ LIVE-ADVISE-1 reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ LIVE-ADVISOR-TAIL LIVE-ADVISE-1 verify before finishing.
+
+ • Background job completed [bash] bg_1 (3.1s)
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.wake-live/home/state/idleempty.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                                                                       │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ … (9 earlier lines, showing 10 of 19) ⟦⌃O: Expand⟧                                                                                                           │
+│ ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.                                                           │
+│ ●  This is a supervision warning only; the guarded operation WILL still run.                                                                                 │
+│ ●  After draining queued wakes, source                                                                                                                       │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.wake-live/home/config/x-mode.env' first, then repair a missing or    │
+│ failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so                                                                  │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.omp/extensions/fm-primary-turnend-guard.ts and                        │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV/.omp/extensions/fm-primary-omp-watch.ts auto-load from                 │
+│ .omp/extensions/ (use -e with both paths only when starting omp from another directory).                                                                     │
+│ ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                                                                                     │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                                                                   │
+│ ⟦Wall: 5.74s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 6985.1791473634.5vD7kk                                                                          │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                                                                  │
+│ ⟦Wall: 0.97s | Timeout: 300s⟧                                                                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4E0VV43ZJ2E8B08ZQ717KFV > ⑂ detached ?1 ▶──────8%────────────────────────────────────────────────────╎───────┃───────────200K─
+╰─
