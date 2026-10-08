@@ -94,23 +94,33 @@ JS
 : > "$TMP_ROOT/transport"
 node "$TMP_ROOT/fake-jev.mjs" "$TMP_ROOT/transport" "$TMP_ROOT/jev-port" &
 FAKE_JEV_PID=$!
+trap 'kill "$FAKE_JEV_PID" 2>/dev/null; fm_test_cleanup' EXIT
 for _ in $(seq 1 100); do [ -s "$TMP_ROOT/jev-port" ] && break; sleep 0.05; done
 [ -s "$TMP_ROOT/jev-port" ] || fail "fake Jev endpoint did not start"
 
-guard_decision() {  # <home>; prints the hook's permission decision, or "allow" when it printed nothing
-  local home=$1 out
+guard_decision() {
+  local home=$1 out err="$TMP_ROOT/hook.err" status
   mkdir -p "$home/state" "$home/config" "$home/data/t1" "$TMP_ROOT/wt"
   : > "$TMP_ROOT/transport"
   out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf ./sandbox"}}' \
     | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE -u OPENROUTER_API_KEY FM_TEST_SEAM=1 \
         FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/jev-port")/v1/systemone" \
-        "$ROOT/bin/fm-jev-guard-hook.sh" "$home" "$home/config" "$home/state" t1 "$TMP_ROOT/wt" "$home/data/t1" firstmate 2>/dev/null)
-  if [ -z "$out" ]; then printf allow; else jq -r .hookSpecificOutput.permissionDecision <<<"$out"; fi
+        "$ROOT/bin/fm-jev-guard-hook.sh" "$home" "$home/config" "$home/state" t1 "$TMP_ROOT/wt" "$home/data/t1" firstmate 2>"$err")
+  status=$?
+  [ "$status" -eq 0 ] || fail "hook exited $status for $home"
+  [ ! -s "$err" ] || fail "hook wrote stderr for $home: $(cat "$err")"
+  if [ -z "$out" ]; then
+    decision=allow
+  else
+    decision=$(jq -er .hookSpecificOutput.permissionDecision <<<"$out") || fail "hook returned no permission decision for $home"
+  fi
 }
 
-[ "$(guard_decision "$LANE")" = deny ] || fail "jev-guard in a home without .env must reach the primary key"
+guard_decision "$LANE"
+[ "$decision" = deny ] || fail "jev-guard in a home without .env must reach the primary key"
 grep -qx 'Bearer primary-key' "$TMP_ROOT/transport" || fail "jev-guard did not send the primary key"
-[ "$(guard_decision "$REMOTE")" = allow ] || fail "jev-guard in a remote-bound home must stay off"
+guard_decision "$REMOTE"
+[ "$decision" = allow ] || fail "jev-guard in a remote-bound home must stay off"
 [ ! -s "$TMP_ROOT/transport" ] || fail "jev-guard in a remote-bound home must make no request"
 kill "$FAKE_JEV_PID" 2>/dev/null
 wait "$FAKE_JEV_PID" 2>/dev/null

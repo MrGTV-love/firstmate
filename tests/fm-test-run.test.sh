@@ -501,7 +501,20 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" rm -q tests/assets/retired-asset.mjs
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
     || fail "a retired test asset was refused as an unmapped changed source"
+  [ -z "$listed" ] || fail "an unreferenced retired test asset must select no suite: $listed"
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm retired-asset-change
+
+  mkdir -p "$repo/tests/assets"
+  : >"$repo/tests/assets/board-render-harness.mjs"
+  printf '#!/usr/bin/env bash\nnode tests/assets/board-render-harness.mjs\n' >"$repo/tests/fm-bearings-board-render.test.sh"
+  chmod +x "$repo/tests/fm-bearings-board-render.test.sh"
+  git -C "$repo" add tests/assets/board-render-harness.mjs tests/fm-bearings-board-render.test.sh
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm board-render-fixture
+  git -C "$repo" rm -q tests/assets/board-render-harness.mjs
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a referenced deleted test asset must select its consumer"
+  assert_contains "$listed" "tests/fm-bearings-board-render.test.sh" "a deleted board-render harness selects its surviving consumer"
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm referenced-asset-deletion
 
   printf '\n' >>"$repo/bin/fm-procevent-quota.sh"
   printf '\n' >>"$repo/bin/fm-quota-choose.sh"

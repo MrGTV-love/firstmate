@@ -1847,11 +1847,6 @@ families_for_changed_path() {
           || printf '%s\n' "__unmapped__:$path"
       fi
       ;;
-    tests/*)
-      # A deleted test asset has no consuming suite left to select, the same
-      # retirement rule the bin/* arm above applies.
-      [ ! -e "$path" ] || printf '%s\n' "__unmapped__:$path"
-      ;;
     README.md|LICENSE|assets/*|docs/*|.gitignore)
       ;;
     *)

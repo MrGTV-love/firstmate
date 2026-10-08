@@ -169,6 +169,7 @@ The workflow retains per-PR supersession without cancelling main pushes or chang
 
 [CONTRIBUTING.md](../CONTRIBUTING.md) owns the local test policy and common entry points.
 `bin/fm-test-run.sh --help` owns exact lane names, selection flags, and bounded `--jobs` mechanics.
+`--changed` scans remaining test consumers of deleted test assets and selects their suites; only unreferenced retired assets select nothing.
 
 ## Timeouts
 
