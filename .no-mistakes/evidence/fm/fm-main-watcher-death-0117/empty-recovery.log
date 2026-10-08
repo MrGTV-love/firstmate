@@ -1,0 +1,6 @@
+deferred (context re-emit while the Stop hook owns wake delivery) - 0 record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.
+OBSERVED: zero queued rows preserved pending downtime episode
+deferred (context re-emit while the Stop hook owns wake delivery) - 0 record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.
+OBSERVED: zero queued rows preserved announced downtime episode
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation empty-announced
+OBSERVED: finished empty episode entered handling and acknowledged generation

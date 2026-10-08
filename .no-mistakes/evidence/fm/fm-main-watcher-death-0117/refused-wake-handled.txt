@@ -1,0 +1,2 @@
+1791455928	8	signal	live-worker	done: worker event during real Stop claim
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 61319.1791455928.6H2EUe

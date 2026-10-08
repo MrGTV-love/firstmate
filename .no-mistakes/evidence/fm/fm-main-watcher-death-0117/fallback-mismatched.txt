@@ -1,0 +1,4 @@
+1791455817	5	signal	lab-task	done: mismatched claim fallback event
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation lab-mismatched
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.

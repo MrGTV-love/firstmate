@@ -1,0 +1,4 @@
+1791456059	9	signal	live-worker	done: worker event during real Stop claim
+1791456075	10	check	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/state/live-success.check.sh	check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/state/live-success.check.sh: lab-success-event: disposable worker completed
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 76593.1791456059.Tt5KLn
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.

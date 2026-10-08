@@ -1,0 +1,3 @@
+1791455825	7	check	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/state/live-once.check.sh	check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/state/live-once.check.sh: lab-once-event: disposable worker completed
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 34767.1791455825.l8EBNm
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.

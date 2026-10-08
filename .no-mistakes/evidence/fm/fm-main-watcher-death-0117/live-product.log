@@ -1,0 +1,42 @@
+lock acquired: harness pid 5646
+claude
+
+OBSERVED fresh reemit preserved exact queue bytes, downtime marker, and guard episode
+lock acquired: harness pid 5646
+deferred (context re-emit while the Stop hook owns wake delivery) - 1 record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.
+
+OBSERVED stale reemit preserved exact queue bytes, downtime marker, and guard episode
+lock acquired: harness pid 5646
+deferred (context re-emit while the Stop hook owns wake delivery) - 1 record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.
+●  WATCHER DOWN - SUPERVISION IS OFF
+
+OBSERVED mutex reemit preserved exact queue bytes, downtime marker, and guard episode
+lock acquired: harness pid 5646
+deferred (context re-emit while wake delivery ownership is being decided) - 1 record(s) are queued and stay durable. The Stop hook starts the handling turn that drains them; do not run bin/fm-wake-drain.sh from this re-emit.
+●  WATCHER DOWN - SUPERVISION IS OFF
+
+OBSERVED finished-claim reemit presented durable worker event and entered handling
+1791455785	2	signal	lab-task	done: durable lab worker event
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation lab-open
+   After handling all emitted wakes and reconciling open decisions and unread status lines, run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`; until then the work remains durable for idempotent re-handling after interruption.
+
+OBSERVED absent-ledger reemit presented the event and entered handling
+epoch=1 owner_pid=10556 outcome=arming updated_at=1791455812
+Thu Oct  8 05:36:22 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/driver.sh
+
+OBSERVED transient real queue-writer contention handed off to an arming claim
+
+OBSERVED dead claim did not defer delivery
+
+OBSERVED mismatched claim did not defer delivery
+
+OBSERVED stuck claim did not defer delivery
+registered: state/live-once.check.sh
+epoch=1 owner_pid=32660 outcome=refused updated_at=1791455828
+Thu Oct  8 05:37:03 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/product/bin/fm-claude-stop-autoarm.sh
+
+OBSERVED real hook exit=0 drained-during-arm=1 marker=pending:handling:34767.1791455825.l8EBNm
+watcher: stopped pid=44147
+unregistered: state/live-once.check.sh
+
+OBSERVED real refused rewake recorded outcome=refused and removed its output

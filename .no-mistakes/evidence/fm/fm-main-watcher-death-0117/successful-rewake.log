@@ -1,0 +1,13 @@
+lock acquired: harness pid 74319
+registered: state/live-success.check.sh
+OBSERVED: compact reemit deferred under real Stop hook pid=92092; queue and recovery marker unchanged
+OBSERVED: real Stop hook exited 2
+firstmate watcher wake - one supervision event needs a handling turn now.
+check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/state/live-success.check.sh: lab-success-event: disposable worker completed
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+epoch=1 owner_pid=92092 outcome=rewake updated_at=1791456079 session_pid=74319 recovery_generation=76593.1791456059.Tt5KLn
+Thu Oct  8 05:40:57 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DEMK2SSZGM33TP7W7S8KMQ/.fm-lab.t14_k20u/product/bin/fm-claude-stop-autoarm.sh
+OBSERVED: handling drain presented the preserved worker event and entered handling
+OBSERVED: emitted acknowledgement consumed all handled rows
+watcher: stopped pid=67832
+unregistered: state/live-success.check.sh
