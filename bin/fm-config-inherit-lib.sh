@@ -1252,6 +1252,7 @@ fm_config_reread_send_pointer() {
     "$send_bin" "$selector" "$message" 2>&1) && rc=0 || rc=$?
   if [ "$rc" -eq 0 ]; then
     rm -f "$pending_path"
+    printf '  config-reread: sent\n'
     return 0
   fi
   out=${out%%$'\n'*}

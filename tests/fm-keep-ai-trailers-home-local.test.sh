@@ -221,6 +221,8 @@ EOF
   assert_no_reread_mentions_flag "$home/state" "$label"
   if [ "$point" != spawn ]; then
     assert_harness_reread_exists "$sm/state" "$label"
+    assert_contains "$(cat "$w/point.out")" '  config-reread: sent' \
+      "$label: successful reread enqueue was not reported"
   fi
   pass "$label preserves the lane's home-local choice while unrelated config converges"
 }
@@ -399,6 +401,8 @@ test_retained_retry_case() (
   out=$(fm_config_send_reread_nudge sm "$home" "$report" 2>&1); status=$?
   if [ "$contents" = mixed ]; then
     expect_code 1 "$status" "$representation: rejected transport should leave a retry: $out"
+    ! grep -q 'config-reread: sent' <<< "$out" \
+      || fail "$representation: rejected transport was reported as sent"
     [ "$(cat "$FM_DELIVERY_DIR/count" 2>/dev/null)" = 1 ] \
       || fail "$representation: real retry did not reach the transport exactly once"
     cmp -s "$expected" "$FM_DELIVERY_DIR/attempt.1" \
@@ -407,6 +411,8 @@ test_retained_retry_case() (
     export FM_DELIVERY_FAIL=0
     out=$(fm_config_reread_retry_pending sm "$home" 2>&1); status=$?
     expect_code 0 "$status" "$representation: retained delivery failed to converge: $out"
+    assert_contains "$out" '  config-reread: sent' \
+      "$representation: successful retained enqueue was not reported"
     [ "$(cat "$FM_DELIVERY_DIR/count")" = 2 ] || fail "$representation: retained delivery was not retried once"
     cmp -s "$expected" "$FM_DELIVERY_DIR/attempt.2" \
       || fail "$representation: retry reread newer config instead of retaining unrelated recorded bytes"
@@ -415,9 +421,13 @@ test_retained_retry_case() (
     done < "$FM_DELIVERY_DIR/pointers"
   else
     expect_code 0 "$status" "$representation: flag-only retry did not retire successfully: $out"
+    ! grep -q 'config-reread: sent' <<< "$out" \
+      || fail "$representation: flag-only retirement was reported as sent"
     [ ! -e "$FM_DELIVERY_DIR/count" ] || fail "$representation: flag-only retry reached transport"
     out=$(fm_config_reread_retry_pending sm "$home" 2>&1); status=$?
     expect_code 0 "$status" "$representation: flag-only retirement left a stuck retry: $out"
+    ! grep -q 'config-reread: sent' <<< "$out" \
+      || fail "$representation: no-op retry was reported as sent"
     [ ! -e "$FM_DELIVERY_DIR/count" ] || fail "$representation: retired flag-only retry reached transport"
     assert_no_reread_mentions_flag "$home/state" "$representation flag-only"
     assert_no_reread_mentions_flag "$source/state" "$representation flag-only"
@@ -427,6 +437,41 @@ test_retained_retry_case() (
   pass "$representation $contents retry removes retained home-local ABSENT instructions and converges"
 )
 
+test_retired_only_command() (
+  local point=$1 rec w root home sm retained absent out status path
+  rec=$(new_world "$point-retired-only")
+  IFS='|' read -r w root home sm <<EOF
+$rec
+EOF
+  cp "$w/lane-flag.expected" "$sm/config/$FLAG"
+  propagate_secondmate_inheritance "$home" "$sm" > "$w/converge.out" 2> "$w/converge.err"
+  status=$?
+  expect_code 0 "$status" "$point: initial convergence failed: $(cat "$w/converge.out") $(cat "$w/converge.err")"
+  retained="$sm/state/.fm-inherited-config-reread.retained"
+  absent="$w/absent"
+  printf 'ABSENT\n' > "$absent"
+  {
+    printf '%s\n' "$FM_CONFIG_REREAD_FRAMING"
+    write_recorded_block "config/$FLAG" "$absent"
+  } > "$retained"
+  fm_config_reread_mark_pending "$retained" "$retained.pending" || fail "$point: cannot seed retained-only pending retry"
+  "run_$point" "$w" "$root" "$home" "$sm" > "$w/point.out" 2> "$w/point.err"
+  status=$?
+  out=$(cat "$w/point.out")
+  expect_code 0 "$status" "$point: retained-only retirement failed: $out $(cat "$w/point.err")"
+  ! grep -q 'config-reread: sent' <<< "$out" \
+    || fail "$point: retained-only retirement was reported as sent"
+  assert_retry_retired "$sm" "$home" "$point retired-only"
+  [ ! -e "$retained" ] && [ ! -L "$retained" ] \
+    || fail "$point: retired-only instruction remains"
+  assert_flag_kept "$sm" "$w/lane-flag.expected" "$point retired-only"
+  for path in "$sm/state"/.fm-inherited-config-reread.*; do
+    [ ! -e "$path" ] && [ ! -L "$path" ] \
+      || fail "$point: otherwise converged config delivered a new reread instruction ($path)"
+  done
+  pass "$point silently retires retained-only instructions without enqueueing a reread"
+)
+
 test_remote_receiver_refuses_home_local_flag
 for point in spawn bootstrap config_push; do
   for primary in absent present; do
@@ -434,6 +479,9 @@ for point in spawn bootstrap config_push; do
       check_point "$point" "$primary" "$lane"
     done
   done
+done
+for point in config_push bootstrap; do
+  test_retired_only_command "$point"
 done
 for representation in pending staged staged-pending exact-temp legacy-report; do
   for contents in mixed flag-only; do
