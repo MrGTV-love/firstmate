@@ -431,7 +431,7 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # agy-regex fold in bin/fm-busy-lib.sh.
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
-FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$|'"$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT"
+FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
 
 fm_busy_lines_match() {  # [harness]
   local harness=${1:-} lines regex
@@ -450,7 +450,8 @@ fm_busy_lines_match() {  # [harness]
       agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
       kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
       cursor) regex=$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT ;;
-      '') regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
+      legacy-tmux) regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
+      '') regex="$FM_DELIVERY_BUSY_REGEX_DEFAULT|$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT" ;;
       *)
         # A supplied harness must never borrow another harness's signature.
         # Register its verified signature explicitly before classifying it busy.

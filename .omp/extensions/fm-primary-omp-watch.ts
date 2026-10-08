@@ -8,7 +8,7 @@
 //     without -e (naming it both ways loads it twice - verified, omp 18.1.11).
 //   - pi.sendUserMessage returns synchronously (no promise) in omp, so "Pi
 //     accepted the follow-up" collapses to "the call returned"; consumption is
-//     still tracked at before_agent_start / message_start exactly as on Pi.
+//     tracked only at the accepted user message_start.
 //   - omp reports no session_shutdown reason, so EVERY shutdown with a pending
 //     actionable close persists the replacement handoff and the next owning
 //     session_start, in this process or a later one, replays it. Replaying a
@@ -52,10 +52,7 @@
 // queued while main is streaming joins the running run without ever raising
 // before_agent_start, so waiting on that event stalls every later close.
 // Consumption is tracked only so a replacement can replay a follow-up omp had
-// not consumed. An idle main consumes at before_agent_start; a streaming main
-// consumes at the user message_start carrying the exact wake text; either
-// event finishes the pending record, and a still-unconsumed record rides the
-// replacement handoff.
+// not consumed. Consumption matches the accepted user message_start exactly.
 //
 // Restored-wake recovery is documented in docs/watcher-continuity.md.
 // Recovery must use the real editor and resend only this extension's unchanged
@@ -555,7 +552,6 @@ process.once("exit", cleanupOnProcessExit);
 export default function (pi: ExtensionAPI) {
   let generation = createGeneration();
   activateGeneration(generation);
-  let startingWake: string | null = null;
 
   async function sendWake(
     owner: SessionGeneration,
@@ -582,13 +578,9 @@ export default function (pi: ExtensionAPI) {
     return generationIsLive(owner);
   }
 
-  function consumeWake(owner: SessionGeneration, text: string, source: "before_agent_start" | "message_start"): void {
-    const pairedMessage = source === "message_start" && startingWake === text;
-    startingWake = null;
-    if (pairedMessage) return;
+  function consumeWake(owner: SessionGeneration, text: string): void {
     for (const [token, wake] of owner.unconsumedWakes) {
       if (wake.content !== text) continue;
-      if (source === "before_agent_start") startingWake = text;
       owner.unconsumedWakes.delete(token);
       if (!wake.pending) return;
       wake.pending.delivered = true;
@@ -1147,21 +1139,19 @@ export default function (pi: ExtensionAPI) {
     return result;
   }
 
-  pi.on?.("before_agent_start", (event, ctx) => {
+  pi.on?.("before_agent_start", (_event, ctx) => {
     rememberContext(ctx);
     markLoaded();
-    consumeWake(generation, String((event as { prompt?: unknown })?.prompt ?? ""), "before_agent_start");
   });
   pi.on?.("message_start", (event, ctx) => {
     rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
-    consumeWake(generation, userMessageText(message.content), "message_start");
+    consumeWake(generation, userMessageText(message.content));
   });
   // A run that ends with a wake still unconsumed either drains it into the next
   // run at once or left it in the composer; the delayed check tells the two apart.
   pi.on?.("agent_end", (_event, ctx) => {
-    startingWake = null;
     rememberContext(ctx);
     scheduleRestoredWakeCheck(generation);
   });
@@ -1175,7 +1165,6 @@ export default function (pi: ExtensionAPI) {
     activateOwnedWatch(generation);
   });
   pi.on?.("session_shutdown", async () => {
-    startingWake = null;
     // omp carries no shutdown reason (verified: `reason` is undefined), so the
     // replacement handoff is always persisted when anything is pending; a
     // terminal quit then merely replays an already-drained wake next start.

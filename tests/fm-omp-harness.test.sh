@@ -566,8 +566,8 @@ await new Promise((r) => setTimeout(r, 2500));
 if (sent.length !== 1) throw new Error(`expected one follow-up wake, saw ${sent.length}: ${JSON.stringify(sent)}`);
 if (!sent[0].m.startsWith("⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: omp-e2e done")) throw new Error(`unexpected wake text: ${sent[0].m}`);
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("wake must be delivered as a follow-up");
-// The wake is consumed when omp starts the next run with that exact prompt.
 await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: sent[0].m }, {});
+await handlers.get("message_start")({ message: { role: "user", content: sent[0].m } }, {});
 await handlers.get("session_shutdown")({}, {});
 if (existsSync(`${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("a consumed wake must not ride the replacement handoff");
 process.exit(0);
@@ -647,6 +647,7 @@ for (const needle of [
   if (!sent[0].m.includes(needle)) throw new Error(`the follow-up lacks '${needle}': ${sent[0].m}`);
 }
 await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: sent[0].m }, {});
+await handlers.get("message_start")({ message: { role: "user", content: sent[0].m } }, {});
 await handlers.get("session_shutdown")({}, {});
 process.exit(0);
 EOF
@@ -715,6 +716,7 @@ const replays = sent.slice(1);
 if (replays.some((item) => item.m.includes("watcher: FAILED"))) throw new Error(`the successor failed to load the handoff: ${JSON.stringify(replays)}`);
 if (replays.length !== 1 || !replays[0].m.includes(boundary)) throw new Error(`the successor did not replay the boundary: ${JSON.stringify(replays)}`);
 await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: replays[0].m }, {});
+await handlers.get("message_start")({ message: { role: "user", content: replays[0].m } }, {});
 await handlers.get("session_shutdown")({}, {});
 if (existsSync(handoff)) throw new Error("a consumed replay must not ride the replacement handoff again");
 process.exit(0);
@@ -843,7 +845,10 @@ const pi = {
   registerTool(t) { tool = t; },
   sendUserMessage(m, o) {
     sent.push({ m, o });
-    if (process.env.SCENARIO === "sync-consumed") handlers.get("before_agent_start")({ prompt: m }, ctx);
+    if (process.env.SCENARIO === "sync-consumed") {
+      handlers.get("before_agent_start")({ prompt: m }, ctx);
+      handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
+    }
     if (process.env.SCENARIO === "failed-send") throw new Error("fixture send rejected");
     if (process.env.SCENARIO === "custom-tail") {
       if (o?.deliverAs) { queued = true; return undefined; }
@@ -852,6 +857,7 @@ const pi = {
         transcript.push({ role: "user", content: m });
         idle = false;
         handlers.get("before_agent_start")({ prompt: m }, ctx);
+        handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
       } else {
         queued = true;
       }
@@ -974,6 +980,7 @@ switch (process.env.SCENARIO) {
       await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: sent[1].m }] } }, ctx);
     } else {
       await handlers.get("before_agent_start")({ prompt: sent[1].m }, ctx);
+      await handlers.get("message_start")({ message: { role: "user", content: sent[1].m } }, ctx);
     }
     composer.text = wake;
     const sets = composer.sets.length;
@@ -1000,17 +1007,57 @@ switch (process.env.SCENARIO) {
   case "normalized-consumed": {
     const prompt = bare.replace(/\s/g, "").replace(/(.{17})/g, "$1\n \t");
     await handlers.get("before_agent_start")({ type: "before_agent_start", prompt }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: prompt } }, ctx);
     composer.text = wake;
     await settle();
     if (sent.length !== 2 || !same(sent[1]) || composer.text !== "") throw new Error("normalized text consumed an exact wake identity");
     await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
     composer.text = wake;
     await settle();
     if (sent.length !== 2 || composer.text !== wake) throw new Error("exact wake consumption was not retained");
     break;
   }
+  case "preparation-cancelled":
+  case "preparation-handoff": {
+    const draft = "\noperator\u2063 draft\n\n";
+    composer.text = `${wake}\n\n${draft}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== draft) throw new Error("first recovery did not preserve the draft");
+    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+    composer.text = `${wake}\n\n${draft}`;
+    if (process.env.SCENARIO === "preparation-handoff") {
+      const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+      await handlers.get("agent_end")({}, ctx);
+      await handlers.get("session_shutdown")({}, ctx);
+      const stored = JSON.parse(readFileSync(handoff, "utf8"));
+      if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("cancelled preparation retired its pending handoff");
+      await handlers.get("session_start")({}, ctx);
+      for (let i = 0; i < 60 && sent.length < 3; i += 1) await sleep(100);
+      if (sent.length !== 3 || sent[2].m !== wake || sent[2].o?.deliverAs !== "followUp") throw new Error("replacement lost the preparation-cancelled wake");
+      await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+      if (JSON.parse(readFileSync(handoff, "utf8")).pending.length !== 1) throw new Error("replacement preparation retired its handoff");
+      await handlers.get("message_start")({ message: { role: "assistant", content: wake } }, ctx);
+      if (!existsSync(handoff)) throw new Error("assistant message retired the wake");
+      await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+      await handlers.get("session_shutdown")({}, ctx);
+      if (existsSync(handoff)) throw new Error("accepted replay retained its handoff");
+      if (composer.text !== `${wake}\n\n${draft}`) throw new Error("replacement changed the restored draft");
+      process.exit(0);
+    }
+    await settle();
+    if (sent.length !== 3 || !same(sent[2]) || composer.text !== draft) throw new Error("second Escape during preparation lost the wake or draft");
+    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    composer.text = `${wake}\n\n${draft}`;
+    const sets = composer.sets.length;
+    await settle();
+    if (sent.length !== 3 || composer.sets.length !== sets || composer.text !== `${wake}\n\n${draft}`) throw new Error("accepted wake was recovered after preparation cancellation");
+    break;
+  }
   case "consumed": {
     await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
     composer.text = wake;
     await settle();
     if (sent.length !== 1) throw new Error(`a consumed wake was sent again: ${sent.length}`);
@@ -1023,8 +1070,8 @@ switch (process.env.SCENARIO) {
     await settle();
     if (sent.length !== 2 || !same(sent[1])) throw new Error(`the restored wake was not submitted again: ${JSON.stringify(sent)}`);
     if (composer.text !== "my unsent draft") throw new Error(`the operator draft was not preserved exactly: ${JSON.stringify(composer.text)}`);
-    // The resubmitted wake starts the run that consumes it; nothing is left to recover.
     await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
     await settle();
     if (sent.length !== 2) throw new Error(`a consumed resubmission was sent a third time: ${sent.length}`);
     if (composer.text !== "my unsent draft") throw new Error("the draft changed after the wake was consumed");
@@ -1114,7 +1161,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"

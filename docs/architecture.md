@@ -220,7 +220,7 @@ The daemon escalates captain-relevant events, plus a bounded recheck for a decla
 Captain-held transfers remain silent until return while the posture record exists.
 Its supervisor injection path supports tmux and herdr panes, with `FM_SUPERVISOR_BACKEND` and `FM_SUPERVISOR_TARGET` resolved independently from the task-spawn backend.
 Pane existence, busy checks, composer checks, capture, and verified submit route through `bin/fm-backend.sh`: tmux keeps the same submit core used by the tmux send backend, while [Herdr submit confirmation](herdr-backend.md#submit-confirmation) owns native and rendered transition eligibility and Claude's pre-Enter payload proof.
-The retries-exhausted queued-Enter decision is owned by `fm_composer_queued_enter_verdict` in `bin/fm-composer-lib.sh`; [tmux](tmux-backend.md#composer-busy-state-and-delivery) and [Herdr](herdr-backend.md#submit-confirmation) own their backend-specific identity and busy signals.
+Herdr's retries-exhausted queued-Enter decision is owned by `fm_composer_queued_enter_verdict` in `bin/fm-composer-lib.sh`; [tmux](tmux-backend.md#composer-busy-state-and-delivery) preserves its legacy non-omp decision while excluding omp and unavailable identity from busy-only confirmation.
 Composer classification has one shared owner, `bin/fm-composer-lib.sh`: tmux, herdr, Zellij, Orca, and cmux contribute only a screen capture plus declarative styled, cursor, identity, and row capabilities, while the shared classifier owns every shape and the `empty`/`pending`/`pending-unproven`/`unknown` verdict.
 `fm-spawn.sh` also routes Kimi launch readiness through that classifier instead of carrying another shape copy.
 The daemon injects only into an affirmatively `empty` composer, so every other or future verdict defers; positive container proof is required, and a blank unidentified row or bare dead-shell prompt cannot receive an escalation.
@@ -257,7 +257,7 @@ Endpoint death is the only process-level override and yields dead; child process
 Each record is bound to an incarnation token minted when the task's wiring is armed, so an event from a superseded incarnation is rejected rather than applied, and a record left behind by one classifies unknown.
 [The omp adapter reference](../.agents/skills/harness-adapters/references/harness/omp.md#extension-loading) owns secondmate versus crewmate/scout extension loading.
 Three rendered-text checks deliberately remain outside this contract because they answer delivery questions: submit acknowledgement and the away-mode supervisor-pane busy guard consume the shared delivery-footer matcher owned by `bin/fm-composer-lib.sh`, while `bin/fm-pending-reply-lib.sh` owns the secondmate delivery-confirmation observation.
-All are harness-scoped rather than a global pattern union, and none is a recorded worker state source.
+Recorded harnesses select their own signatures; identityless guards include verified omp signals, while non-omp tmux submit acknowledgement retains its legacy matcher. None is a recorded worker state source.
 
 ## Runtime session backends
 

@@ -87,7 +87,7 @@ The supervisor guard selects only the detected primary harness's signature rathe
 It types a message once and retries Enter only until the composer clears.
 Only a positively identified omp foreground process receives the pre-retry refresh: after pending or unproven pending, a fresh empty or unreadable composer receives no further Enter. Identification uses tmux's foreground command and the existing foreground-process-group probe, and remains attached to the submission attempt.
 The submit primitive returns `empty` only after composer-clearance proof or one of the delivery-proof exceptions below.
-Text left in established structure remains `pending`, text in ambiguous structure remains unproven, and unreadable or unsafe state remains unknown except that an unconfirmed omp submit returns `pending`.
+Text left in established structure remains `pending`, text in ambiguous structure remains unproven, and unreadable or unsafe state remains unknown except that an unconfirmed omp submit or unavailable initial identity returns `pending`.
 An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
 
@@ -97,8 +97,9 @@ OpenCode 1.18.4 has one busy-queue exception.
 While OpenCode is mid-turn, Enter queues the message but leaves its text visible until the turn completes.
 The legacy non-omp tmux path accepts structurally proven pending text in a busy pane as queued after the normal retry budget; idle panes and ambiguous pending text remain unconfirmed.
 It also preserves main's baseline-gated conversion for an unreadable mid-turn composer (including Pi's `pi-launcher`): an idle baseline before typing and a busy footer after Enter confirm delivery, using the same legacy matcher on both sides.
+The legacy matcher excludes omp's spinner-only, spinner-box, and Waiting signals; the widened omp matcher remains available to positively identified omp and identityless delivery guards.
 All non-omp harnesses retain main's Enter retry behavior without the new refresh.
-omp never receives either busy-only conversion: an independent watcher turn cannot prove that Enter consumed the typed payload, so an unreadable omp composer returns `pending` even when busy. There is no omp busy-baseline confirmation boundary; only a positively empty composer confirms submission.
+omp and unavailable initial identity never receive either busy-only conversion: an independent watcher turn cannot prove that Enter consumed the typed payload, so an unreadable composer returns `pending` even when busy. There is no omp busy-baseline confirmation boundary; only a positively empty composer confirms submission.
 `tests/fm-tmux-submit-busy.test.sh` covers busy and idle panes with proven, ambiguous, and cleared composers, including a dropped Enter followed by an independent omp watcher turn and a cursor/screen redraw race.
 
 ## Limits and regression entry points

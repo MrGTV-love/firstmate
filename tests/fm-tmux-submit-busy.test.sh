@@ -35,7 +35,11 @@ case "${1:-}" in
               "$(cat "$COMPOSER.payload")" > "$COMPOSER"
           fi
           printf '1\n'; exit 0 ;;
-        *pane_current_command*) printf '%s\n' "${FM_FAKE_HARNESS:-}"; exit 0 ;;
+        *pane_current_command*)
+          [ "${FM_FAKE_MISSING_IDENTITY:-0}" != 1 ] || exit 1
+          printf '%s\n' "${FM_FAKE_HARNESS:-codex}"; exit 0 ;;
+        *pane_tty*)
+          [ "${FM_FAKE_MISSING_IDENTITY:-0}" != 1 ] || exit 1 ;;
       esac
     done
     exit 0 ;;
@@ -607,3 +611,75 @@ test_omp_foreground_identity_controls_submit_scope() (
   pass "tmux foreground omp proof survives title loss while background omp cannot change legacy submit scope"
 )
 test_omp_foreground_identity_controls_submit_scope
+
+test_missing_initial_identity_never_confirms_busy_input() (
+  local dir="$TMP_ROOT/missing-initial-identity" fakebin composer sent out path fixture_state
+  fakebin=$(make_submit_mock "$dir")
+  composer="$dir/composer"; sent="$dir/sent"
+  . "$ROOT/bin/fm-tmux-lib.sh"
+  for path in typed direct explicit-empty; do
+    for fixture_state in unknown pending postretry; do
+      printf '0' > "$dir/reads"; : > "$sent"
+      printf '│ > retained wake\n' > "$composer"
+      touch "$dir/.swallow"
+      fm_tmux_composer_state() {
+        local n
+        n=$(cat "$dir/reads"); n=$((n + 1)); printf '%s' "$n" > "$dir/reads"
+        case "$fixture_state" in
+          postretry) if [ "$n" -eq 1 ]; then printf 'pending'; else printf 'unknown'; fi ;;
+          *) printf '%s' "$fixture_state" ;;
+        esac
+      }
+      out=$(
+        export PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent"
+        export FM_FAKE_MISSING_IDENTITY=1 FM_FAKE_APPEND_BUSY=1
+        export FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1
+        [ "$(fm_tmux_submit_harness win)" = unavailable ] || fail "both missing probes must establish unavailable identity"
+        if [ "$path" = typed ]; then
+          fm_tmux_submit_core win 'retained wake' 3 0 0
+        elif [ "$path" = explicit-empty ]; then
+          fm_tmux_submit_enter_core win 3 0 1 ''
+        else
+          fm_tmux_submit_enter_core win 3 0 1
+        fi
+      )
+      [ "$out" = pending ] || fail "$path $fixture_state with unavailable initial identity must stay pending, got '$out'"
+      PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_pane_is_busy win legacy-tmux \
+        || fail "unavailable identity regression must render a later legacy busy signal"
+      grep -q 'retained wake' "$composer" || fail "unavailable identity must not consume the payload"
+    done
+  done
+  pass "tmux unavailable initial identity fails closed on initial, postretry, and exhausted pending paths"
+)
+test_missing_initial_identity_never_confirms_busy_input
+
+test_nonomp_uses_unchanged_legacy_busy_predicate() (
+  local dir="$TMP_ROOT/legacy-busy-predicate" fakebin composer out command signal fixture_state
+  fakebin=$(make_submit_mock "$dir")
+  composer="$dir/composer"
+  . "$ROOT/bin/fm-tmux-lib.sh"
+  for command in pi pi-signed pi-launcher claude kimi; do
+    for signal in '⠧ 11s' '╭── ⠦ 13s > model ──╮' '⎋ Waiting' \
+      '✢ Pollinating… (16s · ↓ 1.1k tokens)' '🌕 · Thinking'; do
+      printf '%s\n' "$signal" > "$composer"
+      touch "$dir/.swallow"
+      PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_pane_is_busy win legacy-tmux \
+        && fail "$command legacy matcher must not newly accept '$signal'"
+      for fixture_state in unknown pending; do
+        fm_tmux_composer_state() { printf '%s' "$fixture_state"; }
+        out=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_HARNESS="$command" \
+          FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
+          fm_tmux_submit_core win payload 2 0 0)
+        [ "$out" = "$fixture_state" ] || fail "$command unchanged busy signal must retain $fixture_state, got '$out'"
+      done
+    done
+    printf 'idle\n' > "$composer"
+    fm_tmux_composer_state() { printf 'unknown'; }
+    out=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_HARNESS="$command" \
+      FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_APPEND_BUSY=1 \
+      fm_tmux_submit_core win payload 2 0 0)
+    [ "$out" = empty ] || fail "$command legacy idle-to-Working transition must confirm, got '$out'"
+  done
+  pass "tmux non-omp confirmation preserves main's predicate and Pi launcher eligibility"
+)
+test_nonomp_uses_unchanged_legacy_busy_predicate

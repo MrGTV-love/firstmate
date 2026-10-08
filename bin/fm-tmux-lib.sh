@@ -255,6 +255,7 @@ fm_tmux_submit_harness() {
   harness=${harness##*/}
   if [ "$harness" != omp ]; then
     while IFS= read -r comm; do
+      [ -n "$harness" ] || harness=${comm##*/}
       if [ "${comm##*/}" = omp ]; then
         harness=omp
         break
@@ -263,6 +264,7 @@ fm_tmux_submit_harness() {
 $(fm_backend_tmux_foreground_comms "$target")
 EOF
   fi
+  [ -n "$harness" ] || harness=unavailable
   printf '%s' "$harness"
 }
 
@@ -276,6 +278,7 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
   if [ "$#" -lt 5 ]; then
     harness=$(fm_tmux_submit_harness "$target")
   fi
+  [ -n "$harness" ] || harness=unavailable
   tmux send-keys -t "$target" Enter 2>/dev/null || true
   sleep "$sleep_s"
   state=$(fm_tmux_composer_state "$target")
@@ -283,14 +286,14 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     case "$state" in
       pending|pending-unproven) ;;
       unknown)
-        if [ "$harness" = omp ]; then
+        if [ "$harness" = omp ] || [ "$harness" = unavailable ]; then
           printf 'pending'
           return 0
         fi
         if [ "$baseline_idle" = 1 ]; then
           j=0
           while [ "$j" -lt "$retries" ]; do
-            if fm_pane_is_busy "$target"; then
+            if fm_pane_is_busy "$target" legacy-tmux; then
               printf 'empty'
               return 0
             fi
@@ -318,7 +321,8 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     sleep "$sleep_s"
     state=$(fm_tmux_composer_state "$target")
   done
-  if [ "$state" = pending ] && [ "$harness" != omp ] && fm_pane_is_busy "$target"; then
+  if [ "$state" = pending ] && [ "$harness" != omp ] && [ "$harness" != unavailable ] \
+    && fm_pane_is_busy "$target" legacy-tmux; then
     printf 'empty'
   else
     printf '%s' "$state"
@@ -331,8 +335,8 @@ fm_tmux_submit_core() {  # <target> <text> <retries> <enter-sleep> <settle>
   # busy before the text lands can turn "busy" for reasons unrelated to our
   # Enter, so only a clean idle-to-busy transition may confirm a submit.
   harness=$(fm_tmux_submit_harness "$target")
-  if [ "$harness" != omp ]; then
-    baseline_state=$(fm_pane_busy_state "$target")
+  if [ "$harness" != omp ] && [ "$harness" != unavailable ]; then
+    baseline_state=$(fm_pane_busy_state "$target" legacy-tmux)
     [ "$baseline_state" = idle ] && baseline_idle=1
   fi
   # A failed literal send replays tmux's stderr (for example "command too
