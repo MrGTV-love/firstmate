@@ -2742,56 +2742,58 @@ resurface_after_downtime() {
   wake "check: rearm-resurface"
 }
 
-while :; do
-  # Home-gone exit: a deleted home, state directory, or code root means this
-  # watcher's world is gone (a torn-down temporary home or a discarded
-  # disposable checkout). Exit with a logged reason rather than writing state
-  # into nothing, or into a live home from a checkout that no longer exists.
-  # A detached helper this watcher started (home-summary refresh, reconcile)
-  # can recreate a deleted state directory before the next poll, so a lock
-  # with no holder at all is read as the same teardown: only a fresh watcher
-  # ever recreates the lock, and that case is the self-eviction below.
-  # Scoped to this process alone: no other watcher is signalled.
-  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$FM_HOME" ]; then
-    echo "watcher: exiting - home no longer exists: $FM_HOME" >&2
-    exit 1
-  elif [ ! -d "$STATE" ]; then
-    echo "watcher: exiting - state directory no longer exists: $STATE" >&2
-    exit 1
-  elif [ ! -e "$WATCH_LOCK/pid" ]; then
-    echo "watcher: exiting - state directory was torn down (singleton lock removed): $STATE" >&2
-    exit 1
-  elif [ ! -d "$SCRIPT_DIR" ]; then
-    echo "watcher: exiting - code root no longer exists: $SCRIPT_DIR" >&2
-    exit 1
+# Cycle order. A signal wake is the only way a lane's done, decision, or blocked
+# line reaches firstmate, so the signal scan goes FIRST and the cycle's other work
+# (ledger surfacing, reconcile and liveness ticks, process-event and inactive
+# scans, due checks) follows it. That work used to sit ahead of the scan. It is
+# O(state) in bash 3.2 and unbounded on a loaded host, and each of its wakes
+# pre-empted the scan, so a status line waited for every earlier step and then for
+# one more firstmate round trip per wake. Signals-first alone would starve that
+# other work under a fleet that signals on every cycle, so the order is bounded:
+# after PRELUDE_MAX_DEFER consecutive signal wakes that skipped it, the next cycle
+# runs it before the scan. The count lives in state/.prelude-deferred so it
+# survives the watcher exit each wake causes; an unreadable count reads as owed,
+# which is the previous order. FM_PRELUDE_MAX_DEFER=0 selects that order always.
+PRELUDE_MAX_DEFER=${FM_PRELUDE_MAX_DEFER:-3}
+case "$PRELUDE_MAX_DEFER" in
+  ''|*[!0-9]*) PRELUDE_MAX_DEFER=3 ;;
+  *) PRELUDE_MAX_DEFER=$((10#$PRELUDE_MAX_DEFER)) ;;
+esac
+PRELUDE_DEFER_MARKER="$STATE/.prelude-deferred"
+SIGNAL_PHASE_FIRST=0
+
+# Loads the persisted count into PRELUDE_DEFER_COUNT without a subshell: absent
+# reads 0, anything unreadable or non-numeric reads as the bound (work owed).
+prelude_defer_load() {
+  local n=
+  PRELUDE_DEFER_COUNT=0
+  [ -e "$PRELUDE_DEFER_MARKER" ] || [ -L "$PRELUDE_DEFER_MARKER" ] || return 0
+  IFS= read -r n < "$PRELUDE_DEFER_MARKER" 2>/dev/null || true
+  case "$n" in
+    ''|*[!0-9]*) PRELUDE_DEFER_COUNT=$PRELUDE_MAX_DEFER ;;
+    *) PRELUDE_DEFER_COUNT=$((10#$n)) ;;
+  esac
+}
+
+# Called just before a signal wake exits the cycle: when that wake skipped the
+# cycle's other work, count it toward the bound above.
+signal_phase_note_deferred_prelude() {
+  [ "$SIGNAL_PHASE_FIRST" -eq 1 ] || return 0
+  prelude_defer_load
+  if printf '%s\n' "$((PRELUDE_DEFER_COUNT + 1))" > "$PRELUDE_DEFER_MARKER.tmp.$$" 2>/dev/null; then
+    mv -f "$PRELUDE_DEFER_MARKER.tmp.$$" "$PRELUDE_DEFER_MARKER" 2>/dev/null \
+      || rm -f "$PRELUDE_DEFER_MARKER.tmp.$$" 2>/dev/null
   fi
+  return 0
+}
 
-  # Self-eviction: if the singleton lock no longer names this process, a second
-  # watcher has taken over (e.g. a transient duplicate from a racy arm). Stand
-  # down so the rightful singleton continues alone. The EXIT trap's release
-  # no-ops because the lock pid is not ours, so the survivor's lock is untouched.
-  # This makes any duplicate self-resolve within one poll instead of persisting
-  # and doubling every wake.
-  if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" != "$WATCHER_PID" ]; then
-    exit 0
-  fi
-
-  watcher_beat force
-
-  # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
-  # status lines before this cycle can exit on a wake. Off costs one file test.
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
-  watcher_beat
-
-  if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
-    home_summary_refresh_detached
-  fi
-
-  # Ledger refresh and surfacing run before any signal or check exit below, so a chatty
-  # fleet can never starve the obligation scan (wake() exits the cycle).
-  if [ ! -e "$STATE/open-loops.json" ] \
-    || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
-    open_loops_refresh_detached
+# The cycle's other work: obligation-ledger surfacing, reconcile and liveness
+# ticks, process-event and inactive scans, and due checks. Each may wake and exit.
+prelude_phase() {
+  # Running the work clears the debt. A marker that cannot be removed stays owed,
+  # which is the previous order.
+  if [ -e "$PRELUDE_DEFER_MARKER" ] || [ -L "$PRELUDE_DEFER_MARKER" ]; then
+    rm -f -- "$PRELUDE_DEFER_MARKER" 2>/dev/null || true
   fi
   open_loops_surface
   watcher_beat
@@ -3006,7 +3008,11 @@ EOF
     fi
   fi
   watcher_beat
+}
 
+# Signal scan and classification, run before the cycle's other work unless that
+# work is owed. It exits the cycle through wake() on an actionable status line.
+signal_phase() {
   # On the first changed signal, linger one grace period and re-scan before
   # classifying: a crewmate's final status write and the same turn's turn-end
   # hook land seconds apart, and reporting them as separate actionable wakes
@@ -3104,6 +3110,7 @@ EOF
       done <<EOF
 $FM_SIGNAL_SURFACE_ENDPOINTS
 EOF
+      signal_phase_note_deferred_prelude
       wake "$reason"
     else
       while IFS=$(printf '\t') read -r sf sig f; do
@@ -3127,10 +3134,80 @@ EOF
         done <<EOF
 $pending
 EOF
+        signal_phase_note_deferred_prelude
         wake "$reason"
       fi
       triage_log "absorbed benign $reason"
     fi
+  fi
+}
+
+while :; do
+  # Home-gone exit: a deleted home, state directory, or code root means this
+  # watcher's world is gone (a torn-down temporary home or a discarded
+  # disposable checkout). Exit with a logged reason rather than writing state
+  # into nothing, or into a live home from a checkout that no longer exists.
+  # A detached helper this watcher started (home-summary refresh, reconcile)
+  # can recreate a deleted state directory before the next poll, so a lock
+  # with no holder at all is read as the same teardown: only a fresh watcher
+  # ever recreates the lock, and that case is the self-eviction below.
+  # Scoped to this process alone: no other watcher is signalled.
+  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$FM_HOME" ]; then
+    echo "watcher: exiting - home no longer exists: $FM_HOME" >&2
+    exit 1
+  elif [ ! -d "$STATE" ]; then
+    echo "watcher: exiting - state directory no longer exists: $STATE" >&2
+    exit 1
+  elif [ ! -e "$WATCH_LOCK/pid" ]; then
+    echo "watcher: exiting - state directory was torn down (singleton lock removed): $STATE" >&2
+    exit 1
+  elif [ ! -d "$SCRIPT_DIR" ]; then
+    echo "watcher: exiting - code root no longer exists: $SCRIPT_DIR" >&2
+    exit 1
+  fi
+
+  # Self-eviction: if the singleton lock no longer names this process, a second
+  # watcher has taken over (e.g. a transient duplicate from a racy arm). Stand
+  # down so the rightful singleton continues alone. The EXIT trap's release
+  # no-ops because the lock pid is not ours, so the survivor's lock is untouched.
+  # This makes any duplicate self-resolve within one poll instead of persisting
+  # and doubling every wake.
+  if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" != "$WATCHER_PID" ]; then
+    exit 0
+  fi
+
+  watcher_beat force
+
+  # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
+  # status lines before this cycle can exit on a wake. Off costs one file test.
+  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
+  watcher_beat
+
+  if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
+    home_summary_refresh_detached
+  fi
+
+  # Ledger refresh is detached and starts ahead of any signal or check exit, so a
+  # slow scan can never stall the beacon. Its surfacing wake is part of
+  # prelude_phase, where the bounded deferral below keeps a chatty fleet from
+  # starving it (wake() exits the cycle).
+  if [ ! -e "$STATE/open-loops.json" ] \
+    || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
+    open_loops_refresh_detached
+  fi
+
+  # Signals first, the cycle's other work second, unless that work is owed
+  # (see "Cycle order" above prelude_phase).
+  prelude_defer_load
+  if [ "$PRELUDE_DEFER_COUNT" -ge "$PRELUDE_MAX_DEFER" ]; then
+    SIGNAL_PHASE_FIRST=0
+    prelude_phase
+    signal_phase
+  else
+    SIGNAL_PHASE_FIRST=1
+    signal_phase
+    SIGNAL_PHASE_FIRST=0
+    prelude_phase
   fi
 
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy
