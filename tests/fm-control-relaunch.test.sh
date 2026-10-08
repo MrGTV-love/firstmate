@@ -84,12 +84,26 @@ SH
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+encode_cwd() {
+  local path=$1
+  path=${path//\\/\\\\}
+  path=${path//$'\xc3\xa9'/\\xc3\\xa9}
+  printf '%s' "$path"
+}
+excluded=
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -p ]; then excluded=${2:-}; shift; fi
+  shift
+done
+if [ "$excluded" != "^$$" ]; then
+  printf 'p%s\nn%s\n' "$$" "$(encode_cwd "$(pwd -P)")"
+fi
 case "$(cat "$D/lsof-mode" 2>/dev/null || printf none)" in
   broken) echo 'lsof: WARNING: could not read the process table' >&2; exit 1 ;;
   partial) printf 'p111\nn/\np222\nn/private/tmp\n'; echo 'lsof: WARNING: read timeout' >&2; exit 1 ;;
   nocwd) printf 'p111\nn/\np%s\n' "$(cat "$D/holder-pid")"; exit 0 ;;
   empty) exit 0 ;;
-  holder) printf 'p111\nn/\np222\nn/private/tmp\np%s\nn%s\n' "$(cat "$D/holder-pid")" "$(cat "$D/holder-cwd")"; exit 0 ;;
+  holder) printf 'p111\nn/\np222\nn/private/tmp\np%s\nn%s\n' "$(cat "$D/holder-pid")" "$(encode_cwd "$(cat "$D/holder-cwd")")"; exit 0 ;;
 esac
 printf 'p111\nn/\np222\nn/private/tmp\n'
 exit 0
@@ -277,10 +291,10 @@ new_case() {
   printf '%s\n' "$dir"
 }
 
-# add_ship_task <case-dir> <id> [harness] [session]
+# add_ship_task <case-dir> <id> [harness] [session] [worktree]
 add_ship_task() {
   local dir=$1 id=$2 harness=${3:-claude} ses=${4:-fmses}
-  local home="$dir/home" proj="$dir/proj" wt="$dir/wt"
+  local home="$dir/home" proj="$dir/proj" wt=${5:-"$dir/wt"}
   fm_git_worktree "$proj" "$wt" "task-$id"
   mkdir -p "$home/data/$id"
   cat > "$home/data/$id/brief.md" <<EOF
@@ -2419,9 +2433,9 @@ test_tmux_gone_endpoint_is_proven_despite_unrelated_servers() {
   for shape in window-absent session-missing server-dead shell-in-worktree; do
     id="rl90${shape//-/}"
     dir=$(new_case "tmux-scoped-$shape" "$id")
-    add_ship_task "$dir" "$id"
+    wt="$dir/wt-café\\lane"
+    add_ship_task "$dir" "$id" claude fmses "$wt"
     prepare_herdr_reclaim "$dir"
-    wt=$(meta_field "$dir" "$id" worktree)
     if [ "$shape" = shell-in-worktree ]; then
       # An idle shell in the copy is the pane's own leftover, not an agent.
       stage_gone "$dir" "$id" window-absent
@@ -2433,11 +2447,12 @@ test_tmux_gone_endpoint_is_proven_despite_unrelated_servers() {
     printf 'unlanded content\n' > "$wt/dirty.txt"
     printf 'working: preserved history\n' > "$dir/home/state/$id.status"
 
-    out=$(run_control "$dir" "$id" exit); rc=$?
+    mkdir -p "$wt/sub"
+    out=$(cd "$wt/sub" && run_control "$dir" "$id" exit); rc=$?
     expect_code 0 "$rc" "a gone recorded endpoint must be proven despite unrelated tmux servers ($shape)"$'\n'"$out"
     assert_contains "$out" endpoint-gone "exit should report proven absence ($shape)"
     rm -f "$dir/fake/list-count"
-    out=$(FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+    out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
     expect_code 0 "$rc" "relaunch must proceed for a gone recorded endpoint ($shape)"$'\n'"$out"
     [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "reclaim did not publish Herdr ($shape)"
     [ "$(meta_field "$dir" "$id" worktree)" = "$wt" ] || fail "reclaim changed the local copy ($shape)"
@@ -2458,7 +2473,7 @@ test_tmux_refuses_while_the_recorded_endpoint_may_be_live() {
   local dir shape id wt
   for shape in window-answers-first window-answers-second agent-in-worktree agent-in-subdirectory gemini-agent-in-worktree gemini-spaced-script-in-worktree; do
     id="rl91${shape//-/}"
-    dir=$(new_case "tmux-live-$shape" "$id")
+    dir=$(new_case "tmux-live-$shape-café\\lane" "$id")
     add_ship_task "$dir" "$id"
     stage_gone "$dir" "$id" window-absent
     wt=$(meta_field "$dir" "$id" worktree)
@@ -2655,16 +2670,17 @@ fi
 case "${1:-} ${2:-}" in
   'pane get')
     if [ -f "$D/herdr-cwd-${3:-}" ]; then
-      printf '{"result":{"pane":{"pane_id":"%s","foreground_cwd":"%s"}}}\n' \
-        "${3:-}" "$(cat "$D/herdr-cwd-${3:-}")"
+      cwd=$(cat "$D/herdr-cwd-${3:-}")
     elif [ "${3:-}" = "$(cat "$D/herdr-pane")" ]; then
-      printf '{"result":{"pane":{"pane_id":"%s","foreground_cwd":"%s"}}}\n' \
-        "${3:-}" "$(cat "$D/cwd")"
+      cwd=$(cat "$D/cwd")
     else
       # Only the pane this case says survived can be read back. Any other pane
       # id is structurally gone, which is herdr's `pane_not_found`.
       printf '{"error":{"code":"pane_not_found"}}\n'
+      exit 0
     fi
+    jq -cn --arg pane "${3:-}" --arg cwd "$cwd" \
+      '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}'
     exit 0 ;;
   'agent get')
     if [ -f "$D/herdr-agent-registration" ]; then

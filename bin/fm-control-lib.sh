@@ -302,6 +302,27 @@ fm_control_backend_state_verified() {  # <backend>
   return 1
 }
 
+fm_control_lsof_path() (
+  set -o pipefail
+  printf '%s' "$1" | LC_ALL=C od -An -v -tu1 | LC_ALL=C awk '
+    {
+      for (i = 1; i <= NF; i++) {
+        c = $i + 0
+        if (c == 255) exit 1
+        if (c == 8) printf "\\b"
+        else if (c == 9) printf "\\t"
+        else if (c == 10) printf "\\n"
+        else if (c == 12) printf "\\f"
+        else if (c == 13) printf "\\r"
+        else if (c < 32) printf "^%c", c + 64
+        else if (c == 92) printf "\\\\"
+        else if (c >= 127) printf "\\x%02x", c
+        else printf "%c", c
+      }
+    }
+  '
+)
+
 # fm_control_worktree_agent_holder: whether a harness agent process has the
 # recorded worktree (or a directory under it) as its working directory.
 # Prints `none`, `held`, or `unknown`; only `none` is evidence, and any read
@@ -317,8 +338,10 @@ fm_control_worktree_agent_holder() {  # <worktree>
   wt=${wt%/}
   [ -n "$wt" ] || { printf 'unknown'; return 0; }
   wt_real=$(cd "$wt" 2>/dev/null && pwd -P) || wt_real=$wt
+  wt=$(fm_control_lsof_path "$wt") || { printf 'unknown'; return 0; }
+  wt_real=$(fm_control_lsof_path "$wt_real") || { printf 'unknown'; return 0; }
   command -v lsof >/dev/null 2>&1 || { printf 'unknown'; return 0; }
-  records=$(LC_ALL=C lsof -w +c 0 -d cwd -F pn 2>/dev/null)
+  records=$(LC_ALL=C sh -c 'exec lsof -w +c 0 -d cwd -F pn -p "^$$"' 2>/dev/null)
   rc=$?
   [ "$rc" -eq 0 ] || { printf 'unknown'; return 0; }
   while IFS= read -r line; do
