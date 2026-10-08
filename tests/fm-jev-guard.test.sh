@@ -24,8 +24,9 @@ mkdir -p "$HOME_DIR/config" "$HOME_DIR/state" "$TASK_DATA" "$WT"
 printf 'TYPESAFE_API_KEY=%s\n' "$KEY" > "$HOME_DIR/.env"
 
 # The fake endpoint answers every declared question. A state naming rm -rf,
-# IGNORE PREVIOUS or sk-live answers the risky way; fail500 returns HTTP 500.
-# Every request appends its Authorization header and body to requests.log.
+# IGNORE PREVIOUS or sk-live answers the risky way; fail500 returns HTTP 500,
+# and tsdown returns HTTP 500 from the TypeSafe path only. Every request
+# appends its path, Authorization header and body to requests.log.
 cat > "$TMP_ROOT/fake.mjs" <<'JS'
 import { createServer } from 'node:http';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -34,10 +35,10 @@ const server = createServer((req, res) => {
   let body = '';
   req.on('data', chunk => { body += chunk; });
   req.on('end', () => {
-    appendFileSync(log, JSON.stringify({ auth: req.headers.authorization, body }) + '\n');
+    appendFileSync(log, JSON.stringify({ path: req.url, auth: req.headers.authorization, body }) + '\n');
     const request = JSON.parse(body);
     const text = JSON.stringify(request.state);
-    if (text.includes('fail500')) { res.statusCode = 500; res.end('{}'); return; }
+    if (text.includes('fail500') || (text.includes('tsdown') && req.url.endsWith('/systemone'))) { res.statusCode = 500; res.end('{}'); return; }
     const risky = /rm -rf|IGNORE PREVIOUS|sk-live/.test(text);
     const answers = {};
     for (const [id, q] of Object.entries(request.questions)) {
@@ -60,7 +61,8 @@ trap 'kill "$FAKE_PID" 2>/dev/null; fm_test_cleanup' EXIT
 for _ in $(seq 1 100); do [ -s "$TMP_ROOT/port" ] && break; sleep 0.05; done
 [ -s "$TMP_ROOT/port" ] || fail "fake TypeSafe endpoint did not start"
 FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/port")/v1/systemone"
-export FM_TEST_SEAM=1 FM_JEV_GUARD_BASE_URL
+FM_JEV_GUARD_OPENROUTER_URL="http://127.0.0.1:$(cat "$TMP_ROOT/port")/api/alpha/decisions"
+export FM_TEST_SEAM=1 FM_JEV_GUARD_BASE_URL FM_JEV_GUARD_OPENROUTER_URL
 
 requests() { wc -l < "$REQUESTS" | tr -d ' '; }
 
@@ -137,7 +139,7 @@ test_ledger_privacy() {
   [ -s "$ledger" ] || fail "no ledger rows were written"
   mode=$(stat -f %Lp "$ledger" 2>/dev/null || stat -c %a "$ledger")
   [ "$mode" = 600 ] || fail "the ledger must be private, got mode $mode"
-  ! grep -q "$KEY" "$ledger" || fail "the key reached the ledger"
+  ! grep -q "$KEY\|fm-jev-guard-or-key" "$ledger" || fail "a key reached the ledger"
   ! grep -q 'IGNORE PREVIOUS\|plain text' "$ledger" || fail "a request body reached the ledger"
   jq -se 'all(.[]; .task == "t1" and (has("state") | not) and (has("questions") | not)) and any(.[]; .kind == "jev" and .usage.input_tokens == 3)' "$ledger" >/dev/null \
     || fail "ledger rows must carry the task and usage without the request body"
@@ -167,6 +169,33 @@ test_unavailable_paths_allow() {
     || fail "malformed hook input must exit 0"
   [ -z "$out" ] || fail "malformed hook input must print nothing: $out"
   pass "never-send matches, HTTP failures, a missing key and malformed input allow without blocking"
+}
+
+test_openrouter_fallback() {
+  local out before
+  before=$(requests)
+  out=$(claude_hook "$(pre Bash '{"command":"rm -rf tsdown"}')")
+  [ -z "$out" ] || fail "a failed direct call with no OpenRouter key must allow: $out"
+  [ "$(requests)" -eq $((before + 1)) ] || fail "with no OpenRouter key only the direct call may be made"
+
+  printf 'OPENROUTER_API_KEY=fm-jev-guard-or-key\n' >> "$HOME_DIR/.env"
+  before=$(requests)
+  out=$(claude_hook "$(pre Bash '{"command":"rm -rf tsdown"}')")
+  deny_reason "$out" >/dev/null || fail "the OpenRouter fallback answer did not drive the upstream gate: $out"
+  [ "$(requests)" -eq $((before + 2)) ] || fail "a failed direct call must be followed by exactly one OpenRouter call"
+  tail -2 "$REQUESTS" | jq -se --arg ts "Bearer $KEY" '.[0].path == "/v1/systemone" and .[0].auth == $ts
+    and .[1].path == "/api/alpha/decisions" and .[1].auth == "Bearer fm-jev-guard-or-key"
+    and (.[1].body | fromjson | .model == "~typesafe/jev-latest")' >/dev/null \
+    || fail "the fallback did not go TypeSafe first, then OpenRouter with its own key and upstream model"
+  jq -se 'map(select(.kind == "jev")) | last | .provider == "openrouter"' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null \
+    || fail "the ledger must record which provider answered"
+
+  before=$(requests)
+  out=$(claude_hook "$(pre Bash '{"command":"ls"}')")
+  [ "$(requests)" -eq $((before + 1)) ] || fail "a healthy direct call must not touch OpenRouter"
+  tail -1 "$REQUESTS" | jq -e '.path == "/v1/systemone"' >/dev/null || fail "a healthy call must go to TypeSafe direct"
+  sed -i.bak '/^OPENROUTER_API_KEY=/d' "$HOME_DIR/.env" && rm -f "$HOME_DIR/.env.bak"
+  pass "TypeSafe direct first; OpenRouter only after a failed direct call and only with its key"
 }
 
 test_claude_adapter_under_node() {
@@ -212,6 +241,7 @@ test_claude_bash_gate
 test_claude_write_gate
 test_claude_result_screen
 test_unavailable_paths_allow
+test_openrouter_fallback
 test_claude_adapter_under_node
 test_omp_installer
 test_ledger_privacy

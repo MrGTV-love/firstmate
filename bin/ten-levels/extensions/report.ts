@@ -39,6 +39,14 @@ function typesafeKey(): string {
   });
 }
 
+/** Firstmate: the OpenRouter fallback key from the same home .env, used only after TypeSafe direct fails. */
+function openrouterKey(): string {
+  return execFileSync("bash", ["-c", '. "$1"; fm_openrouter_key "$2" && printf %s "$OPENROUTER_API_KEY_PRIVATE"', "jev-guard", lib, home], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+}
+
 /** Firstmate: the existing config/dispatch-never-send policy decides what may leave the machine. */
 function permitted(state: State): void {
   execFileSync("bash", ["-c", '. "$1"; s=$(mktemp) || exit 1; fm_typesafe_permitted "$(cat)" "$2" "$s"; rc=$?; rm -f "$s"; exit "$rc"', "jev-guard", lib, resolve(config, "dispatch-never-send")], {
@@ -47,12 +55,24 @@ function permitted(state: State): void {
   });
 }
 
+const seam = (name: string) => process.env.FM_TEST_SEAM === "1" ? process.env[name] || undefined : undefined;
 let client: JevClient | undefined;
-export const jev = () => (client ??= new JevClient({
-  provider: "typesafe",
-  apiKey: typesafeKey(),
-  baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined,
-}));
+export const jev = () => (client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), baseUrl: seam("FM_JEV_GUARD_BASE_URL") }));
+let fallback: JevClient | undefined;
+const openrouter = () => (fallback ??= new JevClient({ provider: "openrouter", apiKey: openrouterKey(), baseUrl: seam("FM_JEV_GUARD_OPENROUTER_URL") }));
+
+/** Firstmate: TypeSafe direct first; OpenRouter only when the direct call is unavailable or fails. */
+async function systemOne(state: State, questions: Questions) {
+  try {
+    return await jev().systemOne(state, questions);
+  } catch (direct) {
+    try {
+      return await openrouter().systemOne(state, questions);
+    } catch {
+      throw direct;
+    }
+  }
+}
 
 /** The level config the lab passed in, JEV_LEVEL_CONFIG as JSON. */
 export function levelConfig<T extends object>(fallback: T): T {
@@ -86,8 +106,8 @@ export async function decide(pi: any, source: string, state: State, questions: Q
   validateQuestions(questions);
   permitted(state);
   const started = performance.now();
-  const result = await jev().systemOne(state, questions);
+  const result = await systemOne(state, questions);
   const out: Decision = { answers: result.answers, usage: result.usage, model: result.model, ms: Math.round(performance.now() - started) };
-  report(pi, "jev", { source, state, questions, answers: out.answers, usage: out.usage, model: out.model, ms: out.ms, ...extra });
+  report(pi, "jev", { source, state, questions, answers: out.answers, usage: out.usage, model: out.model, ms: out.ms, provider: result.meta.provider, ...extra });
   return out;
 }
