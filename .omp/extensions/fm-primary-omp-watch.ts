@@ -548,28 +548,33 @@ async function waitForGenerationChildClose(armChild: ChildProcess | null): Promi
 async function stopSessionGeneration(generation: SessionGeneration, replacement: boolean): Promise<void> {
   generation.replacement = replacement;
   let persistedTokens = "";
-  try {
-    if (replacement && generation.pendingActionables.length > 0) {
+  const persistPending = (): boolean => {
+    try {
       persistReplacementHandoff(generation.pendingActionables);
+      return true;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      for (const pending of generation.pendingActionables) {
+        if (replacementCoordinator.pending.some((item) => item.token === pending.token)) continue;
+        replacementCoordinator.pending.push({
+          ...pending,
+          message: `${pending.message}\n\nwatcher: FAILED - omp extension could not persist a replacement-session actionable wake\n${detail}`,
+        });
+      }
+      return false;
+    }
+  };
+  try {
+    if (replacement && generation.pendingActionables.length > 0 && persistPending()) {
       persistedTokens = generation.pendingActionables.map((pending) => pending.token).join("\n");
     }
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    for (const pending of generation.pendingActionables) {
-      if (replacementCoordinator.pending.some((item) => item.token === pending.token)) continue;
-      replacementCoordinator.pending.push({
-        ...pending,
-        message: `${pending.message}\n\nwatcher: FAILED - omp extension could not persist a replacement-session actionable wake\n${detail}`,
-      });
-    }
-    throw error;
   } finally {
     const child = stopGeneration(generation);
     await waitForGenerationChildClose(child);
   }
   const currentTokens = generation.pendingActionables.map((pending) => pending.token).join("\n");
   if (replacement && currentTokens && currentTokens !== persistedTokens) {
-    persistReplacementHandoff(generation.pendingActionables);
+    persistPending();
   }
 }
 
@@ -591,23 +596,28 @@ process.once("exit", cleanupOnProcessExit);
 
 type OmpWatchInstanceApi = {
   activate: () => Promise<ArmResult>;
-  retire: () => Promise<void>;
+  retire: () => { recovery: boolean; stopped: Promise<void> };
 };
 
 export default function (pi: ExtensionAPI) {
   const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state);
   const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
   let generation = createGeneration();
+  lifecycle("generation-create", { generation: generation.id, cause: "factory-bind" });
   activateGeneration(generation);
+  lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
   // The stop of the latest generation, so a self-heal never races the child
   // retirement that stop is still waiting on.
   let generationStopped: Promise<void> = Promise.resolve();
   let healTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryPending = false;
   lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
   if (instance.previous?.api) {
-    void instance.previous.api.retire().catch(() => {
-      // The superseded instance records its own retirement; nothing to deliver.
-    });
+    const predecessor = instance.previous.api.retire();
+    generationStopped = predecessor.stopped;
+    recoveryPending = predecessor.recovery;
+    if (recoveryPending) scheduleSelfHeal(generation);
+    void generationStopped.catch(() => {});
   }
 
   function clearHealTimer(): void {
@@ -620,6 +630,7 @@ export default function (pi: ExtensionAPI) {
   // an arm call on a stopped generation all bind through here.
   function bindLiveGeneration(cause: string): void {
     clearHealTimer();
+    recoveryPending = false;
     if (generation.stopping) {
       generation = createGeneration();
       lifecycle("generation-create", { generation: generation.id, cause });
@@ -629,12 +640,14 @@ export default function (pi: ExtensionAPI) {
   }
 
   function scheduleSelfHeal(stopped: SessionGeneration): void {
-    if (!instance.isCurrent() || generation !== stopped || !stopped.stopping) return;
+    if (!instance.isCurrent() || generation !== stopped || !recoveryPending) return;
     clearHealTimer();
     const shutdownAt = Date.now();
-    const timer = setTimeout(() => {
+    const retirement = generationStopped;
+    const timer = setTimeout(async () => {
       if (healTimer === timer) healTimer = null;
-      if (!instance.isCurrent() || generation !== stopped || !stopped.stopping) return;
+      await retirement;
+      if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement || !recoveryPending) return;
       const owned = lockOwnership() === "owned";
       lifecycle("bound-expired", {
         waiter: "omp-watch-extension",
@@ -663,18 +676,16 @@ export default function (pi: ExtensionAPI) {
       if (current?.api) return await current.api.activate();
       return { ok: false, message: shuttingDownMessage };
     }
-    if (generation.stopping) {
-      const stopped = generation;
-      const retirement = generationStopped;
-      await retirement;
-      if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement) {
-        return armFromSession();
-      }
-      if (generation.stopping) {
-        lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
-        bindLiveGeneration("arm-call");
-        markLoaded();
-      }
+    const stopped = generation;
+    const retirement = generationStopped;
+    await retirement;
+    if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement) {
+      return armFromSession();
+    }
+    if (generation.stopping || recoveryPending) {
+      lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
+      bindLiveGeneration("arm-call");
+      markLoaded();
     }
     return activateOwnedWatch(generation);
   }
@@ -1258,7 +1269,7 @@ export default function (pi: ExtensionAPI) {
       loadFailure = `watcher: FAILED - omp extension could not load a replacement-session actionable wake\n${detail}`;
     }
     const inProcessPending = replacementCoordinator.pending.splice(0);
-    for (const actionable of [...pending, ...inProcessPending]) {
+    for (const actionable of [...inProcessPending, ...pending]) {
       enqueuePendingActionable(owner, actionable);
     }
     if (owner.pendingActionables.length > 0) {
@@ -1302,6 +1313,8 @@ export default function (pi: ExtensionAPI) {
     }
     rememberContext(ctx);
     lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
+    await generationStopped;
+    if (!instance.isCurrent()) return;
     bindLiveGeneration("session_start");
     markLoaded();
     if (lockOwnership() !== "owned") return;
@@ -1321,7 +1334,8 @@ export default function (pi: ExtensionAPI) {
     restoreTimer = null;
     latestContext = null;
     const stopped = generation;
-    generationStopped = stopSessionGeneration(stopped, true);
+    recoveryPending = true;
+    generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true)]).then(() => {});
     try {
       await generationStopped;
     } finally {
@@ -1358,14 +1372,20 @@ export default function (pi: ExtensionAPI) {
 
   instance.publish({
     activate: armFromSession,
-    retire: async () => {
+    retire: () => {
       clearHealTimer();
       lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
       if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
       if (restoreTimer) clearTimeout(restoreTimer);
       restoreTimer = null;
-      generationStopped = stopSessionGeneration(generation, true);
-      await generationStopped;
+      const stopped = generation;
+      if (!stopped.stopping) {
+        generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true)]).then(() => {});
+      }
+      const retirement = generationStopped.finally(() => {
+        lifecycle("generation-stop", { generation: stopped.id, cause: "factory-retire" });
+      });
+      return { recovery: recoveryPending, stopped: retirement };
     },
   });
 
