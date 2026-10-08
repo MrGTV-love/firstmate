@@ -1490,15 +1490,17 @@ SH
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import fs, { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 const home = process.env.FM_HOME;
 writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null;
+const sent = [];
 const pi = {
   on(e, h) { handlers.set(e, h); },
   registerCommand() {},
   registerTool(t) { tool = t; },
-  sendUserMessage() { return undefined; },
+  sendUserMessage(message) { sent.push(message); },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
@@ -1548,7 +1550,7 @@ const rebound = (module) => {
     on(e, h) { handlers.set(e, h); },
     registerCommand() {},
     registerTool(t) { box.tool = t; },
-    sendUserMessage() { return undefined; },
+    sendUserMessage(message) { sent.push(message); },
   });
   return { handlers, box };
 };
@@ -1586,6 +1588,39 @@ const refused = await foreign.box.tool.execute();
 if (refused.details.ok || !refused.details.message.includes("read-only")) throw new Error("foreign factory recovery did not preserve lock ownership");
 writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 await foreign.handlers.get("session_shutdown")({}, {});
+const unhandled = [];
+process.on("unhandledRejection", (error) => unhandled.push(String(error)));
+const originalWrite = fs.writeFileSync;
+let injected = 0;
+let fault = true;
+writeFileSync(`${home}/state/.omp-watch-extension-loaded`, "stale\n");
+fs.writeFileSync = function(path, ...args) {
+  if (fault && String(path) === `${home}/state/.omp-watch-extension-loaded`) {
+    fault = false;
+    injected++;
+    throw Object.assign(new Error("transient owner write failure"), { code: "EIO" });
+  }
+  return originalWrite.call(this, path, ...args);
+};
+syncBuiltinESMExports();
+for (let i = 0; i < 100 && !injected; i++) await sleep(20);
+await sleep(100);
+if (injected !== 1 || arms() !== 7) throw new Error("timed owner failure did not stop activation");
+const failures = sent.filter((message) => message.includes("transient owner write failure"));
+if (failures.length !== 1) throw new Error("timed activation lost its failure wake");
+if (unhandled.length) throw new Error(`unhandled activation rejection: ${unhandled.join("; ")}`);
+const beforeRepair = lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length;
+const repair = await foreign.box.tool.execute();
+if (!repair.details.ok) throw new Error("timed activation failure poisoned arm repair");
+if (lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length !== beforeRepair + 1) throw new Error("failed activation consumed the recovery obligation");
+await waitForArms(8);
+fs.writeFileSync = originalWrite;
+syncBuiltinESMExports();
+const liveReplacement = rebound(successorModule);
+await waitForArms(9);
+const liveArm = await liveReplacement.box.tool.execute();
+if (!liveArm.details.ok || !liveArm.details.message.includes("unchanged")) throw new Error("live factory retirement did not recover without session_start");
+await liveReplacement.handlers.get("session_shutdown")({}, {});
 process.exit(0);
 EOF
 )
@@ -1746,6 +1781,16 @@ EOF
   pass ".omp watch extension: publication failure retains the wake and permits tool, command, and factory repair"
 }
 
+test_watch_lifecycle_deadline_diagnostics() {
+  local repo="$TMP_ROOT/omp-expiry-root" out status
+  install_omp_extension_fixture "$repo"
+  out=$(node "$ROOT/tests/watch-lifecycle-expiry.mjs" omp "$repo" 2>&1)
+  status=$?
+  expect_code 0 "$status" "omp lifecycle deadline diagnostics: $out"
+  pass "omp shutdown, arm and host readiness, and unready retirement each log one expiry"
+}
+
+test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring

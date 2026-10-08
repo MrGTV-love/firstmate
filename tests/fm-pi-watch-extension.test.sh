@@ -165,12 +165,15 @@ const waitForArms = async (expected) => {
   if (arms() !== expected) throw new Error(`factory recovery expected ${expected} arms, saw ${arms()}`);
 };
 const successorModule = await import(`${pathToFileURL(process.env.PLUGIN).href}?rebound`);
-const terminal = rebound(successorModule);
+rebound(successorModule);
+const terminalAgain = rebound(successorModule);
 await sleep(900);
 if (arms() !== 3) throw new Error("factory rebinding revived a terminal quit");
-await terminal.handlers.get("session_start")({}, {});
+const terminalArm = await terminalAgain.box.tool.execute();
+if (terminalArm.details.ok || !terminalArm.details.message.includes("shutting down")) throw new Error("repeated factory binding revived terminal ownership");
+await terminalAgain.handlers.get("session_start")({}, {});
 await waitForArms(4);
-let owner = terminal;
+let owner = terminalAgain;
 for (const reason of ["reload", "new", "resume", "fork"]) {
   const shutdown = owner.handlers.get("session_shutdown")({ reason }, {});
   const successor = rebound(successorModule);
@@ -268,6 +271,7 @@ fs.renameSync = function(from, to) {
 };
 syncBuiltinESMExports();
 const unhandled = [];
+const sent = [];
 process.on("unhandledRejection", (error) => unhandled.push(String(error)));
 const module = await import(pathToFileURL(process.env.PLUGIN).href);
 const bind = () => {
@@ -276,7 +280,7 @@ const bind = () => {
     on(event, handler) { handlers.set(event, handler); },
     registerCommand() {},
     registerTool(tool) { if (tool.name === "fm_watch_arm_pi") box.tool = tool; },
-    sendUserMessage: async () => {},
+    sendUserMessage: async (message) => { sent.push(message); },
     events: { on() {}, emit() {} },
   });
   return { handlers, box };
@@ -312,7 +316,6 @@ for (const operation of ["write", "rename"]) {
       if (!repair.details.ok) throw new Error(`arm recovery rejected: ${JSON.stringify(repair.details)}`);
     }
     if (recovery === "factory-stopped") owner = bind();
-    if (recovery === "factory-live") await owner.handlers.get("session_start")({}, {});
     await waitForArms(++expected);
     const after = readFileSync(marker, "utf8");
     if (after === before || !after.includes("phase=active")) throw new Error(`${operation}/${recovery} did not publish a fresh active generation`);
@@ -324,6 +327,23 @@ for (const operation of ["write", "rename"]) {
     }
     if (unhandled.length) throw new Error(`unhandled retirement rejection: ${unhandled.join("; ")}`);
   }
+}
+for (const operation of ["write", "rename"]) {
+  await owner.handlers.get("session_shutdown")({ reason: "reload" }, {});
+  const previousFaults = injected;
+  const previousFailures = sent.length;
+  fault = operation;
+  for (let i = 0; i < 100 && injected === previousFaults; i++) await sleep(20);
+  await sleep(100);
+  if (injected !== previousFaults + 1 || rows().length !== expected) throw new Error(`timed ${operation} failure did not stop activation`);
+  const failures = sent.slice(previousFailures);
+  if (failures.length !== 1 || !failures[0].includes(`transient owner ${operation} failure`)) throw new Error("timed activation lost its failure wake");
+  if (unhandled.length) throw new Error(`unhandled activation rejection: ${unhandled.join("; ")}`);
+  const beforeRepair = lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length;
+  const repair = await owner.box.tool.execute();
+  if (!repair.details.ok) throw new Error("timed activation failure poisoned arm repair");
+  if (lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length !== beforeRepair + 1) throw new Error("failed activation consumed the recovery obligation");
+  await waitForArms(++expected);
 }
 await owner.handlers.get("session_shutdown")({ reason: "quit" }, {});
 await sleep(900);
@@ -5552,6 +5572,16 @@ EOF
   pass "OpenCode healthy arm output does not suppress the turn-end guard"
 }
 
+test_pi_lifecycle_deadline_diagnostics() {
+  local repo="$TMP_ROOT/pi-expiry-root" out status
+  install_pi_watch_extension_fixture "$repo"
+  out=$(node "$ROOT/tests/watch-lifecycle-expiry.mjs" pi "$repo" 2>&1)
+  status=$?
+  expect_code 0 "$status" "Pi lifecycle deadline diagnostics: $out"
+  pass "Pi shutdown, readiness, and unready retirement each log one expiry"
+}
+
+test_pi_lifecycle_deadline_diagnostics
 test_pi_extension_reports_external_healthy_watcher
 test_pi_replacement_without_successor_heals_once
 test_pi_factory_replacement_retires_and_hands_off
