@@ -93,7 +93,11 @@ print(json.dumps({"argv": sys.argv[1:], "gen": os.environ.get("FM_SPAWN_GEN"),
                   "shell": os.environ.get("BOUNDARY_SHELL")}))
 PY
   for harness in omp codex; do
-    printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$PYTHON_BIN" "$CASE_DIR/probe.py" > "$FAKEBIN/$harness"
+    printf '#!/bin/sh\n' > "$FAKEBIN/$harness"
+    if [ "$harness" = omp ]; then
+      printf 'if [ "${1:-}" = --version ]; then\n  printf "omp/18.1.20\\n"\n  exit 0\nfi\n' >> "$FAKEBIN/$harness"
+    fi
+    printf 'exec "%s" "%s" "$@"\n' "$PYTHON_BIN" "$CASE_DIR/probe.py" >> "$FAKEBIN/$harness"
     chmod +x "$FAKEBIN/$harness"
   done
   chmod +x "$FAKEBIN/herdr" "$FAKEBIN/ps"
