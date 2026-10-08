@@ -252,9 +252,16 @@ test_claude_hooks_semantic_lifecycle() {
   jq -e '.hooks.PreToolUse[0].matcher == "^(Bash|Write|Edit)$" and .hooks.PostToolUse[0].matcher == "^(Bash|Read)$"
     and .hooks.PreToolUse[0].hooks[0].command == .hooks.PostToolUse[0].hooks[0].command' "$settings" >/dev/null \
     || fail "claude hook settings lack the jev-guard tool hooks"
-  out=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")
-  assert_contains "$out" "/bin/fm-jev-guard-hook.sh' '$HOME_DIR' " "jev-guard hook is not pinned to the owning home"
-  assert_contains "$out" "'$id' '$WT_DIR' '$HOME_DIR/data/$id'" "jev-guard hook lacks the task, worktree and task data directory"
+  python3 - "$settings" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$state" "$id" "$WT_DIR" "$(basename "$PROJ_DIR")" <<'PY' \
+    || fail "Claude's generated hook invocation lost its worker context"
+import json, shlex, sys
+settings, hook, home, state, task, worktree, project = sys.argv[1:]
+with open(settings) as file:
+    hooks = json.load(file)["hooks"]
+expected = [hook, home, home + "/config", state, task, worktree, home + "/data/" + task, project]
+for event in ("PreToolUse", "PostToolUse"):
+    assert shlex.split(hooks[event][0]["hooks"][0]["command"]) == expected
+PY
   out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
     | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE sh -c "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")" 2>&1) \
     || fail "the generated jev-guard hook must exit 0 without a key"

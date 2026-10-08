@@ -1,5 +1,5 @@
 // Claude Code hook adapter for the ten-levels jev-guard (bin/fm-jev-guard.ts).
-// Usage: bin/fm-jev-guard-hook.sh <home> <config> <state> <task> <worktree> <data> < hook.json
+// Usage: bin/fm-jev-guard-hook.sh <home> <config> <state> <task> <worktree> <data> <project> < hook.json
 // Registered by fm-spawn.sh in a Claude worker's .claude/settings.local.json:
 // PreToolUse Bash|Write|Edit runs the upstream tool_call handler and
 // PostToolUse Bash|Read runs its tool_result handler. A block becomes a
@@ -10,9 +10,9 @@
 import { readFileSync } from "node:fs";
 import { installJevGuard } from "./fm-jev-guard.ts";
 
-const [home, config, state, task, worktree, data] = process.argv.slice(2);
+const [home, config, state, task, worktree, data, project] = process.argv.slice(2);
 const handlers: Record<string, (event: any, ctx: any) => Promise<any>> = {};
-installJevGuard({ on: (name: string, handler: any) => { handlers[name] = handler; } }, { home, config, state, task, worktree, data });
+installJevGuard({ on: (name: string, handler: any) => { handlers[name] = handler; } }, { home, config, state, task, worktree, data, project });
 
 function text(response: any): string {
   if (typeof response === "string") return response;

@@ -23,6 +23,7 @@ let home = resolve(bin, "..");
 let config = resolve(home, "config");
 let ledger: string | undefined;
 let task = "";
+let project: string | undefined;
 
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
 
@@ -45,11 +46,12 @@ function preflightTimeout(): number {
 }
 
 /** Firstmate: the owning home, its config and state directories, and the task this session runs. */
-export function configure(c: { home: string; config: string; state: string; task: string }): void {
+export function configure(c: { home: string; config: string; state: string; task: string; project?: string }): void {
   home = c.home;
   config = c.config;
   ledger = resolve(c.state, "jev-guard.jsonl");
   task = c.task;
+  project = c.project;
 }
 
 /** Firstmate: the single primary-home key, resolved at call time and never placed in the environment. */
@@ -72,6 +74,7 @@ function openrouterKey(): string {
 
 /** Firstmate: the existing config/dispatch-never-send policy decides what may leave the machine. */
 function permitted(state: State): void {
+  if (project !== "firstmate") throw new Error("Jev guard data egress is authorized only for the firstmate project.");
   execFileSync("bash", ["-c", '. "$1"; s=$(mktemp) || exit 1; fm_typesafe_permitted "$(cat)" "$2" "$s"; rc=$?; rm -f "$s"; exit "$rc"', "jev-guard", lib, resolve(config, "dispatch-never-send")], {
     input: JSON.stringify(state),
     stdio: ["pipe", "ignore", "ignore"],

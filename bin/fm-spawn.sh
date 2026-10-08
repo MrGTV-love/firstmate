@@ -5030,6 +5030,15 @@ if [ "$KIND" != secondmate ]; then
     /*) ;;
     *) guard_data="$PWD/$guard_data" ;;
     esac
+    guard_project=
+    if guard_proj_real=$(cd "$PROJ_ABS" 2>/dev/null && pwd -P) \
+      && guard_root_real=$(cd "$FM_ROOT" 2>/dev/null && pwd -P); then
+      if [ "$guard_proj_real" = "$guard_root_real" ]; then
+        guard_project=firstmate
+      else
+        guard_project=$(basename "$PROJ_ABS")
+      fi
+    fi
     ;;
   esac
   case "$HARNESS" in
@@ -5050,7 +5059,7 @@ if [ "$KIND" != secondmate ]; then
     j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guard_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
-    j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data")")
+    j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project")")
     cat >"$WT/.claude/settings.local.json" <<EOF
 {"hooks":{"PreToolUse":[{"matcher":"^(Bash|Write|Edit)$","hooks":[{"type":"command","command":"$j_guard","timeout":30}]}],"PostToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guard","timeout":30}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop","timeout":25}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
 EOF
@@ -5217,8 +5226,8 @@ EOF
     # worktree-resident copy a SECOND time next to the explicit -e (verified,
     # omp 18.1.11). Lives in state/, cleaned by teardown.
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
-      --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" \
-      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data}') || exit 1
+      --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
+      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project}') || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.

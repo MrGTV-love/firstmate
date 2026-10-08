@@ -1,6 +1,6 @@
 // Installs disler's ten-levels level 6 jev-guard (bin/ten-levels, see SOURCE.md
 // there) into one Firstmate ship or scout worker session.
-// Usage: installJevGuard(pi, {home, config, state, task, worktree, data}) from the
+// Usage: installJevGuard(pi, {home, config, state, task, worktree, data, project}) from the
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // The upstream extension runs unchanged. This glue only configures the owning
 // home for key, never-send policy and ledger, and picks the write gate's repo
@@ -20,6 +20,7 @@ export interface JevGuardContext {
   task: string;
   worktree: string;
   data: string;
+  project?: string;
 }
 
 function real(path: string): string[] {

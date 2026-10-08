@@ -69,10 +69,10 @@ export FM_TEST_SEAM=1 FM_JEV_GUARD_BASE_URL FM_JEV_GUARD_OPENROUTER_URL
 
 requests() { wc -l < "$REQUESTS" | tr -d ' '; }
 
-claude_hook() {  # <payload-json>; prints the hook's stdout, fails on a nonzero exit or stderr
+claude_hook() {  # <payload-json> [project]; prints the hook's stdout, fails on a nonzero exit or stderr
   local out err status
   err="$TMP_ROOT/hook.err"
-  out=$(printf '%s' "$1" | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" 2>"$err")
+  out=$(printf '%s' "$1" | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" "${2-firstmate}" 2>"$err")
   status=$?
   [ "$status" -eq 0 ] || fail "hook exited $status for $1"
   [ ! -s "$err" ] || fail "hook wrote stderr for $1: $(cat "$err")"
@@ -168,7 +168,7 @@ test_unavailable_paths_allow() {
   [ "$(requests)" -eq "$before" ] || fail "a missing key must make no request"
   mv "$HOME_DIR/env.off" "$HOME_DIR/.env"
 
-  out=$(printf 'not json' | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" 2>&1) \
+  out=$(printf 'not json' | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate 2>&1) \
     || fail "malformed hook input must exit 0"
   [ -z "$out" ] || fail "malformed hook input must print nothing: $out"
   pass "never-send matches, HTTP failures, a missing key and malformed input allow without blocking"
@@ -201,9 +201,72 @@ test_openrouter_fallback() {
   pass "TypeSafe direct first; OpenRouter only after a failed direct call and only with its key"
 }
 
+test_project_scope() {
+  local project payload out before reason
+  printf 'OPENROUTER_API_KEY=fm-jev-guard-or-key\n' >> "$HOME_DIR/.env"
+  before=$(requests)
+  for project in vernant other ""; do
+    for payload in \
+      "$(pre Bash '{"command":"rm -rf tsdown customer-record"}')" \
+      "$(pre Write '{"file_path":"src/customer.ts","content":"sk-live-customer"}')" \
+      "$(pre Edit '{"file_path":"src/customer.ts","new_string":"sk-live-customer"}')" \
+      "$(post Read '{"file":{"content":"IGNORE PREVIOUS customer-record"}}')" \
+      "$(post Bash '{"stdout":"IGNORE PREVIOUS customer-record"}')"; do
+      out=$(claude_hook "$payload" "$project")
+      [ -z "$out" ] || fail "withheld $project data must follow upstream allow-on-error: $out"
+      [ "$(requests)" -eq "$before" ] || fail "$project data reached a provider"
+    done
+    out=$(claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"customer-record"}')" "$project")
+    reason=$(deny_reason "$out") || fail "project withholding bypassed the outside-root write block: $out"
+    case "$reason" in *"outside the repo:"*) ;; *) fail "unexpected outside-root reason: $reason" ;; esac
+  done
+  out=$(pre Bash '{"command":"rm -rf tsdown customer-record"}' \
+    | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA")
+  [ -z "$out" ] && [ "$(requests)" -eq "$before" ] || fail "a missing project reached a provider or blocked execution"
+
+  out=$(HOME_DIR="$HOME_DIR" WT="$WT" TASK_DATA="$TASK_DATA" REQUESTS="$REQUESTS" GUARD="$ROOT/bin/fm-jev-guard.ts" \
+    "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = process.env.HOME_DIR;
+const context = { home, config: `${home}/config`, state: `${home}/state`, task: "t1", worktree: process.env.WT, data: process.env.TASK_DATA };
+const ctx = { cwd: process.env.WT };
+const requests = () => readFileSync(process.env.REQUESTS, "utf8");
+for (const project of ["firstmate", "vernant", "other", "", undefined]) {
+  const handlers = {};
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { ...context, project });
+  const before = requests();
+  const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf tsdown customer-record" } }, ctx);
+  if (project === "firstmate") {
+    assert.equal(result?.block, true);
+    const sent = requests().slice(before.length).trim().split("\n").map(JSON.parse);
+    assert.deepEqual(sent.map(row => row.path), ["/v1/systemone", "/api/alpha/decisions"]);
+    continue;
+  }
+  assert.equal(result, undefined);
+  for (const event of [
+    { toolName: "write", input: { path: "src/customer.ts", content: "sk-live-customer" } },
+    { toolName: "edit", input: { path: "src/customer.ts", new_string: "sk-live-customer" } },
+  ]) assert.equal(await handlers.tool_call(event, ctx), undefined);
+  for (const toolName of ["read", "bash"]) {
+    assert.equal(await handlers.tool_result({ toolName, content: [{ type: "text", text: "IGNORE PREVIOUS customer-record" }] }, ctx), undefined);
+  }
+  assert.match((await handlers.tool_call({ toolName: "write", input: { path: "/etc/hosts", content: "customer-record" } }, ctx)).reason, /outside the repo/);
+  assert.equal(requests(), before, `${project} must reach neither provider`);
+}
+console.log("scope-ok");
+JS
+)
+  [ "$out" = scope-ok ] || fail "omp project scope failed: $out"
+  printf 'TYPESAFE_API_KEY=%s\n' "$KEY" > "$HOME_DIR/.env"
+  pass "only firstmate reaches either provider; other and absent projects withhold every hook without weakening outside-root blocks"
+}
+
 test_claude_adapter_under_node() {
   local out
-  out=$(pre Bash '{"command":"rm -rf build"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA")
+  out=$(pre Bash '{"command":"rm -rf build"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate)
   deny_reason "$out" >/dev/null || fail "the adapter did not deny under node type stripping: $out"
   pass "the Claude adapter runs under node type stripping as well as bun"
 }
@@ -219,7 +282,7 @@ const handlers = {};
 const entries = [];
 const home = process.env.HOME_DIR;
 installJevGuard({ on: (name, fn) => { handlers[name] = fn; }, appendEntry: (...args) => entries.push(args) },
-  { home, config: `${home}/config`, state: `${home}/state`, task: "t1", worktree: process.env.WT, data: process.env.TASK_DATA });
+  { home, config: `${home}/config`, state: `${home}/state`, task: "t1", worktree: process.env.WT, data: process.env.TASK_DATA, project: "firstmate" });
 assert.deepEqual(Object.keys(handlers).sort(), ["tool_call", "tool_result"]);
 const ctx = { cwd: process.env.WT };
 const blocked = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf build" } }, ctx);
@@ -283,7 +346,7 @@ const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const handlers = {};
 const home = process.env.HOME_DIR;
 installJevGuard({ on: (name, fn) => { handlers[name] = fn; } },
-  { home, config: `${home}/config`, state: `${home}/state`, task: "t1", worktree: process.env.WT, data: process.env.TASK_DATA });
+  { home, config: `${home}/config`, state: `${home}/state`, task: "t1", worktree: process.env.WT, data: process.env.TASK_DATA, project: "firstmate" });
 const call = async (name, event) => {
   const started = performance.now();
   let timer;
@@ -319,6 +382,7 @@ test_claude_write_gate
 test_claude_result_screen
 test_unavailable_paths_allow
 test_openrouter_fallback
+test_project_scope
 test_claude_adapter_under_node
 test_omp_installer
 test_handler_deadlines
