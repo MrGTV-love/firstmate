@@ -286,7 +286,7 @@ EOF
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
   local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
-  local target_cursor kind fold_version partial_line='' LC_ALL=C
+  local target_cursor kind fold_version partial_line='' partial_size
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_fm_status_kind "$f")
   fold_version=$(_fm_open_decisions_fold_signature "$kind")
@@ -348,9 +348,10 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
     while IFS= read -r line; do
       open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
-      offset=$((offset + ${#line} + 1))
     done < "$chunk_file"
     partial_line=$line
+    partial_size=$(LC_ALL=C; printf '%s' "${#partial_line}")
+    offset=$((offset + chunk_size - partial_size))
     rm -f "$chunk_file"
     cursor_dirty=1
   fi

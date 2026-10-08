@@ -659,7 +659,43 @@ test_successive_appends_replay_unfinished_lines() {
   pass "successive appends replay partial lines and reject poisoned legacy checkpoints"
 }
 
+test_utf8_whitespace_uses_full_fold_locale() {
+  local dir state out
+  dir=$(make_case utf8-locale); state="$dir/state"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  mkdir -p "$dir/copy"
+  out=$(LC_ALL=en_US.UTF-8 bash -c '
+    . "$1"
+    f=$2 copy=$3 cf="$(dirname "$2")/.task.open-decisions-cursor"
+    printf "needs-decision:\342\200\203[key=api] choose café" > "$f"
+    expected=$'"'"'api\tneeds-decision\tchoose café'"'"'
+    [ "$(status_open_decisions "$f")" = "$expected" ] || { echo "locale does not recognize UTF-8 whitespace"; exit 1; }
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "partial fold changed locale"; exit 1; }
+    printf "\n" >> "$f"
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "complete fold changed locale"; exit 1; }
+    size=$(LC_ALL=C wc -c < "$f" | tr -d "[:space:]")
+    grep -qx "offset=$size" "$cf" || { echo "checkpoint offset counted characters"; exit 1; }
+    ident=$(_fm_open_decisions_file_ident "$f")
+    cp "$f" "$copy"; cp "${f%.status}.meta" "${copy%.status}.meta"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ "$(status_open_decisions "$copy")" = "$expected" ] || { echo "snapshot fold changed locale"; exit 1; }
+    printf "resolved [key=api]: settled\n" >> "$f"
+    [ -z "$(status_open_decisions_incremental "$f")" ] || { echo "resolution left a phantom decision"; exit 1; }
+    size=$(LC_ALL=C wc -c < "$f" | tr -d "[:space:]")
+    printf "version=10:secondmate\noffset=%s\nident=%s\ndefault\tneeds-decision\tphantom\n" "$size" "$ident" > "$cf"
+    [ -z "$(status_open_decisions "$f")" ] || { echo "full fold accepted divergent checkpoint"; exit 1; }
+    cp "$f" "$copy"
+    rm -f "$(dirname "$copy")/.task.open-decisions-cursor"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ ! -e "$(dirname "$copy")/.task.open-decisions-cursor" ] || { echo "divergent checkpoint reached snapshot"; exit 1; }
+    [ -z "$(status_open_decisions_incremental "$f")" ] || { echo "incremental accepted divergent checkpoint"; exit 1; }
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$state/task.status" "$dir/copy/task.status" 2>&1) \
+    || fail "UTF-8 fold locale: $out"
+  pass "UTF-8 fold locale matches full parsing with byte offsets and legacy invalidation"
+}
+
 test_successive_appends_replay_unfinished_lines
+test_utf8_whitespace_uses_full_fold_locale
 test_terminal_supersession_reaches_cached_drains
 test_kind_changes_invalidate_folded_decisions
 test_seeded_whole_file_fold_matches_a_fold_from_line_one

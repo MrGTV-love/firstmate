@@ -100,6 +100,7 @@ SH
     node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { spawn } from "node:child_process";
 const home = process.env.FM_HOME;
 const handlers = new Map(); let tool = null;
 const pi = {
@@ -147,6 +148,64 @@ const quitArm = await tool.execute("after-quit", {}, undefined, undefined, {});
 if (quitArm.details?.ok !== false || quitArm.details.message !== "watcher: not armed - Pi session is shutting down") {
   throw new Error(`terminal quit must keep the shutting-down refusal: ${JSON.stringify(quitArm.details)}`);
 }
+const rebound = (module) => {
+  const handlers = new Map(); const box = {};
+  module.default({
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { if (t.name === "fm_watch_arm_pi") box.tool = t; },
+    sendUserMessage: async () => {},
+    events: { on() {}, emit() {} },
+  });
+  return { handlers, box };
+};
+const waitForArms = async (expected) => {
+  for (let i = 0; i < 60 && arms() < expected; i++) await sleep(50);
+  await sleep(900);
+  if (arms() !== expected) throw new Error(`factory recovery expected ${expected} arms, saw ${arms()}`);
+};
+const successorModule = await import(`${pathToFileURL(process.env.PLUGIN).href}?rebound`);
+const terminal = rebound(successorModule);
+await sleep(900);
+if (arms() !== 3) throw new Error("factory rebinding revived a terminal quit");
+await terminal.handlers.get("session_start")({}, {});
+await waitForArms(4);
+let owner = terminal;
+for (const reason of ["reload", "new", "resume", "fork"]) {
+  const shutdown = owner.handlers.get("session_shutdown")({ reason }, {});
+  const successor = rebound(successorModule);
+  await shutdown;
+  await waitForArms(armsExpected(reason));
+  const owned = await successor.box.tool.execute();
+  if (!owned.details.ok || !owned.details.message.includes("unchanged")) throw new Error(`factory ${reason} successor did not own automatic recovery`);
+  const stale = await owner.box.tool.execute();
+  if (stale.details.ok || !stale.details.message.includes("shutting down")) throw new Error("superseded Pi factory did not preserve the stale refusal");
+  owner = successor;
+}
+function armsExpected(reason) { return 5 + ["reload", "new", "resume", "fork"].indexOf(reason); }
+await owner.handlers.get("session_shutdown")({ reason: "new" }, {});
+const started = rebound(successorModule);
+await started.handlers.get("session_start")({}, {});
+await waitForArms(9);
+await started.handlers.get("session_shutdown")({ reason: "resume" }, {});
+const repaired = rebound(successorModule);
+await repaired.box.tool.execute();
+await waitForArms(10);
+await repaired.handlers.get("session_shutdown")({ reason: "fork" }, {});
+const foreignLock = spawn("sleep", ["30"], { stdio: "ignore" });
+process.once("exit", () => foreignLock.kill());
+writeFileSync(`${home}/state/.lock`, `${foreignLock.pid}\n`);
+const foreign = rebound(successorModule);
+await sleep(900);
+if (arms() !== 10) throw new Error("factory recovery armed under a foreign lock");
+const refused = await foreign.box.tool.execute();
+if (refused.details.ok || !refused.details.message.includes("read-only")) throw new Error("foreign factory recovery did not preserve lock ownership");
+foreignLock.kill();
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+await foreign.handlers.get("session_shutdown")({ reason: "quit" }, {});
+rebound(successorModule);
+await sleep(900);
+if (arms() !== 10) throw new Error("factory recovery revived a terminal quit after replacement");
 process.exit(0);
 EOF
 )

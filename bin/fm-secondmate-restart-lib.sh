@@ -199,7 +199,7 @@ fm_secondmate_restart_turn_ended() {  # <state> <id>
   verdict=$(fm_busy_classify_meta "$meta" "$id" "$state" "$tail40" 2>/dev/null) || return 1
   [ "${verdict%% *}" = idle ] || return 1
   case "$verdict" in
-    'idle cursor-transcript'|'idle muse-session-log') return 0 ;;
+    'idle cursor-transcript') return 0 ;;
   esac
   harness=$(fm_meta_get "$meta" harness)
   fm_busy_source_trusted "$harness" "${verdict#* }"
@@ -214,7 +214,7 @@ fm_secondmate_restart_first_line() {  # <text>
 fm_secondmate_restart_run() {
   local state=$1 id=$2 harness=$3
   local out rc ran_on reason
-  out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$state" \
+  out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$state" FM_SECONDMATE_RESTART_TURN_END=1 \
     "$_FM_SECONDMATE_RESTART_LIB_DIR/fm-control.sh" "$id" relaunch 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ]; then
@@ -222,6 +222,10 @@ fm_secondmate_restart_run() {
     [ -n "$ran_on" ] || ran_on=$harness
     printf 'restarted: %s (%s)\n' "$id" "$ran_on"
     return 0
+  fi
+  if [ "$rc" -eq 75 ]; then
+    printf 'waiting: %s: affirmative turn-end evidence is no longer available at the stop boundary\n' "$id"
+    return 1
   fi
   reason=$(fm_secondmate_restart_first_line "$out")
   [ -n "$reason" ] || reason="the restart failed without a reported reason"
@@ -275,8 +279,13 @@ fm_secondmate_restart_service_locked() {
       printf 'waiting: %s: it confirmed its open work is written down; affirmative turn-end evidence is not available yet\n' "$id"
       return 1
     fi
-    line=$(fm_secondmate_restart_run "$state" "$id" \
-      "$(fm_secondmate_restart_request_get "$request" harness)")
+    if line=$(fm_secondmate_restart_run "$state" "$id" \
+      "$(fm_secondmate_restart_request_get "$request" harness)"); then
+      :
+    else
+      printf '%s\n' "$line"
+      return 1
+    fi
     if ! fm_secondmate_restart_request_finish "$state" "$id" "$line"; then
       printf 'unreached: %s: its restart completion could not be recorded: %s\n' "$id" "$line"
       printf 'error: secondmate %s restart completion could not be recorded: %s\n' "$id" "$line" >&2

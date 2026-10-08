@@ -109,7 +109,9 @@ case "${1:-}" in
     for a in "$@"; do
       if [ "$prev" = -t ]; then target=$a; fi
       case "$a" in
-        *cursor_y*) printf '1\n'; exit 0 ;;
+        *cursor_y*)
+          [ ! -x "$D/on-composer" ] || "$D/on-composer"
+          printf '1\n'; exit 0 ;;
         *pane_current_command*)
           if [ -f "$D/command.$target" ]; then cat "$D/command.$target"; else cat "$D/command"; fi
           printf '\n'; exit 0 ;;
@@ -897,6 +899,59 @@ test_answered_mate_mid_turn_waits_for_turn_end() {
   pass "T17 an answered mate is restarted only after the turn that answered ends"
 }
 
+test_new_turn_during_checkpoint_keeps_restart_queued() {
+  local dir out rc state verdict real_git
+  real_git=$(command -v git)
+  for verdict in busy unknown composer; do
+    dir=$(new_case "checkpoint-$verdict")
+    add_local_mate "$dir" sm1
+    state="$dir/home/state"
+    arm_answer "$dir" sm1
+    printf '%s\n' "$real_git" > "$dir/fake/real-git"
+    printf '%s\n' "$verdict" > "$dir/fake/new-turn"
+    cat > "$dir/fakebin/git" <<'SH'
+#!/usr/bin/env bash
+if [ "${3:-}" = status ] && [ "${4:-}" = --porcelain ] && [ -f "$FM_FAKE_DIR/new-turn" ]; then
+  verdict=$(cat "$FM_FAKE_DIR/new-turn")
+  rm -f "$FM_FAKE_DIR/new-turn"
+  if [ "$verdict" = composer ]; then
+    cat > "$FM_FAKE_DIR/on-composer" <<'HOOK'
+#!/usr/bin/env bash
+rm -f "$FM_FAKE_DIR/on-composer"
+"$FM_ROOT_OVERRIDE/bin/fm-busy-event.sh" apply "$FM_HOME/state" sm1 busy \
+  --current-gen --source claude-hook --event prompt >/dev/null || exit 1
+: > "$FM_FAKE_DIR/turn-started-at-composer"
+HOOK
+    chmod +x "$FM_FAKE_DIR/on-composer"
+  else
+    "$FM_ROOT_OVERRIDE/bin/fm-busy-event.sh" apply "$FM_HOME/state" sm1 "$verdict" \
+      --current-gen --source claude-hook --event prompt >/dev/null || exit 1
+  fi
+  : > "$FM_FAKE_DIR/turn-started-during-checkpoint"
+fi
+exec "$(cat "$FM_FAKE_DIR/real-git")" "$@"
+SH
+    chmod +x "$dir/fakebin/git"
+    out=$(run_restart "$dir" sm1); rc=$?
+    expect_code 0 "$rc" "a new $verdict turn must defer the restart: $out"
+    assert_present "$dir/fake/turn-started-during-checkpoint" "the turn transition never reached checkpointing"
+    if [ "$verdict" = composer ]; then
+      assert_present "$dir/fake/turn-started-at-composer" "the turn transition never reached the final composer boundary"
+    fi
+    assert_contains "$out" "queued: sm1" "the stop boundary did not retain the restart"
+    assert_present "$state/.secondmate-restart-sm1.request" "the stop boundary discarded intent"
+    assert_absent "$state/.secondmate-restart-sm1.outcome" "the stop boundary recorded completion"
+    assert_no_line '/exit' "$dir/fake/literal" "the new turn received an exit command"
+    assert_no_line 'C-c' "$dir/fake/keys" "the new turn was interrupted"
+    "$ROOT/bin/fm-busy-event.sh" apply "$state" sm1 idle --current-gen \
+      --source claude-hook --event stop >/dev/null || fail "could not end the new turn"
+    out=$(process_requests "$dir") || fail "the next turn end did not release the restart: $out"
+    assert_line '/exit' "$dir/fake/literal" "the idle retry did not stop the mate"
+    assert_grep 'restarted: sm1' "$state/.secondmate-restart-sm1.outcome" "the idle retry did not complete"
+  done
+  pass "a new turn during checkpointing defers stop without consuming restart intent"
+}
+
 # --- T18: a restart and the automatic relaunch never contend -----------------
 # Both hold the same per-mate lock: a liveness relaunch in progress defers the
 # restart, and a restart in progress holds the lock across its own stop and
@@ -1459,11 +1514,12 @@ SH
   [ ! -s "$state/.wake-queue" ] || fail "acknowledgement left the completion queued"
   out=$(run_restart_watcher_tick "$dir") || fail "post-ack tick failed: $out"
   [ ! -s "$state/.wake-queue" ] || fail "post-ack tick repeated the completion"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" sm1 --state busy --source claude-hook --event prompt >/dev/null || fail "could not arm replacement turn"
   out=$(run_restart "$dir" sm1) || fail "could not queue a subsequent restart: $out"
   second_corr=$(sed -n 's/^corr=//p' "$state/.secondmate-restart-sm1.request")
   [ "$corr" != "$second_corr" ] || fail "subsequent restart reused the first completion identity"
   answer_now "$dir" sm1
-  "$ROOT/bin/fm-busy-event.sh" arm "$state" sm1 --state idle --source claude-hook --event stop >/dev/null || fail "could not close replacement turn"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" sm1 idle --current-gen --source claude-hook --event stop >/dev/null || fail "could not close replacement turn"
   out=$(process_requests "$dir") || fail "subsequent restart failed: $out"
   out=$(run_restart_watcher_tick "$dir") || fail "subsequent completion handoff failed: $out"
   count=$(awk -F '\t' -v key="secondmate-restart-sm1-$second_corr" '$4 == key { n++ } END { print n+0 }' "$state/.wake-queue")
@@ -1614,6 +1670,7 @@ test_already_current_unprovable_mate_stays_on_the_nudge_path
 test_teamclaude_restart_reaches_claude_through_the_proxy
 
 test_answered_mate_mid_turn_waits_for_turn_end
+test_new_turn_during_checkpoint_keeps_restart_queued
 test_restart_and_auto_relaunch_share_one_lock
 test_second_pass_reuses_the_recorded_request
 test_inconclusive_turn_evidence_stays_queued
