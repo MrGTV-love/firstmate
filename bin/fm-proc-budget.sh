@@ -4,14 +4,14 @@
 # Usage:
 #   fm-proc-budget.sh [<extra>] -- <command...>   run <command...> with a budget
 #
-# The kernel compares RLIMIT_NPROC with the user's WHOLE process count, not with
-# one process tree. A runaway tree therefore starves every other process of the
-# same user until the cap is full, and a bash 3.2 script exits 128 at its first
-# failed fork. The only handle is to stop the runaway early: this wrapper reads
-# the current count and sets the limit (soft and hard) to count + <extra>, then
-# execs the command, so only the tree below it carries the lowered limit and the
-# rest of the user keeps its headroom. <extra> is a positive decimal integer;
-# omit it for 1500.
+# The kernel compares RLIMIT_NPROC with the user's WHOLE count, not with one
+# process tree: processes on Darwin, tasks (threads included) on Linux.
+# A runaway tree therefore starves every other process of the same user until
+# the cap is full, and a bash 3.2 script exits 128 at its first failed fork.
+# This wrapper reads the current count and sets the limit (soft and hard) to
+# count + <extra>, then execs the command, so only the tree below it carries the
+# lowered limit and the rest of the user keeps its headroom. <extra> is a
+# positive decimal integer; omit it for 1500.
 #
 # The budget only tightens. A limit the command already inherits that is lower
 # than count + <extra> stays as it is, and the hard limit is lowered with the
@@ -19,8 +19,8 @@
 # widens an outer budget.
 #
 # Only commands started through the wrapper are protected. Route every shim,
-# lab, and measurement script through it; bin/fm-test-run.sh and
-# bin/fm-live-lab.sh and bin/fm-herdr-lab.sh do so for the trees they start.
+# lab, and measurement script through it. The headers of bin/fm-test-run.sh,
+# bin/fm-live-lab.sh, and bin/fm-herdr-lab.sh own their launch integration.
 #
 # The budget is headroom over the count at the moment the command starts, so a
 # tree that outlives a large rise in the rest of the user's processes can meet
@@ -29,6 +29,9 @@
 # Exit status: the command's own, 2 for a malformed call, and 125 when no budget
 # can be set (an unreadable process count, or a limit the host refuses). The
 # command never runs unbudgeted behind the caller's back in those two cases.
+#
+# tests/fm-proc-budget.test.sh is the regression entry point for a leashed
+# recursive shim and an unbudgeted probe that must keep forking alongside it.
 set -u
 
 fm_proc_budget_error() {
@@ -39,8 +42,6 @@ fm_proc_budget_usage() {
   fm_proc_budget_error "usage: fm-proc-budget.sh [<extra>] -- <command...>"
 }
 
-# The kernel counts what RLIMIT_NPROC is compared with: processes on Darwin,
-# tasks (threads included) on Linux.
 fm_proc_budget_count() {
   local uid count
   uid=$(id -u) || return 1

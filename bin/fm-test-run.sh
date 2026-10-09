@@ -135,12 +135,11 @@
 # 0 denotes degraded work and imposes no budget.
 # Without python3 or the pool tool beside it, scripts run directly.
 #
-# Every executed script also runs under a per-tree process budget
-# (bin/fm-proc-budget.sh owns it): a script that forks without bound stops at its
-# own limit instead of filling the user's process table for every other lane.
+# When the sibling bin/fm-proc-budget.sh is present and executable, every
+# executed script runs through it; its header owns the process-budget contract.
 # The budget is taken when the script starts, after any pass wait. If the budget
 # cannot be set, that script fails with wrapper exit 125 rather than running
-# unbudgeted.
+# unbudgeted. Without the executable wrapper, scripts run without this budget.
 # With a usable pool, --jobs above its size still starts that many workers,
 # but only pool-size scripts run at once.
 #
