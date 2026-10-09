@@ -191,6 +191,16 @@
 # the task's last status line - and on a 0 bounds repeated alarms from new pane
 # hashes for the decision.
 #
+# `open-bound` is the read-only board-key predicate. It reads the source binding
+# and uses the shared answer/inventory resolver: exact task, legacy-derived task,
+# then Beads migration-note or migration-prefix evidence as described above.
+# Only confirmed binding-file absence is unbound; other lookup or read failures
+# are uncertainty. It prints nothing on stdout and changes no task or binding.
+# Exit 0 means the resolved task is an open captain call, 1 means it is known
+# closed or no longer captain-held, and 2 means the key is unresolved, ambiguous,
+# absent, or unreadable, including binding failures. Listener retirement may use
+# only exit 1 as evidence that a card is closed.
+#
 # `diverged` is the read-only guard over the seam between the two records of
 # one captain call. See "record divergence" beside command_diverged below.
 #

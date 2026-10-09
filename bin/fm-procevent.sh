@@ -110,7 +110,8 @@
 #            token printed by register-extension, so a stale owner cannot retire
 #            a replacement generation. --if-identity compares the built-in
 #            registration file identity under the source lock before stopping it
-#            and refuses while any captured round of the source is unacknowledged.
+#            and refuses while any captured round of the source is unacknowledged
+#            or its inbox evidence cannot be read.
 #            Built-in captures do not take this lock: a capture can still arrive
 #            between the check and runner stop; retirement never deletes inbox results.
 # sweep-home Retire a bounded snapshot of this home's registrations and owned

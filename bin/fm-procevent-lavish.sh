@@ -38,30 +38,37 @@
 #            are reported explicitly.
 # sweep      Retire this home's Lavish listeners whose boards are finished, and
 #            print one `retired:`, `kept:` or (with --dry-run) `would-retire:`
-#            line per registration plus a `sweep:` total. A listener lives as
-#            long as its Lavish session, and the captain answers a board with
-#            choice forms that never end the session, so without a sweep every
-#            board ever armed keeps its resident processes and its owner guard
-#            until the session is ended by hand. Keep guards run first: the
-#            standing Bearings board, an unreadable Lavish store, queued
-#            feedback or status feedback, then worker-task ownership.
-#            Otherwise a board is FINISHED when its artifact file is gone, or
-#            when Lavish holds no session or an ended session for it and every
-#            card key is known not to name an open captain call. Other boards
-#            must also be idle for FM_BOARD_LISTENER_IDLE_HOURS (default 48,
-#            whole hours 1..8760): no change to the artifact, the Lavish session
-#            or a captured round. Empty, unreadable or unsupported card discovery
-#            keeps a present board, including scripts and event handlers.
+#            line per registration plus a `sweep:` total. Choice answers do not
+#            end Lavish sessions, so idle boards need explicit listener retirement.
+#            Keep guards run first: the standing Bearings board, unreadable or
+#            ambiguous Lavish session evidence, queued feedback or status
+#            feedback, then worker-task ownership. These guards also apply after
+#            the artifact is deleted. The standing-board exemption survives a
+#            deleted symlink target; an unresolved chain keeps every listener.
+#            Board and inbox lookup, stat, enumeration and read errors keep the
+#            affected listener with a reason; confirmed absence is not a read error.
+#            Otherwise a board is FINISHED when its artifact file is confirmed
+#            gone, or when Lavish holds no session or an ended session for it and
+#            every card key is known not to name an open captain call. Other
+#            boards must also be idle for FM_BOARD_LISTENER_IDLE_HOURS (default
+#            48, whole hours 1..8760); an unusable value refuses the sweep by name.
+#            Activity is the latest artifact mtime, session updated_at, or mtime
+#            of this source's inbox entries, including handled acknowledgements.
+#            Static discovery recognizes quoted and unquoted question attributes,
+#            case-insensitive attribute names and decoded HTML entities. Zero keys,
+#            scripts, event handlers, embedded surfaces, unkeyed forms, malformed
+#            markup, valueless question attributes and invalid decoded keys leave
+#            discovery unknown and keep a present board, even alongside static keys.
 #            `bin/fm-captain-hold.sh open-bound` checks keys in source-binding
-#            context; only exit 1 (resolved and closed) permits retirement.
-#            Open calls, unresolved keys and read errors keep the board. The durable
-#            record of a captain call is its held task, and the standing board
-#            lists every held call. A call held in another home's backlog is
-#            invisible here, so dormancy is the safeguard for live sessions.
-#            An unacknowledged captured round blocks every retirement.
-#            Retiring stops the listener and releases its claim through the
-#            generic `retire`; it never ends the Lavish session, so the board
-#            stays readable and `arm` brings the listener back.
+#            context; only exit 1 (resolved and not an open captain call) permits
+#            retirement. Its header owns the binding and key-resolution contract.
+#            A call held in another home's backlog is invisible here, so dormancy
+#            is the safeguard for live sessions.
+#            An unacknowledged captured round blocks every sweep retirement.
+#            Retirement uses the generic `retire --if-identity` boundary, whose
+#            header owns generation checks, inbox revalidation and capture limits.
+#            It stops the listener and releases its claim without ending the
+#            Lavish session, so the board stays readable and `arm` brings it back.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
 #            and prints its response verbatim, absorbing only the one exact

@@ -2439,20 +2439,9 @@ An already-armed Lavish source keeps its registered listener command until it is
 
 **Retire finished Lavish listeners**
 
-`bin/fm-procevent-lavish.sh sweep [--dry-run]` retires the listeners of boards that are finished, and its header owns the rules.
-A listener otherwise lives as long as its Lavish session, and a captain's choice answers never end the session.
-`bin/fm-bearings-board.sh build` runs the sweep after every successful build, and it can be run by hand at any time.
-The sweep first keeps the standing Bearings board, every board when the Lavish store is unreadable, boards with queued feedback or status `feedback`, and worker-owned boards; these guards also apply after the artifact is deleted.
-The standing-board exemption survives deleted symlink targets; an unresolved symlink chain keeps every listener until its identity can be resolved.
-After those guards, a missing board file permits retirement; a present board with a missing or ended session permits retirement only when every card key is known not to name an open captain call.
-Other present boards must also pass the idle window below.
-Unquoted and quoted card keys, case-insensitive attribute names, and HTML entities are recognized. Zero static keys, scripts, event handlers, embedded surfaces, unkeyed forms, malformed markup, an unreadable board, a valueless question attribute, or an invalid decoded key leave discovery unknown and keep the listener; static matches never establish completeness alongside unsupported markup. Ambiguous session records also keep the listener. Only confirmed file absence permits missing-file retirement; filesystem permission and canonicalization errors keep the listener.
-For each key, `fm-captain-hold.sh open-bound <source-id> <card-key>` reads the source binding and uses the answer intake's exact, legacy-derived, migration-note, then migration-prefix resolution precedence. Only a resolved task known not to be an open captain call permits retirement; unresolved, ambiguous, or unreadable evidence keeps the listener. An unacknowledged captured round blocks every retirement.
-
-`FM_BOARD_LISTENER_IDLE_HOURS` (default 48, whole hours 1..8760) sets how long a board must sit untouched before the sweep may retire it.
-An unusable value makes the sweep refuse by name.
-Retiring a listener never ends the Lavish session, and `bin/fm-procevent-lavish.sh arm <artifact.html>` brings the listener back.
-Retirement compares the snapshotted registration's device/inode identity under the source lock, so a concurrent retire-and-rearm preserves the replacement listener, and refuses while any captured round of the source is unacknowledged.
+Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
+For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
+The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
 
 ### Crew-hosted Lavish review boards
 
