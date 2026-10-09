@@ -174,7 +174,6 @@ fm_session_end_queue_wake() {  # <key> <reason>
   [ -n "${FM_WAKE_QUEUE:-}" ] || FM_WAKE_QUEUE="$STATE/.wake-queue"
   queued=$(fm_wake_queued_keys check 2>/dev/null || true)
   if printf '%s\n' "$queued" | grep -Fx "$1" >/dev/null 2>&1; then
-    fm_wake_publish_queued check "$1" || return 1
     return 0
   fi
   fm_wake_append check "$1" "$2"
