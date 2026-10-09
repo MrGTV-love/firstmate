@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Open-work reconciler. bin/fm-open-loops.sh owns the CLI; docs/configuration.md owns the schemas.
 
-Every row is computed from live records already kept for this home: the fleet snapshot (backlog and
-ordinary tasks), status logs, task worktrees, the no-mistakes run store, and open pull requests.
-A source that cannot be read becomes one degraded row; it never reads as "nothing owed".
+The CLI owner's configuration reference describes collection sources, quota refusal, and degraded coverage.
 """
 import argparse
 import fcntl
