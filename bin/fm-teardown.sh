@@ -272,10 +272,11 @@
 #     never signalled, because no record proves which task owns that lane.
 #     Teardown refuses instead, even with --force, naming the pid, its birth
 #     identity, the matched path, and the lane. A lane is either a worktree
-#     the project or a git-backed root's repository still registers there,
-#     even when its directory or .git is missing or prunable, or a linked
-#     worktree git discovers from the cwd; outer-worktree discovery never
-#     proves custody. Only a cwd exactly equal to a live recorded scan root is
+#     the project, a git-backed scan root, or an available local task project's
+#     repository still registers there, even when its directory or .git is
+#     missing or prunable, or a linked worktree git discovers from the cwd;
+#     outer-worktree discovery never proves custody.
+#     Only a cwd exactly equal to a live recorded scan root is
 #     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
@@ -292,24 +293,31 @@
 #     and write failures. Idempotent: nothing left to find is a silent no-op.
 #   Fix 3 - retire task-private no-mistakes launch agents (runs after Fix 1 and
 #     BEFORE Fix 2, because Fix 2 can neither prove custody of nor durably stop
-#     what an agent owns). A worker that points NO_MISTAKES_HOME inside its task
-#     copy makes no-mistakes install a KeepAlive launchd agent,
-#     com.kunchenguid.no-mistakes.daemon.<hash>, that survives reboots and
-#     relaunches its daemon (`daemon run --root <copy>/.no-mistakes/h`) after
-#     every kill; that daemon's cwd sits beneath the scan root, so Fix 2
-#     refuses it (observed 2026-10-06, six days of uptime).
+#     what an agent owns). A private no-mistakes home can install a KeepAlive
+#     launchd agent, com.kunchenguid.no-mistakes.daemon.<hash>, that survives
+#     reboots and relaunches its daemon after a kill; killing the process alone
+#     cannot release the copy durably.
 #     retire_task_private_nm_launch_agents reads every such plist in
 #     $FM_LAUNCH_AGENTS_DIR (default ~/Library/LaunchAgents) and acts only on
-#     one whose Label matches its file name and whose `--root` is the task copy
-#     or inside it after resolving symlinks and normalizing path segments and
-#     separators; lookalike prefixes such as <copy>-x never match. It runs `launchctl bootout
-#     gui/<uid>/<label>`, requires `launchctl print` to report the service gone
-#     (exit 113), and moves the plist to data/<id>/launchagent-backup/. The
-#     shared daemon's agent (root ~/.no-mistakes), another task's agent, and any
-#     plist that cannot be parsed are left exactly as found; teardown never runs
-#     `no-mistakes daemon stop`, which targets the shared daemon. An agent that
-#     stays loaded, an unreadable load state, or a failed archive refuses even
-#     with --force, preserving the plist and the copy.
+#     one whose Label matches its file name and whose absolute `--root` is the
+#     task copy or inside it after resolving symlinks and normalizing path
+#     segments and separators; lookalike prefixes such as <copy>-x never match.
+#     The Fix 2 nested-lane boundary also applies: a root belonging to a nested
+#     lane is skipped, and unreadable registry or lane classification refuses.
+#     Registries are checked even when the task copy is already gone, so
+#     admitted missing-copy recovery still excludes registered nested lanes.
+#     For a loaded service it runs `launchctl bootout gui/<uid>/<label>`, then
+#     requires `launchctl print` to report the service gone (exit 113) before
+#     moving the plist to data/<id>/launchagent-backup/.
+#     An already-unloaded agent's plist is archived without bootout.
+#     The shared daemon's agent (root ~/.no-mistakes), another task's agent,
+#     symlinked plists, and plists whose root cannot be proven are left as found;
+#     teardown never runs `no-mistakes daemon stop`, which targets the shared
+#     daemon. Missing launchctl, a service that stays loaded, an unreadable load
+#     state, or a failed archive refuses even with --force, preserving the
+#     unarchived plist and any remaining copy.
+#     tests/fm-teardown.test.sh's private, foreign, nested, and absent-copy
+#     launch-agent cases exercise this boundary with a fake launchctl.
 # After Fix 1, Fix 3, and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
@@ -2202,8 +2210,10 @@ task_canonical_path() {  # <path>
 
 # Prints a discovered nested worktree lane beneath <root> that holds <path>.
 # A lane in TASK_REGISTERED_LANES wins even when its directory or .git is gone;
-# otherwise git classifies the nearest existing directory. Empty output is
-# not proof of custody. Fails when git cannot classify <path> under a git <root>.
+# otherwise git classifies the nearest existing directory within <root>.
+# A missing root returns empty after the registry check, supporting absent-copy
+# recovery. Empty output is not proof of process custody.
+# Fails when git cannot classify <path> under a git <root>.
 task_nested_lane_for_path() {  # <root> <path>
   local root=$1 path=$2 dir lane top git_dir common_dir
   [ -e "$path" ] || path=${path% (deleted)}
@@ -2235,8 +2245,9 @@ task_nested_lane_for_path() {  # <root> <path>
 }
 
 # Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
-# entries, that the project or a git-backed scan root's repository registers
-# strictly beneath a scan root.
+# entries, registered strictly beneath a scan root by the recorded project,
+# git-backed scan roots, or available task projects in reachable local Firstmate
+# states. Project registries remain sources when the scan root is missing.
 task_registered_lanes_under_roots() {  # <canonical-root>...
   local root src registry line lane state_dir meta project
   local -a sources
@@ -2502,9 +2513,8 @@ nm_launch_agent_fields() {  # <plist>
   ' < "$1"
 }
 
-# Fix 3 (see script header): bootout, then archive, every no-mistakes daemon
-# launch agent whose `--root` is the task copy or inside it. Anything else, an
-# unparsable plist included, is left exactly as found.
+# Fix 3: apply the script header's private-agent ownership and retirement
+# contract before process reaping.
 retire_task_private_nm_launch_agents() {  # <worktree>
   local wt=$1 dir plist label root canon_wt canon_root fields uid backup dest rc attempt lane
   dir=${FM_LAUNCH_AGENTS_DIR:-${HOME:-}/Library/LaunchAgents}
@@ -3836,9 +3846,9 @@ if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
 fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
-# them). Fix 1 and Fix 2 (see script header) run here, unconditionally on
-# --force, and before ANY destructive step below - a still-parked run or a
-# leaked process can own live work in this exact worktree. Not for
+# them). Fix 1, Fix 3, and Fix 2 (see script header) run here, unconditionally on
+# --force, and before ANY destructive step below - a still-parked run, loaded
+# private agent, or leaked process can own live work in this exact worktree. Not for
 # kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
