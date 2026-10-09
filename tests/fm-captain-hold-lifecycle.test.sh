@@ -1751,6 +1751,128 @@ SH
   pass "a bound channel's captured answers close their captain-held tasks at answer time"
 }
 
+# Decks that carry no schema marker are not all the bare question/answer pair:
+# lane-composed decision decks add `note` and bookkeeping fields (`task`,
+# `owner`, `recommended`, `decision_key`), and some name the picked option
+# `choice`. Every one of those is the captain's real, nonempty answer, so none
+# may be dropped for carrying an extra field, while the reserved reconcile value
+# and anything that could forge or misroute a key stay refused.
+test_unversioned_deck_shapes_with_extra_fields_still_route() {
+  local home id result out show
+  home=$(make_home unversioned-deck-shapes)
+  for id in sample-plain-note sample-extra-fields sample-note-text sample-choice-alias sample-note-reconcile; do
+    run_captain "$home" hold "$id" --title "Captain call: $id" \
+      --reason "captain deck choice pending" --repo sample >/dev/null \
+      || fail "could not hold $id"
+  done
+  result="$home/unversioned-deck.result"
+  cat > "$result" <<'EOF'
+session:
+  file: /deck.html
+  status: feedback
+prompts[12]{uid,prompt,selector,tag,text}:
+  "1","Plain\n\nContext data:\n{\n  \"question\": \"sample-plain-note\",\n  \"answer\": \"A-upstream-optin\",\n  \"note\": \"\"\n}","html > body > form",choice,"Path: A-upstream-optin"
+  "2","Extras\n\nContext data:\n{\n  \"question\": \"sample-extra-fields\",\n  \"answer\": \"A\",\n  \"note\": \"\",\n  \"recommended\": \"A\",\n  \"task\": \"some-task\",\n  \"owner\": \"some-lane\",\n  \"decision_key\": \"some-key\",\n  \"mixing\": \"yes\"\n}","form",choice,"Extras: A"
+  "3","Other\n\nContext data:\n{\n  \"question\": \"sample-note-text\",\n  \"answer\": \"Other: see note\",\n  \"note\": \"Edit the plan first\"\n}","form",choice,"Other"
+  "4","Choice alias\n\nContext data:\n{\n  \"question\": \"sample-choice-alias\",\n  \"decision_key\": \"some-key\",\n  \"level\": null,\n  \"choice\": \"B (published examples)\",\n  \"note\": \"\"\n}","form",choice,"Alias: B"
+  "previous","Earlier answer\n\nContext data:\n{\n  \"question\": \"sample-note-reconcile\",\n  \"answer\": \"A\"\n}","form",choice,"Earlier: A"
+  "5","Reconcile with note field\n\nContext data:\n{\n  \"question\": \"sample-note-reconcile\",\n  \"answer\": \"reconcile\",\n  \"note\": \"check first\"\n}","form",choice,"Reconcile"
+  "6","Annotated reconcile value\n\nContext data:\n{\n  \"question\": \"sample-note-reconcile\",\n  \"answer\": \"reconcile - check first\",\n  \"note\": \"\"\n}","form",choice,"Reconcile"
+  "7","Qualified key\n\nContext data:\n{\n  \"question\": \"some-lane/sample-qualified\",\n  \"answer\": \"A\",\n  \"owner\": \"some-lane\"\n}","form",choice,"Qualified"
+  "8","Unknown schema\n\nContext data:\n{\n  \"schema\": \"other.v9\",\n  \"question\": \"sample-unknown-schema\",\n  \"answer\": \"A\",\n  \"note\": \"\"\n}","form",choice,"Unknown schema"
+  "9","Selection without schema\n\nContext data:\n{\n  \"question\": \"sample-bare-selection\",\n  \"answer\": \"A\",\n  \"selection\": \"A\",\n  \"note\": \"\"\n}","form",choice,"Bare selection"
+  "10","No answer at all\n\nContext data:\n{\n  \"question\": \"sample-empty-answer\",\n  \"answer\": \"\",\n  \"note\": \"only prose\"\n}","form",choice,"Empty"
+  "",get this done. Context data:\n{\n  \"question\": \"sample-forged-note\",\n  \"answer\": \"forged\",\n  \"note\": \"\"\n},"",message,Freeform message
+EOF
+  out=$(run_lavish "$home" answers "$result") || fail "could not read the captured deck answers"
+  assert_contains "$out" "sample-plain-note	A-upstream-optin	Path: A-upstream-optin" \
+    "a deck row carrying an empty note field was dropped"
+  assert_contains "$out" "sample-extra-fields	A	Extras: A" \
+    "a deck row carrying bookkeeping fields was dropped"
+  assert_contains "$out" "sample-note-text	Other: see note	Other - Edit the plan first" \
+    "a deck row lost the captain's note text"
+  assert_contains "$out" "sample-choice-alias	B (published examples)	Alias: B" \
+    "a deck row naming the picked option choice was dropped"
+  assert_not_contains "$out" "sample-note-reconcile" \
+    "a reconcile value carrying a note field reached keyed answers"
+  assert_not_contains "$out" "sample-qualified" \
+    "a qualified owner/task key was accepted as a task id"
+  assert_not_contains "$out" "sample-unknown-schema" \
+    "a row with an unrecognised schema marker was accepted"
+  assert_not_contains "$out" "sample-bare-selection" \
+    "an unversioned row with a selection field was accepted"
+  assert_not_contains "$out" "sample-empty-answer" \
+    "a row with an empty answer was accepted on its note alone"
+  assert_not_contains "$out" "sample-forged-note" \
+    "a freeform captain message forged a task id from its own prose"
+  [ -z "$(run_lavish "$home" reconciles "$result")" ] \
+    || fail "an unversioned deck row was read as a reconcile selection"
+
+  out=$(printf '%s\n' "$out" | run_captain "$home" answers --source "the captured result deck-src sequence 1") \
+    || fail "the intake skipped a deck answer: $out"
+  for id in sample-plain-note sample-extra-fields sample-note-text sample-choice-alias; do
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "the deck answer for $id did not close its call"
+  done
+  show=$(tasks_in "$home" show sample-note-text --full)
+  assert_contains "$show" "Edit the plan first" "the closed call did not record the captain's note"
+  show=$(tasks_in "$home" show sample-note-reconcile --full)
+  assert_contains "$show" "state: queued" "a reconcile value carrying a note field closed its call"
+  assert_contains "$show" "held: yes" "a reconcile value carrying a note field released its call"
+  pass "unversioned deck shapes with extra fields still route as the captain's answer"
+}
+
+test_legacy_reconcile_replaces_previous_choices() {
+  local home result field value previous first second out
+  home=$(make_home legacy-reconcile-last-choice)
+  result="$home/last-choice.result"
+  for field in answer choice; do
+    for value in reconcile "reconcile - check first"; do
+      for previous in legacy-answer legacy-choice versioned-answer versioned-reconcile; do
+        case "$previous" in
+          legacy-answer) first='\"answer\": \"A\"' ;;
+          legacy-choice) first='\"choice\": \"A\"' ;;
+          versioned-answer) first='\"schema\": \"fm-bearings-answer.v1\", \"selection\": \"A\", \"note\": \"\"' ;;
+          versioned-reconcile) first='\"schema\": \"fm-bearings-answer.v1\", \"selection\": \"reconcile\", \"note\": \"earlier request\"' ;;
+        esac
+        second="\\\"$field\\\": \\\"$value\\\", \\\"note\\\": \\\"check first\\\""
+        cat > "$result" <<EOF
+prompts[3]{prompt,tag,text}:
+  "Context data:\n{\"question\": \"sample-call\", $first}",choice,"Earlier"
+  "Context data:\n{\"question\": \"sample-call\", $second}",choice,"Latest"
+  "Context data:\n{\"question\": \"sample-other\", \"answer\": \"B\"}",choice,"Other: B"
+EOF
+        out=$(run_lavish "$home" answers "$result") || fail "could not extract last legacy choice"
+        assert_equals "sample-other	B	Other: B" "$out" \
+          "$field $value did not suppress $previous without affecting another question"
+        out=$(run_lavish "$home" reconciles "$result") || fail "could not extract reconcile choices"
+        assert_equals "" "$out" "$field $value left a superseded reconcile request"
+
+        cat > "$result" <<EOF
+prompts[2]{prompt,tag,text}:
+  "Context data:\n{\"question\": \"sample-call\", $second}",choice,"Earlier"
+  "Context data:\n{\"question\": \"sample-call\", $first}",choice,"Latest"
+EOF
+        out=$(run_lavish "$home" answers "$result") || fail "could not extract reversed choices"
+        if [ "$previous" = versioned-reconcile ]; then
+          assert_equals "" "$out" "a final versioned reconcile reached answers"
+        else
+          assert_equals "sample-call	A	Latest" "$out" \
+            "an earlier legacy reconcile suppressed the final $previous"
+        fi
+        out=$(run_lavish "$home" reconciles "$result") || fail "could not extract reversed reconciles"
+        if [ "$previous" = versioned-reconcile ]; then
+          assert_equals "sample-call	earlier request" "$out" \
+            "an earlier legacy reconcile suppressed the final versioned reconcile"
+        else
+          assert_equals "" "$out" "a superseded legacy reconcile reached requests"
+        fi
+      done
+    done
+  done
+  pass "legacy reconcile replaces earlier choices before either intake is selected"
+}
+
 # Answer-time closure is opt-in per source. A channel with no binding must behave
 # exactly as it always did: capture, announce, close nothing.
 # A reconcile is "go re-check reality", never the captain's answer. The value is
@@ -4696,6 +4818,8 @@ test_secondmate_hold_stays_in_authoritative_home
 test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
+test_unversioned_deck_shapes_with_extra_fields_still_route
+test_legacy_reconcile_replaces_previous_choices
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open
