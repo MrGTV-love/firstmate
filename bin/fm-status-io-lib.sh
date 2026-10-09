@@ -160,10 +160,11 @@ _fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
   _fm_status_stat_raw "$1" "${2-}" "${3-}" "${4-}"
 }
 
-# Whole file into <out-var> without forking cat: the fleet cursor manifest is
-# read once per task per scan, so a child per read was a measurable share of a
-# drain's processes. Fails when the file cannot be opened. Trailing newlines
-# are kept, and the line loops that consume the text skip blank rows.
+# Read the presentation manifest without per-task cat forks, keeping trailing
+# newlines. Publish <out-var> only after a successful read of the metadata byte
+# count; open/read failures, short reads, and NUL-delimited prefixes leave it
+# unchanged. Consumers distinguish a missing manifest from a failed read of an
+# existing receipt, which must never become an empty or partial successful read.
 _fm_read_file_into() {  # <file> <out-var>
   local __fm_rf_data= __fm_rf_size LC_ALL=C
   _fm_status_stat_raw "$1" '' __fm_rf_size '' || return 1
