@@ -58,33 +58,40 @@ if (($ARGV[0] // '') eq 'gate') {
         $waited_from = Time::HiRes::time();
         ACQUIRE: while (!$slot) {
             exit 128 + $signal_number{$caught} if $caught;
-            my $allowed = int($cap + 2 * $ncpu - $slot_load->() + 0.5);
-            $allowed = $floor if $allowed < $floor;
-            $allowed = $cap if $allowed > $cap;
-            for my $index (0 .. $allowed - 1) {
+            my (@free, $occupied);
+            $occupied = 0;
+            for my $index (0 .. $cap - 1) {
                 open(my $fh, '>>', "$slot_dir/slot.$index")
                     or do { $available = 0; last ACQUIRE; };
-                if (flock($fh, LOCK_EX | LOCK_NB)) { $slot = $fh; last; }
+                if (flock($fh, LOCK_EX | LOCK_NB)) { push @free, $fh; next; }
                 my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
                 close $fh;
                 unless ($busy) { $available = 0; last ACQUIRE; }
+                $occupied++;
             }
+            my $allowed = int($cap + 2 * $ncpu - $slot_load->() + 0.5);
+            $allowed = $floor if $allowed < $floor;
+            $allowed = $cap if $allowed > $cap;
+            $slot = shift @free if @free && $occupied < $allowed;
+            my $has_free = @free;
+            close $_ for @free;
             next if $slot || $caught;
-            # Every allowed slot is busy: block on one so a freed slot wakes this
-            # waiter at once, and re-read the load every two seconds.
-            if (open(my $fh, '>>', "$slot_dir/slot.@{[ int(rand($allowed)) ]}")) {
-                my $locked = eval {
+            if ($has_free) {
+                Time::HiRes::sleep(0.1);
+                next;
+            }
+            if (open(my $fh, '>>', "$slot_dir/slot.@{[ int(rand($cap)) ]}")) {
+                eval {
                     local $SIG{ALRM} = sub { die "gate-recheck\n" };
                     alarm 2;
                     my $got = flock($fh, LOCK_EX);
                     my $interrupted = $!{EINTR};
                     alarm 0;
                     die "gate-lock: $!\n" unless $got || $interrupted;
-                    $got;
                 };
                 alarm 0;
                 my $error = $@;
-                if ($locked) { $slot = $fh; } else { close $fh; }
+                close $fh;
                 if ($error && $error ne "gate-recheck\n") { $available = 0; last ACQUIRE; }
             } else {
                 $available = 0;

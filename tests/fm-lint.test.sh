@@ -1142,19 +1142,22 @@ fm_lint_slot_fixture() {  # <name> -> prints the tmp dir
 }
 
 test_host_slots_bound_concurrent_runs() {
-  local tmp peak lone
+  local tmp peak lone baseline
   tmp=$(fm_lint_slot_fixture fm-lint-slots)
   # One run keeps its two workers: the host-wide bound never throttles a lone run.
   lone=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
     fm_lint_concurrent_runs 1 "$tmp" "$tmp/bin")
   [ "$lone" -eq 2 ] || fail "a lone run peaked at $lone live ShellCheck processes, expected its two workers"
   : > "$tmp/peak"
+  baseline=$(FM_LINT_SLOT_DIR=off fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin")
+  [ "$baseline" -eq 12 ] || fail "six ungated runs peaked at $baseline live ShellCheck processes, expected 12"
+  : > "$tmp/peak"
   # Six runs would start twelve ShellCheck processes if each bounded only itself.
   peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
     fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin")
   [ "$peak" -le 3 ] || fail "six concurrent runs reached $peak live ShellCheck processes, expected at most 3 host-wide"
   [ "$peak" -ge 3 ] || fail "six concurrent runs peaked at $peak, so the slots were not used in parallel"
-  pass "concurrent fm-lint.sh runs share a host-wide ShellCheck slot bound"
+  pass "six concurrent runs peak at $baseline ShellCheck processes ungated and $peak with a three-slot pool"
 }
 
 test_host_load_shrinks_slots_to_the_floor() {
@@ -1179,6 +1182,7 @@ test_host_load_preserves_the_cap_until_the_threshold() {
 use strict;
 use warnings;
 use File::Path qw(make_path);
+use Fcntl qw(:flock);
 use Time::HiRes qw(time sleep);
 my ($gate, $tmp) = @ARGV;
 my $command = q{
@@ -1232,8 +1236,47 @@ for my $cap ('', 6) {
         die "cap $full, load $load: $error" if $error;
     }
 }
+for my $path (qw(scan wake)) {
+    my $dir = "$tmp/occupancy.$path";
+    make_path("$dir/slots");
+    my @holders;
+    for my $index ($path eq 'wake' ? (0 .. 8) : (1 .. 8)) {
+        open($holders[$index], '>>', "$dir/slots/slot.$index") or die "$!";
+        flock($holders[$index], LOCK_EX) or die "$!";
+    }
+    local $ENV{FM_LINT_HOST_SLOTS} = 9;
+    local $ENV{FM_TEST_SEAM} = 1;
+    local $ENV{FM_LINT_SLOT_LOAD} = 43;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        close $_ for grep { defined } @holders;
+        exec $^X, $gate, 'gate', "$dir/slots", 18, "$dir/wait",
+            '--', $^X, '-e', 'open(my $fh, ">", $ARGV[0]) or die "$!"', "$dir/started";
+        die "exec: $!";
+    }
+    my $error;
+    eval {
+        sleep 0.25;
+        close $holders[0] if $path eq 'wake';
+        sleep 2;
+        die "admitted with eight occupied slots and an allowance of two\n" if -e "$dir/started";
+        close $holders[$_] for 1 .. 7;
+        my $deadline = time() + 5;
+        until (-e "$dir/started") {
+            die "did not admit below the occupancy allowance\n" if time() > $deadline;
+            sleep 0.01;
+        }
+    };
+    $error = $@;
+    close $holders[8];
+    if ($error) { kill 'KILL', $pid; }
+    waitpid($pid, 0);
+    $error ||= "gated command failed: $?\n" if $?;
+    die "$path: $error" if $error;
+}
 PL
-  pass "default and explicit host caps remain full through twice the cores and shrink only by excess load"
+  pass "host caps follow the load threshold and both acquisition paths respect total occupancy"
 }
 
 test_slot_pool_can_be_disabled_or_misconfigured() {
@@ -1390,16 +1433,33 @@ for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
         die "fork: $!" unless defined $queued;
         if (!$queued) {
             exec $^X, $gate_script, 'gate', "$dir/slots", 18, "$dir/queued.wait",
-                '--', $^X, '-e', 'open(my $fh, ">", $ARGV[0]) or die "$!"', "$dir/admitted";
+                '--', $^X, '-e', q{
+                    my ($admitted, $bounded, @protected) = @ARGV;
+                    if ($bounded ne 'none') {
+                        open(my $ps, '-|', 'ps', '-o', 'stat=', '-p', join(',', @protected)) or die "$!";
+                        my @live = grep { !/^\s*Z/ } <$ps>;
+                        close $ps;
+                        die "admission overlapped a live protected tree\n" if @live;
+                    }
+                    open(my $fh, '>', $admitted) or die "$!";
+                }, "$dir/admitted", $bounded, $command, $descendant;
             die "exec: $!";
         }
         kill 'KILL', $gate;
-        sleep 0.2;
-        die "queued command started while protected tree survived\n" if -e "$dir/admitted";
-        kill 'KILL', $command;
-        sleep 0.2;
-        die "queued command started while protected descendant survived\n" if -e "$dir/admitted";
-        die "protected descendant exited before release\n" unless kill 0, $descendant;
+        if ($bounded eq 'none') {
+            sleep 0.2;
+            die "queued command started while protected tree survived\n" if -e "$dir/admitted";
+            kill 'KILL', $command;
+            sleep 0.2;
+            die "queued command started while protected descendant survived\n" if -e "$dir/admitted";
+            die "protected descendant exited before release\n" unless kill 0, $descendant;
+        } else {
+            my $deadline = time() + 5;
+            until (-e "$dir/admitted") {
+                die "watchdog cleanup did not release the slot\n" if time() > $deadline;
+                sleep 0.01;
+            }
+        }
     };
     $error = $@;
     open(my $release, '>', "$dir/release") or die "$!";
@@ -1425,7 +1485,7 @@ for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
     }
 }
 PL
-  pass "commands retain slots through gate and command death until descendants exit (bounded where supported)"
+  pass "inherited slots prevent overlap after gate death and allow admission after watchdog cleanup"
 }
 
 test_queued_roots_use_high_resolution_timings() {
@@ -3184,17 +3244,6 @@ SH
   assert_contains "$out" SC2119 "runtime consumer lost its joint missing-argument finding"
   pass "unproved transitive runtime closures never reuse successful analysis"
 }
-
-if [ "${1:-}" = --host-slots ]; then
-  test_host_slots_bound_concurrent_runs
-  test_host_load_shrinks_slots_to_the_floor
-  test_host_load_preserves_the_cap_until_the_threshold
-  test_slot_pool_can_be_disabled_or_misconfigured
-  test_slot_file_failures_run_ungated
-  test_slot_survives_gate_death
-  test_queued_roots_use_high_resolution_timings
-  exit 0
-fi
 
 test_command_words_exclude_inert_source_text
 test_child_shell_imports_select_and_invalidate_callers
