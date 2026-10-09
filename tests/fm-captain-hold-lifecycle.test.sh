@@ -4877,9 +4877,9 @@ test_sweep_retires_only_finished_board_listeners() {
     || fail "could not answer the call"
 
   gone=$(sweep_board "$home" gone old)
-  ended=$(sweep_board "$home" ended new)
-  nosession=$(sweep_board "$home" nosession new)
-  dormant=$(sweep_board "$home" dormant old sweep-absent-card)
+  ended=$(sweep_board "$home" ended new sweep-closed-call)
+  nosession=$(sweep_board "$home" nosession new sweep-closed-call)
+  dormant=$(sweep_board "$home" dormant old sweep-closed-call)
   closed=$(sweep_board "$home" closed old sweep-closed-call)
   openheld=$(sweep_board "$home" openheld old sweep-open-call)
   fresh=$(sweep_board "$home" fresh new)
@@ -4890,7 +4890,7 @@ test_sweep_retires_only_finished_board_listeners() {
   printf '<h1>standing</h1>\n' > "$standing"
   ln -s "$standing" "$home/.lavish/bearings-board.html"
   touch -t 200001010000 "$standing"
-  pending=$(sweep_board "$home" pending old)
+  pending=$(sweep_board "$home" pending old sweep-closed-call)
 
   gone_id=$(sweep_register "$home" "$gone")
   ended_id=$(sweep_register "$home" "$ended")
@@ -4999,7 +4999,7 @@ test_sweep_retires_only_finished_board_listeners() {
 
   # A store the sweep cannot read proves nothing about any board's session, so
   # a board that would otherwise be retired keeps its listener.
-  unreadable=$(sweep_board "$home" unreadable old)
+  unreadable=$(sweep_board "$home" unreadable old sweep-closed-call)
   unreadable_id=$(sweep_register "$home" "$unreadable")
   sweep_session "$store" "$unreadable" open 0 2000-01-01T00:00:00.000Z
   gone=$(sweep_board "$home" gone-store-unreadable old)
@@ -5031,9 +5031,11 @@ test_sweep_keeps_recently_handled_boards_in_literal_home_paths() {
   for name in board-sweep-handled 'board sweep handled' 'board sweep [literal]*?'; do
     home=$(make_home "$name")
     fm_test_track_procevent_home "$home" "$home/procevent-claims"
+    tasks_in "$home" add sweep-finished-card "Finished board card" >/dev/null \
+      || fail "could not create the non-held card"
     store="$home/lavish-state"
-    board=$(sweep_board "$home" recently-handled old)
-    idle_board=$(sweep_board "$home" idle old)
+    board=$(sweep_board "$home" recently-handled old sweep-finished-card)
+    idle_board=$(sweep_board "$home" idle old sweep-finished-card)
     sid=$(sweep_register "$home" "$board")
     idle_sid=$(sweep_register "$home" "$idle_board")
     sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
@@ -5068,9 +5070,11 @@ test_sweep_keeps_recently_handled_boards_in_literal_home_paths() {
 test_sweep_stops_a_live_listener_of_a_finished_board() {
   local home store artifact sid out list tries poll_pid
   home=$(make_home board-sweep-live)
+  tasks_in "$home" add sweep-finished-card "Finished board card" >/dev/null \
+    || fail "could not create the non-held card"
   fm_test_track_procevent_home "$home" "$home/procevent-claims"
   store="$home/lavish-state"
-  artifact=$(sweep_board "$home" live-idle old)
+  artifact=$(sweep_board "$home" live-idle old sweep-finished-card)
   cat > "$home/fakebin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 # A poll that blocks until it is killed; bounded so an escaped stub cannot linger.
@@ -5266,11 +5270,13 @@ test_sweep_keeps_unknown_inbox_evidence() {
   local role blocked healthy healthy_id
   for session in idle ended nosession missing; do
     home=$(make_home "board-sweep-inbox-unreadable-$session")
+    tasks_in "$home" add sweep-finished-card "Finished board card" >/dev/null \
+      || fail "could not create the non-held card"
     fm_test_track_procevent_home "$home" "$home/procevent-claims"
     store="$home/lavish-state"
     mkdir -p "$store"
     printf '{"sessions":{}}\n' > "$store/state.json"
-    board=$(sweep_board "$home" unreadable-inbox old)
+    board=$(sweep_board "$home" unreadable-inbox old sweep-finished-card)
     sid=$(sweep_register "$home" "$board")
     case "$session" in
       ended) sweep_session "$store" "$board" ended 0 - ;;
@@ -5311,12 +5317,14 @@ test_sweep_keeps_unknown_inbox_evidence() {
   done
   for role in result adapter handled; do
     home=$(make_home "board-sweep-inbox-stat-$role")
+    tasks_in "$home" add sweep-finished-card "Finished board card" >/dev/null \
+      || fail "could not create the non-held card"
     fm_test_track_procevent_home "$home" "$home/procevent-claims"
     store="$home/lavish-state"
-    board=$(sweep_board "$home" stat-error old)
+    board=$(sweep_board "$home" stat-error old sweep-finished-card)
     sid=$(sweep_register "$home" "$board")
     sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
-    healthy=$(sweep_board "$home" healthy old)
+    healthy=$(sweep_board "$home" healthy old sweep-finished-card)
     healthy_id=$(sweep_register "$home" "$healthy")
     sweep_session "$store" "$healthy" open 0 2000-01-01T00:00:00.000Z
     identity=$(perl -e 'my @s = stat $ARGV[0]; die $! unless @s; print "$s[0]:$s[1]"' "$home/state/procevent/$sid.source")
@@ -5359,9 +5367,11 @@ test_sweep_preserves_rearmed_registration_generations() (
   real_perl=$(command -v perl)
   for mode in plain worker pending; do
     home=$(make_home "board-sweep-rearmed-$mode")
+    tasks_in "$home" add sweep-finished-card "Finished board card" >/dev/null \
+      || fail "could not create the non-held card"
     fm_test_track_procevent_home "$home" "$home/procevent-claims"
     store="$home/lavish-state"
-    board=$(sweep_board "$home" rearmed old)
+    board=$(sweep_board "$home" rearmed old sweep-finished-card)
     sid=$(sweep_register "$home" "$board")
     sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
     printf '#!/usr/bin/env bash\nreal_perl=%q\n' "$real_perl" > "$home/fakebin/perl"
@@ -5456,6 +5466,255 @@ SH
   pass "stale sweeps preserve replacement generations and newly captured rounds"
 )
 
+test_sweep_keeps_unknown_card_discovery() {
+  local home store session shape board sid out list before
+  local -a kept_ids=() retired_ids=()
+  home=$(make_home board-sweep-card-discovery)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  mkdir -p "$store"
+  printf '{"sessions":{}}\n' > "$store/state.json"
+  tasks_in "$home" add sweep-static-finished "Finished static card" >/dev/null \
+    || fail "could not create the non-held static card"
+  run_captain "$home" hold sweep-dynamic-open --title "Dynamic captain call" \
+    --reason "captain choice pending" --repo sample >/dev/null \
+    || fail "could not create the dynamic captain call"
+  for session in idle ended nosession; do
+    for shape in empty dynamic mixed external module handler unkeyed comment malformed frame static; do
+      board=$(sweep_board "$home" "$session-$shape" new sweep-static-finished)
+      case "$shape" in
+        empty) printf '<h1>No static cards</h1>\n' > "$board" ;;
+        dynamic|mixed)
+          [ "$shape" != dynamic ] || : > "$board"
+          cat >> "$board" <<'HTML'
+<script>
+const row = {data: {question: 'sweep-dynamic-open', answer: 'north'}};
+const form = document.createElement('form');
+form.addEventListener('submit', event => {
+  event.preventDefault();
+  window.lavish.queuePrompt('north', {tag: 'choice', element: form, data: row.data});
+});
+form.append(document.createElement('button'));
+document.body.append(form);
+</script>
+HTML
+          ;;
+        external) printf '<script src="deck.js"></script>\n' >> "$board" ;;
+        module) printf '<script type="module">document.createElement("form");</script>\n' >> "$board" ;;
+        handler) printf '<button onclick="window.lavish.queuePrompt(\x27north\x27, {data: {question: \x27sweep-dynamic-open\x27}})">go</button>\n' >> "$board" ;;
+        unkeyed) printf '<form><button>dynamic choice</button></form>\n' >> "$board" ;;
+        comment) printf '<!-- <form data-lavish-question="sweep-static-finished"></form> -->\n' > "$board" ;;
+        malformed) printf '<form data-lavish-question="sweep-static-finished" broken="\n' > "$board" ;;
+        frame) printf '<iframe src="cards.html"></iframe>\n' >> "$board" ;;
+      esac
+      touch -t 200001010000 "$board"
+      sid=$(sweep_register "$home" "$board")
+      if [ "$shape" = static ]; then retired_ids+=("$sid"); else kept_ids+=("$sid"); fi
+      case "$session" in
+        ended) sweep_session "$store" "$board" ended 0 - ;;
+        idle) sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z ;;
+      esac
+    done
+  done
+  before=$(cksum < "$store/state.json")
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
+    || fail "the discovery dry run failed: $out"
+  for sid in "${kept_ids[@]}"; do
+    assert_contains "$out" "kept: $sid" "unknown card discovery permitted retirement: $out"
+  done
+  for sid in "${retired_ids[@]}"; do
+    assert_contains "$out" "would-retire: $sid" "a complete static closed-card set was kept: $out"
+  done
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+    || fail "the discovery sweep failed: $out"
+  list=$(run_procevent "$home" list)
+  for sid in "${kept_ids[@]}"; do
+    assert_contains "$out" "kept: $sid" "unknown card discovery lost its listener: $out"
+    assert_contains "$list" "$sid" "unknown card discovery lost its registration"
+  done
+  for sid in "${retired_ids[@]}"; do
+    assert_contains "$out" "retired: $sid" "a complete static closed-card set was not retired: $out"
+    assert_not_contains "$list" "$sid" "the closed static board remains registered"
+  done
+  assert_contains "$out" 'complete card-key set cannot be established' "unknown discovery was not explained"
+  assert_equals "$before" "$(cksum < "$store/state.json")" "discovery changed Lavish sessions"
+  pass "unknown and dynamic card discovery keeps ended, sessionless and idle listeners"
+}
+
+test_sweep_resolves_bound_captain_keys() {
+  local home store session route key origin board sid expected rc out list before legacy_sid=''
+  local -a kept_ids=() retired_ids=()
+  home=$(make_home board-sweep-bound-keys)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  mkdir -p "$store"
+  printf '{"sessions":{}}\n' > "$store/state.json"
+  for key in origin-open-decision-third-choice origin-closed-decision-third-choice \
+      origin-open-decision-exact-choice sweep-bound-open; do
+    run_captain "$home" hold "$key" --title "Bound captain call $key" \
+      --reason "captain choice pending" --repo sample >/dev/null \
+      || fail "could not create the bound call $key"
+  done
+  tasks_in "$home" add exact-choice "Non-held exact identity" >/dev/null \
+    || fail "could not create the exact precedence fixture"
+  printf 'north\n' > "$home/answer.txt"
+  run_captain "$home" answer origin-closed-decision-third-choice --decision-file "$home/answer.txt" >/dev/null \
+    || fail "could not answer the legacy closed fixture"
+  before=$(cksum < "$home/data/backlog.md")
+  for session in idle ended nosession; do
+    for route in legacy-open legacy-closed exact-open exact-closed missing any-origin bad-binding; do
+      origin=origin-open; expected=0
+      case "$route" in
+        legacy-open) key=third-choice ;;
+        legacy-closed) key=third-choice; origin=origin-closed; expected=1 ;;
+        exact-open) key=sweep-bound-open; origin=--any-origin ;;
+        exact-closed) key=exact-choice; expected=1 ;;
+        missing) key=missing-choice; expected=2 ;;
+        any-origin) key=third-choice; origin=--any-origin; expected=2 ;;
+        bad-binding) key=exact-choice; expected=2 ;;
+      esac
+      board=$(sweep_board "$home" "$session-$route" old "$key")
+      sid=$(sweep_register "$home" "$board")
+      run_captain "$home" bind "$sid" "$origin" >/dev/null || fail "could not bind $route"
+      if [ "$route" = bad-binding ]; then
+        printf 'schema=invalid\norigin=origin-open\n' > "$home/state/decision-bindings/$sid.origin"
+      fi
+      if out=$(run_captain "$home" open-bound "$sid" "$key" 2> "$home/predicate.err"); then rc=0; else rc=$?; fi
+      expect_code "$expected" "$rc" "bound predicate $session/$route: $(cat "$home/predicate.err")"
+      assert_equals '' "$out" "the read-only bound predicate emitted output"
+      if [ "$expected" = 1 ]; then retired_ids+=("$sid"); else kept_ids+=("$sid"); fi
+      if [ "$session/$route" = idle/legacy-open ]; then legacy_sid=$sid; fi
+      case "$session" in
+        ended) sweep_session "$store" "$board" ended 0 - ;;
+        idle) sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z ;;
+      esac
+    done
+  done
+  assert_equals "$before" "$(cksum < "$home/data/backlog.md")" "bound predicates changed captain tasks"
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
+    || fail "the bound-key dry run failed: $out"
+  for sid in "${kept_ids[@]}"; do assert_contains "$out" "kept: $sid" "the dry run lost a bound or unresolved call: $out"; done
+  for sid in "${retired_ids[@]}"; do assert_contains "$out" "would-retire: $sid" "the dry run ignored a closed bound identity: $out"; done
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+    || fail "the bound-key sweep failed: $out"
+  list=$(run_procevent "$home" list)
+  for sid in "${kept_ids[@]}"; do
+    assert_contains "$out" "kept: $sid" "an open or unresolved bound call lost its listener: $out"
+    assert_contains "$list" "$sid" "an open or unresolved bound call lost its registration"
+  done
+  for sid in "${retired_ids[@]}"; do
+    assert_contains "$out" "retired: $sid" "a closed bound identity kept its listener: $out"
+    assert_not_contains "$list" "$sid" "a closed bound identity remains registered"
+  done
+  printf 'third-choice\tnorth\tNorth\n' | run_captain "$home" answers origin-open --source "bound sweep fixture" >/dev/null \
+    || fail "the preserved legacy call could not receive its answer"
+  out=$(tasks_in "$home" show origin-open-decision-third-choice)
+  assert_contains "$out" 'state: done' "the bound answer did not reach the derived task"
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+    || fail "the answered bound-key sweep failed: $out"
+  assert_contains "$out" "retired: $legacy_sid" "the answered legacy card kept its listener: $out"
+  pass "bound sweep keys share exact and legacy answer precedence without cross-source cache leakage"
+}
+
+test_sweep_resolves_migrated_captain_keys() {
+  local mode home store board sid key origin identity expected out rc list before
+  for mode in note derived-note prefix derived-prefix marker-wins ambiguous-note ambiguous-prefix exact-error derived-error prefix-error; do
+    home=$(make_home "board-sweep-migrated-$mode")
+    fm_test_track_procevent_home "$home" "$home/procevent-claims"
+    store="$home/lavish-state"
+    key=legacy-choice; origin=migration-origin; expected=0; identity=$key
+    case "$mode" in derived-note|derived-prefix) identity="$origin-decision-$key" ;; esac
+    cat > "$home/.tasks.toml" <<EOF
+backend = "beads"
+[beads]
+path = "$home/graph"
+binary = "bd"
+prefix = "fm"
+[markdown]
+path = "data/backlog.md"
+EOF
+    printf '[]\n' > "$home/migration-list.json"
+    : > "$home/closed-id"
+    : > "$home/error-id"
+    case "$mode" in
+      note|derived-note)
+        write_known_rows_stub "$home/fakebin" migrated-row
+        jq -cn --arg identity "$identity" '[{id:"migrated-row", notes:("migrated from data/backlog.md id " + $identity + " on 2026-09-04")}]' > "$home/migration-list.json"
+        ;;
+      prefix|derived-prefix) write_known_rows_stub "$home/fakebin" "fm-$identity" ;;
+      marker-wins)
+        write_known_rows_stub "$home/fakebin" migrated-row fm-legacy-choice
+        printf 'migrated-row\n' > "$home/closed-id"
+        printf '[{"id":"migrated-row","notes":"migrated from data/backlog.md id legacy-choice"}]\n' > "$home/migration-list.json"
+        expected=1
+        ;;
+      ambiguous-note)
+        write_known_rows_stub "$home/fakebin" migrated-row other-migrated-row
+        printf '[{"id":"migrated-row","notes":"migrated from data/backlog.md id legacy-choice"},{"id":"other-migrated-row","notes":"migrated from data/backlog.md id legacy-choice"}]\n' > "$home/migration-list.json"
+        expected=2
+        ;;
+      ambiguous-prefix)
+        write_known_rows_stub "$home/fakebin" fm-legacy-choice fm-migration-origin-decision-legacy-choice
+        expected=2
+        ;;
+      exact-error|derived-error|prefix-error)
+        write_known_rows_stub "$home/fakebin" migrated-row
+        case "$mode" in
+          exact-error) printf '%s\n' "$key" > "$home/error-id" ;;
+          derived-error) printf '%s\n' "$origin-decision-$key" > "$home/error-id" ;;
+          prefix-error) printf '%s\n' "fm-$key" > "$home/error-id" ;;
+        esac
+        if [ "$mode" != prefix-error ]; then
+          printf 'migrated-row\n' > "$home/closed-id"
+          printf '[{"id":"migrated-row","notes":"migrated from data/backlog.md id legacy-choice"}]\n' > "$home/migration-list.json"
+        fi
+        expected=2
+        ;;
+    esac
+    cp "$home/fakebin/tasks-axi" "$home/fakebin/tasks-axi-rows"
+    cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = show ]; then
+  if [ "$2" = "$(cat "$FM_HOME/error-id")" ]; then
+    printf 'error: backlog record cannot be read\n' >&2
+    exit 1
+  fi
+  if [ "$2" = "$(cat "$FM_HOME/closed-id")" ]; then
+    printf 'task:\n  id: %s\n  state: done\n  held: no\n  blocked: no\n  hold_kind: -\n  body: ""\n' "$2"
+    exit 0
+  fi
+fi
+exec "$FM_HOME/fakebin/tasks-axi-rows" "$@"
+SH
+    cat > "$home/fakebin/bd" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = list ] || exit 1
+cat "$FM_HOME/migration-list.json"
+SH
+    chmod +x "$home/fakebin/tasks-axi" "$home/fakebin/bd"
+    board=$(sweep_board "$home" migrated old "$key")
+    sid=$(sweep_register "$home" "$board")
+    run_captain "$home" bind "$sid" "$origin" >/dev/null || fail "could not bind the $mode fixture"
+    sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
+    before=$(cksum < "$home/migration-list.json")
+    if out=$(run_captain "$home" open-bound "$sid" "$key" 2> "$home/predicate.err"); then rc=0; else rc=$?; fi
+    expect_code "$expected" "$rc" "migrated bound predicate $mode: $(cat "$home/predicate.err")"
+    assert_equals '' "$out" "the migrated predicate emitted output"
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+      || fail "the $mode migration sweep failed: $out"
+    list=$(run_procevent "$home" list)
+    if [ "$expected" = 1 ]; then
+      assert_contains "$out" "retired: $sid" "the closed marker-noted row lost precedence: $out"
+      assert_not_contains "$list" "$sid" "the closed migrated board remains registered"
+    else
+      assert_contains "$out" "kept: $sid" "the migrated or unknown call lost its listener: $out"
+      assert_contains "$list" "$sid" "the migrated or unknown call lost its registration"
+    fi
+    assert_equals "$before" "$(cksum < "$home/migration-list.json")" "the predicate changed migration evidence"
+  done
+  pass "sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities"
+}
+
 tests=(
 test_sweep_retires_only_finished_board_listeners
 test_sweep_stops_a_live_listener_of_a_finished_board
@@ -5464,6 +5723,9 @@ test_sweep_keeps_boards_with_unsearchable_parents
 test_sweep_preserves_rearmed_registration_generations
 test_sweep_keeps_recently_handled_boards_in_literal_home_paths
 test_sweep_keeps_unknown_inbox_evidence
+test_sweep_keeps_unknown_card_discovery
+test_sweep_resolves_bound_captain_keys
+test_sweep_resolves_migrated_captain_keys
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair

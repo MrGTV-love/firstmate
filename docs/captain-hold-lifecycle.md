@@ -466,6 +466,7 @@ Three legacy inputs are resolved in place:
 
 - A `decision_keys=` metadata entry that names no task resolves through `<origin>-decision-<entry>`.
 - A channel key that names no task resolves the same way when the source's binding carries a concrete legacy origin.
+- The read-only `bin/fm-captain-hold.sh open-bound <source-id> <card-key>` predicate applies that same source binding and resolution order before checking the resolved task: exit 0 is open, exit 1 is known closed or no longer captain-held, and exit 2 is unresolved or unreadable. It changes no task or binding; listener sweeps permit retirement only on exit 1.
 - Resolution records written by the old script are recognized wherever a record is read.
 
 ### Legacy ids on the Beads backend

@@ -50,10 +50,11 @@
 #            card key is known not to name an open captain call. Other boards
 #            must also be idle for FM_BOARD_LISTENER_IDLE_HOURS (default 48,
 #            whole hours 1..8760): no change to the artifact, the Lavish session
-#            or a captured round. Unreadable card keys keep a present board.
-#            `bin/fm-captain-hold.sh open` exit 0 (open), exit 2 (cannot tell),
-#            or any unexpected exit keeps the board; exit 1 (closed) and exit 3
-#            (absent from this home's backlog) permit retirement. The durable
+#            or a captured round. Empty, unreadable or unsupported card discovery
+#            keeps a present board, including scripts and event handlers.
+#            `bin/fm-captain-hold.sh open-bound` checks keys in source-binding
+#            context; only exit 1 (resolved and closed) permits retirement.
+#            Open calls, unresolved keys and read errors keep the board. The durable
 #            record of a captain call is its held task, and the standing board
 #            lists every held call. A call held in another home's backlog is
 #            invisible here, so dormancy is the safeguard for live sessions.
@@ -1110,14 +1111,24 @@ sweep_facts() {  # <state-dir> <lavish-store>
           if ($read_ok && $close_ok) {
             $html //= "";
             my %seen;
+            $html =~ s{<!--.*?(?:-->|\z)}{}gs;
             while ($html =~ m{<([A-Za-z][\w:-]*)(?=[\s/>])}g) {
+              my $tag = lc $1;
               my %attr;
               while ($html =~ m{\G\s*([^\s"\x27<>/=]+)(?:\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s"\x27=<>`]+)))?}gc) {
                 my $name = lc $1;
                 $attr{$name} //= unescape($2 // $3 // $4 // "");
               }
-              $html =~ m{\G\s*/?>}gc;
-              next unless exists $attr{"data-lavish-question"};
+              if ($html !~ m{\G\s*/?>}gc
+                  || $tag =~ /\A(?:script|iframe|object|embed|template)\z/
+                  || grep { /\Aon/i || lc($_) eq "srcdoc" || $attr{$_} =~ /\A\s*javascript:/i } keys %attr) {
+                $keys_unknown = 1;
+                last;
+              }
+              if (!exists $attr{"data-lavish-question"}) {
+                $keys_unknown = 1 if $tag eq "form";
+                next;
+              }
               my $k = $attr{"data-lavish-question"};
               if ($k !~ /\A[A-Za-z0-9._-]{1,128}\z/) {
                 $keys_unknown = 1;
@@ -1125,6 +1136,7 @@ sweep_facts() {  # <state-dir> <lavish-store>
               }
               push @keys, $k unless $seen{$k}++;
             }
+            $keys_unknown = 1 unless @keys;
           } else {
             $evidence = "the board file cannot be read";
           }
@@ -1154,24 +1166,24 @@ sweep_facts() {  # <state-dir> <lavish-store>
 }
 
 sweep_cards_closed() {
-  local keys=$1 key rc IFS=,
-  if [ "$keys" = '?' ]; then
-    reason="the board's card keys cannot be read"
+  local source=$1 keys=$2 key cache_key rc IFS=,
+  if [ "$keys" = '?' ] || [ "$keys" = '-' ] || [ -z "$keys" ]; then
+    reason="the board's complete card-key set cannot be established"
     return 1
   fi
   for key in $keys; do
-    [ "$key" != - ] || continue
+    cache_key="$source:$key"
     case "$open_cache" in
-      *$'\n'"$key="[0-3]$'\n'*) ;;
+      *$'\n'"$cache_key="[0-2]$'\n'*) ;;
       *)
-        FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open "$key" --distinguish-absent \
+        FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open-bound "$source" "$key" \
           >/dev/null 2>&1 </dev/null
         rc=$?
-        open_cache="$open_cache$key=$rc"$'\n'
+        open_cache="$open_cache$cache_key=$rc"$'\n'
         ;;
     esac
     case "$open_cache" in
-      *$'\n'"$key=1"$'\n'*|*$'\n'"$key=3"$'\n'*) ;;
+      *$'\n'"$cache_key=1"$'\n'*) ;;
       *) reason="card $key is an open captain call or cannot be checked"; return 1 ;;
     esac
   done
@@ -1273,7 +1285,7 @@ cmd_sweep() {
       else
         reason="idle for $(((now - activity) / 3600)) hours with no open captain call"
       fi
-      if sweep_cards_closed "$keys"; then
+      if sweep_cards_closed "$id" "$keys"; then
         verdict=retire
       fi
     fi

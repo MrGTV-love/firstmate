@@ -31,6 +31,7 @@
 #   fm-captain-hold.sh complete <origin-id> (--none | <task-id>...)
 #   fm-captain-hold.sh verify <origin-id>
 #   fm-captain-hold.sh open <task-id> [--identity] [--distinguish-absent]
+#   fm-captain-hold.sh open-bound <source-id> <card-key>
 #   fm-captain-hold.sh diverged
 #   fm-captain-hold.sh reconcile list
 #   fm-captain-hold.sh reconcile close <task-id> --evidence-file <path>
@@ -650,7 +651,7 @@ captain_migration_scan_load() {  # <resolved-data-dir>
 # guess, so it only runs when no marker line matches any identity and it accepts
 # a row solely when that row is itself still held for the captain.
 resolve_migrated_entry() {  # <origin-or-empty> <entry>
-  local origin=$1 entry=$2 data root entries prefix derived show backend
+  local origin=$1 entry=$2 data root entries prefix derived backend
   local candidate candidate_matches prefixed matches count prefixed_matches prefixed_count
   data=$(fm_backlog_data_absolute "$DATA") || {
     printf 'fm-captain-hold: the migrated hold of %s cannot be resolved: %s\n' \
@@ -711,14 +712,15 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
       *-) prefixed="$prefix$candidate" ;;
       *) prefixed="$prefix-$candidate" ;;
     esac
-    # Same shell rule as task_show_or_fail: the row is read out of
-    # TASK_SHOW_OUTPUT, so the read cannot sit inside a command substitution.
-    task_show "$prefixed" 2>/dev/null || {
-      [ "$?" -ne 124 ] || return 124
+    if ! fm_backlog_row_probe "$data" "$prefixed"; then
+      [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 124
+      [ "$FM_BACKLOG_ROW_RESULT" = not_found ] || {
+        printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_ROW_ERROR" >&2
+        return 2
+      }
       continue
-    }
-    show=$TASK_SHOW_OUTPUT
-    [ "$(show_field_value "$show" hold_kind)" = captain ] || continue
+    fi
+    [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ] || continue
     prefixed_matches="${prefixed_matches}${prefixed_matches:+$NL_SEP}$prefixed"
   done
   prefixed_count=$(printf '%s\n' "$prefixed_matches" | sed '/^$/d' | wc -l | tr -d ' ')
@@ -737,17 +739,28 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # Prints "<resolved id> <how>", where <how> is exact, legacy, migrated-note or
 # migrated-prefix, so a caller can record which evidence carried the attestation.
 resolve_entry() {  # <origin-or-empty> <entry>; prints "<id> <how>" or fails
-  local origin=$1 entry=$2 legacy migrated rc
-  if task_show "$entry"; then
+  local origin=$1 entry=$2 legacy migrated rc data
+  data=$(fm_backlog_data_absolute "$DATA") || return 2
+  if fm_backlog_row_probe "$data" "$entry"; then
     printf '%s exact' "$entry"
     return 0
   fi
+  [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 124
+  [ "$FM_BACKLOG_ROW_RESULT" = not_found ] || {
+    printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_ROW_ERROR" >&2
+    return 2
+  }
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
     legacy=$(legacy_hold_id "$origin" "$entry")
-    if task_show "$legacy"; then
+    if fm_backlog_row_probe "$data" "$legacy"; then
       printf '%s legacy' "$legacy"
       return 0
     fi
+    [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 124
+    [ "$FM_BACKLOG_ROW_RESULT" = not_found ] || {
+      printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_ROW_ERROR" >&2
+      return 2
+    }
   fi
   rc=0
   migrated=$(resolve_migrated_entry "$origin" "$entry") || rc=$?
@@ -1377,10 +1390,6 @@ command_answers() {
       continue
     fi
     if [ "$resolve_rc" -ne 0 ]; then
-      # resolve_entry runs in a command substitution, so task_show's exit
-      # cannot stop this loop; only its status crosses back. 124 means the
-      # backend never answered, which is not the same as an unknown key and
-      # must not be spent as a skip.
       [ "$resolve_rc" -ne 124 ] \
         || fail "the backlog backend exceeded its read bound resolving $key"
       printf 'skipped: %s (no captain-held task with that id)\n' "$key"
@@ -2038,6 +2047,19 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
   exit 2
 }
 
+command_open_bound() {
+  local source=${1:-} key=${2:-} origin resolved rc=0
+  [ "$#" -eq 2 ] || return 2
+  (validate_source_id "$source"; validate_slug card-key "$key") || return 2
+  origin=$(read_binding "$source") || return 2
+  resolved=$(resolve_entry "$origin" "$key") || return 2
+  command_open "${resolved%% *}" --distinguish-absent || rc=$?
+  case "$rc" in
+    0|1) return "$rc" ;;
+    *) return 2 ;;
+  esac
+}
+
 case "${1:-}" in
   hold) shift; command_hold "$@" ;;
   answer) shift; command_answer "$@" ;;
@@ -2049,6 +2071,7 @@ case "${1:-}" in
   complete) shift; command_complete "$@" ;;
   verify) shift; command_verify "$@" ;;
   open) shift; command_open "$@" ;;
+  open-bound) shift; command_open_bound "$@" ;;
   diverged) shift; command_diverged "$@" ;;
   reconcile) shift; command_reconcile "$@" ;;
   -h|--help) usage ;;
