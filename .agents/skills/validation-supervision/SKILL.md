@@ -1,6 +1,6 @@
 ---
 name: validation-supervision
-description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, when a failed or aborted run's branch needs custody returned (status offers `recover_custody` or `inspect_and_reconcile_manually`), and before deciding or answering any ask-user finding.
+description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, when a failed or aborted run or a passing Gerrit run needs branch custody returned (status offers `recover_custody` or `inspect_and_reconcile_manually`), and before deciding or answering any ask-user finding.
 user-invocable: false
 metadata:
   internal: true
@@ -33,15 +33,15 @@ The worker reports the PR when CI first becomes green rather than waiting for me
 
 ## Custody return when the pipeline head diverged
 
-A run that ended failed or aborted with pipeline commits the worker copy does not hold reports `branch_sync.state` `pipeline_owned` and `branch_sync.next_action.code` `inspect_and_reconcile_manually`, and `axi sync --check` is blocked.
+A failed or aborted run, or a passing Gerrit run, with pipeline commits the worker copy does not hold reports `branch_sync.state` `pipeline_owned` and `branch_sync.next_action.code` `inspect_and_reconcile_manually`, and `axi sync --check` is blocked.
 The copy sits clean at the submitted head S and the gate holds a different pipeline head P.
 `axi sync --recover` is not offered until an archive of P is bound, so this state is the route below and not a reason to wait for a ruling.
 Firstmate sends this route to the worker that owns the run, with the run id, S and P, as authorization for exactly these steps.
 Stop at the first refusal, conflict, or mismatch and report the exact output.
-Never force, waive, edit no-mistakes records or gate refs, delete a ref or bundle, or start a second run while the failed or aborted run still owns the branch.
+Never force, waive, edit no-mistakes records or gate refs, delete a ref or bundle, or start a second run while the terminal run still owns the branch.
 Run every git command directly, never inside a script, alias, subshell, or other wrapper, because getting a guarded command past a project guard that way is a guard escape.
 
-1. Confirm `axi status` still shows the run failed or aborted, the tree is clean, `HEAD` is S, and P resolves in the run's gate repository.
+1. Confirm `axi status` still shows the run failed or aborted, or for Gerrit passed, passed-with-skips, or passed-with-override; the tree is clean, `HEAD` is S, and P resolves in the run's gate repository.
 2. Create `git branch archive/<task>-submitted-<S8> <S>`, then fetch the recovery object without an archive destination: `git fetch --no-tags <gate repo> refs/no-mistakes/recover/<run>`.
    Verify `FETCH_HEAD` resolves to P, then create `git branch archive/<task>-pipeline-<P8> <P>`.
    Both branch creations must refuse an existing name; verify each archive resolves to its expected commit.
@@ -51,6 +51,7 @@ Run every git command directly, never inside a script, alias, subshell, or other
    If the captain invalidated this work, custody recovery is complete: return to the supersession workflow above, replace the obsolete work from the correct pre-invalidation base, and validate once with the replacement intent. Do not adopt P or perform steps 4–6.
 4. Run `git reset --keep refs/heads/archive/<task>-pipeline-<P8>` to adopt P.
    Then `git range-diff` the submitted commits against the new head and report any submitted commit that is missing.
+   For a Gerrit run whose outcome is passed, passed-with-skips, or passed-with-override, confirm `HEAD`'s tree equals P's tree and resume the worker brief's fix-commit check and publish steps. Do not perform steps 5–6 or start another run: P is the head the passing run validated, even if `axi sync --check` offers `run_pipeline`.
 5. A fresh run refuses at the private-mirror guard until S is an ancestor of the head, because the gate's mirror branch still holds S.
    Do not record this with `git merge -s ours`: a project can forbid that merge with no allowed form.
    Replay instead, before adding any commit or merging main, so the range holds no merge commit.

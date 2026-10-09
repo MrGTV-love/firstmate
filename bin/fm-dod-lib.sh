@@ -432,7 +432,7 @@ You may not publish until you have closed that gap:
 2. When its code is \`recover_custody\`, run the exact command that status prints - \`no-mistakes axi sync --recover\` - and confirm \`branch_sync.state\` comes back \`custody_returned\` on a clean tree. The printed command is authoritative if it differs. The \`run_pipeline\` next action status reports after recovery is not an instruction to run again: the recovered head is the one the passed run validated, so publish it.
    When its code is \`inspect_and_reconcile_manually\` instead, the pipeline head diverged from your submitted head and status offers no recovery yet.
    Append \`blocked [at=<epoch>]: inspect_and_reconcile_manually\` and stop.
-   Firstmate returns custody through its bind-archive route (the \`validation-supervision\` skill) and sends you the exact steps; never reset, merge, cherry-pick, or start another run yourself.
+   Firstmate returns custody through its bind-archive route (the \`validation-supervision\` skill) and sends you the exact steps; never reset, merge, cherry-pick, or start another run yourself. After a passing outcome, that route adopts the validated pipeline head and returns you to step 3 to publish without another run.
 3. Confirm with \`git log\` that \`$branch\` now carries every fix commit the run made, whether or not step 2 was needed.
 An unrecovered fix round is an unfinished task, never housekeeping: publishing without it is how the UNFIXED code reaches review.
 Your ready report is refused while the run still holds your branch, while its outcome is missing or not passing, or while your HEAD's tree differs from the run's result.
