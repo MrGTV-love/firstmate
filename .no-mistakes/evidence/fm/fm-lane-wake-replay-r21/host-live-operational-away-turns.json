@@ -1,0 +1,10 @@
+[
+ {
+  "t": 1791585188.816483,
+  "last": "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/tmp/fm-host-live.ayZJIg/operational-away/home'. Do not repeat this information in your reply.\n</system-reminder> \u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE SUPERVISION HOST: supervision-host: outcome 3 the away session finished its work\nThis wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+  "drain": {
+   "returncode": 0,
+   "stdout": ""
+  }
+ }
+]

@@ -1,0 +1,14 @@
+[
+ {
+  "t": 1791585541.966809,
+  "last": "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/tmp/fm-host-live.ayZJIg/restore-owed/home'. Do not repeat this information in your reply.\n</system-reminder> LONGTURN go"
+ },
+ {
+  "t": 1791585544.81166,
+  "last": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: trigger-restore\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+  "drain": {
+   "returncode": 0,
+   "stdout": "1791585541\t1\tsignal\ttrigger-restore\tsignal: trigger-restore\n"
+  }
+ }
+]

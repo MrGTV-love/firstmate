@@ -1,0 +1,28 @@
+omp: omp/18.8.7
+worktree commit: fac72db3617b13da8fde1bc44791a4635837bb20
+== away-archived
+away-archived: one wake naming the durable row 'signal: owed-1' plus the host line; away note present=False
+DELIVERED: '\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: owed-1\nsupervision-host: the away session is paused after repeated engine errors; this wake is yours\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.'
+rc=0
+== away-present
+away-present: one wake naming the durable row 'signal: owed-1' plus the host line; away note present=True
+DELIVERED: '\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: owed-1\nsupervision-host: the away session is paused after repeated engine errors; this wake is yours\nThis wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.'
+rc=0
+== boundary
+boundary: 4 boundary-only closes, 0 model turns, 5 host parks (re-armed every time, no FAILED notice)
+rc=0
+== host-handled
+host-handled: 3 closes carrying handled 'signal:' headlines with no durable row, 0 model turns, 4 host parks
+rc=0
+== diag-empty
+diag-empty: empty queue still delivered 'check: wake may be due' plus both host diagnostics
+DELIVERED: "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/tmp/fm-host-live.ayZJIg/diag-empty/home'. Do not repeat this information in your reply.\n</system-reminder> \u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: wake may be due\nsupervision-host: the away session could not take this wake: the engine turn failed (exit 1); this wake is yours\nsupervision-host: the supervision session is paused after repeated engine errors; every wake reaches you for the next 30 minutes\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+rc=0
+== operational
+operational: hand-back delivered without the handled 'signal:' headline and with no away note
+DELIVERED: "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/tmp/fm-host-live.ayZJIg/operational/home'. Do not repeat this information in your reply.\n</system-reminder> \u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE SUPERVISION HOST: supervision-host: the captain returned; the away session handed control back\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+rc=0
+== operational-away
+operational-away: hand-back carries the outcome and the send-time away note, no handled headline
+DELIVERED: "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/tmp/fm-host-live.ayZJIg/operational-away/home'. Do not repeat this information in your reply.\n</system-reminder> \u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE SUPERVISION HOST: supervision-host: outcome 3 the away session finished its work\nThis wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+rc=0

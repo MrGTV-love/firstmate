@@ -1,0 +1,14 @@
+[
+ {
+  "t": 1791585111.630324,
+  "last": "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/tmp/fm-host-live.ayZJIg/away-archived/home'. Do not repeat this information in your reply.\n</system-reminder> LONGTURN start"
+ },
+ {
+  "t": 1791585114.170444,
+  "last": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: owed-1\nsupervision-host: the away session is paused after repeated engine errors; this wake is yours\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+  "drain": {
+   "returncode": 0,
+   "stdout": "1791585111\t1\tsignal\towed-1\tsignal: owed-1\n"
+  }
+ }
+]
