@@ -1760,10 +1760,10 @@ SH
 test_keyed_answer_releases_a_live_work_item() {
   local home id out show rc
   home=$(make_home keyed-live-work)
-  id=sample-live-ship
-  tasks_in "$home" add "$id" "Ship the live sample" --kind ship --repo sample --start >/dev/null \
+  id=sample-live-scout
+  tasks_in "$home" add "$id" "Review the live sample" --kind scout --repo sample --start >/dev/null \
     || fail "could not create the in-flight work item"
-  write_origin_meta "$home" "$id" ship
+  write_origin_meta "$home" "$id"
   run_captain "$home" hold "$id" --reason "captain design pick needed" >/dev/null \
     || fail "could not hold the live work item for the captain"
   tasks_in "$home" add sample-live-done-ship "Ship the second live sample" --kind ship --repo sample >/dev/null \
@@ -1798,23 +1798,29 @@ test_keyed_answer_releases_a_live_work_item() {
   show=$(tasks_in "$home" show sample-plain-question --full)
   assert_contains "$show" "state: done" "a question with no worker stopped closing"
 
-  out=$(printf 'sample-live-ship\tgo-b\tOption B\n' \
+  out=$(printf 'sample-live-scout\tgo-b\tOption B\n' \
     | run_captain "$home" answers --source "live work fixture" 2>&1) \
     || fail "an identical live-work answer was not idempotent: $out"
-  rm -f "$home/state/sample-live-ship.meta"
-  tasks_in "$home" reopen sample-live-ship >/dev/null \
-    || fail "could not queue the released work item after its worker ended"
-  show=$(tasks_in "$home" show sample-live-ship --full)
-  assert_contains "$show" "state: queued" "the late replay fixture is not queued"
+  mkdir -p "$home/data/sample-live-scout"
+  printf '# Live sample report\n' > "$home/data/sample-live-scout/report.md"
+  printf 'done: report complete\n' > "$home/state/sample-live-scout.status"
+  run_captain "$home" complete sample-live-scout --none >/dev/null \
+    || fail "could not complete the released work item's inventory"
+  run_teardown "$home" sample-live-scout > "$home/teardown.out" 2> "$home/teardown.err" \
+    || fail "could not tear down the released work item: $(cat "$home/teardown.err")"
+  show=$(tasks_in "$home" show sample-live-scout --full)
+  assert_contains "$show" "state: done" "cleanup did not complete the released work item"
   assert_contains "$show" "held: no" "the late replay fixture is still held"
+  assert_absent "$home/state/sample-live-scout.meta" "cleanup left the worker record behind"
   set +e
-  out=$(printf 'sample-live-ship\tgo-b\tOption B\n' \
+  out=$(printf 'sample-live-scout\tgo-b\tOption B\n' \
     | run_captain "$home" answers --source "live work fixture" 2>&1)
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "replaying a release after the worker ended was refused: $out"
-  show=$(tasks_in "$home" show sample-live-ship --full)
-  assert_contains "$show" "state: queued" "a late replay changed the queued work item's state"
+  assert_contains "$out" "closed: sample-live-scout" "the completed release replay was not reported closed"
+  show=$(tasks_in "$home" show sample-live-scout --full)
+  assert_contains "$show" "state: done" "a late replay reopened completed work"
   assert_contains "$show" "held: no" "a late replay re-held the released work item"
   assert_contains "$show" "Resolution mode: released" "a late replay lost its recorded release"
   pass "a keyed answer releases a live work item and still closes a question"
@@ -1903,7 +1909,7 @@ SH
 }
 
 test_interrupted_keyed_release_closes_after_teardown() {
-  local home parent channel id mode row show out open published
+  local home parent channel id mode row show out open published body
   for mode in default done; do
     home=$(make_home "interrupted-keyed-release-$mode")
     parent=$(make_home "interrupted-keyed-release-parent-$mode")
@@ -1976,8 +1982,8 @@ SH
     show=$(tasks_in "$home" show "$id" --full)
     assert_contains "$show" "state: queued" "the failed completion changed the finished work's state"
     assert_contains "$show" "held: yes" "the failed completion released the finished work"
-    assert_contains "$show" 'Resolution mode: answered\n' "the failed completion lost its corrected close"
-    assert_not_contains "$show" "Resolution mode: released" "the correction kept a duplicate release record"
+    assert_contains "$show" 'Resolution mode: released\n' "the failed completion changed the recorded release"
+    assert_not_contains "$show" "Resolution mode: answered" "the failed completion rewrote the release"
     open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
       _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
     assert_contains "$open" "captain-hold-$id-1" "the failed completion resolved the parent decision early"
@@ -1987,20 +1993,29 @@ SH
     show=$(tasks_in "$home" show "$id" --full)
     assert_contains "$show" "state: done" "the automatic retry made finished work runnable"
     assert_contains "$show" "held: no" "the automatic retry left finished work held"
-    assert_contains "$show" 'Resolution mode: answered\n' "the retry did not record its fresh close"
+    assert_contains "$show" 'Resolution mode: released\n' "the retry changed the recorded release"
     assert_contains "$show" "Answer: go" "the retry lost the captain's answer"
     assert_contains "$show" "Deliverable of the finished work: report data/$id/report.md" \
       "the retry lost the finished report"
+    body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+    assert_equals 1 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+      "the interrupted retry invented another resolution record"
     open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
       _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
     assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the original parent decision remained unresolved"
     published=$(cat "$channel")
     assert_contains "$published" "resolved [key=captain-hold-$id-1]" \
-      "the corrected close did not resolve the original occurrence"
-    assert_not_contains "$published" "captain-hold-$id-2" "the corrected close invented a second occurrence"
-    run_captain "$home" answer "$id" --decision-file "$home/decision.txt" >/dev/null \
-      || fail "the direct replay of the corrected close failed"
-    assert_equals "$published" "$(cat "$channel")" "the direct replay changed the parent resolution"
+      "the interrupted retry did not resolve the original occurrence"
+    assert_not_contains "$published" "captain-hold-$id-2" "the interrupted retry invented a second occurrence"
+    if run_captain "$home" answer "$id" --decision-file "$home/decision.txt" \
+      > "$home/direct-done.out" 2> "$home/direct-done.err"; then
+      fail "a direct answer accepted a completed release"
+    fi
+    assert_contains "$(cat "$home/direct-done.err")" "not a captain-answer replay" \
+      "the completed release lost its direct-answer mode check"
+    run_captain "$home" answer "$id" --decision-file "$home/decision.txt" --auto-release >/dev/null \
+      || fail "the locked automatic replay of the completed release failed"
+    assert_equals "$published" "$(cat "$channel")" "the locked automatic replay changed the parent resolution"
     out=$(printf '%s\n' "$row" | run_captain "$home" answers \
       --source "interrupted release fixture" 2>&1) \
       || fail "the closed automatic retry was not idempotent: $out"
@@ -2011,9 +2026,118 @@ SH
   pass "interrupted default and done releases close finished work while explicit mode checks stay strict"
 }
 
+test_completed_keyed_release_replays_after_publication_failure() {
+  local home parent channel id mode failure row out show published open request body before rc
+  for mode in default done; do
+    for failure in ordinary failed-publication; do
+      home=$(make_home "completed-keyed-release-$mode-$failure")
+      parent=$(make_home "completed-keyed-release-parent-$mode-$failure")
+      printf 'completed-release-mate\n' > "$home/.fm-secondmate-home"
+      printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+        > "$home/.fm-secondmate-parent"
+      printf -- '- completed-release-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+        "$home" > "$parent/data/secondmates.md"
+      fm_write_secondmate_meta "$parent/state/completed-release-mate.meta" "$home" \
+        "firstmate:fm-completed-release-mate" sample
+      channel="$parent/state/completed-release-mate.status"
+      id=sample-completed-keyed-release
+      tasks_in "$home" add "$id" "Review completed answer recovery" \
+        --kind scout --repo sample --start >/dev/null || fail "could not create the completed release task"
+      write_origin_meta "$home" "$id"
+      mkdir -p "$home/data/$id"
+      printf 'done: report complete\n' > "$home/state/$id.status"
+      printf '# Completed answer report\n' > "$home/data/$id/report.md"
+      run_captain "$home" hold "$id" --reason "captain report choice pending" >/dev/null \
+        || fail "could not hold the completed release task"
+      complete_through_sibling "$home" "$id" >/dev/null \
+        || fail "could not complete the completed release task's inventory"
+      request_reconciles "$home" completed-release-source "$id" \
+        || fail "could not create the release's reconcile request"
+      request="$home/state/reconcile-requests/$id.request"
+      if [ "$failure" = failed-publication ]; then
+        mv "$channel" "$channel.saved"
+        mkdir "$channel"
+      fi
+      row=$(printf '%s\tgo\tProceed' "$id")
+      [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+      rc=0
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+        --source "completed release fixture" 2>&1) || rc=$?
+      if [ "$failure" = failed-publication ]; then
+        [ "$rc" -ne 0 ] || fail "a failed publication with a pending request reported success"
+        assert_contains "$out" "could not publish" "the failed publication was not actionable"
+        assert_present "$request" "the failed publication retired its reconcile request"
+        rmdir "$channel"
+        mv "$channel.saved" "$channel"
+      else
+        [ "$rc" -eq 0 ] || fail "the ordinary live release failed: $out"
+        assert_absent "$request" "the successful release left its reconcile request pending"
+      fi
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: in_flight" "publication completed the live work"
+      assert_contains "$show" "held: no" "publication failure reversed the release"
+      assert_contains "$show" "Resolution mode: released" "the live release lost its record"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      printf '%s\n' "$body" | jq -j 'split("\n\n")[0:2] | join("\n\n")' > "$home/release-record.txt"
+      run_teardown "$home" "$id" > "$home/teardown.out" 2> "$home/teardown.err" \
+        || fail "cleanup of the released task failed: $(cat "$home/teardown.err")"
+      before=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$before" "state: done" "cleanup did not complete the released task"
+      assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+      if [ "$failure" = failed-publication ]; then
+        assert_present "$request" "cleanup retired the unpublished reconcile request"
+        open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+          _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+        assert_contains "$open" "captain-hold-$id-1" "cleanup resolved the unpublished hold"
+      fi
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+        --source "completed release fixture" 2>&1) || fail "the completed release replay failed: $out"
+      assert_contains "$out" "closed: $id" "the completed release replay was not reported closed"
+      assert_absent "$request" "the completed release replay left its reconcile request pending"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_equals "$before" "$show" "the completed release replay changed the row"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      assert_equals 1 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+        "the completed release replay duplicated its record"
+      printf '%s\n' "$body" | jq -j 'split("\n\n")[0:2] | join("\n\n")' > "$home/replayed-record.txt"
+      cmp -s "$home/release-record.txt" "$home/replayed-record.txt" \
+        || fail "cleanup or replay changed the released record's bytes"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the completed release's parent key remained open"
+      published=$(cat "$channel")
+      assert_equals 1 "$(grep -c "resolved \[key=captain-hold-$id-1\]" "$channel")" \
+        "the completed release did not publish exactly one resolution"
+      assert_not_contains "$published" "captain-hold-$id-2" "the completed replay invented a parent key"
+      printf 'Captain answered this call through completed release fixture.\nTask: %s\nAnswer: go\nAnswer as shown to the captain: Proceed\n' \
+        "$id" > "$home/decision.txt"
+      if run_captain "$home" answer "$id" --decision-file "$home/decision.txt" \
+        > "$home/direct.out" 2> "$home/direct.err"; then
+        fail "a direct answer accepted a completed release"
+      fi
+      assert_contains "$(cat "$home/direct.err")" "not a captain-answer replay" \
+        "the direct completed-release refusal lost its mode check"
+      if printf '%s\tgo\tProceed\trelease\n' "$id" | run_captain "$home" answers \
+        --source "completed release fixture" > "$home/explicit.out" 2> "$home/explicit.err"; then
+        fail "an explicit release card accepted a completed release"
+      fi
+      assert_contains "$(cat "$home/explicit.out")" "already closed" \
+        "the explicit release card did not keep its completed-state refusal"
+      run_captain "$home" answer "$id" --decision-file "$home/decision.txt" --auto-release >/dev/null \
+        || fail "the locked automatic Done replay failed"
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+        --source "completed release fixture" 2>&1) || fail "the second completed replay failed: $out"
+      assert_contains "$out" "closed: $id" "the second completed replay was not idempotent"
+      assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" "the replay or refusals changed Done work"
+      assert_equals "$published" "$(cat "$channel")" "the replay or refusals duplicated parent publication"
+    done
+  done
+  pass "completed default and done releases replay and recover failed publication without rewriting history"
+}
+
 test_repeated_keyed_answer_resolves_its_own_hold() {
   local home parent channel id mode interruption row show out open published body
-  local first_stamp=2026-07-14T12:00:00Z second_stamp=2026-07-15T12:00:00Z
+  local first_stamp=2026-07-14T12:00:00Z second_stamp=2026-07-14T12:00:01Z expected_mode
   for mode in default done; do
     for interruption in interrupted ordinary; do
       home=$(make_home "reheld-keyed-answer-$mode-$interruption")
@@ -2059,6 +2183,16 @@ test_repeated_keyed_answer_resolves_its_own_hold() {
       assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the first parent decision remained open"
       assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-1]" \
         "the first release did not publish its resolution"
+      published=$(cat "$channel")
+      if FM_CAPTAIN_HOLD_NOW="$first_stamp" run_captain "$home" hold "$id" \
+        --reason "captain revised report choice pending" > "$home/collision.out" 2> "$home/collision.err"; then
+        fail "a same-second re-hold reused the first resolution's association"
+      fi
+      assert_contains "$(cat "$home/collision.err")" "FM_CAPTAIN_HOLD_NOW collides" \
+        "a pinned timestamp collision did not explain the refusal"
+      assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+        "a refused same-second re-hold changed the work item"
+      assert_equals "$published" "$(cat "$channel")" "a refused re-hold opened another parent key"
       FM_CAPTAIN_HOLD_NOW="$second_stamp" run_captain "$home" hold "$id" \
         --reason "captain revised report choice pending" >/dev/null \
         || fail "could not open the second hold"
@@ -2105,10 +2239,12 @@ SH
       body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
       assert_equals 2 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
         "the completed second hold did not keep exactly two resolution records"
-      printf '%s\n' "$body" | jq -e --arg stamp "$second_stamp" \
+      expected_mode=answered
+      [ "$interruption" != interrupted ] || expected_mode=released
+      printf '%s\n' "$body" | jq -e --arg stamp "$second_stamp" --arg mode "$expected_mode" \
         'startswith("Resolution recorded by fm-captain-hold.\n") and
-         (split("\n")[2:4] == ["Resolution mode: answered", "Resolves hold set: " + $stamp])' \
-        >/dev/null || fail "the newest record did not close the second hold"
+         (split("\n")[2:4] == ["Resolution mode: " + $mode, "Resolves hold set: " + $stamp])' \
+        >/dev/null || fail "the newest record did not preserve the second hold's resolution"
       printf '%s\n' "$body" | jq -j \
         '("Resolution recorded by fm-captain-hold." + (split("Resolution recorded by fm-captain-hold.")[2])) | split("\n\n")[0:2] | join("\n\n")' \
         > "$home/preserved-resolution.txt"
@@ -5186,6 +5322,7 @@ test_bound_channel_answers_close_at_answer_time
 test_keyed_answer_releases_a_live_work_item
 test_keyed_answer_waits_for_cleanup_before_selecting_its_mode
 test_interrupted_keyed_release_closes_after_teardown
+test_completed_keyed_release_replays_after_publication_failure
 test_repeated_keyed_answer_resolves_its_own_hold
 test_legacy_keyed_release_requires_explicit_closure
 test_reconcile_never_closes_through_the_keyed_answer_intake

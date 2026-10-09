@@ -921,7 +921,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
-  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0
+  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 resolved_hold_set
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -948,12 +948,12 @@ command_hold() {
       *) fail "--until must be a YYYY-MM-DD date: $until" ;;
     esac
   fi
+  acquire_task_control_lock "$id"
   hold_set=${FM_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
   case "$hold_set" in
     [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) : ;;
     *) fail "FM_CAPTAIN_HOLD_NOW must be a UTC YYYY-MM-DDTHH:MM:SSZ timestamp" ;;
   esac
-  acquire_task_control_lock "$id"
   require_tasks_axi
   if task_show "$id"; then
     show=$TASK_SHOW_OUTPUT
@@ -995,6 +995,16 @@ command_hold() {
   # snapshot may see the harmless stamp by itself, but can never see a newly
   # held task without the timestamp that defines this hold lifecycle's age.
   task_show_or_fail "$id" "task $id disappeared before recording its hold-set stamp"
+  if [ "$preserve_hold_set" = 0 ] \
+    || [ -z "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ]; then
+    resolved_hold_set=$(recorded_resolved_hold_set "$(show_field "$show" body)")
+    while [ "$hold_set" = "$resolved_hold_set" ]; do
+      [ -z "${FM_CAPTAIN_HOLD_NOW:-}" ] \
+        || fail "FM_CAPTAIN_HOLD_NOW collides with the newest resolved hold for task $id; choose a later timestamp"
+      sleep 1
+      hold_set=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    done
+  fi
   write_hold_set_stamp "$id" "$(show_field "$show" body)" "$hold_set" "$preserve_hold_set"
   task_show_or_fail "$id" "task $id disappeared while recording its hold-set stamp"
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
@@ -1130,7 +1140,7 @@ remove_interrupted_answer_stamp() {  # <task-id>
 }
 
 command_answer() {
-  local id=${1:-} decision_file='' release=0 auto_release=0 show state hold_kind body outcome recorded_mode occurrence corrected_body tmp
+  local id=${1:-} decision_file='' release=0 auto_release=0 show state hold_kind body outcome recorded_mode occurrence
   local cur resolved_hold_set
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
@@ -1170,16 +1180,17 @@ command_answer() {
       [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
         || fail "captain-held task $id records a different captain decision"
       recorded_mode=$(recorded_resolution_mode "$body" || true)
-      closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+      { closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+        || { [ "$auto_release" = 1 ] && [ "$recorded_mode" = released ]; }; } \
         || fail "task $id records this resolution with mode ${recorded_mode:-unknown}; it is not a captain-answer replay"
       [ "$release" = 0 ] \
         || fail "task $id records this answer with mode ${recorded_mode:-unknown}; --release cannot reopen a closed task"
       remove_interrupted_answer_stamp "$id"
-      if [ "$recorded_mode" = repaired ]; then
-        publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "answered (repaired)"
-      else
-        publish_parent_resolution_then_retire "$id" $((occurrence - 1)) answered
-      fi
+      case "$recorded_mode" in
+        repaired) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "answered (repaired)" ;;
+        released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
+        *) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) answered ;;
+      esac
       printf 'answered: %s\n' "$id"
       return 0
     fi
@@ -1216,17 +1227,6 @@ command_answer() {
             if [ -z "$resolved_hold_set" ]; then
               fail "task $id records this answer as a release; close it with reconcile or a direct answer"
             fi
-            corrected_body=$(decode_shown_value "$body") \
-              || fail "could not decode the existing body for $id"
-            corrected_body=${corrected_body/$'\nResolution mode: released\n'/$'\nResolution mode: answered\n'}
-            tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-body.XXXXXX") \
-              || fail "cannot stage the corrected resolution record"
-            if ! printf '%s\n' "$corrected_body" > "$tmp" \
-              || ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
-              rm -f -- "$tmp"
-              fail "could not correct the captain decision on $id"
-            fi
-            rm -f -- "$tmp"
           fi
           ;;
         answered|routed) [ "$release" = 0 ] || fail "task $id records this answer as a close; retry without --release" ;;
@@ -1236,7 +1236,10 @@ command_answer() {
         fail "could not close answered captain-held task $id"
       fi
       remove_interrupted_answer_stamp "$id"
-      publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "$outcome"
+      case "$recorded_mode" in
+        released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
+        *) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "$outcome" ;;
+      esac
       printf '%s: %s\n' "$outcome" "$id"
       return 0
     fi
@@ -1464,8 +1467,9 @@ command_answers() {
       && { [ "$recorded_digest" = "$digest" ] \
         || { case "$body" in *"Resolution recorded by fm-decision-hold."*) true ;; *) false ;; esac \
           && [ -n "$legacy_digest" ] && [ "$recorded_digest" = "$legacy_digest" ]; }; }; then
-      if { [ "$release_flag" != --release ] && [ "$state" = "done" ] \
-          && closed_answer_replay_mode_compatible "$recorded_mode" "$body"; } \
+      if { [ "$release_flag" = --auto-release ] && [ "$state" = "done" ] \
+          && { closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+            || [ "$recorded_mode" = released ]; }; } \
         || { [ "$state" != "done" ] && [ "$hold_kind" != captain ] \
           && [ "$recorded_mode" = released ]; }; then
         occurrence=$(resolution_record_count "$body")
