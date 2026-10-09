@@ -1,0 +1,39 @@
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ RECOVERY-TAIL-NOTE unique shutdown proof.
+
+ LAB: shutdown completed without successor
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is
+ extension-owned.
+
+
+ LIVE-ACK
+
+ LAB: shutdown and successor completed
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is
+ extension-owned.
+
+
+ LIVE-ACK
+
+ LAB: shutdown and successor completed
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is
+ extension-owned.
+
+
+ LIVE-ACK
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B > ⑂ detached ?1 ▶─10%──────╎┃─200K─
+╰─

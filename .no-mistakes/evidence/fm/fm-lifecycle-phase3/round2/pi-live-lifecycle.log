@@ -1,0 +1,20 @@
+2026-10-09T06:26:31.797Z pid=55997 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T06:26:32.079Z pid=55997 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T06:26:32.080Z pid=55997 instance=1 event=factory-bind generation=1
+2026-10-09T06:26:32.098Z pid=55997 instance=1 event=duplicate-load-ignored
+2026-10-09T06:26:32.576Z pid=55997 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T06:26:32.577Z pid=55997 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T06:26:35.373Z pid=55997 instance=1 event=session_shutdown generation=1 reason=reload
+2026-10-09T06:26:35.374Z pid=55997 instance=1 event=generation-stop generation=1 replacement=true
+2026-10-09T06:26:35.619Z pid=55997 instance=2 event=generation-create generation=2 cause=factory-bind
+2026-10-09T06:26:35.620Z pid=55997 instance=2 event=generation-activate generation=2 cause=factory-bind
+2026-10-09T06:26:35.620Z pid=55997 instance=2 event=factory-bind generation=2 superseded=1
+2026-10-09T06:26:35.620Z pid=55997 instance=1 event=instance-retired generation=1 by=2
+2026-10-09T06:26:35.622Z pid=55997 instance=1 event=generation-stop generation=1 cause=factory-retire
+2026-10-09T06:26:35.635Z pid=55997 instance=2 event=duplicate-load-ignored
+2026-10-09T06:26:35.637Z pid=55997 instance=2 event=session_start generation=2 stopping=false
+2026-10-09T06:26:35.638Z pid=55997 instance=2 event=generation-activate generation=2 cause=session_start
+2026-10-09T06:26:38.430Z pid=55997 instance=2 event=session_shutdown generation=2 reason=reload
+2026-10-09T06:26:38.431Z pid=55997 instance=2 event=generation-stop generation=2 replacement=true
+2026-10-09T06:26:39.945Z pid=55997 instance=2 event=bound-expired waiter=pi-watch-extension waited-on=session_start bound=1500ms actual=1514ms outcome=successor-missing
+2026-10-09T06:26:39.946Z pid=55997 instance=2 event=successor-missing generation=2 message=watcher:_not_armed_-_Pi_replacement_runtime_did_not_start;_reload_the_extension_in_a_live_session

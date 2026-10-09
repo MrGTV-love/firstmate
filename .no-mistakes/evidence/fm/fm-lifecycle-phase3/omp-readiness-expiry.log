@@ -1,0 +1,8 @@
+2026-10-09T05:16:23.435Z pid=64823 instance=2 event=session_shutdown generation=3
+2026-10-09T05:16:24.612Z pid=64823 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1157ms
+2026-10-09T05:16:24.615Z pid=64823 instance=2 event=generation-stop generation=3
+2026-10-09T05:16:24.615Z pid=64823 instance=2 event=session_start generation=3 stopping=true
+2026-10-09T05:16:24.615Z pid=64823 instance=2 event=generation-create generation=4 cause=session_start
+2026-10-09T05:16:24.615Z pid=64823 instance=2 event=generation-activate generation=4 cause=session_start
+2026-10-09T05:23:16.842Z pid=64823 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=12000ms actual=12002ms
+2026-10-09T05:23:17.885Z pid=64823 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1043ms

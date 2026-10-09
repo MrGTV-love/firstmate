@@ -1,0 +1,12 @@
+{
+  "loc1": {
+    "stdout": "ok - UTF-8 fold locale matches full parsing with byte offsets and legacy invalidation\n",
+    "stderr": "",
+    "exit": 0
+  },
+  "loc2": {
+    "stdout": "ok - locale changes invalidate incremental, read-only, wake and snapshot checkpoint reuse\n",
+    "stderr": "",
+    "exit": 0
+  }
+}

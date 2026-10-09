@@ -1,0 +1,1 @@
+ok - golden: retained cursors across two incremental calls match byte-0 folds at complete and split lines for every kind

@@ -1,0 +1,21 @@
+2026-10-09T06:49:33.220Z pid=22837 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T06:49:33.277Z pid=22837 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T06:49:33.277Z pid=22837 instance=1 event=factory-bind generation=1
+2026-10-09T06:49:33.422Z pid=22837 instance=2 event=generation-create generation=1 cause=factory-bind
+2026-10-09T06:49:33.422Z pid=22837 instance=2 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T06:49:33.422Z pid=22837 instance=2 event=factory-bind generation=1 superseded=1
+2026-10-09T06:49:33.422Z pid=22837 instance=1 event=instance-retired generation=1 by=2
+2026-10-09T06:49:33.424Z pid=22837 instance=1 event=generation-stop generation=1 cause=factory-retire
+2026-10-09T06:49:37.170Z pid=22837 instance=1 event=session_start-ignored reason=superseded-instance
+2026-10-09T06:49:37.170Z pid=22837 instance=2 event=session_start generation=1 stopping=false
+2026-10-09T06:49:37.170Z pid=22837 instance=2 event=generation-activate generation=1 cause=session_start
+2026-10-09T06:50:23.319Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=12000ms actual=12003ms
+2026-10-09T06:50:24.341Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1021ms
+2026-10-09T06:53:37.903Z pid=22837 instance=2 event=session_shutdown generation=1
+2026-10-09T06:53:38.907Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1003ms
+2026-10-09T06:53:38.908Z pid=22837 instance=2 event=generation-stop generation=1
+2026-10-09T06:53:38.913Z pid=22837 instance=2 event=session_start generation=1 stopping=true
+2026-10-09T06:53:38.913Z pid=22837 instance=2 event=generation-create generation=2 cause=session_start
+2026-10-09T06:53:38.913Z pid=22837 instance=2 event=generation-activate generation=2 cause=session_start
+2026-10-09T06:55:32.480Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=supervision-host-readiness bound=30000ms actual=30002ms
+2026-10-09T06:55:33.481Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1001ms

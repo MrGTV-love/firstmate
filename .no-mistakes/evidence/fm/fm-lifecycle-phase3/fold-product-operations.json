@@ -1,0 +1,51 @@
+[
+  {
+    "operation": "cold-checkpoint",
+    "exit": 0,
+    "seconds": 9.639,
+    "bytes": 1326045,
+    "output": "api\tneeds-decision\tchoose REST or RPC"
+  },
+  {
+    "operation": "warm-checkpoint",
+    "exit": 0,
+    "seconds": 2.099,
+    "bytes": 1326045,
+    "output": "api\tneeds-decision\tchoose REST or RPC"
+  },
+  {
+    "operation": "bootstrap",
+    "exit": 0,
+    "seconds": 11.328,
+    "bytes": 1326045,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=api] needs-decision: choose REST or RPC\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "append-resolve",
+    "exit": 0,
+    "seconds": 12.783,
+    "bytes": 1326134,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=deployment] needs-decision: staging or production\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "unchanged",
+    "exit": 0,
+    "seconds": 11.152,
+    "bytes": 1326134,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=deployment] needs-decision: staging or production\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "truncate",
+    "exit": 0,
+    "seconds": 9.072,
+    "bytes": 50,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=rewrite] needs-decision: replacement content\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "replace-inode",
+    "exit": 0,
+    "seconds": 7.425,
+    "bytes": 53,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=new-inode] needs-decision: replacement identity\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  }
+]

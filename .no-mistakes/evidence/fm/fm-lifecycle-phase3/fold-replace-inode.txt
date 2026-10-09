@@ -1,0 +1,6 @@
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+d7 [key=new-inode] needs-decision: replacement identity
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.

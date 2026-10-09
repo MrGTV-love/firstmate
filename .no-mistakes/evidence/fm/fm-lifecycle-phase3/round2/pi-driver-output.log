@@ -1,0 +1,31 @@
+[
+  {
+    "scenario": "duplicate entrypoint and idempotent tool",
+    "firstWatcher": 92005,
+    "armResult": {
+      "ok": true,
+      "message": "watcher: unchanged - Pi extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy"
+    }
+  },
+  {
+    "scenario": "reload successor",
+    "retiredWatcher": 92005,
+    "currentWatcher": 3508
+  },
+  {
+    "scenario": "failed reload refuses false active state",
+    "resourceErrors": [
+      {
+        "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.phase3-retest-Y4uDvp/pi-runtime/watch.ts",
+        "error": "Failed to load extension: ParseError: Missing semicolon.  \n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.phase3-retest-Y4uDvp/pi-runtime/watch.ts:1:4"
+      },
+      {
+        "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.phase3-retest-Y4uDvp/pi-runtime/duplicate.ts",
+        "error": "Failed to load extension: ParseError: Missing semicolon.  \n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.phase3-retest-Y4uDvp/pi-runtime/watch.ts:1:4"
+      }
+    ],
+    "expiry": "2026-10-09T06:26:39.945Z pid=55997 instance=2 event=bound-expired waiter=pi-watch-extension waited-on=session_start bound=1500ms actual=1514ms outcome=successor-missing",
+    "owner": "sha256:c78df587aba3c716975aedb5cdb5063d41ec0c8e26b3c496441a141ce07fc770\n55997\ngeneration=2 phase=handoff\n",
+    "tools": []
+  }
+]

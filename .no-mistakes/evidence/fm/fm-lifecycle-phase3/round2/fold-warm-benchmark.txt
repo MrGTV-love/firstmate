@@ -1,0 +1,12 @@
+log_bytes=1357598
+api	needs-decision	choose REST or RPC
+api	needs-decision	choose REST or RPC
+api	needs-decision	choose REST or RPC
+api	needs-decision	choose REST or RPC
+api	needs-decision	choose REST or RPC
+
+seconds=0.410
+seconds=0.114
+seconds=0.111
+seconds=0.351
+seconds=0.196

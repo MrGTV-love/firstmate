@@ -1,0 +1,26 @@
+{
+  "ompPid": 70466,
+  "tree": [
+    {
+      "pid": 50502,
+      "ppid": 70466,
+      "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-watch-arm.sh --restart"
+    },
+    {
+      "pid": 50713,
+      "ppid": 50502,
+      "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-watch.sh"
+    },
+    {
+      "pid": 70466,
+      "ppid": 61581,
+      "command": "/Users/charlesabrooker/.bun/bin/omp --model lab/m1"
+    },
+    {
+      "pid": 78337,
+      "ppid": 50713,
+      "command": "sleep 15"
+    }
+  ],
+  "liveWatcherCount": 1
+}

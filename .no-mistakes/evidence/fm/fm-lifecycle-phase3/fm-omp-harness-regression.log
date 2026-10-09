@@ -1,0 +1,49 @@
+not ok - omp lifecycle deadline diagnostics: node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: omp/unready: node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: one expiry record is required for arm-readiness: 2026-10-09T05:28:07.935Z pid=52262 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T05:28:07.939Z pid=52262 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T05:28:07.939Z pid=52262 instance=1 event=factory-bind generation=1
+2026-10-09T05:28:07.940Z pid=52262 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T05:28:07.940Z pid=52262 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T05:28:12.990Z pid=52262 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=2000ms actual=2186ms
+2026-10-09T05:28:16.022Z pid=52262 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=2000ms actual=2002ms
+2026-10-09T05:28:19.424Z pid=52262 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=2000ms actual=2006ms
+2026-10-09T05:28:22.799Z pid=52262 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=2000ms actual=2001ms
+2026-10-09T05:28:22.912Z pid=52262 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=60ms actual=62ms
+
+
+4 !== 1
+
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/tests/watch-lifecycle-expiry.mjs:93:10 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 4,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.4.0
+
+
+1 !== 0
+
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/tests/watch-lifecycle-expiry.mjs:10:12
+    at ModuleJob.run (node:internal/modules/esm/module_job:447:25)
+    at async node:internal/modules/esm/loader:646:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.4.0: expected exit 0, got 1

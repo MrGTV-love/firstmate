@@ -1,0 +1,20 @@
+[
+  {
+    "kind": "ship",
+    "partialPrefixOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=access] blocked: grant access\ntask [key=deployment] needs-decision: staging or production\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "seededOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=deployment] needs-decision: staging or production\ntask [key=api] needs-decision: choose pagination\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "freshOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=deployment] needs-decision: staging or production\ntask [key=api] needs-decision: choose pagination\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "kind": "scout",
+    "partialPrefixOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=access] blocked: grant access\ntask [key=deployment] needs-decision: staging or production\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "seededOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=deployment] needs-decision: staging or production\ntask [key=api] needs-decision: choose pagination\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "freshOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=deployment] needs-decision: staging or production\ntask [key=api] needs-decision: choose pagination\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "kind": "secondmate",
+    "partialPrefixOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=access] blocked: grant access\ntask [key=deployment] needs-decision: staging or production\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "seededOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=deployment] needs-decision: staging or production\ntask [key=api] needs-decision: choose pagination\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "freshOutput": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=deployment] needs-decision: staging or production\ntask [key=api] needs-decision: choose pagination\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  }
+]

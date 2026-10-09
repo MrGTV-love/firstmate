@@ -1,0 +1,27 @@
+Disposable copies only; production handlers, arms, and message delivery remained real.
+Commands lab-shutdown-without-start and lab-shutdown-with-start invoke actual registered lifecycle handlers with the live omp context.
+export default function (pi: ExtensionAPI) {
+  // Disposable fault-injection seam: invoke the actual registered lifecycle handlers
+  // with the installed harness's real context; arms and delivery remain production code.
+  const liveHandlers = new Map<string, any>();
+  const registerLiveHandler = pi.on;
+  pi.on = (event: string, handler: any) => {
+    liveHandlers.set(event, handler);
+    registerLiveHandler?.(event, handler);
+  };
+  pi.registerCommand?.("lab-shutdown-without-start", {
+    description: "Disposable lifecycle fault injection",
+    handler: async (_args: string, ctx: any) => {
+      await liveHandlers.get("session_shutdown")({}, ctx);
+      ctx.ui.notify("LAB: actual shutdown handler completed without successor", "info");
+    },
+  });
+  pi.registerCommand?.("lab-shutdown-with-start", {
+    description: "Disposable lifecycle successor injection",
+    handler: async (_args: string, ctx: any) => {
+      await liveHandlers.get("session_shutdown")({}, ctx);
+      await liveHandlers.get("session_start")({}, ctx);
+      ctx.ui.notify("LAB: actual shutdown and successor handlers completed", "info");
+    },
+  });
+}

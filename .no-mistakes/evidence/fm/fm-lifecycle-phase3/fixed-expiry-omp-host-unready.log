@@ -1,0 +1,7 @@
+2026-10-09T05:32:01.791Z pid=47141 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T05:32:01.807Z pid=47141 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T05:32:01.807Z pid=47141 instance=1 event=factory-bind generation=1
+2026-10-09T05:32:01.807Z pid=47141 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T05:32:01.808Z pid=47141 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T05:32:32.256Z pid=47141 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=supervision-host-readiness bound=30000ms actual=30018ms
+2026-10-09T05:32:32.354Z pid=47141 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=60ms actual=72ms

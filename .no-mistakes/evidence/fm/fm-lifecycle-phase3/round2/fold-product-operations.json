@@ -1,0 +1,32 @@
+[
+  {
+    "operation": "bootstrap",
+    "seconds": 10.926452875000003,
+    "bytes": 1357598,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=api] needs-decision: choose REST or RPC\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "append-resolve",
+    "seconds": 19.731866500000002,
+    "bytes": 1357684,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=deployment] needs-decision: staging or production\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "unchanged",
+    "seconds": 12.764762791999994,
+    "bytes": 1357684,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=deployment] needs-decision: staging or production\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "truncate",
+    "seconds": 11.523642709000008,
+    "bytes": 50,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=rewrite] needs-decision: replacement content\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "operation": "replace-inode",
+    "seconds": 22.734570584,
+    "bytes": 53,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nd7 [key=new-inode] needs-decision: replacement identity\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  }
+]

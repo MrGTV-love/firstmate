@@ -1,0 +1,40 @@
+ [0m[38;2;107;114;128mLAB: actual shutdown and successor handlers completed[0m                                                                 
+
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface[0m[48;2;15;18;22m                                              [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.[0m[48;2;15;18;22m                     [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+
+ LIVE-ACK                                                                                                              
+
+ [0m[3m[38;2;107;114;128m※ recap: LIVE-ACK[0m                                                                                                     
+
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/omp-lab-x9v3amxi/state/expiry-probe.status[0m[48;2;15;18;22m    [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mwatcher: FAILED - omp extension could not verify a ready successor watcher[0m[48;2;15;18;22m                                            [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mwatcher: FAILED - omp extension could not restore watcher continuity because the unready successor arm did not exit   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mwithin 1000ms[0m[48;2;15;18;22m                                                                                                         [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.[0m[48;2;15;18;22m                     [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+
+ LIVE-ACK                                                                                                              
+
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (3 overdue assigned obligations; read       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mstate/open-loops.json)[0m[48;2;15;18;22m                                                                                                [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mwatcher: FAILED - omp extension could not verify a ready successor watcher[0m[48;2;15;18;22m                                            [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mwatcher: FAILED - omp extension could not restore watcher continuity because the unready successor arm did not exit   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mwithin 1000ms[0m[48;2;15;18;22m                                                                                                         [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.[0m[48;2;15;18;22m                     [0m
+[0m[48;2;15;18;22m                                                                                                                       [0m
+
+ LIVE-ACK                                                                                                              
+
+[0m[48;2;15;18;22m [0m[38;2;107;114;128m[48;2;15;18;22mπ[0m[48;2;15;18;22m [0m[38;2;42;48;56m[48;2;15;18;22m>[0m[48;2;15;18;22m [0m[38;2;0;180;255m[48;2;15;18;22m⬢ m1[0m[38;2;0;255;136m[48;2;15;18;22m 🙈[0m[48;2;15;18;22m [0m[38;2;42;48;56m[48;2;15;18;22m>[0m[48;2;15;18;22m [0m[38;2;232;236;244m[48;2;15;18;22m🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B[0m[48;2;15;18;22m [0m[38;2;42;48;56m[48;2;15;18;22m>[0m[48;2;15;18;22m [0m[38;2;255;179;71m[48;2;15;18;22m⑂ detached [0m[38;2;156;163;176m[48;2;15;18;22m?2[0m[48;2;15;18;22m [0m[38;2;15;18;22m▶[0m[38;2;0;180;255m────10%[0m[38;2;42;48;56m──────────────────────[0m[38;2;156;163;176m╎[0m[38;2;42;48;56m───[0m[38;2;57;152;191m┃[0m[38;2;42;48;56m─────[0m[38;2;57;152;191m200K[0m[38;2;42;48;56m─[0m
+[0m[38;2;74;80;88m╰─ [0m                                                                                                                    

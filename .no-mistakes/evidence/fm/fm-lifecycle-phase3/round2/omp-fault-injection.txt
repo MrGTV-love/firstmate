@@ -1,0 +1,7 @@
+Disposable copy only. Registered commands invoke actual production lifecycle handlers with real installed omp context.
+
+  const labHandlers = new Map<string, any>();
+  const originalOn = pi.on;
+  pi.on = (event: string, handler: any) => { labHandlers.set(event, handler); originalOn?.(event, handler); };
+  pi.registerCommand?.('lab-shutdown-without-start', {description:'Disposable lifecycle fault injection', handler: async (_args: string, ctx: any) => {await labHandlers.get('session_shutdown')({},ctx);ctx.ui.notify('LAB: shutdown completed without successor','info');}});
+  pi.registerCommand?.('lab-shutdown-with-start', {description:'Disposable successor injection', handler: async (_args: string, ctx: any) => {await labHandlers.get('session_shutdown')({},ctx);await labHandlers.get('session_start')({},ctx);ctx.ui.notify('LAB: shutdown and successor completed','info');}});

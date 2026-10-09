@@ -1,0 +1,8 @@
+Synthetic status log bytes: 1326045
+Bash builtin timing (library already loaded; three warm folds):
+fold_seconds=2.321
+fold_seconds=1.481
+fold_seconds=0.541
+
+Fold output each time:
+api	needs-decision	choose REST or RPCapi	needs-decision	choose REST or RPCapi	needs-decision	choose REST or RPC

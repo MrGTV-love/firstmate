@@ -1,0 +1,17 @@
+{
+  "shut": {
+    "stdout": "{\"id\":\"cli:pane:close\",\"result\":{\"type\":\"ok\"}}\n",
+    "stderr": "",
+    "exit": 0
+  },
+  "teardown": {
+    "stdout": "",
+    "stderr": "",
+    "exit": 0
+  },
+  "recordedHostExpiry": [
+    "2026-10-09T06:53:38.907Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1003ms",
+    "2026-10-09T06:55:32.480Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=supervision-host-readiness bound=30000ms actual=30002ms",
+    "2026-10-09T06:55:33.481Z pid=22837 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1001ms"
+  ]
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "appended": "working: history\n",
+    "openSet": "\n",
+    "bytes": 17
+  },
+  {
+    "appended": "needs-decision [key=a]: first\n",
+    "openSet": "a\tneeds-decision\tfirst\n",
+    "bytes": 47
+  },
+  {
+    "appended": "blocked [key=b]: external\n",
+    "openSet": "a\tneeds-decision\tfirst\nb\tblocked\texternal\n",
+    "bytes": 73
+  },
+  {
+    "appended": "needs-decision [key=a]: revised\n",
+    "openSet": "b\tblocked\texternal\na\tneeds-decision\trevised\n",
+    "bytes": 105
+  },
+  {
+    "appended": "resolved [key=a]: settled\n",
+    "openSet": "b\tblocked\texternal\n",
+    "bytes": 131
+  },
+  {
+    "appended": "captain-held [key=b]: durable hold\n",
+    "openSet": "\n",
+    "bytes": 166
+  },
+  {
+    "appended": "needs-decision: [key=c]: café\n",
+    "openSet": "c\tneeds-decision\t: café\n",
+    "bytes": 199
+  },
+  {
+    "appended": "resolved [key=c]: complete\n",
+    "openSet": "\n",
+    "bytes": 226
+  },
+  {
+    "appended": "needs-decision [key=last]: unfinished",
+    "openSet": "last\tneeds-decision\tunfinished\n",
+    "bytes": 263
+  }
+]

@@ -1,0 +1,39 @@
+                                  ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                  ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                  ▒▒  ██                  █
+                                      ██       v18.8.1
+
+             Tip: Find out which model you emotionally abuse the most with `omp
+                                           stats`
+
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.6 is available. Run: omp update
+─────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue
+ assigned obligations; read state/open-loops.json)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is
+ extension-owned.
+
+
+ LIVE-ACK
+
+ watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call
+ fm_watch_arm_omp again only after a later notification says the cycle is missing, failed,
+ or unhealthy
+
+
+ LAB-ADVISE reply LIVE-ACK
+
+
+ LIVE-ACK
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ LIVE-ADVISOR-NOTE verify before finishing.
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B > ⑂ detached ?1 ▶─10%──────╎┃─200K─
+╰─ operator draft kept

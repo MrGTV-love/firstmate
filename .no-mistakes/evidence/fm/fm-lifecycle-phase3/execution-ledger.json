@@ -1,0 +1,44 @@
+{
+  "scope": "Phase 3 decision fold, omp/Pi lifecycle and F10; restart and physical compaction excluded by recorded decisions",
+  "product_commands": [
+    "bin/fm-wake-drain.sh against disposable FM_HOME: open decision, append resolution/new decision, unchanged read, truncate, replace inode",
+    "bash -c: source bin/fm-classify-lib.sh; real incremental/full folds under C and C.UTF-8; generated event-prefix golden comparison",
+    "Real installed Pi DefaultResourceLoader/createAgentSession with duplicate explicit entrypoints, real arm, successful session.reload and failed reload with invalidated entrypoints",
+    "bin/fm-herdr-lab.sh provision/run/teardown fm-lab-phase3-omp-84963-25623; real omp 18.8.1 foreground session with 40-row viewport and local disposable HTTP provider",
+    "omp duplicate direct entrypoints; /fm-watch-arm-omp idempotence; injected actual shutdown handler with live context; timed self-heal; real status event prompts real model turn and leaves draft unsent",
+    "Actual shutdown+successor handlers before grace: no extra self-heal and one production watcher process",
+    "Real lifecycle log rotation at seeded 256 KiB boundary; actual default readiness/retirement expiry via one-shot launch delay",
+    "Actual Herdr ANSI viewport rendered to HTML and Chromium screenshot; lab tripwire teardown and disposable homes/provider removed"
+  ],
+  "setup_retries": [
+    "Provision calls its own prepare; fresh named lab after explicit prepare/provision tripwire refusal",
+    "Transparent lab launchers normalize injected path overrides before exec of real production arm scripts",
+    "Installed typebox locally; direct omp entrypoints avoid embedded-loader dependency resolution failure through re-export wrappers",
+    "Pi noExtensions=true avoids automatic discovery masking deliberately failed explicit entrypoints",
+    "First drain suite stopped at 300-second command deadline; longer command deadline does not change product bounds",
+    "Standalone omp print diagnostic required DEVNULL stdin",
+    "omp /reload and /new do not emit these events on installed version; disposable event injection drives actual handlers and real context instead",
+    "Expiry helper startup/TERM race fixed by shell child that ignores TERM before readiness publication; all wait bounds unchanged"
+  ],
+  "performance": {
+    "synthetic_log_bytes": 1326045,
+    "cold_cli_fold_seconds": 9.639,
+    "warm_cli_fold_seconds": 2.099,
+    "warm_function_only_seconds": [
+      2.321,
+      1.481,
+      0.541
+    ],
+    "target_seconds": 1,
+    "qualification": "Synthetic data, not private d7 status file; concurrent host load. Under-one-second target not consistently demonstrated."
+  },
+  "focused_fix_verification": "NODE_NO_WARNINGS=1 node tests/watch-lifecycle-expiry.mjs omp <fixture> && NODE_NO_WARNINGS=1 node tests/watch-lifecycle-expiry.mjs pi <fixture>: exit 0",
+  "focused_decision_suite": {
+    "commands": [
+      "env TMPDIR=\"$PWD/.phase3-live\" bash tests/fm-wake-drain-open-decisions-cursor.test.sh (300-second command deadline)",
+      "same targeted suite with 1800-second command deadline"
+    ],
+    "result": "Both interrupted by command deadlines. The longer attempt completed locale invalidation, UTF-8 parsing, terminal/kind transitions and golden retained-cursor equivalence before timing out during the remaining checkpoint-consumer matrix. Manual real-product evidence covered the changed locale contract and key cache boundaries."
+  },
+  "cleanup": "Named Herdr lab teardown passed fleet-state tripwire; all disposable homes and local provider stopped; no gate-worktree watcher process survived; all transient worktree files/dependencies removed."
+}

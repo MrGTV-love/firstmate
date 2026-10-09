@@ -1,0 +1,7 @@
+2026-10-09T05:31:55.524Z pid=33097 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T05:31:55.530Z pid=33097 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T05:31:55.530Z pid=33097 instance=1 event=factory-bind generation=1
+2026-10-09T05:31:55.531Z pid=33097 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T05:31:55.531Z pid=33097 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T05:31:58.315Z pid=33097 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=2000ms actual=2002ms
+2026-10-09T05:31:58.377Z pid=33097 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=60ms actual=61ms

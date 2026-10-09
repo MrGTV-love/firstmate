@@ -1,0 +1,4 @@
+LIVE-ACK
+Still starting after 13s — phase: loadExtensions
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.45605.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Working...

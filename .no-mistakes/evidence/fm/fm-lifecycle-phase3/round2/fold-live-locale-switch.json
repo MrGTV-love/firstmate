@@ -1,0 +1,22 @@
+[
+  {
+    "locale": "C",
+    "stdout": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nlocale needs-decision:  [key=api] choose café\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "checkpoint": "version=11:secondmate:ctype=C:collate=C\noffset=41\nident=strong:16777232:162285900:1791529118.128770574\ndefault\tneeds-decision\t [key=api] choose café"
+  },
+  {
+    "locale": "C.UTF-8",
+    "stdout": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nlocale [key=api] needs-decision: choose café\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "checkpoint": "version=11:secondmate:ctype=C.UTF-8:collate=C.UTF-8\noffset=41\nident=strong:16777232:162285900:1791529118.128770574\napi\tneeds-decision\tchoose café"
+  },
+  {
+    "locale": "C",
+    "stdout": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nlocale needs-decision:  [key=api] choose café\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n",
+    "checkpoint": "version=11:secondmate:ctype=C:collate=C\noffset=41\nident=strong:16777232:162285900:1791529118.128770574\ndefault\tneeds-decision\t [key=api] choose café"
+  },
+  {
+    "locale": "C.UTF-8",
+    "operation": "resolve",
+    "stdout": ""
+  }
+]

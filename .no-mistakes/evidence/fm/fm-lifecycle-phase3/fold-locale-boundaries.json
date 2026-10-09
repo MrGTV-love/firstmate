@@ -1,0 +1,14 @@
+[
+  {
+    "from": "C",
+    "to": "C.UTF-8",
+    "seed": "default\tneeds-decision\t [key=api] choose café",
+    "result": "REFERENCE\napi\tneeds-decision\tchoose café\nREADONLY\napi\tneeds-decision\tchoose café\nINCREMENTAL\napi\tneeds-decision\tchoose café\nCHECKPOINT\nversion=11:secondmate:ctype=C.UTF-8:collate=C.UTF-8\noffset=41\nident=strong:16777232:159651730:1791523225.389914469\napi\tneeds-decision\tchoose café"
+  },
+  {
+    "from": "C.UTF-8",
+    "to": "C",
+    "seed": "api\tneeds-decision\tchoose café",
+    "result": "REFERENCE\ndefault\tneeds-decision\t [key=api] choose café\nREADONLY\ndefault\tneeds-decision\t [key=api] choose café\nINCREMENTAL\ndefault\tneeds-decision\t [key=api] choose café\nCHECKPOINT\nversion=11:secondmate:ctype=C:collate=C\noffset=41\nident=strong:16777232:159651730:1791523225.389914469\ndefault\tneeds-decision\t [key=api] choose café"
+  }
+]

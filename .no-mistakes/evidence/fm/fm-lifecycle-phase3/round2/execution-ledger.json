@@ -1,0 +1,42 @@
+{
+  "runtimeVersions": {
+    "omp": "18.8.1",
+    "pi": "1.0.2"
+  },
+  "scope": "Checkpoint-only decision fold, F8 lifecycle, F10 diagnostics; restart split excluded",
+  "realProductEvidence": [
+    "Five real fm-wake-drain operations",
+    "Real incremental fold warm function timings on 1357598-byte synthetic log",
+    "Real Pi SDK loader duplicate entrypoints, reload, failed successor",
+    "Real omp CLI in named Herdr lab, actual registered shutdown/session-start handlers with live context, real arms and local HTTP provider",
+    "Actual omp singleton process tree, advisor-tail wake consumption with retained draft, lifecycle rotation",
+    "Actual default arm readiness 12000ms, host readiness 30000ms, retirement 1000ms and shutdown retirement expiry records",
+    "Real wake-drain CLI under C → C.UTF-8 → C on identical status bytes; locale signature rebuild and subsequent UTF-8 keyed resolution",
+    "Real wake-drain seeded-versus-fresh output equality for ship, scout and secondmate histories after completing an unterminated line"
+  ],
+  "targetedChecks": [
+    "test_seeded_whole_file_fold_matches_a_fold_from_line_one",
+    "test_utf8_whitespace_uses_full_fold_locale",
+    "test_checkpoint_rejects_a_previous_parsing_locale"
+  ],
+  "setupNotes": [
+    "Python eval initialization timed out before creating fixtures; Bun/Node route succeeded",
+    "Used ctrl+u after direct Herdr C-u did not clear composer; clean advisor-tail scenario re-driven",
+    "Browser first open timed out; second capture succeeded",
+    "Disposable host fixture repaired after startup close raced the host-mode toggle; final real default host-readiness row observed",
+    "Extension build marker contains hash/PID, not generation; successor proof uses lifecycle transitions and process ownership",
+    "CLI omits an explicit [key=default] label; corrected the disposable driver expectation to use CLI presentation plus persisted checkpoint contract"
+  ],
+  "warmSeconds": [
+    0.41,
+    0.114,
+    0.111,
+    0.351,
+    0.196
+  ],
+  "limitations": [
+    "Private d7 corpus absent; performance checked with a larger disposable synthetic log",
+    "Shutdown-without-start driven via injected registered command in disposable extension copies because installed omp does not expose a CLI operation emitting that missing-successor sequence"
+  ],
+  "cleanup": "Herdr guarded teardown passed fleet tripwire, disposable lab homes and worktree fixtures removed, local HTTP provider stopped, no owned watch/host commands remain"
+}

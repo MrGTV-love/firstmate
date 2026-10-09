@@ -1,0 +1,18 @@
+2026-10-09T05:13:39.904Z pid=64823 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T05:13:39.905Z pid=64823 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T05:13:39.905Z pid=64823 instance=1 event=factory-bind generation=1
+2026-10-09T05:13:39.911Z pid=64823 instance=2 event=generation-create generation=1 cause=factory-bind
+2026-10-09T05:13:39.911Z pid=64823 instance=2 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T05:13:39.911Z pid=64823 instance=2 event=factory-bind generation=1 superseded=1
+2026-10-09T05:13:39.911Z pid=64823 instance=1 event=instance-retired generation=1 by=2
+2026-10-09T05:13:39.912Z pid=64823 instance=1 event=generation-stop generation=1 cause=factory-retire
+2026-10-09T05:13:40.925Z pid=64823 instance=1 event=session_start-ignored reason=superseded-instance
+2026-10-09T05:13:40.925Z pid=64823 instance=2 event=session_start generation=1 stopping=false
+2026-10-09T05:13:40.925Z pid=64823 instance=2 event=generation-activate generation=1 cause=session_start
+2026-10-09T05:14:17.675Z pid=64823 instance=2 event=session_shutdown generation=1
+2026-10-09T05:14:18.677Z pid=64823 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1001ms
+2026-10-09T05:14:18.678Z pid=64823 instance=2 event=generation-stop generation=1
+2026-10-09T05:14:20.263Z pid=64823 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=session_start bound=1500ms actual=1585ms outcome=self-heal
+2026-10-09T05:14:20.263Z pid=64823 instance=2 event=generation-create generation=2 cause=self-heal
+2026-10-09T05:14:20.263Z pid=64823 instance=2 event=generation-activate generation=2 cause=self-heal
+2026-10-09T05:14:20.307Z pid=64823 instance=2 event=self-heal generation=2 ok=true
