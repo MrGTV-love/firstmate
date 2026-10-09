@@ -35,9 +35,23 @@ reap_cleanup() {
 }
 trap reap_cleanup EXIT
 
+initialized_identity() {
+  local pid=$1 command deadline=$((SECONDS + 5))
+  shift
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    command=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o command= 2>/dev/null) || return 1
+    if [ "$command" = "$*" ]; then
+      fm_test_pid_identity "$pid"
+      return
+    fi
+    sleep 0.05
+  done
+  return 1
+}
+
 track() {
-  local identity=${2:-}
-  [ -n "$identity" ] || identity=$(fm_test_pid_identity "$1" 2>/dev/null) || return 0
+  local identity=$2
+  [ -n "$identity" ] || fail "fixture $1 did not initialize"
   TRACKED_PIDS+=("$1")
   TRACKED_IDENTITIES+=("$identity")
 }
@@ -103,7 +117,7 @@ orphan() {
   ( [ -z "${ORPHAN_CWD:-}" ] || cd "$ORPHAN_CWD" || exit 1
     "$@" >/dev/null 2>&1 &
     pid=$!
-    fm_test_pid_identity "$pid" > "$pidfile.identity" || exit 1
+    initialized_identity "$pid" "$@" > "$pidfile.identity" || exit 1
     printf '%s\n' "$pid" > "$pidfile"
   ) || fail "could not record the orphan fixture's original identity"
   wait_file "$pidfile" 5 || fail "the orphan fixture did not start"
@@ -114,13 +128,23 @@ orphan() {
 start_owner() {
   sleep 120 &
   OWNER=$!
-  track "$OWNER"
+  track "$OWNER" "$(initialized_identity "$OWNER" sleep 120)"
 }
 
-sleep 120 &
+mkfifo "$TMP_ROOT/identity-exec"
+(
+  read -r line < "$TMP_ROOT/identity-exec"
+  exec sleep 120
+) &
 IDENTITY_FIXTURE=$!
 track "$IDENTITY_FIXTURE" "previous ownership identity"
-IDENTITY_FIXTURE_ORIGINAL=$(fm_test_pid_identity "$IDENTITY_FIXTURE") || fail "could not identify the identity fixture"
+(initialized_identity "$IDENTITY_FIXTURE" sleep 120 > "$TMP_ROOT/identity-captured") &
+IDENTITY_CAPTURE=$!
+sleep 0.1
+[ ! -s "$TMP_ROOT/identity-captured" ] || fail "identity capture accepted a fixture before exec"
+printf 'exec\n' > "$TMP_ROOT/identity-exec"
+wait "$IDENTITY_CAPTURE" || fail "could not identify the initialized identity fixture"
+IDENTITY_FIXTURE_ORIGINAL=$(cat "$TMP_ROOT/identity-captured")
 track "$IDENTITY_FIXTURE" "$IDENTITY_FIXTURE_ORIGINAL"
 wait_gone "$IDENTITY_FIXTURE" 1 "different original identity" || fail "a replaced original identity must count as gone"
 alive "$IDENTITY_FIXTURE" || fail "the newest registered identity must identify the live replacement"
@@ -140,7 +164,7 @@ DEAD_STUB=$(cat "$TMP_ROOT/dead.pid")
 write_stub "$ROOT_DEAD/live-parent.sh"
 bash "$ROOT_DEAD/live-parent.sh" "$ROOT_DEAD/release" &
 LIVE_PARENT_STUB=$!
-track "$LIVE_PARENT_STUB"
+track "$LIVE_PARENT_STUB" "$(initialized_identity "$LIVE_PARENT_STUB" bash "$ROOT_DEAD/live-parent.sh" "$ROOT_DEAD/release")"
 # An orphan that never names the fixture root is not this run's.
 write_stub "$TMP_ROOT/unrelated.sh"
 orphan "$TMP_ROOT/unrelated.pid" bash "$TMP_ROOT/unrelated.sh" "$TMP_ROOT/never"
@@ -187,7 +211,7 @@ read -r line < "$2/owner-wait"
 SH
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 LAB_OWNER=$!
-track "$LAB_OWNER"
+track "$LAB_OWNER" "$(initialized_identity "$LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
 wait_file "$LAB_ROOT/ready" 5 || fail "the lab creator did not finish"
 mkdir -p "$LAB_ROOT/bin"
 write_stub "$LAB_ROOT/bin/fm-watch.sh"
@@ -230,7 +254,7 @@ ORPHAN_CWD="${GO_ROOT}2/package" orphan "$TMP_ROOT/go-sibling.pid" "$TMP_ROOT/go
 GO_SIBLING=$(cat "$TMP_ROOT/go-sibling.pid")
 (cd "$GO_ROOT/package" && exec "$TMP_ROOT/go-build-cwd/package.test") &
 GO_LIVE_PARENT=$!
-track "$GO_LIVE_PARENT"
+track "$GO_LIVE_PARENT" "$(initialized_identity "$GO_LIVE_PARENT" "$TMP_ROOT/go-build-cwd/package.test")"
 kill -KILL "$OWNER" 2>/dev/null || true
 wait "$OWNER" 2>/dev/null || true
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the cwd scan failed: $out"
@@ -255,7 +279,7 @@ orphan "$TMP_ROOT/live-lab-watch.pid" bash "$LIVE_ROOT/home/bin/fm-watch.sh" "$L
 LIVE_LAB_WATCH=$(cat "$TMP_ROOT/live-lab-watch.pid")
 sleep 120 &
 LIVE_LAB_PANE=$!
-track "$LIVE_LAB_PANE"
+track "$LIVE_LAB_PANE" "$(initialized_identity "$LIVE_LAB_PANE" sleep 120)"
 printf 'launch_pid=%s\nlaunch_start=%s\n' "$LIVE_LAB_PANE" "$(LC_ALL=C ps -o lstart= -p "$LIVE_LAB_PANE" | awk '{$1=$1; print}')" >> "$LIVE_ROOT/.fm-live-lab"
 kill -KILL "$LIVE_OWNER" 2>/dev/null || true
 wait "$LIVE_OWNER" 2>/dev/null || true
@@ -336,13 +360,13 @@ wait_file "$OWNED/stub.pid" 5 || fail "the owned stub did not start"
 wait_file "$OWNED/child.pid" 5 || fail "the owned stub's child did not start"
 OWNED_STUB=$(cat "$OWNED/stub.pid")
 OWNED_CHILD=$(cat "$OWNED/child.pid")
-track "$OWNED_STUB"
-track "$OWNED_CHILD"
+track "$OWNED_STUB" "$(initialized_identity "$OWNED_STUB" bash "$OWNED/forking.sh" "$OWNED/release" "$OWNED/child.pid")"
+track "$OWNED_CHILD" "$(initialized_identity "$OWNED_CHILD" sleep 120)"
 # A job the caller still holds, below the owner rather than under init, goes too.
 write_stub "$OWNED/job.sh"
 bash "$OWNED/job.sh" "$OWNED/release" &
 OWNED_JOB=$!
-track "$OWNED_JOB"
+track "$OWNED_JOB" "$(initialized_identity "$OWNED_JOB" bash "$OWNED/job.sh" "$OWNED/release")"
 
 rc=0
 out=$("$REAPER" --owner-pid 1 --root "$OWNED" 2>&1) || rc=$?
@@ -372,8 +396,9 @@ pass "the owner-exit sweep stops a hidden stub and everything below it"
 # subshell-started stub down with it; a test killed outright leaves the stub for
 # the next test that sources the library, once the marker proves the owner dead.
 write_child() { # <script> <mode>
-  cat > "$1" <<'SH'
-#!/usr/bin/env bash
+  printf '#!/usr/bin/env bash\n' > "$1"
+  declare -f initialized_identity >> "$1"
+  cat >> "$1" <<'SH'
 set -u
 . "$FM_TEST_LIB"
 root=$(fm_test_tmproot fm-test-reap-child)
@@ -388,7 +413,7 @@ STUB
 chmod +x "$root/stub.sh"
 ( bash "$root/stub.sh" "$root/release" >/dev/null 2>&1 &
   pid=$!
-  fm_test_pid_identity "$pid" > "$FM_TEST_PIDFILE.identity" || exit 1
+  initialized_identity "$pid" bash "$root/stub.sh" "$root/release" > "$FM_TEST_PIDFILE.identity" || exit 1
   printf '%s\n' "$pid" > "$FM_TEST_PIDFILE"
 ) || exit 1
 case "$FM_TEST_MODE" in
@@ -425,7 +450,7 @@ pass "sourcing the test library reaps the stub a killed test left behind"
 NESTED_LAB_ROOT="$SCAN/fm-lab-nested/home"
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 NESTED_LAB_OWNER=$!
-track "$NESTED_LAB_OWNER"
+track "$NESTED_LAB_OWNER" "$(initialized_identity "$NESTED_LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
 wait_file "$NESTED_LAB_ROOT/ready" 5 || fail "the nested lab creator did not finish"
 mkdir -p "$NESTED_LAB_ROOT/bin" "$NESTED_LAB_ROOT-unmarked/bin"
 write_stub "$NESTED_LAB_ROOT/bin/fm-watch.sh"
