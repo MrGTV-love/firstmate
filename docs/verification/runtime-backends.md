@@ -2607,6 +2607,7 @@ Its kernel-environment probes are identity-registered and remain alive until cle
 Its `test_launch_proof_pinned_personal_switch` case changes only the active session proof and verifies that a same-PID personal-session switch loses managed authority.
 `test_reboot_recovery_inspects_without_native_attribution` in `tests/fm-control-relaunch.test.sh` covers inspection without lifecycle input or task-record mutation.
 `tests/fm-omp-harness.test.sh` covers activation, cancelled and rolled-back transitions, shutdown, and child-event preservation with both minimum-runtime and newer context shapes.
+Profile and raw-shell launch regressions assert successful execution with unrelated missing or unlisted defaults and preserved shell effects; they do not require zero harness calls, because the supported-version preflight may invoke `omp --version` before launch.
 The token-free installed-runtime refresh for the production proof extension is:
 
 ```sh

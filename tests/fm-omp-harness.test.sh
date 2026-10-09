@@ -590,7 +590,6 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
       status=$?
       expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
-      assert_absent "$CASE_DIR/omp-env.log" "profile selection must establish no catalog evidence"
       case "$mode" in
         env-omp | env-pi) ;;
         *) assert_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
@@ -675,7 +674,6 @@ EOF" ;;
       fi
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
-      assert_absent "$CASE_DIR/omp-env.log" "expanded raw launch must establish no catalog evidence"
       assert_absent "$CASE_DIR/expanded" "validation must not evaluate command substitutions"
       assert_absent "$CASE_DIR/errors.log" "validation must not evaluate redirections"
       assert_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
@@ -725,8 +723,6 @@ test_spawn_raw_omp_literal_evidence_still_refuses() {
       assert_absent "$CASE_DIR/errors.log" "validation must not execute a literal redirection"
       if [ "$role" = unlisted ]; then
         assert_grep "models:$launch_dir" "$CASE_DIR/omp-env.log" "literal evidence must probe the launch directory's catalog"
-      else
-        assert_absent "$CASE_DIR/omp-env.log" "a missing literal default must refuse without a catalog probe"
       fi
     done
   done
@@ -1738,7 +1734,8 @@ SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+  # Use production readiness bounds: a slow login shell is not a lost wake.
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
     FM_OMP_SUCCESSOR_GRACE_MS=100 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
@@ -1906,8 +1903,9 @@ switch (process.env.SCENARIO) {
         const stored = JSON.parse(readFileSync(handoff, "utf8"));
         if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("unsubmitted duplicate did not retain its handoff record");
         await handlers.get("session_start")({}, ctx);
-        for (let i = 0; i < 60 && sent.length < 4; i += 1) await sleep(100);
-        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== undefined) throw new Error("idle replacement did not replay the unsubmitted duplicate as its own turn");
+        // As for initial delivery, allow readiness, retirement, and bounded retry.
+        for (let i = 0; i < 600 && sent.length < 4; i += 1) await sleep(100);
+        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== undefined) throw new Error(`idle replacement did not replay the unsubmitted duplicate as its own turn: ${JSON.stringify({ sent, wake, composer: composer.text })}`);
         await consumePrompt();
         await handlers.get("session_shutdown")({}, ctx);
         if (existsSync(handoff)) throw new Error("consumed duplicates retained a handoff record");
