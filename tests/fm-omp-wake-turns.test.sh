@@ -16,6 +16,11 @@ assert classifier.classify_turn(turn("OPEN DECISIONS\nBRANCH OUTCOMES\n")) == "e
 assert classifier.classify_turn(turn(code=1)) == "failed"
 assert classifier.classify_turn({"last": "FIRSTMATE WATCHER WAKE"}) == "unmeasured"
 assert classifier.classify_turn({"last": "ordinary captain prompt"}) == "non-wake"
+unmeasured = [{"last": "FIRSTMATE WATCHER WAKE", "drain": {"returncode": 0}}]
+for stdout in (None, 0, False, [], {}):
+    unmeasured.append(turn(stdout))
+for item in unmeasured:
+    assert classifier.classify_turn(item) == "unmeasured"
 with tempfile.TemporaryDirectory(prefix="fm-omp-wake-turns.") as directory:
     records = os.path.join(directory, "turns.jsonl")
     def check(turns, status):
@@ -29,5 +34,11 @@ with tempfile.TemporaryDirectory(prefix="fm-omp-wake-turns.") as directory:
     assert check([row] * 18 + [turn()], 1)["empty_percent"] > 5
     assert check([row, turn(code=1)], 1)["failed"] == 1
     assert check([{"last": "FIRSTMATE WATCHER WAKE"}], 1)["unmeasured"] == 1
+    for item in unmeasured:
+        report = check([row] * 19 + [item], 1)
+        assert report["unmeasured"] == 1
+        assert report["measured"] == 19
+        assert report["empty"] == 0
+        assert report["empty_percent"] == 0
 print("ok - omp empty turns require successful row-free drain evidence; the shared 5% monitor rejects missing or failed evidence")
 PY
