@@ -9,7 +9,7 @@ They are replay inputs, not evidence that every composed scenario was driven liv
 Each status file is unchanged stdout from `no-mistakes axi status --run <id>` executed from the test-phase worktree, without entering the recorded run's checkout.
 The command exited zero for all five run-specific captures.
 `uninitialized.toon` is unchanged stdout from `no-mistakes axi status` in that worktree, which exited one.
-`../../fm-teardown.test.sh` also replays that unchanged stdout with exit one through public forced teardown for local-only ordinary, Orca, and recursive children. It establishes confirmed pipeline absence rather than query unavailability; generic errors and timeouts remain separate refusal fixtures.
+Forced-child absence and query-failure replay coverage is listed below; [`fm-teardown.sh`'s header](../../../bin/fm-teardown.sh) owns the interpretation and refusal contract.
 Update notices on stderr are not part of the captured stdout contract.
 
 | File | Recorded run ID | Observed state |

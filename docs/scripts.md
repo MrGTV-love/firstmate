@@ -183,15 +183,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 ## Task-owned Docker teardown
 
 [`fm-task-docker-lib.sh`'s header](../bin/fm-task-docker-lib.sh) owns object attribution, protected-stack precedence, volume safety, retry metadata, and the Docker call timeout.
-[`fm-teardown.sh`'s header](../bin/fm-teardown.sh) owns cleanup ordering, forced-child pipeline cancellation, reassigned-slot handling, prerequisites, and failure/retry behavior.
+[`fm-teardown.sh`'s header](../bin/fm-teardown.sh) owns cleanup ordering, checked ownership inventories, forced-child quiescence, reassigned-slot handling, prerequisites, failure/retry behavior, and the live-producer residual.
 The worker Docker instructions rendered by [`fm-brief.sh`](../bin/fm-brief.sh) own how ship and scout workers mark resources and isolate Supabase configuration.
 
-Teardown refuses cleanup when any present local Firstmate registry cannot be read, any existing local sibling state directory cannot be enumerated, any task metadata record cannot be read, or ownership-evidence absence cannot be established through searchable parent paths, retaining records for retry.
-Absent registries and shared Supabase configs remain valid when their absence can be proved.
-Differently named metadata hardlinks remain sibling identities; only matching basenames and inodes identify the same record.
-Forced-child cleanup treats the recorded nonzero `repo not initialized` status response as confirmed pipeline absence, not a discovery failure.
-For owned forced-child worktrees, teardown retires private no-mistakes launch agents after pipeline conclusion and before process reaping, archiving their plists under the child's own home; reassigned slots remain untouched.
-
-Residual: a still-live top-level producer can create a stack after the final listing; snapshot cleanup cannot stop a live producer.
-
-[`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon. The live guard requires Docker and Python 3 before creating fixtures; a missing tool skips default execution and fails an explicitly requested run.
+[`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon and declares its prerequisites through [`fm_live_gate`](../tests/lib.sh).

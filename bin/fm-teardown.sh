@@ -225,9 +225,9 @@
 # checks before any destructive return. Teardown output notes every wait, retry, and
 # removal so the operator can see what happened.
 #
-# Pre-teardown cleanup sequence (runs once every landed/discard-work safety
-# refusal above has already passed, and BEFORE any worktree return, branch
-# delete, or backend kill below - a still-active run or a leaked process may
+# Top-level pre-teardown cleanup sequence (runs once every landed/discard-work
+# safety refusal above has already passed, and BEFORE any worktree return,
+# branch delete, or backend kill below - a still-active run or a leaked process may
 # own live work in that worktree):
 #   Fix 1 - conclude the task's own no-mistakes run. A ship task's worktree can
 #     be torn down while its no-mistakes pipeline run is still PARKED at a gate
@@ -237,7 +237,7 @@
 #     post-CI approval gate after the worker was already cleaned up).
 #     In top-level teardown, a run with an autonomous step still under way
 #     (running/fixing/ci) is left alone: no-mistakes drives those against its own
-#     gate-repo clone, not the crew's worktree. Fix 3 below owns the Docker residual
+#     gate-repo clone, not the crew's worktree. Fix 4 below owns the Docker residual
 #     and the stricter forced-descendant cancellation scope.
 #     conclude_task_no_mistakes_run attributes the active-or-most-recent run to
 #     THIS task only when its branch AND code identity (bin/fm-nm-run-lib.sh's
@@ -330,10 +330,13 @@
 #     Forced cleanup closes each child's endpoint before its Docker snapshot.
 #     For ship children with an owned copy, it aborts an attributed parked or
 #     executing (running/fixing/ci) pipeline and confirms that exact run terminal
-#     or not found, then reaps owned worktree and tasktmp processes. Attribution
-#     uses the branch/head proof in Fix 1. An initial status failure, required
-#     ledger query failure, or unconfirmed abort refuses child retirement with
-#     its identity records and worktree kept; top-level discovery stays best effort.
+#     or not found. Owned children then retire private launch agents through
+#     Fix 3, archiving plists under the child's own home, before Fix 2 reaps
+#     worktree and tasktmp processes. Attribution uses the branch/head proof in
+#     Fix 1. The captured exit-one `repo not initialized` status response proves
+#     pipeline absence; other initial status failures, required ledger query
+#     failures, or unconfirmed aborts refuse child retirement with its identity
+#     records and worktree kept. Top-level discovery stays best effort.
 #     Ordinary, Orca, and recursive descendants use their own metadata for Docker
 #     cleanup. Nested secondmate process events are swept before that secondmate's
 #     Docker cleanup and recursive descendant retirement. A Docker refusal retains
@@ -343,6 +346,15 @@
 #     remaining non-path ownership rules still apply.
 #     Docker path roots are owned worktrees only, never tasktmp; nested registered
 #     Git lanes and linked worktrees are excluded, including through symlinks.
+#     Ownership inventories must be complete before removal: checked local-home
+#     discovery uses bin/fm-wake-lib.sh's fm_local_firstmate_state_dirs; teardown
+#     also requires every existing sibling state directory to be enumerable and
+#     every task metadata record readable. Registry, state, metadata, and shared
+#     config presence probes use bin/fm-path-lib.sh's fm_path_lookup_safe; failed
+#     lookup, enumeration, or read retains records for retry, never proves absence.
+#     Proven-absent registries, state directories, and shared configs are valid.
+#     Only matching metadata basenames AND inodes identify the same task record;
+#     differently named hardlinks remain sibling identities.
 #     The shared-stack identity comes from the primary project's
 #     supabase/config.toml project_id. Reading a present config requires python3's
 #     standard-library tomllib parser; unreadable or invalid configuration refuses
@@ -351,7 +363,7 @@
 #     Residual: top-level teardown leaves autonomous pipelines and the endpoint
 #     live; a still-live producer can create a stack after the final listing.
 #     Snapshot cleanup cannot stop a live producer.
-# After Fix 1, Fix 3, Fix 2, and Fix 4, when config/pipeline-spend opts this home in, a ship
+# After Fix 1, Fix 3, and Fix 2, but before Fix 4, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
 # ledger. It runs before the task branch it attributes runs by is deleted and
@@ -2152,7 +2164,7 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
   [ "$actual" = "$expected" ]
 }
 
-# Keep branch/head attribution before any abort; Fix 1 and Fix 3 in the script
+# Keep branch/head attribution before any abort; Fix 1 and Fix 4 in the script
 # header own the top-level and forced-child cancellation scopes.
 conclude_task_no_mistakes_run() {  # <worktree>
   local wt=$1 scope=${2:-parked} out run_id query_rc state_description="parked at a gate" refusal_state=parked
@@ -2726,9 +2738,8 @@ teardown_live_slot_path() {
   canonical_existing_dir "$WT"
 }
 
-# Every local Firstmate state directory whose records can name a pool slot this
-# task's slot might also be; bin/fm-wake-lib.sh's fm_local_firstmate_state_dirs
-# owns the walk and what it refuses.
+# Local-home discovery is owned by bin/fm-wake-lib.sh; the checked state and
+# record inventory required by teardown is described in this script's Fix 4.
 collect_local_firstmate_states() {
   local state_dir meta
   fm_local_firstmate_state_dirs "$1" 1 || {
