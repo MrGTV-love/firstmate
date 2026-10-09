@@ -76,6 +76,7 @@ volume_exists() { docker volume ls -q | grep -Fxq "$1"; }
 test_real_docker_removes_only_the_tasks_own_objects() {
   local wt="$TMP_ROOT/wt" elsewhere="$TMP_ROOT/elsewhere" rc=0
   mkdir -p "$wt/stack" "$elsewhere/stack"
+  fm_write_meta "$TMP_ROOT/$TASK.meta" "kind=ship"
 
   # The task's own: marker label, name, compose project, compose working dir.
   create_container "$TASK-pg"
@@ -101,7 +102,7 @@ test_real_docker_removes_only_the_tasks_own_objects() {
   docker volume create --label "fm.test=$RUN" "$RUN-unmarked-vol" >/dev/null || fail "volume create failed"
   docker volume create --label "fm.test=$RUN" --label "fm.task=$OTHER" "$RUN-foreign-vol" >/dev/null || fail "volume create failed"
 
-  fm_task_docker_cleanup "$TASK" "$OTHER" 0 "" "$wt" 2> "$TMP_ROOT/stderr" || rc=$?
+  fm_task_docker_cleanup "$TASK" "$OTHER" 0 "" "$TMP_ROOT/$TASK.meta" "$wt" 2> "$TMP_ROOT/stderr" || rc=$?
   expect_code 0 "$rc" "real docker: cleanup should succeed: $(cat "$TMP_ROOT/stderr")"
 
   for gone in "$TASK-pg" "$RUN-labelled" "$RUN-proj" "$RUN-path"; do
@@ -122,11 +123,12 @@ test_real_docker_removes_only_the_tasks_own_objects() {
 test_real_docker_ambiguous_id_trusts_only_the_worktree() {
   local wt="$TMP_ROOT/wt2" rc=0
   mkdir -p "$wt"
+  fm_write_meta "$TMP_ROOT/$TASK.meta" "kind=ship"
   create_container "$TASK-ambig-pg"
   create_container "$RUN-ambig-labelled" "fm.task=$TASK"
   create_container "$RUN-ambig-path" "com.docker.compose.project=$RUN-ambig" \
     "com.docker.compose.project.working_dir=$wt"
-  fm_task_docker_cleanup "$TASK" "" 1 "" "$wt" 2> "$TMP_ROOT/stderr2" || rc=$?
+  fm_task_docker_cleanup "$TASK" "" 1 "" "$TMP_ROOT/$TASK.meta" "$wt" 2> "$TMP_ROOT/stderr2" || rc=$?
   expect_code 0 "$rc" "real docker ambiguous: cleanup should succeed: $(cat "$TMP_ROOT/stderr2")"
   exists "$TASK-ambig-pg" || fail "real docker ambiguous: a name match was trusted though the id is ambiguous"
   exists "$RUN-ambig-labelled" || fail "real docker ambiguous: a label match was trusted though the id is ambiguous"
@@ -137,13 +139,14 @@ test_real_docker_ambiguous_id_trusts_only_the_worktree() {
 test_real_docker_excluded_nested_lane_path_is_left_alone() {
   local wt="$TMP_ROOT/wt3" rc=0
   mkdir -p "$wt/lane"
+  fm_write_meta "$TMP_ROOT/$TASK.meta" "kind=ship"
   create_container "$RUN-lane" "com.docker.compose.project=$RUN-lane" \
     "com.docker.compose.project.working_dir=$wt/lane"
   create_container "$RUN-own" "com.docker.compose.project=$RUN-own" \
     "com.docker.compose.project.working_dir=$wt"
   # shellcheck disable=SC2329
   fm_task_docker_path_excluded() { case "$2" in "$wt"/lane*) return 0 ;; esac; return 1; }
-  fm_task_docker_cleanup "$TASK" "" 0 "" "$wt" 2> "$TMP_ROOT/stderr3" || rc=$?
+  fm_task_docker_cleanup "$TASK" "" 0 "" "$TMP_ROOT/$TASK.meta" "$wt" 2> "$TMP_ROOT/stderr3" || rc=$?
   unset -f fm_task_docker_path_excluded
   expect_code 0 "$rc" "real docker lane: cleanup should succeed: $(cat "$TMP_ROOT/stderr3")"
   exists "$RUN-lane" || fail "real docker lane: a nested lane's container was removed"
@@ -154,6 +157,7 @@ test_real_docker_excluded_nested_lane_path_is_left_alone() {
 test_real_docker_never_claims_the_projects_own_shared_stack() {
   local rc=0 wt="$TMP_ROOT/wt4"
   mkdir -p "$wt"
+  fm_write_meta "$TMP_ROOT/$TASK.meta" "kind=ship"
   # A task whose id equals the project's name: the shared stack is named for the
   # project, so the name rules must not claim it. Its worktree compose project is
   # still the task's own.
@@ -161,7 +165,7 @@ test_real_docker_never_claims_the_projects_own_shared_stack() {
   create_container "$RUN-shared-path" "com.docker.compose.project=$RUN-sp" \
     "com.docker.compose.project.working_dir=$wt"
   create_network "$RUN-shared-net" "com.docker.compose.project=$TASK" "com.supabase.cli.project=$TASK"
-  fm_task_docker_cleanup "$TASK" "" 0 "$TASK" "$wt" 2> "$TMP_ROOT/stderr4" || rc=$?
+  fm_task_docker_cleanup "$TASK" "" 0 "$TASK" "$TMP_ROOT/$TASK.meta" "$wt" 2> "$TMP_ROOT/stderr4" || rc=$?
   expect_code 0 "$rc" "real docker protected: cleanup should succeed: $(cat "$TMP_ROOT/stderr4")"
   exists "$RUN-shared-db" || fail "real docker protected: the project's shared stack container was removed"
   network_exists "$RUN-shared-net" || fail "real docker protected: the project's shared stack network was removed"
