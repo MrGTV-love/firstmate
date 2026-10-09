@@ -96,6 +96,39 @@ if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna h
 fi
 pass "matrix fallback retains per-rule permission and strongest-model boundaries"
 
+cat > "$TMP_ROOT/config/model-index.json" <<'JSON'
+{"version":1,"roles":{"sonnet-grade":{"omp":{"model":"openai-codex/gpt-6-luna","stand_in":"openrouter/deepseek/deepseek-v4-flash"}}},"retired":[]}
+JSON
+for use in '{"harness":"omp","role":"sonnet-grade"}' \
+  '[{"harness":"omp","role":"sonnet-grade","stand_in":true}]' \
+  '{"harness":"omp"}'; do
+  jq -n --argjson use "$use" --argjson fallback "$allowed" \
+    '{rules:[{when:"work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
+  model=$(jq -r 'if type == "array" then .[0] else . end |
+    if .stand_in then "openrouter/deepseek/deepseek-v4-flash"
+    elif .role then "openai-codex/gpt-6-luna" else "default" end' <<<"$use")
+  for rule in rule_1 default ''; do
+    set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" "$rule" omp "$model" default) || fail "resolved profile lookup refused $use"
+    assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "resolved and persisted default axes retain their fallback policy"
+    set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" "$rule" omp "${model/default/}" '') || fail "omitted launch axes refused $use"
+    assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "omitted launch axes match the same policy"
+  done
+done
+pass "fallback lookup resolves primary and stand-in roles and normalizes omitted axes"
+
+for retired in openrouter/z-ai/glm-5.3-flash glm-5.3-flash; do
+  jq --arg retired "$retired" '.retired=[$retired]' "$TMP_ROOT/config/model-index.json" > "$TMP_ROOT/retired-index.json"
+  mv "$TMP_ROOT/retired-index.json" "$TMP_ROOT/config/model-index.json"
+  if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp default default > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+    fail "retired rule and default stand-ins must refuse before launch"
+  fi
+  if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '{"status":"exhausted"}' > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+    fail "catalog membership must not authorize a retired stand-in"
+  fi
+done
+rm "$TMP_ROOT/config/model-index.json"
+pass "retirement applies to configured lists and direct fallback selection"
+
 cat > "$QUOTA_FIXTURE" <<'JSON'
 {"schemaVersion":6,"providers":[
  {"provider":"claude","accountKey":"other","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":0}]}},
