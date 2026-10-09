@@ -5065,13 +5065,8 @@ test_sweep_keeps_recently_handled_boards_in_literal_home_paths() {
 
 # The point of the sweep is the resident processes: a live listener's board is
 # finished, and after the sweep neither its runner nor its blocked poll remains.
-# Count of resident `lavish-axi poll` processes serving the live-idle board.
-live_idle_polls() {
-  pgrep -f "lavish-axi poll .*board-sweep-live/boards/live-idle.html" | wc -l | tr -d ' '
-}
-
 test_sweep_stops_a_live_listener_of_a_finished_board() {
-  local home store artifact sid out list tries
+  local home store artifact sid out list tries poll_pid
   home=$(make_home board-sweep-live)
   fm_test_track_procevent_home "$home" "$home/procevent-claims"
   store="$home/lavish-state"
@@ -5079,6 +5074,7 @@ test_sweep_stops_a_live_listener_of_a_finished_board() {
   cat > "$home/fakebin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 # A poll that blocks until it is killed; bounded so an escaped stub cannot linger.
+printf '%s\n' "$$" > "$FM_HOME/poll.pid"
 for _ in $(seq 1 1800); do sleep 0.1; done
 SH
   chmod +x "$home/fakebin/lavish-axi"
@@ -5091,22 +5087,24 @@ SH
   assert_contains "$list" "live" "the armed listener is not running"
   # Armed means claimed; the poll process follows the claim, so wait for it.
   tries=0
-  while [ "$(live_idle_polls)" -eq 0 ] \
-    && [ "$tries" -lt 300 ]; do
+  while [ ! -s "$home/poll.pid" ] && [ "$tries" -lt 300 ]; do
     tries=$((tries + 1))
     sleep 0.1
   done
-  [ "$(live_idle_polls)" -ge 1 ] \
+  [ -s "$home/poll.pid" ] \
     || fail "the armed listener has no resident poll to retire"
+  poll_pid=$(cat "$home/poll.pid")
+  kill -0 "$poll_pid" 2>/dev/null \
+    || fail "the armed listener's poll is not running"
 
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the sweep failed: $out"
   assert_contains "$out" "retired: $sid" "the idle board's live listener was kept"
   tries=0
-  while [ "$(live_idle_polls)" -ne 0 ] && [ "$tries" -lt 100 ]; do
+  while kill -0 "$poll_pid" 2>/dev/null && [ "$tries" -lt 100 ]; do
     tries=$((tries + 1))
     sleep 0.1
   done
-  [ "$(live_idle_polls)" -eq 0 ] \
+  ! kill -0 "$poll_pid" 2>/dev/null \
     || fail "the retired listener's poll is still resident"
   list=$(run_procevent "$home" list)
   assert_not_contains "$list" "$sid" "the retired listener is still registered"
