@@ -791,6 +791,7 @@ export default function (pi: ExtensionAPI) {
       if (wake.content !== text) continue;
       if (wake.pending) wake.pending.delivered = true;
       owner.unconsumedWakes.delete(token);
+      owner.heldWakes.delete(token);
       if (!wake.pending) return;
       try {
         finishPendingActionable(owner, wake.pending);

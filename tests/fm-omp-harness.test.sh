@@ -1879,6 +1879,28 @@ if (scenario === "external") {
       await end();
       await until(() => wakes().length === 2, "outstanding vendor queue release lost owed work");
       expectWake(1, "check: trigger-3");
+    } else if (scenario === "release-consume") {
+      // A's preparation is cancelled and the busy turn end releases A into the held set,
+      // then the operator submits the unchanged restored A, so consuming A must retire its held copy too.
+      idle = false;
+      await handlers.get("before_agent_start")({ prompt: wake.m }, ctx);
+      await handlers.get("agent_end")({}, ctx);
+      await accept(wake);
+      const first = drain();
+      await fire("trigger-2");
+      acknowledge(first);
+      await end();
+      await until(() => wakes().length === 2, "consumed A's held copy retired B");
+      expectWake(1, "check: trigger-2");
+      // B's preparation is cancelled before message_start; the token must release so a later close still sends.
+      idle = false;
+      await handlers.get("before_agent_start")({ prompt: wakes()[1].m }, ctx);
+      const second = drain();
+      await fire("trigger-3");
+      acknowledge(second);
+      idle = true;
+      await until(() => wakes().length === 3, "cancelled B left an outstanding token that blocked C");
+      expectWake(2, "check: trigger-3");
     } else if (scenario === "consumed") {
       await accept(wake);
       acknowledge(drain());
@@ -1908,7 +1930,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed consumed mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued; do
+  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"
