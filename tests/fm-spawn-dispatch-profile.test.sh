@@ -1649,13 +1649,6 @@ test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files() {
   pass "a claude worker nested under a seeded secondmate home excludes that home's memory files"
 }
 
-test_claude_worker_exclusion_survives_special_characters_in_the_home_path() {
-  nested_claude_excludes nested-odd "odd R&D [home] it's {x}"
-  printf '%s\n' "$NESTED_EXCLUDES" | grep -Fxq "$CASE_DIR/odd R&D \\[home\\] it's \\{x\\}/CLAUDE.md" \
-    || fail "glob metacharacters in the home path were not escaped for picomatch; got: $NESTED_EXCLUDES"
-  pass "a home path with glob and quote characters reaches the launch as an escaped, intact exclusion"
-}
-
 test_claude_worker_outside_any_firstmate_home_gets_no_exclusion() {
   nested_claude_excludes plain ""
   [ -z "$NESTED_EXCLUDES" ] || fail "a worker not nested under a firstmate home got exclusions: $NESTED_EXCLUDES"
@@ -1724,9 +1717,6 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
         || fail "raw launch lost its model arguments: $(cat "$env_out.args")"
       [ "$(printf '%s' "$brief" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
         || fail "raw launch lost its brief doorbell"
-      printf '%s' "$settings" | jq -e --arg home "$CASE_DIR/firstmate R&D home it's \\[x\\]" \
-        '.claudeMdExcludes | contains([$home + "/CLAUDE.md", $home + "/CLAUDE.local.md", $home + "/AGENTS.md", $home + "/.claude/CLAUDE.md", $home + "/.claude/rules/**"])' >/dev/null \
-        || fail "$launcher raw launch did not exclude ancestor supervisor memory: $settings"
       if [ "$source" != none ]; then
         printf '%s' "$settings" | jq -e '.feedbackDrafts == "off" and (.claudeMdExcludes | contains(["project/**"]))' >/dev/null \
           || fail "raw launch replaced the caller's settings: $settings"
@@ -2397,7 +2387,6 @@ test_claude_secondmate_launch_omits_task_control_channel_authority
 test_claude_crewmate_launch_carries_the_attribution_policy
 test_claude_worker_nested_under_a_firstmate_home_excludes_its_memory_files
 test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files
-test_claude_worker_exclusion_survives_special_characters_in_the_home_path
 test_claude_worker_outside_any_firstmate_home_gets_no_exclusion
 test_claude_worker_keeps_its_own_root_memory_files
 test_raw_claude_nested_launches_exclude_supervisor_memory

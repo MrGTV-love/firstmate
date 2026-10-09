@@ -37,9 +37,10 @@ fm_claude_md_excludes_json() {
       case "$seen" in *" $dir "*) continue ;; esac
       if [ -f "$dir/.fm-secondmate-home" ] || { [ -f "$dir/AGENTS.md" ] && [ -f "$dir/bin/fm-spawn.sh" ]; }; then
         seen="$seen$dir "
-        # picomatch metacharacters in the home path would change what matches,
-        # and the glob then rides inside a JSON string.
-        home_glob=$(printf '%s' "$dir" | sed 's/[][\\*?{}()!+@^$|]/\\&/g; s/\\/\\\\/g; s/"/\\"/g')
+        # Use character classes for literal glob syntax: Claude's path matching
+        # does not honor backslash-escaped brackets and braces.
+        # Then escape the resulting pattern for its JSON string.
+        home_glob=$(printf '%s' "$dir" | sed 's/[][{}*?()]/[&]/g; s/\\/\\\\/g; s/"/\\"/g')
         list="$list${list:+,}\"$home_glob/CLAUDE.md\",\"$home_glob/CLAUDE.local.md\",\"$home_glob/AGENTS.md\",\"$home_glob/.claude/CLAUDE.md\",\"$home_glob/.claude/rules/**\""
       fi
     done
