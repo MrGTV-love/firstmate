@@ -2238,7 +2238,7 @@ task_nested_lane_for_path() {  # <root> <path>
 # entries, that the project or a git-backed scan root's repository registers
 # strictly beneath a scan root. No git-backed root means no registry is read.
 task_registered_lanes_under_roots() {  # <canonical-root>...
-  local root src registry line lane
+  local root src registry line lane state_dir meta project
   local -a sources
   TASK_REGISTERED_LANES=()
   sources=()
@@ -2247,6 +2247,14 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
   done
   [ "${#sources[@]}" -gt 0 ] || return 0
   [ -z "$PROJ" ] || sources+=("$PROJ")
+  for state_dir in "$STATE" ${TREEHOUSE_OWNER_STATES[@]+"${TREEHOUSE_OWNER_STATES[@]}"}; do
+    for meta in "$state_dir"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      project=$(fm_meta_get "$meta" project)
+      [ -n "$project" ] || continue
+      git -C "$project" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$project")
+    done
+  done
   for src in "${sources[@]}"; do
     if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
       TASK_PIDS_FAILED_DIR=$src
@@ -2498,10 +2506,14 @@ nm_launch_agent_fields() {  # <plist>
 # launch agent whose `--root` is the task copy or inside it. Anything else, an
 # unparsable plist included, is left exactly as found.
 retire_task_private_nm_launch_agents() {  # <worktree>
-  local wt=$1 dir plist label root canon_wt canon_root fields uid backup dest rc attempt
+  local wt=$1 dir plist label root canon_wt canon_root fields uid backup dest rc attempt lane
   dir=${FM_LAUNCH_AGENTS_DIR:-${HOME:-}/Library/LaunchAgents}
   [ -d "$dir" ] || return 0
   canon_wt=$(task_canonical_path "$wt") || return 0
+  if ! task_registered_lanes_under_roots "$canon_wt"; then
+    echo "REFUSED: cannot establish nested worktree ownership under $canon_wt; preserving the launch agents and task $ID." >&2
+    return 1
+  fi
   uid=$(id -u)
   backup="$DATA/$ID/launchagent-backup"
   for plist in "$dir"/com.kunchenguid.no-mistakes.daemon.*.plist; do
@@ -2535,6 +2547,11 @@ retire_task_private_nm_launch_agents() {  # <worktree>
       print "$path\n";
     ' "$root") || continue
     case "$canon_root" in "$canon_wt"|"$canon_wt"/*) ;; *) continue ;; esac
+    if ! lane=$(task_nested_lane_for_path "$canon_wt" "$canon_root"); then
+      echo "REFUSED: cannot classify the worktree holding no-mistakes launch agent $label's root $canon_root; preserving the launch agent and task $ID." >&2
+      return 1
+    fi
+    [ -z "$lane" ] || continue
     if ! command -v launchctl >/dev/null 2>&1; then
       echo "REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable, so it cannot be unloaded; preserving the worktree and $plist." >&2
       return 1

@@ -293,6 +293,11 @@ case "${1:-}" in
         exit 0 ;;
     esac
     ;;
+  daemon)
+    if [ "${2:-}" = stop ] && [ -n "${FM_FAKE_NM_SHARED_DAEMON_STATE:-}" ]; then
+      printf '%s\n' stopped > "$FM_FAKE_NM_SHARED_DAEMON_STATE"
+    fi
+    ;;
   runs)
     [ -z "${FM_FAKE_NM_RUNS_LOG:-}" ] || printf 'runs %s\n' "$*" >> "$FM_FAKE_NM_RUNS_LOG"
     printf '%s\n' "${FM_FAKE_NM_RUNS_LIST:-}" ;;
@@ -5619,11 +5624,16 @@ PLIST
 # found a process it could not prove custody of and refused (and a plain kill is
 # undone by launchd KeepAlive).
 test_private_nm_launch_agent_is_retired_before_teardown() {
-  local case_dir rc pid label calls
+  local case_dir rc pid label shared_state
   case_dir=$(make_case private-nm-agent)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   add_fake_launchctl "$case_dir"
+  shared_state="$case_dir/shared-daemon-state"
+  printf '%s\n' running > "$shared_state"
+  FM_FAKE_NM_SHARED_DAEMON_STATE="$shared_state" "$case_dir/fakebin/no-mistakes" daemon stop
+  [ "$(cat "$shared_state")" = stopped ] || fail "private-nm-agent: fake daemon stop did not stop the shared daemon"
+  printf '%s\n' running > "$shared_state"
   mkdir -p "$case_dir/wt/.no-mistakes/h"
   teardown_fixture_start "$case_dir/wt/.no-mistakes/h" KILL sleep 300
   pid=$TEARDOWN_FIXTURE_PID
@@ -5633,14 +5643,13 @@ test_private_nm_launch_agent_is_retired_before_teardown() {
   add_nm_launch_agent "$case_dir" 3baa54c9 "$(cd "$case_dir/wt" && pwd -P)/.no-mistakes/h" "$pid"
 
   rc=0
-  FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+  FM_FAKE_NM_SHARED_DAEMON_STATE="$shared_state" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   if kill -0 "$pid" 2>/dev/null; then
     teardown_fixture_stop "$pid"
     fail "private-nm-agent: the private daemon survived teardown"
   fi
   expect_code 0 "$rc" "private-nm-agent: teardown must finish once the agent is retired"
-  calls=$(cat "$case_dir/launchctl-calls")
   assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" \
     "private-nm-agent: teardown did not boot the agent out of the user domain"
   assert_absent "$case_dir/launchagents/$label.plist" \
@@ -5649,8 +5658,7 @@ test_private_nm_launch_agent_is_retired_before_teardown() {
     "private-nm-agent: the plist was not archived under the task's data"
   assert_grep "retired task-private no-mistakes launch agent $label" "$case_dir/stderr" \
     "private-nm-agent: teardown did not report the retired agent"
-  assert_not_contains "$calls" "daemon stop" \
-    "private-nm-agent: teardown touched the shared daemon"
+  [ "$(cat "$shared_state")" = running ] || fail "private-nm-agent: teardown stopped the shared daemon"
   pass "a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes"
 }
 
@@ -5693,6 +5701,59 @@ test_private_nm_launch_agent_equivalent_roots_are_retired() {
       "private-nm-agent-$spelling: the task record survived teardown"
   done
   pass "equivalent private roots unload their agents and allow teardown to finish"
+}
+
+test_nested_nm_launch_agents_are_left_alone() {
+  local registrar damage case_dir registry nested lane pid label rc hash
+  for registrar in project sibling; do
+    for damage in none no-git deleted; do
+      case_dir=$(make_case "nested-nm-agent-$registrar-$damage")
+      write_meta "$case_dir" no-mistakes ship
+      land_shippable_commit "$case_dir"
+      add_fake_launchctl "$case_dir"
+      registry="$case_dir/project"
+      if [ "$registrar" = sibling ]; then
+        registry="$case_dir/sibling-clone"
+        git clone -q "$case_dir/origin.git" "$registry"
+      fi
+      nested="$case_dir/wt/other-lane"
+      git -C "$registry" worktree add -q --detach "$nested" main
+      git -C "$registry" worktree lock "$nested"
+      lane=$(cd "$nested" && pwd -P)
+      fm_write_meta "$case_dir/state/other-lane.meta" "worktree=$lane" "project=$registry" "kind=ship"
+      mkdir -p "$lane/.no-mistakes/h"
+      ln -s "$lane/.no-mistakes/h" "$case_dir/lane-home"
+      teardown_fixture_start "$lane/.no-mistakes/h" KILL sleep 300
+      pid=$TEARDOWN_FIXTURE_PID
+      add_nm_launch_agent "$case_dir" 00000001 "$lane/./.no-mistakes//h" "$pid"
+      add_nm_launch_agent "$case_dir" 00000002 "$lane/.no-mistakes/missing/../h"
+      add_nm_launch_agent "$case_dir" 00000003 "$case_dir/lane-home"
+      case "$damage" in
+        no-git) rm -f "$nested/.git" ;;
+        deleted) rm -rf "$nested" ;;
+      esac
+
+      rc=0
+      FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+        run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      if ! kill -0 "$pid" 2>/dev/null; then
+        fail "nested-nm-agent-$registrar-$damage: another lane's daemon was killed"
+      fi
+      teardown_fixture_stop "$pid"
+      expect_code 1 "$rc" "nested-nm-agent-$registrar-$damage: teardown must refuse the foreign process"
+      [ ! -s "$case_dir/launchctl-calls" ] \
+        || fail "nested-nm-agent-$registrar-$damage: teardown addressed another lane's agent"
+      for hash in 00000001 00000002 00000003; do
+        label="$NM_AGENT_PREFIX.$hash"
+        assert_present "$case_dir/launchagents/$label.plist" "nested-nm-agent: foreign plist was removed"
+      done
+      assert_present "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.00000001" "nested-nm-agent: foreign agent was unloaded"
+      assert_absent "$case_dir/data/task-x1/launchagent-backup" "nested-nm-agent: foreign plist was archived"
+      assert_present "$case_dir/state/task-x1.meta" "nested-nm-agent: task record was removed"
+    done
+  done
+  pass "nested-lane agents remain loaded and installed across registry, path, and lane-damage variants"
 }
 
 # Every agent whose root is not inside THIS task's copy stays loaded and
@@ -6177,6 +6238,7 @@ test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_private_nm_launch_agent_is_retired_before_teardown
 test_private_nm_launch_agent_equivalent_roots_are_retired
 test_foreign_nm_launch_agents_are_left_alone
+test_nested_nm_launch_agents_are_left_alone
 test_private_nm_launch_agent_bootout_failure_refuses
 test_private_nm_launch_agent_not_loaded_is_archived
 )

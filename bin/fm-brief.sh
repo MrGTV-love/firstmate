@@ -612,12 +612,13 @@ IFS= read -r -d '' PRIVATE_SERVICE_RULE <<'EOF' || true
 8. Stop every private service you start. A private service is any daemon, server, or watcher that
    only your task needs, including a `no-mistakes` home whose `NO_MISTAKES_HOME` sits inside your
    worktree: that home installs its own launchd agent that keeps running and restarts after a kill
-   or a reboot. Before you append a `paused`, `blocked`, `needs-decision`, `done`, or `failed`
+   or a reboot. Before you append a `__PAUSED_VERB__`, `blocked`, `needs-decision`, `done`, or `failed`
    line that ends your turn, stop each one and name it in that status line. Stop a launchd agent
    with `launchctl bootout gui/$(id -u)/<label>` once its `--root` is confirmed to be inside your
    worktree. Never use `no-mistakes daemon stop` for this: it stops the shared daemon (rule 7).
 EOF
 PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE%$'\n'}
+PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE//__PAUSED_VERB__/$PAUSED_VERB}
 
 if [ "$KIND" = scout ]; then
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then

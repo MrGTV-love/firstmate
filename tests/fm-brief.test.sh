@@ -1469,13 +1469,14 @@ test_crewmate_scaffolds_forbid_pool_administration() {
 }
 
 test_crewmate_scaffolds_require_stopping_private_services() {
-  local home mode id brief ship_rule scout_rule
+  local home mode id brief ship_rule scout_rule verb
   home="$TMP_ROOT/private-service-home"
   mkdir -p "$home/data"
 
+  for verb in paused awaiting; do
   for mode in no-mistakes direct-PR local-only; do
-    id="brief-private-$mode"
-    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
+    id="brief-private-$verb-$mode"
+    FM_HOME="$home" FM_CLASSIFY_PAUSED_VERB="$verb" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
       || fail "fm-brief.sh --mode $mode exited non-zero"
     brief="$home/data/$id/brief.md"
     assert_grep "8. Stop every private service you start." "$brief" \
@@ -1489,15 +1490,18 @@ test_crewmate_scaffolds_require_stopping_private_services() {
       "$mode ship brief does not say how to stop the launchd agent"
     assert_grep "Never use \`no-mistakes daemon stop\` for this" "$brief" \
       "$mode ship brief does not forbid stopping the shared daemon"
+    assert_grep "Before you append a \`$verb\`, \`blocked\`, \`needs-decision\`, \`done\`, or \`failed\`" "$brief" \
+      "$mode ship private-service rule does not render the configured parking verb"
   done
 
-  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-private-scout alpha --scout >/dev/null 2>&1 \
+  FM_HOME="$home" FM_CLASSIFY_PAUSED_VERB="$verb" "$ROOT/bin/fm-brief.sh" "brief-private-$verb-scout" alpha --scout >/dev/null 2>&1 \
     || fail "fm-brief.sh --scout exited non-zero"
-  brief="$home/data/brief-private-scout/brief.md"
-  ship_rule=$(awk '/^8\. Stop every private service/,/^$/' "$home/data/brief-private-no-mistakes/brief.md")
+  brief="$home/data/brief-private-$verb-scout/brief.md"
+  ship_rule=$(awk '/^8\. Stop every private service/,/^$/' "$home/data/brief-private-$verb-no-mistakes/brief.md")
   scout_rule=$(awk '/^8\. Stop every private service/,/^$/' "$brief")
   [ -n "$ship_rule" ] || fail "ship brief emitted no private-service rule to compare"
   [ "$ship_rule" = "$scout_rule" ] || fail "ship and scout private-service rules have drifted apart"
+  done
 
   FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
     FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-private-mate --secondmate alpha >/dev/null 2>&1 \
