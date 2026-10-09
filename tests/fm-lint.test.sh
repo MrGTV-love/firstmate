@@ -1090,8 +1090,24 @@ SH
   pass "jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry"
 }
 
+# Counted design comparison (architectural requirements, not timing estimates):
+# Design                              Host bound  Lone workers  New daemons  Stale-slot cleanup
+# A per-run only                           0           2             0                0
+# B FM_LINT_JOBS=1 default                  0           1             0                0
+# C bash mkdir slot dirs                   1           2             0                1
+# D central lint daemon                    1           2             1                0
+# E flock slot pool in the Perl helper     1           2             0                0 (chosen)
+# E supplies a host bound without a daemon or stale-lock reclamation protocol.
+# Supplied paired reproduction: identical workloads of six roots per run,
+# --jobs 2, gate disabled with FM_LINT_SLOT_DIR=off versus enabled with cap 3.
+# Concurrent runs:                    1     4     8    16
+# Peak live ShellCheck, disabled:     2     8    16    32 (2 x runs)
+# Peak live ShellCheck, enabled:      2     3     3     3 (min(2 x runs, cap))
+# A lone run still peaks at two; fleet-day measurements remain out of scope.
+#
 fm_lint_stub_counting_shellcheck() {
-  local fakebin=$1 activity=$2 peak=$3
+  local fakebin=$1 activity=$2 peak=$3 real_perl
+  real_perl=$(command -v perl)
   mkdir -p "$activity"
   : > "$peak"
   cat > "$fakebin/shellcheck" <<PL
@@ -1122,6 +1138,28 @@ unlink "$activity/\$\$";
 exit 0;
 PL
   chmod +x "$fakebin/shellcheck"
+  cat > "$fakebin/perl" <<PL
+#!$real_perl
+use strict;
+use warnings;
+use Time::HiRes qw(time sleep);
+if (\$ENV{FM_LINT_COUNT_HOLD} && (\$ARGV[0] // '') =~ m{/fm-lint-cache[.]pl\\z}
+    && ((\$ARGV[1] // '') eq 'gate'
+        || ((\$ARGV[1] // '') eq 'check' && (\$ENV{FM_LINT_INTERNAL_SLOT_DIR} // 'off') eq 'off'))) {
+    my \$dir = \$ENV{FM_LINT_COUNT_READY_DIR};
+    open(my \$ready, '>', "\$dir/ready.\$\$") or die "\$!";
+    close \$ready;
+    my \$deadline = time() + 30;
+    until (-e "\$dir/start") {
+        die "contender start deadline exceeded\\n" if time() > \$deadline;
+        sleep 0.01;
+    }
+    open(my \$attempt, '>', "\$dir/attempt.\$\$") or die "\$!";
+    close \$attempt;
+}
+exec "$real_perl", @ARGV or die "exec perl: \$!";
+PL
+  chmod +x "$fakebin/perl"
 }
 
 fm_lint_concurrent_runs() {
@@ -1129,14 +1167,31 @@ fm_lint_concurrent_runs() {
   local -a pids roots
   roots=("$tmp/a.sh" "$tmp/b.sh" "$tmp/c.sh" "$tmp/d.sh")
   rm -f "$tmp/peak.release"
+  rm -rf "$tmp/contenders"
+  mkdir -p "$tmp/contenders"
   for run in $(seq 1 "$runs"); do
-    FM_LINT_COUNT_HOLD=1 PATH="$fakebin:$PATH" "$LINT" --jobs 2 "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
+    FM_LINT_COUNT_HOLD=1 FM_LINT_COUNT_READY_DIR="$tmp/contenders" \
+      PATH="$fakebin:$PATH" "$LINT" --jobs 2 "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
     pids+=("$!")
   done
-  perl - "$tmp/peak" "$expected" <<'PL' || ready_rc=$?
+  perl - "$tmp/peak" "$expected" "$tmp/contenders" "$((2 * runs))" <<'PL' || ready_rc=$?
 use Time::HiRes qw(time sleep);
-my ($peak, $expected) = @ARGV;
+my ($peak, $expected, $dir, $contenders) = @ARGV;
 my $deadline = time() + 30;
+while (1) {
+    my @ready = glob "$dir/ready.*";
+    last if @ready >= $contenders;
+    die "contender readiness deadline exceeded\n" if time() > $deadline;
+    sleep 0.01;
+}
+open(my $start, '>', "$dir/start") or die "$!";
+close $start;
+while (1) {
+    my @attempts = glob "$dir/attempt.*";
+    last if @attempts >= $contenders;
+    die "contender admission attempt deadline exceeded\n" if time() > $deadline;
+    sleep 0.01;
+}
 while (1) {
     open(my $fh, '<', $peak) or die "$!";
     my @counts = <$fh>;
@@ -1145,8 +1200,9 @@ while (1) {
     die "concurrent admission deadline exceeded\n" if time() > $deadline;
     sleep 0.01;
 }
+sleep 3;
 PL
-  touch "$tmp/peak.release"
+  touch "$tmp/contenders/start" "$tmp/peak.release"
   for pid in "${pids[@]}"; do
     wait "$pid" || rc=$?
   done
