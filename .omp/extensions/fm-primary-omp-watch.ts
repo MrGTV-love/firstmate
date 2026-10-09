@@ -79,6 +79,9 @@
 // Restored-wake recovery is documented in docs/watcher-continuity.md.
 // Recovery must use the real editor and resend only this extension's unchanged
 // emitted wake, never submit the whole composer or alter operator draft bytes.
+// Complete wake text left unsent in an idle composer by other wiring is found
+// by a low-rate poll and delivered the same way; docs/watcher-continuity.md
+// (omp stranded wake text) owns what it may touch.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
@@ -150,6 +153,8 @@ type SessionGeneration = {
   // replacement began still needs to distinguish unconsumed wakes from
   // consumed ones.
   unconsumedWakes: Map<string, UnconsumedWake>;
+  restorePendingWaits: number;
+  queueStuckReported: boolean;
   // A verified successor's failure close that arrived while the pipeline was
   // still delivering the wake it was started for; its bounded retry runs once
   // that delivery settles instead of being skipped by the single-flight guard.
@@ -513,6 +518,8 @@ function createGeneration(): SessionGeneration {
     pendingActionables: [],
     cleanupFailure: "",
     unconsumedWakes: new Map(),
+    restorePendingWaits: 0,
+    queueStuckReported: false,
     deferredClose: null,
   };
 }
@@ -595,6 +602,65 @@ async function stopSessionGeneration(
   const currentTokens = generation.pendingActionables.map((pending) => pending.token).join("\n");
   if (replacement && currentTokens && currentTokens !== persistedTokens) {
     persistPending();
+  }
+}
+
+// The wake body is `<prefix><message><suffix>` inside the watcher envelope the
+// operational-input owner encodes; sendWake builds it and the stranded-wake
+// finder below recognizes it, so the two share these parts.
+const wakeBodyPrefix = "FIRSTMATE WATCHER WAKE: ";
+const wakeBodySuffix = "\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.";
+
+// The envelope header (transport mark included) comes from the owner's encoder,
+// never from a literal here. A failed encode answers null and is retried next time.
+let watcherEnvelopeHeaderCache: string | null = null;
+function watcherEnvelopeHeader(): string | null {
+  if (watcherEnvelopeHeaderCache !== null) return watcherEnvelopeHeaderCache;
+  try {
+    const encoded = encodeFirstmateOperationalInput("watcher", wakeBodyPrefix);
+    if (!encoded.endsWith(wakeBodyPrefix)) return null;
+    watcherEnvelopeHeaderCache = encoded.slice(0, -wakeBodyPrefix.length);
+  } catch {
+    return null;
+  }
+  return watcherEnvelopeHeaderCache;
+}
+
+type StrandedWake = {
+  // The complete wake as this extension emits it, transport mark restored.
+  content: string;
+  // The editor without the wake and one transport blank-line separator.
+  remainder: string;
+};
+
+function findStrandedWake(editor: string, eligible: (content: string) => boolean): StrandedWake | null {
+  if (!editor.includes(wakeBodyPrefix)) return null;
+  const header = watcherEnvelopeHeader();
+  if (!header) return null;
+  const mark = header.startsWith("\u2063") ? "\u2063" : "";
+  const opening = header.slice(mark.length) + wakeBodyPrefix;
+  let from = 0;
+  for (;;) {
+    const at = editor.indexOf(opening, from);
+    if (at < 0) return null;
+    from = at + opening.length;
+    const start = mark && at > 0 && editor[at - 1] === mark ? at - 1 : at;
+    if (start !== 0 && (start < 2 || editor.slice(start - 2, start) !== "\n\n")) continue;
+    const closing = editor.indexOf(wakeBodySuffix, from);
+    if (closing <= from) continue;
+    if (editor.slice(from, closing).includes(opening)) continue;
+    const stop = closing + wakeBodySuffix.length;
+    if (stop !== editor.length && editor.slice(stop, stop + 2) !== "\n\n") continue;
+    const content = mark + editor.slice(at, stop);
+    if (!eligible(content)) continue;
+    let cutStart = start;
+    let cutEnd = stop;
+    if (cutStart >= 2 && editor.slice(cutStart - 2, cutStart) === "\n\n") cutStart -= 2;
+    else if (editor.slice(cutEnd, cutEnd + 2) === "\n\n") cutEnd += 2;
+    return {
+      content,
+      remainder: editor.slice(0, cutStart) + editor.slice(cutEnd),
+    };
   }
 }
 
@@ -728,13 +794,19 @@ export default function (pi: ExtensionAPI) {
     if (!generationIsLive(owner)) return false;
     const content = encodeFirstmateOperationalInput(
       "watcher",
-      `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
+      `${wakeBodyPrefix}${message}${wakeBodySuffix}`,
     ).replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, "");
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
     owner.unconsumedWakes.set(token, { content, pending });
     try {
-      if (sessionIsIdle()) await pi.sendUserMessage(content);
-      else await pi.sendUserMessage(content, { deliverAs: "followUp" });
+      if (sessionIsIdle()) {
+        await pi.sendUserMessage(content);
+      } else {
+        await pi.sendUserMessage(content, { deliverAs: "followUp" });
+        // A follow-up omp never starts a turn for (an idle state read wrongly,
+        // or the turn ending around the call) raises no agent_end to look again.
+        scheduleRestoredWakeCheck(owner);
+      }
     } catch (error) {
       owner.unconsumedWakes.delete(token);
       throw error;
@@ -767,8 +839,16 @@ export default function (pi: ExtensionAPI) {
   // stale with a replaced session throws on use, which only skips the check.
   const restoreCheckMs = 2000;
   const restoreAttemptLimit = 3;
+  // Further checks that wait for omp's queue to drain into a run before an idle
+  // session's queue counts as stuck; a compaction can hold the queue for a while.
+  const restorePendingWaitLimit = 15;
+  const strandedPollMs = 3000;
   const restoreAttempts = new Map<string, number>();
+  const strandedAttempts = new Map<string, number>();
   let restoreTimer: ReturnType<typeof setTimeout> | null = null;
+  let strandedTimer: ReturnType<typeof setInterval> | null = null;
+  let strandedSeen = "";
+  let nextStrandedId = 0;
 
   function rememberContext(ctx: unknown): void {
     if (typeof ctx === "object" && ctx !== null) latestContext = ctx;
@@ -783,14 +863,66 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  function recoverRestoredWake(owner: SessionGeneration): void {
-    if (!generationIsLive(owner) || owner.unconsumedWakes.size === 0) return;
+  function editorContext(): any {
     const ctx = latestContext;
-    if (!ctx?.hasUI || typeof ctx.isIdle !== "function" || typeof ctx.ui?.getEditorText !== "function" || typeof ctx.ui?.setEditorText !== "function") return;
+    if (!ctx?.hasUI || typeof ctx.isIdle !== "function" || typeof ctx.ui?.getEditorText !== "function" || typeof ctx.ui?.setEditorText !== "function") return null;
+    return ctx;
+  }
+
+  // A wait this extension cannot resolve is shown in omp's own UI, not dropped.
+  function reportWait(ctx: any, message: string): void {
     try {
-      // A turn that already started, or a queue that still holds messages,
-      // will consume the wake itself.
-      if (!ctx.isIdle() || ctx.hasPendingMessages?.()) return;
+      ctx.ui?.notify?.(message, "warning");
+    } catch {}
+  }
+
+  // omp is idle with messages still queued after the bounded wait, so nothing
+  // will run them: the follow-up gate refused to start a turn for them. Sending
+  // an unconsumed wake through the prompt-starting API starts that turn and
+  // flushes the queue behind it, and the wake's own consumption proves delivery.
+  // The wake can then reach main twice, which the idempotent drain absorbs.
+  function flushStuckQueue(owner: SessionGeneration, ctx: any): void {
+    for (const [token, wake] of [...owner.unconsumedWakes]) {
+      const attempts = restoreAttempts.get(token) ?? 0;
+      if (attempts >= restoreAttemptLimit) continue;
+      restoreAttempts.set(token, attempts + 1);
+      pi.sendUserMessage(wake.content);
+      scheduleRestoredWakeCheck(owner);
+      return;
+    }
+    if (owner.queueStuckReported) return;
+    owner.queueStuckReported = true;
+    reportWait(
+      ctx,
+      `watcher: wake not delivered - omp is idle with queued messages it will not run, and ${restoreAttemptLimit} resubmissions did not start a turn; the wake stays in the durable queue for bin/fm-wake-drain.sh`,
+    );
+  }
+
+  function recoverRestoredWake(owner: SessionGeneration): void {
+    if (!generationIsLive(owner)) return;
+    const ctx = editorContext();
+    if (!ctx) return;
+    try {
+      // A turn that already started will consume the wake itself.
+      if (!ctx.isIdle()) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
+        return;
+      }
+      // Queued messages normally drain into the next run within moments, so the
+      // check waits for that. Skipping for good would strand a queue omp will
+      // never run; after the bounded wait the stuck queue is handled below.
+      const queued = ctx.hasPendingMessages?.() === true;
+      if (!queued) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
+      }
+      if (owner.unconsumedWakes.size === 0) return;
+      if (queued && owner.restorePendingWaits < restorePendingWaitLimit) {
+        owner.restorePendingWaits += 1;
+        scheduleRestoredWakeCheck(owner);
+        return;
+      }
       let editor = String(ctx.ui.getEditorText() ?? "");
       for (const [token, wake] of [...owner.unconsumedWakes]) {
         const attempts = restoreAttempts.get(token) ?? 0;
@@ -805,17 +937,99 @@ export default function (pi: ExtensionAPI) {
         pi.sendUserMessage(wake.content);
         return;
       }
+      if (queued) flushStuckQueue(owner, ctx);
     } catch {}
   }
 
-  function scheduleRestoredWakeCheck(owner: SessionGeneration): void {
-    if (restoreTimer || owner.unconsumedWakes.size === 0) return;
+  // Every later check keeps a pending one. The check that follows an agent_end
+  // replaces it instead, so the editor is read two full seconds after the run
+  // ended - the settle time that tells a wake omp drained from one it left behind.
+  function scheduleRestoredWakeCheck(owner: SessionGeneration, afterRunEnd = false): void {
+    if (owner.unconsumedWakes.size === 0) return;
+    if (restoreTimer) {
+      if (!afterRunEnd) return;
+      clearTimeout(restoreTimer);
+      restoreTimer = null;
+    }
     const timer = setTimeout(() => {
       restoreTimer = null;
       recoverRestoredWake(owner);
     }, restoreCheckMs);
     timer.unref();
     restoreTimer = timer;
+  }
+
+  // Tracked wakes retain ownership even when their composer copies are missing
+  // or edited; template matching must not bypass exact restored recovery.
+  // docs/watcher-continuity.md#omp-stranded-wake-text owns polling behavior.
+  function pollStrandedWake(owner: SessionGeneration): void {
+    if (!generationIsLive(owner) || lockOwnership() !== "owned") return;
+    const ctx = editorContext();
+    if (!ctx) return;
+    try {
+      if (ctx.isIdle() !== true) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
+        strandedSeen = "";
+        return;
+      }
+      if (ctx.hasPendingMessages?.() !== true) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
+      }
+      const editor = String(ctx.ui.getEditorText() ?? "");
+      const tracked = [...owner.unconsumedWakes.values()];
+      let unownedEditor = editor;
+      for (const wake of tracked) {
+        const remainder = removeRestoredWake(unownedEditor, wake.content);
+        if (remainder === null) {
+          strandedSeen = "";
+          return;
+        }
+        unownedEditor = remainder;
+      }
+      const bare = (text: string): string => (text.startsWith("\u2063") ? text.slice(1) : text);
+      const found = findStrandedWake(editor, (content) =>
+        !tracked.some((wake) => bare(wake.content) === bare(content)) &&
+        (strandedAttempts.get(content) ?? 0) < restoreAttemptLimit,
+      );
+      if (!found) {
+        strandedSeen = "";
+        return;
+      }
+      if (strandedSeen !== editor) {
+        strandedSeen = editor;
+        return;
+      }
+      const attempts = strandedAttempts.get(found.content) ?? 0;
+      strandedAttempts.set(found.content, attempts + 1);
+      const token = `stranded-${process.pid}-${++nextStrandedId}`;
+      owner.unconsumedWakes.set(token, { content: found.content });
+      try {
+        // Idle, so this starts the turn that consumes the wake. The composer is
+        // cleared only once omp has taken it.
+        pi.sendUserMessage(found.content);
+      } catch (error) {
+        owner.unconsumedWakes.delete(token);
+        throw error;
+      }
+      ctx.ui.setEditorText(found.remainder);
+      strandedSeen = "";
+      scheduleRestoredWakeCheck(owner);
+    } catch {}
+  }
+
+  function startStrandedPoll(): void {
+    if (strandedTimer) return;
+    const timer = setInterval(() => pollStrandedWake(generation), strandedPollMs);
+    timer.unref();
+    strandedTimer = timer;
+  }
+
+  function stopStrandedPoll(): void {
+    if (strandedTimer) clearInterval(strandedTimer);
+    strandedTimer = null;
+    strandedSeen = "";
   }
 
   function confirmHandlingDelivery(recovery: { generation: string; watcherPid: string }): {
@@ -1305,6 +1519,7 @@ export default function (pi: ExtensionAPI) {
     if (!generationIsLive(owner)) return { ok: false, message: shuttingDownMessage };
     if (lockOwnership() !== "owned") return startArm(owner);
     replacementCoordinator.receiver = receiveReplacementActionable;
+    startStrandedPoll();
     let pending: PendingActionableClose[] = [];
     let loadFailure = "";
     try {
@@ -1343,6 +1558,8 @@ export default function (pi: ExtensionAPI) {
     rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
+    generation.restorePendingWaits = 0;
+    generation.queueStuckReported = false;
     consumeWake(generation, userMessageText(message.content));
   });
   // A run that ends with a wake still unconsumed either drains it into the next
@@ -1350,7 +1567,9 @@ export default function (pi: ExtensionAPI) {
   pi.on?.("agent_end", (_event, ctx) => {
     if (!instance.isCurrent()) return;
     rememberContext(ctx);
-    scheduleRestoredWakeCheck(generation);
+    generation.restorePendingWaits = 0;
+    generation.queueStuckReported = false;
+    scheduleRestoredWakeCheck(generation, true);
   });
 
   pi.on?.("session_start", async (_event, ctx) => {
@@ -1379,6 +1598,7 @@ export default function (pi: ExtensionAPI) {
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
     if (restoreTimer) clearTimeout(restoreTimer);
     restoreTimer = null;
+    stopStrandedPoll();
     rememberContext(ctx);
     const stopped = generation;
     recoveryPending = true;
@@ -1421,6 +1641,7 @@ export default function (pi: ExtensionAPI) {
     activate: armFromSession,
     retire: () => {
       clearHealTimer();
+      stopStrandedPoll();
       lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
       if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
       if (restoreTimer) clearTimeout(restoreTimer);
