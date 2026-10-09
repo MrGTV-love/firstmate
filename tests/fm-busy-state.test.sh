@@ -310,7 +310,23 @@ This project'"'"'s CLAUDE.md imports files outside the current working directory
   Yes, allow external imports')
   [ "$out" = "unknown launch-prompt" ] \
     || fail "a launch pinned at fm-spawn parked on Claude's external-imports dialog must classify unknown launch-prompt, got '$out'"
-  pass "a Claude launch parked on its trust or external-imports dialog classifies unknown launch-prompt"
+  out=$(fm_busy_classify tmux w1 claude t1 "$state" 'WARNING: Claude Code running in Bypass Permissions mode
+> No, exit
+  Yes, I accept
+Enter to confirm . Esc to cancel')
+  [ "$out" = "unknown launch-prompt" ] \
+    || fail "a launch pinned at fm-spawn parked on Claude's bypass-permissions dialog must classify unknown launch-prompt, got '$out'"
+  out=$(fm_busy_classify tmux w1 claude t1 "$state" 'Detected a custom API key in your environment
+Do you want to use this API key?
+  Yes
+> No (recommended)')
+  [ "$out" = "unknown launch-prompt" ] \
+    || fail "a launch pinned at fm-spawn parked on Claude's custom-API-key dialog must classify unknown launch-prompt, got '$out'"
+  # The question text alone is prose a worker could render; it needs its option.
+  out=$(fm_busy_classify tmux w1 claude t1 "$state" 'The docs ask: Do you want to use this API key?')
+  [ "$out" = "busy fm-spawn" ] \
+    || fail "a Claude pane quoting the API-key question without its option must stay busy fm-spawn, got '$out'"
+  pass "a Claude launch parked on any of its four startup dialogs classifies unknown launch-prompt"
 }
 
 test_launch_prompt_pi_trust_dialog() {

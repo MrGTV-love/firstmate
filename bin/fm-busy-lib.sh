@@ -915,14 +915,11 @@ fm_busy_agy_tail_busy() {
 # signature out, so absence never proves the pane is NOT parked, only that
 # this check cannot confirm it.
 
-# fm_busy_claude_launch_prompt_tail: Claude's workspace-trust dialog
-# ("Quick safety check: Is this a project you created or one you trust?",
-# re-verified live on Claude Code 2.1.278, docs/verification/runtime-backends.md
-# "Launch-prompt backstop signatures") and its separate external-CLAUDE.md-
-# imports dialog ("Allow external CLAUDE.md file imports?", verified by
-# disassembly, .agents/skills/harness-adapters/references/harness/claude.md
-# "Hook trust" sibling section). fm-claude-trust.sh pre-registers both before
-# launch; this is the backstop for when that registration did not take effect.
+# fm_busy_claude_launch_prompt_tail: Claude's recognized startup dialogs;
+# docs/verification/runtime-backends.md "Launch-prompt backstop signatures"
+# owns the rendered evidence. This is a backstop, not consent:
+# bin/fm-claude-trust.sh owns pre-registration and consent carry-forward;
+# bin/fm-claude-memory-lib.sh owns ancestor-supervisor-memory exclusion.
 # Each dialog's own question text is paired with one of its own rendered
 # option/footer lines, both required together: the question text alone is
 # plausible self-referential prose a firstmate-repo worker could easily render
@@ -935,8 +932,36 @@ fm_busy_claude_launch_prompt_tail() {
     && printf '%s' "$buf" | grep -qiE 'No, exit|Enter to confirm'; then
     return 0
   fi
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
-    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'
+  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'; then
+    return 0
+  fi
+  # The machine-level bypass-permissions confirmation and the custom-API-key
+  # choice, live-verified on Claude Code 2.1.294 in a scratch config. Each
+  # is paired with its own rendered option, for the same self-reference reason.
+  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_BYPASS_PROMPT_REGEX:-WARNING: Claude Code running in Bypass Permissions mode}" \
+    && printf '%s' "$buf" | grep -qiE 'Yes, I accept'; then
+    return 0
+  fi
+  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_APIKEY_PROMPT_REGEX:-Do you want to use this API key\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No \(recommended\)'
+}
+
+# fm_busy_claude_launch_prompt_name: names which of the dialogs above the
+# captured pane on stdin shows, for a report a person can act on. Prints
+# nothing when none matches.
+fm_busy_claude_launch_prompt_name() {
+  local buf
+  buf=$(cat)
+  if printf '%s' "$buf" | grep -qiE 'Allow external CLAUDE\.md file imports\?'; then
+    printf '%s' 'Allow external CLAUDE.md file imports?'
+  elif printf '%s' "$buf" | grep -qiE 'Quick safety check: Is this a project you created or one you trust\?'; then
+    printf '%s' 'workspace trust (Quick safety check)'
+  elif printf '%s' "$buf" | grep -qiE 'WARNING: Claude Code running in Bypass Permissions mode'; then
+    printf '%s' 'bypass-permissions confirmation'
+  elif printf '%s' "$buf" | grep -qiE 'Do you want to use this API key\?'; then
+    printf '%s' 'custom API key choice'
+  fi
 }
 
 # fm_busy_pi_launch_prompt_tail: Pi's project-trust dialog. Live-verified on
