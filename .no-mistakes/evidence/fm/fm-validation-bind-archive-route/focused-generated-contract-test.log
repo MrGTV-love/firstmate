@@ -1,0 +1,6 @@
+Selector: tests/fm-task-delivery.test.sh::test_forge_gerrit_changes_what_no_mistakes_means
+Method: loaded only this existing function plus tests/lib.sh; invoked with TMPDIR inside disposable worktree fixture. Did not execute the complete file or suite.
+Exit: 0
+ok - forge=gerrit: no-mistakes runs with its forge steps skipped, recovers its fixes, then publishes one change
+
+This test checks the emitted brief contract, not real agent custody or publication.

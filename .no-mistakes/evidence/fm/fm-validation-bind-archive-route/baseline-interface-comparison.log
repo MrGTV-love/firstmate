@@ -1,0 +1,5 @@
+Ran base-commit bin/fm-dod-lib.sh through Bash stdin from the worktree bin directory (unchanged sibling libraries), invoked fm_dod_block no-mistakes live-custody-gerrit fm/live-custody-gerrit gerrit.
+Exit: 0
+Baseline generated contract lacks diverged-head escalation: true
+Target bin/fm-brief.sh generated contract includes diverged-head escalation: true
+This reproduces the missing generated instruction, not the reported stranded custody run.

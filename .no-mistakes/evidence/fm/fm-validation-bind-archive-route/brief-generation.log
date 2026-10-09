@@ -1,0 +1,14 @@
+COMMAND: bin/fm-brief.sh live-custody-gerrit disposable-review-project --mode no-mistakes --forge gerrit
+EXIT: 0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY4BYS4QNZST6135G1W245/.live-validation-bind-archive/home/data/live-custody-gerrit/brief.md (ship, mode=no-mistakes forge=gerrit shape=squash; replace {TASK} and {FIRSTMATE_SPEC})
+
+EMITTED INTERFACE CHECKS:
+{
+  "diverged-head escalation": true,
+  "owned route handoff": true,
+  "publish after passing recovery without rerun": true,
+  "preserved nondivergent recovery": true,
+  "publish through Gerrit consumer": true,
+  "passing outcomes only": true
+}
+NOTE: This proves emitted instructions, not agent interpretation or custody return.

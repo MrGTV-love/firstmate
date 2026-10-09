@@ -1,0 +1,117 @@
+Scope: actual Git commands in a disposable repository, not no-mistakes custody recovery. No no-mistakes lifecycle commands or gate records were used. The disposable upstream holds refs/heads/pipeline, not a fabricated no-mistakes recovery record.
+
+Observed heads:
+S=896cce96b5d7d8043ea56735ad96ebba465ab516
+B=5a253f18bc052b6ea3be0627a0bd006b98b5f010
+P=a3d70980ca26ddc3cfa6115b0084b866ce815dad
+
+Commands executed directly:
+git branch archive/live-submitted-896cce96 fixture-S
+git clone --bare -q . ../fixture-remote.git
+git fetch --no-tags ../fixture-remote.git refs/heads/pipeline
+git rev-parse FETCH_HEAD
+Output: a3d70980ca26ddc3cfa6115b0084b866ce815dad
+git branch archive/live-pipeline-a3d70980 a3d70980ca26ddc3cfa6115b0084b866ce815dad
+git rev-parse archive/live-submitted-896cce96 archive/live-pipeline-a3d70980
+Output:
+896cce96b5d7d8043ea56735ad96ebba465ab516
+a3d70980ca26ddc3cfa6115b0084b866ce815dad
+
+ARCHIVE COLLISION (ancestor destination must not fast-forward):
+$ git branch archive/collision-pipeline-a3d70980 fixture-base
+$ git rev-parse archive/collision-pipeline-a3d70980
+6823fbff24cdb45c9c8c797303189a0f01cfe8ef
+$ git branch archive/collision-pipeline-a3d70980 fixture-P
+fatal: a branch named 'archive/collision-pipeline-a3d70980' already exists
+Exit: 128
+$ git branch archive/live-submitted-896cce96 fixture-P
+fatal: a branch named 'archive/live-submitted-896cce96' already exists
+Exit: 128
+$ git rev-parse archive/collision-pipeline-a3d70980 archive/live-submitted-896cce96
+6823fbff24cdb45c9c8c797303189a0f01cfe8ef
+896cce96b5d7d8043ea56735ad96ebba465ab516
+
+SAFE REPLAY PRECONDITIONS:
+$ git reset --keep archive/live-pipeline-a3d70980
+$ git range-diff fixture-base..archive/live-submitted-896cce96 main..fixture-B
+1:  896cce9 = 1:  5a253f1 Submitted feature
+$ git cherry -v fixture-B fixture-S
+- 896cce96b5d7d8043ea56735ad96ebba465ab516 Submitted feature
+$ git diff --name-only fixture-B..HEAD
+fix.txt
+$ git diff --quiet fixture-S fixture-B -- fix.txt
+Exit: 0
+$ git merge-base --is-ancestor fixture-S HEAD
+Exit: 1 (the pre-replay head does not contain S)
+
+REPLAY:
+$ git rev-list --reverse fixture-B..archive/live-pipeline-a3d70980
+a3d70980ca26ddc3cfa6115b0084b866ce815dad
+$ git reset --keep archive/live-submitted-896cce96
+$ git cherry-pick a3d70980ca26ddc3cfa6115b0084b866ce815dad
+[submitted a09dfca] Pipeline fixes defect
+ Date: Thu Oct 8 21:46:04 2026 -0500
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ git merge-base --is-ancestor fixture-S HEAD
+Exit: 0
+$ git range-diff fixture-B..archive/live-pipeline-a3d70980 fixture-S..HEAD
+1:  a3d7098 = 1:  a09dfca Pipeline fixes defect
+$ git status --porcelain
+(empty; exit 0)
+$ git log --format='%h %s' -3
+a09dfca Pipeline fixes defect
+896cce9 Submitted feature
+6823fbf Fixture base
+
+ADVERSARIAL MISSING SUBMITTED PATCH:
+$ git cherry -v fixture-B fixture-unmatched-S
+- 896cce96b5d7d8043ea56735ad96ebba465ab516 Submitted feature
++ a3a1768d4f17e5339b0bfcdfab7847cf30986835 Unmatched submitted patch
+No reset or cherry-pick was performed for this candidate.
+
+ADVERSARIAL UPSTREAM-DEPENDENT FIX:
+$ git diff --name-only fixture-B..HEAD
+main-only.txt
+$ git diff --quiet fixture-S fixture-B -- main-only.txt
+Exit: 1
+$ git rev-parse HEAD
+8a9c4bc6b599eb629f10d6d9e5006d89f46e3fa3
+(The candidate HEAD remained unchanged after the failed precondition.)
+$ git diff fixture-S fixture-B -- main-only.txt
+diff --git a/main-only.txt b/main-only.txt
+index 8851128..d5e0a0d 100644
+--- a/main-only.txt
++++ b/main-only.txt
+@@ -1 +1 @@
+-main base
++main advanced independently
+No replay was attempted for this candidate.
+
+ADOPT P (Git portion only; no passing no-mistakes run or publish was simulated):
+$ git switch -c gerrit-adopt fixture-S
+$ git reset --keep archive/live-pipeline-a3d70980
+$ git diff --quiet HEAD archive/live-pipeline-a3d70980
+Exit: 0
+$ git rev-parse 'HEAD^{tree}' 'archive/live-pipeline-a3d70980^{tree}'
+df0abea4579011d7c9ad3bad29b836814860e35f
+df0abea4579011d7c9ad3bad29b836814860e35f
+$ git log --format='%h %s' -4
+a3d7098 Pipeline fixes defect
+5a253f1 Submitted feature
+fabb25b Advance upstream main independently
+6823fbf Fixture base
+$ git status --porcelain
+(empty; exit 0)
+
+OBSERVABLE FIX CONTENT:
+$ git show submitted:fix.txt
+fixed by pipeline
+$ git show gerrit-adopt:fix.txt
+fixed by pipeline
+$ git rev-parse submitted gerrit-adopt
+a09dfca81287fd25e2daf18a0beb99e72eb305ba
+a3d70980ca26ddc3cfa6115b0084b866ce815dad
+$ git merge-base --is-ancestor fixture-S submitted
+Exit: 0
+$ git range-diff fixture-B..archive/live-pipeline-a3d70980 fixture-S..submitted
+1:  a3d7098 = 1:  a09dfca Pipeline fixes defect
