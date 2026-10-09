@@ -344,7 +344,7 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -434,7 +434,7 @@ family_for_basename() {
       ;;
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|\
     fm-pr-merge.test.sh|fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
-    fm-review-diff.test.sh|fm-teardown.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
+    fm-review-diff.test.sh|fm-teardown.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -809,6 +809,7 @@ tests/fm-home-summary-refresh-ownership.test.sh 20922
 tests/fm-home-summary-refresh.test.sh 180746
 tests/fm-host-mirror-live-e2e.test.sh 79
 tests/fm-host-mirror.test.sh 11587
+tests/fm-idle-session-reap.test.sh 35000
 tests/fm-inactive-reconcile.test.sh 60823
 tests/fm-inbox.test.sh 6062
 tests/fm-jev-guardrail-home.test.sh 10731
@@ -958,6 +959,7 @@ tests/fm-wake-drain-unread-status.test.sh 24251
 tests/fm-wake-queue.test.sh 165906
 tests/fm-watch-arm.test.sh 113076
 tests/fm-watch-checkpoint.test.sh 11234
+tests/fm-watch-idle-reap.test.sh 45000
 tests/fm-watch-open-loops.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59092
 tests/fm-watch-triage.test.sh 1074843
@@ -1746,7 +1748,7 @@ families_for_changed_path() {
       printf '%s\n' watcher-wake-lock
       printf '%s\n' "__script__:fm-procevent-quota.test.sh"
       ;;
-    bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-review-diff.sh|\
+    bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
       printf '%s\n' pr-forge
       ;;
