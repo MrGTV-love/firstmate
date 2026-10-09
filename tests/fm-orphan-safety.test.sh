@@ -237,8 +237,5 @@ case "${1:-all}" in
     for mode in snapshot-direct snapshot-descendant after-cont before-kill survivor-kill owner-unknown; do test_reaper_identity "$mode"; done
     for action in activate publish release deactivate append keys drain-first drain-second; do test_lock_failure "$action"; done
     for action in link followups clear; do test_link_lock_failure "$action"; done ;;
-  snapshot-direct|snapshot-descendant|after-cont|before-kill|survivor-kill|owner-unknown) test_reaper_identity "$1" ;;
-  activate|publish|release|deactivate|append|keys|drain-first|drain-second) test_lock_failure "$1" ;;
-  link|followups|clear) test_link_lock_failure "$1" ;;
   *) exit 2 ;;
 esac

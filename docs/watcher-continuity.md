@@ -326,6 +326,8 @@ Orphan reaping recognizes test roots marked by `.fm-test-fixture`, scratch lab h
 
 `tests/fm-orphan-safety.test.sh` covers reused direct and descendant PIDs, identity changes between signals, unknown live owners, returning-state acquisition failures for queue/grant operations and both acknowledgement acquisitions, and all three request-link mutations. `tests/fm-test-reap-orphans.test.sh` exercises real-process termination and non-termination, a compiled Go test binary attributed by cwd, lab creator/runtime lifetimes, owner-exit cleanup, and startup cleanup after a killed test. Fixture disappearance checks and cleanup signals use identities captured before the owning run exits.
 
+Run `bash tests/fm-orphan-safety.test.sh` without arguments to execute all of its regressions.
+
 ### Guard counts for branch-held rows
 
 Because the main drain's exclusion makes branch-granted rows invisible to main, `bin/fm-guard.sh`'s queued-wake warning counts only the rows the calling actor can itself present or retire.
