@@ -201,7 +201,7 @@ It accepts the relocation only when all of these hold, and it refuses every othe
 - **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
 - **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
 - **Its HEAD contains every surviving recorded head:** the record's own `worktree_head`, the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
-  Relocation refuses when none survives, or when history was rewritten between two recorded heads and the copy cannot contain both.
+  Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.
   The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
   Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
 - **No other task of any local Firstmate home records it** (the root home and every registered local secondmate home, the same walk teardown uses); an unreadable home or registry refuses. Records are checked by path or alias in both `worktree` and `home`, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
@@ -210,7 +210,7 @@ It accepts the relocation only when all of these hold, and it refuses every othe
   The control plane checks, and the launch owner checks again at the moment it would write.
   A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
 
-The journal keeps `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, including failure phases and later ordinary relaunches, and a repeated relocation is judged against that proof.
+The journal keeps the current worktree checkpoint (`worktree_head`, `worktree_dirty`, and any child count) and `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, including failure phases and later ordinary relaunches, and a repeated relocation is judged against both applicable head fields. An existing unreadable journal refuses a control relaunch before it can overwrite recovery evidence.
 The record's `worktree=` moves only at the launch owner's single atomic publication, alongside the ordinary relaunch profile updates (including an explicit harness switch).
 A surviving endpoint is reused; a proven-gone endpoint follows the normal reclaim rules above.
 The task id, status log, and armed poll are preserved. The `--note` requirement still applies, and the progress note is appended to the existing brief.

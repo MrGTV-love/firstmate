@@ -900,12 +900,15 @@ PRIOR_RELOCATE_FROM=
 PRIOR_RELOCATE_TO=
 PRIOR_RELOCATE_HEAD=
 PRIOR_RELOCATE_HEAD_SOURCE=
-if [ -f "$JOURNAL" ] && [ ! -L "$JOURNAL" ] \
-   && [ "$(fm_meta_get "$JOURNAL" task)" = "$ID" ]; then
-  PRIOR_RELOCATE_FROM=$(fm_meta_get "$JOURNAL" relocation_from)
-  PRIOR_RELOCATE_TO=$(fm_meta_get "$JOURNAL" relocation_to)
-  PRIOR_RELOCATE_HEAD=$(fm_meta_get "$JOURNAL" relocation_head)
-  PRIOR_RELOCATE_HEAD_SOURCE=$(fm_meta_get "$JOURNAL" relocation_head_source)
+if [ "$VERB" = relaunch ] && { [ -e "$JOURNAL" ] || [ -L "$JOURNAL" ]; }; then
+  [ -f "$JOURNAL" ] && [ ! -L "$JOURNAL" ] && cat "$JOURNAL" >/dev/null 2>&1 \
+    || die "control journal $JOURNAL cannot be read; refusing to overwrite recorded recovery evidence"
+  if [ "$(fm_meta_get "$JOURNAL" task)" = "$ID" ]; then
+    PRIOR_RELOCATE_FROM=$(fm_meta_get "$JOURNAL" relocation_from)
+    PRIOR_RELOCATE_TO=$(fm_meta_get "$JOURNAL" relocation_to)
+    PRIOR_RELOCATE_HEAD=$(fm_meta_get "$JOURNAL" relocation_head)
+    PRIOR_RELOCATE_HEAD_SOURCE=$(fm_meta_get "$JOURNAL" relocation_head_source)
+  fi
 fi
 RELAUNCH_TX=
 RELAUNCH_BRIEF=
@@ -954,7 +957,7 @@ journal_write() {  # <phase> [extra-line]...
       [ -z "$PRIOR_RELOCATE_HEAD_SOURCE" ] || echo "relocation_head_source=$PRIOR_RELOCATE_HEAD_SOURCE"
     fi
     local line
-    for line in "$@"; do
+    for line in "${CHECKPOINT_LINES[@]}" "$@"; do
       echo "$line"
     done
   } > "$JOURNAL.tmp" && mv -f "$JOURNAL.tmp" "$JOURNAL"; then
@@ -1341,10 +1344,10 @@ do_relaunch() {
   fi
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
-  journal_write checkpoint "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write checkpoint "$note_line"
 
   record_note
-  journal_write noted "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write noted "$note_line"
 
   # Refuse before stopping the current worker, using the replacement harness,
   # account pin, allowlist, and backend that fm-spawn will use.
@@ -1353,14 +1356,14 @@ do_relaunch() {
   fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
     "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" \
     || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker"
-  journal_write stopping "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write stopping "$note_line"
   exit_result=$(do_exit)
-  journal_write exited "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
+  journal_write exited "$note_line" "exit_result=$exit_result"
 
   # The launch owner (fm-spawn --relaunch) clears the previous incarnation's
   # per-task harness wiring before arming the new one, so nothing to do here.
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
-  journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
+  journal_write launching "$note_line" "relaunch_tx=$RELAUNCH_TX"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
   [ "$RECONCILE_ONLY" = 0 ] || spawn_args+=(--reconcile-only)
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
@@ -1406,7 +1409,7 @@ do_relaunch() {
   }
   RELAUNCH_AGENT_CONFIRMED=1
 
-  journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
+  journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }

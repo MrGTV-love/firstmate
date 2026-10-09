@@ -2915,6 +2915,76 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
   pass "relocation: every surviving recorded head must be contained, and no evidence refuses"
 }
 
+test_relocation_refuses_unreadable_head_evidence() {
+  local dir id variant locked common admin fragment out rc before brief_before journal_before
+  local -a args
+  [ "$(id -u)" != 0 ] || { echo "skip - unreadable head evidence needs a non-root user"; return; }
+  for variant in registration reflog journal journal-ordinary; do
+    id="rl110${variant//-/}"
+    dir=$(new_case "relocate-unreadable-$variant" "$id")
+    locked=
+    journal_before=
+    if [ "$variant" = journal-ordinary ]; then
+      add_ship_task "$dir" "$id"
+      printf zsh > "$dir/fake/command"
+    else
+      make_relocation_case "$dir" "$id" keep-registration
+      set_case_meta_field "$dir" "$id" pr_head "$(cat "$dir/first-head")"
+      git -C "$dir/dest" reset -q --hard "$(cat "$dir/first-head")"
+    fi
+    case "$variant" in
+      registration|reflog)
+        common=$(git -C "$dir/proj" rev-parse --path-format=absolute --git-common-dir)
+        for admin in "$common"/worktrees/*; do
+          [ "$(cat "$admin/gitdir")" = "$dir/wt/.git" ] || continue
+          if [ "$variant" = registration ]; then
+            locked="$admin/gitdir"
+            fragment="worktree registration"
+          else
+            locked="$admin/logs/HEAD"
+            fragment="recorded worktree reflog"
+          fi
+          break
+        done
+        [ -n "$locked" ] || fail "the vanished worktree registration was not retained"
+        ;;
+      journal*)
+        locked="$dir/home/state/$id.control-relaunch"
+        if [ "$variant" = journal ]; then
+          printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/committed-head")" > "$locked"
+        else
+          printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(git -C "$dir/wt" rev-parse HEAD)" > "$locked"
+        fi
+        journal_before=$(cat "$locked")
+        fragment="control journal"
+        ;;
+    esac
+    before=$(cat "$dir/home/state/$id.meta")
+    brief_before=$(cat "$dir/home/data/$id/brief.md")
+    chmod 000 "$locked"
+    args=("$id" relaunch --note "resume")
+    [ "$variant" = journal-ordinary ] || args+=(--worktree "$dir/dest")
+    out=$(run_control "$dir" "${args[@]}"); rc=$?
+    expect_code 1 "$rc" "control must refuse unreadable historical evidence ($variant)"$'\n'"$out"
+    assert_contains "$out" "$fragment" "control refused for the wrong reason ($variant)"
+    if [ "$variant" != journal-ordinary ]; then
+      out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+      expect_code 1 "$rc" "direct spawn must refuse unreadable historical evidence ($variant)"$'\n'"$out"
+      assert_contains "$out" "$fragment" "direct spawn refused for the wrong reason ($variant)"
+    fi
+    chmod 644 "$locked"
+    [ "$(cat "$dir/home/state/$id.meta")" = "$before" ] || fail "unreadable evidence refusal changed the record ($variant)"
+    [ "$(cat "$dir/home/data/$id/brief.md")" = "$brief_before" ] || fail "unreadable evidence refusal changed the instructions ($variant)"
+    if [ -n "$journal_before" ]; then
+      [ "$(cat "$dir/home/state/$id.control-relaunch")" = "$journal_before" ] || fail "unreadable journal was overwritten ($variant)"
+    else
+      assert_absent "$dir/home/state/$id.control-relaunch" "unreadable evidence refusal wrote a journal ($variant)"
+    fi
+    [ ! -s "$dir/fake/literal" ] || fail "unreadable evidence refusal launched a worker ($variant)"
+  done
+  pass "relocation: unreadable registrations, reflogs and journals refuse without discarding evidence"
+}
+
 test_relocation_refuses_every_unsafe_destination() {
   local dir id variant fragment root_uid foreign
   root_uid=$(id -u)
@@ -2985,11 +3055,16 @@ test_relocation_refuses_every_unsafe_destination() {
 }
 
 test_relocation_refuses_a_copy_another_local_home_records() {
-  local dir id variant field owned out rc before brief_before journal_before fragment
-  for variant in worktree worktree-alias home home-alias unavailable own-record; do
+  local dir id variant field owned out rc before brief_before journal_before fragment locked
+  for variant in worktree worktree-alias home home-alias unavailable own-record unreadable-registry-worktree unreadable-registry-home; do
     id="rl108${variant//-/}"
     dir=$(new_case "relocate-local-home-$variant" "$id")
     make_relocation_case "$dir" "$id"
+    locked=
+    if [[ "$variant" = unreadable-registry-* ]] && [ "$(id -u)" = 0 ]; then
+      echo "skip - unreadable registry needs a non-root user"
+      continue
+    fi
     printf -- '- mate - a local mate (home: %s; scope: project work; projects: project; added 2026-09-01)\n' \
       "$dir/mate" > "$dir/home/data/secondmates.md"
     printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/first-head")" \
@@ -3009,6 +3084,17 @@ test_relocation_refuses_a_copy_another_local_home_records() {
         fragment="recorded by another task"
         ;;
       unavailable) fragment="registered local Firstmate home is unavailable" ;;
+      unreadable-registry-*)
+        mkdir -p "$dir/mate/data" "$dir/hidden/state" "$dir/sibling/state"
+        printf -- '- sibling - a local mate (home: %s; scope: project work; projects: project; added 2026-09-01)\n' \
+          "$dir/sibling" >> "$dir/home/data/secondmates.md"
+        locked="$dir/mate/data/secondmates.md"
+        printf -- '- hidden - a local mate (home: %s; scope: project work; projects: project; added 2026-09-01)\n' \
+          "$dir/hidden" > "$locked"
+        printf '%s=%s\n' "${variant##*-}" "$dir/dest" > "$dir/hidden/state/$id.meta"
+        chmod 000 "$locked"
+        fragment="local Firstmate registry cannot be read"
+        ;;
       own-record)
         set_case_meta_field "$dir" "$id" home "$dir/dest"
         out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
@@ -3028,6 +3114,7 @@ test_relocation_refuses_a_copy_another_local_home_records() {
     [ "$(cat "$dir/home/data/$id/brief.md")" = "$brief_before" ] || fail "direct refusal changed the instructions ($variant)"
     [ "$(cat "$dir/home/state/$id.control-relaunch")" = "$journal_before" ] || fail "direct refusal changed the journal ($variant)"
     [ ! -s "$dir/fake/literal" ] || fail "direct refusal launched into another home's copy ($variant)"
+    [ -z "$locked" ] || chmod 644 "$locked"
   done
   pass "relocation: every registered local home's records are checked, an unavailable home refuses, and the exact own record is excluded"
 }
@@ -3125,13 +3212,13 @@ test_relocation_proof_survives_every_failure_journal_rewrite() {
   rm "$dir/fake/ignore-cd"
   out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "third attempt"); rc=$?
   expect_code 0 "$rc" "the identical relocation must succeed once the copy is right"$'\n'"$out"
-  [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-relocation_head,meta-pr_head ] \
-    || fail "the retry must check the surviving relocation journal head and the PR head, got '$(journal_field "$dir" "$id" relocation_head_source)'"
+  [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-relocation_head,journal-worktree_head,meta-pr_head ] \
+    || fail "the retry must check both surviving journal heads and the PR head, got '$(journal_field "$dir" "$id" relocation_head_source)'"
   pass "relocation: the vanished path and recorded head survive every failure journal rewrite and judge the retry"
 }
 
 test_relocation_proof_survives_later_ordinary_launch_failure() {
-  local dir out rc id=rl105ordinary field expected
+  local dir out rc id=rl105ordinary field expected newer
   dir=$(new_case relocate-ordinary-failure "$id")
   make_relocation_case "$dir" "$id"
   printf codex > "$dir/fake/becomes"
@@ -3140,6 +3227,8 @@ test_relocation_proof_survives_later_ordinary_launch_failure() {
   expect_code 1 "$rc" "relocation must report a post-publication launch failure"$'\n'"$out"
   [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "published relocation did not retain its destination"
   [ "$(journal_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "failure journal still names the vanished worktree"
+  git_commit_file "$dir/dest" later.txt "committed after relocation"
+  newer=$(git -C "$dir/dest" rev-parse HEAD)
   out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
     run_control "$dir" "$id" relaunch --note "ordinary retry"); rc=$?
   expect_code 1 "$rc" "ordinary retry must report the staged launch failure"$'\n'"$out"
@@ -3154,15 +3243,23 @@ test_relocation_proof_survives_later_ordinary_launch_failure() {
     [ "$(journal_field "$dir" "$id" "relocation_$field")" = "$expected" ] \
       || fail "ordinary launch failure lost relocation_$field"
   done
+  [ "$(journal_field "$dir" "$id" worktree_head)" = "$newer" ] || fail "ordinary launch failure lost the newer checkpoint"
   set_case_meta_field "$dir" "$id" pr_head ""
   git -C "$dir/proj" worktree remove --force "$dir/dest"
+  git -C "$dir/proj" branch -f "task-$id" "$(cat "$dir/committed-head")"
   git -C "$dir/proj" worktree add -q "$dir/next" "task-$id"
   printf zsh > "$dir/fake/command"
+  : > "$dir/fake/literal"
+  run_relocation_refusal "$dir" "$id" "journal-worktree_head" "newer checkpoint after ordinary launch failure" "$dir/next"
+  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/next"); rc=$?
+  expect_code 1 "$rc" "direct spawn must preserve the failed ordinary relaunch checkpoint"$'\n'"$out"
+  assert_contains "$out" "journal-worktree_head" "direct spawn missed the failed ordinary checkpoint"
+  git -C "$dir/next" reset -q --hard "$newer"
   out=$(run_control "$dir" "$id" relaunch --worktree "$dir/next" --note "relocate again"); rc=$?
   expect_code 0 "$rc" "a later relocation must recover proof through relocation_to"$'\n'"$out"
   [ "$(journal_field "$dir" "$id" relocation_from)" = "$dir/dest" ] || fail "new relocation did not replace the prior proof"
   [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/next" ] || fail "new relocation did not record its destination"
-  [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-relocation_head ] || fail "later relocation did not use the surviving relocation journal head"
+  [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-relocation_head,journal-worktree_head ] || fail "later relocation did not use both surviving journal heads"
   pass "relocation: proof survives ordinary launch failures and proves a later destination"
 }
 
@@ -4738,6 +4835,7 @@ test_reclaim_refuses_an_unreadable_endpoint
 test_relocation_rebinds_a_vanished_worktree_to_a_fresh_copy
 test_relocation_checks_every_recorded_head_and_requires_evidence
 test_relocation_refuses_every_unsafe_destination
+test_relocation_refuses_unreadable_head_evidence
 test_relocation_refuses_a_copy_another_local_home_records
 test_relocation_never_overwrites_or_deletes_a_foreign_harness_file
 test_relocation_proof_survives_every_failure_journal_rewrite

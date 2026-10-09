@@ -60,12 +60,33 @@ fm_control_worktree_wiring_free() {
 # the copy last stood on even after the branch itself was moved. Prints nothing
 # when no registration or reflog survives.
 fm_control_worktree_registered_head() {  # <git-common-dir> <path>
-  local common=$1 want=$2 admin
+  local common=$1 want=$2 admin registered reflog
+  if [ -d "$common/worktrees" ] && { [ ! -r "$common/worktrees" ] || [ ! -x "$common/worktrees" ]; }; then
+    echo "error: worktree registrations in $common/worktrees cannot be read" >&2
+    return 1
+  fi
   for admin in "$common"/worktrees/*; do
-    [ -f "$admin/gitdir" ] || continue
-    [ "$(cat "$admin/gitdir" 2>/dev/null)" = "$want/.git" ] || continue
-    [ -f "$admin/logs/HEAD" ] || return 0
-    tail -n 1 "$admin/logs/HEAD" 2>/dev/null | awk '{ print $2 }'
+    [ -d "$admin" ] || continue
+    [ -r "$admin" ] && [ -x "$admin" ] || {
+      echo "error: worktree registration $admin cannot be read" >&2
+      return 1
+    }
+    [ -e "$admin/gitdir" ] || [ -L "$admin/gitdir" ] || continue
+    registered=$(cat "$admin/gitdir" 2>/dev/null) || {
+      echo "error: worktree registration $admin/gitdir cannot be read" >&2
+      return 1
+    }
+    [ "$registered" = "$want/.git" ] || continue
+    if [ -d "$admin/logs" ] && { [ ! -r "$admin/logs" ] || [ ! -x "$admin/logs" ]; }; then
+      echo "error: recorded worktree reflog $admin/logs cannot be read" >&2
+      return 1
+    fi
+    [ -e "$admin/logs/HEAD" ] || [ -L "$admin/logs/HEAD" ] || return 0
+    reflog=$(tail -n 1 "$admin/logs/HEAD" 2>/dev/null) || {
+      echo "error: recorded worktree reflog $admin/logs/HEAD cannot be read" >&2
+      return 1
+    }
+    printf '%s\n' "$reflog" | awk '{ print $2 }'
     return 0
   done
 }
@@ -177,19 +198,24 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
 
   head=$(fm_meta_get "$meta" worktree_head)
   if [ -n "$head" ]; then heads+=("$head"); sources+=("meta-worktree_head"); fi
-  head=$(fm_control_worktree_registered_head "$common" "$old")
+  head=$(fm_control_worktree_registered_head "$common" "$old") || return 1
   if [ -n "$head" ]; then heads+=("$head"); sources+=("registered-worktree"); fi
   journal="$state/$id.control-relaunch"
-  if [ -f "$journal" ] && [ ! -L "$journal" ] \
-     && [ "$(fm_meta_get "$journal" task)" = "$id" ]; then
-    if [ "$(fm_meta_get "$journal" relocation_from)" = "$old" ] \
-       || [ "$(fm_meta_get "$journal" relocation_to)" = "$old" ]; then
-      head=$(fm_meta_get "$journal" relocation_head)
-      if [ -n "$head" ]; then heads+=("$head"); sources+=("journal-relocation_head"); fi
+  if [ -e "$journal" ] || [ -L "$journal" ]; then
+    if [ ! -f "$journal" ] || [ -L "$journal" ] || ! cat "$journal" >/dev/null 2>&1; then
+      echo "error: control journal $journal cannot be read, so recorded head evidence cannot be established" >&2
+      return 1
     fi
-    if [ "$(fm_meta_get "$journal" worktree)" = "$old" ]; then
-      head=$(fm_meta_get "$journal" worktree_head)
-      if [ -n "$head" ]; then heads+=("$head"); sources+=("journal-worktree_head"); fi
+    if [ "$(fm_meta_get "$journal" task)" = "$id" ]; then
+      if [ "$(fm_meta_get "$journal" relocation_from)" = "$old" ] \
+         || [ "$(fm_meta_get "$journal" relocation_to)" = "$old" ]; then
+        head=$(fm_meta_get "$journal" relocation_head)
+        if [ -n "$head" ]; then heads+=("$head"); sources+=("journal-relocation_head"); fi
+      fi
+      if [ "$(fm_meta_get "$journal" worktree)" = "$old" ]; then
+        head=$(fm_meta_get "$journal" worktree_head)
+        if [ -n "$head" ]; then heads+=("$head"); sources+=("journal-worktree_head"); fi
+      fi
     fi
   fi
   head=$(fm_meta_get "$meta" pr_head)

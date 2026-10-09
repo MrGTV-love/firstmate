@@ -1459,6 +1459,10 @@ fm_local_firstmate_state_dirs() {  # <first-state>
       FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
       return 1
     }
+    if ! cat "$reg" >/dev/null 2>&1; then
+      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry cannot be read at $reg"
+      return 1
+    fi
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         "- "*)
@@ -1479,7 +1483,10 @@ fm_local_firstmate_state_dirs() {  # <first-state>
           [ "$known" = 1 ] || homes+=("$child")
           ;;
       esac
-    done < "$reg"
+    done < "$reg" || {
+      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry cannot be read at $reg"
+      return 1
+    }
   done
 }
 
