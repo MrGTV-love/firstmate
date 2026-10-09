@@ -516,6 +516,140 @@ test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow() {
   pass "drain subshell entries stay flat as unread history grows and linear in the fleet ($per_task per task)"
 }
 
+# Reference the original command-substitution fold's byte contract, independently
+# of the optimized fold/drop helpers. This is deliberately slow and test-only.
+legacy_decision_fold_line() {
+  local open=$1 line=$2 resolve=$3 held=$4 kind=$5 verb key note row kept=''
+  verb=$(status_line_verb "$line")
+  _fm_status_unstamped "$line" line
+  case "$line" in *:*|*\[key=*\]*) ;; *) printf '%s' "$open"; return 0 ;; esac
+  case "$line" in
+    *:*) case "$verb:$kind" in
+      done:ship|done:scout|failed:ship|failed:scout) return 0 ;;
+    esac ;;
+  esac
+  case "$verb" in
+    needs-decision|blocked|"$resolve"|"$held") ;;
+    *) printf '%s' "$open"; return 0 ;;
+  esac
+  key=$(_fm_decision_key "$line") || { printf '%s' "$open"; return 0; }
+  note=$(status_line_note "$line")
+  _fm_decision_key_transition_allowed "$key" "$note" \
+    || { printf '%s' "$open"; return 0; }
+  while IFS= read -r row || [ -n "$row" ]; do
+    [ -n "$row" ] || continue
+    case "$row" in "$key"$'\t'*) ;; *) kept+="$row"$'\n' ;; esac
+  done <<EOF
+$open
+EOF
+  open=${kept%$'\n'}
+  case "$verb" in
+    needs-decision|blocked)
+      [ -n "$open" ] && open+=$'\n'
+      open+="$key"$'\t'"$verb"$'\t'"$note"
+      ;;
+  esac
+  printf '%s' "$open"
+}
+
+test_decision_fold_preserves_stdout_and_out_var_bytes() {
+  # shellcheck source=bin/fm-classify-lib.sh
+  . "$ROOT/bin/fm-classify-lib.sh"
+  local input=$'a\tneeds-decision\tfirst\nb\tblocked\tsecond\n\n' line kind expected actual open
+  local lines=(
+    'working: unchanged'
+    'needs-decision bare prose [at=10:30]'
+    'blocked [key=bad/key]: rejected key'
+    'resolved [key=pending-reply-7]: unrelated note'
+    'needs-decision [key=a] [at=2026-10-09T10:30:00Z]: reopened'
+    'blocked [key=c]: third'
+    $'blocked [key=c]: third\n\n'
+    'done'
+    'resolved [key=a]: answered'
+    'captain-held [key=b]: transferred'
+    'done: shipped'
+    'failed: stopped'
+  )
+  for input in '' "$input"; do
+    for kind in ship scout secondmate; do
+      for line in "${lines[@]}"; do
+        expected=$(legacy_decision_fold_line "$input" "$line" resolved captain-held "$kind")
+        actual=$(_fm_decision_fold_line "$input" "$line" resolved captain-held "$kind") \
+          || fail "stdout fold failed for $kind: $line"
+        [ "$actual" = "$expected" ] || fail "stdout fold changed bytes for $kind: $line"
+        open=$input
+        _fm_decision_fold_line_into "$open" "$line" resolved captain-held "$kind" open
+        [ "$open" = "$expected" ] || fail "out-var fold changed bytes for $kind: $line"
+      done
+    done
+  done
+  for input in '' $'a\tblocked\tfirst\nb\tneeds-decision\tsecond'; do
+    for line in a missing; do
+      actual=$(_fm_decision_drop "$input" "$line") || fail "stdout key removal failed"
+      open=$input
+      _fm_decision_drop "$open" "$line" open
+      [ "$open" = "$actual" ] || fail "key removal out-var and stdout bytes differ"
+      case "$line" in
+        missing) [ "$open" = "$input" ] || fail "absent key removal changed the set" ;;
+        a) [ "$open" = "${input#*$'\n'}" ] || fail "key removal changed surviving record" ;;
+      esac
+    done
+  done
+  pass "stdout and in-process decision folds preserve legacy bytes and early returns"
+}
+
+test_keyed_cold_drain_preserves_cursor_bytes_and_flat_forks() {
+  # shellcheck source=bin/fm-classify-lib.sh
+  . "$ROOT/bin/fm-classify-lib.sh"
+  local dir state history task i line open expected actual ident size signature small large
+  dir=$(make_case keyed-cold-fold)
+  for history in 3 60; do
+    state="$dir/h$history/state"
+    mkdir -p "$state"
+    for ((task = 0; task < 3; task++)); do
+      {
+        printf '%s\n' 'needs-decision [key=keep]: initial' 'blocked [key=remove]: temporary'
+        for ((i = 0; i < history; i++)); do
+          printf 'resolved [key=side-%s]: routine close\nworking: step %s\n' "$i" "$i"
+        done
+        printf '%s\n' \
+          'captain-held [key=remove]: transferred' \
+          'needs-decision [key=pending-reply-7]: pending-reply-missed: still waiting' \
+          'resolved [key=pending-reply-7]: unrelated note cannot close' \
+          'blocked [key=last]: final blocker' \
+          'needs-decision [key=keep] [at=2026-10-09T10:30:00Z]: reopened'
+        case "$task" in 1) printf 'done: shipped\n' ;; esac
+      } > "$state/fleet$task.status"
+      printf 'kind=ship\n' > "$state/fleet$task.meta"
+    done
+    actual=$(subshell_entries "$state" "$dir/h$history.count")
+    case "$history" in 3) small=$actual ;; 60) large=$actual ;; esac
+    for ((task = 0; task < 3; task++)); do
+      open=''
+      while IFS= read -r line || [ -n "$line" ]; do
+        open=$(legacy_decision_fold_line "$open" "$line" resolved captain-held ship)
+      done < "$state/fleet$task.status"
+      expected=$'pending-reply-7\tneeds-decision\tpending-reply-missed: still waiting\nlast\tblocked\tfinal blocker\nkeep\tneeds-decision\treopened'
+      case "$task" in 1) expected='' ;; esac
+      [ "$open" = "$expected" ] || fail "legacy fold did not retain the expected order and notes"
+      _fm_status_stat_into "$state/fleet$task.status" ident size \
+        || fail "could not read fixture identity and size"
+      _fm_open_decisions_fold_signature ship signature
+      {
+        printf 'version=%s\noffset=%s\nident=%s\n' "$signature" "$size" "$ident"
+        printf '%s' "$open"
+      } > "$dir/expected.cursor"
+      cmp -s "$dir/expected.cursor" "$state/.fleet$task.open-decisions-cursor" \
+        || fail "drain persisted different cursor bytes, including trailing newlines"
+      actual=$(status_open_decisions_incremental "$state/fleet$task.status")
+      [ "$actual" = "$open" ] || fail "keyed cold drain changed the legacy open set"
+    done
+  done
+  [ "$large" -le "$((small + 40))" ] \
+    || fail "keyed cold-fold subshell entries grew with history: $small to $large"
+  pass "keyed cold drains preserve exact open/cursor bytes with flat forks ($small/$large)"
+}
+
 test_incident_note_answer_buried_under_routine_note_surfaces_both
 test_already_presented_notes_are_not_replayed
 test_brand_new_note_after_presentation_is_surfaced
@@ -531,3 +665,5 @@ test_open_decisions_fold_is_unchanged
 test_empty_queue_does_not_swallow_later_signal_annotation
 test_routine_working_and_covered_done_stay_silent_on_the_empty_queue
 test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow
+test_decision_fold_preserves_stdout_and_out_var_bytes
+test_keyed_cold_drain_preserves_cursor_bytes_and_flat_forks
