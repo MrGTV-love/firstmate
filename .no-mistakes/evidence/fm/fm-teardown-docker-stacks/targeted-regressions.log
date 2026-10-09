@@ -1,0 +1,14 @@
+ok - top-level status and ledger query failures remain best effort
+ok - a task-owned autonomous running step is left alone rather than aborted
+ok - teardown removes the task's labelled, named, compose-project and worktree-compose stacks and leaves every other Docker object
+ok - Docker workdir ownership canonicalizes both sides and excludes nested lanes, foreign symlinks and task temp roots
+ok - foreign project carriers veto empty heuristic networks, all-owned projects propagate and explicit markers remain authoritative
+ok - foreign carriers observed after container removal veto both project-label heuristics but not explicit network markers
+ok - standalone secondmate retirement skips Docker even when the daemon is unavailable
+ok - ambiguous task ids authorize only worktree evidence
+ok - every Docker listing, verification and removal failure retains forced task records until a successful retry
+ok - forced secondmate quiesces child endpoints, pipelines and processes before Docker cleanup and retains failures for retry
+ok - forced Orca children quiesce before Docker cleanup and retain identity and worktrees on failure
+ok - recursive forced secondmate cleanup quiesces the grandchild before Docker cleanup and retains failed identity for retry
+ok - a container arriving during network cleanup blocks retirement until retry removes it
+rm: /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-teardown-tests.T0I2jt: Directory not empty

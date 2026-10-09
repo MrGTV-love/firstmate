@@ -1,0 +1,340 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ushiomxd
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ushiomxd
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ushiomxd
+/tmp/fml.2wk1mN
+[exit 0]
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/owned-protected-retry
+[exit 0]
+
+$ git -c user.name=LiveTest -c user.email=live@example.invalid commit -q --allow-empty -m 'disposable baseline'
+[exit 0]
+
+$ treehouse get --lease --no-fetch
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry' to release it.
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry
+[exit 0]
+
+$ git checkout -q -b fm/fmlive77846x1791532366-owned-protected-retry
+[exit 0]
+
+$ tmux -L fm-lab new-session -d -s validation -n control -x 120 -y 35 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-fmlive77846x1791532366-owned-protected-retry -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry 'sleep 1800'
+[exit 0]
+
+$ docker network create --subnet 198.19.97.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry fmlive77846x1791532366-own-net
+dc43a2f50fc6f682a2a60bdc9afe16ee1a2a7b1c5a1868c067b5f1640e4f86a8
+[exit 0]
+
+$ docker volume create --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry fmlive77846x1791532366-own-vol
+fmlive77846x1791532366-own-vol
+[exit 0]
+
+$ docker volume create --label fm.test=fmlive77846x1791532366 fmlive77846x1791532366-unmarked-vol
+fmlive77846x1791532366-unmarked-vol
+[exit 0]
+
+$ docker volume create --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry-v2 fmlive77846x1791532366-foreign-vol
+fmlive77846x1791532366-foreign-vol
+[exit 0]
+
+$ docker run -d --name fmlive77846x1791532366-owned-protected-retry-running-pg --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry --network fmlive77846x1791532366-own-net -e POSTGRES_HOST_AUTH_METHOD=trust -v fmlive77846x1791532366-own-vol:/var/lib/postgresql/data postgres:17-alpine
+bace9d3040cad7f17a282950d654051c74b626b62a18fe4af9a6ee591968a992
+[exit 0]
+
+$ docker exec fmlive77846x1791532366-owned-protected-retry-running-pg pg_isready -h 127.0.0.1 -U postgres
+127.0.0.1:5432 - no response
+[exit 2]
+
+$ docker exec fmlive77846x1791532366-owned-protected-retry-running-pg pg_isready -h 127.0.0.1 -U postgres
+127.0.0.1:5432 - no response
+[exit 2]
+
+$ docker exec fmlive77846x1791532366-owned-protected-retry-running-pg pg_isready -h 127.0.0.1 -U postgres
+127.0.0.1:5432 - accepting connections
+[exit 0]
+
+$ docker exec fmlive77846x1791532366-owned-protected-retry-running-pg psql -h 127.0.0.1 -U postgres -c 'CREATE TABLE proof (task_id text); INSERT INTO proof VALUES ('"'"'fmlive77846x1791532366-owned-protected-retry'"'"'); SELECT * FROM proof;'
+CREATE TABLE
+INSERT 0 1
+                   task_id                    
+----------------------------------------------
+ fmlive77846x1791532366-owned-protected-retry
+(1 row)
+
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-owned-protected-retry-stopped-pg --label fm.test=fmlive77846x1791532366 -v fmlive77846x1791532366-unmarked-vol:/keep -v /scratch postgres:17-alpine true
+8ef59d042f76a23aa08ff5040605f5afd3e41c5eeccc626435da1f71bd88ee07
+[exit 0]
+
+$ docker inspect 8ef59d042f76a23aa08ff5040605f5afd3e41c5eeccc626435da1f71bd88ee07 --format '{{json .Mounts}}'
+[{"Type":"volume","Name":"fmlive77846x1791532366-unmarked-vol","Source":"/var/lib/docker/volumes/fmlive77846x1791532366-unmarked-vol/_data","Destination":"/keep","Driver":"local","Mode":"z","RW":true,"Propagation":""},{"Type":"volume","Name":"6e82e6bbf3a358c6e78fd787e809501098e6386039a98cdf8df91e944d24e745","Source":"/var/lib/docker/volumes/6e82e6bbf3a358c6e78fd787e809501098e6386039a98cdf8df91e944d24e745/_data","Destination":"/scratch","Driver":"local","Mode":"","RW":true,"Propagation":""},{"Type":"volume","Name":"d50947cbb723087512ea5ca43beaea9846564505c5b8b0ca333ffd560cc93317","Source":"/var/lib/docker/volumes/d50947cbb723087512ea5ca43beaea9846564505c5b8b0ca333ffd560cc93317/_data","Destination":"/var/lib/postgresql/data","Driver":"local","Mode":"","RW":true,"Propagation":""}]
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-labelled --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry postgres:17-alpine true
+4c8f4015d740b3a207043430194862e0d30a5b0b9ce051dabad89648a548f3b7
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-exact-compose --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-owned-protected-retry postgres:17-alpine true
+c01445c1164d49bfb96b54c0ce37705cc889d8ecfbe3130d1a8ceb5b3e6f71e7
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-own-path --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-derived --label com.docker.compose.project.working_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry postgres:17-alpine true
+e771196d771e796e1f021ecfacce30d7b8d482b1b68b4f215171eb6603ea43d7
+[exit 0]
+
+$ docker network create --subnet 198.19.97.0/24 --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-derived fmlive77846x1791532366-derived-net
+Error response from daemon: invalid pool request: Pool overlaps with other one on this address space
+[exit 1]
+
+$ docker network create --subnet 198.19.98.0/24 --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-derived fmlive77846x1791532366-derived-net
+598d50f88582990f505e4cd41a4bb0ba2680a0fa99ee3b12f6cd9336193cf3d7
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-owned-protected-retry-v2-pg --label fm.test=fmlive77846x1791532366 postgres:17-alpine true
+edbbb1b4d6741447c47010ca9796c2d1d8753643b825ee04ba13bada895ec539
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-owned-protected-retry0-pg --label fm.test=fmlive77846x1791532366 postgres:17-alpine true
+407a5194f2caf110d1a9917b1af13fc65759650516488a5f6cbf8a3a0446d048
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-foreign --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry-v2 postgres:17-alpine true
+adb6daba827971a1d2d5687c59b8704f110eb1ab4f801063c0aab48cb4dfc1c9
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-unmarked --label fm.test=fmlive77846x1791532366 postgres:17-alpine true
+bab667a33ceeff00f13d84c51744013499ff3f7fc2981019f72a897fb289f648
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-owned-protected-retry-claimed --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry-v2 postgres:17-alpine true
+9c21634b93a8e1a919d01b4627aa154d9c72f3efbb7227c5496c0b8ff9d27679
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-owned-protected-retry-shared-by-name --label fm.test=fmlive77846x1791532366 --label com.supabase.cli.project=fmlive77846x1791532366-owned-protected-retry postgres:17-alpine true
+b977f29f8a21e643ed37ddd2d1b40e877c0d0cb09290ceae969336bcd62b515a
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-shared-by-path --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-owned-protected-retry --label com.docker.compose.project.working_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry postgres:17-alpine true
+8255e25bda277f95f913c3f8fe2837c8670a964620bdbba3586ca3c0c16a0c63
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-prefixed-project --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-owned-protected-retry-stack postgres:17-alpine true
+18c3f0c3af08cac48644c0cd6b35191413f57c5d91e558bebd250efaca26427c
+[exit 0]
+
+$ docker network create --subnet 198.19.97.0/24 --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-owned-protected-retry --label com.supabase.cli.project=fmlive77846x1791532366-owned-protected-retry fmlive77846x1791532366-shared-net
+Error response from daemon: invalid pool request: Pool overlaps with other one on this address space
+[exit 1]
+
+$ docker network create --subnet 198.19.98.0/24 --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-owned-protected-retry --label com.supabase.cli.project=fmlive77846x1791532366-owned-protected-retry fmlive77846x1791532366-shared-net
+Error response from daemon: invalid pool request: Pool overlaps with other one on this address space
+[exit 1]
+
+$ docker network create --subnet 198.19.99.0/24 --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-owned-protected-retry --label com.supabase.cli.project=fmlive77846x1791532366-owned-protected-retry fmlive77846x1791532366-shared-net
+3ba624e76151e69fdc7d359b1afe2c28e375ad8ae90b4cd8978101cd34fa15ef
+[exit 0]
+
+$ docker network create --subnet 198.19.97.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry-v2 fmlive77846x1791532366-foreign-net
+Error response from daemon: invalid pool request: Pool overlaps with other one on this address space
+[exit 1]
+
+$ docker network create --subnet 198.19.98.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry-v2 fmlive77846x1791532366-foreign-net
+Error response from daemon: invalid pool request: Pool overlaps with other one on this address space
+[exit 1]
+
+$ docker network create --subnet 198.19.99.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry-v2 fmlive77846x1791532366-foreign-net
+Error response from daemon: invalid pool request: Pool overlaps with other one on this address space
+[exit 1]
+
+$ docker network create --subnet 198.19.100.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-owned-protected-retry-v2 fmlive77846x1791532366-foreign-net
+af77a5dbba486c90e7b1a47ef3bebc6764aab8496b0108aa34dfedc9dee01da2
+[exit 0]
+
+=== before end-user teardown: running PostgreSQL and stopped leftovers alongside protected decoys ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-prefixed-project | Created |  | fmlive77846x1791532366-owned-protected-retry-stack
+fmlive77846x1791532366-shared-by-path | Created |  | fmlive77846x1791532366-owned-protected-retry
+fmlive77846x1791532366-owned-protected-retry-shared-by-name | Created |  | 
+fmlive77846x1791532366-owned-protected-retry-claimed | Created | fmlive77846x1791532366-owned-protected-retry-v2 | 
+fmlive77846x1791532366-unmarked | Created |  | 
+fmlive77846x1791532366-foreign | Created | fmlive77846x1791532366-owned-protected-retry-v2 | 
+fmlive77846x1791532366-owned-protected-retry0-pg | Created |  | 
+fmlive77846x1791532366-owned-protected-retry-v2-pg | Created |  | 
+fmlive77846x1791532366-own-path | Created |  | fmlive77846x1791532366-derived
+fmlive77846x1791532366-exact-compose | Created |  | fmlive77846x1791532366-owned-protected-retry
+fmlive77846x1791532366-labelled | Created | fmlive77846x1791532366-owned-protected-retry | 
+fmlive77846x1791532366-owned-protected-retry-stopped-pg | Created |  | 
+fmlive77846x1791532366-owned-protected-retry-running-pg | Up 6 seconds | fmlive77846x1791532366-owned-protected-retry | 
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-derived-net |  | fmlive77846x1791532366-derived
+fmlive77846x1791532366-foreign-net | fmlive77846x1791532366-owned-protected-retry-v2 | 
+fmlive77846x1791532366-own-net | fmlive77846x1791532366-owned-protected-retry | 
+fmlive77846x1791532366-shared-net |  | fmlive77846x1791532366-owned-protected-retry
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+fmlive77846x1791532366-foreign-vol | fmlive77846x1791532366-owned-protected-retry-v2
+fmlive77846x1791532366-own-vol | fmlive77846x1791532366-owned-protected-retry
+fmlive77846x1791532366-unmarked-vol | 
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/bin/fm-teardown.sh fmlive77846x1791532366-owned-protected-retry
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ushiomxd
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 10s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for fmlive77846x1791532366-owned-protected-retry: 27305
+teardown: removing Docker container(s) owned by fmlive77846x1791532366-owned-protected-retry: fmlive77846x1791532366-own-path(path) fmlive77846x1791532366-labelled(label) fmlive77846x1791532366-owned-protected-retry-stopped-pg(name) fmlive77846x1791532366-owned-protected-retry-running-pg(label)
+teardown: removed Docker network fmlive77846x1791532366-derived-net owned by fmlive77846x1791532366-owned-protected-retry
+teardown: removed Docker network fmlive77846x1791532366-own-net owned by fmlive77846x1791532366-owned-protected-retry
+teardown: removed Docker volume fmlive77846x1791532366-own-vol owned by fmlive77846x1791532366-owned-protected-retry
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown fmlive77846x1791532366-owned-protected-retry complete (window validation:fm-fmlive77846x1791532366-owned-protected-retry, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry)
+Backlog: fmlive77846x1791532366-owned-protected-retry just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ushiomxd/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ushiomxd/data/backlog.md - move fmlive77846x1791532366-owned-protected-retry to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+
+=== after end-user teardown ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-prefixed-project | Created |  | fmlive77846x1791532366-owned-protected-retry-stack
+fmlive77846x1791532366-shared-by-path | Created |  | fmlive77846x1791532366-owned-protected-retry
+fmlive77846x1791532366-owned-protected-retry-shared-by-name | Created |  | 
+fmlive77846x1791532366-owned-protected-retry-claimed | Created | fmlive77846x1791532366-owned-protected-retry-v2 | 
+fmlive77846x1791532366-unmarked | Created |  | 
+fmlive77846x1791532366-foreign | Created | fmlive77846x1791532366-owned-protected-retry-v2 | 
+fmlive77846x1791532366-owned-protected-retry0-pg | Created |  | 
+fmlive77846x1791532366-owned-protected-retry-v2-pg | Created |  | 
+fmlive77846x1791532366-exact-compose | Created |  | fmlive77846x1791532366-owned-protected-retry
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-foreign-net | fmlive77846x1791532366-owned-protected-retry-v2 | 
+fmlive77846x1791532366-shared-net |  | fmlive77846x1791532366-owned-protected-retry
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+fmlive77846x1791532366-foreign-vol | fmlive77846x1791532366-owned-protected-retry-v2
+fmlive77846x1791532366-unmarked-vol | 
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-prefixed-project
+fmlive77846x1791532366-shared-by-path
+fmlive77846x1791532366-owned-protected-retry-shared-by-name
+fmlive77846x1791532366-owned-protected-retry-claimed
+fmlive77846x1791532366-unmarked
+fmlive77846x1791532366-foreign
+fmlive77846x1791532366-owned-protected-retry0-pg
+fmlive77846x1791532366-owned-protected-retry-v2-pg
+fmlive77846x1791532366-exact-compose
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+fmlive77846x1791532366-foreign-net
+fmlive77846x1791532366-shared-net
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+fmlive77846x1791532366-foreign-net
+fmlive77846x1791532366-shared-net
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+fmlive77846x1791532366-foreign-vol
+fmlive77846x1791532366-unmarked-vol
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+fmlive77846x1791532366-foreign-vol
+fmlive77846x1791532366-unmarked-vol
+[exit 0]
+
+$ docker volume inspect 6e82e6bbf3a358c6e78fd787e809501098e6386039a98cdf8df91e944d24e745
+[]
+Error response from daemon: get 6e82e6bbf3a358c6e78fd787e809501098e6386039a98cdf8df91e944d24e745: no such volume
+[exit 1]
+
+$ docker volume inspect d50947cbb723087512ea5ca43beaea9846564505c5b8b0ca333ffd560cc93317
+[]
+Error response from daemon: get d50947cbb723087512ea5ca43beaea9846564505c5b8b0ca333ffd560cc93317: no such volume
+[exit 1]
+
+$ treehouse status
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     available    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/owned-protected-retry-f73544/1/owned-protected-retry  (detached)
+[exit 0]
+
+Verified actual database contents before retirement; owned running/stopped containers, labelled network/volume and derived Compose network disappeared. Protected shared identity collision, conflicting marker, longer sibling, name near-match, prefixed project, unmarked/foreign named volumes survived. Anonymous data volumes absent, task metadata removed and Treehouse slot available.
+
+$ tmux -L fm-lab kill-server
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ushiomxd
+[exit 0]
+
+$ docker ps -a -q --filter label=fm.test=fmlive77846x1791532366
+18c3f0c3af08
+8255e25bda27
+b977f29f8a21
+9c21634b93a8
+bab667a33cee
+adb6daba8279
+407a5194f2ca
+edbbb1b4d674
+c01445c1164d
+[exit 0]
+
+$ docker rm -f -v 18c3f0c3af08 8255e25bda27 b977f29f8a21 9c21634b93a8 bab667a33cee adb6daba8279 407a5194f2ca edbbb1b4d674 c01445c1164d
+18c3f0c3af08
+8255e25bda27
+b977f29f8a21
+9c21634b93a8
+bab667a33cee
+adb6daba8279
+407a5194f2ca
+edbbb1b4d674
+c01445c1164d
+[exit 0]
+
+$ docker network ls -q --filter label=fm.test=fmlive77846x1791532366
+af77a5dbba48
+3ba624e76151
+[exit 0]
+
+$ docker network rm af77a5dbba48 3ba624e76151
+af77a5dbba48
+3ba624e76151
+[exit 0]
+
+$ docker volume ls -q --filter label=fm.test=fmlive77846x1791532366
+fmlive77846x1791532366-foreign-vol
+fmlive77846x1791532366-unmarked-vol
+[exit 0]
+
+$ docker volume rm fmlive77846x1791532366-foreign-vol fmlive77846x1791532366-unmarked-vol
+fmlive77846x1791532366-foreign-vol
+fmlive77846x1791532366-unmarked-vol
+[exit 0]

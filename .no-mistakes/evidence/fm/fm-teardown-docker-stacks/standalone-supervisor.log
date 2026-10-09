@@ -1,0 +1,63 @@
+$ rm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/path/no-mistakes
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.tdj5l_rg
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.tdj5l_rg
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.tdj5l_rg
+/tmp/fml.2WUORi
+[exit 0]
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/standalone-supervisor
+[exit 0]
+
+$ git -c user.name=LiveTest -c user.email=live@example.invalid commit -q --allow-empty -m 'disposable baseline'
+[exit 0]
+
+$ treehouse get --lease --no-fetch
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/standalone-supervisor-033890/1/standalone-supervisor. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/standalone-supervisor-033890/1/standalone-supervisor' to release it.
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/standalone-supervisor-033890/1/standalone-supervisor
+[exit 0]
+
+$ git checkout -q -b fm/fmlive77846x1791532366-standalone-supervisor
+[exit 0]
+
+$ tmux -L fm-lab new-session -d -s validation -n control -x 120 -y 35 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-fmlive77846x1791532366-standalone-supervisor -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/standalone-supervisor-033890/1/standalone-supervisor 'sleep 1800'
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/bin/fm-teardown.sh fmlive77846x1791532366-standalone-supervisor
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.tdj5l_rg
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown fmlive77846x1791532366-standalone-supervisor complete (window validation:fm-fmlive77846x1791532366-standalone-supervisor, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/idle-supervisor)
+[exit 0]
+
+Idle standalone supervisor retired with Docker installed but unreachable; its home, endpoint and metadata removed without a Docker availability dependency.
+
+$ tmux -L fm-lab kill-server
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.tdj5l_rg
+[exit 0]
+
+$ docker ps -a -q --filter label=fm.test=fmlive77846x1791532366
+[exit 0]
+
+$ docker network ls -q --filter label=fm.test=fmlive77846x1791532366
+[exit 0]
+
+$ docker volume ls -q --filter label=fm.test=fmlive77846x1791532366
+[exit 0]

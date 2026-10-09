@@ -1,0 +1,103 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.dmoiojer
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.dmoiojer
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.dmoiojer
+/tmp/fml.OCfL55
+[exit 0]
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/forced-discovery-refusal
+[exit 0]
+
+$ git -c user.name=LiveTest -c user.email=live@example.invalid commit -q --allow-empty -m 'disposable baseline'
+[exit 0]
+
+$ treehouse get --lease --no-fetch
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-discovery-refusal-344132/1/forced-discovery-refusal. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-discovery-refusal-344132/1/forced-discovery-refusal' to release it.
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-discovery-refusal-344132/1/forced-discovery-refusal
+[exit 0]
+
+$ git checkout -q -b fm/fmlive77846x1791532366-forced-discovery-refusal
+[exit 0]
+
+$ tmux -L fm-lab new-session -d -s validation -n control -x 120 -y 35 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-fmlive77846x1791532366-forced-discovery-refusal -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-discovery-refusal-344132/1/forced-discovery-refusal 'sleep 1800'
+[exit 0]
+
+$ git checkout -q -B fm/query-fmlive77846x1791532366
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-query-fmlive77846x1791532366 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-discovery-refusal-344132/1/forced-discovery-refusal 'sleep 1800'
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-query-own --label fm.test=fmlive77846x1791532366 --label fm.task=query-fmlive77846x1791532366 postgres:17-alpine true
+6eeb9e003a5b781cfd7945209a76caf6259308084e0d544795946a5e3b98161e
+[exit 0]
+
+=== child stack before failed real pipeline discovery ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-query-own | Created | query-fmlive77846x1791532366 | 
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/bin/fm-teardown.sh fmlive77846x1791532366-forced-discovery-refusal --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/drop-authorization.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.dmoiojer
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: cannot establish no-mistakes pipeline state for child query-fmlive77846x1791532366; retaining its records until status and ledger queries succeed.
+[exit 1]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-query-own
+[exit 0]
+
+=== after refused forced retirement: child Docker and identity retained ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-query-own | Created | query-fmlive77846x1791532366 | 
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+[exit 0]
+
+Real no-mistakes axi status returned repo-not-initialized; forced child retirement refused before Docker removal, keeping child/parent metadata, status and leased worktree. No pipeline initialized or aborted.
+
+$ tmux -L fm-lab kill-server
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.dmoiojer
+[exit 0]
+
+$ docker ps -a -q --filter label=fm.test=fmlive77846x1791532366
+6eeb9e003a5b
+[exit 0]
+
+$ docker rm -f -v 6eeb9e003a5b
+6eeb9e003a5b
+[exit 0]
+
+$ docker network ls -q --filter label=fm.test=fmlive77846x1791532366
+[exit 0]
+
+$ docker volume ls -q --filter label=fm.test=fmlive77846x1791532366
+[exit 0]

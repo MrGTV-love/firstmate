@@ -1,0 +1,210 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.1bgqcm23
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.1bgqcm23
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.1bgqcm23
+/tmp/fml.iPvmti
+[exit 0]
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/custody-retry
+[exit 0]
+
+$ git -c user.name=LiveTest -c user.email=live@example.invalid commit -q --allow-empty -m 'disposable baseline'
+[exit 0]
+
+$ treehouse get --lease --no-fetch
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry' to release it.
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry
+[exit 0]
+
+$ git checkout -q -b fm/fmlive77846x1791532366-custody-retry
+[exit 0]
+
+$ tmux -L fm-lab new-session -d -s validation -n control -x 120 -y 35 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-fmlive77846x1791532366-custody-retry -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry 'sleep 1800'
+[exit 0]
+
+$ git worktree add -q --detach /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry/nested-lane main
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-amb-own-path --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-amb-derived --label com.docker.compose.project.working_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry postgres:17-alpine true
+87cc10a4426f77ad3ae4b4425c7f2c5908526c189798728a9c5e21c9ed5411f4
+[exit 0]
+
+$ docker network create --subnet 198.19.97.0/24 --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-amb-derived fmlive77846x1791532366-amb-derived-net
+31a5942d170ab998382ced66dd12eb8a39c774e4ab23f1e952b45f1ff51dd488
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-custody-retry-name --label fm.test=fmlive77846x1791532366 postgres:17-alpine true
+0f6f6710069a802e0a2d8dc616af51c34d694044ceeeb8dc4bfb2bc178e61bb5
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-amb-marker --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-custody-retry postgres:17-alpine true
+4309d75500ac06527d293b696b362231ea4ef4d8bef2a34aad6e809b9ed497df
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-amb-project --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-custody-retry postgres:17-alpine true
+898e849c33ba9f2b3df4163622ab952bdbf1d7287d25604fe2a514ce1a1770e3
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-nested-path --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project=fmlive77846x1791532366-nested --label com.docker.compose.project.working_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry/nested-lane postgres:17-alpine true
+db6ebc8e3e0f656f01c3db256ccb2dd9cb08a4b94bccf384584818ad06a2e6f3
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-foreign-symlink --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project.working_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry/foreign-symlink postgres:17-alpine true
+289da169f9daa6173eebfbffb383617c11419d6320583d6617d3ae44d12da8f6
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-conflicting-marker-path --label fm.test=fmlive77846x1791532366 --label fm.task=foreign-task --label com.docker.compose.project.working_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry postgres:17-alpine true
+e73077b092c985b1d341efcba1caf15adabf549231d899fc9387318dc6af1af2
+[exit 0]
+
+$ docker network create --subnet 198.19.97.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-custody-retry fmlive77846x1791532366-amb-marker-net
+Error response from daemon: invalid pool request: Pool overlaps with other one on this address space
+[exit 1]
+
+$ docker network create --subnet 198.19.98.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-custody-retry fmlive77846x1791532366-amb-marker-net
+558c97b944add6dfbc85fcb2f2af65c96a2553bbbe25911e78d5c900461d11f5
+[exit 0]
+
+$ docker volume create --label fm.test=fmlive77846x1791532366 --label fm.task=fmlive77846x1791532366-custody-retry fmlive77846x1791532366-amb-marker-vol
+fmlive77846x1791532366-amb-marker-vol
+[exit 0]
+
+=== duplicate task id across registered local homes: before forced retirement ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-conflicting-marker-path | Created | foreign-task | 
+fmlive77846x1791532366-foreign-symlink | Created |  | 
+fmlive77846x1791532366-nested-path | Created |  | fmlive77846x1791532366-nested
+fmlive77846x1791532366-amb-project | Created |  | fmlive77846x1791532366-custody-retry
+fmlive77846x1791532366-amb-marker | Created | fmlive77846x1791532366-custody-retry | 
+fmlive77846x1791532366-custody-retry-name | Created |  | 
+fmlive77846x1791532366-amb-own-path | Created |  | fmlive77846x1791532366-amb-derived
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-amb-derived-net |  | fmlive77846x1791532366-amb-derived
+fmlive77846x1791532366-amb-marker-net | fmlive77846x1791532366-custody-retry | 
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+fmlive77846x1791532366-amb-marker-vol | fmlive77846x1791532366-custody-retry
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/bin/fm-teardown.sh fmlive77846x1791532366-custody-retry --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/drop-authorization.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.1bgqcm23
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for fmlive77846x1791532366-custody-retry: 97541
+teardown: removing Docker container(s) owned by fmlive77846x1791532366-custody-retry: fmlive77846x1791532366-amb-own-path(path)
+teardown: removed Docker network fmlive77846x1791532366-amb-derived-net owned by fmlive77846x1791532366-custody-retry
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown fmlive77846x1791532366-custody-retry complete (window validation:fm-fmlive77846x1791532366-custody-retry, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/custody-retry-3e8e70/1/custody-retry)
+Backlog: fmlive77846x1791532366-custody-retry just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.1bgqcm23/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.1bgqcm23/data/backlog.md - move fmlive77846x1791532366-custody-retry to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+
+=== after ambiguous-id cleanup ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-conflicting-marker-path | Created | foreign-task | 
+fmlive77846x1791532366-foreign-symlink | Created |  | 
+fmlive77846x1791532366-nested-path | Created |  | fmlive77846x1791532366-nested
+fmlive77846x1791532366-amb-project | Created |  | fmlive77846x1791532366-custody-retry
+fmlive77846x1791532366-amb-marker | Created | fmlive77846x1791532366-custody-retry | 
+fmlive77846x1791532366-custody-retry-name | Created |  | 
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-amb-marker-net | fmlive77846x1791532366-custody-retry | 
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+fmlive77846x1791532366-amb-marker-vol | fmlive77846x1791532366-custody-retry
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-conflicting-marker-path
+fmlive77846x1791532366-foreign-symlink
+fmlive77846x1791532366-nested-path
+fmlive77846x1791532366-amb-project
+fmlive77846x1791532366-amb-marker
+fmlive77846x1791532366-custody-retry-name
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-conflicting-marker-path
+fmlive77846x1791532366-foreign-symlink
+fmlive77846x1791532366-nested-path
+fmlive77846x1791532366-amb-project
+fmlive77846x1791532366-amb-marker
+fmlive77846x1791532366-custody-retry-name
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+fmlive77846x1791532366-amb-marker-net
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+fmlive77846x1791532366-amb-marker-net
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+fmlive77846x1791532366-amb-marker-vol
+[exit 0]
+
+Verified actual registry ambiguity suppresses name/marker/project claims; own worktree Compose and its derived network removed, nested lane/foreign symlink/conflicting-marker containers preserved. Other home identity remains.
+
+$ tmux -L fm-lab kill-server
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.1bgqcm23
+[exit 0]
+
+$ docker ps -a -q --filter label=fm.test=fmlive77846x1791532366
+e73077b092c9
+289da169f9da
+db6ebc8e3e0f
+898e849c33ba
+4309d75500ac
+0f6f6710069a
+[exit 0]
+
+$ docker rm -f -v e73077b092c9 289da169f9da db6ebc8e3e0f 898e849c33ba 4309d75500ac 0f6f6710069a
+e73077b092c9
+289da169f9da
+db6ebc8e3e0f
+898e849c33ba
+4309d75500ac
+0f6f6710069a
+[exit 0]
+
+$ docker network ls -q --filter label=fm.test=fmlive77846x1791532366
+558c97b944ad
+[exit 0]
+
+$ docker network rm 558c97b944ad
+558c97b944ad
+[exit 0]
+
+$ docker volume ls -q --filter label=fm.test=fmlive77846x1791532366
+fmlive77846x1791532366-amb-marker-vol
+[exit 0]
+
+$ docker volume rm fmlive77846x1791532366-amb-marker-vol
+fmlive77846x1791532366-amb-marker-vol
+[exit 0]

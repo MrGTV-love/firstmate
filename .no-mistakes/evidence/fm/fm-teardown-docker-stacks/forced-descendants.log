@@ -1,0 +1,184 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ky_15wx2
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ky_15wx2
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ky_15wx2
+/tmp/fml.o5gft0
+[exit 0]
+
+$ tmux -L fm-lab new-session -d -s validation -n control -x 120 -y 35 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-fmlive77846x1791532366-forced-descendants -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-z-fmlive77846x1791532366 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/disposable-nested-mate 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-grand-fmlive77846x1791532366 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-descendants-c9f818/2/forced-descendants 'sleep 1800'
+[exit 0]
+
+$ tmux -L fm-lab new-window -d -t validation -n fm-a-fmlive77846x1791532366 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-descendants-c9f818/1/forced-descendants 'exec /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/shutdown-producer.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/producer-ready-final /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/producer-shutdown-event-final a-fmlive77846x1791532366 fmlive77846x1791532366 fmlive77846x1791532366-shutdown-proof-1791533714'
+[exit 0]
+
+$ docker network create --subnet 198.19.97.0/24 --label fm.test=fmlive77846x1791532366 --label fm.task=a-fmlive77846x1791532366 fmlive77846x1791532366-descendant-net
+471e26b9c81e596ac8bf46ecdc5f521f8d699e2d1532bf615f9447981cf1a53c
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-descendant-owned --label fm.test=fmlive77846x1791532366 --label fm.task=a-fmlive77846x1791532366 --network fmlive77846x1791532366-descendant-net postgres:17-alpine true
+611c37b9c1399a1759e1f3fd847a25aed124fc4343bd451c8a43f4f5165c2599
+[exit 0]
+
+$ docker run -d --name fmlive77846x1791532366-descendant-foreign --label fm.test=fmlive77846x1791532366 --label fm.task=somebody-else --network fmlive77846x1791532366-descendant-net postgres:17-alpine sh -c 'trap "exit 0" TERM; while :; do sleep 1; done'
+0a48698fce00b2892e62e074f2f87f609f9a668db187e969b8375b0da2466af9
+[exit 0]
+
+$ docker create --name fmlive77846x1791532366-grandchild-owned --label fm.test=fmlive77846x1791532366 --label com.docker.compose.project.working_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-descendants-c9f818/2/forced-descendants postgres:17-alpine true
+cda6e85fb17ff29cdea79aaee643dfc37c0fe8e81679f38010cb7661ca14abca
+[exit 0]
+
+$ docker volume create --label fm.test=fmlive77846x1791532366 --label fm.task=grand-fmlive77846x1791532366 fmlive77846x1791532366-grandchild-vol
+fmlive77846x1791532366-grandchild-vol
+[exit 0]
+
+=== forced supervisor before cleanup: endpoint resource producer and recursive descendant ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-grandchild-owned | Created |  | 
+fmlive77846x1791532366-descendant-foreign | Up 1 second | somebody-else | 
+fmlive77846x1791532366-descendant-owned | Created | a-fmlive77846x1791532366 | 
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-descendant-net | a-fmlive77846x1791532366 | 
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+fmlive77846x1791532366-grandchild-vol | grand-fmlive77846x1791532366
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/bin/fm-teardown.sh fmlive77846x1791532366-forced-descendants --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/drop-authorization.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ky_15wx2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for a-fmlive77846x1791532366: 93625
+teardown: removing Docker container(s) owned by a-fmlive77846x1791532366: fmlive77846x1791532366-shutdown-proof-1791533714(label) fmlive77846x1791532366-descendant-owned(label)
+warning: Docker network fmlive77846x1791532366-descendant-net owned by a-fmlive77846x1791532366 could not be removed
+[exit 1]
+
+$ tmux -L fm-lab list-windows -t validation -F '#{window_name}'
+control
+fm-fmlive77846x1791532366-forced-descendants
+fm-z-fmlive77846x1791532366
+fm-grand-fmlive77846x1791532366
+[exit 0]
+
+Actual shutdown producer event:
+created owned Docker container during endpoint shutdown: fmlive77846x1791532366-shutdown-proof-1791533714
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-grandchild-owned
+fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-grandchild-owned
+fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-grandchild-owned
+fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-grandchild-owned
+fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+Unique shutdown-created container observed in actual teardown removal output; stopped child, retained records/worktree and real attached-network refusal confirmed.
+
+$ docker network disconnect fmlive77846x1791532366-descendant-net fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/runtime/bin/fm-teardown.sh fmlive77846x1791532366-forced-descendants --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/drop-authorization.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ky_15wx2
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: removed Docker network fmlive77846x1791532366-descendant-net owned by a-fmlive77846x1791532366
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown: reaping leaked worktree process(es) for grand-fmlive77846x1791532366: 92975
+teardown: removing Docker container(s) owned by grand-fmlive77846x1791532366: fmlive77846x1791532366-grandchild-owned(path)
+teardown: removed Docker volume fmlive77846x1791532366-grandchild-vol owned by grand-fmlive77846x1791532366
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown fmlive77846x1791532366-forced-descendants complete (window validation:fm-fmlive77846x1791532366-forced-descendants, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/disposable-mate)
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}}'
+fmlive77846x1791532366-descendant-foreign
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}}'
+[exit 0]
+
+=== after retry and post-retirement observation: only foreign holder remains ===
+
+$ docker ps -a --filter label=fm.test=fmlive77846x1791532366 --format '{{.Names}} | {{.Status}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+fmlive77846x1791532366-descendant-foreign | Up 5 minutes | somebody-else | 
+[exit 0]
+
+$ docker network ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}} | {{.Label "com.docker.compose.project"}}'
+[exit 0]
+
+$ docker volume ls --filter label=fm.test=fmlive77846x1791532366 --format '{{.Name}} | {{.Label "fm.task"}}'
+[exit 0]
+
+$ treehouse status
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     available    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-descendants-c9f818/1/forced-descendants  (detached)
+2     available    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/.docker-live-validation-2wjqk63l/trees/.treehouse/forced-descendants-c9f818/2/forced-descendants  (detached)
+[exit 0]
+
+$ tmux -L fm-lab kill-server
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYEG29XG0DSEEVYT1NKMJR/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EYEG29XG0DSEEVYT1NKMJR/fm-lab.ky_15wx2
+[exit 0]
+
+$ docker ps -a -q --filter label=fm.test=fmlive77846x1791532366
+0a48698fce00
+[exit 0]
+
+$ docker rm -f -v 0a48698fce00
+0a48698fce00
+[exit 0]
+
+$ docker network ls -q --filter label=fm.test=fmlive77846x1791532366
+[exit 0]
+
+$ docker volume ls -q --filter label=fm.test=fmlive77846x1791532366
+[exit 0]

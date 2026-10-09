@@ -1,0 +1,4 @@
+ok - real Docker: the task's labelled, named, compose-project and worktree stacks are removed and every other object survives
+ok - real Docker: when the id is ambiguous across homes only a compose working directory under the worktree is trusted
+ok - real Docker: a compose project in a nested lane the task does not own is left alone
+ok - real Docker: protected project identity vetoes every heuristic while an isolated worktree stack is removed
