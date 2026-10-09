@@ -1171,28 +1171,26 @@ switch (process.env.SCENARIO) {
       timer.callback();
       return timer.callback;
     };
-    const episode = async (label) => {
+    const episode = (label, attempts = 3) => {
       const count = sent.length;
       const warnings = notices.length;
       const content = sent.at(-1).m;
       queued = true;
       idle = true;
-      await handlers.get("agent_end")({}, ctx);
       for (let i = 0; i < 15; i += 1) {
         check();
         if (sent.length !== count || notices.length !== warnings) throw new Error(`${label}: recovery acted before fifteen checks`);
       }
-      for (let i = 1; i <= 3; i += 1) {
+      for (let i = 1; i <= attempts; i += 1) {
         check();
-        if (sent.length !== count + i || sent.at(-1).m !== content || sent.at(-1).o?.deliverAs !== undefined || notices.length !== warnings) throw new Error(`${label}: recovery did not submit exactly three prompt attempts`);
+        if (sent.length !== count + i || sent.at(-1).m !== content || sent.at(-1).o?.deliverAs !== undefined || notices.length !== warnings) throw new Error(`${label}: recovery did not submit exactly ${attempts} prompt attempts`);
       }
       const recheck = check();
       const notice = notices.at(-1);
       if (notices.length !== warnings + 1 || notice.level !== "warning" || !notice.m.includes("wake not delivered")) throw new Error(`${label}: exhausted episode did not warn`);
       recheck();
-      if (sent.length !== count + 3 || notices.length !== warnings + 1) throw new Error(`${label}: recovery or warning repeated`);
+      if (sent.length !== count + attempts || notices.length !== warnings + 1) throw new Error(`${label}: recovery or warning repeated`);
       if (composer.text !== "operator draft" || composer.sets.length !== 0) throw new Error(`${label}: recovery disturbed the composer`);
-      return content;
     };
     const nextWake = async () => {
       const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
@@ -1204,51 +1202,56 @@ switch (process.env.SCENARIO) {
       unlinkSync(`${dir}/session-replacement-actionable.json`);
       if (sent.length !== count + 1 || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("expected a fresh queued failure wake");
     };
-    const consume = async (content) => handlers.get("message_start")({ message: { role: "user", content } }, ctx);
     composer.text = "operator draft";
-    let content = await episode("first session");
-    await consume(content);
+    episode("first session");
     await handlers.get("session_shutdown")({}, ctx);
     idle = false;
+    const beforeReplacement = sent.length;
     await handlers.get("session_start")({}, ctx);
+    for (let i = 0; i < 60 && sent.length === beforeReplacement; i += 1) await sleep(100);
+    if (sent.length !== beforeReplacement + 1 || sent.at(-1).m !== wake || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("replacement did not replay its unconsumed wake");
     await nextWake();
-    content = await episode("replacement session");
-    await handlers.get("agent_end")({}, ctx);
-    await consume(content);
-    queued = false;
-    check();
+    episode("replacement session");
+
     await nextWake();
-    content = await episode("queue drained without tracked wakes");
-    await consume(content);
-    queued = false;
-    pollCheck();
-    await nextWake();
-    content = await episode("queue drained between recovery checks");
-    await handlers.get("agent_end")({}, ctx);
-    idle = false;
-    check();
-    await consume(content);
-    await nextWake();
-    content = await episode("running turn observed by recovery");
-    idle = false;
-    pollCheck();
-    await consume(content);
-    await nextWake();
-    content = await episode("running turn observed by polling");
-    idle = false;
-    await handlers.get("before_agent_start")({ prompt: content }, ctx);
-    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: content }] } }, ctx);
     idle = true;
-    await handlers.get("agent_end")({}, ctx);
+    queued = false;
+    check();
     await nextWake();
-    content = await episode("short accepted wake turn between checks");
+    episode("queue drained observed by recovery", 6);
+
+    queued = false;
+    pollCheck();
+    await nextWake();
+    episode("queue drained observed by polling");
+
+    await nextWake();
+    check();
+    await nextWake();
+    episode("running turn observed by recovery", 6);
+
     idle = false;
+    pollCheck();
+    await nextWake();
+    episode("running turn observed by polling");
+
+    await nextWake();
+    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: wake }] } }, ctx);
+    episode("short accepted wake turn before completion");
+
+    await nextWake();
     await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
     await handlers.get("message_start")({ message: { role: "user", content: "continue work" } }, ctx);
+    episode("short accepted ordinary turn before completion");
+
+    idle = false;
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "assistant", content: "done" } }, ctx);
     idle = true;
     await handlers.get("agent_end")({}, ctx);
     await nextWake();
-    await episode("short accepted ordinary turn between checks");
+    episode("short turn completion between checks");
     break;
   }
   case "ownership-marked":
@@ -1617,7 +1620,7 @@ test_watch_queue_episodes_reset_across_sessions_and_completion() {
   status=$?
   expect_code 0 "$status" "omp stuck-queue episode lifecycle: $out"
   [ -z "$out" ] || fail "omp stuck-queue episode lifecycle printed output: $out"
-  pass ".omp watch extension: every stuck-queue episode waits fifteen checks and warns once across replacement, queue drain, and running turns"
+  pass ".omp watch extension: isolated replacement, queue drain, running observations, accepted messages, and turn completion each restart the fifteen-check wait and once-only warning"
 }
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
