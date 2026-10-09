@@ -410,8 +410,8 @@ The projection remains read-only and uses the canonical snapshot's structured fi
 ### Merge-to-cleanup window
 
 The window between a merge landing and cleanup is an accepted structural residual rather than an oversight.
-That local window is normally only seconds wide and requires re-holding a task whose merge has just landed.
-A re-hold inside the window makes cleanup retain the row rather than publish it, so the delivery is omitted until the stale hold is cleared from that row.
+A re-hold inside that window makes ordinary teardown retain the row rather than publish it, so the delivery is omitted until the stale hold is cleared from that row.
+The finished-session sweep instead follows its [automatic admission contract](../bin/fm-idle-session-reap.sh).
 Queued forge merges cannot be covered locally.
 The forge performs the merge asynchronously after the local command has returned, when no lock this code could hold would still be held.
 The away-posture restriction on queued merges and its residual limits are owned by [architecture.md](architecture.md#delivery-modes-are-explicit-per-task).

@@ -702,7 +702,6 @@ The remote-job TERM, crash-recovery, and failed-stop tests keep their commands b
 They confirm command groups are stopped after termination or recovery; the failed-stop case also requires quarantined ownership and replacement refusal while its command group remains live.
 
 [`fm-remote-delta-read.test.sh`](../tests/fm-remote-delta-read.test.sh) exercises the reader's continuity results through its executable interface.
-Same-size rewrites preserve the log's size and inode; shortened fixtures are published atomically so concurrent sampling cannot mistake an intermediate empty file for the intended change.
 
 The portable tests run with these commands:
 

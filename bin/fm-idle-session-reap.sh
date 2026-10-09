@@ -16,9 +16,10 @@
 #   - its harness reports a semantic busy state of idle (unknown is never idle:
 #     bin/fm-busy-lib.sh);
 #   - no steering message is waiting unhandled in state/<id>.inbox/;
+#   - no declared wait stands according to bin/fm-status-event-lib.sh's
+#     canonical status_declared_wait_line reader and predicates;
 #   - its newest status event is `done` and the keyed decision fold has nothing
-#     open (a paused, blocked, needs-decision, captain-held, or failed task is
-#     PARKED and only reported, with its reason);
+#     open;
 #   - the durable captain-hold `open` predicate confirms no open captain call
 #     (an open call or an inconclusive read is parked, not reaped);
 #   - landing evidence exists locally, without any forge call: a scout needs a
@@ -29,6 +30,11 @@
 #   - no refusal from a recent teardown attempt still stands (see below).
 # A ship that is done but has no merge marker is awaiting its pipeline or its
 # merge and is reported, not reaped.
+# Standing declared waits are PARKED with their reason before busy-state and
+# steering-inbox classification, including busy, unknown, and idle workers.
+# bin/fm-status-event-lib.sh owns configured wait verbs and wait retraction.
+# Other latest-event parked states (blocked, needs-decision, failed) also retain
+# their reasons; reporting never authorizes cleanup.
 # Automatic teardown admission uses this same classifier from
 # bin/fm-idle-reap-lib.sh under the task control and metadata locks, before
 # destructive cleanup, so a scan verdict cannot authorize stale eligibility.
