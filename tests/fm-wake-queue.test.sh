@@ -2778,14 +2778,20 @@ test_lock_wait_ends_when_the_lock_directory_is_gone() {
   [ -e "$dir/holder.ready" ] || { kill "$holder_pid" 2>/dev/null || true; fail "lock holder did not acquire"; }
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
+    : > "$4"
     fm_lock_acquire_wait "$2"
     printf "%s\n" "$?" > "$3"
-  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/waiter.rc" &
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/waiter.rc" "$dir/waiter.ready" &
   waiter_pid=$!
-  sleep 0.5
+  for i in $(seq 1 100); do
+    [ -e "$dir/waiter.ready" ] && break
+    sleep 0.05
+  done
+  [ -e "$dir/waiter.ready" ] \
+    || { kill "$waiter_pid" "$holder_pid" 2>/dev/null || true; fail "waiter did not initialize"; }
   lock_wait_pid_is_live "$waiter_pid" \
     || { kill "$holder_pid" 2>/dev/null || true; fail "waiter did not block behind the live holder"; }
-  rm -rf "$state"
+  mv "$state" "$dir/state.gone" || fail "could not move the lock directory away"
   kill -KILL "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
   for i in $(seq 1 200); do
@@ -3768,11 +3774,6 @@ SH
   [ ! -s "$dir/tmux.log" ] || fail "an unreachable remote probe touched a local endpoint"
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
-
-if [ "${1:-}" = --orphan-review ]; then
-  test_lock_wait_ends_when_the_lock_directory_is_gone
-  exit 0
-fi
 
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking

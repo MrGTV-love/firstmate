@@ -2419,11 +2419,6 @@ assert len(doc["scripts"])==3
   pass "aggregate-json merges lane timing artifacts"
 }
 
-if [ "${1:-}" = --orphan-review ]; then
-  test_runner_reaps_stubs_a_killed_script_left_behind
-  exit 0
-fi
-
 test_list_all_exact_suite_coverage
 test_family_selection
 test_single_script_selection
