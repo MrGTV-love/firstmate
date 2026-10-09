@@ -26,6 +26,8 @@ set -u
 
 # shellcheck source=bin/fm-classify-lib.sh
 . "$ROOT/bin/fm-classify-lib.sh"
+# shellcheck source=bin/fm-timing-lib.sh
+. "$ROOT/bin/fm-timing-lib.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-classify-decision-key-tests)
 
@@ -791,3 +793,65 @@ test_dated_decisions_cost_does_not_scale_with_open_keys_times_lines() {
 
 test_dated_decisions_pair_each_open_key_with_its_own_last_opening
 test_dated_decisions_cost_does_not_scale_with_open_keys_times_lines
+
+# The dated output is tab-separated, so a note that ends in tabs must not carry
+# them into the summary field: a consumer that splits on tabs would read an
+# extra empty field. The ordinary fold keeps the note's own bytes.
+test_dated_summary_never_ends_in_a_tab() {
+  local dir f
+  dir=$(case_dir dated-trailing-tab)
+  f="$dir/task.status"
+  printf 'needs-decision [key=tabbed] [at=100]: inner\ttab kept\t\t\n' > "$f"
+  printf 'blocked [key=tagged] [at=110]: [key=other]\t\n' >> "$f"
+  printf 'needs-decision [key=cut] [at=120]: bad \xff byte\t\n' >> "$f"
+  assert_equals "$(printf '%s\n' \
+    "$(printf 'tabbed\tneeds-decision\t100\tinner\ttab kept')" \
+    "$(printf 'tagged\tblocked\t110\t[key=other]')" \
+    "$(printf 'cut\tneeds-decision\t120\tbad \xff byte')")" \
+    "$(status_open_decisions_dated "$f")" "a note ending in a tab left that tab on the dated summary"
+  pass "a dated summary keeps inner tabs and never ends in one"
+}
+
+# Every transition drops its key from the open set, so the ordinary fold must
+# not pay a multibyte pass over the whole set per transition. Forty open
+# decisions with wide multibyte notes, then a long run of open-and-answer
+# pairs, is the shape of a busy lane log. Folding it under a UTF-8 locale must
+# cost about what folding the same bytes under the C locale costs; comparing
+# the two runs keeps the bound independent of host load. Each run is a
+# subshell so the locale it forces cannot leak into another case.
+test_fold_cost_does_not_scale_with_multibyte_open_set_width() {
+  local dir f utf8 probe=$'\xc3\xa9' c_ms utf8_ms
+  dir=$(case_dir fold-multibyte-set-cost)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  utf8=$(locale -a 2>/dev/null | grep -i -E '^(C|en_US)\.utf-?8$' | head -1)
+  [ -n "$utf8" ] || fail "no UTF-8 locale is installed to fold a multibyte open set under"
+  awk 'BEGIN {
+    pad = sprintf("%500s", ""); gsub(/ /, "\303\251", pad)
+    for (i = 1; i <= 40; i++) printf "needs-decision [key=wide-q%02d] [at=%d]: question %d %s\n", i, 1700000000 + i, i, pad
+    for (i = 1; i <= 200; i++) {
+      printf "needs-decision [key=churn] [at=%d]: short question %d\n", 1700001000 + i, i
+      printf "resolved [key=churn] [at=%d]: answered %d\n", 1700001000 + i, i
+    }
+  }' > "$f"
+  timed_fold() {  # <locale> -> elapsed ms
+    local started out
+    LC_ALL=$1
+    started=$(fm_timing_now_ms)
+    out=$(status_open_decisions "$f")
+    assert_equals 40 "$(printf '%s\n' "$out" | grep -c .)" "the fixture did not leave 40 decisions open under $1"
+    printf '%s' "$(( $(fm_timing_now_ms) - started ))"
+  }
+  c_ms=$(timed_fold C) || exit 1
+  utf8_ms=$(
+    LC_ALL=$utf8
+    [ "${#probe}" = 1 ] || fail "locale $utf8 did not read a two-byte character as one"
+    timed_fold "$utf8"
+  ) || exit 1
+  [ "$utf8_ms" -le $((c_ms * 5 / 2)) ] \
+    || fail "folding 400 transitions over a wide multibyte open set took ${utf8_ms}ms under $utf8 and ${c_ms}ms under C"
+  pass "folding 400 transitions over a wide multibyte open set took ${utf8_ms}ms under $utf8 and ${c_ms}ms under C"
+}
+
+test_dated_summary_never_ends_in_a_tab
+test_fold_cost_does_not_scale_with_multibyte_open_set_width

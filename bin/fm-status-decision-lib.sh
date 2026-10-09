@@ -243,6 +243,9 @@ _fm_decision_drop() {  # <open-set> <key> <out-var>
   # Keys contain only slug characters (or the internal keyless marker). Escape
   # their dots, and capture the neighboring records in one regex match: bash
   # 3.2's glob substitutions and bytewise read loops are costly on wide sets.
+  # Every expansion below runs on the whole set and looks only for a newline
+  # byte, so the function reads the set as bytes throughout.
+  local LC_ALL=C
   __fm_drop_re='^((.*)'$'\n'')?'"$__fm_drop_key"$'\t''[^'$'\n'']*('$'\n''(.*))?$'
   if _fm_status_bytes_match "$1" "$__fm_drop_re"; then
     __fm_drop_prefix=${BASH_REMATCH[2]}
@@ -474,9 +477,10 @@ status_own_open_decisions() {  # <status-file>
 # A single fold retains small record IDs, with opening lines and summaries held
 # outside the open set. Only surviving openings have their dates parsed;
 # historical transitions neither fork nor reread every retained summary.
+# A summary never ends in a tab: the tab is this output's field separator.
 # Regression coverage: tests/fm-classify-decision-key.test.sh.
 status_open_decisions_dated() {  # <status-file> [<kind>]
-  local f=$1 open='' key verb summary line kind resolve held index=0 epoch
+  local f=$1 open='' key verb summary line kind resolve held index=0 epoch tab=$'\t'
   local -a opened summaries
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" "${2:-}" kind
@@ -496,7 +500,9 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
   while IFS=$'\t' read -r key verb index; do
     [ -n "$verb" ] || continue
     _fm_status_at_epoch "${opened[index]}" epoch || epoch=
-    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "${summaries[index]}"
+    summary=${summaries[index]}
+    summary=${summary%"${summary##*[!$tab]}"}
+    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$summary"
   done <<EOF
 $open
 EOF
