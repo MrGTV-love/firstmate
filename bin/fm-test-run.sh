@@ -129,11 +129,11 @@
 # An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so participating test bursts across worktrees take turns.
-# A runner already inside a pass (FM_CPU_PASS_HELD set) runs directly with at
-# most that many concurrent scripts, reporting a reduced --jobs on stderr.
+# A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
+# and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # The marker must be a nonnegative decimal integer or execution exits 125;
-# 0 denotes degraded work and imposes no budget.
-# Without python3 or the pool tool beside it, scripts run directly.
+# 0 denotes degraded work with no CPU-pass concurrency limit.
+# Without python3 or the pool tool beside it, scripts run without a CPU pass.
 #
 # When the sibling bin/fm-proc-budget.sh is present and executable, every
 # executed script runs through it; its header owns the process-budget contract.
