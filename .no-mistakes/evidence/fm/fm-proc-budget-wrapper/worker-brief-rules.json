@@ -1,0 +1,42 @@
+[
+  {
+    "mode": "no-mistakes",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "brief-command soft=2952 hard=2952\n"
+  },
+  {
+    "mode": "direct-PR",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "brief-command soft=2945 hard=2945\n"
+  },
+  {
+    "mode": "local-only",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "brief-command soft=2915 hard=2915\n"
+  },
+  {
+    "mode": "scout",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "brief-command soft=2930 hard=2930\n"
+  },
+  {
+    "mode": "foreign-no-mistakes",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "quoted budget command executed\n"
+  },
+  {
+    "mode": "foreign-direct-PR",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "quoted budget command executed\n"
+  },
+  {
+    "mode": "foreign-local-only",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "quoted budget command executed\n"
+  },
+  {
+    "mode": "foreign-scout",
+    "emitted_rule": "9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+    "output": "quoted budget command executed\n"
+  }
+]

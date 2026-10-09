@@ -1,0 +1,154 @@
+[
+  {
+    "label": "Caller limit and process-count baseline",
+    "command": "/bin/bash -c 'printf \"parent soft=%s hard=%s\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"; ps -U \"$(id -u)\" -o pid= | wc -l'",
+    "exit": 0,
+    "stdout": "parent soft=10666 hard=16000\n    1423\n",
+    "stderr": "",
+    "duration_seconds": 0.355
+  },
+  {
+    "label": "Default wrapper budget",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh -- /bin/bash -c 'printf \"child pid=%s soft=%s hard=%s\n\" \"$$\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'",
+    "exit": 0,
+    "stdout": "child pid=28953 soft=2959 hard=2959\n",
+    "stderr": "",
+    "duration_seconds": 0.292
+  },
+  {
+    "label": "Explicit wrapper budget",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 100 -- /bin/bash -c 'printf \"child pid=%s soft=%s hard=%s\n\" \"$$\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'",
+    "exit": 0,
+    "stdout": "child pid=29634 soft=1572 hard=1572\n",
+    "stderr": "",
+    "duration_seconds": 0.309
+  },
+  {
+    "label": "Nested wrapper cannot widen or raise budget",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 100 -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 1500 -- /bin/bash -c 'ulimit -S -u 10666 2>/dev/null; raise_rc=$?; printf \"nested soft=%s hard=%s raise_rc=%s\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$raise_rc\"'",
+    "exit": 0,
+    "stdout": "nested soft=1566 hard=1566 raise_rc=1\n",
+    "stderr": "",
+    "duration_seconds": 0.447
+  },
+  {
+    "label": "Argument quoting and child exit status",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh -- /bin/bash -c 'printf \"arg1=<%s> arg2=<%s>\n\" \"$1\" \"$2\"; exit 7' _ 'a b' 'helper'\"'\"'s path'",
+    "exit": 7,
+    "stdout": "arg1=<a b> arg2=<helper's path>\n",
+    "stderr": "",
+    "duration_seconds": 0.108
+  },
+  {
+    "label": "Wrapper exec preserves launched process identity",
+    "command": "/bin/bash -c '\"$1\" -- /bin/bash -c '\"'\"'printf \"exec_child_pid=%s\\n\" \"$$\"'\"'\"' & child=$!; printf \"launcher_pid=%s\n\" \"$child\"; wait \"$child\"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+    "exit": 0,
+    "stdout": "launcher_pid=31681\nexec_child_pid=31681\n",
+    "stderr": "",
+    "duration_seconds": 0.437
+  },
+  {
+    "label": "Measured count-plus-1500 arithmetic",
+    "command": "/bin/bash -x /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh -- /bin/bash -c 'printf \"soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'",
+    "exit": 0,
+    "stdout": "soft=2964 hard=2964\n",
+    "stderr": "+ set -u\n+ extra=1500\n+ '[' -- '!=' -- ']'\n+ '[' -- '!=' -- ']'\n+ shift\n+ '[' 3 -gt 0 ']'\n+ case \"$extra\" in\n+ fm_proc_budget_apply 1500\n+ local extra=1500 count current hard limit\n++ fm_proc_budget_count\n++ local uid count\n+++ id -u\n++ uid=501\n++ set -o pipefail\n++ case \"$(uname -s)\" in\n+++ uname -s\n+++ ps -U 501 -o pid=\n+++ wc -l\n++ count='    1464'\n+++ printf %s '    1464'\n+++ tr -d '[:space:]'\n++ count=1464\n++ case \"$count\" in\n++ printf '%s\\n' 1464\n+ count=1464\n+ limit=2964\n++ ulimit -S -u\n+ current=10666\n++ ulimit -H -u\n+ hard=16000\n+ case \"$current\" in\n+ '[' 2964 -lt 10666 ']'\n+ case \"$hard\" in\n+ '[' 2964 -lt 16000 ']'\n+ ulimit -u 2964\n+ exec /bin/bash -c 'printf \"soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'\n",
+    "duration_seconds": 1.675
+  },
+  {
+    "label": "Measured count-plus-100 arithmetic",
+    "command": "/bin/bash -x /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 100 -- /bin/bash -c 'printf \"soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'",
+    "exit": 0,
+    "stdout": "soft=1601 hard=1601\n",
+    "stderr": "+ set -u\n+ extra=1500\n+ '[' 100 '!=' -- ']'\n+ '[' 5 -gt 0 ']'\n+ extra=100\n+ shift\n+ '[' -- '!=' -- ']'\n+ shift\n+ '[' 3 -gt 0 ']'\n+ case \"$extra\" in\n+ fm_proc_budget_apply 100\n+ local extra=100 count current hard limit\n++ fm_proc_budget_count\n++ local uid count\n+++ id -u\n++ uid=501\n++ set -o pipefail\n++ case \"$(uname -s)\" in\n+++ uname -s\n+++ ps -U 501 -o pid=\n+++ wc -l\n++ count='    1501'\n+++ tr -d '[:space:]'\n+++ printf %s '    1501'\n++ count=1501\n++ case \"$count\" in\n++ printf '%s\\n' 1501\n+ count=1501\n+ limit=1601\n++ ulimit -S -u\n+ current=10666\n++ ulimit -H -u\n+ hard=16000\n+ case \"$current\" in\n+ '[' 1601 -lt 10666 ']'\n+ case \"$hard\" in\n+ '[' 1601 -lt 16000 ']'\n+ ulimit -u 1601\n+ exec /bin/bash -c 'printf \"soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'\n",
+    "duration_seconds": 1.83
+  },
+  {
+    "label": "Targeted wrapper regressions including real leashed runaway shim",
+    "command": "/bin/bash tests/fm-proc-budget.test.sh",
+    "exit": 0,
+    "stdout": "ok - default budget is the current count plus 1500\nok - explicit extra sets the budget\nok - a budget only ever tightens the limit it inherits\nok - a retained soft limit seals the inherited hard limit\nok - exit status and arguments pass through\nok - bad calls and an unreadable process count never run the command\nok - a budgeted runaway tree stops at depth 343 while an unbudgeted probe forks freely\n",
+    "stderr": "",
+    "duration_seconds": 28.056
+  },
+  {
+    "label": "Malformed wrapper call []",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/should-not-run",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: usage: fm-proc-budget.sh [<extra>] -- <command...>\n",
+    "duration_seconds": 0.022
+  },
+  {
+    "label": "Malformed wrapper call ['0', '--']",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 0 -- touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/should-not-run",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '0'\n",
+    "duration_seconds": 0.017
+  },
+  {
+    "label": "Malformed wrapper call ['-5', '--']",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh -5 -- touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/should-not-run",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '-5'\n",
+    "duration_seconds": 0.079
+  },
+  {
+    "label": "Malformed wrapper call ['1.5', '--']",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 1.5 -- touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/should-not-run",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '1.5'\n",
+    "duration_seconds": 0.268
+  },
+  {
+    "label": "Malformed wrapper call ['01', '--']",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 01 -- touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/should-not-run",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '01'\n",
+    "duration_seconds": 0.034
+  },
+  {
+    "label": "Malformed wrapper call ['100']",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh 100 touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/should-not-run",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: usage: fm-proc-budget.sh [<extra>] -- <command...>\n",
+    "duration_seconds": 0.01
+  },
+  {
+    "label": "Wrapper refuses unreadable process table",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh -- touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/should-not-run",
+    "exit": 125,
+    "stdout": "",
+    "stderr": "scenario: process table access denied\nfm-proc-budget: cannot read the process count, so no budget can be set\n",
+    "duration_seconds": 0.129
+  },
+  {
+    "label": "Place real wrapper at quoted foreign tool path",
+    "command": "cp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/budget helper'\"'\"'s root/bin/'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "duration_seconds": 0.137
+  },
+  {
+    "label": "Caller limits remain unchanged after all wrapped commands",
+    "command": "/bin/bash -c 'printf \"caller after testing soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'",
+    "exit": 0,
+    "stdout": "caller after testing soft=10666 hard=16000\n",
+    "stderr": "",
+    "duration_seconds": 0.01
+  },
+  {
+    "label": "Removed environment aliases cannot disable or widen budget",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh -- /bin/bash -c 'printf \"legacy-env child soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'",
+    "exit": 0,
+    "stdout": "legacy-env child soft=2750 hard=2750\n",
+    "stderr": "",
+    "duration_seconds": 0.105
+  }
+]

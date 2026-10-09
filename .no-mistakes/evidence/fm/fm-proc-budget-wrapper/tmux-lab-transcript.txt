@@ -1,0 +1,46 @@
+/tmp/fm-lab-01M4FNQD-t9daXj
+CALLER soft=10666 hard=16000
+LIVE_TMUX server_pid=32999 pane_pid=33093 socket_dir=/tmp/fm-lab-01M4FNQD-t9daXj/tmux
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ printf "PANE soft=%s hard=%s pid=%s\n" "$(ulimit -S -u)" "$(ulimit -H -u)" "$$"; /bin/bash -c 'printf "DESCEND
+ANT soft=%s hard=%s pid=%s\n" "$(ulimit -S -u)" "$(ulimit -H -u)" "$$"'; printf "LIMIT_DONE\n"
+PANE soft=2939 hard=2939 pid=33093
+DESCENDANT soft=2939 hard=2939 pid=33232
+LIMIT_DONE
+bash-3.2$
+bash-3.2$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CLEANUP lab_removed=yes private_socket_removed=yes lab=/tmp/fm-lab-01M4FNQD-t9daXj
+
+STDERR:

@@ -1,0 +1,34 @@
+[
+  {
+    "label": "Real runner workload serial",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/runner/bin/fm-test-run.sh tests/fm-budget-live.test.sh",
+    "exit": 0,
+    "stdout": "FM_TEST_BEGIN 2026-10-09T12:09:29Z tests/fm-budget-live.test.sh family=unclassified expected_gate_skip=none\nWORKLOAD pid=73930 soft=2919 hard=2919 cpu_pass=1\nDESCENDANT soft=2919 hard=2919\nok - workload and descendant inherited sealed process budgets\nFM_TEST_END 2026-10-09T12:09:30Z tests/fm-budget-live.test.sh exit=0 duration_ms=452 gate_skip=false\nFM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1347\nFM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=452 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/fm-budget-live.test.sh duration_ms=452\n",
+    "stderr": "",
+    "duration_seconds": 2.163
+  },
+  {
+    "label": "Real runner workload parallel with CPU-pass and timeout",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/runner/bin/fm-test-run.sh --jobs 2 --per-script-timeout-secs 30 tests/fm-budget-live.test.sh",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-test-run: --jobs 2 refused: tests/fm-budget-live.test.sh is not in the proven-isolated set (see bin/fm-test-isolation-proof.sh --list) and its family has no recorded concurrent proof. Unproven stateful scripts stay serial.\n",
+    "duration_seconds": 0.09
+  },
+  {
+    "label": "Concurrent runner workloads under CPU-pass and timeout",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/runner/bin/fm-test-run.sh --jobs 2 --per-script-timeout-secs 30 tests/fm-test-run.test.sh tests/fm-brief.test.sh",
+    "exit": 0,
+    "stdout": "FM_TEST_BEGIN 2026-10-09T12:09:48Z tests/fm-brief.test.sh family=pure-contract-unit expected_gate_skip=none\nFM_TEST_BEGIN 2026-10-09T12:09:48Z tests/fm-test-run.test.sh family=pure-contract-unit expected_gate_skip=none\nWORKLOAD pid=18499 soft=2947 hard=2947 cpu_pass=1\nDESCENDANT soft=2947 hard=2947\nok - workload and descendant inherited sealed process budgets\nFM_TEST_END 2026-10-09T12:09:49Z tests/fm-brief.test.sh exit=0 duration_ms=689 gate_skip=false\nWORKLOAD pid=18565 soft=2931 hard=2931 cpu_pass=1\nDESCENDANT soft=2931 hard=2931\nok - workload and descendant inherited sealed process budgets\nFM_TEST_END 2026-10-09T12:09:50Z tests/fm-test-run.test.sh exit=0 duration_ms=671 gate_skip=false\nFM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=1761\nFM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=1360 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/fm-brief.test.sh duration_ms=689\nFM_TEST_SLOWEST rank=2 script=tests/fm-test-run.test.sh duration_ms=671\n",
+    "stderr": "",
+    "duration_seconds": 1.961
+  },
+  {
+    "label": "Runner refuses workload when process count is denied",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.fm-budget-validation/runner/bin/fm-test-run.sh tests/fm-budget-live.test.sh",
+    "exit": 1,
+    "stdout": "FM_TEST_BEGIN 2026-10-09T12:09:50Z tests/fm-budget-live.test.sh family=unclassified expected_gate_skip=none\nFM_TEST_END 2026-10-09T12:09:51Z tests/fm-budget-live.test.sh exit=125 duration_ms=248 gate_skip=false\nFM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=545\nFM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=248 failed=1\nFM_TEST_SLOWEST rank=1 script=tests/fm-budget-live.test.sh duration_ms=248\n",
+    "stderr": "scenario: process table access denied\nfm-proc-budget: cannot read the process count, so no budget can be set\n",
+    "duration_seconds": 0.776
+  }
+]
