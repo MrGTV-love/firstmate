@@ -1166,26 +1166,19 @@ sweep_facts() {  # <state-dir> <lavish-store>
 }
 
 sweep_cards_closed() {
-  local source=$1 keys=$2 key cache_key rc IFS=,
+  local source=$1 keys=$2 key rc IFS=,
   if [ "$keys" = '?' ] || [ "$keys" = '-' ] || [ -z "$keys" ]; then
     reason="the board's complete card-key set cannot be established"
     return 1
   fi
   for key in $keys; do
-    cache_key="$source:$key"
-    case "$open_cache" in
-      *$'\n'"$cache_key="[0-2]$'\n'*) ;;
-      *)
-        FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open-bound "$source" "$key" \
-          >/dev/null 2>&1 </dev/null
-        rc=$?
-        open_cache="$open_cache$cache_key=$rc"$'\n'
-        ;;
-    esac
-    case "$open_cache" in
-      *$'\n'"$cache_key=1"$'\n'*) ;;
-      *) reason="card $key is an open captain call or cannot be checked"; return 1 ;;
-    esac
+    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open-bound "$source" "$key" \
+      >/dev/null 2>&1 </dev/null
+    rc=$?
+    if [ "$rc" -ne 1 ]; then
+      reason="card $key is an open captain call or cannot be checked"
+      return 1
+    fi
   done
   return 0
 }
@@ -1193,7 +1186,7 @@ sweep_cards_closed() {
 cmd_sweep() {
   local dry=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
   local facts file_state sessions status queued activity keys captured evidence reason verdict out identity current_identity
-  local open_cache=$'\n' retired=0 kept=0 idx
+  local retired=0 kept=0 idx
   local -a ids=() kinds=() identities=()
   case "${1-}" in
     '') ;;

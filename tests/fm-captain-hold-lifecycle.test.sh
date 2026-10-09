@@ -4882,7 +4882,7 @@ test_sweep_retires_only_finished_board_listeners() {
   dormant=$(sweep_board "$home" dormant old sweep-closed-call)
   closed=$(sweep_board "$home" closed old sweep-closed-call)
   openheld=$(sweep_board "$home" openheld old sweep-open-call)
-  fresh=$(sweep_board "$home" fresh new)
+  fresh=$(sweep_board "$home" fresh new sweep-closed-call)
   queued=$(sweep_board "$home" queued old)
   owned=$(sweep_board "$home" owned old)
   standing="$home/boards/standing.html"
@@ -4956,6 +4956,7 @@ test_sweep_retires_only_finished_board_listeners() {
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
     || fail "the dry-run sweep failed: $out"
   assert_contains "$out" "would-retire: $gone_id" "the dry run missed a board whose file is gone"
+  assert_contains "$out" "kept: $fresh_id $fresh - active within the last 48 hours" "the dry run did not keep the recently touched board for its activity"
   assert_contains "$out" "sweep: would-retire=5 kept=$kept_count" "the dry run counted the wrong verdicts: $out"
   list=$(run_procevent "$home" list)
   assert_contains "$list" "$dormant_id" "a dry run retired a registration"
@@ -4968,7 +4969,7 @@ test_sweep_retires_only_finished_board_listeners() {
   assert_contains "$out" "retired: $dormant_id" "an idle board with no open call kept its listener"
   assert_contains "$out" "retired: $closed_id" "an idle board whose only call is answered kept its listener"
   assert_contains "$out" "kept: $openheld_id" "an idle board with an open captain call lost its listener"
-  assert_contains "$out" "kept: $fresh_id" "a recently touched board lost its listener"
+  assert_contains "$out" "kept: $fresh_id $fresh - active within the last 48 hours" "the sweep did not keep the recently touched board for its activity"
   assert_contains "$out" "kept: $queued_id" "a board holding queued feedback lost its listener"
   assert_contains "$out" "kept: $owned_id" "a worker-owned board lost its listener to a dormancy rule"
   assert_contains "$out" "kept: $standing_id" "the standing Bearings board lost its listener"
