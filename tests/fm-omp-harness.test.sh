@@ -19,8 +19,7 @@
 #      ancestor: it beats an inherited CLAUDECODE under omp and is inert when it
 #      leaks into a worker whose ancestry holds no omp.
 #   3. Every omp launch clears foreign markers, carries the tracked posture
-#      overlay, --auto-approve, --cwd, and (for a crewmate) one -e pointing at
-#      state/<id>.omp-ext.ts; a secondmate launch names no -e at all.
+#      overlay, --auto-approve, and --cwd.
 #   4. A <provider>/<id> model is validated only when `omp models --json` lists
 #      that provider; an unlisted provider passes through with a notice.
 #   5. Busy state: agent_start is busy, agent_end with willContinue stays busy,
@@ -730,9 +729,7 @@ CASES
 
 test_secondmate_launch_relies_on_discovery() {
   # A seeded secondmate home, launched for real through fm-spawn on omp: the
-  # launch must carry the posture overlay and pin --cwd to the home, and must
-  # name NO -e, because omp auto-discovers the home's tracked .omp/extensions
-  # and a file named both ways loads twice.
+  # launch must carry the posture overlay and pin --cwd to the home.
   local world home fakebin launchlog out status launch
   world="$TMP_ROOT/secondmate"
   home="$world/sm"
@@ -768,7 +765,7 @@ test_secondmate_launch_relies_on_discovery() {
   assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
   assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
   assert_absent "$world/home/state/sm.omp-ext.ts" "a secondmate must not receive a per-task worker extension"
-  pass "fm-spawn: a real omp secondmate launch relies on auto-discovery while crewmates load one -e"
+  pass "fm-spawn: a real omp secondmate launch preserves primary posture and supervision"
 }
 
 test_secondmate_config_pinned_model_is_validated() {
@@ -974,7 +971,8 @@ install_omp_extension_fixture() {  # <repo>
   local repo=$1
   mkdir -p "$repo/.omp/extensions" "$repo/.pi/extensions/lib" "$repo/bin" "$repo/node_modules/typebox"
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
-  cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" "$repo/.pi/extensions/lib/"
+  cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" \
+    "$ROOT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$repo/.pi/extensions/lib/"
   cp "$ROOT/bin/fm-operational-input.sh" "$ROOT/bin/fm-supervision-engine-lib.sh" "$repo/bin/"
   chmod +x "$repo/bin/fm-operational-input.sh"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
@@ -1407,6 +1405,9 @@ run_watch_restore_scenario() {  # <scenario>
 # at once keeps its synchronous call from blocking the whole run.
 [ "${1:-}" != --handling-delivered ] || exit 0
 printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
+if [[ "${SCENARIO:-}" = idle-recovery-* ]]; then
+  while [ ! -e "$FM_HOME/state/.e2e-ready" ]; do sleep 0.05; done
+fi
 if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ] || { [[ "${SCENARIO:-}" = duplicates* ]] && [ ! -e "$FM_HOME/state/.e2e-fired-again" ]; }; then
   if [ -e "$FM_HOME/state/.e2e-fired" ]; then
     : > "$FM_HOME/state/.e2e-fired-again"
@@ -1426,19 +1427,23 @@ SH
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
   FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_OMP_SUCCESSOR_GRACE_MS=100 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-const handlers = new Map(); let tool = null; const sent = []; const turns = [];
+const handlers = new Map(); const commands = new Map(); let tool = null; const sent = []; const turns = [];
+let receiveWake;
+const wakeReceived = new Promise((resolve) => { receiveWake = resolve; });
 const transcript = [{ role: "assistant" }];
 const pi = {
   on(e, h) { handlers.set(e, h); },
-  registerCommand() {},
+  registerCommand(name, command) { commands.set(name, command); },
   registerTool(t) { tool = t; },
   sendUserMessage(m, o) {
     sent.push({ m, o });
+    receiveWake();
     if (process.env.SCENARIO === "sync-consumed") {
       handlers.get("before_agent_start")({ prompt: m }, ctx);
       handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
@@ -1472,7 +1477,7 @@ const composer = {
 let idle = process.env.SCENARIO.startsWith("idle-"); let queued = false;
 const ctx = {
   hasUI: true,
-  isIdle: () => { if (process.env.SCENARIO === "idle-stale-context") throw new Error("stale context"); return idle; },
+  isIdle: () => { if (process.env.SCENARIO === "idle-stale-context" || process.env.SCENARIO === "idle-recovery-stale") throw new Error("stale context"); return idle; },
   hasPendingMessages: () => queued,
   ui: { getEditorText: () => composer.text, setEditorText: (t) => { composer.sets.push(t); composer.text = t; } },
 };
@@ -1491,8 +1496,27 @@ const advisorTail = { role: "custom", customType: "advisor", content: "advisor n
 if (process.env.SCENARIO.startsWith("idle-")) transcript.push(advisorTail);
 if (process.env.SCENARIO === "idle-draft") composer.text = "my unsent draft";
 const editorBefore = composer.text;
-await handlers.get("session_start")({ type: "session_start" }, ctx);
-if (!["nonpending", "failed-send"].includes(process.env.SCENARIO)) await tool.execute();
+const scenario = process.env.SCENARIO;
+const recovery = scenario.startsWith("idle-recovery-");
+const repairContext = scenario.endsWith("-context");
+const initialContext = scenario === "idle-recovery-missing" ? undefined
+  : repairContext ? { isIdle() { throw new Error("retired context"); } } : ctx;
+await handlers.get("session_start")({ type: "session_start" }, initialContext);
+if (recovery) {
+  const predecessorTool = tool;
+  if (scenario !== "idle-recovery-live-factory") await handlers.get("session_shutdown")({}, undefined);
+  if (scenario.includes("factory") || scenario === "idle-recovery-forwarded") mod.default(pi);
+  if (scenario.includes("command")) await commands.get("fm-watch-arm-omp").handler("", ctx);
+  else if (scenario.includes("tool")) await tool.execute("repair", {}, undefined, undefined, repairContext ? ctx : undefined);
+  else if (scenario === "idle-recovery-forwarded") await predecessorTool.execute("repair", {}, undefined, undefined, ctx);
+  else {
+    const log = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/lifecycle.log`;
+    for (let i = 0; i < 60 && !readFileSync(log, "utf8").includes("event=self-heal "); i++) await sleep(50);
+    if (!readFileSync(log, "utf8").includes("event=self-heal ")) throw new Error("missing automatic recovery");
+  }
+  if (scenario === "idle-recovery-busy") idle = false;
+  writeFileSync(`${process.env.FM_HOME}/state/.e2e-ready`, "");
+} else if (!["nonpending", "failed-send"].includes(scenario)) await tool.execute();
 if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   await sleep(50);
   if (sent.length !== 1 || !sent[0].m.includes("could not load a replacement-session actionable wake")) throw new Error("expected nonpending load-failure wake");
@@ -1509,16 +1533,20 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   process.exit(0);
 }
 const expectedWakes = process.env.SCENARIO.startsWith("duplicates") ? 2 : 1;
-for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep(100);
+if (recovery) await wakeReceived;
+else for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep(100);
 if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
-if (process.env.SCENARIO === "idle-stale-context") {
-  if (sent[0].o?.deliverAs !== "followUp" || !queued || turns.length !== 0) throw new Error("a stale context must keep follow-up delivery");
+if (recovery && !wake.includes("signal: omp-restore done")) throw new Error(`recovery did not deliver its actionable close: ${wake}`);
+if (["idle-stale-context", "idle-recovery-stale", "idle-recovery-busy", "idle-recovery-missing"].includes(scenario)) {
+  if (sent[0].o?.deliverAs !== "followUp" || !queued || turns.length !== 0) throw new Error("delivery without positive idle evidence must remain a follow-up");
   await handlers.get("session_shutdown")({}, ctx);
   process.exit(0);
 }
 if (process.env.SCENARIO.startsWith("idle-")) {
   if (sent[0].o?.deliverAs !== undefined || queued) throw new Error(`an idle wake was queued as a follow-up: ${JSON.stringify(sent[0].o)}`);
+  const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+  if (existsSync(handoff)) throw new Error("a consumed idle wake retained its replacement handoff");
   if (turns.length !== 1 || turns[0].prompt !== wake || turns[0].tail !== advisorTail) throw new Error("an idle wake behind an advisor tail did not start its own turn");
   if (composer.sets.length !== 0 || composer.text !== editorBefore) throw new Error("idle delivery touched the composer");
   idle = true;
@@ -1783,7 +1811,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context idle-recovery-timer idle-recovery-factory idle-recovery-live-factory idle-recovery-tool idle-recovery-command idle-recovery-forwarded idle-recovery-tool-context idle-recovery-command-context idle-recovery-busy idle-recovery-stale idle-recovery-missing draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
@@ -1893,6 +1921,344 @@ EOF
   pass ".omp turn-end guard: the loaded marker follows the lock owner at turn boundaries instead of only at load"
 }
 
+# A watch-arm stub that records every arm it starts and then stays up as a
+# healthy cycle, so the number of arms is the number of rows in the arm log.
+install_counting_arm() {  # <repo>
+  cat > "$1/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+exec sleep 30
+SH
+  chmod +x "$1/bin/fm-watch-arm.sh"
+}
+
+# A session generation stopped with no successor session_start is not a dead
+# end: after the successor grace the extension binds a fresh generation and
+# arms exactly once; a real session_start inside the grace arms nothing twice;
+# and an arm call on a stopped generation heals at once instead of refusing.
+# Every transition, and the expired bound, is in the lifecycle record.
+test_watch_extension_heals_a_generation_stopped_without_a_successor() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-heal/repo"; home="$TMP_ROOT/watch-heal/home"
+  install_omp_extension_fixture "$repo"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+trap 'if [ -e "$FM_HOME/state/.delay-stop" ]; then sleep 0.7; fi; exit 0' TERM
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+while :; do sleep 0.05; done
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  mkdir -p "$home/state"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import fs, { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null;
+const sent = [];
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage(message) { sent.push(message); },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const lifecycle = () => readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, {});
+for (let i = 0; i < 50 && arms() < 1; i += 1) await sleep(50);
+if (arms() !== 1) throw new Error(`startup should arm once, saw ${arms()}`);
+
+// 1. Shutdown with no successor: one self-heal arm after the grace, no more.
+await handlers.get("session_shutdown")({}, {});
+await sleep(150);
+if (arms() !== 1) throw new Error(`a heal fired before the successor grace: ${arms()} arms`);
+for (let i = 0; i < 60 && arms() < 2; i += 1) await sleep(50);
+if (arms() !== 2) throw new Error(`a stopped generation with no successor was not healed: ${arms()} arms`);
+await sleep(900);
+if (arms() !== 2) throw new Error(`the self-heal armed more than once: ${arms()} arms`);
+const healed = await tool.execute();
+if (!/^watcher: unchanged/.test(healed.content[0].text)) throw new Error(`the healed generation does not own its arm: ${healed.content[0].text}`);
+const record = lifecycle();
+for (const needle of ["event=session_shutdown", "event=generation-stop", "event=bound-expired", "waiter=omp-watch-extension", "waited-on=session_start", "bound=400ms", "outcome=self-heal", "event=generation-create", "cause=self-heal", "event=self-heal"]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+
+// 2. Shutdown then a real session_start inside the grace: one arm, no heal.
+await handlers.get("session_shutdown")({}, {});
+await handlers.get("session_start")({ type: "session_start" }, {});
+for (let i = 0; i < 60 && arms() < 3; i += 1) await sleep(50);
+await sleep(900);
+if (arms() !== 3) throw new Error(`a successor session_start must arm exactly once with no heal: ${arms()} arms`);
+if ((lifecycle().match(/event=self-heal /g) ?? []).length + (lifecycle().match(/event=self-heal$/gm) ?? []).length !== 1) {
+  throw new Error(`a heal fired despite a successor session_start:\n${lifecycle()}`);
+}
+
+// 3. An arm call on a stopped generation heals at once instead of refusing.
+await handlers.get("session_shutdown")({}, {});
+const armed = await tool.execute();
+if (/shutting down/.test(armed.content[0].text)) throw new Error(`an arm call on a stopped generation was refused: ${armed.content[0].text}`);
+if (!/^watcher: started/.test(armed.content[0].text)) throw new Error(`an arm call did not heal and arm: ${armed.content[0].text}`);
+await sleep(900);
+if (arms() !== 4) throw new Error(`the arm-call heal and the timed heal both armed: ${arms()} arms`);
+if (!lifecycle().includes("cause=arm-call")) throw new Error(`the arm-call heal is not recorded:\n${lifecycle()}`);
+const rebound = (module) => {
+  const handlers = new Map(); const box = {};
+  module.default({
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { box.tool = t; },
+    sendUserMessage(message) { sent.push(message); },
+  });
+  return { handlers, box };
+};
+const waitForArms = async (expected) => {
+  for (let i = 0; i < 60 && arms() < expected; i++) await sleep(50);
+  await sleep(900);
+  if (arms() !== expected) throw new Error(`factory recovery expected ${expected} arms, saw ${arms()}`);
+};
+const successorModule = await import(`${pathToFileURL(process.env.EXT).href}?rebound`);
+writeFileSync(`${home}/state/.delay-stop`, "");
+const shutdown = handlers.get("session_shutdown")({}, {});
+const successor = rebound(successorModule);
+await sleep(500);
+if (arms() !== 4) throw new Error("factory recovery raced pending predecessor retirement");
+await shutdown;
+await waitForArms(5);
+const successorArm = await successor.box.tool.execute();
+if (!successorArm.details.ok || !successorArm.details.message.includes("unchanged")) throw new Error("factory successor did not own the automatic recovery");
+const forwarded = await tool.execute();
+if (!forwarded.details.ok || !forwarded.details.message.includes("unchanged")) throw new Error("predecessor tool did not forward to the healed factory");
+await successor.handlers.get("session_shutdown")({}, {});
+const started = rebound(successorModule);
+await started.handlers.get("session_start")({}, {});
+await waitForArms(6);
+await started.handlers.get("session_shutdown")({}, {});
+const repaired = rebound(successorModule);
+await repaired.box.tool.execute();
+await waitForArms(7);
+await repaired.handlers.get("session_shutdown")({}, {});
+writeFileSync(`${home}/state/.lock`, `${process.ppid}\n`);
+const foreign = rebound(successorModule);
+await sleep(900);
+if (arms() !== 7) throw new Error("factory recovery armed under a foreign lock");
+const refused = await foreign.box.tool.execute();
+if (refused.details.ok || !refused.details.message.includes("read-only")) throw new Error("foreign factory recovery did not preserve lock ownership");
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+await foreign.handlers.get("session_shutdown")({}, {});
+const unhandled = [];
+process.on("unhandledRejection", (error) => unhandled.push(String(error)));
+const originalWrite = fs.writeFileSync;
+let injected = 0;
+let fault = true;
+writeFileSync(`${home}/state/.omp-watch-extension-loaded`, "stale\n");
+fs.writeFileSync = function(path, ...args) {
+  if (fault && String(path) === `${home}/state/.omp-watch-extension-loaded`) {
+    fault = false;
+    injected++;
+    throw Object.assign(new Error("transient owner write failure"), { code: "EIO" });
+  }
+  return originalWrite.call(this, path, ...args);
+};
+syncBuiltinESMExports();
+for (let i = 0; i < 100 && !injected; i++) await sleep(20);
+await sleep(100);
+if (injected !== 1 || arms() !== 7) throw new Error("timed owner failure did not stop activation");
+const failures = sent.filter((message) => message.includes("transient owner write failure"));
+if (failures.length !== 1) throw new Error("timed activation lost its failure wake");
+if (unhandled.length) throw new Error(`unhandled activation rejection: ${unhandled.join("; ")}`);
+const beforeRepair = lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length;
+const repair = await foreign.box.tool.execute();
+if (!repair.details.ok) throw new Error("timed activation failure poisoned arm repair");
+if (lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length !== beforeRepair + 1) throw new Error("failed activation consumed the recovery obligation");
+await waitForArms(8);
+fs.writeFileSync = originalWrite;
+syncBuiltinESMExports();
+const liveReplacement = rebound(successorModule);
+await waitForArms(9);
+const liveArm = await liveReplacement.box.tool.execute();
+if (!liveArm.details.ok || !liveArm.details.message.includes("unchanged")) throw new Error("live factory retirement did not recover without session_start");
+await liveReplacement.handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension self-heal: $out"
+  [ -z "$out" ] || fail "omp watch extension self-heal test printed output: $out"
+  pass ".omp watch extension: a generation stopped without a successor heals once; a real successor or arm call never double-arms"
+}
+
+# Loading the extension twice in one process (auto-discovery plus -e) leaves
+# exactly one live generation and one arm: the earlier instance retires, its
+# events are ignored, and its arm tool forwards to the current instance.
+test_watch_extension_is_single_instance_per_home() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-single/repo"; home="$TMP_ROOT/watch-single/home"
+  install_omp_extension_fixture "$repo"
+  install_counting_arm "$repo"
+  mkdir -p "$home/state"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const makePi = () => {
+  const handlers = new Map(); const box = { tool: null };
+  return { handlers, box, pi: {
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { box.tool = t; },
+    sendUserMessage() { return undefined; },
+  } };
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const mod = await import(pathToFileURL(process.env.EXT).href);
+const first = makePi(); mod.default(first.pi);
+const second = makePi(); mod.default(second.pi);
+// Both instances see the same session events, as a double load would.
+await first.handlers.get("session_start")({ type: "session_start" }, {});
+await second.handlers.get("session_start")({ type: "session_start" }, {});
+for (let i = 0; i < 50 && arms() < 1; i += 1) await sleep(50);
+await sleep(600);
+if (arms() !== 1) throw new Error(`a double load armed ${arms()} cycles`);
+const viaFirst = await first.box.tool.execute();
+if (!/^watcher: unchanged/.test(viaFirst.content[0].text)) throw new Error(`the tool of the superseded instance did not reach the live owner: ${viaFirst.content[0].text}`);
+const viaSecond = await second.box.tool.execute();
+if (!/^watcher: unchanged/.test(viaSecond.content[0].text)) throw new Error(`the current instance lost its arm: ${viaSecond.content[0].text}`);
+// A shutdown seen by the superseded instance is ignored: the live cycle keeps running.
+await first.handlers.get("session_shutdown")({}, {});
+await sleep(900);
+if (arms() !== 1) throw new Error(`the superseded instance changed the live cycle: ${arms()} arms`);
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+for (const needle of ["event=factory-bind", "superseded=1", "event=instance-retired", "event=session_start-ignored", "event=arm-forwarded", "event=session_shutdown-ignored"]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+const shutdown = second.handlers.get("session_shutdown")({}, {});
+const repair = second.box.tool.execute();
+const third = makePi(); mod.default(third.pi);
+await third.handlers.get("session_start")({}, {});
+const repaired = await repair;
+await shutdown;
+if (!/^watcher: unchanged/.test(repaired.content[0].text)) throw new Error(`stale continuation did not reach successor: ${repaired.content[0].text}`);
+for (let i = 0; i < 50 && arms() < 2; i++) await sleep(50);
+await sleep(900);
+if (arms() !== 2) throw new Error(`arm continuation stole ownership from successor: ${arms()} arms`);
+const current = await third.box.tool.execute();
+if (!/^watcher: unchanged/.test(current.content[0].text)) throw new Error(`successor lost ordinary arm ownership: ${current.content[0].text}`);
+await third.handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension single instance: $out"
+  [ -z "$out" ] || fail "omp watch extension single-instance test printed output: $out"
+  pass ".omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool"
+}
+
+test_watch_extension_repairs_after_handoff_publication_failure() {
+  local repair repo home out status
+  for repair in tool command factory; do
+    repo="$TMP_ROOT/watch-persist-$repair/repo"; home="$TMP_ROOT/watch-persist-$repair/home"
+    install_omp_extension_fixture "$repo"
+    mkdir -p "$home/state"
+    cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+if [ ! -e "$FM_HOME/state/.fired" ]; then
+  : > "$FM_HOME/state/.fired"
+  printf 'check: publication failure wake\n'
+  exit 0
+fi
+exec sleep 30
+SH
+    chmod +x "$repo/bin/fm-watch-arm.sh"
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+      FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+      REPAIR="$repair" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const waitFor = async (predicate) => {
+  for (let i = 0; i < 60 && !predicate(); i++) await sleep(50);
+  if (!predicate()) throw new Error("timed out waiting for publication failure fixture");
+};
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const makePi = () => {
+  const handlers = new Map(), commands = new Map(), sent = [], box = {};
+  return { handlers, commands, sent, box, pi: {
+    on(e, h) { handlers.set(e, h); },
+    registerCommand(name, command) { commands.set(name, command); },
+    registerTool(t) { box.tool = t; },
+    sendUserMessage(message) { sent.push(message); },
+  } };
+};
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const mod = await import(pathToFileURL(process.env.EXT).href);
+const first = makePi(); mod.default(first.pi);
+await first.handlers.get("session_start")({}, {});
+await waitFor(() => first.sent.length === 1 && arms() === 2);
+const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+mkdirSync(handoff);
+let owner = first;
+if (process.env.REPAIR === "factory") {
+  owner = makePi(); mod.default(owner.pi);
+} else {
+  await first.handlers.get("session_shutdown")({}, {});
+}
+rmSync(handoff, { recursive: true });
+if (process.env.REPAIR === "command") {
+  const notifications = [];
+  await owner.commands.get("fm-watch-arm-omp").handler("", { ui: { notify(message) { notifications.push(message); } } });
+  if (notifications.length !== 1 || !notifications[0].startsWith("watcher: started")) throw new Error("command repair was poisoned by publication failure");
+} else {
+  const repaired = await owner.box.tool.execute();
+  if (!repaired.details.ok || !repaired.details.message.startsWith("watcher: started")) throw new Error("tool repair was poisoned by publication failure");
+}
+await waitFor(() => owner.sent.some((message) => message.includes("could not persist a replacement-session actionable wake")));
+const failures = owner.sent.filter((message) => message.includes("could not persist a replacement-session actionable wake"));
+if (failures.length !== 1 || !failures[0].includes("check: publication failure wake")) throw new Error("repair lost the actionable wake or its persistence failure");
+await owner.handlers.get("message_start")({ message: { role: "user", content: failures[0] } }, {});
+await sleep(900);
+if (arms() !== 3) throw new Error("publication failure repair double-armed");
+const unchanged = await owner.box.tool.execute();
+if (!unchanged.details.ok || !unchanged.details.message.includes("unchanged")) throw new Error("repaired watcher lost ordinary arm ownership");
+await owner.handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+    status=$?
+    expect_code 0 "$status" "omp publication failure $repair repair: $out"
+    [ -z "$out" ] || fail "omp publication failure $repair repair printed output: $out"
+  done
+  pass ".omp watch extension: publication failure retains the wake and permits tool, command, and factory repair"
+}
+
+test_watch_lifecycle_deadline_diagnostics() {
+  local repo="$TMP_ROOT/omp-expiry-root" out status
+  install_omp_extension_fixture "$repo"
+  out=$(node "$ROOT/tests/watch-lifecycle-expiry.mjs" omp "$repo" 2>&1)
+  status=$?
+  expect_code 0 "$status" "omp lifecycle deadline diagnostics: $out"
+  pass "omp shutdown, arm and host readiness, and unready retirement each log one expiry"
+}
+
+test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
@@ -1921,3 +2287,6 @@ test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
 test_primary_extensions_ignore_a_descendant_session
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
+test_watch_extension_heals_a_generation_stopped_without_a_successor
+test_watch_extension_is_single_instance_per_home
+test_watch_extension_repairs_after_handoff_publication_failure

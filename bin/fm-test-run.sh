@@ -394,6 +394,7 @@ family_for_basename() {
     fm-worker-account-live-e2e.test.sh|fm-teamclaude-launch-live-e2e.test.sh|\
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
+    fm-pi-watch-loader-live.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
@@ -1487,6 +1488,13 @@ families_for_changed_path() {
       # report.ts are exercised only through the jev-guard behavior suite.
       printf '%s\n' "__script__:fm-jev-guard.test.sh"
       ;;
+    tests/fm-pi-watch-loader-live.test.mjs)
+      printf '%s\n' __script__:fm-pi-watch-loader-live.test.sh
+      ;;
+    tests/watch-lifecycle-expiry.mjs)
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      ;;
     bin/fm-test-run.sh)
       # Deliberately the WHOLE family, not just the two contract tests. This
       # runner executes every pure-contract-unit script, so a change to it is
@@ -1666,6 +1674,17 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-supervision-host-hook.test.sh
       # Whether an arriving outcome still lets the captain type is a fact only
       # a real Pi TUI can answer, so the live guards are selected too.
+      printf '%s\n' live-harness-optin
+      ;;
+    .pi/extensions/lib/fm-watch-lifecycle.ts)
+      # The primary watcher extensions' shared lifecycle record and instance
+      # registry: the suites that load either watcher extension, plus the Pi
+      # typecheck and the live guards that load the real harness.
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' __script__:fm-watch-recovery-loop.test.sh
+      printf '%s\n' __script__:fm-calm-pi-extension.test.sh
+      printf '%s\n' __script__:fm-pi-primary-types.test.sh
       printf '%s\n' live-harness-optin
       ;;
     .pi/extensions/lib/fm-operational-input.ts)

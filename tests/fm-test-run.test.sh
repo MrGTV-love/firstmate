@@ -604,6 +604,42 @@ test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer() {
   pass "fleet snapshot selects its exact ledger consumer without widening snapshot siblings"
 }
 
+test_changed_watch_helpers_select_runnable_consumers() {
+  local tmp repo listed expected path out status
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-watch-helpers.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cp -R "$ROOT/bin/." "$repo/bin/"
+  cp "$ROOT/tests/fm-pi-watch-loader-live.test.sh" "$repo/tests/"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-omp-harness.test.sh"
+  : >"$repo/tests/fm-pi-watch-loader-live.test.mjs"
+  : >"$repo/tests/watch-lifecycle-expiry.mjs"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm watch-fixture
+  for path in fm-pi-watch-loader-live.test.mjs watch-lifecycle-expiry.mjs; do
+    printf '\n' >>"$repo/tests/$path"
+    listed=$("$repo/bin/fm-test-run.sh" --list --changed --base HEAD) \
+      || fail "$path failed changed-test selection"
+    case "$path" in
+      fm-pi-watch-loader-live.test.mjs) expected=tests/fm-pi-watch-loader-live.test.sh ;;
+      watch-lifecycle-expiry.mjs) expected=$(printf '%s\n' tests/fm-omp-harness.test.sh tests/fm-pi-watch-extension.test.sh) ;;
+    esac
+    [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] || fail "$path selected incorrect consumers: $listed"
+    git -C "$repo" add "tests/$path"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm helper-change
+  done
+  listed=$("$repo/bin/fm-test-run.sh" --list --family live-harness-optin)
+  assert_contains "$listed" tests/fm-pi-watch-loader-live.test.sh "loader regression must belong to the opt-in family"
+  cp "$ROOT/tests/lib.sh" "$repo/tests/"
+  out=$(FM_LIVE=0 FM_PI_WATCH_LOADER_LIVE_E2E=0 "$repo/bin/fm-test-run.sh" --jobs 1 tests/fm-pi-watch-loader-live.test.sh 2>&1) && status=0 || status=$?
+  expect_code 0 "$status" "disabled Pi loader regression: $out"
+  assert_contains "$out" "skip: live: disabled by FM_PI_WATCH_LOADER_LIVE_E2E=0" "loader must skip before requiring the SDK"
+  assert_contains "$out" "expected_gate_skip=live-capability" "loader skip must use the live capability class"
+  assert_contains "$out" "skipped_gate=1" "runner must record the disabled loader regression"
+  rm -rf "$tmp"
+  pass "watch JavaScript helpers select runnable consumers and the loader regression is gated"
+}
+
 test_changed_status_owners_select_all_consuming_tests() {
   local tmp repo listed expected family script owner
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-status-record.XXXXXX")
@@ -2458,6 +2494,7 @@ test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
 test_supervision_groups_share_coverage_and_changed_selection
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
+test_changed_watch_helpers_select_runnable_consumers
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
