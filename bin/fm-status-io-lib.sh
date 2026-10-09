@@ -41,7 +41,12 @@ _fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
 }
 
 
-# Portable device:inode identity for the rotation/recreation check below.
+# Portable strongest-available identity: strong:<device>:<inode>:<birth-time>
+# when birth time is available, otherwise weak:<device>:<inode>.
+# The default reader captures identity and size in one stat invocation to avoid
+# repeated per-task scheduling and to sample both from the same metadata read.
+# Optional output variables let warm fold callers avoid command substitutions;
+# without an identity output variable, the identity is printed on stdout.
 _fm_open_decisions_file_ident() {  # <file> [<identity-out-var> [<size-out-var>]]
   local __fm_info_record __fm_info_rest __fm_info_ident __fm_info_epoch __fm_info_birth __fm_info_size
   if [ -n "${FM_STATUS_IDENTITY_READER:-}" ]; then

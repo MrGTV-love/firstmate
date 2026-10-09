@@ -2,13 +2,13 @@
 // primary watcher extensions (.pi/extensions/fm-primary-pi-watch.ts and
 // .omp/extensions/fm-primary-omp-watch.ts).
 //
-// Lifecycle record: every session_start, session_shutdown, factory bind, and
-// generation create, activate, stop, and self-heal is appended as one line
+// Lifecycle evidence: session events, factory binds, generation transitions,
+// and recovery attempts use one line per event:
 //   <ISO time> pid=<pid> instance=<n> event=<name> [key=value...]
-// to state/extensions/<extension>/lifecycle.log, rotated to lifecycle.log.1 at
-// 256 KiB so it never grows without bound. A bound that expires is recorded the
-// same way with waiter, waited-on, bound, and actual fields. Writing it never
-// throws: the record explains supervision and must never break it.
+// at state/extensions/<extension>/lifecycle.log. Before the next append at
+// 256 KiB, rotate to lifecycle.log.1, replacing the previous rotation. Expired
+// bounds use waiter, waited-on, bound, and actual fields. This record is
+// best-effort and never throws: evidence failure must not break supervision.
 //
 // Single instance: one process may evaluate a watcher extension more than
 // once for the same home (for example when it is both auto-discovered and named

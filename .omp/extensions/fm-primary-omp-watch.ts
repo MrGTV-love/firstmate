@@ -40,26 +40,29 @@
 // omp emits session_shutdown for ordinary same-process replacements (/new,
 // /resume, /fork) as well as terminal quit. This extension binds one generation
 // per session activation. Only the active live generation may start, stop,
-// rearm, or clear the arm child. An owning replacement session_start (or fresh
-// factory bind) arms its new generation without a model turn. A replacement
+// rearm, or clear the arm child. An owning replacement session_start or arm
+// call activates its new generation without a model turn. A replacement
 // handoff carries actionable closes that were still pending delivery; its
 // durable state lives at state/extensions/omp-primary-watch/session-replacement-actionable.json.
 // Stale callbacks from a prior generation are no-ops against the active replacement.
 // A stopped generation is never a dead end: omp can stop a session generation
 // with no matching session_start reaching this extension, and a stopped
 // generation refuses every arm. If no successor has bound within
-// FM_OMP_SUCCESSOR_GRACE_MS (15s) while this process still owns the home lock,
-// the extension binds a fresh generation itself, exactly as session_start
-// would, and an arm call from the model does the same at once, because a tool
-// call proves a live session. A real successor arriving later finds that
-// generation live and arms nothing twice.
+// FM_OMP_SUCCESSOR_GRACE_MS (configuration reference owns the default) while
+// this process still owns the home lock, the extension binds a fresh generation
+// itself, exactly as session_start would, and an arm call does the same because
+// it proves a live session. Recovery waits for predecessor retirement, and a
+// real successor arriving later finds the generation live and arms nothing twice.
+// Recovery remains pending until activation hands off to a tracked arm or
+// scheduled retry. Timed activation failures surface through the failure-wake
+// path and leave recovery available to a later arm call or successor.
 // Single instance: the latest factory bind in this process owns the home
 // (.pi/extensions/lib/fm-watch-lifecycle.ts owns the registry). An earlier
 // instance retires its generation and its event handlers become no-ops, and
 // its arm tool and command forward to the current instance, so a session that
 // loaded this file twice still has exactly one live generation and one arm.
-// Every lifecycle transition is recorded in
-// state/extensions/omp-primary-watch/lifecycle.log (same owner).
+// .pi/extensions/lib/fm-watch-lifecycle.ts owns the best-effort lifecycle record
+// at state/extensions/omp-primary-watch/lifecycle.log.
 //
 // Delivery versus consumption (stated once here):
 // A main wake is delivered once omp accepts it (sendUserMessage returns).

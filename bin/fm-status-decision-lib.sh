@@ -361,8 +361,8 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # TAB-separated "<key>\t<verb>\t<summary>" line per still-open decision, in
 # most-recently-opened-last order; prints nothing when none are open. Reads the
 # status file, its sibling `.meta` for the task kind when the caller passes no
-# <kind>, and a sibling fold checkpoint when available. The fold signature
-# includes the optional verb and reserved-key overrides. This is the durable open-set the fleet
+# <kind>, and a sibling fold checkpoint when available; the signature contract
+# is owned by _fm_open_decisions_fold_signature below. This is the durable open-set the fleet
 # snapshot and any point-in-time consumer must use instead of trusting the last
 # status line.
 # The scan_open_decisions wrapper in bin/fm-classify-lib.sh enumerates a whole directory rather than
@@ -481,6 +481,11 @@ EOF
 # The signature a fold checkpoint must carry to be reused for <kind>: the fold
 # version, task kind, effective parsing locales, and every fold-affecting
 # override, so readers never reuse a checkpoint under a different interpretation.
+# Parsing retains the caller's locale in full and incremental folds; byte-offset
+# measurement uses LC_ALL=C without changing the interpretation of status lines.
+# Effective LC_CTYPE and LC_COLLATE each use the first nonempty value among
+# LC_ALL, their category variable, LANG, and C. Missing or different locale fields
+# therefore refuse reuse in incremental, read-only, wake-cursor, and snapshot reads.
 _fm_open_decisions_fold_signature() {  # <kind> [<out-var>]
   local __fm_sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
   __fm_sig="$__fm_sig:ctype=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}:collate=${LC_ALL:-${LC_COLLATE:-${LANG:-C}}}"

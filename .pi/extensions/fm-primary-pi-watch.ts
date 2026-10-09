@@ -5,9 +5,9 @@
 // /fork, reload) as well as terminal quit. This extension binds one generation per
 // session activation. Only the active live generation may start, stop, rearm, or
 // clear the arm child. Replacement shutdown publishes a generation-bound handoff
-// phase but retains its established child until the next owning session_start (or
-// fresh factory bind) publishes a distinct active generation and commits the
-// tracked replacement arm without a model turn. A replacement handoff carries
+// phase but retains its established child until a live successor runtime's
+// session_start or arm call publishes a distinct active generation and commits
+// the tracked replacement arm without a model turn. A replacement handoff carries
 // actionable closes that were still pending delivery; its durable state lives at
 // state/extensions/pi-primary-watch/session-replacement-actionable.json.
 // Terminal quit leaves the final generation stopped so late callbacks cannot rearm.
@@ -16,8 +16,14 @@
 // ignored before registration, preserving one tool and one watcher. A reload
 // removes the loader-owned discovery subscription and binds a new instance;
 // the latest bound instance owns the home, and earlier instances refuse arms.
-// Every lifecycle transition is recorded in
-// state/extensions/pi-primary-watch/lifecycle.log (same owner).
+// Replacement invalidates the outgoing delivery API: command and tool repair
+// on that stopped instance must refuse, not publish false active ownership.
+// If session_start is missing after FM_PI_SUCCESSOR_GRACE_MS (configuration
+// reference owns the default), log successor-missing and one bound-expired
+// record without calling the retired API. A live successor runtime is required
+// to recover; terminal quit schedules no successor wait.
+// .pi/extensions/lib/fm-watch-lifecycle.ts owns the best-effort lifecycle record
+// at state/extensions/pi-primary-watch/lifecycle.log.
 //
 // Delivery versus consumption (stated once here):
 // A main follow-up is delivered once Pi accepts it (sendUserMessage resolves).
@@ -597,6 +603,8 @@ async function stopSessionGeneration(
   try {
     retireGenerationOwner(generation, replacement);
   } catch (error) {
+    // Marker publication is evidence, not retirement: failing it must not
+    // poison the promise a live successor needs before it can activate.
     lifecycle("generation-owner-retire-failed", {
       generation: generation.id,
       replacement,

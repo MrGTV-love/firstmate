@@ -73,28 +73,30 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 
 - It retires the predecessor arm at replacement shutdown instead of retaining it across the handoff.
 - It reports no shutdown reason, so every shutdown with a pending actionable close persists the handoff for the next owning `session_start` to replay.
-- If handoff publication fails, the pending wake and failure detail remain in process memory. Completed child retirement still permits an arm repair, which replays that retained wake.
+- If handoff publication fails, the pending wake and failure detail remain in process memory for recovery to replay.
 
 ### omp idle wake delivery
 
 omp starts no turn for an explicit follow-up that reaches an idle session unless its own auto-continue gate passes, and that gate refuses while the context tail is not an assistant or tool result, such as an advisor note posted after the turn ended.
 `.omp/extensions/fm-primary-omp-watch.ts` sends a wake through omp's prompt-starting message API only when the latest extension context returns exactly `true` from `isIdle()`; busy, missing, or unreadable idle state keeps follow-up delivery.
-The latest context is retained across shutdown and transferred to a replacement extension factory, so missing-successor recovery can still start an idle wake's turn. Arm commands and tools refresh that context when supplied; each delivery rechecks live idle state rather than caching an idle verdict across recovery.
+The latest context is retained across shutdown and transferred to a replacement extension factory, so missing-successor recovery can still start an idle wake's turn.
+Arm commands and tools refresh that context when supplied; each delivery rechecks live idle state rather than caching an idle verdict across recovery.
 The prompt flow never touches the composer, so an operator draft stays unsent, and it also flushes any follow-up already stranded in omp's queue.
 `tests/fm-omp-harness.test.sh` covers idle delivery behind an advisor tail with an empty composer and with a draft, plus the follow-up fallback for an unreadable idle state; the live guard's idle step and its evidence are recorded in [omp idle wake behind an advisor note](verification/runtime-backends.md#2026-10-08-omp-idle-wake-behind-an-advisor-note).
 
 ### Stopped generations and duplicate loads
 
-A stopped generation refuses every arm, so a shutdown that no successor `session_start` follows would otherwise leave the session unable to arm a watcher at all.
-The omp watcher binds a fresh generation when no successor arrives within a short grace while the process still owns the home lock, and an arm call on that stopped generation heals at once. Pi replacement shutdown invalidates the outgoing delivery runtime, so its stopped generation refuses both command and tool repair rather than claiming a usable watcher. If no successor arrives within `FM_PI_SUCCESSOR_GRACE_MS`, Pi records one `bound-expired` row and a `successor-missing` diagnostic in its lifecycle log; it does not activate or send through the retired API. Recovery requires a live successor runtime and its session start or arm call.
-Only the latest factory bind of an extension in a process owns the home. Pi first discovers an already-bound watcher through its loader-owned event bus and ignores duplicate entrypoints before claiming the home or registering a tool, so duplicate loading cannot reject startup with a tool-name conflict. Reload removes that discovery subscription and binds a fresh successor normally; both harnesses retain one live generation and one arm.
-The new factory retires its predecessor through the replacement lifecycle, carrying unconsumed actionable wakes even across separate module evaluations. Retiring a live predecessor establishes a missing-successor recovery obligation; an already-stopped predecessor transfers its outstanding obligation. The successor waits for predecessor retirement before automatic recovery, session-start activation, or arm repair. Pi terminal quit transfers no recovery and remains stopped across repeated factory binds until an explicit session start. An arm repair that awaits retirement checks instance ownership and the captured generation again before activation; omp forwards a superseded repair to the current instance, while Pi refuses it.
-Pi separates completed generation retirement from owner-marker publication failure. A failed marker write or rename records `generation-owner-retire-failed` with the generation, replacement flag, and diagnostic in the lifecycle log, but does not leave a rejected retirement promise for session start, successor arm repair, or a successor factory to inherit.
-Recovery remains pending until watcher activation successfully hands off to a tracked arm or scheduled continuity retry. omp timed recovery catches owner-marker and activation errors, records `self-heal-failed`, and delivers the diagnostic through the existing failure-wake path without an unhandled timer rejection; later arm repair or successor activation can still complete recovery. Pi's successor-expiry callback only logs diagnostics and never publishes active ownership.
-Each extension header owns its exact rule, `.pi/extensions/lib/fm-watch-lifecycle.ts` owns the shared registry, and every lifecycle transition, including factory generation creation, activation, and retirement, and expired bound is recorded in `state/extensions/<extension>/lifecycle.log`.
-Shutdown child-close, successor readiness (including omp host mode), and unready-arm retirement deadlines each append one `bound-expired` record per expiry with waiter, waited-on, bound, and actual elapsed duration. They use the same rotated lifecycle log and do not change the wait outcome or timeout.
+omp can repair a missing successor automatically or through an explicit arm call; Pi requires a live replacement runtime rather than repair through its invalidated outgoing API.
+The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, and stale callback behavior.
 
-`FM_PI_WATCH_LOADER_LIVE_E2E=1 FM_PI_PACKAGE_DIR=<installed-pi-package> bin/fm-test-run.sh tests/fm-pi-watch-loader-live.test.sh` exercises the real Pi resource loader and session runtime without provider calls. The runner discovers it in the `live-harness-optin` family and selects it when its JavaScript test changes; changes to the shared lifecycle-expiry helper select both Pi and omp consumer suites. It loads the watcher plus a re-exporting entrypoint, verifies successful startup and idempotent arm-tool execution, and reloads with exactly one live successor and no duplicate tool registration. All homes and agent configuration are disposable.
+For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` or `state/extensions/omp-primary-watch/lifecycle.log`.
+Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.
+The shared [lifecycle helper](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns the record format, expiry fields, rotation, and best-effort evidence policy.
+These logs are evidence, not proof of a healthy arm or permission to use a retired runtime.
+
+`tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, and owner-marker publication failures.
+`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, and wake delivery after recovery.
+Both suites use `tests/watch-lifecycle-expiry.mjs` for shutdown child-close, successor readiness (including omp host mode), and unready-arm retirement expiry evidence.
 
 ### omp restored-wake recovery
 
@@ -495,6 +497,10 @@ The same suite covers ordinary same-process session replacement for `/new`, `/re
 - A mid-restore marker advance that delivers the wake with no rejection appendix, offers it to an accepting supervision branch like a confirmed delivery, and records the attempt and the confirm result in the bounded extension log when opted in.
 - A failed confirmation for a stale successor that spares a newer arm started by a repair.
 - A repair, a scheduled retry, and a deferred close over a dead-but-unclosed arm child that each start a fresh arm instead of stalling.
+
+`FM_PI_WATCH_LOADER_LIVE_E2E=1 FM_PI_PACKAGE_DIR=<installed-pi-package> bin/fm-test-run.sh tests/fm-pi-watch-loader-live.test.sh` exercises the real Pi resource loader and session runtime without provider calls.
+It loads the watcher plus a re-exporting entrypoint, checks startup and idempotent arm-tool execution, and reloads with one live successor and no duplicate tool registration.
+All homes and agent configuration are disposable; the runner includes this guard in `live-harness-optin`.
 
 The guard and session-start suites prove that active generation evidence tolerates a fresh-beacon handoff.
 They also prove that a legacy or handoff-phase watcher marker from an absent replacement extension still raises the outage diagnostic.
