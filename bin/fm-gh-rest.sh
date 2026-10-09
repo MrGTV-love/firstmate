@@ -3,8 +3,7 @@
 #
 # Usage:
 #   fm-gh-rest.sh get <endpoint> [--paginate] [--slurp] [--floor] [-f key=value]...
-#   fm-gh-rest.sh guard [--resource core]
-#   fm-gh-rest.sh status
+#   fm-gh-rest.sh guard
 #
 # get makes one REST GET per page through `gh api -i` and prints the JSON body (one document per page;
 # --slurp prints a single array of page bodies). It sends If-None-Match from a per-URL ETag cache under
@@ -20,7 +19,6 @@
 # reset; otherwise it exits 0 silently. get --floor runs the same check before any network call, so a sweep
 # that passes --floor stops at the first read. The floor is FM_GH_RATE_FLOOR_PERCENT percent of the limit
 # (default 15; values outside 0..100 use 15). Neither reads the network.
-# status prints the recorded buckets, one JSON object per line.
 #
 # <state> is FM_STATE_OVERRIDE, else $FM_HOME/state, else the code root's state/. docs/configuration.md
 # owns the contract this header summarizes.
@@ -29,7 +27,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE=${FM_STATE_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}
 CACHE="$STATE/gh-rest-cache"
 EX_TEMPFAIL=75
-MAX_PAGES=1000
 work=
 
 die() { printf 'fm-gh-rest: %s\n' "$*" >&2; exit 1; }
@@ -61,7 +58,7 @@ header_pairs() { # headers-file
     { name = tolower($1); if (name in want) { v = $0; sub(/^[^:]*: */, "", v); print name "=" v } }' "$1"
 }
 
-record_rate() { # headers-file
+record_rate() ( # headers-file
   local limit='' remaining='' reset='' resource=core file previous prev_reset prev_remaining name value
   while IFS='=' read -r name value; do
     case "$name" in
@@ -75,10 +72,14 @@ record_rate() { # headers-file
   [ -n "$limit" ] && [ -n "$remaining" ] && [ -n "$reset" ] || return 0
   file="$STATE/gh-ratelimit.$resource.json"
   mkdir -p "$STATE" 2>/dev/null || return 0
+  . "$SCRIPT_DIR/fm-wake-lib.sh"
+  fm_lock_acquire_wait "$file.lock" || return 0
+  trap 'fm_lock_release "$file.lock"' EXIT
   if [ -f "$file" ]; then
     previous=$(jq -r 'select((.reset | type) == "number" and (.remaining | type) == "number") | "\(.reset) \(.remaining)"' "$file" 2>/dev/null || true)
     if [ -n "$previous" ]; then
       prev_reset=${previous% *}; prev_remaining=${previous#* }
+      [ "$prev_reset" -le "$reset" ] || return 0
       if [ "$prev_reset" = "$reset" ] && [ "$prev_remaining" -lt "$remaining" ]; then remaining=$prev_remaining; fi
     fi
   fi
@@ -87,7 +88,7 @@ record_rate() { # headers-file
   printf '{"resource":"%s","limit":%s,"remaining":%s,"reset":%s,"observed":%s}\n' \
     "$resource" "$limit" "$remaining" "$reset" "$(date +%s)" > "$staged"
   mv -f -- "$staged" "$file" || rm -f -- "$staged"
-}
+)
 
 cache_path() { # endpoint
   local key
@@ -129,9 +130,23 @@ fetch_page() {
     { print > body }'
   status=$(awk 'NR == 1 { print $2 }' "$hdr" 2>/dev/null)
   record_rate "$hdr"
+  local name value response_etag='' link='' has_link=0
+  while IFS='=' read -r name value; do
+    case "$name" in etag) response_etag=$value ;; link) link=$value; has_link=1 ;; esac
+  done < <(header_pairs "$hdr")
+  next=$(printf '%s' "$link" | tr ',' '\n' | sed -n 's/^[[:space:]]*<\([^>]*\)>[[:space:]]*;[[:space:]]*rel="next".*/\1/p' | head -1 | sed -E 's#^https?://[^/]+/##')
   if [ "$status" = 304 ] && [ -n "$etag" ]; then
     jq -r .body "$entry" > "$body_out"
-    next=$(jq -r '.next // empty' "$entry")
+    if [ "$has_link" -eq 0 ]; then
+      next=$(jq -r '.next // empty' "$entry")
+    elif staged=$(mktemp "$CACHE/.entry.XXXXXX" 2>/dev/null); then
+      if jq --arg next "$next" '.next = (if $next == "" then null else $next end)' "$entry" > "$staged" \
+        && chmod 600 "$staged"; then
+        mv -f -- "$staged" "$entry" || rm -f -- "$staged"
+      else
+        rm -f -- "$staged"
+      fi
+    fi
     touch "$entry" 2>/dev/null || true
     rm -f -- "$raw" "$hdr" "$err"
     printf '%s' "$next"
@@ -140,12 +155,7 @@ fetch_page() {
   case "$status" in
     2??)
       if [ "$rc" -eq 0 ] && jq -e . "$body_out" >/dev/null 2>&1; then
-        local name value link=''
-        etag=''
-        while IFS='=' read -r name value; do
-          case "$name" in etag) etag=$value ;; link) link=$value ;; esac
-        done < <(header_pairs "$hdr")
-        next=$(printf '%s' "$link" | tr ',' '\n' | sed -n 's/^[[:space:]]*<\([^>]*\)>[[:space:]]*;[[:space:]]*rel="next".*/\1/p' | head -1 | sed -E 's#^https?://[^/]+/##')
+        etag=$response_etag
         if [ -n "$etag" ] && mkdir -p "$CACHE" 2>/dev/null && staged=$(mktemp "$CACHE/.entry.XXXXXX" 2>/dev/null); then
           if jq -n --arg etag "$etag" --rawfile body "$body_out" --arg next "$next" \
             '{etag:$etag,body:$body,next:(if $next == "" then null else $next end)}' > "$staged" \
@@ -177,7 +187,7 @@ cmd_get() {
       --paginate) paginate=1 ;;
       --slurp) slurp=1 ;;
       --floor) floor=1 ;;
-      -f|-F)
+      -f)
         shift
         [ "$#" -gt 0 ] || die 'missing value for -f'
         key=${1%%=*}; value=${1#*=}
@@ -190,10 +200,6 @@ cmd_get() {
   done
   [ -n "$endpoint" ] || die 'an endpoint is required'
   command -v gh >/dev/null 2>&1 || die 'gh is required'
-  if [ "$floor" -eq 1 ] && reason=$(quota_low core); then
-    printf '%s\n' "$reason" >&2
-    exit "$EX_TEMPFAIL"
-  fi
   if [ -n "$query" ]; then
     case "$endpoint" in *\?*) endpoint="$endpoint&$query" ;; *) endpoint="$endpoint?$query" ;; esac
   fi
@@ -201,7 +207,11 @@ cmd_get() {
   local pages=() next
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-gh-rest.XXXXXX") || die 'cannot create a temporary directory'
   trap '[ -z "$work" ] || rm -rf -- "$work"' EXIT
-  while [ -n "$endpoint" ] && [ "$i" -lt "$MAX_PAGES" ]; do
+  while [ -n "$endpoint" ]; do
+    if [ "$floor" -eq 1 ] && reason=$(quota_low core); then
+      printf '%s\n' "$reason" >&2
+      exit "$EX_TEMPFAIL"
+    fi
     i=$((i + 1))
     next=$(fetch_page "$endpoint" "$work/page.$i") || exit 1
     pages+=("$work/page.$i")
@@ -216,25 +226,15 @@ cmd_get() {
 }
 
 cmd_guard() {
-  local resource=core reason
-  if [ "${1:-}" = --resource ]; then resource=${2:-core}; fi
-  if reason=$(quota_low "$resource"); then
+  local reason
+  if reason=$(quota_low core); then
     printf '%s\n' "$reason"
     exit "$EX_TEMPFAIL"
   fi
 }
 
-cmd_status() {
-  local file
-  for file in "$STATE"/gh-ratelimit.*.json; do
-    [ -f "$file" ] && jq -c . "$file"
-  done
-  return 0
-}
-
 case "${1:-}" in
   get) shift; cmd_get "$@" ;;
   guard) shift; cmd_guard "$@" ;;
-  status) cmd_status ;;
   *) usage >&2; exit 2 ;;
 esac

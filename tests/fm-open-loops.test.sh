@@ -73,13 +73,16 @@ body = json.dumps(value)
 etag = '"' + hashlib.sha1(body.encode()).hexdigest()[:16] + '"'
 rate = (f"X-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: {os.environ.get('GH_REMAINING', '4000')}\r\n"
         f"X-Ratelimit-Reset: {os.environ.get('GH_RESET', str(int(time.time()) + 3600))}\r\nX-Ratelimit-Resource: core\r\n")
+link = ''
+if os.environ.get('GH_NEXT_LINK') and 'page=2' not in path:
+    link = 'Link: <https://api.github.com' + os.environ['GH_NEXT_LINK'] + '>; rel="next"\r\n'
 if conditional == etag:
     with open(os.environ['GH_REQUESTS'] + '_304', 'a') as stream:
         stream.write(path + '\n')
-    sys.stdout.write('HTTP/2.0 304 Not Modified\r\nEtag: ' + etag + '\r\n' + rate + '\r\n')
+    sys.stdout.write('HTTP/2.0 304 Not Modified\r\nEtag: ' + etag + '\r\n' + rate + link + '\r\n')
     sys.stderr.write('gh: HTTP 304\n')
     sys.exit(1)
-sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: ' + etag + '\r\n' + rate + '\r\n' + body)
+sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: ' + etag + '\r\n' + rate + link + '\r\n' + body)
 ''')
 
 # Git: an origin with one landed baseline, plus separate task copies.
@@ -1197,7 +1200,7 @@ assert second_requests == first_requests, (first_requests, second_requests)
 assert not_modified.read_text().splitlines() == second_requests, 'unchanged reads were not answered with 304'
 assert second == first, 'a cached read changed the ledger'
 
-low = dict(env, GH_REMAINING='500')
+low = dict(env, GH_REMAINING='500', GH_NEXT_LINK='/repos/test/project/pulls?per_page=100&page=2')
 published = json.loads(out([code / 'bin/fm-open-loops.sh', '--heartbeat', '--json']))
 assert published['complete'] is True and 'stale' not in published, published
 # A run whose own responses report 500 of 5000 left crosses the floor mid-sweep: it stops reading and keeps the

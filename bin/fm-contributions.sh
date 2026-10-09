@@ -238,8 +238,11 @@ forge() {
     fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
       "$SCRIPT_DIR/fm-gh-rest.sh" get --floor "$@" 2> "$forge_err" || rc=$?
   else
-    fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
-      gh "$@" 2> "$forge_err" || rc=$?
+    "$SCRIPT_DIR/fm-gh-rest.sh" guard > "$forge_err" 2>&1 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+        gh "$@" 2> "$forge_err" || rc=$?
+    fi
   fi
   if [ "$rc" -eq 75 ]; then # the quota floor refused the read; no forge call was made
     head -1 "$forge_err" > "$TMP/quota-low"
@@ -268,9 +271,15 @@ mark_quota_stale() { # canonical-url task... : keep the last observation, make t
     if jq -e --arg error "$QUOTA_REASON" '.error == $error' "$TMP/old.json" >/dev/null; then
       continue
     fi
+    if ! jq -e --arg error "$QUOTA_REASON" '
+      (.error // "" | split(" quota low (")) as $old
+      | ($error | split(" quota low (")) as $new
+      | ($old | length) == 2 and $old[0] == $new[0]
+        and ($old[1] | split("resets at ")[-1]) == ($new[1] | split("resets at ")[-1])' "$TMP/old.json" >/dev/null; then
+      QUOTA_ANNOUNCE=1
+    fi
     jq --arg error "$QUOTA_REASON" '.error = $error' "$TMP/old.json" > "$TMP/row.json"
     write_record "$task" "$TMP/row.json"
-    QUOTA_ANNOUNCE=1
   done
 }
 
@@ -435,6 +444,10 @@ poll() {
   QUOTA_ANNOUNCE=0
   QUOTA_REASON=
   while IFS=$'\t' read -r -a row; do
+    if [ -n "$QUOTA_REASON" ]; then
+      mark_quota_stale "${row[0]}" "${row[@]:1}"
+      continue
+    fi
     [ $((DEADLINE - $(date +%s))) -ge "$OBSERVATION_RESERVE" ] || break
     url=${row[0]}
     observed=0
