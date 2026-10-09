@@ -675,7 +675,7 @@ deliver_interrupt() {
 verify_interrupt_running() {
   local proof after
   fm_backend_target_exists "$BACKEND" "$T" "$LABEL" \
-    || die "task $ID's endpoint disappeared while interrupting it; no further control action is safe"
+    || die "task $ID's endpoint presence could not be verified after interrupting it; no further control action is safe"
   proof=endpoint
   if fm_control_backend_state_verified "$BACKEND"; then
     # An interrupt cancels a turn; it must never have stopped the agent. This
@@ -714,7 +714,7 @@ clear_retired_meta_busy_gen() {  # <gen>
     . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
   fi
   lock=$(fm_meta_lock_path "$meta") || return 1
-  fm_lock_acquire_wait "$lock"
+  fm_lock_acquire_wait "$lock" || return 1
   current=$(fm_meta_get "$meta" busy_gen)
   if [ "$current" != "$gen" ]; then
     fm_lock_release "$lock"

@@ -222,16 +222,13 @@ test_read_failure_preserves_state_for_retry() {
 }
 
 test_cursor_cache_read_failure_refolds_without_replaying_unread_status() {
-  local dir state fakebin statusfile cursor out probe real_cat status_bytes probe_bytes
+  local dir state statusfile cursor out probe status_bytes probe_bytes
   dir=$(make_case cursor-cache-read-failure)
   state="$dir/state"
-  fakebin="$dir/failbin"
-  mkdir -p "$fakebin"
   statusfile="$state/task5.status"
   cursor="$state/.task5.open-decisions-cursor"
   out="$dir/drain.out"
   probe="$dir/probe.tsv"
-  real_cat=$(command -v cat)
 
   {
     printf 'needs-decision [key=cache]: recover from authoritative status\n'
@@ -249,17 +246,17 @@ test_cursor_cache_read_failure_refolds_without_replaying_unread_status() {
   printf 'working: appended before cache failure\n' >> "$statusfile"
   status_bytes=$(LC_ALL=C wc -c < "$statusfile" | tr -d '[:space:]')
   : > "$probe"
-  cat > "$fakebin/cat" <<SH
-#!/usr/bin/env bash
-if [ "\$#" -eq 1 ] && [ "\$1" = "$cursor" ]; then
-  exit 1
-fi
-exec "$real_cat" "\$@"
-SH
-  chmod +x "$fakebin/cat"
-
-  FM_STATE_OVERRIDE="$state" FM_OPEN_DECISIONS_READ_PROBE="$probe" PATH="$fakebin:$PATH" "$DRAIN" > "$out" \
-    || fail "wake drain failed instead of refolding after the cursor-cache read failure"
+  chmod 000 "$cursor"
+  if [ -r "$cursor" ]; then
+    chmod 600 "$cursor"
+    printf 'SKIP: cursor-cache read failure: checkpoint remains readable with mode 000\n'
+    return 0
+  fi
+  if ! FM_STATE_OVERRIDE="$state" FM_OPEN_DECISIONS_READ_PROBE="$probe" "$DRAIN" > "$out"; then
+    chmod 600 "$cursor"
+    fail "wake drain failed instead of refolding after the cursor-cache read failure"
+  fi
+  chmod 600 "$cursor"
   grep -F 'task5' "$out" | grep -F '[key=cache]' | grep -F 'authoritative status' >/dev/null \
     || fail "the cursor-cache read failure hid the recurring open decision: $(command cat "$out")"
   if grep -F 'UNREAD STATUS' "$out" >/dev/null \
@@ -829,6 +826,95 @@ test_checkpoint_carries_onto_a_snapshot_copy_only_when_it_describes_it() {
   pass "a fold checkpoint rides onto a snapshot copy only when it describes that copy"
 }
 
+UTF8_LOCALE=
+for CANDIDATE in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+  if locale -a 2>/dev/null | grep -qx "$CANDIDATE"; then UTF8_LOCALE=$CANDIDATE; break; fi
+done
+
+test_utf8_whitespace_uses_full_fold_locale() {
+  local dir state out
+  if [ -z "$UTF8_LOCALE" ]; then
+    printf 'SKIP: UTF-8 fold locale: no UTF-8 locale is installed\n'
+    return 0
+  fi
+  dir=$(make_case utf8-locale); state="$dir/state"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  mkdir -p "$dir/copy"
+  out=$(LC_ALL="$UTF8_LOCALE" bash -c '
+    . "$1"
+    f=$2 copy=$3 cf="$(dirname "$2")/.task.open-decisions-cursor"
+    printf "needs-decision:\342\200\203[key=api] choose café" > "$f"
+    expected=$'"'"'api\tneeds-decision\tchoose café'"'"'
+    [ "$(status_open_decisions "$f")" = "$expected" ] || { echo "locale does not recognize UTF-8 whitespace"; exit 1; }
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "partial fold changed locale"; exit 1; }
+    printf "\n" >> "$f"
+    [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "complete fold changed locale"; exit 1; }
+    size=$(LC_ALL=C wc -c < "$f" | tr -d "[:space:]")
+    grep -qx "offset=$size" "$cf" || { echo "checkpoint offset counted characters"; exit 1; }
+    ident=$(_fm_open_decisions_file_ident "$f")
+    cp "$f" "$copy"; cp "${f%.status}.meta" "${copy%.status}.meta"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ "$(status_open_decisions "$copy")" = "$expected" ] || { echo "snapshot fold changed locale"; exit 1; }
+    printf "resolved [key=api]: settled\n" >> "$f"
+    [ -z "$(status_open_decisions_incremental "$f")" ] || { echo "resolution left a phantom decision"; exit 1; }
+    size=$(LC_ALL=C wc -c < "$f" | tr -d "[:space:]")
+    printf "version=10:secondmate\noffset=%s\nident=%s\ndefault\tneeds-decision\tphantom\n" "$size" "$ident" > "$cf"
+    [ -z "$(status_open_decisions "$f")" ] || { echo "full fold accepted divergent checkpoint"; exit 1; }
+    cp "$f" "$copy"
+    rm -f "$(dirname "$copy")/.task.open-decisions-cursor"
+    status_open_decisions_checkpoint_carry "$f" "$copy" "$ident"
+    [ ! -e "$(dirname "$copy")/.task.open-decisions-cursor" ] || { echo "divergent checkpoint reached snapshot"; exit 1; }
+    [ -z "$(status_open_decisions_incremental "$f")" ] || { echo "incremental accepted divergent checkpoint"; exit 1; }
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$state/task.status" "$dir/copy/task.status" 2>&1) \
+    || fail "UTF-8 fold locale: $out"
+  pass "UTF-8 fold locale matches full parsing with byte offsets and legacy invalidation"
+}
+
+test_checkpoint_rejects_a_previous_parsing_locale() {
+  local dir state out from to
+  if [ -z "$UTF8_LOCALE" ]; then
+    printf 'SKIP: cross-locale checkpoint reuse: no UTF-8 locale is installed\n'
+    return 0
+  fi
+  dir=$(make_case cross-locale); state="$dir/state"
+  printf 'kind=secondmate\n' > "$state/task.meta"
+  mkdir -p "$dir/copy"
+  printf 'kind=secondmate\n' > "$dir/copy/task.meta"
+  for from in C "$UTF8_LOCALE"; do
+    if [ "$from" = C ]; then to=$UTF8_LOCALE; else to=C; fi
+    printf 'needs-decision:\342\200\203[key=api] choose a plan\n' > "$state/task.status"
+    rm -f "$state/.task.open-decisions-cursor" "$dir/copy/.task.open-decisions-cursor"
+    LC_ALL="$from" bash -c '. "$1"; status_open_decisions_incremental "$2" >/dev/null' \
+      _ "$ROOT/bin/fm-classify-lib.sh" "$state/task.status" || fail "could not seed $from checkpoint"
+    cp "$state/task.status" "$dir/copy/task.status"
+    out=$(LC_ALL="$to" bash -c '
+      . "$1"
+      f=$2 copy=$3 cf="$(dirname "$2")/.task.open-decisions-cursor"
+      cp "$f" "$copy"
+      expected=$(status_open_decisions "$copy")
+      before=$(cat "$cf")
+      [ "$(status_open_decisions "$f")" = "$expected" ] || { echo "whole-file reused another locale"; exit 1; }
+      [ "$(cat "$cf")" = "$before" ] || { echo "read-only fold wrote its checkpoint"; exit 1; }
+      . "$4"
+      [ "$(status_open_decisions_cursor_offset "$f")" = 0 ] || { echo "wake reader accepted another locale"; exit 1; }
+      status_open_decisions_checkpoint_carry "$f" "$copy" "$(_fm_open_decisions_file_ident "$f")"
+      [ ! -e "$(dirname "$copy")/.task.open-decisions-cursor" ] || { echo "snapshot carried another locale"; exit 1; }
+      [ "$(status_open_decisions_incremental "$f")" = "$expected" ] || { echo "incremental reused another locale"; exit 1; }
+      [ "$(cat "$cf")" != "$before" ] || { echo "incremental did not replace the signature"; exit 1; }
+      printf "resolved [key=api]: settled\n" >> "$f"
+      printf "resolved [key=api]: settled\n" >> "$copy"
+      [ "$(status_open_decisions_incremental "$f")" = "$(status_open_decisions "$copy")" ] || { echo "resolution diverged"; exit 1; }
+    ' _ "$ROOT/bin/fm-classify-lib.sh" "$state/task.status" "$dir/copy/task.status" "$ROOT/bin/fm-status-wake-lib.sh" 2>&1) \
+      || fail "$from to $to checkpoint reuse: $out"
+  done
+  pass "locale changes invalidate incremental, read-only, wake and snapshot checkpoint reuse"
+}
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+else
+test_checkpoint_rejects_a_previous_parsing_locale
+test_utf8_whitespace_uses_full_fold_locale
 test_terminal_supersession_reaches_cached_drains
 test_kind_changes_invalidate_folded_decisions
 test_seeded_whole_file_fold_matches_a_fold_from_line_one
@@ -844,3 +930,4 @@ test_pre_fix_cursor_refolds_corr_tagged_decision
 test_previous_fold_cache_is_refolded_under_current_semantics
 test_large_previous_fold_cache_migrates_within_startup_bound
 test_buried_decision_survives_many_growing_drains_and_resolution_clears_it
+fi

@@ -46,6 +46,8 @@ case "$1 ${2:-}" in
     fi
     ;;
   "server --session")
+    ulimit -S -u > "$state/$session.limit"
+    ulimit -H -u >> "$state/$session.limit"
     if [ "${FM_FAKE_HERDR_SERVER_DELAY:-0}" != 0 ]; then
       "$FM_FAKE_HERDR_REAL_SLEEP" "$FM_FAKE_HERDR_SERVER_DELAY"
     fi
@@ -96,6 +98,23 @@ run_with_fake() {
     "$@"
 }
 
+assert_lab_process_budget() {
+  local file=$1 soft hard inherited
+  {
+    IFS= read -r soft
+    IFS= read -r hard
+  } < "$file" || fail "lab process did not record both limits"
+  case "$soft" in
+    ''|*[!0-9]*) fail "lab process did not inherit a numeric budget: $soft" ;;
+  esac
+  assert_equals "$soft" "$hard" "lab process must not be able to raise its budget"
+  inherited=$(ulimit -S -u)
+  case "$inherited" in
+    ''|*[!0-9]*) ;;
+    *) [ "$soft" -lt "$inherited" ] || fail "lab process did not lower the fixture's process limit" ;;
+  esac
+}
+
 test_refuses_unsafe_names() {
   local status=0 generated
   fm_herdr_lab_validate_name default >/dev/null 2>&1 || status=$?
@@ -111,12 +130,20 @@ test_refuses_unsafe_names() {
 }
 
 test_provision_run_and_guarded_teardown() {
-  local name='' line_count status=0 stop_line delete_line
+  local name='' line_count status=0 stop_line delete_line inherited
   name="fm-lab-behavior-$$"
   : > "$FAKE_LOG"
-  run_with_fake fm_herdr_lab_provision "$name" || fail "provision failed"
+  inherited=$(ulimit -S -u)
+  (
+    case "$inherited" in
+      ''|*[!0-9]*) ;;
+      *) ulimit -S -u "$((inherited - 1))" || exit 125 ;;
+    esac
+    run_with_fake fm_herdr_lab_provision "$name"
+  ) || fail "provision failed"
   [ "$(cat "$FAKE_STATE/$name")" = running ] || fail "provision did not start the named lab session"
   assert_present "$TRIPWIRES/$name.fleet-state.json" "provision did not record the fleet-state tripwire"
+  assert_lab_process_budget "$FAKE_STATE/$name.limit"
 
   run_with_fake fm_herdr_lab_cli "$name" workspace list >/dev/null || fail "safe run command failed"
   run_with_fake fm_herdr_lab_cli "$name" server >/dev/null 2>&1 || status=$?
@@ -443,20 +470,29 @@ write_viewer_record() {
 }
 
 test_viewer_start_cancels_an_unrecorded_launcher() {
-  local name="fm-lab-viewer-late-$$" out status=0 launcher_pid
+  local name="fm-lab-viewer-late-$$" out status=0 launcher_pid inherited
   local started="$TMP_ROOT/viewer-launcher-started"
   run_with_fake fm_herdr_lab_provision "$name" || fail "viewer-late fixture provision failed"
   cat > "$FAKEBIN/python3" <<'SH'
 #!/usr/bin/env bash
+ulimit -S -u > "$FM_FAKE_VIEWER_STARTED.limit"
+ulimit -H -u >> "$FM_FAKE_VIEWER_STARTED.limit"
 printf '%s\n' "$$" > "$FM_FAKE_VIEWER_STARTED"
 exec "$FM_FAKE_HERDR_REAL_SLEEP" 20
 SH
   chmod +x "$FAKEBIN/python3"
-  out=$(FM_FAKE_HERDR_FAST_POLL=1 FM_FAKE_HERDR_WAIT_MARKER="$started" \
-    FM_FAKE_VIEWER_STARTED="$started" run_with_fake fm_herdr_lab_viewer_start "$name" 2>&1) || status=$?
+  inherited=$(ulimit -S -u)
+  out=$(
+    if [ "$inherited" != unlimited ]; then
+      ulimit -S -u "$((inherited - 1))" || exit 125
+    fi
+    FM_FAKE_HERDR_FAST_POLL=1 FM_FAKE_HERDR_WAIT_MARKER="$started" \
+      FM_FAKE_VIEWER_STARTED="$started" run_with_fake fm_herdr_lab_viewer_start "$name" 2>&1
+  ) || status=$?
   rm -f "$FAKEBIN/python3"
   expect_code 1 "$status" "an unrecorded launcher must not outlive viewer start"
   assert_present "$started" "delayed viewer launcher did not start"
+  assert_lab_process_budget "$started.limit"
   launcher_pid=$(cat "$started")
   kill -0 "$launcher_pid" 2>/dev/null && fail "timed-out viewer launcher remained alive"
   assert_contains "$out" "did not become the foreground client" "launcher timeout was unclear"

@@ -215,14 +215,22 @@ emit() {  # <state> <source> [detail]
 
 [ -f "$META" ] || emit unknown none "no metadata for $ID"
 
-meta_value() {  # <key>
-  grep "^$1=" "$META" 2>/dev/null | tail -1 | cut -d= -f2- || true
+# The LAST value recorded for a key, read in one pass with no process started.
+meta_value_to() {  # <output-variable> <key>
+  local _line _value=''
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    case "$_line" in
+      "$2="*) _value=${_line#*=} ;;
+    esac
+  done < "$META" 2>/dev/null || :
+  printf -v "$1" '%s' "$_value"
 }
 
-WT=$(meta_value worktree)
-KIND=$(meta_value kind)
-HARNESS=$(meta_value harness)
-REMOTE_HOST=$(meta_value remote_host)
+WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT=''
+meta_value_to WT worktree
+meta_value_to KIND kind
+meta_value_to HARNESS harness
+meta_value_to REMOTE_HOST remote_host
 [ -n "$KIND" ] || KIND=ship
 
 # A torn-down (or never-created) worktree has no current state to read. A
@@ -244,7 +252,9 @@ fi
 # not treated as finished-and-safe.
 emit_ship_status_done() {  # [extra-detail]
   local extra=${1:-} reason
-  if reason=$(fm_dod_accept_ship_done "$KIND" "$(meta_value mode)" "$WT" "$(meta_value project)" "$LOG_LINE" "$STATE" "$ID" "$META"); then
+  meta_value_to META_MODE mode
+  meta_value_to META_PROJECT project
+  if reason=$(fm_dod_accept_ship_done "$KIND" "$META_MODE" "$WT" "$META_PROJECT" "$LOG_LINE" "$STATE" "$ID" "$META"); then
     emit "done" status-log "$(status_line_note "$LOG_LINE")${extra:+${SEP}$extra}"
   fi
   emit blocked status-log "$reason"
@@ -318,7 +328,7 @@ BACKEND_TARGET=$(fm_backend_target_of_meta "$META")
 EXPECTED_LABEL="fm-$ID"
 pane_readable() {  # <target>
   case "$TASK_BACKEND" in
-    tmux) tmux display-message -p -t "$1" '#{pane_id}' >/dev/null 2>&1 ;;
+    tmux) fm_backend_target_exists tmux "$1" "$EXPECTED_LABEL" ;;
     *) fm_backend_capture "$TASK_BACKEND" "$1" 1 "$EXPECTED_LABEL" >/dev/null 2>&1 ;;
   esac
 }

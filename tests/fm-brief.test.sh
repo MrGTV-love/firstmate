@@ -1468,11 +1468,117 @@ test_crewmate_scaffolds_forbid_pool_administration() {
   pass "fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool"
 }
 
+test_crewmate_scaffolds_require_stopping_private_services() {
+  local home mode id brief ship_rule scout_rule verb
+  home="$TMP_ROOT/private-service-home"
+  mkdir -p "$home/data"
+
+  for verb in paused awaiting; do
+  for mode in no-mistakes direct-PR local-only; do
+    id="brief-private-$verb-$mode"
+    FM_HOME="$home" FM_CLASSIFY_PAUSED_VERB="$verb" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh --mode $mode exited non-zero"
+    brief="$home/data/$id/brief.md"
+    assert_grep "8. Stop every private service you start." "$brief" \
+      "$mode ship brief lacks the private-service rule"
+    assert_grep "NO_MISTAKES_HOME" "$brief" \
+      "$mode ship brief does not name the private no-mistakes home"
+    assert_grep "name it in that status line" "$brief" \
+      "$mode ship brief does not require naming the service in the status line"
+    # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+    assert_grep 'launchctl bootout gui/$(id -u)/<label>' "$brief" \
+      "$mode ship brief does not say how to stop the launchd agent"
+    assert_grep "Never use \`no-mistakes daemon stop\` for this" "$brief" \
+      "$mode ship brief does not forbid stopping the shared daemon"
+    assert_grep "Before you append a \`$verb\`, \`blocked\`, \`needs-decision\`, \`done\`, or \`failed\`" "$brief" \
+      "$mode ship private-service rule does not render the configured parking verb"
+  done
+
+  FM_HOME="$home" FM_CLASSIFY_PAUSED_VERB="$verb" "$ROOT/bin/fm-brief.sh" "brief-private-$verb-scout" alpha --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh --scout exited non-zero"
+  brief="$home/data/brief-private-$verb-scout/brief.md"
+  ship_rule=$(awk '/^8\. Stop every private service/,/^$/' "$home/data/brief-private-$verb-no-mistakes/brief.md")
+  scout_rule=$(awk '/^8\. Stop every private service/,/^$/' "$brief")
+  [ -n "$ship_rule" ] || fail "ship brief emitted no private-service rule to compare"
+  [ "$ship_rule" = "$scout_rule" ] || fail "ship and scout private-service rules have drifted apart"
+  done
+
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-private-mate --secondmate alpha >/dev/null 2>&1 \
+    || fail "fm-brief.sh --secondmate exited non-zero"
+  assert_no_grep "Stop every private service you start." "$home/data/brief-private-mate/brief.md" \
+    "secondmate charter must not inherit the crewmate private-service rule"
+
+  pass "fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line"
+}
+
+# A runaway scratch tree fills the user's whole process table and costs every
+# lane its forks (the 2026-10-08 fork-EAGAIN incident), and only the worker's
+# own brief reaches an ad-hoc shim, lab, or measurement script. Every crewmate
+# scaffold carries the one-line rule that routes such a script through
+# bin/fm-proc-budget.sh; the emitted line must be identical for ship and scout.
+test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget() {
+  local home="$TMP_ROOT/proc-budget-home" mode brief ship_rule scout_rule
+  mkdir -p "$home/data"
+  for mode in no-mistakes direct-PR local-only; do
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "brief-budget-$mode" alpha --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh --mode $mode exited non-zero"
+    brief="$home/data/brief-budget-$mode/brief.md"
+    assert_grep "9. Run any shim, lab, or measurement script through" "$brief" \
+      "$mode ship brief lacks the process-budget rule"
+    assert_grep "$ROOT/bin/fm-proc-budget.sh" "$brief" \
+      "$mode ship brief does not name the process-budget wrapper by path"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-budget-scout alpha --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh --scout exited non-zero"
+  brief="$home/data/brief-budget-scout/brief.md"
+  assert_grep "9. Run any shim, lab, or measurement script through" "$brief" \
+    "scout brief lacks the process-budget rule"
+  ship_rule=$(grep '^9\. Run any shim' "$home/data/brief-budget-no-mistakes/brief.md")
+  scout_rule=$(grep '^9\. Run any shim' "$brief")
+  [ -n "$ship_rule" ] && [ "$ship_rule" = "$scout_rule" ] \
+    || fail "ship and scout process-budget rules have drifted apart"
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-budget-mate --secondmate alpha >/dev/null 2>&1 \
+    || fail "fm-brief.sh --secondmate exited non-zero"
+  assert_no_grep "fm-proc-budget.sh" "$home/data/brief-budget-mate/brief.md" \
+    "a secondmate charter is not a crewmate scratch-script rule"
+  pass "fm-brief.sh: every crewmate scaffold routes scratch scripts through the process budget"
+}
+
+test_process_budget_command_quotes_foreign_firstmate_path() {
+  local home="$TMP_ROOT/budget-foreign-home" mode id brief rule command got
+  local foreign_root="$TMP_ROOT/budget helper's root"
+  mkdir -p "$home/data" "$foreign_root/bin"
+  cp "$ROOT/bin/fm-proc-budget.sh" "$foreign_root/bin/"
+  for mode in no-mistakes direct-PR local-only scout; do
+    id="brief-budget-foreign-$mode"
+    if [ "$mode" = scout ]; then
+      FM_HOME="$home" FM_ROOT_OVERRIDE="$foreign_root" "$ROOT/bin/fm-brief.sh" "$id" foreign --scout >/dev/null 2>&1 \
+        || fail "foreign-root scout brief failed"
+    else
+      FM_HOME="$home" FM_ROOT_OVERRIDE="$foreign_root" "$ROOT/bin/fm-brief.sh" "$id" foreign --mode "$mode" >/dev/null 2>&1 \
+        || fail "foreign-root $mode brief failed"
+    fi
+    brief="$home/data/$id/brief.md"
+    rule=$(grep '^9\. Run any shim' "$brief")
+    command=${rule#*\`}
+    command=${command%%\`*}
+    command=${command% -- <command...>}
+    got=$(bash -c "$command -- printf '%s' 'budget command executed'") \
+      || fail "the emitted $mode budget command could not execute from a quoted root"
+    assert_equals "budget command executed" "$got" "the emitted $mode command must execute the wrapper"
+  done
+  pass "fm-brief.sh: emitted process-budget commands execute from foreign paths"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs
 test_ship_mode_is_required_and_closed_set
+test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget
+test_process_budget_command_quotes_foreign_firstmate_path
 test_ship_mode_is_explicit_not_registry
 test_delivery_flags_are_refused_where_they_do_not_apply
 test_faster_paths_use_configured_authority_without_stacked_review
@@ -1505,3 +1611,4 @@ test_branch_prefix_is_refused_where_it_does_not_apply
 test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_crewmate_scaffolds_forbid_pool_administration
+test_crewmate_scaffolds_require_stopping_private_services

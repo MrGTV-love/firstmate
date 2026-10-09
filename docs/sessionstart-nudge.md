@@ -158,6 +158,8 @@ Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) th
 The first bound hit latches the sweep.
 Later reads in that sweep then return immediately while still naming their own item.
 
+`tests/fm-backlog-read-bound.test.sh` exercises hanging reads through hold, inventory verification (including migrated-prefix resolution), reconcile-request intake, and session start. It checks bounded completion, rejection without task creation or inventory attestation, and suppression of further backend reads after a timeout; diagnostic word order is not part of those CLI contracts.
+
 When timeout, gtimeout, and perl are unavailable, the shared timeout owner falls back to a pure-Bash process-group watchdog.
 So no supported host runs the digest unbounded.
 

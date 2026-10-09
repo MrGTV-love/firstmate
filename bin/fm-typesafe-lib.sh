@@ -6,7 +6,6 @@
 # existing .fm-secondmate-parent record (fm_firstmate_root_home), so a
 # secondmate home and its crews share the primary home's single key without
 # any copy. A remote-seeded home has no local primary and stops at its own .env.
-# fm_openrouter_key <home> reads OPENROUTER_API_KEY from <home>/.env alone.
 # fm_typesafe_post <request-json> <response-file> [transfer-seconds-file] uses
 # the fixed endpoint and five-second deadline, with no retries. Prints only the
 # HTTP code (000 on a transport failure), optionally saving curl's transfer time.
@@ -20,6 +19,9 @@
 # docs/configuration.md "What the model receives", "Never-send list", and
 # "Worker skill selection" own the extraction and privacy contracts.
 # A refusal sets FM_TYPESAFE_WITHHELD_REASON and returns 1, without echoing text.
+# fm_openrouter_key <home> resolves OPENROUTER_API_KEY for both the jev-guard
+# and worker skill-selection OpenRouter fallbacks into the non-exported
+# OPENROUTER_API_KEY_PRIVATE.
 
 TYPESAFE_API_KEY_PRIVATE=${TYPESAFE_API_KEY_PRIVATE:-${TYPESAFE_API_KEY:-}}
 export -n TYPESAFE_API_KEY_PRIVATE 2>/dev/null || true
@@ -41,10 +43,15 @@ fm_typesafe_key() {
   [ -n "$TYPESAFE_API_KEY_PRIVATE" ]
 }
 
-# The OpenRouter fallback key comes from the same home .env only, never the
-# ambient environment, where an unrelated project's OpenRouter key may live.
+# The OpenRouter fallback key comes from <home>/.env, then the primary home's
+# .env, never the ambient environment where an unrelated project's OpenRouter
+# key may live.
 fm_openrouter_key() {
+  local primary
   OPENROUTER_API_KEY_PRIVATE=$(fmx_env_get OPENROUTER_API_KEY "$1/.env")
+  if [ -z "$OPENROUTER_API_KEY_PRIVATE" ] && primary=$(fm_firstmate_root_home "$1" 2>/dev/null); then
+    OPENROUTER_API_KEY_PRIVATE=$(fmx_env_get OPENROUTER_API_KEY "$primary/.env")
+  fi
   [ -n "$OPENROUTER_API_KEY_PRIVATE" ]
 }
 

@@ -146,11 +146,15 @@ fm_session_end_ledger_add() {  # <state-dir> <id> <attempt|relaunched|failed>
 
 # A current session-end record. Prints "gen seq" or nothing.
 fm_session_end_identity() {  # <state-dir> <id>
-  local state=$1 id=$2 gen out r_state r_source r_event r_seq
+  local state=$1 id=$2 gen out r_state r_source r_event r_seq rec
+  # No busy record means no session-end record: skip the read, which would only
+  # answer "missing" after starting a process.
+  fm_busy_record_path_to rec "$state" "$id"
+  [ -f "$rec" ] || return 1
   out=$(fm_busy_record_read "$state" "$id" 2>/dev/null) || return 1
   read -r r_state r_source r_event r_seq <<< "$out"
   [ "$r_state" = idle ] && [ "$r_event" = session-end ] && [ -n "$r_seq" ] || return 1
-  gen=$(fm_busy_current_gen "$state" "$id") || return 1
+  fm_busy_current_gen_to gen "$state" "$id" || return 1
   printf '%s %s\n' "$gen" "$r_seq"
 }
 
@@ -193,13 +197,13 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   meta="$state/$id.meta"
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 0
   [ ! -e "$state/$id.backlog-close" ] && [ ! -L "$state/$id.backlog-close" ] || return 0
-  kind=$(fm_meta_get "$meta" kind 2>/dev/null || true)
+  fm_meta_get_to kind "$meta" kind
   [ -n "$kind" ] || kind=ship
   case "$kind" in
     ship|scout) ;;
     *) return 0 ;;
   esac
-  wt=$(fm_meta_get "$meta" worktree 2>/dev/null || true)
+  fm_meta_get_to wt "$meta" worktree
   [ -n "$wt" ] && [ -d "$wt" ] || return 0
   identity=$(fm_session_end_identity "$state" "$id") || return 0
   gen=${identity%% *}

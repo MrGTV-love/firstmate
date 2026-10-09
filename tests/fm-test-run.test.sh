@@ -498,6 +498,35 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" add .agents/skills/hyper-jev
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-skill-change
 
+  mkdir -p "$repo/bin/ten-levels/extensions" "$repo/tests/assets"
+  : >"$repo/bin/ten-levels/extensions/report.ts"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-jev-guard.test.sh"
+  chmod +x "$repo/tests/fm-jev-guard.test.sh"
+  : >"$repo/tests/assets/retired-asset.mjs"
+  git -C "$repo" add tests/fm-jev-guard.test.sh tests/assets/retired-asset.mjs
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm guard-fixture
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
+  assert_contains "$listed" "tests/fm-jev-guard.test.sh" "vendored jev-guard files select the jev-guard suite"
+  git -C "$repo" add bin/ten-levels
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-guard-change
+  git -C "$repo" rm -q tests/assets/retired-asset.mjs
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a retired test asset was refused as an unmapped changed source"
+  [ -z "$listed" ] || fail "an unreferenced retired test asset must select no suite: $listed"
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm retired-asset-change
+
+  mkdir -p "$repo/tests/assets"
+  : >"$repo/tests/assets/board-render-harness.mjs"
+  printf '#!/usr/bin/env bash\nnode tests/assets/board-render-harness.mjs\n' >"$repo/tests/fm-bearings-board-render.test.sh"
+  chmod +x "$repo/tests/fm-bearings-board-render.test.sh"
+  git -C "$repo" add tests/assets/board-render-harness.mjs tests/fm-bearings-board-render.test.sh
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm board-render-fixture
+  git -C "$repo" rm -q tests/assets/board-render-harness.mjs
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a referenced deleted test asset must select its consumer"
+  assert_contains "$listed" "tests/fm-bearings-board-render.test.sh" "a deleted board-render harness selects its surviving consumer"
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm referenced-asset-deletion
+
   printf '\n' >>"$repo/bin/fm-procevent-quota.sh"
   printf '\n' >>"$repo/bin/fm-quota-choose.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
@@ -619,6 +648,42 @@ test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer() {
   done
   rm -rf "$tmp"
   pass "fleet snapshot selects its exact ledger consumer without widening snapshot siblings"
+}
+
+test_changed_watch_helpers_select_runnable_consumers() {
+  local tmp repo listed expected path out status
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-watch-helpers.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cp -R "$ROOT/bin/." "$repo/bin/"
+  cp "$ROOT/tests/fm-pi-watch-loader-live.test.sh" "$repo/tests/"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-omp-harness.test.sh"
+  : >"$repo/tests/fm-pi-watch-loader-live.test.mjs"
+  : >"$repo/tests/watch-lifecycle-expiry.mjs"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm watch-fixture
+  for path in fm-pi-watch-loader-live.test.mjs watch-lifecycle-expiry.mjs; do
+    printf '\n' >>"$repo/tests/$path"
+    listed=$("$repo/bin/fm-test-run.sh" --list --changed --base HEAD) \
+      || fail "$path failed changed-test selection"
+    case "$path" in
+      fm-pi-watch-loader-live.test.mjs) expected=tests/fm-pi-watch-loader-live.test.sh ;;
+      watch-lifecycle-expiry.mjs) expected=$(printf '%s\n' tests/fm-omp-harness.test.sh tests/fm-pi-watch-extension.test.sh) ;;
+    esac
+    [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] || fail "$path selected incorrect consumers: $listed"
+    git -C "$repo" add "tests/$path"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm helper-change
+  done
+  listed=$("$repo/bin/fm-test-run.sh" --list --family live-harness-optin)
+  assert_contains "$listed" tests/fm-pi-watch-loader-live.test.sh "loader regression must belong to the opt-in family"
+  cp "$ROOT/tests/lib.sh" "$repo/tests/"
+  out=$(FM_LIVE=0 FM_PI_WATCH_LOADER_LIVE_E2E=0 "$repo/bin/fm-test-run.sh" --jobs 1 tests/fm-pi-watch-loader-live.test.sh 2>&1) && status=0 || status=$?
+  expect_code 0 "$status" "disabled Pi loader regression: $out"
+  assert_contains "$out" "skip: live: disabled by FM_PI_WATCH_LOADER_LIVE_E2E=0" "loader must skip before requiring the SDK"
+  assert_contains "$out" "expected_gate_skip=live-capability" "loader skip must use the live capability class"
+  assert_contains "$out" "skipped_gate=1" "runner must record the disabled loader regression"
+  rm -rf "$tmp"
+  pass "watch JavaScript helpers select runnable consumers and the loader regression is gated"
 }
 
 test_changed_status_owners_select_all_consuming_tests() {
@@ -2123,6 +2188,129 @@ SH
   pass "--per-script-timeout-secs turns a hung script into a bounded failure"
 }
 
+# A script killed outright (the per-script bound's KILL, an outer timeout) never
+# runs its cleanup trap, so a stub it started outlives it. The runner sweeps the
+# leftovers its fixture marker proves are the dead run's after each script.
+test_runner_reaps_stubs_a_killed_script_left_behind() {
+  local tmp repo runner leak stub_pid_file stub rc waited
+  tmp=$(mktemp -d)
+  repo="$tmp/repo"
+  leak=tests/fm-leak-fixture.test.sh
+  mkdir -p "$repo/tests"
+  cp -R "$ROOT/bin" "$repo/bin"
+  cp "$ROOT/tests/lib.sh" "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  cp "$repo/bin/fm-test-reap-orphans.sh" "$repo/bin/fm-test-reap-fixture.sh"
+  cat > "$repo/bin/fm-test-reap-orphans.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "$#" -eq 0 ]; then set -- --tmpdir "${TMPDIR:?}"; fi
+exec "$(dirname "${BASH_SOURCE[0]}")/fm-test-reap-fixture.sh" "$@"
+SH
+  chmod +x "$repo/bin/fm-test-reap-orphans.sh"
+  runner="$repo/bin/fm-test-run.sh"
+  stub_pid_file="$tmp/stub.pid"
+  cat >"$repo/$leak" <<'SH'
+#!/usr/bin/env bash
+set -u
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+root=$(fm_test_tmproot fm-leak-fixture)
+cat >"$root/stub.sh" <<'STUB'
+#!/usr/bin/env bash
+n=0
+while [ ! -e "$1" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+  sleep 0.05
+  n=$((n + 1))
+done
+STUB
+(
+  bash "$root/stub.sh" "$root/release" >/dev/null 2>&1 &
+  fm_test_record_process "$FM_LEAK_PIDFILE" "$!" || exit 1
+) || exit 1
+kill -KILL "$$"
+SH
+  chmod +x "$runner" "$repo/$leak"
+
+  set +e
+  (cd "$repo" && FM_TEST_SKIP_ORPHAN_REAP=1 FM_LEAK_PIDFILE="$stub_pid_file" \
+    TMPDIR="$tmp" "$runner" "$leak" >"$tmp/out" 2>"$tmp/err")
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "a script killed outright must fail the run: $(cat "$tmp/out")"
+  [ -s "$stub_pid_file" ] || fail "the killed script never started its stub: $(cat "$tmp/out" "$tmp/err")"
+  IFS=$'\t' read -r stub _ < "$stub_pid_file"
+  waited=0
+  while fm_test_process_alive "$stub_pid_file" /stub.sh && [ "$waited" -lt 100 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  if fm_test_process_alive "$stub_pid_file" /stub.sh; then
+    fm_test_process_alive "$stub_pid_file" /stub.sh && kill -KILL "$FM_TEST_PROCESS_PID" 2>/dev/null || true
+    fail "the runner left the killed script's stub $stub running"
+  fi
+  grep -Fq "reaped after $leak:" "$tmp/err" \
+    || fail "the runner did not say what it reaped: $(cat "$tmp/err")"
+  rm -rf "$tmp"
+  pass "the runner reaps the stub a killed script left behind"
+}
+
+# A script that forks without bound must stop at its own limit instead of
+# filling the user's process table for every other lane (the 2026-10-08
+# fork-EAGAIN incident), so the runner starts each script under the per-tree
+# process budget of bin/fm-proc-budget.sh. The fixture reports the limit it
+# runs under; the runner's own limit is the comparison.
+test_each_script_runs_under_a_process_budget() {
+  local tmp repo fixture inherited seen expected count
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-budget.XXXXXX")
+  repo="$tmp/repo"
+  fixture=tests/fm-budget-fixture.test.sh
+  mkdir -p "$repo/bin" "$repo/tests" "$tmp/failing-ps" "$tmp/budget-ps"
+  cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-proc-budget.sh" "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  cat >"$repo/$fixture" <<'SH'
+#!/usr/bin/env bash
+echo "ok - fixture runs under limit $(ulimit -u)"
+SH
+  printf '#!/bin/sh\nexit 1\n' >"$tmp/failing-ps/ps"
+  case "$(uname -s)" in
+    Linux) count=$(set -o pipefail; ps -L -U "$(id -u)" -o lwp= | wc -l) || fail "cannot read the baseline task count" ;;
+    *) count=$(set -o pipefail; ps -U "$(id -u)" -o pid= | wc -l) || fail "cannot read the baseline process count" ;;
+  esac
+  cat >"$tmp/budget-ps/ps" <<SH
+#!/bin/sh
+i=0
+while [ "\$i" -lt "$count" ]; do
+  echo "\$i"
+  i=\$((i + 1))
+done
+SH
+  chmod +x "$repo/bin/fm-test-run.sh" "$repo/$fixture" "$tmp/failing-ps/ps" "$tmp/budget-ps/ps"
+  inherited=$(ulimit -S -u)
+  expected=$((count + 1500))
+  case "$inherited" in
+    ''|*[!0-9]*) ;;
+    *) [ "$expected" -lt "$inherited" ] || expected=$inherited ;;
+  esac
+
+  PATH="$tmp/budget-ps:$PATH" "$repo/bin/fm-test-run.sh" "$fixture" >"$tmp/out" 2>"$tmp/err" \
+    || fail "the budgeted run failed: $(cat "$tmp/out" "$tmp/err")"
+  seen=$(sed -n 's/.*fixture runs under limit //p' "$tmp/out")
+  case "$seen" in
+    ''|*[!0-9]*) fail "the fixture did not report a numeric limit (got '$seen'): $(cat "$tmp/out")" ;;
+  esac
+  assert_equals "$expected" "$seen" "the script budget must be capped by its inherited limit"
+
+  if PATH="$tmp/failing-ps:$PATH" "$repo/bin/fm-test-run.sh" "$fixture" >"$tmp/out4" 2>"$tmp/err4"; then
+    fail "a runner with an unreadable process count must fail"
+  fi
+  assert_not_contains "$(cat "$tmp/out4" "$tmp/err4")" "fixture runs under limit" \
+    "a failed budget must prevent fixture execution"
+  assert_contains "$(cat "$tmp/out4" "$tmp/err4")" "cannot read the process count" \
+    "a failed budget must report the wrapper's refusal"
+
+  rm -rf "$tmp"
+  pass "each script runs under a per-tree process budget"
+}
+
 # The duration regression this guard exists for: a suite whose scripts are all
 # green but whose wall clock outgrew its caller's invocation budget. The caller
 # gets killed mid-run and retries invisibly, so an over-budget run has to be a
@@ -2455,6 +2643,7 @@ test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
 test_supervision_groups_share_coverage_and_changed_selection
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
+test_changed_watch_helpers_select_runnable_consumers
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
@@ -2491,6 +2680,8 @@ test_changed_shared_fixture_selects_its_readers
 test_changed_omp_composer_captures_select_their_consumers
 test_concurrent_runs_are_ordered_longest_first
 test_per_script_timeout_bounds_a_hang
+test_runner_reaps_stubs_a_killed_script_left_behind
+test_each_script_runs_under_a_process_budget
 test_changed_bound_gives_slow_watcher_suites_headroom
 test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation

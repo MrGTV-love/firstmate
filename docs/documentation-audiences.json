@@ -373,6 +373,10 @@
       "audience": "public-product"
     },
     {
+      "path": "bin/ten-levels/SOURCE.md",
+      "audience": "maintainer-architecture"
+    },
+    {
       "path": "docs/agent-control.md",
       "audience": "maintainer-architecture"
     },
@@ -442,6 +446,10 @@
     },
     {
       "path": "docs/examples/watched-tools.json",
+      "audience": "operator-example"
+    },
+    {
+      "path": "docs/examples/fm-watchdog.plist",
       "audience": "operator-example"
     },
     {
@@ -614,6 +622,10 @@
     },
     {
       "path": "docs/voice-relay.md",
+      "audience": "operator-current"
+    },
+    {
+      "path": "docs/watchdog.md",
       "audience": "operator-current"
     },
     {

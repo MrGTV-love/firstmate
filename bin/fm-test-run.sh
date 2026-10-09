@@ -28,6 +28,12 @@
 # Aggregation (no suite execution):
 #   fm-test-run.sh --aggregate-json <out.json> <lane.json> [more lane.json...]
 #
+# Leftovers: after each script finishes, the runner invokes the reaper beside it
+# in its own checkout, including when running from a scratch copy. The
+# bin/fm-test-reap-orphans.sh header owns ended lab/test ownership proof.
+# A script killed before cleanup completes can leave stubs behind; the sweep
+# logs its reaper output and never changes the script's result.
+#
 # Options:
 #   --json <path>   write a deterministic timing artifact after the run. Each
 #                   script record carries its family, expected gate-skip class,
@@ -123,11 +129,17 @@
 # An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so participating test bursts across worktrees take turns.
-# A runner already inside a pass (FM_CPU_PASS_HELD set) runs directly with at
-# most that many concurrent scripts, reporting a reduced --jobs on stderr.
+# A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
+# and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # The marker must be a nonnegative decimal integer or execution exits 125;
-# 0 denotes degraded work and imposes no budget.
-# Without python3 or the pool tool beside it, scripts run directly.
+# 0 denotes degraded work with no CPU-pass concurrency limit.
+# Without python3 or the pool tool beside it, scripts run without a CPU pass.
+#
+# When the sibling bin/fm-proc-budget.sh is present and executable, every
+# executed script runs through it; its header owns the process-budget contract.
+# The budget is taken when the script starts, after any pass wait. If the budget
+# cannot be set, that script fails with wrapper exit 125 rather than running
+# unbudgeted. Without the executable wrapper, scripts run without this budget.
 # With a usable pool, --jobs above its size still starts that many workers,
 # but only pool-size scripts run at once.
 #
@@ -164,6 +176,9 @@
 # tests/fixtures/<dir>/ is mapped by that directory instead. The flat omp ANSI
 # captures select their exact composer consumer. Curated family arms above
 # those also name individual tests/ files explicitly.
+# Deleted test assets still select remaining suites that reference them; an
+# unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
+# select the jev-guard behavior suite.
 set -eu
 
 now_ms() {
@@ -311,7 +326,6 @@ family_for_basename() {
     fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|fm-omp-harness.test.sh|fm-herdr-lab.test.sh|fm-lint.test.sh|\
     fm-lint-workflows.test.sh|\
     fm-operational-input.test.sh|fm-pi-primary-types.test.sh|\
-    fm-omp-jev-pipeline.test.sh|\
     fm-calm-claude-mod.test.sh|\
     fm-harness-adapter-references.test.sh|\
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
@@ -332,7 +346,7 @@ family_for_basename() {
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
     fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-task-inbox.test.sh|\
-    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh)
+    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     fm-afk-inject-herdr-e2e.test.sh|fm-afk-launch.test.sh|fm-backend-autodetect-smoke.test.sh|\
@@ -380,13 +394,14 @@ family_for_basename() {
     fm-grok-stop-live-e2e.test.sh|fm-harness-adapter-instructions-live-e2e.test.sh|\
     fm-harness-liveness-drift-live-e2e.test.sh|\
     fm-devin-signals-live-e2e.test.sh|fm-muse-signals-live-e2e.test.sh|fm-rovo-signals-live-e2e.test.sh|fm-agy-signals-live-e2e.test.sh|\
-    fm-launch-prompt-signals-live-e2e.test.sh|\
+    fm-launch-prompt-signals-live-e2e.test.sh|fm-claude-nested-home-live-e2e.test.sh|\
     fm-pi-seeded-home-trust-live-e2e.test.sh|\
     fm-herdr-version-floor-live-e2e.test.sh|\
     fm-herdr-pi-stale-registration-live-e2e.test.sh|\
     fm-worker-account-live-e2e.test.sh|fm-teamclaude-launch-live-e2e.test.sh|\
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
+    fm-pi-watch-loader-live.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
@@ -848,6 +863,7 @@ tests/fm-pr-check-security.test.sh 300675
 tests/fm-pr-reviewers.test.sh 273
 tests/fm-pr-state-live-e2e.test.sh 47
 tests/fm-pr-state.test.sh 531
+tests/fm-proc-budget.test.sh 8000
 tests/fm-procevent-quota.test.sh 2459
 tests/fm-procevent-when.test.sh 25674
 tests/fm-procevent.test.sh 370820
@@ -914,6 +930,7 @@ tests/fm-startup-network.test.sh 72106
 tests/fm-stat-shadowing.test.sh 75
 tests/fm-stow-cascade.test.sh 3058
 tests/fm-supervision-events.test.sh 673
+tests/fm-supervision-fork-budget.test.sh 7400
 tests/fm-supervision-host-attended-live-e2e.test.sh 49
 tests/fm-supervision-host-live-e2e.test.sh 75
 tests/fm-supervision-host-hook.test.sh 70651
@@ -929,6 +946,7 @@ tests/fm-teardown.test.sh 202132
 tests/fm-test-fixture-cleanup.test.sh 937
 tests/fm-test-fixtures.test.sh 1802
 tests/fm-test-isolation-proof.test.sh 2866
+tests/fm-test-reap-orphans.test.sh 10537
 tests/fm-timeout-lib.test.sh 10750
 tests/fm-tmux-agent-liveness.test.sh 3770
 tests/fm-tool-update-check.test.sh 14383
@@ -952,6 +970,7 @@ tests/fm-watch-open-loops.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59092
 tests/fm-watch-triage.test.sh 1074843
 tests/fm-watcher-lock.test.sh 108940
+tests/fm-watchdog-check.test.sh 23000
 tests/fm-worker-account-live-e2e.test.sh 3179
 tests/fm-worker-account.test.sh 125208
 EOF
@@ -1480,8 +1499,17 @@ families_for_changed_path() {
       # resolution in the caller; emit a marker family of __script__
       printf '%s\n' "__script__:$(basename "$path")"
       ;;
-    extensions/omp-jev-*.mjs|tests/assets/omp-jev-pipeline.test.mjs)
-      printf '%s\n' "__script__:fm-omp-jev-pipeline.test.sh"
+    bin/ten-levels/*)
+      # Vendored upstream jev-guard (see SOURCE.md there) and its Firstmate
+      # report.ts are exercised only through the jev-guard behavior suite.
+      printf '%s\n' "__script__:fm-jev-guard.test.sh"
+      ;;
+    tests/fm-pi-watch-loader-live.test.mjs)
+      printf '%s\n' __script__:fm-pi-watch-loader-live.test.sh
+      ;;
+    tests/watch-lifecycle-expiry.mjs)
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
       ;;
     bin/fm-test-run.sh)
       # Deliberately the WHOLE family, not just the two contract tests. This
@@ -1662,6 +1690,17 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-supervision-host-hook.test.sh
       # Whether an arriving outcome still lets the captain type is a fact only
       # a real Pi TUI can answer, so the live guards are selected too.
+      printf '%s\n' live-harness-optin
+      ;;
+    .pi/extensions/lib/fm-watch-lifecycle.ts)
+      # The primary watcher extensions' shared lifecycle record and instance
+      # registry: the suites that load either watcher extension, plus the Pi
+      # typecheck and the live guards that load the real harness.
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' __script__:fm-watch-recovery-loop.test.sh
+      printf '%s\n' __script__:fm-calm-pi-extension.test.sh
+      printf '%s\n' __script__:fm-pi-primary-types.test.sh
       printf '%s\n' live-harness-optin
       ;;
     .pi/extensions/lib/fm-operational-input.ts)
@@ -1871,9 +1910,6 @@ families_for_changed_path() {
         families_for_unmapped_bin "$path" \
           || printf '%s\n' "__unmapped__:$path"
       fi
-      ;;
-    tests/*)
-      printf '%s\n' "__unmapped__:$path"
       ;;
     README.md|LICENSE|assets/*|docs/*|.gitignore)
       ;;
@@ -2484,6 +2520,10 @@ elif ! command -v python3 >/dev/null 2>&1; then
   CPU_PASS_ACTIVE=0
   log "running without CPU passes: python3 not found"
 fi
+PROC_BUDGET_ACTIVE=1
+if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
+  PROC_BUDGET_ACTIVE=0
+fi
 if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
   SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
 fi
@@ -2628,6 +2668,16 @@ record_script_result() {
   TOTAL=$((TOTAL + 1))
 }
 
+# Run the header's leftovers sweep before this worker moves to its next script.
+reap_script_leftovers() {  # <script>
+  local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line
+  [ -x "$reaper" ] || return 0
+  while IFS= read -r line; do
+    [ -z "$line" ] || log "reaped after $1: $line"
+  done < <("$reaper" 2>/dev/null || true)
+  return 0
+}
+
 # Run <script>, capturing output to <out>. <stream> 1 also echoes it live.
 # <id> only has to be unique within this run. When PER_SCRIPT_TIMEOUT_SECS is
 # positive, a script that outruns it is terminated and reported as exit 124: a
@@ -2654,6 +2704,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   else
     cmd=(bash "$script")
   fi
+  if [ "$PROC_BUDGET_ACTIVE" -eq 1 ]; then
+    # Innermost, so the budget is taken when the script starts, not before a
+    # pass wait or after another script has already grown the process count.
+    cmd=("$ROOT/bin/fm-proc-budget.sh" -- "${cmd[@]}")
+  fi
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
     # The bound runs inside the pass holder so the pass wait stays outside it.
     # shellcheck disable=SC2016
@@ -2676,6 +2731,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"
     [ "$stream" -eq 1 ] && tail -1 "$out"
   fi
+  reap_script_leftovers "$script"
   return "$rc"
 }
 

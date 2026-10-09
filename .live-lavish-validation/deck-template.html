@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Legacy captain answer validation</title></head>
+<style>body{background:#fff;color:#18202a;font:16px system-ui,sans-serif;margin:24px;}form{border:1px solid #cad0d8;padding:12px;margin:12px 0;}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;}button{padding:8px 12px;}</style>
+<body>
+<h1 id="title">Legacy captain answer validation</h1>
+<p>Disposable review deck. Queue the choices below, then use Lavish’s Send to Agent control.</p>
+<main id="choices"></main>
+<script>
+const rows = __ROWS__;
+const heading = __HEADING__;
+document.querySelector('#title').textContent = heading;
+for (const [index, row] of rows.entries()) {
+  const form = document.createElement('form');
+  form.id = 'row-' + index;
+  const label = document.createElement('p');
+  label.textContent = row.label;
+  const details = document.createElement('pre');
+  details.textContent = JSON.stringify(row.data, null, 2);
+  const button = document.createElement('button');
+  button.type = 'submit';
+  button.textContent = 'Queue ' + row.label;
+  form.append(label, details, button);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    window.lavish.queuePrompt(row.label, {
+      tag: row.tag || 'choice', text: row.label, element: form,
+      queueKey: form.id, data: row.data
+    });
+    button.textContent = 'Queued: ' + row.label;
+    button.disabled = true;
+  });
+  document.querySelector('#choices').append(form);
+}
+</script>
+</body>
+</html>
