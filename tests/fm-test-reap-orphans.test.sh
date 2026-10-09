@@ -46,7 +46,7 @@ alive() {
   local pid=$1 identity=${2:-} current i
   if [ -z "$identity" ]; then
     for i in "${!TRACKED_PIDS[@]}"; do
-      [ "${TRACKED_PIDS[$i]}" != "$pid" ] || { identity=${TRACKED_IDENTITIES[$i]}; break; }
+      [ "${TRACKED_PIDS[$i]}" != "$pid" ] || identity=${TRACKED_IDENTITIES[$i]}
     done
   fi
   [ -n "$identity" ] || return 1
@@ -119,11 +119,12 @@ start_owner() {
 
 sleep 120 &
 IDENTITY_FIXTURE=$!
-track "$IDENTITY_FIXTURE"
+track "$IDENTITY_FIXTURE" "previous ownership identity"
 IDENTITY_FIXTURE_ORIGINAL=$(fm_test_pid_identity "$IDENTITY_FIXTURE") || fail "could not identify the identity fixture"
+track "$IDENTITY_FIXTURE" "$IDENTITY_FIXTURE_ORIGINAL"
 wait_gone "$IDENTITY_FIXTURE" 1 "different original identity" || fail "a replaced original identity must count as gone"
-alive "$IDENTITY_FIXTURE" "$IDENTITY_FIXTURE_ORIGINAL" || fail "an identity mismatch check signalled the live replacement"
-if wait_gone "$IDENTITY_FIXTURE" 1 "$IDENTITY_FIXTURE_ORIGINAL"; then
+alive "$IDENTITY_FIXTURE" || fail "the newest registered identity must identify the live replacement"
+if wait_gone "$IDENTITY_FIXTURE" 1; then
   fail "a still-live original identity must not count as gone"
 fi
 kill -KILL "$IDENTITY_FIXTURE" 2>/dev/null || true
