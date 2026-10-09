@@ -9,9 +9,12 @@ def classify_turn(turn):
     drain = turn.get("drain")
     if not isinstance(drain, dict):
         return "unmeasured"
+    stdout = drain.get("stdout")
+    if not isinstance(stdout, str):
+        return "unmeasured"
     if drain.get("returncode") != 0:
         return "failed"
-    for line in drain.get("stdout", "").splitlines():
+    for line in stdout.splitlines():
         fields = line.split("\t")
         if (len(fields) >= 5 and fields[0].isdigit() and fields[1].isdigit()
                 and fields[2] in ("signal", "stale", "check", "heartbeat")):
@@ -33,13 +36,12 @@ def summarize(turns):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("turns", help="JSONL turn records containing last and drain returncode/stdout/stderr")
-    parser.add_argument("--max-empty-percent", type=float, default=5)
     args = parser.parse_args()
     with open(args.turns) as handle:
         report = summarize(json.loads(line) for line in handle if line.strip())
     print(json.dumps(report, sort_keys=True))
     return int(bool(report["failed"] or report["unmeasured"]
-                    or report["empty_percent"] > args.max_empty_percent))
+                    or report["empty_percent"] > 5))
 
 
 if __name__ == "__main__":

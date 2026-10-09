@@ -324,6 +324,27 @@ test_shell_line_ending_policy_selects_runner_contract() {
   pass "shell line-ending policy selects runner coverage"
 }
 
+test_changed_wake_classifier_selects_both_consumers() {
+  local tmp repo listed script expected
+  tmp=$(fm_test_tmproot fm-test-run-wake-classifier)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for script in fm-omp-wake-turns.test.sh fm-omp-stale-wake-live-e2e.test.sh; do
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm wake-classifier-consumers
+  : >"$repo/tests/omp_wake_turns.py"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "wake classifier changed selection failed"
+  listed=$(printf '%s\n' "$listed" | LC_ALL=C sort)
+  expected=$(printf '%s\n' tests/fm-omp-stale-wake-live-e2e.test.sh tests/fm-omp-wake-turns.test.sh)
+  [ "$listed" = "$expected" ] || fail "wake classifier must select exactly both consumers: $listed"
+  rm -rf "$tmp"
+  pass "wake classifier changes select both consuming suites without broadening coverage"
+}
+
 test_changed_spawn_selects_picker_without_broadening_siblings() {
   local tmp repo listed source
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-spawn-selection.XXXXXX")
@@ -2551,6 +2572,7 @@ test_task_marker_refuses_the_primary_checkout
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
+test_changed_wake_classifier_selects_both_consumers
 test_supervision_groups_share_coverage_and_changed_selection
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
