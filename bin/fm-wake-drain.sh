@@ -427,12 +427,10 @@ EOF
   fi
 }
 
-# Print still-unread informational status lines (note: answers and pending-reply
-# resolutions) that the OPEN DECISIONS fold never carries. Uses the same
-# cursor-backed unread span as the annotation path, and runs on every drain -
-# including the empty-queue fast path - so a buried answer cannot be swallowed
-# when the fold later advances the cursor. Prints nothing when nothing is
-# unread, which is the common case.
+# Present the informational rows prepared by status_acknowledge_presented_snapshot,
+# not a second read of the status logs: the receipt must describe the same bytes
+# this section presents. Runs even on an empty-queue drain so buried answers
+# cannot be swallowed; prints nothing when the prepared row set is empty.
 print_unread_status_section() {
   local unread=$1 task line shown=0
   [ -n "$unread" ] || return 0
