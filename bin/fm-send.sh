@@ -1158,7 +1158,7 @@ else
     echo "error: text not sent to $T ($TARGET_BACKEND send failed; tried $RESOLUTION_TRIED)" >&2
     exit 1
     ;;
-  pending)
+  pending|unknown-draft)
     # The text was typed into the live target and Enter was sent; only the
     # submit read-back stayed unconfirmed (e.g. a busy harness queues the
     # steer and keeps rendering it). That is not a proven failure, so never
@@ -1170,7 +1170,7 @@ else
     # correlated report still resolves it and an unanswered one still
     # surfaces through the library's own reconciliation
     # (bin/fm-pending-reply-lib.sh).
-    echo "fm-send: text delivered to $T but submission is unconfirmed (verdict=pending; tried $RESOLUTION_TRIED); do not retype or blindly resend - verify with fm-peek.sh, then re-send '--key Enter' only if the composer still holds the text" >&2
+    echo "fm-send: text delivered to $T but submission is unconfirmed (verdict=$verdict; tried $RESOLUTION_TRIED); do not retype or blindly resend - verify with fm-peek.sh, then re-send '--key Enter' only if the composer still holds the text" >&2
     exit 3
     ;;
   *)
