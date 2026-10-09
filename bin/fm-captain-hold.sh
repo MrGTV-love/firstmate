@@ -31,6 +31,7 @@
 #   fm-captain-hold.sh complete <origin-id> (--none | <task-id>...)
 #   fm-captain-hold.sh verify <origin-id>
 #   fm-captain-hold.sh open <task-id> [--identity] [--distinguish-absent]
+#   fm-captain-hold.sh open-bound <source-id> <card-key>
 #   fm-captain-hold.sh diverged
 #   fm-captain-hold.sh reconcile list
 #   fm-captain-hold.sh reconcile close <task-id> --evidence-file <path>
@@ -197,6 +198,16 @@
 # the task's last status line - and on a 0 bounds repeated alarms from new pane
 # hashes for the decision.
 #
+# `open-bound` is the read-only board-key predicate. It reads the source binding
+# and uses the shared answer/inventory resolver: exact task, legacy-derived task,
+# then Beads migration-note or migration-prefix evidence as described above.
+# Only confirmed binding-file absence is unbound; other lookup or read failures
+# are uncertainty. It prints nothing on stdout and changes no task or binding.
+# Exit 0 means the resolved task is an open captain call, 1 means it is known
+# closed or no longer captain-held, and 2 means the key is unresolved, ambiguous,
+# absent, or unreadable, including binding failures. Listener retirement may use
+# only exit 1 as evidence that a card is closed.
+#
 # `diverged` is the read-only guard over the seam between the two records of
 # one captain call. See "record divergence" beside command_diverged below.
 #
@@ -304,7 +315,7 @@ validate_one_line() {  # <label> <value>
 
 acquire_task_control_lock() {  # <task-id>
   CAPTAIN_CONTROL_LOCK="$STATE/.control-$1.lock"
-  fm_lock_acquire_wait "$CAPTAIN_CONTROL_LOCK"
+  fm_lock_acquire_wait "$CAPTAIN_CONTROL_LOCK" || fail "could not acquire task control lock"
   CAPTAIN_CONTROL_LOCK_HELD=1
 }
 
@@ -674,7 +685,7 @@ captain_migration_scan_load() {  # <resolved-data-dir>
 # guess, so it only runs when no marker line matches any identity and it accepts
 # a row solely when that row is itself still held for the captain.
 resolve_migrated_entry() {  # <origin-or-empty> <entry>
-  local origin=$1 entry=$2 data root entries prefix derived show backend
+  local origin=$1 entry=$2 data root entries prefix derived backend
   local candidate candidate_matches prefixed matches count prefixed_matches prefixed_count
   data=$(fm_backlog_data_absolute "$DATA") || {
     printf 'fm-captain-hold: the migrated hold of %s cannot be resolved: %s\n' \
@@ -735,14 +746,15 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
       *-) prefixed="$prefix$candidate" ;;
       *) prefixed="$prefix-$candidate" ;;
     esac
-    # Same shell rule as task_show_or_fail: the row is read out of
-    # TASK_SHOW_OUTPUT, so the read cannot sit inside a command substitution.
-    task_show "$prefixed" 2>/dev/null || {
-      [ "$?" -ne 124 ] || return 124
+    if ! fm_backlog_row_probe "$data" "$prefixed"; then
+      [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 124
+      [ "$FM_BACKLOG_ROW_RESULT" = not_found ] || {
+        printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_ROW_ERROR" >&2
+        return 2
+      }
       continue
-    }
-    show=$TASK_SHOW_OUTPUT
-    [ "$(show_field_value "$show" hold_kind)" = captain ] || continue
+    fi
+    [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ] || continue
     prefixed_matches="${prefixed_matches}${prefixed_matches:+$NL_SEP}$prefixed"
   done
   prefixed_count=$(printf '%s\n' "$prefixed_matches" | sed '/^$/d' | wc -l | tr -d ' ')
@@ -761,17 +773,28 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # Prints "<resolved id> <how>", where <how> is exact, legacy, migrated-note or
 # migrated-prefix, so a caller can record which evidence carried the attestation.
 resolve_entry() {  # <origin-or-empty> <entry>; prints "<id> <how>" or fails
-  local origin=$1 entry=$2 legacy migrated rc
-  if task_show "$entry"; then
+  local origin=$1 entry=$2 legacy migrated rc data
+  data=$(fm_backlog_data_absolute "$DATA") || return 2
+  if fm_backlog_row_probe "$data" "$entry"; then
     printf '%s exact' "$entry"
     return 0
   fi
+  [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 124
+  [ "$FM_BACKLOG_ROW_RESULT" = not_found ] || {
+    printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_ROW_ERROR" >&2
+    return 2
+  }
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
     legacy=$(legacy_hold_id "$origin" "$entry")
-    if task_show "$legacy"; then
+    if fm_backlog_row_probe "$data" "$legacy"; then
       printf '%s legacy' "$legacy"
       return 0
     fi
+    [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 124
+    [ "$FM_BACKLOG_ROW_RESULT" = not_found ] || {
+      printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_ROW_ERROR" >&2
+      return 2
+    }
   fi
   rc=0
   migrated=$(resolve_migrated_entry "$origin" "$entry") || rc=$?
@@ -1294,19 +1317,36 @@ binding_path() { printf '%s/%s.origin\n' "$BINDING_DIR" "$1"; }
 # feeding nothing is the safe direction only when it is a deliberate choice,
 # never when it is a corrupted record.
 read_binding() {  # <source-id>
-  local path origin schema
+  local path
   path=$(binding_path "$1")
-  [ -e "$path" ] || return 0
-  [ -f "$path" ] && [ ! -L "$path" ] || fail "decision binding is unsafe: $path"
-  schema=$(sed -n 's/^schema=//p' "$path" | head -1)
-  [ "$schema" = "$BINDING_SCHEMA" ] || fail "decision binding has an incompatible schema: $path"
-  origin=$(sed -n 's/^origin=//p' "$path" | head -1)
-  if [ "$origin" != "$BINDING_ANY" ]; then
-    case "$origin" in
-      ''|*[!A-Za-z0-9._-]*) fail "decision binding has an invalid origin id: $path" ;;
-    esac
-  fi
-  printf '%s\n' "$origin"
+  perl -MErrno=ENOENT -MFcntl=S_ISREG -e '
+    use strict; use warnings;
+    my ($path, $expected_schema, $any_origin) = @ARGV;
+    my @stat = lstat $path;
+    unless (@stat) {
+      exit 0 if $! == ENOENT;
+      die "fm-captain-hold: decision binding cannot be checked: $path: $!\n";
+    }
+    S_ISREG($stat[2]) or die "fm-captain-hold: decision binding is unsafe: $path\n";
+    open my $file, "<", $path or do {
+      exit 0 if $! == ENOENT;
+      die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
+    };
+    my ($schema, $origin);
+    $! = 0;
+    while (my $line = <$file>) {
+      chomp $line;
+      $schema = $1 if !defined($schema) && $line =~ /^schema=(.*)$/;
+      $origin = $1 if !defined($origin) && $line =~ /^origin=(.*)$/;
+    }
+    die "fm-captain-hold: decision binding cannot be read: $path: $!\n" if $!;
+    close $file or die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
+    defined($schema) && $schema eq $expected_schema
+      or die "fm-captain-hold: decision binding has an incompatible schema: $path\n";
+    defined($origin) && ($origin eq $any_origin || $origin =~ /\A[A-Za-z0-9._-]+\z/)
+      or die "fm-captain-hold: decision binding has an invalid origin id: $path\n";
+    print "$origin\n";
+  ' "$path" "$BINDING_SCHEMA" "$BINDING_ANY" || return 2
 }
 
 command_bind() {
@@ -1436,10 +1476,6 @@ command_answers() {
       continue
     fi
     if [ "$resolve_rc" -ne 0 ]; then
-      # resolve_entry runs in a command substitution, so task_show's exit
-      # cannot stop this loop; only its status crosses back. 124 means the
-      # backend never answered, which is not the same as an unknown key and
-      # must not be spent as a skip.
       [ "$resolve_rc" -ne 124 ] \
         || fail "the backlog backend exceeded its read bound resolving $key"
       printf 'skipped: %s (no captain-held task with that id)\n' "$key"
@@ -1820,7 +1856,7 @@ command_complete() {
   [ -f "$meta" ] && has_meta=1
   if [ "$has_meta" = 1 ]; then
     CAPTAIN_META_LOCK=$(fm_meta_lock_path "$meta") || fail "could not resolve task metadata lock"
-    fm_lock_acquire_wait "$CAPTAIN_META_LOCK"
+    fm_lock_acquire_wait "$CAPTAIN_META_LOCK" || fail "could not acquire task metadata lock"
     CAPTAIN_META_LOCK_HELD=1
     [ -f "$meta" ] || fail "task metadata disappeared while recording completion"
   fi
@@ -2119,6 +2155,19 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
   exit 2
 }
 
+command_open_bound() {
+  local source=${1:-} key=${2:-} origin resolved rc=0
+  [ "$#" -eq 2 ] || return 2
+  (validate_source_id "$source"; validate_slug card-key "$key") || return 2
+  origin=$(read_binding "$source") || return 2
+  resolved=$(resolve_entry "$origin" "$key") || return 2
+  command_open "${resolved%% *}" --distinguish-absent || rc=$?
+  case "$rc" in
+    0|1) return "$rc" ;;
+    *) return 2 ;;
+  esac
+}
+
 case "${1:-}" in
   hold) shift; command_hold "$@" ;;
   answer) shift; command_answer "$@" ;;
@@ -2130,6 +2179,7 @@ case "${1:-}" in
   complete) shift; command_complete "$@" ;;
   verify) shift; command_verify "$@" ;;
   open) shift; command_open "$@" ;;
+  open-bound) shift; command_open_bound "$@" ;;
   diverged) shift; command_diverged "$@" ;;
   reconcile) shift; command_reconcile "$@" ;;
   -h|--help) usage ;;

@@ -19,6 +19,16 @@
 # The receipt binds the terminal observation to the canonical registration and
 # lets a restart finish fixed-path removal without executing state-file bytes.
 
+# The kernel name, read once per process: the file-stat helpers below run on
+# every supervision cycle, and each used to start a uname process per call.
+# A function-only form follows because a runner started with exported functions
+# inherits the functions but not this variable; it then reads the name itself.
+_FM_PR_UNAME=${_FM_UNAME:-$(uname 2>/dev/null)}
+_fm_pr_is_darwin() {
+  [ -n "${_FM_PR_UNAME:-}" ] || _FM_PR_UNAME=$(uname 2>/dev/null)
+  [ "$_FM_PR_UNAME" = Darwin ]
+}
+
 FM_PR_PROVIDER=
 FM_PR_URL=
 FM_PR_HOST=
@@ -277,7 +287,7 @@ fm_pr_json_draft_state() {  # <pull-request-json>
 }
 
 fm_pr_file_mode() {
-  if [ "$(uname)" = Darwin ]; then
+  if _fm_pr_is_darwin; then
     /usr/bin/stat -f %Lp "$1" 2>/dev/null
   else
     stat -c %a "$1" 2>/dev/null
@@ -285,15 +295,27 @@ fm_pr_file_mode() {
 }
 
 fm_pr_file_device() {
-  if [ "$(uname)" = Darwin ]; then
+  if _fm_pr_is_darwin; then
     /usr/bin/stat -f %d "$1" 2>/dev/null
   else
     stat -c %d "$1" 2>/dev/null
   fi
 }
 
+# device, inode, permission bits and owner of one path from a single stat
+# process, space separated; fails when the path cannot be read. A caller that
+# needs several of these facts (the owner-watchdog tick validates the state
+# root every few seconds) pays one process instead of one per fact.
+fm_pr_file_facts() {  # <path>
+  if _fm_pr_is_darwin; then
+    /usr/bin/stat -f '%d %i %Lp %u' "$1" 2>/dev/null
+  else
+    stat -c '%d %i %a %u' "$1" 2>/dev/null
+  fi
+}
+
 fm_pr_file_link_count() {
-  if [ "$(uname)" = Darwin ]; then
+  if _fm_pr_is_darwin; then
     /usr/bin/stat -f %l "$1" 2>/dev/null
   else
     stat -c %h "$1" 2>/dev/null
@@ -301,7 +323,7 @@ fm_pr_file_link_count() {
 }
 
 fm_pr_file_inode() {
-  if [ "$(uname)" = Darwin ]; then
+  if _fm_pr_is_darwin; then
     /usr/bin/stat -f %i "$1" 2>/dev/null
   else
     stat -c %i "$1" 2>/dev/null
