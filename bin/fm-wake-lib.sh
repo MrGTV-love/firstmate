@@ -1257,8 +1257,11 @@ fm_lock_try_acquire() {
 }
 
 fm_lock_acquire_wait() {
-  local lockdir=$1
+  local lockdir=$1 current=''
   while ! fm_lock_try_acquire "$lockdir"; do
+    # Failed self-reclamation cannot make progress by waiting for ourselves.
+    [ -n "$current" ] || fm_current_pid current || return 1
+    [ "$FM_LOCK_HELD_PID" != "$current" ] || return 1
     sleep 0.1
   done
 }
@@ -1268,9 +1271,11 @@ fm_lock_acquire_wait() {
 # its trap, so the wait gives up after <seconds> and leaves the ordinary
 # stale-owner evidence for the next acquirer to reclaim.
 fm_lock_acquire_wait_max() {  # <lockdir> <max-seconds>
-  local lockdir=$1 seconds=$2 deadline
+  local lockdir=$1 seconds=$2 deadline current=''
   deadline=$((SECONDS + seconds))
   while ! fm_lock_try_acquire "$lockdir"; do
+    [ -n "$current" ] || fm_current_pid current || return 1
+    [ "$FM_LOCK_HELD_PID" != "$current" ] || return 1
     [ "$SECONDS" -lt "$deadline" ] || return 1
     sleep 0.1
   done
@@ -1323,6 +1328,7 @@ fm_lock_acquire_wait_bounded() {
   fi
 
   fm_current_pid caller_pid || return 1
+  [ "$FM_LOCK_HELD_PID" != "$caller_pid" ] || return 1
   # shellcheck disable=SC2016 # Positional parameters expand in the child shell.
   if fm_run_timed "$seconds" env \
     "FM_STATE_OVERRIDE=$STATE" \

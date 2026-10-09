@@ -1066,7 +1066,7 @@ test_bootstrap_opt_out_cleanup() {
 }
 
 test_bootstrap_opt_out_reports_cleanup_failure() {
-  local home fakebin out
+  local home fakebin out bootstrap_pid
   home="$TMP_ROOT/boot-optout-fail"; mkdir -p "$home"
   printf 'FMX_PAIRING_TOKEN=tok-out\n' > "$home/.env"
   FM_HOME="$home" "$ROOT/bin/fm-bootstrap.sh" >/dev/null 2>&1
@@ -1079,7 +1079,16 @@ exit 1
 SH
   chmod +x "$fakebin/rm"
   printf 'FMX_PAIRING_TOKEN=\n' > "$home/.env"
-  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  (
+    PATH="$fakebin:$PATH" FM_HOME="$home" "$ROOT/bin/fm-bootstrap.sh" > "$home/bootstrap.out" 2>/dev/null
+    printf '%s\n' "$?" > "$home/bootstrap.done"
+  ) &
+  bootstrap_pid=$!
+  fm_test_wait_until 10 test -e "$home/bootstrap.done" \
+    || fail "bootstrap stalled after X artifact cleanup failed"
+  wait "$bootstrap_pid" || fail "cleanup-failure bootstrap fixture failed"
+  [ "$(cat "$home/bootstrap.done")" = 0 ] || fail "cleanup-failure bootstrap did not complete"
+  out=$(cat "$home/bootstrap.out")
   assert_contains "$out" "FMX: X mode off - failed to remove relay poll shim or 30s cadence" \
     "opt-out cleanup failure must be reported"
   assert_present "$home/state/x-watch.check.sh" "failed opt-out cleanup must leave the stale shim visible"
