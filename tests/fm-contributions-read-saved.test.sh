@@ -8,9 +8,16 @@ HOME_DIR="$TMP_ROOT/home"
 mkdir -p "$HOME_DIR/data/hidden" "$HOME_DIR/state"
 trap 'chmod 755 "$HOME_DIR/data/hidden"; fm_test_cleanup' EXIT
 printf '{"backlog":{"present":true,"records":[]},"tasks":[]}\n' > "$HOME_DIR/input.json"
+REAL_JQ=$(command -v jq)
 
 contributions() {
-  FM_HOME="$HOME_DIR" FM_DATA_OVERRIDE="${DATA_ROOT:-$HOME_DIR/data}" \
+  if [ "${RACE_REPLACE:-0}" = 1 ]; then
+    write_record visible 1048577
+    mv "$HOME_DIR/data/visible/contributions.json" "$HOME_DIR/replacement.json"
+    write_record visible 1048576
+  fi
+  PATH="${CONTRIBUTIONS_PATH:-$PATH}" REAL_JQ="$REAL_JQ" \
+    FM_HOME="$HOME_DIR" FM_DATA_OVERRIDE="${DATA_ROOT:-$HOME_DIR/data}" \
     FM_CONTRIBUTIONS_NOW=2026-09-16T08:00:00Z \
     "$ROOT/bin/fm-contributions.sh" "$@"
 }
@@ -50,7 +57,7 @@ pass 'records at the 1 MiB cap preserve normal output bytes'
 
 write_record hidden 1048577
 assert_refused
-pass 'bulk size enumeration refuses records above the cap'
+pass 'bounded reads refuse records above the cap'
 
 chmod 111 "$HOME_DIR/data/hidden"
 if find "$HOME_DIR/data" -mindepth 2 -maxdepth 2 -name contributions.json \
@@ -58,17 +65,17 @@ if find "$HOME_DIR/data" -mindepth 2 -maxdepth 2 -name contributions.json \
   fail 'permission fixture did not cause incomplete size enumeration; run without root privileges'
 fi
 assert_refused
-pass 'incomplete enumeration refuses oversized records in searchable unreadable directories'
+pass 'bounded reads refuse oversized records in searchable unreadable directories'
 
 chmod 755 "$HOME_DIR/data/hidden"
 write_record hidden 1048576
 chmod 111 "$HOME_DIR/data/hidden"
 assert_clear
-pass 'fallback accepts capped records and preserves readable sibling output'
+pass 'bounded reads accept capped records and preserve readable sibling output'
 
 chmod 000 "$HOME_DIR/data/hidden/contributions.json"
 assert_refused
-pass 'failed fallback size reads cannot prove clear coverage'
+pass 'failed record reads cannot prove clear coverage'
 chmod 644 "$HOME_DIR/data/hidden/contributions.json"
 chmod 755 "$HOME_DIR/data/hidden"
 
@@ -83,3 +90,27 @@ pass 'symlink data roots are refused with or without trailing slashes'
 DATA_ROOT="$HOME_DIR/data////"
 assert_clear
 pass 'ordinary data roots retain byte-identical output with trailing slashes'
+unset DATA_ROOT
+
+FAKEBIN=$(fm_fakebin "$TMP_ROOT")
+cat > "$FAKEBIN/jq" <<'SH'
+#!/usr/bin/env bash
+set -eu
+args=("$@")
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --arg ] && [ "${2:-}" = task ] && [ "${3:-}" = hidden ]; then
+    mv "$FM_HOME/replacement.json" "$FM_HOME/data/visible/contributions.json"
+    printf 'replaced\n' >> "$FM_HOME/replacements.log"
+    break
+  fi
+  shift
+done
+exec "$REAL_JQ" "${args[@]}"
+SH
+chmod +x "$FAKEBIN/jq"
+CONTRIBUTIONS_PATH="$FAKEBIN:$PATH"
+RACE_REPLACE=1
+assert_refused
+[ "$(wc -l < "$HOME_DIR/replacements.log")" -eq 2 ] \
+  || fail 'records were not replaced between listing and reading in both commands'
+pass 'pending and snapshot refuse oversized replacements after record listing'

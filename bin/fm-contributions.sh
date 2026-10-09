@@ -138,15 +138,13 @@ jq_lib() { # jq options/program via final argument
 }
 
 read_saved() {
-  local file dir task oversized bytes scan_failed=0 base=$DATA
+  local file dir task bytes base=$DATA
   : > "$TMP/saved.jsonl"
   ERRORS=0
   while [ "${base%/}" != "$base" ] && [ "$base" != / ]; do base=${base%/}; done
   if [ -L "$base" ]; then
     ERRORS=1; printf '[]\n' > "$TMP/saved.json"; return 0
   fi
-  oversized=$(find "$base" -mindepth 2 -maxdepth 2 -name contributions.json -size +1048576c -print 2>/dev/null) || scan_failed=1
-  oversized=$'\n'"$oversized"$'\n'
   for file in "$base"/*/contributions.json; do
     [ -e "$file" ] || [ -L "$file" ] || continue
     fm_dirname_to dir "$file"
@@ -155,18 +153,12 @@ read_saved() {
       ERRORS=$((ERRORS + 1))
       continue
     fi
-    case "$oversized" in
-      *$'\n'"$file"$'\n'*) ERRORS=$((ERRORS + 1)); continue ;;
-    esac
-    if [ "$scan_failed" -ne 0 ]; then
-      if ! bytes=$(wc -c < "$file" 2>/dev/null) || [ "$bytes" -gt 1048576 ]; then
-        ERRORS=$((ERRORS + 1))
-        continue
-      fi
+    if ! head -c 1048577 "$file" > "$TMP/record.json" 2>/dev/null \
+      || ! bytes=$(wc -c < "$TMP/record.json") || [ "$bytes" -gt 1048576 ]; then
+      ERRORS=$((ERRORS + 1))
+      continue
     fi
-    # One read validates the record, checks that its task identity matches its
-    # durable directory rather than arbitrary JSON, and emits it compactly.
-    if ! jq_lib -nce --slurpfile record "$file" --arg task "$task" \
+    if ! jq_lib -nce --slurpfile record "$TMP/record.json" --arg task "$task" \
         '($record | length) == 1 and ($record[0] | valid_record) and ($record[0].task == $task)
          | if . then $record[0] else empty end' >> "$TMP/saved.jsonl" 2>/dev/null; then
       ERRORS=$((ERRORS + 1))
