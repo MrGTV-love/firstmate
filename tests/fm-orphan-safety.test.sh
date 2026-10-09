@@ -3,7 +3,7 @@ set -u
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 TMP_ROOT=$(fm_test_tmproot fm-orphan-safety)
-BIN=${FM_ORPHAN_SAFETY_BIN:-$ROOT/bin}
+BIN="$ROOT/bin"
 REAL_PS=$(command -v ps)
 
 test_reaper_identity() {
