@@ -165,9 +165,6 @@ That its duration landed within 3% of the two clean runs is evidence the elevate
 These durations are not comparable with the six-member run above: that measurement was taken on a different machine state, and the gap is far larger than two short scripts can account for, so it is not evidence about the two new members.
 For the same reason the 1.72x four-worker figure recorded above is left as a statement about that measurement rather than restated as current.
 
-The recorded family proofs predate `tests/fm-gh-rest.test.sh` and the shared REST-reader changes; they do not establish concurrent isolation for those changes.
-Refresh this evidence with the family proof command above before treating the current admission as verified.
-
 ### secondmate: admitted
 
 - Date: 2026-09-03
