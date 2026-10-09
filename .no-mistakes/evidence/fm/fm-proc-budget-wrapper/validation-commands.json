@@ -1,0 +1,293 @@
+[
+  {
+    "label": "wrapper-live",
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/wrapper-scenarios.sh"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/wrapper-live.txt"
+  },
+  {
+    "label": "recursive-shim-regression",
+    "command": [
+      "bash",
+      "tests/fm-proc-budget.test.sh"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/recursive-shim-regression.txt"
+  },
+  {
+    "label": "incident-live",
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident-live.sh"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/incident-live.txt"
+  },
+  {
+    "label": "runner-live",
+    "command": [
+      "bin/fm-test-run.sh",
+      "--jobs",
+      "1",
+      "--per-script-timeout-secs",
+      "15",
+      "--json",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/runner-live.json",
+      "tests/fm-budget-live.test.sh"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/runner-live.txt"
+  },
+  {
+    "label": "runner-fail-closed",
+    "command": [
+      "bin/fm-test-run.sh",
+      "--jobs",
+      "1",
+      "--per-script-timeout-secs",
+      "15",
+      "--json",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/runner-refused.json",
+      "tests/fm-budget-live.test.sh"
+    ],
+    "exit": 1,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/runner-fail-closed.txt"
+  },
+  {
+    "label": "brief-live-budget-no-mistakes",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-no-mistakes",
+      "alpha",
+      "--mode",
+      "no-mistakes"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-no-mistakes.txt"
+  },
+  {
+    "label": "brief-command-live-budget-no-mistakes",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-no-mistakes.txt"
+  },
+  {
+    "label": "brief-live-budget-direct-PR",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-direct-PR",
+      "alpha",
+      "--mode",
+      "direct-PR"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-direct-PR.txt"
+  },
+  {
+    "label": "brief-command-live-budget-direct-PR",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-direct-PR.txt"
+  },
+  {
+    "label": "brief-live-budget-local-only",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-local-only",
+      "alpha",
+      "--mode",
+      "local-only"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-local-only.txt"
+  },
+  {
+    "label": "brief-command-live-budget-local-only",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-local-only.txt"
+  },
+  {
+    "label": "brief-live-budget-scout",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-scout",
+      "alpha",
+      "--scout"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-scout.txt"
+  },
+  {
+    "label": "brief-command-live-budget-scout",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-scout.txt"
+  },
+  {
+    "label": "brief-live-budget-no-mistakes-quoted",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-no-mistakes-quoted",
+      "alpha",
+      "--mode",
+      "no-mistakes"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-no-mistakes-quoted.txt"
+  },
+  {
+    "label": "brief-command-live-budget-no-mistakes-quoted",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-no-mistakes-quoted.txt"
+  },
+  {
+    "label": "brief-live-budget-direct-PR-quoted",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-direct-PR-quoted",
+      "alpha",
+      "--mode",
+      "direct-PR"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-direct-PR-quoted.txt"
+  },
+  {
+    "label": "brief-command-live-budget-direct-PR-quoted",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-direct-PR-quoted.txt"
+  },
+  {
+    "label": "brief-live-budget-local-only-quoted",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-local-only-quoted",
+      "alpha",
+      "--mode",
+      "local-only"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-local-only-quoted.txt"
+  },
+  {
+    "label": "brief-command-live-budget-local-only-quoted",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-local-only-quoted.txt"
+  },
+  {
+    "label": "brief-live-budget-scout-quoted",
+    "command": [
+      "bin/fm-brief.sh",
+      "live-budget-scout-quoted",
+      "alpha",
+      "--scout"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-live-budget-scout-quoted.txt"
+  },
+  {
+    "label": "brief-command-live-budget-scout-quoted",
+    "command": [
+      "bash",
+      "-c",
+      "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"emitted command executed: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/brief-command-live-budget-scout-quoted.txt"
+  },
+  {
+    "label": "tmux-lab-live",
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/tmux-lab-live.sh"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/tmux-lab-live.txt"
+  },
+  {
+    "label": "herdr-targeted-fake",
+    "command": [
+      "bash",
+      "tests/fm-herdr-lab.test.sh"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/herdr-targeted-fake.txt"
+  },
+  {
+    "label": "autoarm-targeted-regression",
+    "command": [
+      "bash",
+      "tests/fm-claude-stop-autoarm.test.sh"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/autoarm-targeted-regression.txt"
+  },
+  {
+    "label": "wrapper-no-bypass",
+    "command": [
+      "env",
+      "FM_PROC_BUDGET=off",
+      "FM_PROC_BUDGET_EXTRA=99999",
+      "bin/fm-proc-budget.sh",
+      "--",
+      "bash",
+      "-c",
+      "printf \"legacy bypass ignored: soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"; [ \"$(ulimit -S -u)\" -lt 10666 ]"
+    ],
+    "exit": 0,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/wrapper-no-bypass.txt"
+  },
+  {
+    "label": "wrapper-refuses-count",
+    "command": [
+      "bin/fm-proc-budget.sh",
+      "--count"
+    ],
+    "exit": 2,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/wrapper-refuses-count.txt"
+  },
+  {
+    "label": "wrapper-refuses-check",
+    "command": [
+      "bin/fm-proc-budget.sh",
+      "--check"
+    ],
+    "exit": 2,
+    "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4G01FPCZHEAXED5ZRXC923P/wrapper-refuses-check.txt"
+  }
+]

@@ -1,0 +1,50 @@
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/tmux-lab-live.sh
+/tmp/fm-lab-01M4FNQD-dOgCmR
+outside lab soft=10666 hard=16000
+real tmux server pid=9544 private socket=/tmp/fm-lab-01M4FNQD-dOgCmR/tmux
+pane pid=9571 soft=2967 hard=2967
+descendant pid=9610 soft=2967 hard=2967
+pane and real descendant inherited identical sealed budgets below the outside limit
+budget report completed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+removed lab and private socket directory: /tmp/fm-lab-01M4FNQD-dOgCmR (absent)
+
+[exit=0; elapsed=1.48s]

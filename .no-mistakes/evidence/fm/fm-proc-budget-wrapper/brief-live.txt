@@ -1,0 +1,38 @@
+mode=no-mistakes quoted_path=False
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=2994 hard=2994
+
+
+mode=direct-PR quoted_path=False
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=3052 hard=3052
+
+
+mode=local-only quoted_path=False
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=3083 hard=3083
+
+
+mode=scout quoted_path=False
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=3027 hard=3027
+
+
+mode=no-mistakes quoted_path=True
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=3026 hard=3026
+
+
+mode=direct-PR quoted_path=True
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=3031 hard=3031
+
+
+mode=local-only quoted_path=True
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=3016 hard=3016
+
+
+mode=scout quoted_path=True
+9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/budget helper'\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.
+emitted command executed: soft=3056 hard=3056

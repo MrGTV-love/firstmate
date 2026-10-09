@@ -1,0 +1,28 @@
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/wrapper-scenarios.sh
+parent soft=10666 hard=16000; baseline user processes=    1545
+extra=80: 1629 1629
+descendant soft/hard=(1629, 1629)
+observed allowance=84; user processes after=    1535
+extra=default: 3040 3040
+descendant soft/hard=(3040, 3040)
+observed allowance=1495; user processes after=    1544
+exec pid=12570 expected=12570 args=<a b>|<c*>
+child exit propagated=7
+outer soft=1684 hard=1684
+nested soft=1684 hard=1684
+raising sealed hard limit refused
+fm-proc-budget: extra must be a positive decimal integer, got '0'
+malformed extra=0 exit=2 command-ran=no
+fm-proc-budget: extra must be a positive decimal integer, got '01'
+malformed extra=01 exit=2 command-ran=no
+fm-proc-budget: extra must be a positive decimal integer, got '-5'
+malformed extra=-5 exit=2 command-ran=no
+fm-proc-budget: extra must be a positive decimal integer, got '1.5'
+malformed extra=1.5 exit=2 command-ran=no
+fm-proc-budget: extra must be a positive decimal integer, got 'nope'
+malformed extra=nope exit=2 command-ran=no
+fm-proc-budget: cannot read the process count, so no budget can be set
+unreadable count exit=125 command-ran=no
+parent remains soft=10666 hard=16000
+
+[exit=0; elapsed=4.75s]

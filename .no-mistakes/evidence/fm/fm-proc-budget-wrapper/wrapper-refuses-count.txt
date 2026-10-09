@@ -1,0 +1,4 @@
+$ bin/fm-proc-budget.sh --count
+fm-proc-budget: usage: fm-proc-budget.sh [<extra>] -- <command...>
+
+[exit=2; elapsed=0.01s]

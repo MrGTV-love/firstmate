@@ -1,0 +1,4 @@
+$ env FM_PROC_BUDGET=off FM_PROC_BUDGET_EXTRA=99999 bin/fm-proc-budget.sh -- bash -c printf "legacy bypass ignored: soft=%s hard=%s\n" "$(ulimit -S -u)" "$(ulimit -H -u)"; [ "$(ulimit -S -u)" -lt 10666 ]
+legacy bypass ignored: soft=3016 hard=3016
+
+[exit=0; elapsed=1.31s]

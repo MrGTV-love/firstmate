@@ -1,0 +1,10 @@
+$ bash tests/fm-proc-budget.test.sh
+ok - default budget is the current count plus 1500
+ok - explicit extra sets the budget
+ok - a budget only ever tightens the limit it inherits
+ok - a retained soft limit seals the inherited hard limit
+ok - exit status and arguments pass through
+ok - bad calls and an unreadable process count never run the command
+ok - a budgeted runaway tree stops at depth 307 while an unbudgeted probe forks freely
+
+[exit=0; elapsed=65.93s]

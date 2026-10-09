@@ -1,0 +1,22 @@
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident-live.sh
+outside parent soft=10666 hard=16000
+runaway tree exit=127; outside probe exit=0
+inside soft=1898 hard=1898
+outside probe completed 1059 successful forks
+runaway maximum recursion depth=352
+runaway fork diagnostics:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: fork: Resource temporarily unavailable
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.gate-proc-budget-validation/incident/bomb/basename: line 6: exec: : not found
+outside probe stderr=''
+
+[exit=0; elapsed=29.25s]
