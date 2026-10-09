@@ -47,12 +47,7 @@ A failed wake delivery never cancels continuity restoration.
 
 ### Pi session replacement
 
-Pi same-process session replacement follows the generation-owner contract in `.pi/extensions/fm-primary-pi-watch.ts`:
-
-1. `session_shutdown` changes the current generation's durable extension marker from `active` to `handoff`, but keeps its established arm child alive.
-2. The owning `session_start` publishes a distinct active generation.
-3. That `session_start` commits its tracked replacement arm.
-4. Only after that commit does the replacement arm retire the predecessor.
+The [Pi extension header](../.pi/extensions/fm-primary-pi-watch.ts) owns replacement activation, predecessor retirement, and the requirement for a live successor runtime.
 
 A state-scoped replacement handoff carries every actionable close whose delivery overlapped `session_shutdown`, including:
 
@@ -69,11 +64,7 @@ The extension header owns how consumption is observed and why it only decides wh
 
 ### omp session replacement
 
-omp's replacement follows its own generation-owner contract in `.omp/extensions/fm-primary-omp-watch.ts`, whose header owns its differences from Pi:
-
-- It retires the predecessor arm at replacement shutdown instead of retaining it across the handoff.
-- It reports no shutdown reason, so every shutdown with a pending actionable close persists the handoff for the next owning `session_start` to replay.
-- If handoff publication fails, the pending wake and failure detail remain in process memory for recovery to replay.
+The [omp extension header](../.omp/extensions/fm-primary-omp-watch.ts) owns replacement activation, predecessor retirement, and actionable-close replay, including recovery after handoff publication fails.
 
 ### omp idle wake delivery
 
@@ -88,7 +79,7 @@ The prompt flow never touches the composer, so an operator draft stays unsent, a
 
 omp can repair a missing successor automatically or through an explicit arm call; Pi requires a live replacement runtime rather than repair through its invalidated outgoing API.
 The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, and stale callback behavior.
-Each replacement factory releases its predecessor slot after transferring retirement, recovery state, and (for omp) the latest context; API publication also clears the binding's predecessor reference, so the current registry owner does not retain a chain of retired factories.
+The [instance registry contract](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns predecessor-reference release after factory handoff.
 
 For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` or `state/extensions/omp-primary-watch/lifecycle.log`.
 Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.

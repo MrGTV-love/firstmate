@@ -16,6 +16,10 @@
 // a process-global registry, so the latest bind is the current instance and
 // every earlier one learns it was superseded. Each extension decides what a
 // superseded instance does; the registry only answers who is current.
+// A binding's previous slot is only for transferring predecessor state. Callers
+// release it after handoff; publish also clears it before storing an API that
+// may capture the binding, so the current slot cannot retain retired factories
+// through a chain of predecessor APIs.
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 

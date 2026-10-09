@@ -9,10 +9,12 @@
 //   - pi.sendUserMessage returns synchronously (no promise) in omp, so accepting
 //     a wake means the call returned, not that a turn consumed it.
 //   - omp reports no session_shutdown reason, so EVERY shutdown with a pending
-//     actionable close persists the replacement handoff and the next owning
-//     session_start, in this process or a later one, replays it. Replaying a
-//     wake main has already drained is harmless (the queue is durable and the
-//     drain is idempotent); losing one across /new is not.
+//     actionable close persists the replacement handoff. The next owning
+//     activation, through session_start, self-heal, or an arm call, replays it;
+//     a later process can also replay the durable handoff. If publication fails,
+//     the pending wake and failure detail remain in process memory for recovery.
+//     Replaying a wake main has already drained is harmless (the queue is durable
+//     and the drain is idempotent); losing one across /new is not.
 //   - Replacement shutdown retires the established predecessor arm before the
 //     successor arms; unlike Pi, it is not retained until a distinct active
 //     successor generation commits its own arm, so omp keeps the plain
