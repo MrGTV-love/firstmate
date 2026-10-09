@@ -690,6 +690,8 @@ It also repacks the source at Git's transport pack-creation boundary and checks 
 The remote-job TERM, crash-recovery, and failed-stop tests keep their commands blocked on test-owned FIFOs rather than relying on a short sleep surviving scheduler delays.
 They confirm command groups are stopped after termination or recovery; the failed-stop case also requires quarantined ownership and replacement refusal while its command group remains live.
 
+[`fm-remote-delta-read.test.sh`](../tests/fm-remote-delta-read.test.sh) exercises the reader's continuity results through its executable interface.
+
 The portable tests run with these commands:
 
 ```sh
@@ -708,6 +710,7 @@ bin/fm-test-run.sh tests/fm-remote-herdr-guard.test.sh
 bin/fm-test-run.sh tests/fm-project-origin.test.sh
 bin/fm-test-run.sh tests/fm-secondmate-sync.test.sh
 bin/fm-test-run.sh tests/fm-remote-reply.test.sh
+bin/fm-test-run.sh tests/fm-remote-delta-read.test.sh
 bin/fm-test-run.sh tests/fm-remote-backlog-handoff.test.sh
 bin/fm-test-run.sh tests/fm-remote-secondmate-lifecycle-e2e.test.sh
 bin/fm-test-run.sh tests/fm-remote-secondmate-trace-context.test.sh
