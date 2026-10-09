@@ -4005,7 +4005,7 @@ if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend"
     || echo "warning: could not record $ID's no-mistakes pipeline spend; cleanup continues" >&2
 fi
 
-# Fix 3 (see script header): keep task identity records and the worktree until
+# Fix 4 (see script header): keep task identity records and the worktree until
 # Docker cleanup succeeds, so a partial removal can be retried.
 if [ "$KIND" != secondmate ] && ! teardown_docker_stacks "$ID" "$META" "$STATE" "$TEARDOWN_SLOT_REASSIGNED"; then
   echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
