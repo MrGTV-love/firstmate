@@ -521,8 +521,12 @@ pass "live omp idle wake: $SUBJECT started its own turn for a wake that reached 
 OLD_WAKE_MESSAGE='stale: old-wiring-lane wake left in the composer'
 fm_operational_input_encode watcher "${FM_LEGACY_WATCHER_PREFIX}${OLD_WAKE_MESSAGE}${FM_LEGACY_WATCHER_SUFFIX}" OLD_WAKE \
   || fail "could not encode the older-wiring wake"
-idle_composer() { idle_screen | awk '/^╰─/ { buf = ""; on = 1 } on { buf = buf $0 "\n" } END { printf "%s", buf }'; }
-draft_cleared() { ! idle_composer | grep -F 'operator draft kept' >/dev/null; }
+idle_composer() { fm_backend_herdr_composer_content "$SESSION:$IDLE_PANE" ''; }
+draft_cleared() {
+  local content
+  content=$(idle_composer) || return 1
+  [ -z "$content" ]
+}
 lab pane send-keys "$IDLE_PANE" ctrl+u >/dev/null
 wait_for 10 draft_cleared \
   || { idle_screen >&2; fail "$SUBJECT: could not clear the idle-wake draft before the stranded-wake step"; }
@@ -531,10 +535,10 @@ wait_for 40 model_saw "$OLD_WAKE_MESSAGE" \
   || { idle_screen >&2; fail "$SUBJECT: wake text left unsent in an idle composer was never delivered"; }
 sleep 3
 model_saw 'operator draft beside the wake' && fail "$SUBJECT: the operator draft was submitted with the stranded wake"
-idle_composer | grep -F 'operator draft beside the wake' >/dev/null \
-  || { idle_screen >&2; fail "$SUBJECT: the operator draft did not stay in the composer beside the stranded wake"; }
-idle_composer | grep -F 'old-wiring-lane' >/dev/null \
-  && { idle_screen >&2; fail "$SUBJECT: the stranded wake text stayed in the composer after it was delivered"; }
+draft=$(idle_composer) \
+  || { idle_screen >&2; fail "$SUBJECT: could not read the full composer after the stranded wake was delivered"; }
+[ "$draft" = 'operator draft beside the wake' ] \
+  || { idle_screen >&2; fail "$SUBJECT: the stranded wake recovery did not leave exactly the operator draft, composer now holds: '$draft'"; }
 pass "live omp stranded wake: $SUBJECT delivered wake text an older wiring left unsent in an idle composer as its own turn, cleared only that wake, and left the operator draft as typed"
 lab pane close "$IDLE_PANE" >/dev/null 2>&1 || true
 

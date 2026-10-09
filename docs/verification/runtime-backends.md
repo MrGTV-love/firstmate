@@ -1333,6 +1333,9 @@ The guard exercises the extension under review on the installed omp:
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
+The stranded-wake step now reads the full editor through `fm_backend_herdr_composer_content` and requires the remainder to equal `operator draft beside the wake` exactly; the model log separately checks that the draft was not submitted.
+The recorded run below predates this stronger assertion: its bottom-row-only check could miss multiline wake text remaining above the draft.
+
 ```text
 ok - live omp idle wake: omp (omp/18.8.1) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
 ok - live omp stranded wake: omp (omp/18.8.1) on herdr 0.9.1 delivered wake text an older wiring left unsent in an idle composer as its own turn, cleared only that wake, and left the operator draft as typed
