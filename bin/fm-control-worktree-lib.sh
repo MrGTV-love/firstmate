@@ -15,26 +15,13 @@
 #   Returns 0 and sets, for the caller to journal and publish:
 #     FM_CONTROL_RELOCATION_PATH         the destination's physical root
 #     FM_CONTROL_RELOCATION_FROM         the recorded path proven absent
-#     FM_CONTROL_RELOCATION_HEAD         the recorded head the destination contains
-#     FM_CONTROL_RELOCATION_HEAD_SOURCE  which evidence supplied that head
+#     FM_CONTROL_RELOCATION_HEAD         the destination's proven HEAD
+#     FM_CONTROL_RELOCATION_HEAD_SOURCE  comma-separated sources checked for containment
 #   Returns 1 after printing the concrete refusal on stderr. A refusal changes
 #   nothing.
 #
-# What it proves, and nothing else is accepted:
-#   - the task is a ship, because only a ship has a branch to match;
-#   - the recorded path is ABSENT, shown from a readable and searchable
-#     ancestor - an existing file, a dangling symlink, or an unreadable
-#     ancestry is "cannot say", never "gone" (an unmounted volume is
-#     indistinguishable from a deleted copy; do not relocate while one is
-#     offline);
-#   - the destination is an isolated worktree root of the SAME repository as the
-#     recorded project, checked out on the recorded branch, with no uncommitted
-#     changes, and its HEAD contains the recorded head;
-#   - no other task of any local Firstmate home (fm_local_firstmate_state_dirs)
-#     records the destination, and a Treehouse pool slot is not claimed by another task;
-#   - the destination holds none of the per-task harness files the launch writes
-#     over and deletes (fm_control_worktree_wiring_free), so nothing a project
-#     or another tool owns is ever overwritten or deleted.
+# docs/agent-control.md "Relocating a task whose worktree is gone" owns the
+# eligibility and refusal contract; keep its prose there rather than copying it.
 #
 
 fm_control_worktree_wiring_free() {

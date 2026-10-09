@@ -34,7 +34,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | --- | --- | --- |
 | `interrupt` | Deliver the harness's verified interrupt sequence while leaving the agent running. | Delivery succeeds while the endpoint still exists and the agent is still alive where the backend can classify that; cancellation is confirmed only from an adapter-owned acknowledgement and otherwise reports `cancel=unconfirmed`. |
 | `exit` | Stop the agent, preserving the endpoint, the worktree, and every uncommitted change. | The backend's recovery-grade classifier reports the agent gone. Already-stopped is idempotent success. A `missing` endpoint goes through the shared [absence proof](#reclaiming-a-task-whose-endpoint-is-gone): proven gone reports `endpoint-gone`, a surviving idle pane reports `already-stopped`, and a surviving agent takes the ordinary interrupt-then-exit path. Unproven absence refuses. |
-| `relaunch` | Replace the running agent with a new one in the same worktree - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
+| `relaunch` | Replace the running agent with a new one in the same worktree by default (see the [missing-worktree exception](#relocating-a-task-whose-worktree-is-gone)) - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
 | `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
 
 An exit that delivers lifecycle input but cannot prove the agent stopped fails with `exit=unconfirmed`, reports the observed agent state and any interrupt cancellation claim, and never claims that nothing changed.
@@ -96,8 +96,8 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    The exit verb writes `state/<id>.control-exit` bound to the busy generation before it types the exit command.
    A known non-delivery (`send-failed`) removes that marker before refusing; this includes the [Herdr pre-Enter proof refusals](herdr-backend.md#claude-composer-proof).
    A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait, and `bin/fm-session-end-relaunch-lib.sh` owns how a later tick reads it.
-5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which reuses the recorded worktree instead of creating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
-   When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in that same worktree and republishes the binding, subject to the backend policy in [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
+5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which uses the checkpointed worktree without allocating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
+   When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in that worktree and republishes the binding, subject to the backend policy in [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
 6. **Preserve runtime-bound status authority where supported.**
    The endpoint's runtime may bind pane status to one session identity; the launch owner preserves it only when that runtime records a reference the replacement adapter can consume, and otherwise launches the ordinary fresh session.
    This reference is a launch input, never authority to send, close, or act on the pane.
@@ -154,7 +154,7 @@ Every transient or self-contradicting read stays `unreadable` or `ambiguous` and
 That proof has one owner for the whole control plane (`fm_control_endpoint_absence_verdict` in `bin/fm-control-lib.sh`), so `exit` and `relaunch` cannot reach two different answers about one endpoint.
 `exit` reports what the proof established and nothing more - see its row in the verb table above.
 
-What a reclaim is not:
+What an endpoint-only reclaim is not (a simultaneous worktree change follows the separate [relocation contract](#relocating-a-task-whose-worktree-is-gone)):
 
 - It is **not a teardown**. The worktree is reused exactly as the previous agent left it; nothing unlanded is ever discarded, and the ordinary `--note` requirement still applies.
 - It does **not** change the task's identity.
@@ -187,12 +187,13 @@ The worktree and the task's records are unaffected either way.
 ### Relocating a task whose worktree is gone
 
 A pool slot can vanish while its task's branch and every commit on it survive in the shared repository.
-Plain `relaunch` refuses that task, because its record names a path nothing can re-create and it will not lose track of work it cannot account for.
+Plain `relaunch` refuses that task because it cannot checkpoint the missing recorded copy.
 `fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh isolated copy of the same branch that the caller has already prepared.
 A scout has no branch to match and a secondmate's home is not a task copy, so both refuse.
 
 [`bin/fm-control-worktree-lib.sh`](../bin/fm-control-worktree-lib.sh) owns the proof, and both `fm-control` and `fm-spawn --relaunch --worktree` run it, so the two cannot disagree.
-It accepts the relocation only when all of these hold, and it refuses every other case before anything is stopped, journaled, edited, or created:
+The control-plane preflight checks all of the conditions below before stopping the agent or writing the relaunch journal or progress note.
+The launch owner repeats the proof before publication; a later refusal can therefore occur after the control plane has journaled the attempt and stopped the old agent, following [Failure and rollback](#failure-and-rollback).
 
 - **The recorded path is proven absent.**
   Absence is shown from a readable, searchable ancestor.
@@ -210,17 +211,20 @@ It accepts the relocation only when all of these hold, and it refuses every othe
   The control plane checks, and the launch owner checks again at the moment it would write.
   A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
 
-The journal keeps the current worktree checkpoint (`worktree_head`, `worktree_dirty`, and any child count) and `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, including failure phases and later ordinary relaunches, and a repeated relocation is judged against both applicable head fields. An existing unreadable journal refuses a control relaunch before it can overwrite recovery evidence.
+The journal keeps the current worktree checkpoint (`worktree_head`, `worktree_dirty`, and any child count) and `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, including failure phases.
+Later ordinary relaunches checkpoint the current copy while preserving the prior relocation fields, and a repeated relocation is judged against both applicable head fields.
+An existing unreadable journal refuses a control relaunch before it can overwrite recovery evidence.
 The record's `worktree=` moves only at the launch owner's single atomic publication, alongside the ordinary relaunch profile updates (including an explicit harness switch).
 A surviving endpoint is reused; a proven-gone endpoint follows the normal reclaim rules above.
-The task id, status log, and armed poll are preserved. The `--note` requirement still applies, and the progress note is appended to the existing brief.
+The task id, status log, and armed poll are preserved.
+The `--note` requirement still applies, and the progress note is appended to the existing brief.
 Uncommitted changes in the vanished copy are not recoverable, and the progress note says so.
 
 **Why the caller prepares the copy.**
 The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
 It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration or force the checkout, and both change repository administration that every lane's worktrees share.
 It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a 60-second isolation poll and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
-Validating a copy the caller prepared reads that state and changes none of it: one new library, no new process, and every refusal above before the first side effect.
+The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 Editing the record by hand has none of those checks, no journal, and no lock against a concurrent launch.
 
 ### Failure and rollback
@@ -254,7 +258,7 @@ The runtime lifecycle verbs have the boundaries below; metadata-only authorizati
 - `exit`'s composer-empty check, above, is itself a fail-closed boundary that `relaunch` inherits by stopping the old agent through `exit`.
 - `fm-spawn --relaunch` independently refuses unless the endpoint is positively agent-free - either a surviving `dead` endpoint or one proven gone by the shared absence proof - so a replacement can never join a live agent.
   An `alive`, `ambiguous`, or `unreadable` verdict refuses, as does any endpoint whose absence is unproven.
-  It also requires the shell to be in the recorded worktree: every backend but Orca (which owns its own task worktree with no current-path probe) gets one explicit `cd` to the recorded path, then a pre-launch path read that refuses before any harness starts unless it confirms the endpoint is sitting in the recorded copy.
+  It also requires the shell to be in the selected worktree: every backend but Orca (which owns its own task worktree with no current-path probe) gets one explicit `cd` to that path, then a pre-launch path read that refuses before any harness starts unless it confirms the endpoint is sitting in that copy.
 
 ## Capability matrix
 
@@ -274,5 +278,5 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 ## Verification
 
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
-- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr reclaim, tmux absence scoped to the recorded endpoint despite unrelated servers, refusal of other configured backends, and refusals on a live window, a worktree-holding agent, or unreadable evidence.
+- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr reclaim, tmux absence scoped to the recorded endpoint despite unrelated servers, refusal of other configured backends, and refusals on a live window, a worktree-holding agent, or unreadable evidence; missing-worktree relocation cases cover recorded-head containment, foreign harness-file preservation, failure-journal recovery, concurrent destination ownership, and unpublished pool-claim cleanup.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.

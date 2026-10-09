@@ -63,8 +63,8 @@
 #   Recorded recovery=reconcile-only is inherited while present; the clearance
 #   policy is in docs/agent-control.md "Recovering an exited instruction owner".
 #
-#   --relaunch launches a replacement agent for an EXISTING task into that
-#   task's own recorded worktree, reusing its recorded endpoint when that
+#   By default, --relaunch launches a replacement agent for an EXISTING task
+#   into its recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
 #   the launch half of the control plane (bin/fm-control.sh relaunch), which
 #   owns the checkpoint, the progress note, stopping the previous agent, and the
@@ -85,17 +85,13 @@
 #   worktree. Herdr keeps its recorded session; a gone tmux endpoint requires
 #   the home's current configured spawn backend to resolve to Herdr and pass
 #   spawn validation.
-#   The validated worktree is reused untouched either way;
-#   a rebind is a recovery, never a teardown.
-#   --worktree <path> applies to --relaunch of a ship whose recorded worktree is
-#   PROVEN GONE: the record is republished pointing at that fresh copy of the same
-#   branch. bin/fm-control-worktree-lib.sh owns the proof (this script repeats it
-#   under the task's meta lock, so the control plane and the launch owner cannot
-#   disagree) and bin/fm-control.sh's header owns the contract. The copy is never
-#   created, moved or removed here, a Treehouse slot it occupies is claimed for
-#   the task under the shared project lock, and a harness file it already holds
-#   is refused rather than overwritten or deleted. Only a crewmate or scout rebinds: a
-#   secondmate whose endpoint is gone is respawned by its own owner
+#   No worktree is allocated or torn down; a rebind is a recovery, never a teardown.
+#   --worktree <path> uses the control header's prepared-destination option.
+#   docs/agent-control.md "Relocating a task whose worktree is gone" owns the
+#   contract. bin/fm-control-worktree-lib.sh repeats the proof under this task's
+#   meta lock and the shared project lock, which is held through publication.
+#   Only a crewmate or scout rebinds:
+#   a secondmate whose endpoint is gone is respawned by its own owner
 #   (`--secondmate`, driven by the session-start liveness sweep).
 #   Every fresh ship/scout launch and replacement explicitly enters the recorded
 #   worktree immediately before trust setup and brief delivery, and a pre-launch
@@ -4759,10 +4755,9 @@ if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$RELAUNCH" -eq 1 ]; then
   [ "$RELAUNCH_RELOCATING" = 0 ] || spawn_enter_recorded_worktree
-  # No worktree is acquired: the recorded one is reused as-is. What must be
-  # proven instead is that the adopted endpoint's shell is actually sitting in
-  # that worktree, so the replacement agent starts where the work is rather
-  # than wherever the pane happened to drift.
+  # No worktree is acquired: the selected pre-existing copy is used. The adopted
+  # endpoint's shell must be sitting in that copy, including after a relocation
+  # handoff, so the replacement never starts wherever the pane happened to drift.
   relaunch_wt_real=$(real_path_or_raw "$WT")
   relaunch_seen=
   for _ in $(seq 1 10); do

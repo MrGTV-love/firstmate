@@ -25,12 +25,9 @@
 # explicitly clear recovery after ordinary automatic-backlog admission.
 # It neither launches an agent nor delivers instructions; then use fm-send for
 # a new continuation instruction, or ordinary relaunch for an exited owner.
-# --worktree is relaunch-only and ship-only: it rebinds a task whose recorded
-# worktree is PROVEN GONE onto a fresh isolated copy of the same repository that
-# the caller already prepared, checked out on the recorded branch at a head that
-# contains the recorded head. It never creates, moves or removes a copy, never
-# touches one that exists, and never overwrites or deletes a harness file the
-# fresh copy already holds.
+# --worktree <path> accepts a prepared absolute destination for a ship relaunch.
+# docs/agent-control.md "Relocating a task whose worktree is gone" owns eligibility
+# and recovery guarantees; bin/fm-control-worktree-lib.sh owns their proof.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
