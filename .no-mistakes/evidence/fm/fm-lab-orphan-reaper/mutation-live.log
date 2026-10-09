@@ -1,0 +1,25 @@
+$ python3 .nm-live-validation/mutation-proof.py
+$ append: bash -c . "$1"; if [ -n "${BASH_ENV:-}" ]; then . "$BASH_ENV"; printf ready > "$PROOF_READY"; fi; fm_wake_append signal new payload _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-lib.sh
+append: real_wait=4.72s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+append: retry after genuine unlock exit=0 output=''
+$ keys: bash -c . "$1"; if [ -n "${BASH_ENV:-}" ]; then . "$BASH_ENV"; printf ready > "$PROOF_READY"; fi; fm_wake_queued_keys signal _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-lib.sh
+keys: real_wait=4.72s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+keys: retry after genuine unlock exit=0 output='existing'
+$ drain-first: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 79912.1791540449.1jOwjk
+drain-first: real_wait=4.41s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+drain-first: retry after genuine unlock exit=0 output=''
+$ drain-second: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 89749.1791540456.d8dh9R
+drain-second: real_wait=5.13s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+drain-second: retry after genuine unlock exit=0 output=''
+$ link: bash -c . "$1/fm-wake-lib.sh"; . "$1/fm-x-lib.sh"; if [ -n "${BASH_ENV:-}" ]; then . "$BASH_ENV"; printf ready > "$PROOF_READY"; fi; fmx_meta_link_set "$2" replacement 10 _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/mutation-proof/link/state/task.meta
+link: real_wait=5.18s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+link: retry after genuine unlock exit=0 output=''
+$ followups: bash -c . "$1/fm-wake-lib.sh"; . "$1/fm-x-lib.sh"; if [ -n "${BASH_ENV:-}" ]; then . "$BASH_ENV"; printf ready > "$PROOF_READY"; fi; fmx_meta_followups_set "$2" 3 _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/mutation-proof/followups/state/task.meta
+followups: real_wait=5.45s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+followups: retry after genuine unlock exit=0 output=''
+$ clear: bash -c . "$1/fm-wake-lib.sh"; . "$1/fm-x-lib.sh"; if [ -n "${BASH_ENV:-}" ]; then . "$BASH_ENV"; printf ready > "$PROOF_READY"; fi; fmx_meta_link_clear "$2" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/mutation-proof/clear/state/task.meta
+clear: real_wait=5.24s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+clear: retry after genuine unlock exit=0 output=''
+REAL LOCK FAILURE MATRIX COMPLETE
+
+exit=0 elapsed=45.85s

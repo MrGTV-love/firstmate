@@ -1,0 +1,47 @@
+$ python3 .nm-live-validation/drive.py
+$ tmux -f /dev/null -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.v/tmux-501/x new-session -d -s fm-lab-orphan-reaper sleep 240
+exit= 0
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.v/tmux-501/x display-message -p #{socket_path},#{pid},0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.v/tmux-501/x,84856,0
+exit= 0
+real scratch watcher armed: pid=87542 same_identity=True
+87542     1 Ss   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/manual-scan/fm-lab-nested/home/bin/fm-watch.sh
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/manual-scan
+exit= 0
+Live lab creator retained its detached real watcher.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/manual-scan
+reaped pid=87542 root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/manual-scan/fm-lab-nested/home cmd=bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-...
+exit= 0
+ended nested lab watcher after sweep: pid=87542 same_identity=False
+
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.v/tmux-501/x kill-server
+exit= 0
+$ tmux -f /dev/null -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.v/tmux-501/x new-session -d -s fm-lab-orphan-reaper sleep 240
+exit= 0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/manual-scan
+exit= 0
+dead creator but real private runtime active: pid=57853 same_identity=True
+57853     1 Ss   sleep 240
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.v/tmux-501/x list-sessions
+fm-lab-orphan-reaper: 1 windows (created Fri Oct  9 04:53:09 2026)
+exit= 0
+$ tmux -S /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.v/tmux-501/x kill-server
+exit= 0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/manual-scan
+reaped pid=57853 root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/manual-scan/fm-lab-runtime/home cmd=sleep 240
+exit= 0
+runtime ended and detached lab process reaped: pid=57853 same_identity=False
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh activate 27921 live-proof
+exit= 0
+$ bash -c . "$1"; fm_wake_append signal key payload _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-lib.sh
+exit= 0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh publish live-proof 1
+exit= 0
+release still blocked after six seconds behind live holder: pid=39995 same_identity=True
+39995 83692 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh release live-proof
+release after atomically removed state: exit=1 elapsed=6.49s stdout='' stderr=''
+release after one-second state absence and holder unlock: exit=0 rows_exist=False owner_exists=True
+LIVE PROOFS COMPLETE
+
+exit=0 elapsed=86.53s

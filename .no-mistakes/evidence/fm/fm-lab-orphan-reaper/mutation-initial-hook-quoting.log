@@ -1,0 +1,11 @@
+$ python3 .nm-live-validation/mutation-proof.py
+$ activate: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh activate 58583 replacement
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/mutation-proof.py", line 79, in <module>
+    wait_until(lambda:(folder/'ready').exists())
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/mutation-proof.py", line 22, in wait_until
+    raise AssertionError('worker did not reach lock acquisition')
+AssertionError: worker did not reach lock acquisition
+
+exit=1 elapsed=23.64s

@@ -1,0 +1,20 @@
+$ TMPDIR=<worktree>/.nm-live-validation bash tests/fm-orphan-safety.test.sh
+ok - snapshot-direct preserves the process ownership boundary
+ok - snapshot-descendant preserves the process ownership boundary
+ok - after-cont preserves the process ownership boundary
+ok - before-kill preserves the process ownership boundary
+ok - survivor-kill preserves the process ownership boundary
+ok - owner-unknown preserves the process ownership boundary
+ok - activate propagates acquisition failure without touching protected state
+ok - publish propagates acquisition failure without touching protected state
+ok - release propagates acquisition failure without touching protected state
+ok - deactivate propagates acquisition failure without touching protected state
+ok - append propagates acquisition failure without touching protected state
+ok - keys propagates acquisition failure without touching protected state
+ok - drain-first propagates acquisition failure without touching protected state
+ok - drain-second propagates acquisition failure without touching protected state
+ok - link leaves metadata unchanged after acquisition failure
+ok - followups leaves metadata unchanged after acquisition failure
+ok - clear leaves metadata unchanged after acquisition failure
+
+exit=0 elapsed=141.51s

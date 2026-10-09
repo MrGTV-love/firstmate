@@ -1,0 +1,23 @@
+$ python3 .nm-live-validation/mutation-proof.py
+$ activate: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh activate 52223 replacement
+activate: real_wait=4.75s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+activate: retry after genuine unlock exit=0 output=''
+$ publish: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh publish original 1
+publish: real_wait=9.11s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+publish: retry after genuine unlock exit=0 output=''
+$ release: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh release original
+release: real_wait=6.31s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+release: retry after genuine unlock exit=0 output=''
+$ deactivate: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-grant.sh deactivate 52223 original
+deactivate: real_wait=4.57s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''
+deactivate: retry after genuine unlock exit=0 output=''
+$ append: bash -c . "$1"; fm_wake_append signal new payload _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/bin/fm-wake-lib.sh
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/mutation-proof.py", line 79, in <module>
+    wait_until(lambda:(folder/'ready').exists())
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/mutation-proof.py", line 22, in wait_until
+    raise AssertionError('worker did not reach lock acquisition')
+AssertionError: worker did not reach lock acquisition
+
+exit=1 elapsed=66.63s

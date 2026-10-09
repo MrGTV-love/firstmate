@@ -1,0 +1,61 @@
+{
+  "product": "unmodified target CLI and library functions",
+  "timing": "actual sleeps; DEBUG trace only synchronizes OS directory moves and restoration at the acquisition-failure return",
+  "observations": [
+    {
+      "action": "activate",
+      "observed_result": "activate: real_wait=4.75s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-grants-live.log"
+    },
+    {
+      "action": "publish",
+      "observed_result": "publish: real_wait=9.11s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-grants-live.log"
+    },
+    {
+      "action": "release",
+      "observed_result": "release: real_wait=6.31s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-grants-live.log"
+    },
+    {
+      "action": "deactivate",
+      "observed_result": "deactivate: real_wait=4.57s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-grants-live.log"
+    },
+    {
+      "action": "append",
+      "observed_result": "append: real_wait=4.72s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-live.log"
+    },
+    {
+      "action": "keys",
+      "observed_result": "keys: real_wait=4.72s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-live.log"
+    },
+    {
+      "action": "drain-first",
+      "observed_result": "drain-first: real_wait=4.41s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-live.log"
+    },
+    {
+      "action": "drain-second",
+      "observed_result": "drain-second: real_wait=5.13s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-live.log"
+    },
+    {
+      "action": "link",
+      "observed_result": "link: real_wait=5.18s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-live.log"
+    },
+    {
+      "action": "followups",
+      "observed_result": "followups: real_wait=5.45s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-live.log"
+    },
+    {
+      "action": "clear",
+      "observed_result": "clear: real_wait=5.24s exit=1 restored_before_failure_return=True public_state_unchanged=True foreign_lock_retained=True stdout='' stderr=''",
+      "transcript": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FAAZCMK3BCMX01ZYFMDD9D/mutation-live.log"
+    }
+  ]
+}

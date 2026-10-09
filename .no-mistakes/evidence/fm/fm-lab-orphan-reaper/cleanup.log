@@ -1,0 +1,5 @@
+$ bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation
+exit=0
+$ bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/runner-proof
+exit=0
+No fixture-naming processes remained; disposable worktree fixtures and private socket directory removed.

@@ -1,0 +1,24 @@
+$ TMPDIR=<worktree>/.nm-live-validation GOCACHE=<fixture>/go-cache bash tests/fm-test-reap-orphans.test.sh
+ok - disappearance checks distinguish a replaced identity from the still-live original
+ok - a stub is left alone while the run that made it is alive
+ok - the reaper stops a stub whose owning run has ended
+ok - the reaper leaves live-parent, unrelated and prefix-sharing processes alone
+ok - the reaper is idempotent
+ok - lab creation records its caller and ended scratch-copy watchers are reaped
+ok - go-build-only argv is attributed by cwd without crossing ownership boundaries
+ok - live labs persist after up exits until their recorded runtime ends
+ok - failed lab creation without a runtime is ended when its creator exits
+ok - active and indeterminate private lab servers prevent reaping until stopped
+ok - an owner claim must name the caller or an ancestor
+ok - the owner-exit sweep only reaps roots whose marker names the caller
+ok - owner-exit authority requires the original owner identity as well as its PID
+ok - the owner-exit sweep stops a hidden stub and everything below it
+PASS
+ok - a test that exits normally leaves no stub of its own behind
+ok - sourcing the test library reaps the stub a killed test left behind
+ok - startup recovery reaps killed parallel tests' nested stubs without crossing ownership boundaries
+ok - nested marked lab watchers are reaped while unmarked nested homes are left alone
+tests/fm-test-reap-orphans.test.sh: line 463: 58747 Killed: 9               env TMPDIR="$NESTED_WORKER_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_MODE=killed FM_TEST_PIDFILE="$TMP_ROOT/nested-killed.pid" FM_TEST_SKIP_ORPHAN_REAP=1 bash "$TMP_ROOT/child.sh" > /dev/null 2>&1
+tests/lib.sh: line 218: 85554 Killed: 9               bash "$ROOT_DEAD/live-parent.sh" "$ROOT_DEAD/release"
+
+exit=0 elapsed=222.37s

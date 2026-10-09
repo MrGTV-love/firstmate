@@ -1,0 +1,32 @@
+$ python3 .nm-live-validation/runner-proof.py
+$ FM_PROOF_MODE=killed /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/runner-proof/repo/bin/fm-test-run.sh --jobs 1 --per-script-timeout-secs 60 tests/fm-live-leak.test.sh tests/fm-live-observe.test.sh
+FM_TEST_BEGIN 2026-10-09T09:58:43Z tests/fm-live-leak.test.sh family=unclassified expected_gate_skip=none
+Fixture launched detached poll-publish-holder pid=20907 mode=killed
+FM_TEST_END 2026-10-09T09:58:56Z tests/fm-live-leak.test.sh exit=137 duration_ms=12412 gate_skip=false
+FM_TEST_BEGIN 2026-10-09T09:58:56Z tests/fm-live-observe.test.sh family=unclassified expected_gate_skip=none
+Next script observes orphan pid=20907 same_identity=false
+FM_TEST_END 2026-10-09T09:59:20Z tests/fm-live-observe.test.sh exit=0 duration_ms=24488 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=1 skipped_gate=0 duration_ms=37480
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=36900 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-live-observe.test.sh duration_ms=24488
+FM_TEST_SLOWEST rank=2 script=tests/fm-live-leak.test.sh duration_ms=12412
+fm-test-run: reaped after tests/fm-live-leak.test.sh: reaped pid=20907 root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/runner-proof/fm-live-leak.dOtCDP cmd=bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-...
+runner exit= 1
+Runner preserved killed failure and next script saw no surviving owned orphan.
+$ FM_PROOF_MODE=timeout /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/runner-proof/repo/bin/fm-test-run.sh --jobs 1 --per-script-timeout-secs 60 tests/fm-live-leak.test.sh tests/fm-live-observe.test.sh
+FM_TEST_BEGIN 2026-10-09T09:59:21Z tests/fm-live-leak.test.sh family=unclassified expected_gate_skip=none
+Fixture launched detached poll-publish-holder pid=4709 mode=timeout
+not ok - tests/fm-live-leak.test.sh exceeded the per-script bound of 60s and was terminated
+FM_TEST_END 2026-10-09T10:00:38Z tests/fm-live-leak.test.sh exit=124 duration_ms=77181 gate_skip=false
+FM_TEST_BEGIN 2026-10-09T10:00:38Z tests/fm-live-observe.test.sh family=unclassified expected_gate_skip=none
+Next script observes orphan pid=4709 same_identity=false
+FM_TEST_END 2026-10-09T10:01:12Z tests/fm-live-observe.test.sh exit=0 duration_ms=34165 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=1 skipped_gate=0 duration_ms=111641
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=111346 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-live-leak.test.sh duration_ms=77181
+FM_TEST_SLOWEST rank=2 script=tests/fm-live-observe.test.sh duration_ms=34165
+fm-test-run: reaped after tests/fm-live-leak.test.sh: reaped pid=4709 root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/runner-proof/fm-live-leak.pcTQ9x cmd=bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-...
+runner exit= 1
+Runner preserved timeout failure and next script saw no surviving owned orphan.
+
+exit=0 elapsed=150.65s

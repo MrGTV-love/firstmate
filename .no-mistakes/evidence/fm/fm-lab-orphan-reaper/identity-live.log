@@ -1,0 +1,14 @@
+$ python3 .nm-live-validation/identity-proof.py
+direct: actual ownership snapshot: 83558     1 Fri Oct  9 05:02:25 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-direct/replacement.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-direct/transition /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-direct/ready
+direct: same PID after exec: Fri Oct  9 05:02:25 2026     sleep 240
+$ bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan
+direct: reaper_exit=0 replacement_still_alive=True
+descendant: actual ownership snapshot: 98070 98049 Fri Oct  9 05:02:35 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-descendant/replacement.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-descendant/transition /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-descendant/ready
+descendant: same PID after exec: Fri Oct  9 05:02:35 2026     sleep 240
+$ bin/fm-test-reap-orphans.sh --tmpdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan
+reaped pid=98049 root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-descendant cmd=bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-...
+reaped pid=98073 root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FAAZCMK3BCMX01ZYFMDD9D/.nm-live-validation/identity-scan/fm-descendant cmd=sleep 240
+descendant: reaper_exit=0 replacement_still_alive=True
+REAL IDENTITY TRANSITIONS PRESERVED
+
+exit=0 elapsed=19.99s
