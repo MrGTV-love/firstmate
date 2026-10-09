@@ -129,11 +129,17 @@
 # An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so participating test bursts across worktrees take turns.
-# A runner already inside a pass (FM_CPU_PASS_HELD set) runs directly with at
-# most that many concurrent scripts, reporting a reduced --jobs on stderr.
+# A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
+# and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # The marker must be a nonnegative decimal integer or execution exits 125;
-# 0 denotes degraded work and imposes no budget.
-# Without python3 or the pool tool beside it, scripts run directly.
+# 0 denotes degraded work with no CPU-pass concurrency limit.
+# Without python3 or the pool tool beside it, scripts run without a CPU pass.
+#
+# When the sibling bin/fm-proc-budget.sh is present and executable, every
+# executed script runs through it; its header owns the process-budget contract.
+# The budget is taken when the script starts, after any pass wait. If the budget
+# cannot be set, that script fails with wrapper exit 125 rather than running
+# unbudgeted. Without the executable wrapper, scripts run without this budget.
 # With a usable pool, --jobs above its size still starts that many workers,
 # but only pool-size scripts run at once.
 #
@@ -850,6 +856,7 @@ tests/fm-pr-check-security.test.sh 300675
 tests/fm-pr-reviewers.test.sh 273
 tests/fm-pr-state-live-e2e.test.sh 47
 tests/fm-pr-state.test.sh 531
+tests/fm-proc-budget.test.sh 8000
 tests/fm-procevent-quota.test.sh 2459
 tests/fm-procevent-when.test.sh 25674
 tests/fm-procevent.test.sh 370820
@@ -2486,6 +2493,10 @@ elif ! command -v python3 >/dev/null 2>&1; then
   CPU_PASS_ACTIVE=0
   log "running without CPU passes: python3 not found"
 fi
+PROC_BUDGET_ACTIVE=1
+if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
+  PROC_BUDGET_ACTIVE=0
+fi
 if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
   SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
 fi
@@ -2665,6 +2676,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
     cmd=(bash -c 'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out")
   else
     cmd=(bash "$script")
+  fi
+  if [ "$PROC_BUDGET_ACTIVE" -eq 1 ]; then
+    # Innermost, so the budget is taken when the script starts, not before a
+    # pass wait or after another script has already grown the process count.
+    cmd=("$ROOT/bin/fm-proc-budget.sh" -- "${cmd[@]}")
   fi
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
     # The bound runs inside the pass holder so the pass wait stays outside it.

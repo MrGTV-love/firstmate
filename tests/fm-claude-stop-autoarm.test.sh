@@ -1468,6 +1468,11 @@ printf 'supervision-host: the away session could not take this wake: fixture; re
 for i in 1 2 3 4 5 6 7 8 9 10; do printf 'supervision-host: outcome %s for demo [routine]: fixture %s\n' "$i" "$i"; done
 SH
         ;;
+      failed-handback|failed-handback-silent)
+        printf "printf 'pending:handling:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
+        [ "$kind" = failed-handback-silent ] || printf "printf 'watcher: started pid=123 (beacon fresh)\\n'\n"
+        printf 'exit 1\n'
+        ;;
       crash)
         printf 'kill -KILL "$$"\n'
         ;;
@@ -1668,6 +1673,40 @@ test_host_lost_announced_handback_notifies_once_per_episode() {
   pass "auto-arm: a lost host hand-back on an announced marker notifies once per failure episode"
 }
 
+# An explicit failed hand-back must notify, not park on another host, even if
+# the first arm closed before its readiness line was streamed to the owner.
+test_host_failed_handback_is_not_retried() {
+  local kind successor dir out status pid identity
+  for kind in failed-handback failed-handback-silent; do
+    for successor in absent live; do
+      dir=$(make_primary_dir "$TMP_ROOT/host-$kind-$successor")
+      rm -f "$dir/config/supervision-host-off"
+      : > "$dir/state/task.meta"
+      write_host_fixture "$dir" "$kind"
+      pid=
+      if [ "$successor" = live ]; then
+        sleep 60 &
+        pid=$!
+        identity=$(watcher_identity "$dir" "$pid") || fail "could not identify the successor watcher"
+        record_watcher_lock "$dir" "$pid" "$identity"
+        touch "$dir/state/.last-watcher-beat"
+      fi
+      out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+      if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+      fi
+      expect_code 2 "$status" "$kind/$successor: a failed hand-back must notify main"
+      assert_contains "$out" 'auto-arm FAILED' "$kind/$successor: the failure notice is missing"
+      assert_present "$dir/state/.claude-autoarm-failure-notified" "$kind/$successor: the failure episode was not recorded"
+      [ "$(epoch_outcome "$dir")" = failed ] || fail "$kind/$successor: the hook did not commit the failure"
+      [ "$(wc -l < "$dir/state/host-ran" | tr -d ' ')" -eq 1 ] \
+        || fail "$kind/$successor: the failed hand-back was retried"
+    done
+  done
+  pass "auto-arm: explicit failed hand-backs notify without retry, with or without output or a live successor"
+}
+
 test_host_crash_is_retried_then_reported() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/host-crash")
@@ -1794,6 +1833,7 @@ test_host_stand_down_is_silent
 test_host_benign_rewake_refusal_opens_no_failure_episode
 test_host_lost_handback_notifies_once_per_episode
 test_host_lost_announced_handback_notifies_once_per_episode
+test_host_failed_handback_is_not_retried
 test_host_crash_is_retried_then_reported
 test_arguments_never_arm
 test_fm_lock_status_still_works_with_shared_lib
