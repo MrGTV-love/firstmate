@@ -316,7 +316,15 @@ An ordinary presentation drain bounds both its initial queue-lock acquire and it
 | Initial queue lock | One PID-naming advisory, and the whole drain is skipped before any claim or mutation. |
 | Status-presentation lock | One such advisory after raw wake presentation, and status annotations, sections, and cursors are left retriable on the next drain. |
 
-Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics, so acknowledgement atomicity is unchanged.
+Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics while the lock's parent directory exists, so acknowledgement atomicity is unchanged.
+
+### Vanished fixture state
+
+`fm_lock_acquire_wait` returns failure when the lock's parent stays absent beyond `FM_LOCK_PARENT_GONE_GRACE_SECONDS` (default five seconds). Queue append and queued-key reads, plus grant activate, publish, release, and deactivate, propagate that failure before accessing protected records, even if the directory returns immediately afterward.
+
+Fixture orphan reaping binds each target's birth identity and command to the same process snapshot used to establish ownership, including descendants. It rechecks that identity before CONT, TERM, and KILL. A live fixture owner's unreadable identity does not prove the run ended and leaves its root untouched.
+
+`tests/fm-orphan-safety.test.sh` covers reused direct and descendant PIDs, identity changes between signals, unknown live owners, and acquisition failure followed by returning state for all six queue/grant entry points. `tests/fm-test-reap-orphans.test.sh` exercises real-process termination and non-termination, owner-exit cleanup, and startup cleanup after a killed test.
 
 ### Guard counts for branch-held rows
 

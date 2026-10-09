@@ -82,10 +82,6 @@ if [ "${#TMPDIRS[@]}" -eq 0 ]; then
   TMPDIRS+=(/tmp)
 fi
 
-# Only the pid identity helper is needed, and only once a marker names a live
-# pid or a process is about to be signalled, so the common empty sweep stays a
-# glob and a few file reads. Its state directory is pointed at a path that
-# already exists so sourcing leaves nothing behind.
 identity_ready() {
   command -v fm_pid_identity >/dev/null 2>&1 && return 0
   FM_STATE_OVERRIDE=${TMPDIRS[0]:-/tmp}
@@ -124,7 +120,7 @@ marker_owner_dead() {
   [ -n "$owner_identity" ] || return 1
   kill -0 "$owner_pid" 2>/dev/null || return 0
   identity_ready
-  current=$(fm_pid_identity "$owner_pid" 2>/dev/null) || return 0
+  current=$(fm_pid_identity "$owner_pid" 2>/dev/null) || return 1
   [ "$current" != "$owner_identity" ]
 }
 
@@ -160,7 +156,7 @@ else
 fi
 [ -s "$WORK/roots" ] || exit 0
 
-COLUMNS=10000 LC_ALL=C ps -U "$(id -u)" -ww -o pid= -o ppid= -o command= > "$WORK/ps" 2>/dev/null \
+COLUMNS=10000 LC_ALL=C ps -U "$(id -u)" -ww -o pid= -o ppid= -o lstart= -o command= > "$WORK/ps" 2>/dev/null \
   || { echo "fm-test-reap-orphans: cannot read the process list" >&2; exit 1; }
 
 # One pass over the snapshot picks the targets: processes naming a proven root
@@ -212,7 +208,9 @@ BEGIN {
   split(head, h, " ")
   pid = h[1] + 0
   parent[pid] = h[2] + 0
-  cmd[pid] = substr(line, RLENGTH + 1)
+  identity[pid] = substr(line, RLENGTH + 1)
+  cmd[pid] = identity[pid]
+  if (!sub(/^[^ ]+ +[^ ]+ +[0-9]+ +[0-9:]+ +[0-9]+ +/, "", cmd[pid])) next
   order[++count] = pid
 }
 END {
@@ -249,19 +247,25 @@ END {
   } while (changed)
   for (i = 1; i <= count; i++) {
     pid = order[i]
-    if (pid in target) printf "%d\t%s\t%s\n", pid, target[pid], cmd[pid]
+    if (pid in target) printf "%d\t%s\t%s\t%s\n", pid, target[pid], identity[pid], cmd[pid]
   }
 }
 ' "$WORK/ps" > "$WORK/targets"
 
-identity_ready
+target_identity() {
+  local out
+  out=$(COLUMNS=10000 LC_ALL=C ps -p "$1" -ww -o lstart= -o command= 2>/dev/null) || return 1
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out" | sed 's/^[[:space:]]*//'
+}
 PIDS=()
 IDENTITIES=()
 ROOTS_OF=()
 CMDS=()
-while IFS=$'\t' read -r pid root command; do
+while IFS=$'\t' read -r pid root identity command; do
   case "$pid" in ''|*[!0-9]*) continue ;; esac
-  identity=$(fm_pid_identity "$pid" 2>/dev/null) || continue
+  current=$(target_identity "$pid") || continue
+  [ "$current" = "$identity" ] || continue
   PIDS+=("$pid")
   IDENTITIES+=("$identity")
   ROOTS_OF+=("$root")
@@ -271,7 +275,7 @@ done < <(sed '1d' "$WORK/targets")
 
 still_same() {  # <index>
   local current
-  current=$(fm_pid_identity "${PIDS[$1]}" 2>/dev/null) || return 1
+  current=$(target_identity "${PIDS[$1]}") || return 1
   [ "$current" = "${IDENTITIES[$1]}" ]
 }
 
@@ -292,6 +296,7 @@ done
 for i in "${!PIDS[@]}"; do
   still_same "$i" || continue
   kill -CONT "${PIDS[$i]}" 2>/dev/null || true
+  still_same "$i" || continue
   kill -TERM "${PIDS[$i]}" 2>/dev/null || true
 done
 tick=0

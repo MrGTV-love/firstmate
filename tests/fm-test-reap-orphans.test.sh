@@ -23,17 +23,24 @@ SCAN="$TMP_ROOT/scan"
 mkdir -p "$SCAN"
 
 TRACKED_PIDS=()
+TRACKED_IDENTITIES=()
 reap_cleanup() {
-  local pid
-  for pid in "${TRACKED_PIDS[@]:-}"; do
-    [ -n "$pid" ] || continue
-    kill -KILL "$pid" 2>/dev/null || true
+  local i current
+  for i in "${!TRACKED_PIDS[@]}"; do
+    current=$(fm_test_pid_identity "${TRACKED_PIDS[$i]}" 2>/dev/null) || continue
+    [ "$current" = "${TRACKED_IDENTITIES[$i]}" ] || continue
+    kill -KILL "${TRACKED_PIDS[$i]}" 2>/dev/null || true
   done
   fm_test_cleanup
 }
 trap reap_cleanup EXIT
 
-track() { TRACKED_PIDS+=("$1"); }
+track() {
+  local identity
+  identity=$(fm_test_pid_identity "$1" 2>/dev/null) || return 0
+  TRACKED_PIDS+=("$1")
+  TRACKED_IDENTITIES+=("$identity")
+}
 
 alive() { kill -0 "$1" 2>/dev/null; }
 
