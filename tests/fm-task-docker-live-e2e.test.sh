@@ -16,7 +16,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-fm_live_gate default-on FM_TASK_DOCKER_LIVE_E2E docker
+fm_live_gate default-on FM_TASK_DOCKER_LIVE_E2E docker python3
 
 docker info >/dev/null 2>&1 || { printf 'skip: live: docker daemon not reachable\n'; exit 0; }
 IMAGE=$(docker image ls --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>' | head -1)

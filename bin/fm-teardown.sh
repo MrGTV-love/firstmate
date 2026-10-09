@@ -2727,7 +2727,7 @@ teardown_live_slot_path() {
 # owns the walk and what it refuses.
 collect_local_firstmate_states() {
   local state_dir meta
-  fm_local_firstmate_state_dirs "$1" || {
+  fm_local_firstmate_state_dirs "$1" 1 || {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
     return 1
   }

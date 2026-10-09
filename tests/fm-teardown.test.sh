@@ -6002,11 +6002,12 @@ make_docker_case() {
 }
 
 test_incomplete_local_inventories_retain_tasks_and_docker() {
-  local caller scan failure case_dir home meta wt id sibling store before rc real_ls
+  local caller scan failure case_dir home meta wt id sibling store before rc real_ls real_cat registry branch
   real_ls=$(command -v ls)
+  real_cat=$(command -v cat)
   for caller in top-level forced-child; do
     for scan in process docker; do
-      for failure in state metadata enumeration; do
+      for failure in state metadata enumeration registry registry-read; do
         case_dir=$(make_case "inventory-$caller-$scan-$failure")
         write_meta "$case_dir" local-only ship
         home="$case_dir/primary-home"
@@ -6031,6 +6032,18 @@ test_incomplete_local_inventories_retain_tasks_and_docker() {
         fm_write_meta "$sibling/state/$id.meta" "kind=ship"
         printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
           "$sibling" > "$case_dir/primary-home/data/secondmates.md"
+        registry="$sibling/data/secondmates.md"
+        case "$failure" in
+          registry|registry-read)
+            branch="$case_dir/registry-home"
+            mkdir -p "$branch/state" "$branch/data" "$case_dir/later-home/state" "$case_dir/later-home/data"
+            printf -- '- branch - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n- later - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
+              "$branch" "$case_dir/later-home" > "$case_dir/primary-home/data/secondmates.md"
+            registry="$branch/data/secondmates.md"
+            printf -- '- nested - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
+              "$sibling" > "$registry"
+            ;;
+        esac
         if [ "$caller" = forced-child ]; then
           cp "$case_dir/primary-home/data/secondmates.md" "$home/data/secondmates.md"
         fi
@@ -6060,6 +6073,18 @@ exec "$real_ls" "\$@"
 EOF
             chmod +x "$case_dir/fakebin/ls"
             ;;
+          registry)
+            chmod 000 "$registry"
+            [ ! -r "$registry" ] || fail "inventory: fixture registry remains readable"
+            ;;
+          registry-read)
+            cat > "$case_dir/fakebin/cat" <<EOF
+#!/usr/bin/env bash
+if [ "\${*: -1}" = "$registry" ]; then exit 1; fi
+exec "$real_cat" "\$@"
+EOF
+            chmod +x "$case_dir/fakebin/cat"
+            ;;
         esac
         rc=0
         FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
@@ -6067,20 +6092,28 @@ EOF
             > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         chmod 755 "$sibling/state"
         chmod 644 "$sibling/state/$id.meta"
-        rm -f "$case_dir/fakebin/ls"
+        [ ! -e "$registry" ] || chmod 644 "$registry"
+        rm -f "$case_dir/fakebin/ls" "$case_dir/fakebin/cat"
         expect_code 1 "$rc" "$caller $scan $failure: incomplete inventory allowed retirement"
         assert_present "$meta" "$caller $scan $failure: task metadata was retired"
         assert_present "$case_dir/state/task-x1.meta" "$caller $scan $failure: parent metadata was retired"
         assert_present "$wt" "$caller $scan $failure: task worktree was removed"
         assert_equals "$before" "$(cat "$store")" "$caller $scan $failure: Docker resources were changed"
         assert_absent "$case_dir/docker.log" "$caller $scan $failure: Docker ran with an incomplete inventory"
-        if [ "$failure" = metadata ]; then
-          assert_grep "cannot read local Firstmate task record $sibling/state/$id.meta" \
-            "$case_dir/stderr" "$caller $scan $failure: failed metadata read was not exercised"
-        else
-          assert_grep "cannot enumerate local Firstmate state $sibling/state" \
-            "$case_dir/stderr" "$caller $scan $failure: failed enumeration was not exercised"
-        fi
+        case "$failure" in
+          metadata)
+            assert_grep "cannot read local Firstmate task record $sibling/state/$id.meta" \
+              "$case_dir/stderr" "$caller $scan $failure: failed metadata read was not exercised"
+            ;;
+          registry|registry-read)
+            assert_grep "cannot read local Firstmate registry at $registry" \
+              "$case_dir/stderr" "$caller $scan $failure: failed registry read was not exercised"
+            ;;
+          *)
+            assert_grep "cannot enumerate local Firstmate state $sibling/state" \
+              "$case_dir/stderr" "$caller $scan $failure: failed enumeration was not exercised"
+            ;;
+        esac
         rc=0
         FM_FAKE_DOCKER_STORE="$store" \
           run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
@@ -6097,7 +6130,7 @@ EOF
       done
     done
   done
-  pass "unreadable states, unreadable metadata and failed enumeration retain tasks and Docker until complete inventories permit retry"
+  pass "unreadable registries, states, metadata and failed enumeration retain tasks and Docker until complete inventories permit retry"
 }
 
 test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings() {
