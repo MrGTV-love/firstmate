@@ -656,6 +656,31 @@ test_dated_decisions_follow_valid_reopenings() {
   pass "dated decisions retain only the last valid reopening across resolutions and terminal declarations"
 }
 
+test_dated_decisions_close_only_the_exact_key_record() {
+  local dir f expected
+  dir=$(case_dir dated-exact-key)
+  f="$dir/task.status"
+  printf '%s\n' \
+    'needs-decision [key=first] [at=100]: mentions [key=a.b], tabs aside, and .* regex prose' \
+    'needs-decision [key=axb] [at=110]: keep this different key' \
+    'blocked [key=a.b] [at=120]: credentials [x] (y) * remain literal' \
+    'needs-decision [key=last] [at=130]: final question' \
+    'resolved [key=a.b] [at=140]: credentials arrived' > "$f"
+  expected=$(printf '%s\n' \
+    $'first\tneeds-decision\t100\tmentions [key=a.b], tabs aside, and .* regex prose' \
+    $'axb\tneeds-decision\t110\tkeep this different key' \
+    $'last\tneeds-decision\t130\tfinal question')
+  assert_equals "$expected" "$(status_open_decisions_dated "$f")" \
+    "closing a dotted middle key removed a different key or interpreted note prose"
+  printf 'resolved [key=first]: answered\nresolved [key=last]: answered\n' >> "$f"
+  assert_fold "$f" $'axb\tneeds-decision\tkeep this different key' "closing first and last keys"
+  assert_equals $'axb\tneeds-decision\t110\tkeep this different key' \
+    "$(status_open_decisions_dated "$f")" "closing neighboring keys changed the surviving age"
+  pass "dated and ordinary folds close only exact keys at every record position"
+}
+
+test_dated_decisions_close_only_the_exact_key_record
+
 test_dated_decisions_ignore_rejected_openers
 test_dated_decisions_follow_valid_reopenings
 test_dated_decisions_pair_each_open_key_with_its_own_last_opening() {
