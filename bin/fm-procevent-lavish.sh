@@ -1053,12 +1053,12 @@ board_idle_seconds() {
 
 # One perl pass for every registration: <source-id> TAB <artifact> lines on
 # stdin, one fact row per line out:
-#   id, artifact, real path ("-" when the file is gone), sessions (count, or
+#   id, artifact, file state (present, missing, or unknown), sessions (count, or
 #   "unknown"), status, queued prompts, last-activity epoch, card keys.
 # `sessions` is "unknown" when Lavish's store cannot be read, so an unreadable
 # store keeps every board instead of reading as "no session".
 sweep_facts() {  # <state-dir> <lavish-store>
-  perl -MJSON::PP -MCwd=realpath -MEncode=decode,FB_DEFAULT -MTime::Local=timegm -e '
+  perl -MJSON::PP -MCwd=realpath -MErrno=ENOENT -MEncode=decode,FB_DEFAULT -MTime::Local=timegm -e '
     use strict; use warnings;
     my ($state, $store) = @ARGV;
     my (%by, $store_ok);
@@ -1088,14 +1088,16 @@ sweep_facts() {  # <state-dir> <lavish-store>
       chomp $line;
       my ($id, $art) = split /\t/, $line, 2;
       next unless defined $art;
-      my $real = -f $art ? realpath($art) : undef;
+      my @stat = stat $art;
+      my $file_state = @stat ? (-f _ && defined realpath($art) ? "present" : "unknown")
+        : ($! == ENOENT ? "missing" : "unknown");
       my ($sessions, $status, $pending, @keys) = ("unknown", "", 0);
       my $keys_unknown = 0;
       my $activity = $newest->(glob("$state/procevent-inbox/$id.*"));
-      if (defined $real) {
-        my $t = $newest->($real);
+      if ($file_state eq "present") {
+        my $t = $stat[9];
         $activity = $t if $t > $activity;
-        if (open my $in, "<:raw", $real) {
+        if (open my $in, "<:raw", $art) {
           local $/;
           local $! = 0;
           my $html = <$in>;
@@ -1104,8 +1106,15 @@ sweep_facts() {  # <state-dir> <lavish-store>
           if ($read_ok && $close_ok) {
             $html //= "";
             my %seen;
-            while ($html =~ /\bdata-lavish-question\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s"\x27=<>`]+))/gi) {
-              my $k = unescape($1 // $2 // $3);
+            while ($html =~ m{<([A-Za-z][\w:-]*)(?=[\s/>])}g) {
+              my %attr;
+              while ($html =~ m{\G\s*([^\s"\x27<>/=]+)(?:\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s"\x27=<>`]+)))?}gc) {
+                my $name = lc $1;
+                $attr{$name} //= unescape($2 // $3 // $4 // "");
+              }
+              $html =~ m{\G\s*/?>}gc;
+              next unless exists $attr{"data-lavish-question"};
+              my $k = $attr{"data-lavish-question"};
               if ($k !~ /\A[A-Za-z0-9._-]{1,128}\z/) {
                 $keys_unknown = 1;
                 last;
@@ -1120,8 +1129,8 @@ sweep_facts() {  # <state-dir> <lavish-store>
         }
       }
       if ($store_ok) {
-        my $list = defined $real ? ($by{decode("UTF-8", $real, FB_DEFAULT)} // []) : [];
-        $sessions = scalar @$list;
+        my $list = $by{decode("UTF-8", $art, FB_DEFAULT)} // [];
+        $sessions = @$list > 1 ? "unknown" : scalar @$list;
         if (@$list == 1) {
           my $s = $list->[0];
           $status = $s->{status} // "";
@@ -1133,7 +1142,7 @@ sweep_facts() {  # <state-dir> <lavish-store>
           }
         }
       }
-      print join("\t", $id, $art, defined $real ? $real : "-", $sessions, $status || "-", $pending, $activity, $keys_unknown ? "?" : (join(",", @keys) || "-")), "\n";
+      print join("\t", $id, $art, $file_state, $sessions, $status || "-", $pending, $activity, $keys_unknown ? "?" : (join(",", @keys) || "-")), "\n";
     }
   ' "$1" "$2"
 }
@@ -1165,9 +1174,9 @@ sweep_cards_closed() {
 
 cmd_sweep() {
   local dry=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
-  local pending_ids facts real sessions status queued activity keys reason verdict out
+  local pending_ids facts file_state sessions status queued activity keys reason verdict out identity current_identity
   local open_cache=$'\n' retired=0 kept=0 idx
-  local -a ids=() kinds=()
+  local -a ids=() kinds=() identities=()
   case "${1-}" in
     '') ;;
     --dry-run) dry=1; shift ;;
@@ -1180,8 +1189,11 @@ cmd_sweep() {
   reg=$(fm_procevent_registry_dir "$state")
   store=${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json
   now=$(date +%s)
-  standing=$(perl -MCwd=realpath -e '$p = realpath($ARGV[0]); print $p if defined $p' \
-    "$FM_HOME/.lavish/bearings-board.html" 2>/dev/null || true)
+  standing=$(perl -MCwd=realpath -e '
+    my $home = realpath($ARGV[0]) // exit 1;
+    my $dir = realpath("$home/.lavish") // "$home/.lavish";
+    print realpath("$home/.lavish/bearings-board.html") // "$dir/bearings-board.html";
+  ' "$FM_HOME" 2>/dev/null || true)
   pending_ids=$(fm_procevent_pending "$state" | sed -n 's|.*/\([^/.]*\)\.[0-9][0-9]*\.result$|\1|p')
 
   # Read every registration first so one perl pass can answer for all of them.
@@ -1190,6 +1202,7 @@ cmd_sweep() {
     [ -f "$rec" ] && [ ! -L "$rec" ] || continue
     id=${rec##*/}; id=${id%.source}
     fm_procevent_source_id_valid "$id" || continue
+    identity=$(fm_pr_file_identity "$rec" 2>/dev/null) || continue
     adapter=''; kind=plain; argv_poll=''; artifact=''; n=0; in_argv=0
     while IFS= read -r line || [ -n "$line" ]; do
       if [ "$in_argv" = 1 ]; then
@@ -1204,8 +1217,10 @@ cmd_sweep() {
         argv:) in_argv=1 ;;
       esac
     done < "$rec"
+    current_identity=$(fm_pr_file_identity "$rec" 2>/dev/null) || continue
+    [ "$current_identity" = "$identity" ] || continue
     [ "$adapter" = lavish ] && [ "$argv_poll" = poll ] && [ -n "$artifact" ] || continue
-    ids+=("$id"); kinds+=("$kind")
+    ids+=("$id"); kinds+=("$kind"); identities+=("$identity")
     facts="$facts$id"$'\t'"$artifact"$'\n'
   done
   if [ "${#ids[@]}" -eq 0 ]; then
@@ -1214,22 +1229,24 @@ cmd_sweep() {
   fi
   facts=$(printf '%s' "$facts" | sweep_facts "$state" "$store") || die "cannot read the Lavish board facts"
 
-  while IFS=$'\t' read -r id artifact real sessions status queued activity keys; do
+  while IFS=$'\t' read -r id artifact file_state sessions status queued activity keys; do
     [ -n "$id" ] || continue
-    kind=plain
+    kind=plain; identity=''
     for idx in "${!ids[@]}"; do
-      [ "${ids[$idx]}" = "$id" ] && { kind=${kinds[$idx]}; break; }
+      [ "${ids[$idx]}" = "$id" ] && { kind=${kinds[$idx]}; identity=${identities[$idx]}; break; }
     done
     verdict=keep
-    if [ -n "$standing" ] && [ "$real" = "$standing" ]; then
+    if [ -n "$standing" ] && [ "$artifact" = "$standing" ]; then
       reason='the standing Bearings board'
     elif [ "$sessions" = unknown ]; then
-      reason='the Lavish session store cannot be read'
+      reason='Lavish session evidence cannot be read unambiguously'
     elif [ "$status" = feedback ] || [ "$queued" -gt 0 ]; then
       reason='Lavish holds queued feedback for the board'
     elif [ "$kind" = task-owned ]; then
       reason='owned by a worker task'
-    elif [ "$real" = - ]; then
+    elif [ "$file_state" = unknown ]; then
+      reason='the board file cannot be checked'
+    elif [ "$file_state" = missing ]; then
       verdict=retire; reason='the board file is gone'
     elif [ "$sessions" != 0 ] && [ "$status" != ended ] && [ $((now - activity)) -lt "$idle" ]; then
       reason="active within the last $((idle / 3600)) hours"
@@ -1251,7 +1268,7 @@ cmd_sweep() {
       esac
     fi
     if [ "$verdict" = retire ] && [ "$dry" = 0 ]; then
-      if ! out=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" retire "$id" 2>&1 </dev/null); then
+      if ! out=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" retire "$id" --if-identity "$identity" 2>&1 </dev/null); then
         verdict=keep
         reason="retire refused: ${out%%$'\n'*}"
       fi

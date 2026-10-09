@@ -4885,9 +4885,10 @@ test_sweep_retires_only_finished_board_listeners() {
   fresh=$(sweep_board "$home" fresh new)
   queued=$(sweep_board "$home" queued old)
   owned=$(sweep_board "$home" owned old)
-  standing="$home/.lavish/bearings-board.html"
+  standing="$home/boards/standing.html"
   mkdir -p "$home/.lavish"
   printf '<h1>standing</h1>\n' > "$standing"
+  ln -s "$standing" "$home/.lavish/bearings-board.html"
   touch -t 200001010000 "$standing"
   pending=$(sweep_board "$home" pending old)
 
@@ -4909,7 +4910,7 @@ test_sweep_retires_only_finished_board_listeners() {
     || fail "could not register the worker-owned board"
 
   for session in ended nosession idle; do
-    for syntax in quoted single unquoted uppercase hex decimal invalid unreadable; do
+    for syntax in quoted single unquoted uppercase hex decimal invalid valueless unreadable; do
       board=$(sweep_board "$home" "$session-$syntax" new)
       case "$syntax" in
         quoted) printf '<form data-lavish-question="sweep-open-call"></form>\n' > "$board" ;;
@@ -4919,6 +4920,7 @@ test_sweep_retires_only_finished_board_listeners() {
         hex) printf '<form data-lavish-question="sweep&#x2d;open-call"></form>\n' > "$board" ;;
         decimal) printf '<form data-lavish-question="sweep&#45;open-call"></form>\n' > "$board" ;;
         invalid) printf '<form data-lavish-question="sweep-closed-call"></form><form data-lavish-question="bad&amp;key"></form>\n' > "$board" ;;
+        valueless) printf '<form data-lavish-question></form>\n' > "$board" ;;
       esac
       [ "$session" != idle ] || touch -t 200001010000 "$board"
       sid=$(sweep_register "$home" "$board")
@@ -5074,9 +5076,186 @@ SH
   pass "the sweep stops the resident poll of a finished board's live listener"
 }
 
+test_sweep_preserves_deleted_board_keep_guards() {
+  local home store guard board sid out list before
+  local -a kept_ids=()
+  home=$(make_home board-sweep-deleted)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  for guard in standing feedback queued owned pending ambiguous; do
+    board=$(sweep_board "$home" "$guard" old)
+    if [ "$guard" = standing ]; then
+      mkdir -p "$home/.lavish"
+      mv "$board" "$home/.lavish/bearings-board.html"
+      board="$home/.lavish/bearings-board.html"
+    fi
+    if [ "$guard" = owned ]; then
+      sid=$(run_lavish "$home" source-id "$board") || fail "could not derive the owned source id"
+      printf 'window=fmtest:fm-deleted-owner\nworktree=%s/worktree-deleted-owner\nproject=fmtest\n' "$home" \
+        > "$home/state/deleted-owner.meta"
+      run_procevent "$home" register-task lavish "$sid" deleted-owner -- \
+        "$ROOT/bin/fm-procevent-lavish.sh" poll "$board" >/dev/null \
+        || fail "could not register the deleted worker-owned board"
+    else
+      sid=$(sweep_register "$home" "$board")
+    fi
+    kept_ids+=("$sid")
+    case "$guard" in
+      feedback|ambiguous) sweep_session "$store" "$board" feedback 0 - ;;
+      queued) sweep_session "$store" "$board" open 2 - ;;
+      *) sweep_session "$store" "$board" ended 0 - ;;
+    esac
+    if [ "$guard" = ambiguous ]; then
+      perl -MJSON::PP -e '
+        my ($path, $board) = @ARGV;
+        open my $in, "<", $path or die $!;
+        local $/;
+        my $doc = decode_json(<$in>);
+        close $in;
+        $doc->{sessions}{duplicate} = { file => $board, status => "ended", pending_prompts => 0 };
+        open my $out, ">", $path or die $!;
+        print $out encode_json($doc);
+        close $out or die $!;
+      ' "$store/state.json" "$board"
+    fi
+    if [ "$guard" = pending ]; then
+      mkdir -p "$home/state/procevent-inbox"
+      printf 'session:\n  status: feedback\n' > "$home/state/procevent-inbox/$sid.1.result"
+      printf 'lavish\n' > "$home/state/procevent-inbox/$sid.1.adapter"
+    fi
+    rm "$board"
+  done
+  before=$(cksum < "$store/state.json")
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
+    || fail "the deleted-board dry run failed: $out"
+  assert_contains "$out" 'sweep: would-retire=0 kept=6' "deleted boards bypassed keep guards: $out"
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+    || fail "the deleted-board sweep failed: $out"
+  list=$(run_procevent "$home" list)
+  for sid in "${kept_ids[@]}"; do
+    assert_contains "$out" "kept: $sid" "a deleted protected board was retired: $out"
+    assert_contains "$list" "$sid" "a deleted protected board lost its registration"
+  done
+  [ "$before" = "$(cksum < "$store/state.json")" ] || fail "the deleted-board sweep changed Lavish sessions"
+  pass "deleted boards retain standing, feedback, ownership and captured-result protections"
+}
+
+test_sweep_keeps_boards_with_unsearchable_parents() {
+  local home store session board parent sid out rc list
+  home=$(make_home board-sweep-inaccessible)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  mkdir -p "$store"
+  printf '{"sessions":{}}\n' > "$store/state.json"
+  run_captain "$home" hold sweep-inaccessible-call --title "Choose the inaccessible route" \
+    --reason "captain route pending" --repo sample >/dev/null || fail "could not hold the inaccessible call"
+  for session in ended nosession idle; do
+    board=$(sweep_board "$home/$session" inaccessible old sweep-inaccessible-call)
+    parent=${board%/*}
+    sid=$(sweep_register "$home" "$board")
+    case "$session" in
+      ended) sweep_session "$store" "$board" ended 0 - ;;
+      idle) sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z ;;
+    esac
+    chmod 000 "$parent"
+    perl -MErrno=EACCES -e 'stat($ARGV[0]); exit($! == EACCES ? 0 : 1)' "$board"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      chmod 700 "$parent"
+      fail "the unsearchable-parent fixture did not produce EACCES"
+    fi
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep)
+    rc=$?
+    chmod 700 "$parent"
+    [ "$rc" -eq 0 ] || fail "the inaccessible-board sweep failed: $out"
+    assert_contains "$out" "kept: $sid" "an inaccessible $session board was treated as missing: $out"
+    assert_contains "$out" 'the board file cannot be checked' "the filesystem error lost its unknown verdict: $out"
+    list=$(run_procevent "$home" list)
+    assert_contains "$list" "$sid" "an inaccessible board lost its registration"
+  done
+  pass "filesystem permission errors keep ended, sessionless and idle board listeners"
+}
+
+test_sweep_preserves_rearmed_registration_generations() (
+  local mode home store board sid real_perl sweep_pid poll_pid out list rc
+  real_perl=$(command -v perl)
+  for mode in plain worker; do
+    home=$(make_home "board-sweep-rearmed-$mode")
+    fm_test_track_procevent_home "$home" "$home/procevent-claims"
+    store="$home/lavish-state"
+    board=$(sweep_board "$home" rearmed old)
+    sid=$(sweep_register "$home" "$board")
+    sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
+    printf '#!/usr/bin/env bash\nreal_perl=%q\n' "$real_perl" > "$home/fakebin/perl"
+    cat >> "$home/fakebin/perl" <<'SH'
+if [ "${FM_TEST_SWEEP_PAUSE:-}" = 1 ] \
+    && [ "${!#}" = "$FM_HOME/lavish-state/state.json" ] \
+    && [ ! -e "$FM_HOME/sweep-ready" ]; then
+  : > "$FM_HOME/sweep-ready"
+  while [ ! -e "$FM_HOME/sweep-release" ] && [ "$SECONDS" -lt 120 ]; do sleep 0.01; done
+fi
+exec "$real_perl" "$@"
+SH
+    cat > "$home/fakebin/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$FM_HOME/poll.pid"
+exec sleep 120
+SH
+    chmod +x "$home/fakebin/perl" "$home/fakebin/lavish-axi"
+    exec 7< "$home/state/procevent/$sid.source"
+    FM_TEST_SWEEP_PAUSE=1 LAVISH_AXI_STATE_DIR="$store" \
+      run_lavish "$home" sweep > "$home/sweep.out" 2> "$home/sweep.err" &
+    sweep_pid=$!
+    if ! wait_for_test_file "$home/sweep-ready" "$sweep_pid"; then
+      : > "$home/sweep-release"
+      wait "$sweep_pid" 2>/dev/null || true
+      fail "the sweep did not reach its post-snapshot barrier"
+    fi
+    run_procevent "$home" retire "$sid" >/dev/null \
+      || { : > "$home/sweep-release"; wait "$sweep_pid"; fail "could not retire the snapshotted board"; }
+    if [ "$mode" = worker ]; then
+      printf 'window=fmtest:fm-rearmed-owner\nworktree=%s/worktree-rearmed-owner\nproject=fmtest\n' "$home" \
+        > "$home/state/rearmed-owner.meta"
+      out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60 LAVISH_AXI_STATE_DIR="$store" \
+        run_lavish "$home" arm "$board" --for rearmed-owner)
+      rc=$?
+    else
+      out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60 LAVISH_AXI_STATE_DIR="$store" \
+        run_lavish "$home" arm "$board")
+      rc=$?
+    fi
+    if [ "$rc" -ne 0 ]; then
+      : > "$home/sweep-release"
+      wait "$sweep_pid" 2>/dev/null || true
+      fail "could not re-arm the $mode replacement: $out"
+    fi
+    if ! wait_for_test_file "$home/poll.pid" "$sweep_pid"; then
+      : > "$home/sweep-release"
+      wait "$sweep_pid" 2>/dev/null || true
+      fail "the replacement listener did not start polling"
+    fi
+    poll_pid=$(cat "$home/poll.pid")
+    : > "$home/sweep-release"
+    wait "$sweep_pid" || fail "the stale sweep failed: $(cat "$home/sweep.err")"
+    exec 7<&-
+    out=$(cat "$home/sweep.out")
+    assert_contains "$out" "kept: $sid" "the stale sweep retired the $mode replacement: $out"
+    assert_contains "$out" 'source registration generation changed' "the stale retirement was not generation-gated: $out"
+    list=$(run_procevent "$home" list)
+    assert_contains "$list" "$sid" "the replacement registration was deleted"
+    kill -0 "$poll_pid" 2>/dev/null || fail "the stale sweep stopped the replacement poll"
+    run_procevent "$home" retire "$sid" >/dev/null \
+      || fail "ordinary retirement refused the replacement listener"
+  done
+  pass "stale sweeps preserve rearmed plain and worker-owned listener generations"
+)
+
 tests=(
 test_sweep_retires_only_finished_board_listeners
 test_sweep_stops_a_live_listener_of_a_finished_board
+test_sweep_preserves_deleted_board_keep_guards
+test_sweep_keeps_boards_with_unsearchable_parents
+test_sweep_preserves_rearmed_registration_generations
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair
