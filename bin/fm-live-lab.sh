@@ -495,6 +495,7 @@ cmd_up() {
     mkdir -p "$root" || die "cannot create '$root'"
   fi
   ROOT=$(real_dir "$root")
+  # shellcheck source=bin/fm-wake-lib.sh
   FM_STATE_OVERRIDE="$ROOT" . "$SCRIPT_DIR/fm-wake-lib.sh"
   local owner_identity
   owner_identity=$(fm_pid_identity "$$") || die "cannot identify the lab creator"

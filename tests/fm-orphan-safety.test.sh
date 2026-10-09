@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 TMP_ROOT=$(fm_test_tmproot fm-orphan-safety)
 BIN="$ROOT/bin"
@@ -138,6 +139,7 @@ SH
     append|keys|drain-first|drain-second) set -- ;;
   esac
   if [ "$action" = append ] || [ "$action" = keys ]; then
+    # shellcheck disable=SC2016 # Expanded by the child shell.
     out=$(env BASH_ENV="$dir/fail-lock.sh" FM_STATE_OVERRIDE="$state" \
       bash -c '. "$1"; if [ "$2" = append ]; then fm_wake_append signal new payload; else fm_wake_queued_keys signal; fi' \
       _ "$BIN/fm-wake-lib.sh" "$action" 2>&1) || rc=$?
@@ -201,6 +203,7 @@ sleep() {
 }
 SH
   rc=0
+  # shellcheck disable=SC2016 # Expanded by the child shell.
   out=$(env BASH_ENV="$dir/fail-lock.sh" FM_STATE_OVERRIDE="$state" bash -c '
     . "$1/fm-wake-lib.sh"
     . "$1/fm-x-lib.sh"

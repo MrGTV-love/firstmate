@@ -133,7 +133,7 @@ start_owner() {
 
 mkfifo "$TMP_ROOT/identity-exec"
 (
-  read -r line < "$TMP_ROOT/identity-exec"
+  read -r _ < "$TMP_ROOT/identity-exec"
   exec sleep 120
 ) &
 IDENTITY_FIXTURE=$!
@@ -220,6 +220,7 @@ LAB_WATCH=$(cat "$TMP_ROOT/lab-watch.pid")
 assert_contains "$(cat "$LAB_ROOT/.fm-lab-home")" "owner_pid=$LAB_OWNER" "the lab marker must retain its creating caller"
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the lab scan failed: $out"
 alive "$LAB_WATCH" || fail "the reaper stopped a live creator's scratch-copy watcher"
+# shellcheck disable=SC2016 # Expanded by the child shell.
 env FM_TEST_GATE_LIB="$ROOT/bin/fm-gate-refuse-lib.sh" FM_TEST_LAB_ROOT="$LAB_ROOT" \
   bash -c '. "$FM_TEST_GATE_LIB"; fm_gate_lab_home "$FM_TEST_LAB_ROOT"' \
   || fail "provenance changed the lab gate marker contract"
@@ -465,6 +466,7 @@ wait_file "$TMP_ROOT/nested-killed.pid" 5 || fail "the killed parallel test did 
 NESTED_KILLED_STUB=$(cat "$TMP_ROOT/nested-killed.pid")
 track "$NESTED_KILLED_STUB" "$(cat "$TMP_ROOT/nested-killed.pid.identity")"
 alive "$NESTED_KILLED_STUB" || fail "the parallel test's stub did not outlive its owner"
+# shellcheck disable=SC2016 # The child shell, not this one, expands $FM_TEST_LIB.
 env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REAP=0 bash -c '. "$FM_TEST_LIB"' >/dev/null 2>&1
 wait_gone "$NESTED_KILLED_STUB" 10 || fail "startup recovery left the killed parallel test's nested stub running"
 alive "$NESTED_LIVE_STUB" || fail "startup recovery stopped a live test's nested stub"

@@ -174,7 +174,7 @@ tmux_dir_inactive() {
 }
 
 lab_inactive() {
-  local root=$1 marker=$1/.fm-live-lab line pid= start current dir
+  local root=$1 marker=$1/.fm-live-lab line pid='' start current dir
   if [ -f "$marker" ]; then
     while IFS= read -r line; do
       case "$line" in
