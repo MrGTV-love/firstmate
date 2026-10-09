@@ -331,7 +331,7 @@ function operationalHandback(message: string): boolean {
 }
 
 function hostNotes(message: string): string[] {
-  return [...new Set(message.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line) || line === awayNote))];
+  return [...new Set(message.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line)))];
 }
 
 function diagnosticNote(line: string): boolean {
@@ -343,7 +343,7 @@ function watcherMark(message: string): string {
 }
 
 function operationalMessage(message: string): string {
-  const lines = message.replace(/^FIRSTMATE SUPERVISION HOST: /, "").split(/\r?\n/).filter((line) => !headlinePattern.test(line));
+  const lines = message.replace(/^FIRSTMATE SUPERVISION HOST: /, "").split(/\r?\n/).filter((line) => !headlinePattern.test(line) && line !== awayNote);
   return `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}`;
 }
 
@@ -353,7 +353,6 @@ function hostWakeMessage(output: string): string {
   const lines = hostNotes(output);
   const operational = operationalHandback(output);
   if (!operational && !actionableLine(output) && lines.length === 0) return "";
-  if (awayRecordPresent()) lines.push(awayNote);
   return operational ? `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}` : watcherMark(lines.join("\n"));
 }
 
@@ -848,7 +847,7 @@ export default function (pi: ExtensionAPI) {
       owner.heldWakes.set(pending.token, { pending });
       return await flushHeldWakes(owner);
     }
-    const content = wakeContent(message);
+    const content = wakeContent(operationalHandback(message) && awayRecordPresent() ? `${message}\n${awayNote}` : message);
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
     return submitWake(owner, token, { content, pending });
   }
@@ -1007,6 +1006,7 @@ export default function (pi: ExtensionAPI) {
       }
       const pending = held[0].pending;
       const headline = rows.length === 0 ? wakeDueMessage : rows[0].split("\t").slice(4).join("\t");
+      if (awayRecordPresent() && hostModeEnabled()) notes.push(awayNote);
       const message = [`${headline}${rows.length > 1 ? `\nand ${rows.length - 1} more queued` : ""}`, ...notes].join("\n");
       const delivered = await submitWake(owner, pending.token, { content: wakeContent(message), pending });
       if (delivered === "sent") {
