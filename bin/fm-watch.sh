@@ -2903,7 +2903,7 @@ signal_phase_note_queued() {
 
 watch_before_wake() {
   case "$1" in
-    signal:*) rm -f -- "$SIGNAL_PHASE_LATE_MARKER" 2>/dev/null || true ;;
+    signal:*) ;;
     *) signal_phase_flush ;;
   esac
 }
@@ -2914,7 +2914,6 @@ signal_phase_follow_up() {
   [ -e "$SIGNAL_PHASE_LATE_MARKER" ] || [ -L "$SIGNAL_PHASE_LATE_MARKER" ] || return 0
   files=$(cat "$SIGNAL_PHASE_LATE_MARKER") || exit 1
   queued=$(fm_wake_queued_keys signal) || exit 1
-  rm -f -- "$SIGNAL_PHASE_LATE_MARKER" || exit 1
   read -r -a late_files <<< "$files"
   for f in "${late_files[@]}"; do
     case $'\n'"$queued"$'\n' in
@@ -2922,10 +2921,15 @@ signal_phase_follow_up() {
     esac
   done
   [ "$reason" = signal: ] || wake "$reason"
+  rm -f -- "$SIGNAL_PHASE_LATE_MARKER" || exit 1
 }
 
 watch_after_wake() {
-  [ "$1" -eq 0 ] && [ "$2" -eq 0 ] || return 0
+  [ "$1" -eq 0 ] || return 0
+  case "$FM_WATCH_DELIVERED_REASON" in
+    signal:*) rm -f -- "$SIGNAL_PHASE_LATE_MARKER" 2>/dev/null || true ;;
+  esac
+  [ "$2" -eq 0 ] || return 0
   prelude_step_commit
 }
 
@@ -3035,6 +3039,7 @@ prelude_phase() {
     rejected_checks=
     contribution_check_output=
     for c in "$STATE"/*.check.sh; do
+      signal_phase_flush
       [ -e "$c" ] || continue
       watcher_beat
       is_pr_poll=0
@@ -3079,7 +3084,6 @@ prelude_phase() {
           continue
         fi
       fi
-      signal_phase_flush
       if [ -n "$out" ]; then
         if [ "$(basename "$c")" = contributions.check.sh ]; then
           contribution_check_output=
@@ -3152,6 +3156,7 @@ EOF
       fm_wake_append check unauthenticated-state-checks "$reason" || exit 1
       [ -n "$check_wake_reason" ] || check_wake_reason=$reason
     fi
+    signal_phase_flush
     touch "$STATE/.last-check"
     if [ -n "$contribution_check_output" ]; then
       [ -n "$check_wake_reason" ] || check_wake_reason=$contribution_check_output

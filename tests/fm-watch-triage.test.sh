@@ -2333,11 +2333,12 @@ test_late_signal_follow_up_filters_drained_rows() {
     done
     cat > "$state/late.check.sh" <<'SH'
 #!/usr/bin/env bash
+printf 'run\n' >> "$FM_STATE_OVERRIDE/late-check-runs"
 [ ! -e "$FM_STATE_OVERRIDE/late-check-injected" ] || exit 0
 touch "$FM_STATE_OVERRIDE/late-check-injected"
 printf 'needs-decision [key=access]: need access\n' >> "$FM_STATE_OVERRIDE/a.status"
 printf 'done: routine task completed\n' >> "$FM_STATE_OVERRIDE/b.status"
-[ ! -e "$FM_STATE_OVERRIDE/late-marker-unwritable" ] || { mkdir "$FM_STATE_OVERRIDE/.watch-late-signals"; exit 0; }
+[ ! -e "$FM_STATE_OVERRIDE/late-marker-unwritable" ] || mkdir "$FM_STATE_OVERRIDE/.watch-late-signals"
 printf 'late check completed\n'
 SH
     chmod 0700 "$state/late.check.sh"
@@ -2352,14 +2353,20 @@ SH
         || fail "marker-store failure lost its accumulated signal headline: $(cat "$out")"
       assert_watch_offer "$state" "$out" 0 0 b
       [ "$(cat "$state/.prelude-progress")" = 10 ] || fail "signal fallback skipped unfinished checks"
+      [ "$(grep -Fc "$(printf 'check\t%s\tcheck: %s: late check completed' "$state/late.check.sh" "$state/late.check.sh")" "$state/.wake-queue")" -eq 1 ] \
+        || fail "marker-store failure lost the completed one-shot check row"
       rmdir "$state/.watch-late-signals"
       next_out="$dir/recovery.out"
       watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
-        FM_WATCH_HANDLING_SUCCESSOR=1
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1
       pid=$!
       wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "successor did not finish the interrupted checks: $(cat "$next_out")"; }
       [ ! -s "$next_out" ] || { reap "$pid"; fail "marker failure caused a duplicate signal wake"; }
       [ ! -e "$state/.prelude-progress" ] || { reap "$pid"; fail "successor left completed maintenance owed"; }
+      [ "$(wc -l < "$state/late-check-runs" | tr -d '[:space:]')" -ge 2 ] \
+        || { reap "$pid"; fail "successor did not rerun the one-shot check"; }
+      [ "$(grep -Fc "$(printf 'check\t%s\tcheck: %s: late check completed' "$state/late.check.sh" "$state/late.check.sh")" "$state/.wake-queue")" -eq 1 ] \
+        || { reap "$pid"; fail "successor duplicated or lost the one-shot check row"; }
       reap "$pid"
       continue
     fi
@@ -2394,8 +2401,85 @@ SH
     [ ! -e "$state/.watch-late-signals" ] || { reap "$pid"; fail "consumed late signal marker remained"; }
     reap "$pid"
   done
-  pass "follow-ups filter drained rows and marker-store failures deliver signals in successor posture"
+  pass "follow-ups filter drained rows and marker-store failures preserve one-shot check results in successor posture"
 }
+
+test_late_signal_output_failure_retries() {
+  local dir state fakebin out next_out quiet_out fifo pid reader rc mode queue
+  for mode in follow-up prelude; do
+    dir=$(make_case "late-signal-output-failure-$mode"); state="$dir/state"; fakebin="$dir/fakebin"
+    out="$dir/watch.out"; fifo="$dir/output.fifo"
+    mkdir -p "$dir/approved" "$dir/config"
+    printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/task.meta"
+    printf 'working: setup\n' > "$state/task.status"
+    prime_status_seen "$state" "$state/task.status" || fail "could not prime output-failure signal"
+    cat > "$state/late.check.sh" <<'SH'
+#!/usr/bin/env bash
+[ ! -e "$FM_STATE_OVERRIDE/late-check-injected" ] || exit 0
+touch "$FM_STATE_OVERRIDE/late-check-injected"
+printf 'done: finished during the check\n' >> "$FM_STATE_OVERRIDE/task.status"
+[ "$FM_TEST_CHECK_RESULT" = quiet ] || printf 'late check completed\n'
+SH
+    chmod 0700 "$state/late.check.sh"
+    FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" late >/dev/null \
+      || fail "could not register output-failure check"
+    if [ "$mode" = follow-up ]; then
+      watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=actionable
+      pid=$!
+      wait_for_exit "$pid" 300 || { reap "$pid"; fail "initial check did not deliver"; }
+      case "$(cat "$out")" in check:*'late check completed') ;; *) fail "initial check lost its headline" ;; esac
+      assert_watch_offer "$state" "$out" 0 0 task
+      [ -s "$state/.watch-late-signals" ] || fail "initial check omitted the follow-up marker"
+      printf '10\n' > "$state/.prelude-progress"
+      queue=$(cat "$state/.wake-queue")
+    fi
+    mkfifo "$fifo"
+    sh -c ': < "$1"' _ "$fifo" & reader=$!
+    watch_bg "$state" "$fakebin" "$fifo" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=quiet \
+      bash -c 'trap "" PIPE; exec "$@"' _ 2> "$dir/failed-output.err"
+    pid=$!
+    wait "$reader" || fail "failed-output reader did not close"
+    rc=0
+    wait_for_exit "$pid" 300 || rc=$?
+    [ "$rc" -eq 1 ] || fail "$mode did not report an output-write failure (rc=$rc)"
+    [ -s "$state/.watch-late-signals" ] || fail "$mode consumed its marker before successful output"
+    grep -F "$(printf 'signal\ttask.status\t')" "$state/.wake-queue" >/dev/null \
+      || fail "$mode lost its durable signal row"
+    if [ "$mode" = follow-up ]; then
+      [ "$(cat "$state/.wake-queue")" = "$queue" ] || fail "failed follow-up changed its durable batch"
+    fi
+    queue=$(cat "$state/.wake-queue")
+    if [ "$mode" = follow-up ]; then
+      [ "$(cat "$state/.prelude-progress")" = 10 ] || fail "failed follow-up advanced interrupted maintenance"
+    fi
+    next_out="$dir/retry.out"
+    watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=quiet
+    pid=$!
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$mode did not ring after output recovered"; }
+    [ "$(cat "$next_out")" = "signal: $state/task.status" ] || fail "$mode retry lost its signal headline"
+    assert_watch_offer "$state" "$next_out" 1 0 task
+    [ ! -e "$state/.watch-late-signals" ] || fail "$mode successful retry retained its marker"
+    [ "$(cat "$state/.wake-queue")" = "$queue" ] || fail "$mode retry changed its durable batch"
+    if [ "$mode" = follow-up ]; then
+      [ "$(cat "$state/.prelude-progress")" = 10 ] || fail "successful follow-up skipped interrupted maintenance"
+    fi
+    quiet_out="$dir/quiet.out"
+    watch_bg "$state" "$fakebin" "$quiet_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=quiet
+    pid=$!
+    wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "$mode repeated its delivered signal"; }
+    [ ! -s "$quiet_out" ] || { reap "$pid"; fail "$mode successful retry caused a follow-up loop"; }
+    [ ! -e "$state/.prelude-progress" ] || { reap "$pid"; fail "$mode did not finish owed maintenance"; }
+    [ "$(cat "$state/.wake-queue")" = "$queue" ] \
+      || { reap "$pid"; fail "$mode retry duplicated or lost a queued row"; }
+    reap "$pid"
+  done
+  pass "follow-up and end-of-prelude output failures preserve signal markers until one successful successor ring"
+}
+
 
 test_late_signal_marker_failure_before_procevent() {
   local dir state fakebin out next_out pid fault real_mv marker
@@ -7319,6 +7403,7 @@ test_signal_not_held_behind_a_blocked_check
 test_flushed_signals_preserve_main_owned_routing
 test_heartbeat_late_signal_retains_fleet_scope
 test_late_signal_follow_up_filters_drained_rows
+test_late_signal_output_failure_retries
 test_late_signal_marker_failure_before_procevent
 test_signal_not_preempted_by_an_overdue_ledger
 test_cycle_work_runs_after_bounded_signal_deferrals
