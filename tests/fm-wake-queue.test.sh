@@ -2785,9 +2785,9 @@ test_lock_wait_ends_when_the_lock_directory_is_gone() {
   sleep 0.5
   lock_wait_pid_is_live "$waiter_pid" \
     || { kill "$holder_pid" 2>/dev/null || true; fail "waiter did not block behind the live holder"; }
+  rm -rf "$state"
   kill -KILL "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
-  rm -rf "$state"
   for i in $(seq 1 200); do
     lock_wait_pid_is_live "$waiter_pid" || break
     sleep 0.05
