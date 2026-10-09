@@ -47,7 +47,7 @@ HARNESS="$ROOT/bin/fm-harness.sh"
 TMP_ROOT=$(fm_test_tmproot fm-omp-harness)
 export NODE_NO_WARNINGS=1
 export PI_CODING_AGENT_DIR=
-export OMP_PROFILE= PI_PROFILE=
+export OMP_PROFILE='' PI_PROFILE=''
 
 # A process whose kernel-recorded identity is the bare name `omp`: a SYMLINK to
 # the system shell, never a copy (a copied platform binary fails macOS code
@@ -376,6 +376,7 @@ test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
         ;;
     esac
     command="PI_CODING_AGENT_DIR='$launch_dir' omp --auto-approve"
+    # shellcheck disable=SC2016 # The pane expands this variable when executing the raw command.
     [ "$mode" != uncertain ] || command='PI_CODING_AGENT_DIR="$PANE_AGENT_DIR" omp --auto-approve'
     case "$mode" in
       stderr) command="$command 2>'$CASE_DIR/errors.log'" ;;
@@ -432,7 +433,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
       else
         printf 'modelRoles:\n  default: openai-codex/gpt-gone\n' > "$launch_dir/config.yml"
       fi
-      omp_profile= pi_profile=
+      omp_profile='' pi_profile=''
       command="PI_CODING_AGENT_DIR='$launch_dir' omp --auto-approve"
       first_arg=--auto-approve
       case "$mode" in
@@ -512,7 +513,9 @@ test_spawn_raw_omp_expansions_pass_through_unchanged() {
           {
             printf '#!/usr/bin/env bash\n. %q\n' "$ROOT/bin/fm-timeout-lib.sh"
             printf 'exec 3<&0\nfm_run_timed 3 bash -c '\''exec "$@" <&3'\'' _ %q "$@"\n' "$(command -v node)"
+            # shellcheck disable=SC2016 # Capture status in the generated wrapper, not while generating it.
             printf 'status=$?\nprintf "%%s\\n" "$status" > %q\n' "$CASE_DIR/node-status"
+            # shellcheck disable=SC2016 # The generated wrapper evaluates its own status.
             printf 'if fm_timed_out "$status"; then printf timeout > %q; fi\nexit "$status"\n' "$CASE_DIR/node-timeout"
           } > "$FAKEBIN_DIR/node"
           chmod +x "$FAKEBIN_DIR/node"
