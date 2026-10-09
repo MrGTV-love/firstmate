@@ -1,0 +1,12 @@
+ok - a keyed answer releases a live work item and still closes a question
+ok - default and done keyed answers choose their mode after cleanup releases the lock
+ok - interrupted default and done releases close finished work while explicit mode checks stay strict
+ok - completed default and done releases replay and recover failed publication without rewriting history
+ok - stale default, done and release replays preserve a concurrent hold until a fresh answer
+ok - repeated default and done answers preserve prior holds and resolve the current parent decision
+ok - ambiguous legacy default and done releases require explicit closure without rewriting history
+ok - a bound channel's captured answers close their captain-held tasks at answer time
+ok - a board answer reaches the keyed-answer intake and wakes firstmate
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - cleanup replay closes answered work and preserves the report after direct or keyed answers

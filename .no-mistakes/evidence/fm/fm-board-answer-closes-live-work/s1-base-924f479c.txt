@@ -1,0 +1,93 @@
+
+### S1 setup: four captain-held items (in-flight scout with worker, spawned ship with worker, in-flight row only, plain question)
+$ cap hold lab-live-scout --reason captain design pick needed
+lab-live-scout
+[exit 0]
+$ cap hold lab-live-ship --reason captain design pick needed
+lab-live-ship
+[exit 0]
+$ cap hold lab-row-only --reason captain design pick needed
+lab-row-only
+[exit 0]
+$ cap hold lab-plain-question --title Captain call: plain --reason captain choice pending --repo sample
+lab-plain-question
+[exit 0]
+--- task lab-live-scout ---
+  state: in_flight
+  held: yes
+  kind: scout
+  body| Captain hold set: 2026-10-09T22:34:03Z
+  worker record: PRESENT
+--- task lab-live-ship ---
+  state: queued
+  held: yes
+  kind: ship
+  body| Captain hold set: 2026-10-09T22:34:04Z
+  worker record: PRESENT
+--- task lab-row-only ---
+  state: in_flight
+  held: yes
+  kind: ship
+  body| Captain hold set: 2026-10-09T22:34:06Z
+  worker record: absent
+--- task lab-plain-question ---
+  state: queued
+  held: yes
+  kind: captain
+  body| Captain hold set: 2026-10-09T22:34:07Z
+  worker record: absent
+
+### S1 act: one keyed board batch answers all four (default, done, done, default)
+$ fm-captain-hold.sh answers --source "lab board batch" < batch.tsv
+lab-live-scout^Igo-b^IOption B$
+lab-live-ship^Igo-b^IOption B^Idone$
+lab-row-only^Igo-b^IOption B^Idone$
+lab-plain-question^Iyes^IYes$
+closed: lab-live-scout
+closed: lab-live-ship
+closed: lab-row-only
+closed: lab-plain-question
+answers: closed=4 skipped=0
+[exit 0]
+
+### S1 result
+--- task lab-live-scout ---
+  state: done
+  held: no
+  kind: scout
+  body| Resolution mode: answered
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: PRESENT
+--- task lab-live-ship ---
+  state: done
+  held: no
+  kind: ship
+  body| Resolution mode: answered
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: PRESENT
+--- task lab-row-only ---
+  state: done
+  held: no
+  kind: ship
+  body| Resolution mode: answered
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: absent
+--- task lab-plain-question ---
+  state: done
+  held: no
+  kind: captain
+  body| Resolution mode: answered
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: yes
+  body| Answer as shown to the captain: Yes
+  worker record: absent

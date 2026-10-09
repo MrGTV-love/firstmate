@@ -1,0 +1,77 @@
+
+### S4 (adversarial): release, re-hold in the same pinned second, re-hold later, same answer again
+(pinned FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z)
+$ cap hold lab-rehold --reason first question
+lab-rehold
+[exit 0]
+closed: lab-rehold
+answers: closed=1 skipped=0
+[exit 0]
+--- task lab-rehold ---
+  state: in_flight
+  held: no
+  kind: scout
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-07-14T12:00:00Z
+  body| Captain decision:
+  body| Captain answered this call through lab rehold board.
+  body| Answer: go
+  body| Answer as shown to the captain: Proceed
+  worker record: PRESENT
+
+### same-second re-hold with pinned time must refuse
+(pinned FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z)
+$ cap hold lab-rehold --reason second question
+fm-captain-hold: FM_CAPTAIN_HOLD_NOW collides with the newest resolved hold for task lab-rehold; choose a later timestamp
+[exit 1]
+--- task lab-rehold ---
+  state: in_flight
+  held: no
+  kind: scout
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-07-14T12:00:00Z
+  body| Captain decision:
+  body| Captain answered this call through lab rehold board.
+  body| Answer: go
+  body| Answer as shown to the captain: Proceed
+  worker record: PRESENT
+
+### later re-hold, then the identical answer
+(pinned FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:01Z)
+$ cap hold lab-rehold --reason second question
+lab-rehold
+[exit 0]
+--- task lab-rehold ---
+  state: in_flight
+  held: yes
+  kind: scout
+  body| Captain hold set: 2026-07-14T12:00:01Z
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-07-14T12:00:00Z
+  body| Captain decision:
+  body| Captain answered this call through lab rehold board.
+  body| Answer: go
+  body| Answer as shown to the captain: Proceed
+  worker record: PRESENT
+closed: lab-rehold
+answers: closed=1 skipped=0
+[exit 0]
+--- task lab-rehold ---
+  state: in_flight
+  held: no
+  kind: scout
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-07-14T12:00:01Z
+  body| Captain decision:
+  body| Captain answered this call through lab rehold board.
+  body| Answer: go
+  body| Answer as shown to the captain: Proceed
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-07-14T12:00:00Z
+  body| Captain decision:
+  body| Captain answered this call through lab rehold board.
+  body| Answer: go
+  body| Answer as shown to the captain: Proceed
+  worker record: PRESENT
+resolution records now: 2
+record 1 text: UNCHANGED inside the new body

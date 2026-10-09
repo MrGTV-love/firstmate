@@ -1,0 +1,28 @@
+
+### S5: a real board result (Lavish poll shape) flows through fm-procevent into the intake, for a live work item
+$ cap hold lab-board-work --reason captain board route choice pending
+lab-board-work
+[exit 0]
+$ pe register lavish lavish-b0a4d0000000f1e2 -- /Users/charlesabrooker/tmp/fm-lab.Z8wqvn/board-source.sh
+registered: lavish-b0a4d0000000f1e2 (lavish)
+[exit 0]
+$ cap bind lavish-b0a4d0000000f1e2
+bound: lavish-b0a4d0000000f1e2 -> (any)
+[exit 0]
+$ pe start lavish-b0a4d0000000f1e2
+reconciles-fed: lavish-b0a4d0000000f1e2
+answers-fed: lavish-b0a4d0000000f1e2
+not-autohandled: lavish-b0a4d0000000f1e2 (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.Z8wqvn/state/procevent-inbox/lavish-b0a4d0000000f1e2.1.result
+[exit 0]
+--- task lab-board-work ---
+  state: in_flight
+  held: no
+  kind: ship
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:33:39Z
+  body| Captain decision:
+  body| Captain answered this call through the captured result lavish-b0a4d0000000f1e2 sequence 1.
+  body| Answer: north
+  body| Answer as shown to the captain: Take the north route
+  worker record: PRESENT

@@ -1,0 +1,38 @@
+
+### S3 (adversarial): work is finished and cleaned up while still held; the answer arrives late. It must close, not reopen.
+$ cap hold lab-late-answer --reason captain report choice pending
+lab-late-answer
+[exit 0]
+$ cap complete lab-late-answer lab-late-answer-call
+complete: lab-late-answer captain-call inventory reviewed (lab-late-answer-call)
+[exit 0]
+$ td lab-late-answer
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Z8wqvn
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown lab-late-answer complete (window firstmate:fm-lab-late-answer, worktree /Users/charlesabrooker/tmp/fm-lab.Z8wqvn/projects/missing-lab-late-answer)
+Backlog: lab-late-answer stays open in /Users/charlesabrooker/tmp/fm-lab.Z8wqvn/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+--- task lab-late-answer ---
+  state: queued
+  held: yes
+  kind: scout
+  body: "Captain hold set: 2026-10-09T22:33:01Z\n\nDeliverable of the finished work: report data/lab-late-answer/report.md"
+  body| Captain hold set: 2026-10-09T22:33:01Z
+  body| Deliverable of the finished work: report data/lab-late-answer/report.md
+  worker record: absent
+closed: lab-late-answer
+answers: closed=1 skipped=0
+[exit 0]
+--- task lab-late-answer ---
+  state: done
+  held: no
+  kind: scout
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: c145b88435712dd4bac993f1855f61b426c5823ced2f433c4acdb689cb22a7b8\nResolution mode: answered\nResolves hold set: 2026-10-09T22:33:01Z\n\nCaptain decision:\nCaptain answered this call through lab late board.\nTask: lab-late-answer\nAnswer: go\nAnswer as shown to the captain: Proceed\n\nDeliverable of the finished work: report data/lab-late-answer/report.md"
+  body| Resolution mode: answered
+  body| Resolves hold set: 2026-10-09T22:33:01Z
+  body| Captain decision:
+  body| Captain answered this call through lab late board.
+  body| Answer: go
+  body| Answer as shown to the captain: Proceed
+  body| Deliverable of the finished work: report data/lab-late-answer/report.md
+  worker record: absent

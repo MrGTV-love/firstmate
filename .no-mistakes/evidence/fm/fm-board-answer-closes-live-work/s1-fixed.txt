@@ -1,0 +1,153 @@
+
+### S1 setup: four captain-held items (in-flight scout with worker, spawned ship with worker, in-flight row only, plain question)
+$ cap hold lab-live-scout --reason captain design pick needed
+lab-live-scout
+[exit 0]
+$ cap hold lab-live-ship --reason captain design pick needed
+lab-live-ship
+[exit 0]
+$ cap hold lab-row-only --reason captain design pick needed
+lab-row-only
+[exit 0]
+$ cap hold lab-plain-question --title Captain call: plain --reason captain choice pending --repo sample
+lab-plain-question
+[exit 0]
+--- task lab-live-scout ---
+  state: in_flight
+  held: yes
+  kind: scout
+  body| Captain hold set: 2026-10-09T22:31:59Z
+  worker record: PRESENT
+--- task lab-live-ship ---
+  state: queued
+  held: yes
+  kind: ship
+  body| Captain hold set: 2026-10-09T22:32:00Z
+  worker record: PRESENT
+--- task lab-row-only ---
+  state: in_flight
+  held: yes
+  kind: ship
+  body| Captain hold set: 2026-10-09T22:32:02Z
+  worker record: absent
+--- task lab-plain-question ---
+  state: queued
+  held: yes
+  kind: captain
+  body| Captain hold set: 2026-10-09T22:32:04Z
+  worker record: absent
+
+### S1 act: one keyed board batch answers all four (default, done, done, default)
+$ fm-captain-hold.sh answers --source "lab board batch" < batch.tsv
+lab-live-scout^Igo-b^IOption B$
+lab-live-ship^Igo-b^IOption B^Idone$
+lab-row-only^Igo-b^IOption B^Idone$
+lab-plain-question^Iyes^IYes$
+closed: lab-live-scout
+closed: lab-live-ship
+closed: lab-row-only
+closed: lab-plain-question
+answers: closed=4 skipped=0
+[exit 0]
+
+### S1 result
+--- task lab-live-scout ---
+  state: in_flight
+  held: no
+  kind: scout
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 59d2f078f3888c5fccda18c86991c53610842075a9a149787975e4674bdd8e3d\nResolution mode: released\nResolves hold set: 2026-10-09T22:31:59Z\n\nCaptain decision:\nCaptain answered this call through lab board batch.\nTask: lab-live-scout\nAnswer: go-b\nAnswer as shown to the captain: Option B"
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:31:59Z
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: PRESENT
+--- task lab-live-ship ---
+  state: queued
+  held: no
+  kind: ship
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 5c17cff96b7305530f8123214b23f6c55fff4b9b8dbb8872b5c51d1e4e178397\nResolution mode: released\nResolves hold set: 2026-10-09T22:32:00Z\n\nCaptain decision:\nCaptain answered this call through lab board batch.\nTask: lab-live-ship\nAnswer: go-b\nAnswer as shown to the captain: Option B"
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:32:00Z
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: PRESENT
+--- task lab-row-only ---
+  state: in_flight
+  held: no
+  kind: ship
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: a4ed1563462a6c924fedb42020855feb48557a66991379824aa481b8d4ae34f4\nResolution mode: released\nResolves hold set: 2026-10-09T22:32:02Z\n\nCaptain decision:\nCaptain answered this call through lab board batch.\nTask: lab-row-only\nAnswer: go-b\nAnswer as shown to the captain: Option B"
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:32:02Z
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: absent
+--- task lab-plain-question ---
+  state: done
+  held: no
+  kind: captain
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 14f078e010c38ed1dd098b9978ec74e9081573872a83e31e0ba17083476e4ffb\nResolution mode: answered\nResolves hold set: 2026-10-09T22:32:04Z\n\nCaptain decision:\nCaptain answered this call through lab board batch.\nTask: lab-plain-question\nAnswer: yes\nAnswer as shown to the captain: Yes"
+  body| Resolution mode: answered
+  body| Resolves hold set: 2026-10-09T22:32:04Z
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: yes
+  body| Answer as shown to the captain: Yes
+  worker record: absent
+--- backlog.md ---
+## In flight
+- [ ] lab-row-only - Ship the row-only sample (repo: sample) (kind: ship) (since 2026-10-09)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: a4ed1563462a6c924fedb42020855feb48557a66991379824aa481b8d4ae34f4
+  Resolution mode: released
+  Resolves hold set: 2026-10-09T22:32:02Z
+
+  Captain decision:
+  Captain answered this call through lab board batch.
+  Task: lab-row-only
+  Answer: go-b
+  Answer as shown to the captain: Option B
+
+- [ ] lab-live-scout - Review the live sample (repo: sample) (kind: scout) (since 2026-10-09)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 59d2f078f3888c5fccda18c86991c53610842075a9a149787975e4674bdd8e3d
+  Resolution mode: released
+  Resolves hold set: 2026-10-09T22:31:59Z
+
+  Captain decision:
+  Captain answered this call through lab board batch.
+  Task: lab-live-scout
+  Answer: go-b
+  Answer as shown to the captain: Option B
+
+## Queued
+- [ ] lab-live-ship - Ship the live sample (repo: sample) (kind: ship) (since 2026-10-09)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 5c17cff96b7305530f8123214b23f6c55fff4b9b8dbb8872b5c51d1e4e178397
+  Resolution mode: released
+  Resolves hold set: 2026-10-09T22:32:00Z
+
+  Captain decision:
+  Captain answered this call through lab board batch.
+  Task: lab-live-ship
+  Answer: go-b
+  Answer as shown to the captain: Option B
+
+## Done
+- [x] lab-plain-question - Captain call: plain (repo: sample) (kind: captain) (done 2026-10-09) (hold: fm-hold-v1:Y2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: 
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 14f078e010c38ed1dd098b9978ec74e9081573872a83e31e0ba17083476e4ffb
+  Resolution mode: answered
+  Resolves hold set: 2026-10-09T22:32:04Z
+
+  Captain decision:
+  Captain answered this call through lab board batch.
+  Task: lab-plain-question
+  Answer: yes
+  Answer as shown to the captain: Yes
+

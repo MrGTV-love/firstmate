@@ -1,0 +1,43 @@
+
+### S6 (boundary): explicit release mode, unknown mode, reserved reconcile value, direct answer without --release
+closed: lab-m-release
+skipped: lab-m-bogus (unknown close mode bogus)
+refused: lab-m-reconcile (reconcile requests require a bound captured source)
+answers: closed=1 skipped=2
+[exit 1]
+--- task lab-m-release ---
+  state: in_flight
+  held: no
+  kind: ship
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:33:45Z
+  body| Captain decision:
+  body| Captain answered this call through lab modes.
+  body| Answer: go
+  body| Answer as shown to the captain: Go
+  worker record: PRESENT
+--- task lab-m-bogus ---
+  state: in_flight
+  held: yes
+  kind: ship
+  body| Captain hold set: 2026-10-09T22:33:46Z
+  worker record: PRESENT
+--- task lab-m-reconcile ---
+  state: in_flight
+  held: yes
+  kind: ship
+  body| Captain hold set: 2026-10-09T22:33:48Z
+  worker record: PRESENT
+
+### direct 'answer' without --release keeps its documented explicit close (not changed by this fix)
+$ cap answer lab-m-direct --decision-file /Users/charlesabrooker/tmp/fm-lab.Z8wqvn/direct.txt
+answered: lab-m-direct
+[exit 0]
+--- task lab-m-direct ---
+  state: done
+  held: no
+  kind: ship
+  body| Resolution mode: answered
+  body| Resolves hold set: 2026-10-09T22:33:49Z
+  body| Captain decision:
+  worker record: PRESENT

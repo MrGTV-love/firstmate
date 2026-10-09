@@ -1,0 +1,63 @@
+
+### S2: the worker of lab-live-scout finishes; cleanup (teardown) runs; then the same board answer arrives again
+
+### replay while the worker still runs
+closed: lab-live-scout
+answers: closed=1 skipped=0
+[exit 0]
+--- task lab-live-scout ---
+  state: in_flight
+  held: no
+  kind: scout
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 59d2f078f3888c5fccda18c86991c53610842075a9a149787975e4674bdd8e3d\nResolution mode: released\nResolves hold set: 2026-10-09T22:31:59Z\n\nCaptain decision:\nCaptain answered this call through lab board batch.\nTask: lab-live-scout\nAnswer: go-b\nAnswer as shown to the captain: Option B"
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:31:59Z
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: PRESENT
+$ cap complete lab-live-scout --none
+complete: lab-live-scout captain-call inventory reviewed
+[exit 0]
+$ td lab-live-scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Z8wqvn
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown lab-live-scout complete (window firstmate:fm-lab-live-scout, worktree /Users/charlesabrooker/tmp/fm-lab.Z8wqvn/projects/missing-lab-live-scout)
+Backlog: lab-live-scout is closed in /Users/charlesabrooker/tmp/fm-lab.Z8wqvn/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+--- task lab-live-scout ---
+  state: done
+  held: no
+  kind: scout
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 59d2f078f3888c5fccda18c86991c53610842075a9a149787975e4674bdd8e3d\nResolution mode: released\nResolves hold set: 2026-10-09T22:31:59Z\n\nCaptain decision:\nCaptain answered this call through lab board batch.\nTask: lab-live-scout\nAnswer: go-b\nAnswer as shown to the captain: Option B"
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:31:59Z
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: absent
+
+### replay after cleanup completed the work
+closed: lab-live-scout
+answers: closed=1 skipped=0
+[exit 0]
+--- task lab-live-scout ---
+  state: done
+  held: no
+  kind: scout
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 59d2f078f3888c5fccda18c86991c53610842075a9a149787975e4674bdd8e3d\nResolution mode: released\nResolves hold set: 2026-10-09T22:31:59Z\n\nCaptain decision:\nCaptain answered this call through lab board batch.\nTask: lab-live-scout\nAnswer: go-b\nAnswer as shown to the captain: Option B"
+  body| Resolution mode: released
+  body| Resolves hold set: 2026-10-09T22:31:59Z
+  body| Captain decision:
+  body| Captain answered this call through lab board batch.
+  body| Answer: go-b
+  body| Answer as shown to the captain: Option B
+  worker record: absent
