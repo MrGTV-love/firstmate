@@ -873,13 +873,8 @@ EOF
 # Each scenario runs in its own process because the arm fixture fires exactly
 # one actionable close.
 run_watch_restore_scenario() {  # <scenario>
-  local scenario=$1 repo home stranded_poll_ms=3600000 restore_check_ms=2000
+  local scenario=$1 repo home
   repo="$TMP_ROOT/watch-restore-$scenario/repo"; home="$TMP_ROOT/watch-restore-$scenario/home"
-  # The stranded-wake poll is off (an hour) except where a scenario exercises it,
-  # and the restored-wake check keeps its two-second delay except for the
-  # scenarios that wait out several of its rounds.
-  case "$scenario" in stranded-*|limit-polled) stranded_poll_ms=100 ;; esac
-  case "$scenario" in pending-*|limit-polled) restore_check_ms=100 ;; esac
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -908,10 +903,17 @@ SH
   # otherwise hold a command substitution open for its whole sleep.
   FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
-    FM_OMP_STRANDED_WAKE_POLL_MS="$stranded_poll_ms" FM_OMP_RESTORE_CHECK_MS="$restore_check_ms" FM_OMP_RESTORE_PENDING_WAITS=3 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+const realSetTimeout = globalThis.setTimeout;
+const realSetInterval = globalThis.setInterval;
+const fastRestore = process.env.SCENARIO.startsWith("pending-") || process.env.SCENARIO === "limit-polled";
+const pollWake = process.env.SCENARIO.startsWith("stranded-") || process.env.SCENARIO === "limit-polled";
+globalThis.setTimeout = (callback, delay, ...args) =>
+  realSetTimeout(callback, delay === 2000 && fastRestore ? 100 : delay, ...args);
+globalThis.setInterval = (callback, delay, ...args) =>
+  realSetInterval(callback, delay === 3000 ? (pollWake ? 100 : 3600000) : delay, ...args);
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = []; const turns = [];
 const transcript = [{ role: "assistant" }];
@@ -1391,7 +1393,7 @@ switch (process.env.SCENARIO) {
     // wait is reported once and the bound holds.
     queued = true;
     await handlers.get("agent_end")({ type: "agent_end" }, ctx);
-    await sleep(1800);
+    await sleep(2800);
     if (sent.length !== 4 || !sent.slice(1).every(same)) throw new Error(`resubmission was not bounded to three attempts: ${sent.length}`);
     if (notices.length !== 1 || notices[0].level !== "warning" || !notices[0].m.includes("wake not delivered")) throw new Error(`the undelivered wake was not reported once: ${JSON.stringify(notices)}`);
     await sleep(600);

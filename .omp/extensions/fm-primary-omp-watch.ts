@@ -691,12 +691,12 @@ export default function (pi: ExtensionAPI) {
   // Restored-wake recovery state. The context is whichever one omp passed to
   // the latest event: timers run outside any handler, and a context that went
   // stale with a replaced session throws on use, which only skips the check.
-  const restoreCheckMs = positiveInteger("FM_OMP_RESTORE_CHECK_MS", 2000);
+  const restoreCheckMs = 2000;
   const restoreAttemptLimit = 3;
   // Further checks that wait for omp's queue to drain into a run before an idle
   // session's queue counts as stuck; a compaction can hold the queue for a while.
-  const restorePendingWaitLimit = positiveInteger("FM_OMP_RESTORE_PENDING_WAITS", 15);
-  const strandedPollMs = positiveInteger("FM_OMP_STRANDED_WAKE_POLL_MS", 3000);
+  const restorePendingWaitLimit = 15;
+  const strandedPollMs = 3000;
   const restoreAttempts = new Map<string, number>();
   const strandedAttempts = new Map<string, number>();
   let restoreTimer: ReturnType<typeof setTimeout> | null = null;

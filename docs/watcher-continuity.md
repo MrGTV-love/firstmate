@@ -103,6 +103,7 @@ A wake restored by Alt+Up while idle without `agent_end` is not resubmitted, and
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
 `tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, pending-wake retention across cancelled preparation without `agent_end`, later completed draft turns, and replacement handoff until accepted user `message_start`, plus identical wakes across preparation plus accepted-message callbacks, streaming delivery, and session replacement.
 It also covers the wait on queued messages: a queue that drains, a restored wake behind a queue that never drains, a wake stuck in the queue itself, and resubmissions that start no turn.
+Recovery delays and wait limits are fixed in production; the fixture controls timer scheduling in its Node host to accelerate bounded waits and isolate polling scenarios.
 The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
 
 ### omp stranded wake text
