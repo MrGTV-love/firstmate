@@ -1775,68 +1775,81 @@ test_main_is_never_told_to_drain_rows_only_the_branch_owns() {
 # The per-actor count runs awk over the queue, and awk implementations differ on
 # whether a failed input open aborts before the END rule; one that reaches END
 # reports a 0 count for a queue that was never proved empty.
-# A wake headline is stale once the lane has acknowledged what it announced.
-# --owed is the one question a delivery path asks before injecting a headline:
-# would a drain still hand this actor something to acknowledge? It is read-only
-# and silent, and anything it cannot read counts as owed.
 test_owed_reports_whether_a_drain_would_still_hand_over_work() {
-  local dir state ack_line ack_seq ack_gen out rc before after marker
+  local dir state ack_line ack_seq ack_gen out rc before after marker literal actor
   dir=$(make_case owed-predicate)
   state="$dir/state"
-  owed() { FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 2> "$dir/owed.err"; }
+  owed() { FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR="${actor:-main}" "$DRAIN" --owed "$1" > "$dir/owed.out" 2> "$dir/owed.err"; }
 
-  owed && fail "an empty queue with no recovery marker was reported as owed"
-  [ ! -s "$dir/owed.err" ] || fail "--owed was not silent on an empty queue: $(cat "$dir/owed.err")"
-
-  append_wake "$state" signal task.status "signal: task.status" || fail "seed wake failed"
-  owed || fail "a queued row was reported as nothing owed"
-
-  # The lane drains and acknowledges everything: the headline it was queued
-  # behind is now stale, which is exactly the case --owed must name.
+  owed "signal: A" && fail "missing queue was reported as owed"
+  append_wake "$state" signal A.status "signal: A" || fail "seed wake failed"
+  owed "signal: A" || fail "queued A was not owed"
+  owed "signal: B" && fail "another queued headline satisfied B"
   out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" 2>&1) || fail "drain failed"
   ack_line=$(printf '%s\n' "$out" | grep '^WAKE_ACK_REQUIRED:') || fail "drain printed no acknowledgement command"
   ack_seq=$(printf '%s\n' "$ack_line" | sed 's/.*--ack-through \([0-9]*\).*/\1/')
   ack_gen=$(printf '%s\n' "$ack_line" | sed 's/.*--recovery-generation \([A-Za-z0-9._-]*\).*/\1/')
-  owed || fail "a presented but unacknowledged row was reported as nothing owed"
+  owed "signal: A" || fail "presented but unacknowledged A was not owed"
+  append_wake "$state" signal B.status "signal: B" || fail "B append failed"
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$ack_seq" --recovery-generation "$ack_gen" >/dev/null 2>&1 \
     || fail "acknowledgement failed"
-  owed && fail "an acknowledged queue was still reported as owed"
+  owed "signal: A" && fail "acknowledged A was owed while B remained pending"
+  owed "signal: B" || fail "pending B was not owed after A acknowledgement"
 
-  # A row that arrived after the acknowledgement is owed again.
-  append_wake "$state" stale default:w1:p2 "stale: default:w1:p2" || fail "second wake failed"
-  owed || fail "a row appended after the acknowledgement was reported as nothing owed"
-  : > "$state/.wake-queue"
+  FM_STATE_OVERRIDE="$state" "$GRANT" activate "$$" owed-actor || fail "branch activation failed"
+  FM_STATE_OVERRIDE="$state" "$GRANT" publish owed-actor 2 || fail "branch grant failed"
+  owed "signal: B" && fail "main was owed a branch-reserved headline"
+  actor=branch
+  owed "signal: B" || fail "branch was not owed its granted headline"
+  append_wake "$state" signal C.status "signal: C" || fail "C append failed"
+  owed "signal: C" && fail "branch was owed a main-owned headline"
+  actor=main
+  owed "signal: C" || fail "main was not owed its unreserved headline"
+  FM_STATE_OVERRIDE="$state" "$GRANT" deactivate "$$" owed-actor || fail "branch deactivation failed"
+  owed "signal: B" || fail "main did not reclaim the released headline"
+  actor=branch
+  owed "signal: B" && fail "branch without a grant was owed a headline"
+  actor=main
 
-  # No row, but an unacknowledged recovery episode: the drain still starts a
-  # handling turn, so the wake is owed. An acknowledged episode owes nothing.
-  for marker in pending:downtime:g1 announced:downtime:g2 pending:handling:g3 announced:handling:g4; do
-    printf '%s\n' "$marker" > "$state/.watcher-down"
-    owed || fail "an empty queue with recovery marker $marker was reported as nothing owed"
-  done
-  for marker in acked:downtime:g5 acked:handling:g6; do
-    printf '%s\n' "$marker" > "$state/.watcher-down"
-    owed && fail "an empty queue with acknowledged marker $marker was reported as owed"
-  done
-
-  # Anything unreadable is owed: a stale headline costs a turn, a dropped wake costs the lane.
-  printf 'not a marker\n' > "$state/.watcher-down"
-  owed || fail "an unreadable recovery marker was reported as nothing owed"
-  rm -f "$state/.watcher-down"
-  append_wake "$state" signal task.status "signal: task.status" || fail "third wake failed"
-  chmod 000 "$state/.wake-queue" || fail "could not make the queue unreadable"
-  owed || { chmod 600 "$state/.wake-queue"; fail "an unreadable queue was reported as nothing owed"; }
-  chmod 600 "$state/.wake-queue" || fail "could not restore the queue"
-  [ ! -s "$dir/owed.err" ] || fail "--owed was not silent on an unreadable queue: $(cat "$dir/owed.err")"
-
-  # It never presents, claims, or acknowledges anything.
-  before=$(cat "$state/.wake-queue" "$state/.wake-queue.seq" 2>/dev/null; ls -A "$state")
-  owed || :
-  after=$(cat "$state/.wake-queue" "$state/.wake-queue.seq" 2>/dev/null; ls -A "$state")
+  literal=$'signal: literal \\n \\t \\123 "quote" [.*] $dollar\tab\rcr\nline'
+  append_wake "$state" signal literal.status "$literal" || fail "literal append failed"
+  owed "$literal" || fail "literal headline did not match cleaned serialization"
+  owed 'signal: literal' && fail "prefix matched a complete headline"
+  before=$(cat "$state"/.wake-* "$state"/.branch-* "$state/.watcher-down" 2>/dev/null; ls -A "$state")
+  owed "$literal" || fail "read-only query failed"
+  after=$(cat "$state"/.wake-* "$state"/.branch-* "$state/.watcher-down" 2>/dev/null; ls -A "$state")
   [ "$before" = "$after" ] || fail "--owed changed the durable record"
+  [ ! -s "$dir/owed.out" ] && [ ! -s "$dir/owed.err" ] || fail "--owed was not silent"
 
-  out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" --owed extra 2>&1); rc=$?
-  [ "$rc" -eq 2 ] || fail "--owed with extra arguments was not refused (rc=$rc)"
-  pass "fm-wake-drain --owed: reports whether a drain would still hand the lane work, silently and without touching the record"
+  mkdir "$dir/failed-awk"
+  cat > "$dir/failed-awk/awk" <<'SH'
+#!/usr/bin/env bash
+printf '1\n'
+exit 2
+SH
+  chmod +x "$dir/failed-awk/awk"
+  PATH="$dir/failed-awk:$PATH" owed "$literal" && fail "a failed queue read authorized delivery"
+
+  chmod 000 "$state/.wake-queue" || fail "could not make queue unreadable"
+  owed "$literal" && { chmod 600 "$state/.wake-queue"; fail "unreadable queue was owed"; }
+  chmod 600 "$state/.wake-queue" || fail "could not restore queue"
+  printf '1\tbad\tsignal\tkey\tsignal: A\ninvalid\n' > "$state/.wake-queue"
+  owed "signal: A" && fail "structurally invalid row satisfied a headline"
+  : > "$state/.wake-queue"
+  for marker in pending:downtime:g1 announced:downtime:g2 pending:handling:g3 announced:handling:g4 acked:downtime:g5 'not a marker'; do
+    printf '%s\n' "$marker" > "$state/.watcher-down"
+    owed "signal: A" && fail "marker-only state $marker was owed"
+  done
+  for out in missing extra; do
+    rc=0
+    if [ "$out" = missing ]; then
+      FM_STATE_OVERRIDE="$state" "$DRAIN" --owed >/dev/null 2>&1 || rc=$?
+    else
+      FM_STATE_OVERRIDE="$state" "$DRAIN" --owed "signal: A" extra >/dev/null 2>&1 || rc=$?
+    fi
+    [ "$rc" -eq 2 ] || fail "--owed $out arguments were not refused (rc=$rc)"
+  done
+  pass "fm-wake-drain --owed HEADLINE: exact cleaned actor-owned queued payload, silent and read-only"
 }
 
 test_uncountable_queue_still_raises_the_pending_alarm() {

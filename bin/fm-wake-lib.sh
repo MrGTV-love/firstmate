@@ -2461,23 +2461,36 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   printf '%s\n' "$count"
 }
 
-# Whether a drain by <actor> would now hand it something to acknowledge: a
-# queued row it owns, or an unacknowledged recovery episode (main only; the
-# branch drains rows alone). This is the one predicate a delivery path asks
-# before injecting a wake headline, so an injected headline always names work
-# the durable record still owes. Read without locks, like the count above.
-# Anything that cannot be read counts as owed: a stale headline costs one idle
-# turn, but a wake nobody can prove was drained must never be dropped.
-fm_wake_owed() {  # <actor>
-  local actor=${1:-main} marker="$STATE/.watcher-down"
-  [ "$(fm_wake_actor_pending_count "$actor" 2>/dev/null)" = 0 ] || return 0
-  [ "$actor" != branch ] || return 1
-  [ -e "$marker" ] || [ -L "$marker" ] || return 1
-  fm_recovery_marker_read "$marker" || return 0
-  case "$FM_RECOVERY_MARKER_TOKEN" in
-    pending:*|announced:*) return 0 ;;
+fm_wake_owed() {
+  [ "$#" -eq 2 ] || return 1
+  local actor=$1 headline rows="$STATE/.branch-eligible-rows"
+  local owner="$STATE/.branch-eligible-owner" grant='' matched
+  [ -f "$FM_WAKE_QUEUE" ] && [ -r "$FM_WAKE_QUEUE" ] || return 1
+  headline=$(printf '%s' "$2" | fm_wake_clean_field) || return 1
+  if fm_wake_branch_grant_live "$rows" "$owner" 2>/dev/null; then
+    grant=$rows
+  fi
+  case "$actor" in
+    main) ;;
+    branch) [ -n "$grant" ] || return 1 ;;
+    *) return 1 ;;
   esac
-  return 1
+  matched=$(FM_WAKE_OWED_HEADLINE="$headline" FM_WAKE_OWED_GRANT="$grant" FM_WAKE_OWED_ACTOR="$actor" \
+    awk -F '\t' '
+      BEGIN {
+        seqs = ENVIRON["FM_WAKE_OWED_GRANT"]
+        if (seqs != "") {
+          while ((status = getline line < seqs) > 0) reserved[line] = 1
+          if (status < 0) { failed = 1; exit 1 }
+          close(seqs)
+        }
+      }
+      NF >= 5 && $2 ~ /^[0-9]+$/ && $5 == ENVIRON["FM_WAKE_OWED_HEADLINE"] {
+        if (ENVIRON["FM_WAKE_OWED_ACTOR"] == "branch" ? ($2 in reserved) : !($2 in reserved)) found = 1
+      }
+      END { print (failed ? 0 : found + 0) }
+    ' "$FM_WAKE_QUEUE" 2>/dev/null) || return 1
+  [ "$matched" = 1 ]
 }
 
 # Print which of the given sequence numbers are still queued, one per line.
