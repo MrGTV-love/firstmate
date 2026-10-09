@@ -2615,9 +2615,10 @@ SH
 # A process-event wake prints while it holds the wake-queue lock, and the scan
 # before every non-signal wake lingers one grace period on a fresh status line.
 # That linger must never run under the lock: every other queue writer and the
-# drain would wait on it. Both race shapes are driven with a real queue writer.
+# drain would wait on it. A sleep shim records whether the queue lock is held
+# each time the grace sleep starts, so the proof does not depend on host load.
 test_procevent_wake_never_lingers_under_the_queue_lock() {
-  local dir state fakebin out next_out pid shape real_bin hook n i t0 waited max_wait
+  local dir state fakebin out next_out pid shape real_bin hook real_sleep grace_log
   for shape in before-lock under-lock; do
     dir=$(make_case "procevent-grace-lock-$shape"); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
     mkdir -p "$dir/approved" "$dir/config"
@@ -2652,28 +2653,37 @@ fi
 exec "$real_bin" "$@"
 SH
     chmod 0700 "$fakebin/$hook"
+    # The grace is 7s, a value no other watcher sleep uses.
+    grace_log="$dir/grace-sleeps"
+    real_sleep=$(type -P sleep)
+    printf '#!/usr/bin/env bash\nreal_sleep=%q\ngrace_log=%q\n' "$real_sleep" "$grace_log" > "$fakebin/sleep"
+    cat >> "$fakebin/sleep" <<'SH'
+if [ "$*" = 7 ]; then
+  if [ -e "$FM_STATE_OVERRIDE/.wake-queue.lock" ] || [ -L "$FM_STATE_OVERRIDE/.wake-queue.lock" ]; then
+    printf 'held\n' >> "$grace_log"
+  else
+    printf 'free\n' >> "$grace_log"
+  fi
+fi
+exec "$real_sleep" "$@"
+SH
+    chmod 0700 "$fakebin/sleep"
     watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
-      FM_WATCH_HANDLING_SUCCESSOR=1 FM_SIGNAL_GRACE=6
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_SIGNAL_GRACE=7
     pid=$!
-    i=0
-    while [ ! -e "$state/late-signal-injected" ] && [ "$i" -lt 300 ]; do
-      sleep 0.1
-      i=$((i + 1))
-    done
-    [ -e "$state/late-signal-injected" ] || { reap "$pid"; fail "$shape status line was never appended"; }
-    n=0; max_wait=0
-    while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 600 ]; do
-      n=$((n + 1))
-      t0=$(date +%s)
-      append_wake "$state" check "queue-writer:$n" 'check: concurrent queue writer' \
-        || { reap "$pid"; fail "$shape concurrent queue writer failed"; }
-      waited=$(( $(date +%s) - t0 ))
-      [ "$waited" -le "$max_wait" ] || max_wait=$waited
-      sleep 0.05
-    done
-    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$shape process-event wake never exited"; }
-    [ "$max_wait" -lt 3 ] \
-      || fail "$shape queue writer waited ${max_wait}s on the 6s signal grace"
+    wait_for_exit "$pid" 600 || { reap "$pid"; fail "$shape process-event wake never exited"; }
+    [ -e "$state/late-signal-injected" ] || fail "$shape status line was never appended"
+    ! grep -qx held "$grace_log" 2>/dev/null \
+      || fail "$shape slept the signal grace while holding the wake-queue lock"
+    case "$shape" in
+      before-lock)
+        [ "$(cat "$grace_log" 2>/dev/null)" = free ] \
+          || fail "before-lock did not linger once outside the queue lock: $(cat "$grace_log" 2>/dev/null)"
+        ;;
+      under-lock)
+        [ ! -e "$grace_log" ] || fail "under-lock lingered on the signal grace: $(cat "$grace_log")"
+        ;;
+    esac
     [ "$(cat "$out")" = 'check: process-event result captured: procevent:grace-lock:1' ] \
       || fail "$shape emitted the wrong headline: $(cat "$out")"
     awk -F '\t' '$3 == "signal" && $4 == "a.status" { found = 1 } END { exit !found }' "$state/.wake-queue" \
