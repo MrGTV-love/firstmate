@@ -204,7 +204,7 @@ The launch owner repeats the proof before publication; a later refusal can there
 - **Its HEAD contains every surviving recorded head:** the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.
   A task with no PR and no prior control relaunch has only the reflog, so prepare the copy with `git worktree add -f <path> <branch>` and do not run `git worktree prune` first.
-  If the registration was already pruned, give the PR head or a known commit of the branch through the existing evidence: the record's `pr_head=` (recorded by `bin/fm-pr-check.sh`) or the control journal's `worktree_head=` for the vanished path.
+  If the registration was already pruned, give the PR head or a known commit of the branch: write one line, `pr_head=<sha>`, into the task record (`state/<id>.meta`).
   The refusal names this remedy.
   The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
   Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
@@ -229,7 +229,7 @@ It cannot check the branch out while git still lists the vanished path as that b
 It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a 60-second isolation poll and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 The caller prepares the copy with `git worktree add -f <path> <branch>`, never after `git worktree prune`: the forced add keeps the vanished copy's registration, whose reflog may be the task's only recorded head.
-If that registration is already gone and no other head survives, the refusal asks for the PR head or a known commit through the record's `pr_head=` or the control journal's `worktree_head=`.
+If that registration is already gone and no other head survives, the refusal asks for the PR head or a known commit as one `pr_head=<sha>` line in the task record (`state/<id>.meta`).
 Editing the record by hand has none of those checks, no journal, and no lock against a concurrent launch.
 
 ### Failure and rollback

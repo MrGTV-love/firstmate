@@ -2953,7 +2953,10 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
   run_relocation_refusal "$dir" "$id" "no recorded head exists" "no surviving recorded head"
   run_relocation_refusal "$dir" "$id" "git worktree add -f <path> task-$id" "no-head refusal names the forced add"
   run_relocation_refusal "$dir" "$id" "do not run 'git worktree prune' first" "no-head refusal warns against pruning"
-  run_relocation_refusal "$dir" "$id" "pr_head=" "no-head refusal names the existing evidence route"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+  expect_code 1 "$rc" "relocation must refuse (no-head remedy)"$'\n'"$out"
+  assert_contains "$out" "pr_head=<sha>, into the task record" "no-head refusal must name the pr_head= route"
+  assert_not_contains "$out" "worktree_head=" "no-head refusal must not name the journal worktree_head= hint"
   pass "relocation: every surviving recorded head must be contained, and no evidence refuses"
 }
 
