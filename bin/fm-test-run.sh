@@ -1468,6 +1468,10 @@ families_for_changed_path() {
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
       ;;
+    tests/omp_wake_turns.py)
+      printf '%s\n' "__script__:fm-omp-wake-turns.test.sh"
+      printf '%s\n' "__script__:fm-omp-stale-wake-live-e2e.test.sh"
+      ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family
       # resolution in the caller; emit a marker family of __script__
