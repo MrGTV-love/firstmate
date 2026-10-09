@@ -132,6 +132,8 @@ type SessionGeneration = {
   // replacement began still needs to distinguish unconsumed wakes from
   // consumed ones.
   unconsumedWakes: Map<string, UnconsumedWake>;
+  restorePendingWaits: number;
+  queueStuckReported: boolean;
   // A verified successor's failure close that arrived while the pipeline was
   // still delivering the wake it was started for; its bounded retry runs once
   // that delivery settles instead of being skipped by the single-flight guard.
@@ -493,6 +495,8 @@ function createGeneration(): SessionGeneration {
     pendingActionables: [],
     cleanupFailure: "",
     unconsumedWakes: new Map(),
+    restorePendingWaits: 0,
+    queueStuckReported: false,
     deferredClose: null,
   };
 }
@@ -698,8 +702,6 @@ export default function (pi: ExtensionAPI) {
   const strandedAttempts = new Map<string, number>();
   let restoreTimer: ReturnType<typeof setTimeout> | null = null;
   let strandedTimer: ReturnType<typeof setInterval> | null = null;
-  let restorePendingWaits = 0;
-  let queueStuckReported = false;
   let strandedSeen = "";
   let nextStrandedId = 0;
   let latestContext: any = null;
@@ -744,8 +746,8 @@ export default function (pi: ExtensionAPI) {
       scheduleRestoredWakeCheck(owner);
       return;
     }
-    if (queueStuckReported) return;
-    queueStuckReported = true;
+    if (owner.queueStuckReported) return;
+    owner.queueStuckReported = true;
     reportWait(
       ctx,
       `watcher: wake not delivered - omp is idle with queued messages it will not run, and ${restoreAttemptLimit} resubmissions did not start a turn; the wake stays in the durable queue for bin/fm-wake-drain.sh`,
@@ -753,13 +755,14 @@ export default function (pi: ExtensionAPI) {
   }
 
   function recoverRestoredWake(owner: SessionGeneration): void {
-    if (!generationIsLive(owner) || owner.unconsumedWakes.size === 0) return;
+    if (!generationIsLive(owner)) return;
     const ctx = editorContext();
     if (!ctx) return;
     try {
       // A turn that already started will consume the wake itself.
       if (!ctx.isIdle()) {
-        restorePendingWaits = 0;
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
         return;
       }
       // Queued messages normally drain into the next run within moments, so the
@@ -767,10 +770,12 @@ export default function (pi: ExtensionAPI) {
       // never run; after the bounded wait the stuck queue is handled below.
       const queued = ctx.hasPendingMessages?.() === true;
       if (!queued) {
-        restorePendingWaits = 0;
-        queueStuckReported = false;
-      } else if (restorePendingWaits < restorePendingWaitLimit) {
-        restorePendingWaits += 1;
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
+      }
+      if (owner.unconsumedWakes.size === 0) return;
+      if (queued && owner.restorePendingWaits < restorePendingWaitLimit) {
+        owner.restorePendingWaits += 1;
         scheduleRestoredWakeCheck(owner);
         return;
       }
@@ -823,8 +828,14 @@ export default function (pi: ExtensionAPI) {
     if (!ctx) return;
     try {
       if (ctx.isIdle() !== true) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
         strandedSeen = "";
         return;
+      }
+      if (ctx.hasPendingMessages?.() !== true) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
       }
       const editor = String(ctx.ui.getEditorText() ?? "");
       const tracked = [...owner.unconsumedWakes.values()];

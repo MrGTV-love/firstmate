@@ -905,15 +905,30 @@ SH
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from "node:fs";
 const realSetTimeout = globalThis.setTimeout;
 const realSetInterval = globalThis.setInterval;
+const realClearTimeout = globalThis.clearTimeout;
+const manualQueue = process.env.SCENARIO === "queue-episodes";
+const restoreChecks = new Set();
+let pollCheck = null;
 const fastRestore = process.env.SCENARIO.startsWith("pending-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled"].includes(process.env.SCENARIO);
 const pollWake = process.env.SCENARIO.startsWith("stranded-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled", "editor-normalized-edited", "prepended", "appended", "appended-newline", "prepended-mark", "appended-mark", "internal-mark", "edited"].includes(process.env.SCENARIO);
-globalThis.setTimeout = (callback, delay, ...args) =>
-  realSetTimeout(callback, delay === 2000 && fastRestore ? 100 : delay, ...args);
-globalThis.setInterval = (callback, delay, ...args) =>
-  realSetInterval(callback, delay === 3000 ? (pollWake ? 100 : 3600000) : delay, ...args);
+globalThis.setTimeout = (callback, delay, ...args) => {
+  if (manualQueue && delay === 2000) {
+    const timer = { callback: () => callback(...args), unref() {} };
+    restoreChecks.add(timer);
+    return timer;
+  }
+  return realSetTimeout(callback, delay === 2000 && fastRestore ? 100 : delay, ...args);
+};
+globalThis.clearTimeout = (timer) => {
+  if (!restoreChecks.delete(timer)) realClearTimeout(timer);
+};
+globalThis.setInterval = (callback, delay, ...args) => {
+  if (manualQueue && delay === 3000) pollCheck = () => callback(...args);
+  return realSetInterval(callback, delay === 3000 ? (pollWake ? 100 : 3600000) : delay, ...args);
+};
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = []; const turns = [];
 const transcript = [{ role: "assistant" }];
@@ -1148,6 +1163,80 @@ const settle = async () => { await handlers.get("agent_end")({ type: "agent_end"
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "queue-episodes": {
+    const check = () => {
+      if (restoreChecks.size !== 1) throw new Error(`expected one recovery check, saw ${restoreChecks.size}`);
+      const timer = restoreChecks.values().next().value;
+      restoreChecks.delete(timer);
+      timer.callback();
+    };
+    const episode = async (label) => {
+      const count = sent.length;
+      const warnings = notices.length;
+      const content = sent.at(-1).m;
+      queued = true;
+      idle = true;
+      await handlers.get("agent_end")({}, ctx);
+      for (let i = 0; i < 15; i += 1) {
+        check();
+        if (sent.length !== count || notices.length !== warnings) throw new Error(`${label}: recovery acted before fifteen checks`);
+      }
+      for (let i = 1; i <= 3; i += 1) {
+        check();
+        if (sent.length !== count + i || sent.at(-1).m !== content || sent.at(-1).o?.deliverAs !== undefined || notices.length !== warnings) throw new Error(`${label}: recovery did not submit exactly three prompt attempts`);
+      }
+      check();
+      const notice = notices.at(-1);
+      if (notices.length !== warnings + 1 || notice.level !== "warning" || !notice.m.includes("wake not delivered")) throw new Error(`${label}: exhausted episode did not warn`);
+      await handlers.get("agent_end")({}, ctx);
+      check();
+      if (sent.length !== count + 3 || notices.length !== warnings + 1) throw new Error(`${label}: recovery or warning repeated`);
+      if (composer.text !== "operator draft" || composer.sets.length !== 0) throw new Error(`${label}: recovery disturbed the composer`);
+      return content;
+    };
+    const nextWake = async () => {
+      const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(`${dir}/session-replacement-actionable.json`, "invalid");
+      idle = false;
+      const count = sent.length;
+      await tool.execute();
+      unlinkSync(`${dir}/session-replacement-actionable.json`);
+      if (sent.length !== count + 1 || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("expected a fresh queued failure wake");
+    };
+    const consume = async (content) => handlers.get("message_start")({ message: { role: "user", content } }, ctx);
+    composer.text = "operator draft";
+    let content = await episode("first session");
+    await consume(content);
+    await handlers.get("session_shutdown")({}, ctx);
+    idle = false;
+    await handlers.get("session_start")({}, ctx);
+    await nextWake();
+    content = await episode("replacement session");
+    await handlers.get("agent_end")({}, ctx);
+    await consume(content);
+    queued = false;
+    check();
+    await nextWake();
+    content = await episode("queue drained without tracked wakes");
+    await consume(content);
+    queued = false;
+    pollCheck();
+    await nextWake();
+    content = await episode("queue drained between recovery checks");
+    await handlers.get("agent_end")({}, ctx);
+    idle = false;
+    check();
+    await consume(content);
+    await nextWake();
+    content = await episode("running turn observed by recovery");
+    idle = false;
+    pollCheck();
+    await consume(content);
+    await nextWake();
+    await episode("running turn observed by polling");
+    break;
+  }
   case "ownership-marked":
   case "ownership-unmarked": {
     const before = "\n\nbefore\u2063 draft\n\n";
@@ -1508,6 +1597,15 @@ EOF
   return "$status"
 }
 
+test_watch_queue_episodes_reset_across_sessions_and_completion() {
+  local out status
+  out=$(run_watch_restore_scenario queue-episodes)
+  status=$?
+  expect_code 0 "$status" "omp stuck-queue episode lifecycle: $out"
+  [ -z "$out" ] || fail "omp stuck-queue episode lifecycle printed output: $out"
+  pass ".omp watch extension: every stuck-queue episode waits fifteen checks and warns once across replacement, queue drain, and running turns"
+}
+
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
   for scenario in duplicates duplicates-handoff duplicates-streaming duplicates-edited-polled preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context stranded-alone stranded-unmarked stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-bounded-unmarked ownership-marked ownership-unmarked ownership-missing blocked-tracked-marked blocked-tracked-unmarked pending-persistent pending-drains pending-stuck pending-unflushable limit-polled restore-window draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
@@ -1637,5 +1735,6 @@ test_watch_extension_keeps_the_arm_without_the_file_or_with_off
 test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
+test_watch_queue_episodes_reset_across_sessions_and_completion
 test_primary_extensions_ignore_a_descendant_session
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
