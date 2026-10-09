@@ -240,7 +240,7 @@ case "${1:-}" in
     case "$ACK_GENERATION" in ''|*[!A-Za-z0-9._-]*) echo "wake drain: invalid recovery generation" >&2; exit 2 ;; esac
     [ "$#" -eq 4 ] || { echo "wake drain: unexpected acknowledgement arguments" >&2; exit 2; }
     ;;
-  *) echo "usage: fm-wake-drain.sh [--reemit | --owed HEADLINE | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
+  *) echo "usage: fm-wake-drain.sh [--reemit | --owed SEQUENCE | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
 esac
 
 [ "$ACTOR" != branch ] || require_branch_eligible_rows || exit 1
