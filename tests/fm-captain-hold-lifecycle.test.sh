@@ -5619,7 +5619,9 @@ test_sweep_resolves_bound_captain_keys() {
 
 test_sweep_resolves_migrated_captain_keys() {
   local mode home store board sid key origin identity expected out rc list before
-  for mode in note derived-note prefix derived-prefix marker-wins ambiguous-note ambiguous-prefix exact-error derived-error prefix-error; do
+  local permission_path permission_mode fixture_rc sweep_rc session predicate_err predicate_out
+  for mode in note derived-note prefix derived-prefix marker-wins ambiguous-note ambiguous-prefix exact-error derived-error prefix-error \
+      binding-lookup-error-idle binding-lookup-error-ended binding-lookup-error-nosession binding-read-error unbound unbound-directory; do
     home=$(make_home "board-sweep-migrated-$mode")
     fm_test_track_procevent_home "$home" "$home/procevent-claims"
     store="$home/lavish-state"
@@ -5671,6 +5673,16 @@ EOF
         fi
         expected=2
         ;;
+      binding-lookup-error-*|binding-read-error|unbound|unbound-directory)
+        key=third-choice
+        write_known_rows_stub "$home/fakebin" migrated-row other-migrated-row
+        printf 'migrated-row\n' > "$home/closed-id"
+        jq -cn --arg key "$key" --arg derived "$origin-decision-$key" \
+          '[{id:"migrated-row", notes:("migrated from data/backlog.md id " + $key)},
+            {id:"other-migrated-row", notes:("migrated from data/backlog.md id " + $derived)}]' \
+          > "$home/migration-list.json"
+        case "$mode" in unbound*) expected=1 ;; *) expected=2 ;; esac
+        ;;
     esac
     cp "$home/fakebin/tasks-axi" "$home/fakebin/tasks-axi-rows"
     cat > "$home/fakebin/tasks-axi" <<'SH'
@@ -5695,14 +5707,56 @@ SH
     chmod +x "$home/fakebin/tasks-axi" "$home/fakebin/bd"
     board=$(sweep_board "$home" migrated old "$key")
     sid=$(sweep_register "$home" "$board")
-    run_captain "$home" bind "$sid" "$origin" >/dev/null || fail "could not bind the $mode fixture"
-    sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
+    case "$mode" in
+      unbound) ;;
+      unbound-directory) mkdir -p "$home/state/decision-bindings" ;;
+      *) run_captain "$home" bind "$sid" "$origin" >/dev/null || fail "could not bind the $mode fixture" ;;
+    esac
+    session=idle
+    case "$mode" in binding-lookup-error-*) session=${mode##*-} ;; esac
+    case "$session" in
+      idle) sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z ;;
+      ended) sweep_session "$store" "$board" ended 0 - ;;
+      nosession) mkdir -p "$store"; printf '{"sessions":{}}\n' > "$store/state.json" ;;
+    esac
+    permission_path=''
+    permission_mode=700
+    case "$mode" in
+      binding-lookup-error-*|binding-read-error)
+        if run_captain "$home" open-bound "$sid" "$key" 2> "$home/predicate.err"; then rc=0; else rc=$?; fi
+        expect_code 2 "$rc" "the readable binding did not preserve both migration candidates"
+        permission_path="$home/state/decision-bindings"
+        if [ "$mode" = binding-read-error ]; then
+          permission_path="$permission_path/$sid.origin"
+          permission_mode=600
+        fi
+        chmod 000 "$permission_path"
+        if perl -MErrno=EACCES -e '
+          if ($ARGV[1] eq "binding-read-error") { open my $file, "<", $ARGV[0]; }
+          else { lstat $ARGV[0]; }
+          exit($! == EACCES ? 0 : 1);
+        ' "$home/state/decision-bindings/$sid.origin" "$mode"; then fixture_rc=0; else fixture_rc=$?; fi
+        if [ "$fixture_rc" -ne 0 ]; then
+          chmod "$permission_mode" "$permission_path"
+          fail "the binding permission fixture did not produce EACCES"
+        fi
+        ;;
+    esac
     before=$(cksum < "$home/migration-list.json")
     if out=$(run_captain "$home" open-bound "$sid" "$key" 2> "$home/predicate.err"); then rc=0; else rc=$?; fi
-    expect_code "$expected" "$rc" "migrated bound predicate $mode: $(cat "$home/predicate.err")"
-    assert_equals '' "$out" "the migrated predicate emitted output"
-    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
-      || fail "the $mode migration sweep failed: $out"
+    predicate_err=$(cat "$home/predicate.err")
+    predicate_out=$out
+    if out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep); then sweep_rc=0; else sweep_rc=$?; fi
+    [ -z "$permission_path" ] || chmod "$permission_mode" "$permission_path"
+    expect_code "$expected" "$rc" "migrated bound predicate $mode: $predicate_err"
+    assert_equals '' "$predicate_out" "the migrated predicate emitted output"
+    [ "$sweep_rc" -eq 0 ] || fail "the $mode migration sweep failed: $out"
+    case "$mode" in
+      binding-lookup-error-*|binding-read-error)
+        assert_contains "$predicate_err" 'decision binding cannot be' "the binding read error was not reported"
+        assert_contains "$out" "card $key is an open captain call or cannot be checked" "binding uncertainty was not explained: $out"
+        ;;
+    esac
     list=$(run_procevent "$home" list)
     if [ "$expected" = 1 ]; then
       assert_contains "$out" "retired: $sid" "the closed marker-noted row lost precedence: $out"

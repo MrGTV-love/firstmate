@@ -1248,19 +1248,36 @@ binding_path() { printf '%s/%s.origin\n' "$BINDING_DIR" "$1"; }
 # feeding nothing is the safe direction only when it is a deliberate choice,
 # never when it is a corrupted record.
 read_binding() {  # <source-id>
-  local path origin schema
+  local path
   path=$(binding_path "$1")
-  [ -e "$path" ] || return 0
-  [ -f "$path" ] && [ ! -L "$path" ] || fail "decision binding is unsafe: $path"
-  schema=$(sed -n 's/^schema=//p' "$path" | head -1)
-  [ "$schema" = "$BINDING_SCHEMA" ] || fail "decision binding has an incompatible schema: $path"
-  origin=$(sed -n 's/^origin=//p' "$path" | head -1)
-  if [ "$origin" != "$BINDING_ANY" ]; then
-    case "$origin" in
-      ''|*[!A-Za-z0-9._-]*) fail "decision binding has an invalid origin id: $path" ;;
-    esac
-  fi
-  printf '%s\n' "$origin"
+  perl -MErrno=ENOENT -MFcntl=S_ISREG -e '
+    use strict; use warnings;
+    my ($path, $expected_schema, $any_origin) = @ARGV;
+    my @stat = lstat $path;
+    unless (@stat) {
+      exit 0 if $! == ENOENT;
+      die "fm-captain-hold: decision binding cannot be checked: $path: $!\n";
+    }
+    S_ISREG($stat[2]) or die "fm-captain-hold: decision binding is unsafe: $path\n";
+    open my $file, "<", $path or do {
+      exit 0 if $! == ENOENT;
+      die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
+    };
+    my ($schema, $origin);
+    $! = 0;
+    while (my $line = <$file>) {
+      chomp $line;
+      $schema = $1 if !defined($schema) && $line =~ /^schema=(.*)$/;
+      $origin = $1 if !defined($origin) && $line =~ /^origin=(.*)$/;
+    }
+    die "fm-captain-hold: decision binding cannot be read: $path: $!\n" if $!;
+    close $file or die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
+    defined($schema) && $schema eq $expected_schema
+      or die "fm-captain-hold: decision binding has an incompatible schema: $path\n";
+    defined($origin) && ($origin eq $any_origin || $origin =~ /\A[A-Za-z0-9._-]+\z/)
+      or die "fm-captain-hold: decision binding has an invalid origin id: $path\n";
+    print "$origin\n";
+  ' "$path" "$BINDING_SCHEMA" "$BINDING_ANY" || return 2
 }
 
 command_bind() {
