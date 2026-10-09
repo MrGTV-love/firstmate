@@ -5509,9 +5509,8 @@ preserve_relaunch_meta() {
     echo "home=$PROJ_ABS"
     echo "projects=$SECONDMATE_PROJECTS"
   fi
-  # Written before the preserved lines, never after: a pr= line's identity block
-  # must stay LAST in the record, because fm_pr_metadata_identity_parse rejects
-  # any other key following pr= and PR monitoring would silently stop.
+  # Keep relaunch fields before the preserved PR block so monitoring can parse it;
+  # fm_pr_metadata_identity_parse owns the allowed fields following pr=.
   if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
     echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"
   fi

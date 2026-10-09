@@ -53,7 +53,7 @@ Disabling propagation is an intentional trace boundary: a disabled home injects 
 An actual disabled relaunch regenerates the task meta without `traceparent=`, so a later enabled relaunch roots a new trace instead of resuming the identity from before the boundary; reusing an already-alive remote endpoint is not a relaunch and preserves the carrier that agent already holds.
 
 Carrier publication removes prior `traceparent=` lines and writes one replacement before the first `pr=` line, or at the end of a record without a PR.
-This keeps the trailing PR identity block parseable for monitoring after a traced relaunch.
+PR monitoring can still parse the preserved identity after relaunch with tracing on or off; [`tests/fm-control-relaunch.test.sh`](../tests/fm-control-relaunch.test.sh)'s `test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring` covers both paths.
 
 ### Enablement is home-session-scoped
 
