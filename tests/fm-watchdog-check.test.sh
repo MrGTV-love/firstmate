@@ -14,19 +14,18 @@ set -u
 
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found (plist and heartbeat fixtures)"; exit 0; }
 TMP_ROOT=$(fm_test_tmproot fm-watchdog-check)
-SESSION_PIDS=()
-cleanup_sessions() {
-  local pid
-  for pid in ${SESSION_PIDS[@]+"${SESSION_PIDS[@]}"}; do
-    kill "$pid" 2>/dev/null || true
-  done
-}
-trap cleanup_sessions EXIT
 
 start_session() {  # prints the pid of a live harness-shaped process
+  local pid pidfile
+  pidfile=$(mktemp "$TMP_ROOT/session.XXXXXX") || return 1
+  fm_test_track_process "$pidfile" claude || return 1
   bash -c 'exec -a claude /bin/sleep 600' >/dev/null 2>&1 &
-  SESSION_PIDS+=("$!")
-  printf '%s\n' "$!"
+  pid=$!
+  fm_test_record_process "$pidfile" "$pid" || {
+    kill "$pid" 2>/dev/null || true
+    return 1
+  }
+  printf '%s\n' "$pid"
 }
 
 dead_pid() {
