@@ -2826,6 +2826,7 @@ PRELUDE_PROGRESS_MARKER="$STATE/.prelude-progress"
 PRELUDE_NEXT_STEP=
 SIGNAL_PHASE_DELIVERY_ONLY=0
 SIGNAL_PHASE_QUEUED_REASON=
+SIGNAL_PHASE_LATE_MARKER="$STATE/.watch-late-signals"
 
 # Loads the persisted count into PRELUDE_DEFER_COUNT without a subshell: absent
 # reads 0, anything unreadable or non-numeric reads as the bound (work owed).
@@ -2884,15 +2885,38 @@ signal_phase_note_queued() {
       *) SIGNAL_PHASE_QUEUED_REASON="$SIGNAL_PHASE_QUEUED_REASON $f" ;;
     esac
   done
+  if [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 1 ]; then
+    if [ -d "$SIGNAL_PHASE_LATE_MARKER" ] \
+      || ! printf '%s\n' "${SIGNAL_PHASE_QUEUED_REASON#signal:}" > "$SIGNAL_PHASE_LATE_MARKER.tmp.$$" \
+      || ! mv -f "$SIGNAL_PHASE_LATE_MARKER.tmp.$$" "$SIGNAL_PHASE_LATE_MARKER"; then
+      rm -f -- "$SIGNAL_PHASE_LATE_MARKER.tmp.$$"
+      exit 1
+    fi
+  fi
   return 0
 }
 
 watch_before_wake() {
-  case "$1" in signal:*) ;; *) signal_phase_flush ;; esac
   case "$1" in
-    check:*) ;;
-    *) [ -z "$SIGNAL_PHASE_QUEUED_REASON" ] || FM_WAKE_OUTPUT_REASON=$SIGNAL_PHASE_QUEUED_REASON ;;
+    signal:*) rm -f -- "$SIGNAL_PHASE_LATE_MARKER" ;;
+    *) signal_phase_flush ;;
   esac
+}
+
+signal_phase_follow_up() {
+  local files queued f reason=signal:
+  local -a late_files
+  [ -e "$SIGNAL_PHASE_LATE_MARKER" ] || [ -L "$SIGNAL_PHASE_LATE_MARKER" ] || return 0
+  files=$(cat "$SIGNAL_PHASE_LATE_MARKER") || exit 1
+  queued=$(fm_wake_queued_keys signal) || exit 1
+  rm -f -- "$SIGNAL_PHASE_LATE_MARKER" || exit 1
+  read -r -a late_files <<< "$files"
+  for f in "${late_files[@]}"; do
+    case $'\n'"$queued"$'\n' in
+      *$'\n'"${f##*/}"$'\n'*) reason="$reason $f" ;;
+    esac
+  done
+  [ "$reason" = signal: ] || wake "$reason"
 }
 
 watch_after_wake() {
@@ -3279,6 +3303,7 @@ EOF
 
 FM_WAKE_BEFORE_OUTPUT_ACTION=watch_before_wake
 FM_WAKE_AFTER_OUTPUT_ACTION=watch_after_wake
+signal_phase_follow_up
 
 # A merged poll may have queued its terminal wake and then lost the process
 # between receipt publication and fixed-path removal.
