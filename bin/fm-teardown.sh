@@ -297,12 +297,12 @@
 #     volumes that bin/fm-task-docker-lib.sh attributes to this task - by an
 #     fm.task=<id> label, the id in a name or compose project, or a compose
 #     working directory under the task's worktree - and nothing else. That
-#     library owns the ownership rules and what is never removed. An owned
-#     container that survives its removal stops teardown with the task's
-#     records kept, so a rerun retries; --force continues past it loudly. A
-#     missing Docker CLI is silent and a Docker that cannot be listed is a
-#     warning naming the manual command, never a refusal. Not run for a
-#     secondmate. A pool slot reassigned to another task contributes no path
+#     library owns the ownership rules and what is never removed. Any Docker
+#     listing, verification, or removal failure stops teardown with the task's
+#     records kept, even under --force; the next teardown retries. A missing
+#     Docker CLI is silent; an unlistable daemon warns and stops teardown.
+#     Not run for a standalone secondmate; forced cleanup still applies each
+#     descendant's own metadata. A reassigned pool slot contributes no path
 #     evidence, only the task's own label and names.
 # After Fix 1 and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
@@ -2523,7 +2523,7 @@ PY
       return 1
     }
   fi
-  fm_task_docker_cleanup "$ID" "$siblings" "$ambiguous" "$protected" ${roots[@]+"${roots[@]}"}
+  fm_task_docker_cleanup "$ID" "$siblings" "$ambiguous" "$protected" "$META" ${roots[@]+"${roots[@]}"}
 }
 
 
@@ -3802,7 +3802,7 @@ fi
 # Fix 3 (see script header): the task's own Docker stacks go in this same
 # pre-destructive cleanup, before any record or endpoint is touched, so a
 # refusal leaves everything for a rerun.
-if ! teardown_docker_stacks "$ID" "$META" "$STATE" "$TEARDOWN_SLOT_REASSIGNED"; then
+if [ "$KIND" != secondmate ] && ! teardown_docker_stacks "$ID" "$META" "$STATE" "$TEARDOWN_SLOT_REASSIGNED"; then
   echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
   exit 1
 fi

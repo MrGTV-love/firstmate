@@ -8,7 +8,7 @@
 # (observed 2026-09-30 to 2026-10-06: three stopped throwaway Postgres
 # containers survived 1.5 to 8 days because teardown had no Docker step).
 #
-#   fm_task_docker_cleanup <task-id> <sibling-ids> <ambiguous> <protected> [<root>...]
+#   fm_task_docker_cleanup <task-id> <sibling-ids> <ambiguous> <protected> <meta> [<root>...]
 #       Removes the Docker containers, then the compose/labelled networks and
 #       labelled volumes, that this task owns. Returns 0 when nothing is owned,
 #       or when Docker is absent; returns nonzero when cleanup is incomplete.
@@ -17,6 +17,7 @@
 #         <ambiguous>    1 when another local home has a live task with this
 #                        same id, so the id alone proves nothing.
 #         <protected>    space-separated shared-stack project identities.
+#         <meta>         retained task record for derived project identities.
 #         <root>...      the task's owned worktree directories.
 #       fm_task_docker_path_excluded <root> <path>, when the caller defines it,
 #       returns 0 for a path that sits in a nested lane the task does not own.
@@ -155,16 +156,22 @@ $out
 EOF
 }
 
-fm_task_docker_cleanup() {  # <task-id> <sibling-ids> <ambiguous> <protected> [<root>...]
-  local id=$1 siblings=$2 ambiguous=$3 protected=$4 sep=$_FM_TASK_DOCKER_SEP
-  local objects cid names project supabase why survivors projects="" foreign_projects="" nname candidate
+fm_task_docker_cleanup() {
+  local id=$1 siblings=$2 ambiguous=$3 protected=$4 record=$5 sep=$_FM_TASK_DOCKER_SEP
+  local objects cid names project supabase why projects foreign_projects="" nname candidate saved_projects tmp
   local -a ids
-  shift 4
+  shift 5
   command -v docker >/dev/null 2>&1 || return 0
   if [ "$#" -gt 0 ] && ! command -v python3 >/dev/null 2>&1; then
     echo "error: python3 is required to resolve Docker working directories for $id" >&2
     return 1
   fi
+  if [ ! -f "$record" ] || [ -L "$record" ] \
+     || ! projects=$(LC_ALL=C awk 'index($0, "docker_projects=") == 1 {value=substr($0, 17)} END {print value}' "$record"); then
+    echo "error: cannot read retained Docker project identities for $id" >&2
+    return 1
+  fi
+  saved_projects=$projects
   if ! objects=$(fm_task_docker_containers "$id" "$siblings" "$ambiguous" "$protected" "$@"); then
     echo "warning: Docker could not be listed for $id, so its Docker stacks were not cleaned up; with Docker running, list its own with: docker ps -a --filter label=$FM_TASK_DOCKER_MARKER_LABEL=$id" >&2
     return 1
@@ -175,11 +182,8 @@ fm_task_docker_cleanup() {  # <task-id> <sibling-ids> <ambiguous> <protected> [<
     [ -n "$cid" ] || continue
     for candidate in "$project" "$supabase"; do
       [ -n "$candidate" ] || continue
-      if [ -n "$why" ]; then
-        case " $projects " in *" $candidate "*) ;; *) projects="$projects $candidate" ;; esac
-      else
-        case " $foreign_projects " in *" $candidate "*) ;; *) foreign_projects="$foreign_projects $candidate" ;; esac
-      fi
+      [ -n "$why" ] || continue
+      case " $projects " in *" $candidate "*) ;; *) projects="$projects $candidate" ;; esac
     done
     [ -n "$why" ] || continue
     ids+=("$cid")
@@ -187,10 +191,20 @@ fm_task_docker_cleanup() {  # <task-id> <sibling-ids> <ambiguous> <protected> [<
   done <<EOF
 $objects
 EOF
+  if [ "$projects" != "$saved_projects" ]; then
+    tmp=$(umask 077; mktemp "${record%/*}/.docker-projects.XXXXXXXX") || return 1
+    if ! { LC_ALL=C awk 'index($0, "docker_projects=") != 1' "$record" \
+           && printf 'docker_projects=%s\n' "$projects"; } > "$tmp" \
+       || ! mv -f "$tmp" "$record"; then
+      rm -f "$tmp"
+      echo "error: cannot retain Docker project identities for $id before removal" >&2
+      return 1
+    fi
+  fi
   if [ "${#ids[@]}" -gt 0 ]; then
     echo "teardown: removing Docker container(s) owned by $id:$names" >&2
     fm_task_docker_run rm -f -v "${ids[@]}" >/dev/null 2>&1 || return 1
-    if ! survivors=$(fm_task_docker_containers "$id" "$siblings" "$ambiguous" "$protected" "$@"); then
+    if ! objects=$(fm_task_docker_containers "$id" "$siblings" "$ambiguous" "$protected" "$@"); then
       echo "warning: Docker could not be listed again after removing the containers owned by $id, so the removal is unverified; check with: docker ps -a --filter label=$FM_TASK_DOCKER_MARKER_LABEL=$id" >&2
       return 1
     fi
@@ -199,9 +213,18 @@ EOF
       echo "error: Docker container owned by $id is still present after removal: $nname" >&2
       return 1
     done <<EOF
-$survivors
+$objects
 EOF
   fi
+  while IFS="$sep" read -r cid nname project supabase why; do
+    [ -n "$cid" ] && [ -z "$why" ] || continue
+    for candidate in "$project" "$supabase"; do
+      [ -n "$candidate" ] || continue
+      case " $foreign_projects " in *" $candidate "*) ;; *) foreign_projects="$foreign_projects $candidate" ;; esac
+    done
+  done <<EOF
+$objects
+EOF
   fm_task_docker_remove_networks "$id" "$ambiguous" "$protected" "$projects" "$foreign_projects" || return 1
   fm_task_docker_remove_volumes "$id" "$ambiguous" || return 1
   return 0

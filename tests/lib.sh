@@ -651,6 +651,11 @@ if ($cmd eq 'rm') {
     if ($hit && $fail{$hit->[2]}) { print STDERR "Error: cannot remove container $hit->[2]\n"; $bad = 1; next; }
     @objs = grep { !($_->[0] eq 'container' && ($_->[1] eq $id || $_->[2] eq $id)) } @objs;
   }
+  if (length($ENV{FM_FAKE_DOCKER_ADD_AFTER_RM} // '')) {
+    open my $in, '<', $ENV{FM_FAKE_DOCKER_ADD_AFTER_RM} or die;
+    while (<$in>) { chomp; next unless length; push @objs, [split /\t/, $_, -1]; }
+    close $in;
+  }
   save(); exit($bad || ($ENV{FM_FAKE_DOCKER_RM_ERROR_AFTER_REMOVE} // '') eq '1' ? 1 : 0);
 }
 if ($cmd eq 'network' && $sub eq 'ls') {

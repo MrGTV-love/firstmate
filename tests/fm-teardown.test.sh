@@ -5661,6 +5661,9 @@ EOF
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "docker-rm-fails: the rerun should finish: $(cat "$case_dir/stderr")"
   assert_absent "$case_dir/state/task-x1.meta" "docker-rm-fails: the rerun left the task record"
+  assert_equals "other_default supabase_network_vernant task-x1_shared " \
+    "$(docker_store_names "$case_dir/docker-store" network)" \
+    "docker-rm-fails: partial container removal lost derived network ownership on retry"
   pass "an owned container that cannot be removed stops teardown with the record kept, and a rerun finishes it"
 }
 
@@ -5690,16 +5693,18 @@ test_stopped_docker_daemon_blocks_teardown() {
   pass "an unavailable Docker daemon refuses teardown and retains task identity"
 }
 
-test_teardown_without_a_docker_binary_is_silent() {
-  local case_dir rc
+test_teardown_without_a_docker_binary_skips_docker_cleanup() {
+  local case_dir rc before
   case_dir=$(make_docker_case docker-absent)
+  before=$(cat "$case_dir/docker-store")
   rm -f "$case_dir/fakebin/docker"
   rc=0
   FM_TEARDOWN_TEST_PATH=$(fm_test_base_path_sans "$PATH" docker) \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "docker-absent: teardown without Docker should succeed: $(cat "$case_dir/stderr")"
-  assert_no_grep "ocker" "$case_dir/stderr" "docker-absent: teardown spoke about Docker though none is installed"
-  pass "a host without Docker tears down silently"
+  assert_absent "$case_dir/state/task-x1.meta" "docker-absent: task record was not retired"
+  assert_equals "$before" "$(cat "$case_dir/docker-store")" "docker-absent: Docker state changed"
+  pass "a host without Docker retires task records without changing Docker state"
 }
 
 test_docker_configured_supabase_identity_vetoes_all_heuristics() {
@@ -5820,6 +5825,80 @@ test_docker_mixed_project_carriers_spare_empty_heuristic_networks() {
   pass "foreign project carriers veto empty heuristic networks, all-owned projects propagate and explicit markers remain authoritative"
 }
 
+test_docker_latest_foreign_carriers_veto_network_removal() {
+  local case_dir store rc
+  case_dir=$(make_docker_case docker-latest-carriers)
+  store="$case_dir/docker-store"
+  : > "$store"
+  docker_store_add "$store" container c-exact own-exact "fm.task=task-x1;com.docker.compose.project=task-x1" ""
+  docker_store_add "$store" container c-derived own-derived "com.docker.compose.project=derived;com.docker.compose.project.working_dir=$case_dir/wt" ""
+  docker_store_add "$case_dir/arriving-containers" container c-foreign arriving-foreign \
+    "fm.task=other;com.docker.compose.project=task-x1;com.supabase.cli.project=derived" ""
+  docker_store_add "$store" network n-exact exact-compose "com.docker.compose.project=task-x1"
+  docker_store_add "$store" network n-supa exact-supabase "com.supabase.cli.project=task-x1"
+  docker_store_add "$store" network n-derived derived-compose "com.docker.compose.project=derived"
+  docker_store_add "$store" network n-derived-supa derived-supabase "com.supabase.cli.project=derived"
+  docker_store_add "$store" network n-marked explicitly-owned "fm.task=task-x1;com.docker.compose.project=derived"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_ADD_AFTER_RM="$case_dir/arriving-containers" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "latest-carriers: teardown failed: $(cat "$case_dir/stderr")"
+  assert_equals "arriving-foreign " "$(docker_store_names "$store" container)" \
+    "latest-carriers: foreign carrier was removed"
+  assert_equals "derived-compose derived-supabase exact-compose exact-supabase " "$(docker_store_names "$store" network)" \
+    "latest-carriers: latest foreign evidence was ignored or explicit marker was vetoed"
+  pass "foreign carriers observed after container removal veto both project-label heuristics but not explicit network markers"
+}
+
+test_standalone_secondmate_skips_docker_cleanup() {
+  local case_dir posture rc
+  for posture in ordinary forced; do
+    case_dir=$(make_case "docker-secondmate-$posture")
+    write_meta "$case_dir" local-only secondmate
+    mkdir -p "$case_dir/secondmate-home/state"
+    printf '%s\n' task-x1 > "$case_dir/secondmate-home/.fm-secondmate-home"
+    printf 'home=%s\n' "$case_dir/secondmate-home" >> "$case_dir/state/task-x1.meta"
+    rc=0
+    if [ "$posture" = forced ]; then
+      FM_FAKE_DOCKER_DOWN=1 FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+        run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      FM_FAKE_DOCKER_DOWN=1 FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+        run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    expect_code 0 "$rc" "$posture secondmate: teardown failed: $(cat "$case_dir/stderr")"
+    assert_absent "$case_dir/state/task-x1.meta" "$posture secondmate: supervisor record was not retired"
+    assert_absent "$case_dir/secondmate-home" "$posture secondmate: supervisor home was not removed"
+    assert_absent "$case_dir/docker.log" "$posture secondmate: standalone retirement contacted Docker"
+  done
+  pass "standalone secondmate retirement skips Docker even when the daemon is unavailable"
+}
+
+test_docker_project_record_failure_prevents_container_removal() {
+  local case_dir store rc before
+  case_dir=$(make_docker_case docker-project-record-failure)
+  store="$case_dir/docker-store"
+  : > "$store"
+  docker_store_add "$store" container c-own own-derived "com.docker.compose.project=derived;com.docker.compose.project.working_dir=$case_dir/wt" ""
+  docker_store_add "$store" network n-own derived-network "com.docker.compose.project=derived"
+  before=$(cat "$case_dir/state/task-x1.meta")
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$case_dir/fakebin/mv"
+  chmod +x "$case_dir/fakebin/mv"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" PATH="$case_dir/fakebin:$PATH" \
+    bash -c '. "$1/bin/fm-task-docker-lib.sh"; fm_task_docker_cleanup task-x1 "" 0 "" "$2" "$3"' \
+      _ "$ROOT" "$case_dir/state/task-x1.meta" "$case_dir/wt" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "project-record-failure: cleanup ignored failed record publication"
+  assert_equals "$before" "$(cat "$case_dir/state/task-x1.meta")" \
+    "project-record-failure: existing task metadata was changed"
+  assert_equals "own-derived " "$(docker_store_names "$store" container)" \
+    "project-record-failure: container was removed before its project identity was retained"
+  assert_equals "derived-network " "$(docker_store_names "$store" network)" \
+    "project-record-failure: network was removed after record failure"
+  pass "failed project-identity publication preserves the task record and container evidence"
+}
+
 test_docker_ambiguous_ids_trust_only_worktree_evidence() {
   local case_dir store rc
   case_dir=$(make_docker_case docker-ambiguous-id)
@@ -5833,8 +5912,8 @@ test_docker_ambiguous_ids_trust_only_worktree_evidence() {
   docker_store_add "$store" volume marked-volume "fm.task=task-x1"
   rc=0
   FM_FAKE_DOCKER_STORE="$store" PATH="$case_dir/fakebin:$PATH" \
-    bash -c '. "$1/bin/fm-task-docker-lib.sh"; fm_task_docker_cleanup task-x1 "" 1 "" "$2"' \
-      _ "$ROOT" "$case_dir/wt" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    bash -c '. "$1/bin/fm-task-docker-lib.sh"; fm_task_docker_cleanup task-x1 "" 1 "" "$2" "$3"' \
+      _ "$ROOT" "$case_dir/state/task-x1.meta" "$case_dir/wt" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "ambiguous-id: cleanup failed: $(cat "$case_dir/stderr")"
   assert_equals "exact-project marked-only task-x1-db " "$(docker_store_names "$store" container)" \
     "ambiguous-id: ambiguous identity authorized removal"
@@ -5850,8 +5929,9 @@ test_docker_all_failure_channels_retain_forced_tasks_until_retry() {
     store="$case_dir/docker-store"
     : > "$store"
     : > "$case_dir/state/task-x1.status"
-    docker_store_add "$store" container c-own owned-container "fm.task=task-x1" ""
-    docker_store_add "$store" network n-own owned-network "fm.task=task-x1"
+    docker_store_add "$store" container c-own owned-container "com.docker.compose.project=derived;com.supabase.cli.project=derived-supa;com.docker.compose.project.working_dir=$case_dir/wt" ""
+    docker_store_add "$store" network n-own owned-network "com.docker.compose.project=derived"
+    docker_store_add "$store" network n-supa owned-supa-project-network "com.docker.compose.project=derived-supa"
     docker_store_add "$store" volume owned-volume "fm.task=task-x1"
     cat > "$case_dir/fakebin/treehouse" <<EOF
 #!/usr/bin/env bash
@@ -5881,6 +5961,15 @@ EOF
     assert_present "$case_dir/wt" "$channel: worktree was removed"
     assert_absent "$case_dir/retired" "$channel: worktree return ran before confirmed Docker cleanup"
     assert_no_grep "teardown task-x1 complete" "$case_dir/stdout" "$channel: teardown falsely reported completion"
+    if [ "$channel" != initial-ps ]; then
+      assert_grep 'docker_projects= derived derived-supa' "$case_dir/state/task-x1.meta" \
+        "$channel: retained task record lost its derived project identities"
+    fi
+    if [ "$channel" = network-rm ]; then
+      assert_equals "" "$(docker_store_names "$store" container)" "$channel: regression requires container removal to succeed"
+      assert_equals "owned-network owned-supa-project-network " "$(docker_store_names "$store" network)" \
+        "$channel: regression requires derived networks to survive the first attempt"
+    fi
     rc=0
     FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
       > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
@@ -5901,10 +5990,10 @@ assert_forced_child_docker_cleanup_and_retry() {
   home="$case_dir/secondmate-home"
   store="$case_dir/docker-store"
   : > "$store"
-  docker_store_add "$store" container c-a owned-child-a "fm.task=child-a" ""
+  docker_store_add "$store" container c-a owned-child-a "fm.task=child-a;com.docker.compose.project=derived-child-a" ""
   docker_store_add "$store" container c-b owned-child-b "com.docker.compose.project=child-stack;com.docker.compose.project.working_dir=$case_dir/child-b-wt" ""
   docker_store_add "$store" container c-foreign foreign-child "fm.task=somebody-else" ""
-  docker_store_add "$store" network n-a child-a-network "fm.task=child-a"
+  docker_store_add "$store" network n-a child-a-network "com.docker.compose.project=derived-child-a"
   docker_store_add "$store" volume child-b-volume "fm.task=child-b"
   for child in child-a child-b; do
     if [ "$backend" = orca ]; then
@@ -5959,6 +6048,19 @@ EOF
   assert_present "$home/state/child-a.status" "$backend child: child status retired"
   assert_present "$case_dir/child-a-wt" "$backend child: child worktree removed"
   assert_absent "$case_dir/destructive.log" "$backend child: endpoint or worktree mutation preceded Docker cleanup"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_NETWORK_RM_FAIL=child-a-network \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/network-failure.stdout" 2> "$case_dir/network-failure.stderr" || rc=$?
+  expect_code 1 "$rc" "$backend child: failed network removal must refuse retirement"
+  assert_equals "foreign-child owned-child-b " "$(docker_store_names "$store" container)" \
+    "$backend child: regression requires child-a container removal to succeed"
+  assert_equals "child-a-network " "$(docker_store_names "$store" network)" \
+    "$backend child: failed derived network did not survive"
+  assert_grep 'docker_projects= derived-child-a' "$home/state/child-a.meta" \
+    "$backend child: derived network identity was not retained"
+  assert_present "$home/state/child-a.status" "$backend child: network failure retired status"
+  assert_absent "$case_dir/destructive.log" "$backend child: network failure allowed destructive cleanup"
   rc=0
   FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
     > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
@@ -6402,11 +6504,14 @@ test_teardown_removes_the_tasks_own_docker_stacks
 test_docker_removal_failure_keeps_the_task_records_until_a_rerun_succeeds
 test_forced_teardown_retains_records_after_a_docker_removal_failure
 test_stopped_docker_daemon_blocks_teardown
-test_teardown_without_a_docker_binary_is_silent
+test_teardown_without_a_docker_binary_skips_docker_cleanup
 test_docker_configured_supabase_identity_vetoes_all_heuristics
 test_docker_project_labels_require_the_exact_task_id
 test_docker_workdirs_canonicalize_and_exclude_foreign_lanes_and_tasktmp
 test_docker_mixed_project_carriers_spare_empty_heuristic_networks
+test_docker_latest_foreign_carriers_veto_network_removal
+test_standalone_secondmate_skips_docker_cleanup
+test_docker_project_record_failure_prevents_container_removal
 test_docker_ambiguous_ids_trust_only_worktree_evidence
 test_docker_all_failure_channels_retain_forced_tasks_until_retry
 test_forced_secondmate_cleans_each_child_docker_before_retirement_and_retries
