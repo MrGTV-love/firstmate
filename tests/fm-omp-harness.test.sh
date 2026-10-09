@@ -302,7 +302,7 @@ try {
   process.env.FM_JEV_GUARD_BASE_URL = `${base}/direct`;
   process.env.FM_JEV_GUARD_OPENROUTER_URL = `${base}/fallback`;
   const handlers = {};
-  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; } });
+  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
   const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
   if (process.env.PROJECT === "firstmate") {
     assert.equal(result?.block, true);
