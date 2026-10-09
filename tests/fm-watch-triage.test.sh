@@ -3103,7 +3103,8 @@ test_restated_wait_recheck_uses_last_surface_time() {
   local mode phase dir state fakebin out capture statusf window key throttle before pid wakes
   local kind harness command verdict line future
   future=$(iso_utc_at "$(( $(date +%s) + 31536000 ))")
-  for mode in live stopped secondmate secondmate-until secondmate-held busy busy-changing; do
+  for mode in live live-changing live-until live-changing-until stopped stopped-until \
+    secondmate secondmate-until secondmate-held busy busy-changing busy-until busy-changing-until; do
     dir=$(make_case "restated-cadence-$mode"); state="$dir/state"; fakebin="$dir/fakebin"
     out="$dir/watch.out"; capture="$dir/pane.txt"; statusf="$state/parked.status"
     window=test:fm-parked; key=$(printf '%s' "$window" | tr ':/.' '___')
@@ -3112,12 +3113,12 @@ test_restated_wait_recheck_uses_last_surface_time() {
     verdict='state: paused · source: status-log · parked'
     line='paused [key=k]: waiting on validation'
     case "$mode" in
-      stopped) command=zsh; verdict='state: stopped · source: pane · bare shell' ;;
+      stopped*) command=zsh; verdict='state: stopped · source: pane · bare shell' ;;
       secondmate*) kind=secondmate ;;
       busy*) harness=pi; command=pi; verdict='state: working · source: pane · harness busy (pi-ext)' ;;
     esac
     case "$mode" in
-      secondmate-until) line="paused [key=k]: waiting until $future" ;;
+      *-until) line="paused [key=k]: waiting until $future" ;;
       secondmate-held) line='captain-held [key=k]: awaiting the captain' ;;
     esac
     printf 'window=%s\nkind=%s\nharness=%s\nbackend=tmux\n' "$window" "$kind" "$harness" > "$state/parked.meta"
@@ -3141,7 +3142,7 @@ test_restated_wait_recheck_uses_last_surface_time() {
           before=$(file_mtime "$throttle")
           ;;
       esac
-      case "$mode" in busy-changing) printf 'Working... %s\n' "$phase" > "$capture" ;; esac
+      case "$mode" in *-changing*) printf 'Parked... %s\n' "$phase" > "$capture" ;; esac
       printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
       PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture" \
         FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_CREW_STATE="$verdict" \
@@ -3173,6 +3174,80 @@ test_restated_wait_recheck_uses_last_surface_time() {
     done
   done
   pass "restated waits recheck four hours after their last surface on every absorbed path"
+}
+
+test_restated_wait_preserves_fired_deadline_phase() {
+  local mode phase dir state fakebin out capture statusf window key throttle before pid wakes past
+  local kind harness command verdict
+  past=$(iso_utc_at "$(( $(date +%s) - 120 ))")
+  for mode in live live-changing stopped secondmate busy busy-changing; do
+    dir=$(make_case "restated-deadline-$mode"); state="$dir/state"; fakebin="$dir/fakebin"
+    out="$dir/watch.out"; capture="$dir/pane.txt"; statusf="$state/parked.status"
+    window=test:fm-parked; key=$(printf '%s' "$window" | tr ':/.' '___')
+    throttle="$state/.paused-resurfaced-$key"
+    kind=ship; harness=grok; command=grok
+    verdict='state: paused · source: status-log · parked'
+    case "$mode" in
+      stopped) command=zsh; verdict='state: stopped · source: pane · bare shell' ;;
+      secondmate) kind=secondmate ;;
+      busy*) harness=pi; command=pi; verdict='state: working · source: pane · harness busy (pi-ext)' ;;
+    esac
+    printf 'window=%s\nkind=%s\nharness=%s\nbackend=tmux\n' "$window" "$kind" "$harness" > "$state/parked.meta"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$state/parked.meta"
+    case "$mode" in busy*) record_pi_busy "$state" parked ;; esac
+    printf 'paused [key=k]: waiting on validation\n' > "$statusf"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$statusf"
+    printf 'parked on validation\n' > "$capture"
+    printf '%s' "$(hash_text "$(cat "$capture")")" > "$state/.hash-$key"
+    printf '1\n' > "$state/.count-$key"
+
+    for phase in initial deadline restated recheck deadline-restated; do
+      case "$phase" in
+        deadline|deadline-restated)
+          printf 'paused [key=k]: still waiting until %s\n' "$past" >> "$statusf"
+          set_mtime "$(( $(date +%s) - 480 ))" "$throttle"
+          ;;
+        restated|recheck)
+          printf 'paused [key=k]: still waiting on validation\n' >> "$statusf"
+          if [ "$phase" = restated ]; then
+            set_mtime "$(( $(date +%s) - 480 ))" "$throttle"
+          else
+            set_mtime "$(( $(date +%s) - 20000 ))" "$throttle"
+          fi
+          ;;
+      esac
+      [ "$phase" = initial ] || before=$(file_mtime "$throttle")
+      case "$mode" in *-changing) printf 'Parked... %s\n' "$phase" > "$capture" ;; esac
+      printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+      PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture" \
+        FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_CREW_STATE="$verdict" \
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+        FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+        FM_PAUSE_RESURFACE_SECS=14400 FM_BUSY_TURN_MAX_SECS=1 \
+        FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+        "$WATCH" >> "$out" &
+      pid=$!
+      case "$phase" in
+        restated|deadline-restated)
+          wait_poll_cycle "$state" "$pid" \
+            || { reap "$pid"; fail "[$mode] $phase reopened a fired deadline inside the four-hour cadence"; }
+          wakes=$(wedge_stale_wakes "$state" "$window")
+          [ "$wakes" -eq 0 ] || { reap "$pid"; fail "[$mode] $phase queued $wakes stale wakes"; }
+          [ "$(file_mtime "$throttle")" = "$before" ] \
+            || { reap "$pid"; fail "[$mode] $phase advanced the last actual surface time"; }
+          reap "$pid"
+          ;;
+        *)
+          wait_for_exit "$pid" 300 \
+            || { reap "$pid"; fail "[$mode] $phase did not surface when required: $(cat "$out"); $(cat "$state/.watch-triage.log" 2>/dev/null)"; }
+          wakes=$(wedge_stale_wakes "$state" "$window")
+          [ "$wakes" -eq 1 ] || fail "[$mode] $phase queued $wakes stale wakes instead of one"
+          ;;
+      esac
+      ack_stopped_cycle "$state" || fail "[$mode] could not acknowledge $phase"
+    done
+  done
+  pass "deadline rechecks expedite once and survive undated restatements and periodic rechecks"
 }
 
 test_live_paused_until_controls_recheck_time() {
@@ -6980,6 +7055,7 @@ test_absorbed_replacement_wait_does_not_inherit_the_old_throttle
 test_live_declared_wait_churn_honors_the_resurface_throttle
 test_live_keyed_wait_restatement_is_not_a_new_wait
 test_restated_wait_recheck_uses_last_surface_time
+test_restated_wait_preserves_fired_deadline_phase
 test_live_paused_until_controls_recheck_time
 test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
 test_wedge_threshold_keeps_a_wait_past_a_default_key_answer

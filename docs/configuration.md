@@ -3090,6 +3090,8 @@ FM_INBOX_ASK_MODEL=     # overrides config/inbox-ask-model for fm-inbox.sh ask
 FM_INBOX_PROFILE=       # overrides config/inbox-profile; explicitly empty forces ambient credentials
 ```
 
+Declared-wait rechecks use `FM_PAUSE_RESURFACE_SECS` from the last actual watcher surface, so same-key progress restatements cannot postpone the cadence. A declared `until` time expedites the first deadline recheck within that episode; omitting or repeating the deadline afterward does not reopen that phase, including after a periodic recheck. Future deadlines remain bounded by the same cadence for both stable and changing pane hashes.
+
 `fm-teardown.sh` retries only Git's `Unable to create '...index.lock': File exists` return failure up to `FM_TREEHOUSE_RETURN_LOCK_RETRIES` times.
 `FM_TREEHOUSE_RETURN_LOCK_RETRIES` accepts a nonnegative integer, and an unset, blank, or invalid value uses the default of 3.
 

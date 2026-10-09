@@ -1197,6 +1197,18 @@ secondmate_liveness_tick() {
 # below).
 FM_WEDGE_DEMAND_INSPECT_COUNT=${FM_WEDGE_DEMAND_INSPECT_COUNT:-3}
 
+resurface_scope() {
+  local throttle=$1 scope=$2
+  case "$scope" in
+    declared:*)
+      if [ "$(cat "$throttle" 2>/dev/null || true)" = "$scope:due" ]; then
+        scope="$scope:due"
+      fi
+      ;;
+  esac
+  printf '%s' "$scope"
+}
+
 # One bounded re-surface for a pane the watcher is deliberately absorbing, so no
 # absorb can rot invisibly. <age> is how long the current absorb has held and
 # <throttle> is the per-window marker whose mtime records the last re-surface, so
@@ -1207,6 +1219,7 @@ FM_WEDGE_DEMAND_INSPECT_COUNT=${FM_WEDGE_DEMAND_INSPECT_COUNT:-3}
 # drift apart; each caller owns its own marker and reason.
 resurface_absorbed() {  # <window> <throttle-marker> <age> <reason> [scope] [min-age]
   local win=$1 throttle=$2 age=$3 reason=$4 scope=${5-} min_age=${6:-$PAUSE_RESURFACE_SECS}
+  scope=$(resurface_scope "$throttle" "$scope")
   if [ ! -e "$throttle" ]; then
     [ "$age" -ge "$min_age" ] || return 0
   elif [ -z "$scope" ] || [ "$(cat "$throttle" 2>/dev/null || true)" = "$scope" ]; then
@@ -1895,8 +1908,9 @@ captain_call_declaration() {  # <task> <call-identity>
 # current PAUSE_RESURFACE_SECS. A pure read: recording an alarm is the caller's,
 # so the throttle is never advanced by a sighting it just absorbed.
 stale_wait_throttled() {  # <window-key> <declaration>
-  local throttle="$STATE/.paused-resurfaced-$1"
-  [ "$(cat "$throttle" 2>/dev/null || true)" = "$2" ] \
+  local throttle="$STATE/.paused-resurfaced-$1" scope
+  scope=$(resurface_scope "$throttle" "$2")
+  [ "$(cat "$throttle" 2>/dev/null || true)" = "$scope" ] \
     && [ "$(age_of "$throttle")" -lt "$PAUSE_RESURFACE_SECS" ]
 }
 
@@ -1915,6 +1929,7 @@ stale_wait_throttled() {  # <window-key> <declaration>
 # an alarm outright rather than delay it.
 stale_wait_record() {  # <window-key>
   [ -n "$STALE_WAIT_DECLARATION" ] || return 0
+  STALE_WAIT_DECLARATION=$(resurface_scope "$STATE/.paused-resurfaced-$1" "$STALE_WAIT_DECLARATION")
   printf '%s' "$STALE_WAIT_DECLARATION" > "$STATE/.paused-resurfaced-$1"
 }
 
@@ -1965,7 +1980,8 @@ surface_nonterminal_stale() {  # <window> <hash>
     if until=$(status_paused_until "$last"); then
       now=$(date +%s)
       if [ "$now" -lt "$until" ]; then
-        throttled=0
+        handle_paused_stale "$win" "$task" "$h"
+        return 0
       else
         STALE_WAIT_DECLARATION="$STALE_WAIT_DECLARATION:due"
         stale_wait_throttled "$key" "$STALE_WAIT_DECLARATION" && throttled=0
