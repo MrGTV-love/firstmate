@@ -1722,7 +1722,7 @@ if (scenario === "external") {
     await until(() => wakes().length === 1, "partial acknowledgement lost B", 20);
     expectWake(0, "check: trigger-2");
     if (wakes()[0].m.includes("check: trigger-1")) throw new Error("acknowledged A was replayed");
-  } else if (["failure", "timeout", "slow", "slow-turn", "slow-turn-new-row", "query-close"].includes(scenario)) {
+  } else if (["failure", "timeout", "slow", "slow-pending", "slow-turn", "slow-turn-new-row", "query-close"].includes(scenario)) {
     if (scenario === "query-close") acknowledge(drain());
     writeFileSync(`${state}/query-${scenario === "failure" ? "fail" : scenario === "timeout" ? "hang" : "slow"}`, "");
     await end();
@@ -1741,6 +1741,11 @@ if (scenario === "external") {
       await until(() => wakes().length === 1, "close during an empty query lost its mark");
       expectWake(0, "check: trigger-2");
       if (queries() < 2) throw new Error("new close reused the earlier empty snapshot");
+    } else if (scenario === "slow-pending") {
+      await until(() => existsSync(`${state}/query-started`), "slow query did not start");
+      queued = true;
+      await until(() => wakes().length === 1, "vendor queue appearing during query blocked owed work");
+      expectWake(0, "check: trigger-1");
     } else if (scenario.startsWith("slow-turn")) {
       await until(() => existsSync(`${state}/query-started`), "slow query did not capture A");
       idle = false;
@@ -1777,9 +1782,15 @@ if (scenario === "external") {
     }
   } else {
     if (scenario === "owed") { await fire("trigger-2"); await fire("trigger-3"); }
-    await end();
+    if (scenario.startsWith("advisor-tail")) {
+      queued = true;
+      editor = scenario === "advisor-tail-draft" ? "\noperator\u2063 draft\n\n" : "";
+    }
+    if (scenario === "advisor-tail") idle = true;
+    else await end();
     await until(() => wakes().length === 1, "owed row was not sent");
     expectWake(0, scenario === "utf8" ? "check: 船😀 café Ελληνικά" : "check: trigger-1");
+    if (scenario.startsWith("advisor-tail") && (editor !== (scenario === "advisor-tail-draft" ? "\noperator\u2063 draft\n\n" : "") || sets)) throw new Error("advisor-tail delivery touched operator draft bytes");
     if (scenario === "owed" && !wakes()[0].m.includes("and 2 more queued")) throw new Error("missing queued-row count");
     const wake = wakes()[0];
     const count = queries();
@@ -1854,6 +1865,20 @@ if (scenario === "external") {
       await until(() => wakes().length === 2, "outstanding token blocked B");
       expectWake(1, "check: trigger-2");
       if (editor !== original || sets) throw new Error("token release changed operator edits");
+    } else if (scenario.startsWith("advisor-tail")) {
+      queued = true;
+      await fire("trigger-2");
+      await handlers.get("before_agent_start")({ prompt: wake.m }, ctx);
+      await sleep(1500);
+      if (queries() !== count || wakes().length !== 1) throw new Error("pending vendor work did not serialize an outstanding watcher");
+      queued = false;
+      await accept(wake);
+      const first = drain();
+      await fire("trigger-3");
+      acknowledge(first);
+      await end();
+      await until(() => wakes().length === 2, "outstanding vendor queue release lost owed work");
+      expectWake(1, "check: trigger-3");
     } else {
       await accept(wake);
       acknowledge(drain());
@@ -1873,7 +1898,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed mixed same-close handoff late-handoff external host-drained host-owed outstanding-end dropped removed edited failure timeout slow slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued; do
+  for scenario in drained owed mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"

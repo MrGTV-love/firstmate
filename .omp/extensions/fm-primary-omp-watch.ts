@@ -891,10 +891,10 @@ export default function (pi: ExtensionAPI) {
     if (owner.flushing) return "held";
     owner.flushing = true;
     try {
-      if (!sessionIsIdle() || latestContext?.hasPendingMessages?.()) return "held";
+      if (!sessionIsIdle()) return "held";
       recoverRestoredWake(owner);
       releaseWatcherWakes(owner, true);
-      const outstanding = [...owner.unconsumedWakes].some(([token, wake]) => wake.pending && !operationalHandback(wake.pending.message) && !owner.heldWakes.has(token));
+      const outstanding = [...owner.unconsumedWakes].some(([token, wake]) => wake.pending && !operationalHandback(wake.pending.message) && (!owner.heldWakes.has(token) || latestContext?.hasPendingMessages?.()));
       if (outstanding || owner.heldWakes.size === 0) return "held";
       const held = [...owner.heldWakes.values()];
       const activity = sessionActivity;
@@ -909,7 +909,7 @@ export default function (pi: ExtensionAPI) {
       }
       if (!generationIsLive(owner)) return false;
       owner.queueReadFailures = 0;
-      if (activity !== sessionActivity || !sessionIsIdle() || latestContext?.hasPendingMessages?.()) return "held";
+      if (activity !== sessionActivity || !sessionIsIdle()) return "held";
       if (rows.length === 0) {
         for (const { pending } of held) retirePending(owner, pending);
         return "dropped";
