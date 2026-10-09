@@ -2011,6 +2011,192 @@ SH
   pass "interrupted default and done releases close finished work while explicit mode checks stay strict"
 }
 
+test_repeated_keyed_answer_resolves_its_own_hold() {
+  local home parent channel id mode interruption row show out open published body
+  local first_stamp=2026-07-14T12:00:00Z second_stamp=2026-07-15T12:00:00Z
+  for mode in default done; do
+    for interruption in interrupted ordinary; do
+      home=$(make_home "reheld-keyed-answer-$mode-$interruption")
+      parent=$(make_home "reheld-keyed-answer-parent-$mode-$interruption")
+      printf 'reheld-answer-mate\n' > "$home/.fm-secondmate-home"
+      printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+        > "$home/.fm-secondmate-parent"
+      printf -- '- reheld-answer-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+        "$home" > "$parent/data/secondmates.md"
+      fm_write_secondmate_meta "$parent/state/reheld-answer-mate.meta" "$home" \
+        "firstmate:fm-reheld-answer-mate" sample
+      channel="$parent/state/reheld-answer-mate.status"
+      id=sample-reheld-keyed-answer
+      tasks_in "$home" add "$id" "Investigate repeated answer recovery" \
+        --kind scout --repo sample --start >/dev/null || fail "could not create the re-held task"
+      write_origin_meta "$home" "$id"
+      mkdir -p "$home/data/$id"
+      printf 'done: report complete\n' > "$home/state/$id.status"
+      printf '# Re-held answer report\n' > "$home/data/$id/report.md"
+      FM_CAPTAIN_HOLD_NOW="$first_stamp" run_captain "$home" hold "$id" \
+        --reason "captain initial report choice pending" >/dev/null \
+        || fail "could not open the first hold"
+      complete_through_sibling "$home" "$id" >/dev/null \
+        || fail "could not complete the re-held task's inventory"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_contains "$open" "captain-hold-$id-1" "the first parent decision did not open"
+      row=$(printf '%s\tgo\tProceed' "$id")
+      [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "reheld answer fixture" 2>&1) \
+        || fail "the first keyed answer failed: $out"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: in_flight" "the first answer completed live work"
+      assert_contains "$show" "held: no" "the first answer did not release live work"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      printf '%s\n' "$body" | jq -j 'split("\n\n")[0:2] | join("\n\n")' > "$home/first-resolution.txt"
+      assert_equals 1 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+        "the first answer wrote duplicate records"
+      assert_contains "$show" "Resolution mode: released\\nResolves hold set: $first_stamp" \
+        "the first release did not identify its hold"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the first parent decision remained open"
+      assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-1]" \
+        "the first release did not publish its resolution"
+      FM_CAPTAIN_HOLD_NOW="$second_stamp" run_captain "$home" hold "$id" \
+        --reason "captain revised report choice pending" >/dev/null \
+        || fail "could not open the second hold"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_contains "$open" "captain-hold-$id-2" "the second parent decision did not open"
+      if [ "$interruption" = interrupted ]; then
+        cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = unhold ] && [ "${2:-}" = sample-reheld-keyed-answer ] \
+  && [ ! -e "$FM_HOME/unhold-failed-once" ]; then
+  : > "$FM_HOME/unhold-failed-once"
+  exit 93
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+        chmod +x "$home/fakebin/tasks-axi"
+        if printf '%s\n' "$row" | run_captain "$home" answers \
+          --source "reheld answer fixture" > "$home/answer.out" 2> "$home/answer.err"; then
+          fail "the interrupted second release reported success"
+        fi
+        show=$(tasks_in "$home" show "$id" --full)
+        assert_contains "$show" "state: in_flight" "the failed second release completed live work"
+        assert_contains "$show" "held: yes" "the failed second release lost its hold"
+        body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+        assert_equals 2 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+          "the repeated live answer did not record the second hold's own answer"
+        assert_contains "$show" "Resolution mode: released\\nResolves hold set: $second_stamp" \
+          "the second release did not identify its hold"
+      fi
+      REAL_TASKS_AXI="$TASKS_AXI_BIN" run_teardown "$home" "$id" \
+        > "$home/teardown.out" 2> "$home/teardown.err" \
+        || fail "cleanup of the re-held task failed: $(cat "$home/teardown.err")"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: queued" "cleanup did not queue the re-held finished work"
+      assert_contains "$show" "held: yes" "cleanup released the second hold"
+      assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "reheld answer fixture" 2>&1) \
+        || fail "the repeated answer did not complete the second hold: $out"
+      assert_contains "$out" "closed: $id" "the second hold was not reported resolved"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: done" "the repeated answer made finished work runnable"
+      assert_contains "$show" "held: no" "the repeated answer left the second hold active"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      assert_equals 2 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+        "the completed second hold did not keep exactly two resolution records"
+      printf '%s\n' "$body" | jq -e --arg stamp "$second_stamp" \
+        'startswith("Resolution recorded by fm-captain-hold.\n") and
+         (split("\n")[2:4] == ["Resolution mode: answered", "Resolves hold set: " + $stamp])' \
+        >/dev/null || fail "the newest record did not close the second hold"
+      printf '%s\n' "$body" | jq -j \
+        '("Resolution recorded by fm-captain-hold." + (split("Resolution recorded by fm-captain-hold.")[2])) | split("\n\n")[0:2] | join("\n\n")' \
+        > "$home/preserved-resolution.txt"
+      cmp -s "$home/first-resolution.txt" "$home/preserved-resolution.txt" \
+        || fail "the second hold changed the first resolution's bytes"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the first parent decision reopened"
+      assert_not_contains "$open" "captain-hold-$id-2"$'\t' "the second parent decision remained open"
+      published=$(cat "$channel")
+      assert_contains "$published" "resolved [key=captain-hold-$id-2]" \
+        "the second hold did not resolve its own parent key"
+      assert_not_contains "$published" "captain-hold-$id-3" "the second hold invented a third parent key"
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "reheld answer fixture" 2>&1) \
+        || fail "the completed second hold could not replay: $out"
+      assert_contains "$out" "closed: $id" "the completed replay was not idempotent"
+      assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+        "the completed replay changed resolution history"
+      assert_equals "$published" "$(cat "$channel")" "the completed replay changed parent keys"
+    done
+  done
+  pass "repeated default and done answers preserve prior holds and resolve the current parent decision"
+}
+
+test_legacy_keyed_release_requires_explicit_closure() {
+  local home id mode row show body out
+  for mode in default done; do
+    home=$(make_home "legacy-keyed-release-$mode")
+    id=sample-legacy-keyed-release
+    tasks_in "$home" add "$id" "Investigate legacy answer recovery" \
+      --kind scout --repo sample --start >/dev/null || fail "could not create the legacy release task"
+    write_origin_meta "$home" "$id"
+    mkdir -p "$home/data/$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Legacy answer report\n' > "$home/data/$id/report.md"
+    FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold "$id" \
+      --reason "captain initial report choice pending" >/dev/null || fail "could not open the legacy first hold"
+    complete_through_sibling "$home" "$id" >/dev/null || fail "could not complete the legacy task inventory"
+    row=$(printf '%s\tgo\tProceed' "$id")
+    [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+    printf '%s\n' "$row" | run_captain "$home" answers --source "legacy release fixture" >/dev/null \
+      || fail "could not release the legacy first hold"
+    FM_CAPTAIN_HOLD_NOW=2026-07-15T12:00:00Z run_captain "$home" hold "$id" \
+      --reason "captain revised report choice pending" >/dev/null || fail "could not open the legacy second hold"
+    cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = unhold ] && [ "${2:-}" = sample-legacy-keyed-release ] \
+  && [ ! -e "$FM_HOME/unhold-failed-once" ]; then
+  : > "$FM_HOME/unhold-failed-once"
+  exit 93
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+    chmod +x "$home/fakebin/tasks-axi"
+    if printf '%s\n' "$row" | run_captain "$home" answers --source "legacy release fixture" \
+      > "$home/answer.out" 2> "$home/answer.err"; then
+      fail "the interrupted legacy release reported success"
+    fi
+    show=$(tasks_in "$home" show "$id" --full)
+    body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+    printf '%s\n' "$body" | jq -j 'sub("Resolves hold set: 2026-07-15T12:00:00Z\n"; "")' \
+      > "$home/legacy-body.txt"
+    tasks_in "$home" update "$id" --body-file "$home/legacy-body.txt" >/dev/null \
+      || fail "could not install the persisted legacy record"
+    REAL_TASKS_AXI="$TASKS_AXI_BIN" run_teardown "$home" "$id" \
+      > "$home/teardown.out" 2> "$home/teardown.err" \
+      || fail "cleanup of the legacy release failed: $(cat "$home/teardown.err")"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: queued" "cleanup did not retain legacy finished work"
+    assert_contains "$show" "held: yes" "cleanup released the legacy hold"
+    assert_absent "$home/state/$id.meta" "cleanup left the legacy worker record behind"
+    if out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "legacy release fixture" 2>&1); then
+      fail "an ambiguous legacy release was automatically completed"
+    fi
+    assert_contains "$out" "close it with reconcile or a direct answer" \
+      "the legacy retry did not give safe closure guidance"
+    assert_not_contains "$out" "retry with --release" "the legacy retry advised reopening finished work"
+    assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+      "the legacy retry rewrote history or changed task state"
+    printf 'Captain explicitly closes this finished report.\n' > "$home/close.txt"
+    run_captain "$home" answer "$id" --decision-file "$home/close.txt" >/dev/null \
+      || fail "a fresh direct answer could not close the legacy hold"
+    assert_contains "$(tasks_in "$home" show "$id" --full)" "state: done" \
+      "the explicit legacy closure did not complete finished work"
+  done
+  pass "ambiguous legacy default and done releases require explicit closure without rewriting history"
+}
+
 # Answer-time closure is opt-in per source. A channel with no binding must behave
 # exactly as it always did: capture, announce, close nothing.
 # A reconcile is "go re-check reality", never the captain's answer. The value is
@@ -5000,6 +5186,8 @@ test_bound_channel_answers_close_at_answer_time
 test_keyed_answer_releases_a_live_work_item
 test_keyed_answer_waits_for_cleanup_before_selecting_its_mode
 test_interrupted_keyed_release_closes_after_teardown
+test_repeated_keyed_answer_resolves_its_own_hold
+test_legacy_keyed_release_requires_explicit_closure
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open

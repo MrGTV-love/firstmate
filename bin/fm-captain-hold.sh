@@ -200,6 +200,7 @@
 # reconciled. Records written by the retired fm-decision-hold.sh (routed,
 # declined, answered, repaired) are recognized everywhere a record is read, so
 # nothing already closed needs rewriting.
+# `Resolves hold set:` associates a resolution with its hold-set stamp.
 #
 # Parent channel: inside a secondmate home a task held for the captain, and its
 # answer, are captain-facing facts the moment they are recorded, so `hold`
@@ -506,6 +507,20 @@ recorded_resolution_mode() {  # <task-body>
   printf '%s' "$rest"
 }
 
+recorded_resolved_hold_set() {
+  local body
+  body=$(decode_shown_value "$1") || return 1
+  printf '%s\n' "$body" | awk '
+    /^Resolution mode: / {
+      if (getline > 0 && /^Resolves hold set: /) {
+        sub(/^Resolves hold set: /, "")
+        print
+      }
+      exit
+    }
+  '
+}
+
 closed_answer_replay_mode_compatible() {  # <mode> <task-body>
   case "$1" in
     answered|repaired|routed) return 0 ;;
@@ -516,11 +531,13 @@ closed_answer_replay_mode_compatible() {  # <mode> <task-body>
 # The record's label is what keeps an evidence-backed reconciliation from
 # reading as the captain's own words. `reconciled` closes a call that went moot
 # and carries verified evidence; every other mode carries what the captain said.
-resolution_block() {  # <mode>
+resolution_block() {
   local label='Captain decision:'
   [ "$1" != reconciled ] || label='Reconciliation evidence:'
-  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n\n%s\n%s\n' \
-    "$DECISION_DIGEST" "$1" "$label" "$DECISION_TEXT"
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n' \
+    "$DECISION_DIGEST" "$1"
+  [ -z "$2" ] || printf 'Resolves hold set: %s\n' "$2"
+  printf '\n%s\n%s\n' "$label" "$DECISION_TEXT"
 }
 
 # Durable state of one captain call: an active captain hold (annotations
@@ -1018,10 +1035,10 @@ command_hold() {
 # Successful closure removes the stamp to restore resolution-first ordering.
 write_resolution_record() {  # <task-id> <mode> <shown-body>
   local id=$1 mode=$2 body=$3 new_body tmp hold_set
-  new_body=$(resolution_block "$mode")
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   hold_set=$(body_hold_set_timestamp "$body")
+  new_body=$(resolution_block "$mode" "$hold_set")
   if [ -n "$hold_set" ]; then
     body=${body#"Captain hold set: $hold_set"}
     case "$body" in
@@ -1114,6 +1131,7 @@ remove_interrupted_answer_stamp() {  # <task-id>
 
 command_answer() {
   local id=${1:-} decision_file='' release=0 auto_release=0 show state hold_kind body outcome recorded_mode occurrence corrected_body tmp
+  local cur resolved_hold_set
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -1184,13 +1202,20 @@ command_answer() {
   fi
 
   if [ "$hold_kind" = captain ]; then
+    cur=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
+    resolved_hold_set=$(recorded_resolved_hold_set "$body")
     if body_has_resolution_record "$body" \
-      && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
+      && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
+      && { [ -z "$resolved_hold_set" ] \
+        || { [ -n "$cur" ] && [ "$resolved_hold_set" = "$cur" ]; }; }; then
       recorded_mode=$(recorded_resolution_mode "$body" || true)
       case "$recorded_mode" in
         released)
           if [ "$release" = 0 ]; then
             [ "$auto_release" = 1 ] || fail "task $id records this answer as a release; retry with --release"
+            if [ -z "$resolved_hold_set" ]; then
+              fail "task $id records this answer as a release; close it with reconcile or a direct answer"
+            fi
             corrected_body=$(decode_shown_value "$body") \
               || fail "could not decode the existing body for $id"
             corrected_body=${corrected_body/$'\nResolution mode: released\n'/$'\nResolution mode: answered\n'}
