@@ -271,6 +271,9 @@ case "${1-}" in ''|-h|--help|help) usage ;; esac
 
 REG=$(fm_procevent_registry_dir "$STATE")
 MAX_OUTPUT_BYTES=${FM_PROCEVENT_MAX_OUTPUT_BYTES:-1048576}
+# Longest release_start_claim keeps retrying a process-group inspection that
+# stays uncertain before it leaves the claim for reconciliation.
+RELEASE_UNCERTAIN_SECONDS=10
 EXTENSION_HOST="$SCRIPT_DIR/fm-extension.mjs"
 EXTENSION_LIFECYCLE_LOCK="$REG/.extension-binding-lifecycle.lock"
 
@@ -893,7 +896,7 @@ EOF
       esac
     fi
     unset FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
-    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || { fm_procevent_source_lock_release "$id"; return 1; }
     if awk -F '\t' -v key="procevent:$id:$seq" \
       'NF >= 5 && $3 == "check" && $4 == key { found=1; exit } END { exit !found }' \
       "$FM_WAKE_QUEUE" 2>/dev/null; then
@@ -1121,14 +1124,17 @@ cmd_start() {
     trap '' INT TERM HUP
     extension_lifecycle_lock_release 2>/dev/null || true
     [ -z "$STAGED_OUTPUT" ] || rm -f -- "$STAGED_OUTPUT"
+    local gone uncertain_deadline=
     while :; do
-      runner_group_children_gone "$CLAIM_PID" 0
-      case "$?" in
+      gone=0
+      runner_group_children_gone "$CLAIM_PID" 0 || gone=$?
+      case "$gone" in
         0) break ;;
         1)
           if runner_group_signal TERM "$CLAIM_PID" "$CLAIM_IDENTITY"; then
-            runner_group_children_gone "$CLAIM_PID" 2
-            case "$?" in
+            gone=0
+            runner_group_children_gone "$CLAIM_PID" 2 || gone=$?
+            case "$gone" in
               0) break ;;
               1)
                 # This escalation retains the live-leader proof from our TERM.
@@ -1140,6 +1146,15 @@ cmd_start() {
           fi
           ;;
       esac
+      if [ "$gone" -eq 1 ]; then
+        uncertain_deadline=
+      else
+        # Inspection that stays uncertain proves nothing about the children.
+        # Stop retrying after a bound and keep the claim for reconciliation,
+        # the same outcome as the KILL branch; never release on a guess.
+        [ -n "$uncertain_deadline" ] || uncertain_deadline=$((SECONDS + RELEASE_UNCERTAIN_SECONDS))
+        [ "$SECONDS" -lt "$uncertain_deadline" ] || return 0
+      fi
       sleep 0.1
     done
     fm_procevent_source_lock_try_acquire "$CLAIM_ID" 2>/dev/null || return 0
@@ -1990,9 +2005,6 @@ confirm_launched_runners() {  # <id><TAB><registration-identity><TAB><stamp-befo
       rest=${rest#*$'\t'}
       before=${rest%%$'\t'*}
       ! launch_stamp_advanced "$id" "$identity" "$before" || continue
-      if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
-        continue
-      fi
       if generation_is_listening "$id" "$identity"; then
         continue
       fi
@@ -2110,9 +2122,6 @@ cmd_ensure_listening() {
   deadline=$((SECONDS + 10#$window + 1))
   while :; do
     ! launch_stamp_advanced "$id" "$identity" "$before" || return 0
-    if [ "$final_read" -eq 1 ]; then
-      ! launch_stamp_advanced "$id" "$identity" "$before" || return 0
-    fi
     listening=0
     generation_is_listening "$id" "$identity" || listening=$?
     [ "$listening" -ne 0 ] || return 0
