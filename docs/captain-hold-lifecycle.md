@@ -270,8 +270,9 @@ The Lavish adapter splits each capture between two commands:
 | `reconciles` | Only task ids whose structured selection is Reconcile, carrying their notes as request provenance. |
 
 Current rows require the versioned shape and the `choice` tag.
-A time-limited rollout branch accepts ordinary answers from the old question/answer shape.
-That branch refuses the old shape's bare and separator-annotated reconcile values from both intakes, because those rows do not separate the selected option from its note.
+Unversioned rows without `schema` or `selection` accept a nonempty `answer` (or `choice`), optional notes, and bookkeeping fields.
+The latest structurally valid choice per question replaces earlier choices before either output is selected, including across versioned and legacy rows.
+Legacy bare and separator-annotated reconcile values suppress earlier choices but feed neither intake, because those rows do not separate the selected option from its note.
 Every other structurally uncertain capture feeds neither intake, remains announced, and cannot forge a task id from freeform prose.
 
 The adapter-agnostic runner pipes reconcile rows into `reconcile-requests` only for a bound source.

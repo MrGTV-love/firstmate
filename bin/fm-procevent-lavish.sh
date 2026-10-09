@@ -824,7 +824,6 @@ cmd_choice_rows() {
         $note = defined($data->{note}) ? $data->{note} : "";
         next if !defined($key) || ref($key) || !defined($answer) || ref($answer) || ref($note);
         next unless length($answer) && length($answer) <= 512;
-        next if $answer eq "reconcile" || index($answer, "reconcile - ") == 0;
         $selected = "";
         $legacy = 1;
       } else {
@@ -851,6 +850,8 @@ cmd_choice_rows() {
       };
     }
     for my $choice (grep { defined } @choices) {
+      next if $choice->{legacy} && ($choice->{answer} eq "reconcile"
+        || index($choice->{answer}, "reconcile - ") == 0);
       if ($selection eq "reconciles") {
         next if $choice->{legacy};
         if ($choice->{selection} eq "reconcile") {

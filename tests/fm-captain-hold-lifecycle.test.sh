@@ -1770,11 +1770,12 @@ test_unversioned_deck_shapes_with_extra_fields_still_route() {
 session:
   file: /deck.html
   status: feedback
-prompts[11]{uid,prompt,selector,tag,text}:
+prompts[12]{uid,prompt,selector,tag,text}:
   "1","Plain\n\nContext data:\n{\n  \"question\": \"sample-plain-note\",\n  \"answer\": \"A-upstream-optin\",\n  \"note\": \"\"\n}","html > body > form",choice,"Path: A-upstream-optin"
   "2","Extras\n\nContext data:\n{\n  \"question\": \"sample-extra-fields\",\n  \"answer\": \"A\",\n  \"note\": \"\",\n  \"recommended\": \"A\",\n  \"task\": \"some-task\",\n  \"owner\": \"some-lane\",\n  \"decision_key\": \"some-key\",\n  \"mixing\": \"yes\"\n}","form",choice,"Extras: A"
   "3","Other\n\nContext data:\n{\n  \"question\": \"sample-note-text\",\n  \"answer\": \"Other: see note\",\n  \"note\": \"Edit the plan first\"\n}","form",choice,"Other"
   "4","Choice alias\n\nContext data:\n{\n  \"question\": \"sample-choice-alias\",\n  \"decision_key\": \"some-key\",\n  \"level\": null,\n  \"choice\": \"B (published examples)\",\n  \"note\": \"\"\n}","form",choice,"Alias: B"
+  "previous","Earlier answer\n\nContext data:\n{\n  \"question\": \"sample-note-reconcile\",\n  \"answer\": \"A\"\n}","form",choice,"Earlier: A"
   "5","Reconcile with note field\n\nContext data:\n{\n  \"question\": \"sample-note-reconcile\",\n  \"answer\": \"reconcile\",\n  \"note\": \"check first\"\n}","form",choice,"Reconcile"
   "6","Annotated reconcile value\n\nContext data:\n{\n  \"question\": \"sample-note-reconcile\",\n  \"answer\": \"reconcile - check first\",\n  \"note\": \"\"\n}","form",choice,"Reconcile"
   "7","Qualified key\n\nContext data:\n{\n  \"question\": \"some-lane/sample-qualified\",\n  \"answer\": \"A\",\n  \"owner\": \"some-lane\"\n}","form",choice,"Qualified"
@@ -1819,6 +1820,57 @@ EOF
   assert_contains "$show" "state: queued" "a reconcile value carrying a note field closed its call"
   assert_contains "$show" "held: yes" "a reconcile value carrying a note field released its call"
   pass "unversioned deck shapes with extra fields still route as the captain's answer"
+}
+
+test_legacy_reconcile_replaces_previous_choices() {
+  local home result field value previous first second out
+  home=$(make_home legacy-reconcile-last-choice)
+  result="$home/last-choice.result"
+  for field in answer choice; do
+    for value in reconcile "reconcile - check first"; do
+      for previous in legacy-answer legacy-choice versioned-answer versioned-reconcile; do
+        case "$previous" in
+          legacy-answer) first='\"answer\": \"A\"' ;;
+          legacy-choice) first='\"choice\": \"A\"' ;;
+          versioned-answer) first='\"schema\": \"fm-bearings-answer.v1\", \"selection\": \"A\", \"note\": \"\"' ;;
+          versioned-reconcile) first='\"schema\": \"fm-bearings-answer.v1\", \"selection\": \"reconcile\", \"note\": \"earlier request\"' ;;
+        esac
+        second="\\\"$field\\\": \\\"$value\\\", \\\"note\\\": \\\"check first\\\""
+        cat > "$result" <<EOF
+prompts[3]{prompt,tag,text}:
+  "Context data:\n{\"question\": \"sample-call\", $first}",choice,"Earlier"
+  "Context data:\n{\"question\": \"sample-call\", $second}",choice,"Latest"
+  "Context data:\n{\"question\": \"sample-other\", \"answer\": \"B\"}",choice,"Other: B"
+EOF
+        out=$(run_lavish "$home" answers "$result") || fail "could not extract last legacy choice"
+        assert_equals "sample-other	B	Other: B" "$out" \
+          "$field $value did not suppress $previous without affecting another question"
+        out=$(run_lavish "$home" reconciles "$result") || fail "could not extract reconcile choices"
+        assert_equals "" "$out" "$field $value left a superseded reconcile request"
+
+        cat > "$result" <<EOF
+prompts[2]{prompt,tag,text}:
+  "Context data:\n{\"question\": \"sample-call\", $second}",choice,"Earlier"
+  "Context data:\n{\"question\": \"sample-call\", $first}",choice,"Latest"
+EOF
+        out=$(run_lavish "$home" answers "$result") || fail "could not extract reversed choices"
+        if [ "$previous" = versioned-reconcile ]; then
+          assert_equals "" "$out" "a final versioned reconcile reached answers"
+        else
+          assert_equals "sample-call	A	Latest" "$out" \
+            "an earlier legacy reconcile suppressed the final $previous"
+        fi
+        out=$(run_lavish "$home" reconciles "$result") || fail "could not extract reversed reconciles"
+        if [ "$previous" = versioned-reconcile ]; then
+          assert_equals "sample-call	earlier request" "$out" \
+            "an earlier legacy reconcile suppressed the final versioned reconcile"
+        else
+          assert_equals "" "$out" "a superseded legacy reconcile reached requests"
+        fi
+      done
+    done
+  done
+  pass "legacy reconcile replaces earlier choices before either intake is selected"
 }
 
 # Answer-time closure is opt-in per source. A channel with no binding must behave
@@ -4767,6 +4819,7 @@ test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
 test_unversioned_deck_shapes_with_extra_fields_still_route
+test_legacy_reconcile_replaces_previous_choices
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open
