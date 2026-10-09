@@ -51,8 +51,9 @@ It works in this order:
 
 1. It uses an existing task, or creates one when nothing exists to hold.
 2. It records the task's UTC hold-set timestamp as the leading line of the task body.
-3. It invokes the underlying tasks-axi hold operation.
-4. It verifies both records.
+3. When `--origin` is supplied, it records the origin on the task, replacing any previous association.
+4. It invokes the underlying tasks-axi hold operation.
+5. It verifies the hold and timestamp.
 
 Publishing the stamp first ensures a snapshot cannot observe a newly captain-held task without the timestamp that defines its age.
 
@@ -62,6 +63,10 @@ Repeat and edge cases:
 - Re-holding released work starts a new timestamped lifecycle.
 - A closed task is refused rather than reopened.
 - `--until` stores the captain's own deferral date through tasks-axi's date gate.
+- Before the backend hold runs, `--origin` records the origin the call is held for on its own `Captain hold origin:` body line, which `complete` and `verify` check using backend identities rather than alias spellings.
+  If that write fails, the backend hold is not attempted.
+- The reason may contain parentheses, semicolons, quotes, and line breaks.
+  [`bin/fm-hold-reason-lib.sh`](../bin/fm-hold-reason-lib.sh) owns the storage encoding and compatibility rules; [`bin/fm-tasks-axi.sh --help`](../bin/fm-tasks-axi.sh) owns the public read commands and output contract.
 
 ### Answering a call (`answer`)
 
@@ -85,9 +90,7 @@ A matching retry also completes any resolution-first normalization left unfinish
 
 ### Answer retries and tasks closed elsewhere
 
-- An exact retry is idempotent only when the requested close mode matches the newest record.
-- A drifted answer or a mode mismatch is rejected.
-- A re-held task accepts a new answer as a new record on top.
+[`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns direct-answer retry compatibility; [answer-time resolution](#answer-time-resolution) explains automatic recovery.
 
 On a task closed outside the script, `answer` records the missing block only when the captain-hold annotations tasks-axi preserves through a close prove the captain owned it.
 It also verifies the task stays closed.
@@ -103,6 +106,10 @@ A post-teardown visual review can complete against the surviving report and dura
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.
 Before recording completion, `complete` verifies every listed task against tasks-axi.
+The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
+For a historical inventory that names its own origin, hold a separate captain task with `--origin`, replace only the invalid entry in the final `decision_keys=` line of the origin metadata with that task id while preserving all other entries, and re-run `complete`.
+An entry whose recorded origin differs from the one being completed is refused.
+An entry with no recorded origin, such as a hold made before origins were recorded or without `--origin`, is accepted on the durability check alone and named in the output.
 
 With a non-empty inventory, `complete` appends a `captain-held [key=<key>]` transfer event for every still-open keyed status decision.
 The event names the reviewed inventory.
@@ -114,7 +121,7 @@ Scout teardown calls the read-only `verify` subcommand after checking for the re
 `verify` checks three things:
 
 - The recorded attestation exists.
-- Every recorded inventory entry is still durable: actively captain-held, or carrying a recorded answer.
+- Every recorded inventory entry still passes the [completion inventory checks](#recording-a-reviewed-inventory-complete).
 - No keyed status decision opened after the last `complete`.
 
 A keyed status decision opened after the last `complete` makes `verify` fail, and re-running `complete` is the repair.
@@ -140,6 +147,7 @@ After cleanup, and still under the task's own lock, teardown does three things:
 
 - It records one `Deliverable of the finished work: ...` line at the end of the task body.
 - It copies a supported pull request or canonical `data/<id>/report.md` into the row's structured artifact fields.
+  A Gerrit change URL is not a pull request tasks-axi accepts, so it appears only in the deliverable line.
 - It runs `tasks-axi reopen`.
 
 The row returns to Queued with its hold intact.
@@ -149,7 +157,8 @@ It remains on the appropriate Captain's Call or Charted Next decision surface in
 
 The interrupted close/retention marker's publication and replay safety gates are owned by [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh)'s CRASH RECOVERY header.
 
-If the captain answers before replay, `answer` validates that record and copies any supported retained pull request or report into the row before closing it.
+If a direct answer closes the row before replay, `answer` validates that record and copies any supported retained pull request or report into the row before closing it.
+A retained Gerrit change URL is instead recorded as a `Gerrit change <url>` note on that close.
 Replay then retires the record.
 
 ### Known retained-delivery gaps
@@ -162,7 +171,7 @@ They are recorded for separate upstream work rather than representing defects in
 - A relocated retained report cannot reach the row, because tasks-axi accepts only `data/<id>/report.md`.
   `done` reports `Task report link must be a data/<id>/report.md path`, and `update` reports `--report must be a data/<id>/report.md path`.
 
-When an interrupted retention leaves such a relocated report in the validated pending-close record, `answer` skips only that known-unsupported row artifact and closes normally.
+When an interrupted retention leaves such a relocated report in the validated pending-close record, `answer`, or cleanup replay converting retention to completion after a release, skips only that known-unsupported row artifact and closes normally.
 The delivery then remains absent from Recently Landed instead of wedging the captain's answer.
 
 A pending-close record that fails validation outright is a different case, and it still refuses the answer.
@@ -178,31 +187,24 @@ Only `answer` with the captain's words or evidence-backed `reconcile close` reso
 
 "A keyed answer resolves its matching captain-held task" is one capability with one owner.
 `answers` is its channel-agnostic entry point.
-It reads `<task-id>\t<answer>\t<label>[\t<mode>]` lines and resolves each named task through the same `answer` path.
+[`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns keyed input syntax, card-declared modes, replay compatibility, per-key output, and exit status.
 Every guard therefore applies identically no matter which channel the answer arrived on.
 
-The optional mode column carries a card-declared close:
+Automatic resolution chooses whether to release or complete from fresh state under the task control lock shared with teardown.
+A task whose worker still owns it, shown by an existing runtime record or an In flight backlog row, is released rather than completed.
+If teardown finishes first and returns the held item to Queued without a runtime record, the answer closes it.
+Completing live work would record a landing that has not happened, so cleanup remains responsible for completion; its [recovery owner](../bin/fm-backlog-transition-lib.sh) describes replay after a resolved hold.
+A replay of that answer on an unheld, open item after the worker has ended stays a release.
+Resolution records are never changed after they are written.
+If a release was recorded but interrupted before lifting the hold, an automatic retry after teardown completes the finished held item without unholding it, leaving the record as `released`, only when its `Resolves hold set:` stamp identifies the currently open hold; the occurrence and parent decision key stay unchanged across retries.
+A new hold receives its stamp under the task control lock and cannot reuse the newest resolution's associated stamp; a colliding `FM_CAPTAIN_HOLD_NOW` is refused.
+A repeated answer on a re-held task is recorded as that hold's own answer, preserving prior resolution records.
+An exact automatic answer replay after cleanup reaches Done preserves the recorded release and completed state while finishing parent publication and reconcile-request retirement.
+An ambiguous legacy release without a hold association on finished, still-held work must be closed through reconciliation or a fresh direct answer rather than automatically completed.
+Explicit direct-answer callers retain their strict mode checks.
+Replay classification, parent publication, and reconcile-request retirement share the task control lock.
+A released-row snapshot invalidated by a concurrent hold is skipped without resolving that hold or retiring its reconcile request.
 
-| Mode | Effect |
-| --- | --- |
-| `done` (default) | Completes the task. |
-| `release` | Lifts the hold so held work resumes. |
-| Any other value | Skipped. |
-
-The live task record overrides the column.
-A task whose worker still owns it, shown by a live runtime record or an In flight backlog row, is always released, whatever mode the card declared.
-Completing it would record a landing that has not happened, so only cleanup closes it.
-A replay of that answer after the worker has ended stays a release.
-
-Each key is reported as follows:
-
-| Key | Result |
-| --- | --- |
-| Names no task, names a task that is not captain-held, or names a task already closed | Reported as `skipped:` and feeds nothing. |
-| A replay whose answer and requested close mode match the newest record | An idempotent `closed:`. |
-| A replay with a mode mismatch | Skipped. |
-
-The command exits nonzero when any key was skipped.
 `--source` is provenance text recorded in the durable decision, never a behavior switch, and the command carries no per-channel branch.
 
 ### Source bindings
@@ -480,7 +482,7 @@ It then finishes any still-recorded dependency-edge cleanup without rewriting th
 
 ## Verification record
 
-The focused end-to-end regression suite is `tests/fm-captain-hold-lifecycle.test.sh`, using only synthetic `sample` identities and decision text.
+The focused end-to-end regression suite is `tests/fm-captain-hold-lifecycle.test.sh`, using only synthetic identities and decision text.
 It proves the behaviors below.
 The suite does not test the accepted merge-to-cleanup re-hold window or asynchronous queued-forge landing because those events occur after the locally serialized merge command has returned.
 
@@ -488,11 +490,12 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 - Cleanup of a finished task whose own row is the captain call leaves that call open, queued, held, carrying its deliverable, and visible in Bearings' Captain's Call.
   That cleanup leaves no pending record behind.
-  The call survives a `--force` cleanup and closes only when `answer` records the captain's words.
+  The call survives a `--force --drop-file <captain-words>` cleanup and closes only when `answer` records the captain's words.
   An ordinary finished task in the same home still closes with its report link.
 - An interrupted cleanup leaves the row In flight and untouched with its pending record.
   When the row remains unanswered, the next session start retains it as queued and held with the deliverable recorded.
-  An answer before replay preserves that record's completed report while closing the call, so the next session start retires the satisfied record without losing the delivery from Recently Landed.
+  `test_answer_before_cleanup_replay_preserves_the_retained_report` covers direct and keyed answers before [cleanup recovery](#interrupted-cleanup), including loss of runtime metadata, without losing the completed report from Recently Landed.
+  The Gerrit answer-before-replay case uses ordinary cleanup of already-landed Git work, preserving the change URL rather than recording a forced ship discard as `dropped`.
 - A pending-close record that cannot be validated refuses the answer while naming the record and the reason.
 - A relocated data directory keeps the retention in its one configured backlog.
 
@@ -520,8 +523,11 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 ### Answers, stamps, and deferral
 
-- Answer-time resolution works through a bound channel with task-id keys.
-  This includes the `release` mode, mode-matched replay idempotence, and the refusal of drifted, mode-mismatched, absent, unheld, and already-closed keys.
+- [`tests/fm-captain-hold-lifecycle.test.sh`](../tests/fm-captain-hold-lifecycle.test.sh) covers bound-channel answer-time resolution and the intake's invalid-key and incompatible-replay refusals.
+  Its `test_keyed_answer_releases_a_live_work_item` and `test_keyed_answer_waits_for_cleanup_before_selecting_its_mode` cover [automatic mode selection](#answer-time-resolution).
+  `test_interrupted_keyed_release_closes_after_teardown` and `test_completed_keyed_release_replays_after_publication_failure` cover interrupted and completed release recovery.
+  `test_stale_keyed_replay_preserves_a_concurrent_hold` covers replay invalidated by a concurrent hold.
+  `test_repeated_keyed_answer_resolves_its_own_hold` and `test_legacy_keyed_release_requires_explicit_closure` cover hold association and the legacy refusal boundary.
 - The chat channel reaches the same intake.
 - Hold-set stamping precedes visible hold state, preserves an active lifecycle's timestamp, and resets after release.
 - Interrupted answer closure retains the stamp until close and restores resolution-first ordering on retry.
@@ -529,7 +535,8 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 ### Legacy paths
 
-- Every legacy path works: composed identities through the shim, pre-collapse `decision_keys=` metadata, routed-resolution replay, and a concrete-origin binding.
+- Composed identities through the shim, valid pre-collapse `decision_keys=` inventories, routed-resolution replay, and a concrete-origin binding remain supported.
+  Historical self-inventories require the [documented repair](#recording-a-reviewed-inventory-complete).
 
 ### Task-body read-back cases
 

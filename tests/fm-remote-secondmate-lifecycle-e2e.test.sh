@@ -1379,7 +1379,9 @@ FM_STATE_OVERRIDE="$WATCH_STATE" FM_SECONDMATE_LIVENESS_SECS=1 FM_POLL=1 \
   > "$TMP_ROOT/watch-liveness.out" 2> "$TMP_ROOT/watch-liveness.err" &
 watch_pid=$!
 watch_wait=0
-while kill -0 "$watch_pid" 2>/dev/null && [ "$watch_wait" -lt 1500 ]; do
+# Allow the watcher's 120-second relaunch bound plus startup and wake overhead.
+# A loaded portable runner can take more than 30 seconds for a healthy spawn.
+while kill -0 "$watch_pid" 2>/dev/null && [ "$watch_wait" -lt 7500 ]; do
   sleep 0.02
   watch_wait=$((watch_wait + 1))
 done

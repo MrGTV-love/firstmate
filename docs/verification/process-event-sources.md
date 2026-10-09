@@ -5,42 +5,31 @@ Audience: maintainer verification.
 This record holds reusable version-scoped evidence for the runner's active guarantees.
 `docs/configuration.md` owns the operating contract, each script's header and `--help` own its mechanics, and `.agents/skills/process-event-sources/SKILL.md` owns the handling procedure.
 
-Verified on 2026-07-31 on macOS (Darwin 25.5.0) with `lavish-axi` 0.1.45 installed.
-Generic keyed-answer feed verified on 2026-08-16 on the same platform, against the same published poll response shape.
-Cross-origin keyed-answer feed verified on 2026-08-19 through the real runner and Lavish adapter interface.
+The published reply handoff was verified on 2026-09-29 on macOS (Darwin 25.5.0) with `lavish-axi` 0.1.80 installed.
+The poll lifecycle was first verified on 2026-07-31 with 0.1.45; generic keyed-answer feed was verified on 2026-08-16, and cross-origin keyed-answer feed on 2026-08-19.
 Trusted external `process-event-adapter/1` binding conformance and the runnable `file-signal` example were verified on 2026-08-27 on macOS (Darwin 25.5.0) with Node v25.9.0.
 
-## The published Lavish poll interface the adapter wraps
+## The published Lavish poll and reply interfaces
 
-Verified at implementation time without upgrading the installed build:
+The current published command surface includes a synchronous reply command in addition to the blocking poll:
 
 ```sh
 $ lavish-axi --version
-0.1.45
+0.1.80
+$ lavish-axi reply --help | head -1
+Usage: lavish-axi reply <html-file> (--agent-reply "..." | --agent-reply-file <path>)
 $ lavish-axi poll --help | head -1
-Usage: lavish-axi poll <html-file> [--agent-reply "..."]
+Usage: lavish-axi poll <html-file> [--owner <label>] [--takeover] [--agent-reply "..."] [--agent-reply-file <path>]
 ```
 
-The same help states that the command "long-polls indefinitely".
-The adapter therefore registers the plain blocking form with no timeout flag, so a completion is a real server-side event rather than a timer expiry.
-
-This build exposes no capabilities command and no multiplexed or subscription endpoint:
-
-```sh
-$ lavish-axi capabilities --json
-error: Lavish Editor expects an HTML file
-code: VALIDATION_ERROR   # exit 2
-```
-
-Exit 2 with `VALIDATION_ERROR` is positive proof the subcommand does not exist, because the word is parsed as a filename.
-Note that `lavish-axi <anything> --help` exits 0 for any argument, including a nonsense subcommand, so a `--help` exit code can never be used as a capability probe.
-
-The adapter requires none of those extra commands or endpoints: delivery uses the published poll shape above.
+`reply --help` states that the command exits 0 only after the server answers that the reply was sent, which is when the board stops showing Working, and exits non-zero if that answer does not arrive within 10 seconds.
+`poll --help` states that the command long-polls indefinitely; when `--agent-reply` is supplied, it posts the reply and then keeps waiting, so its return is not an acceptance receipt.
+The adapter uses `lavish-axi reply` under the source lock after arm eligibility and before listener registration on 0.1.80 and newer, and preserves poll-with-reply for older compatible versions.
 Its separate routing lookup reads the board's saved Lavish session; the adapter header owns that contract.
 
 ## Why an ended Lavish review is terminal
 
-Re-verified on 2026-08-01 against the same installed build.
+Re-verified on 2026-08-01 against lavish-axi 0.1.45.
 The published poll help states the lifecycle directly:
 
 ```text
@@ -101,10 +90,10 @@ Exercised by `tests/fm-procevent.test.sh` against a fake blocking source whose c
 | proactive-delivery crash and drain boundaries | dotted and underscored source ids at the same sequence receive distinct markers; a concurrent drain cannot consume between queue revalidation and marker commit; failed output, failed marker commit, and a crash before marker commit leave replay available, while successful output still ends the actionable cycle and a crash after marker commit suppresses a duplicate |
 | adapter-owned terminal verdict | two fixture adapters - one that ends on any result, one with no terminal knowledge - decide the outcome alone: the first has its registration and claim retired automatically after one capture and is never restarted, the second stays armed |
 | adapter-owned application of a captured result | a remote-secondmate reply captured through the real relay in an isolated home reaches that secondmate's local status mirror, settles its correlated pending-reply expectation, re-arms the next cursor-anchored source, and is acknowledged, with no handler step or duplicate `check` wake; its new mirrored bytes remain visible to the watcher's signal gate, while exact source-line replay identity keeps a commit-failure retry or cursor-loss whole-log recapture from duplicating a decision when document availability changes, and a recapture that adds no bytes is acknowledged quietly; for an already-escalated request, the same path closes the exact decision so the open-decision fold clears and remains clear; a capture whose adapter application fails because local storage for a referenced remote document is obstructed is left unacknowledged and receives the fallback `check` wake, and the handler's own `handle` still applies it in full after storage recovers; a document offered through a structured `report=` pointer that the reader cannot deliver fails open, mirroring its line with the original pointer, advancing the cursor, and appending one unkeyed note with the reader's own reason that opens no decision, while a path merely mentioned in prose is never fetched and the reported announce-then-explain incident leaves no standing decision yet still delivers its report through the later structured offer |
-| generic built-in keyed-answer feed | `tests/fm-captain-hold-lifecycle.test.sh` drives a bound built-in source through the real runner with a fixture adapter that only prints keyed lines, proving any bound built-in channel reaches the one keyed-answer intake: named captain-held tasks close at capture time, a card-declared release mode frees held work, keys naming no captain-held task skip, freeform prose forges nothing, matching answer-and-mode replays are idempotent while mode mismatches refuse, an unbound source closes nothing, and capture remains independent of the handler wake. |
+| generic built-in keyed-answer feed | `tests/fm-captain-hold-lifecycle.test.sh` drives a bound built-in source through the real runner with a fixture adapter that only prints keyed lines, proving any bound built-in channel reaches the one keyed-answer intake, an unbound source feeds nothing, freeform prose forges nothing, and capture remains independent of the handler wake; [captain-hold lifecycle](../captain-hold-lifecycle.md#answer-time-resolution) owns resolution semantics and its [answer regressions](../captain-hold-lifecycle.md#answers-stamps-and-deferral) cover mode selection and replay. |
 | structured reconcile feed | The same suite drives the optional `reconciles` adapter seam through the real runner and proves only a bound captured source can create a request; the ordinary keyed-answer and chat paths refuse the reserved value without closing or creating a request, versioned selection stays separate from its note, rollout-compatible ordinary legacy answers still pass, and legacy reconcile-shaped values feed neither intake. |
 | adapter-owned silence verdict | an ordinary firstmate-owned Lavish source driven against a stand-in poll that returns an empty ended session captures its result, records it durably handled, appends no wake, and stays silent through a later `reconcile` that would otherwise republish it, while still retiring its ended source; the same real path with a `Send & End` response carrying the captain's choice still publishes its `check` wake and is left unacknowledged for the handler |
-| worker-owned Lavish rounds | one three-round fixture arms a board for an identity-matched task endpoint, delivers nonterminal and terminal captures directly to that task's steering inbox without a firstmate `check` wake, acknowledges each nonterminal round through a successful re-arm, rings the owner's doorbell once when the capture writes a fresh inbox note and never re-rings or resurrects a note the owner has filed into `handled/` across repeated reconciles, refuses a second armer and every early retirement, and concludes the terminal round through `handled` without another poll; focused fixtures also pin failed re-arm rollback, generation-specific reply staging, one reply post across transient poll retries, unreachable-owner refusal, interrupted conclusion recovery, and repeat acknowledgement isolation |
+| worker-owned Lavish rounds | one three-round fixture arms a board for an identity-matched task endpoint, delivers nonterminal and terminal captures directly to that task's steering inbox without a firstmate `check` wake, acknowledges each nonterminal round through a successful re-arm, rings the owner's doorbell once when the capture writes a fresh inbox note and never re-rings or resurrects a note the owner has filed into `handled/` across repeated reconciles, refuses a second armer and every early retirement, and concludes the terminal round through `handled` without another poll; focused fixtures also pin synchronous reply acceptance before modern arm returns, failed reply refusal before registration, refused-arm reply isolation, direct poll reply ordering, the legacy poll-with-reply fallback, failed re-arm rollback, one legacy reply post across transient retries, unreachable-owner refusal, interrupted conclusion recovery, and repeat acknowledgement isolation |
 | Lavish handled-status classification | an executable fixture table pins exact `feedback`, `ended`, `waiting`, and `browser_disconnected` mappings, including `browser_disconnected` to `disconnected`; the same suite proves that status is nonterminal and receives a zero-answer silence verdict |
 | session-derived Lavish routing | the three-round worker fixture starts its first listener under conflicting ambient host/port values and configuration, then recovers later listeners while that conflicting configuration remains, and proves every reply/poll uses the board's saved session endpoint; direct polls cover Unicode artifact paths, hostnames, IPv6, session endpoint changes, quiet retries, and refusal before reply consumption when session evidence is absent or invalid; spawn coverage still proves the configured opening address enters the worker launch |
 | silence fails closed | the adapter's published `silent` command suppresses only an `ended` session with no queued content block or a `browser_disconnected` response, and announces a real answer, freeform prose, any recognized content block regardless of its declared count, a malformed top-level content header, a `waiting` or `missing` session, a server error, an unreadable result, and indented payload text imitating an empty content block; the `remote-reply` and `when` adapters, which implement no `silent` command, announce every result |

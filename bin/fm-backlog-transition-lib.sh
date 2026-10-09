@@ -53,16 +53,16 @@
 # the preserved task. The writer and replay share one complete-record validator,
 # so teardown never publishes or acts on a close replay would reject.
 # The validator pins the data path to this home's configured root before any
-# recovery mutation, then re-runs exactly that close.
+# recovery mutation; replay then selects the transition from the current row.
 # `tasks-axi done` on an already-closed task backfills links
 # without moving the close date, so replay is idempotent. Ordinary dispatch needs
 # no marker: it publishes the meta first, so a crash leaves the meta itself as
 # the evidence that the row is owed a start.
-# A captain-held row uses the same record with a `mode=retain` line: replay then
-# records the deliverable and reopens the row instead of closing it, and never
-# closes a row that reads as an open captain call. An answer that closes the row
-# first applies any supported retained artifact from the validated record, then
-# replay simply retires the record.
+# A captain-held row uses the same record with a `mode=retain` line. Replay
+# records the deliverable and reopens the row only while it remains an open
+# captain call, never closing it. If the hold was released before replay, the
+# finished row closes instead of reopening unheld work. If an answer already
+# closed a retained row, replay simply retires the satisfied record.
 
 # Set by fm_backlog_transition_applies for a return-1 exemption.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
@@ -86,6 +86,13 @@ FM_BACKLOG_CLOSE_REPLAY_RESULT=
 # library does not source fm-tasks-axi-lib.sh does not apply.
 # shellcheck source=bin/fm-timeout-lib.sh disable=SC1091
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-timeout-lib.sh"
+# fm-pr-lib.sh owns which URL is a Gerrit change. It is functions and empty
+# globals only, so it is sourced once rather than re-initialising a caller's
+# parsed identity.
+if ! declare -F fm_pr_url_parse >/dev/null 2>&1; then
+  # shellcheck source=bin/fm-pr-lib.sh disable=SC1091
+  . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-pr-lib.sh"
+fi
 
 # Latched when a row read hits its bound. fm_backlog_row_show runs inside a
 # command substitution, so the subshell can READ this latch but cannot set it;
@@ -684,16 +691,34 @@ fm_backlog_start() {  # <data-dir> <id>
   fm_backlog_new_work_transition "$1" "$2" in_flight fm_backlog_mutate "$1" start "$2"
 }
 
+# tasks-axi takes a --pr link only as a canonical GitHub or Forgejo pull request
+# and refuses anything else, so a Gerrit change URL is recorded on the row as a
+# note instead. The subshell keeps the parse from overwriting a caller's
+# FM_PR_* identity.
+fm_backlog_pr_is_gerrit_change() {  # <url>
+  ( fm_pr_url_parse "$1" && [ "$FM_PR_PROVIDER" = gerrit ] )
+}
+
 fm_backlog_done() {  # <data-dir> <id> [flag...]
-  local data=$1 id=$2
+  local data=$1 id=$2 arg previous_arg=''
+  local -a done_args=()
   shift 2
-  fm_backlog_mutate "$data" "done" "$id" "$@"
+  for arg in "$@"; do
+    if [ "$previous_arg" = --pr ] && fm_backlog_pr_is_gerrit_change "$arg"; then
+      done_args[${#done_args[@]}-1]=--note
+      done_args+=("Gerrit change $arg")
+    else
+      done_args+=("$arg")
+    fi
+    previous_arg=$arg
+  done
+  fm_backlog_mutate "$data" "done" "$id" "${done_args[@]+"${done_args[@]}"}"
 }
 
 fm_backlog_row_artifact_supported() {
   local id=$1 flag=${2:-} value=${3:-}
   case "$flag" in
-    --pr) return 0 ;;
+    --pr) ! fm_backlog_pr_is_gerrit_change "$value" ;;
     --report) [ "$value" = "data/$id/report.md" ] ;;
     *) return 1 ;;
   esac
@@ -725,8 +750,12 @@ fm_backlog_retain() {  # <data-dir> <id> [flag...]
         fi
         ;;
       --pr)
-        deliverable="${deliverable:+$deliverable; }PR $arg"
-        row_args=(--pr "$arg")
+        if fm_backlog_row_artifact_supported "$id" --pr "$arg"; then
+          deliverable="${deliverable:+$deliverable; }PR $arg"
+          row_args=(--pr "$arg")
+        else
+          deliverable="${deliverable:+$deliverable; }Gerrit change $arg"
+        fi
         ;;
       --note) deliverable="${deliverable:+$deliverable; }$arg" ;;
     esac
@@ -1367,6 +1396,12 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
     row_state=$FM_BACKLOG_ROW_STATE
     if [ "${row_state%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       mode=retain
+    elif [ "${row_state%% *}" != "done" ]; then
+      if [ "$mode" = retain ] && [ "${args[0]-}" = --report ] \
+        && ! fm_backlog_row_artifact_supported "$id" "${args[@]}"; then
+        args=()
+      fi
+      mode=close
     fi
   else
     if [ "$FM_BACKLOG_ROW_RESULT" != not_found ]; then

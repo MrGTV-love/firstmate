@@ -19,7 +19,7 @@ TMP_ROOT=$(fm_test_tmproot fm-cpu-pass)
 # states the pass environment it needs instead.
 unset FM_CPU_PASS_HELD FM_CPU_POOL_DIR
 
-REAL_PYTHON=$(command -v python3)
+REAL_PYTHON=$(python3 -c 'import sys; print(sys.executable)')
 mkdir -p "$TMP_ROOT/test-bin"
 printf '#!%s\n' "$REAL_PYTHON" >"$TMP_ROOT/test-bin/python3"
 cat >>"$TMP_ROOT/test-bin/python3" <<'PY'
