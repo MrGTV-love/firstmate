@@ -260,17 +260,26 @@ test_snapshot_does_not_ack_a_later_append() {
   prime_cursor "$state" "$status"
   printf 'note: included in presentation snapshot\n' >> "$status"
 
-  FM_STATE_OVERRIDE="$state" bash -c '
-    set -u
-    . "$1/bin/fm-wake-lib.sh"
-    . "$1/bin/fm-classify-lib.sh"
-    snapshot=$(status_presentation_snapshot "$STATE")
-    scan_unread_surface_snapshot "$STATE" "$snapshot" > "$2"
-    printf "note: appended after presentation snapshot\n" >> "$STATE/task-race.status"
-    scan_open_decisions_snapshot "$STATE" "$snapshot" >/dev/null
-    status_commit_presentation_snapshot "$STATE" "$snapshot"
-    scan_unread_surface_lines "$STATE" > "$3"
-  ' _ "$ROOT" "$dir/first" "$dir/second" || fail "snapshot race exercise failed"
+  FM_STATE_OVERRIDE="$state" FM_RACE_STATUS="$status" bash -c '
+    read() {
+      local __test_frame
+      if [ ! -e "$FM_RACE_STATUS.appended" ] && [ "${FUNCNAME[1]:-}" = _fm_status_stat_raw ]; then
+        for __test_frame in "${FUNCNAME[@]}"; do
+          if [ "$__test_frame" = status_presentation_snapshot ]; then
+            printf "note: appended after presentation snapshot\n" >> "$FM_RACE_STATUS"
+            : > "$FM_RACE_STATUS.appended"
+            break
+          fi
+        done
+      fi
+      builtin read "$@"
+    }
+    drain=$1; shift
+    . "$drain"
+  ' _ "$DRAIN" > "$dir/first" || fail "snapshot race drain failed"
+  grep -F 'appended after presentation snapshot' "$status" >/dev/null \
+    || fail "the post-snapshot append was not exercised inside the drain"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/second" || fail "drain after the snapshot race failed"
   first=$(cat "$dir/first")
   second=$(cat "$dir/second")
   case "$first" in *'included in presentation snapshot'*) ;; *) fail "snapshot omitted the line it captured: $first" ;; esac

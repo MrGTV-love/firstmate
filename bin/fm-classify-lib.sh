@@ -700,8 +700,6 @@ EOF
 scan_unread_surface_lines() {  # <state>
   local state=$1 f task lines line exclude
   exclude=$(status_scan_parent_channel_exclude "$state")
-  local _FM_STATUS_STAT_BATCH=''
-  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   for f in "$state"/*.status; do
     [ -e "$f" ] || continue
     [ "$f" = "$exclude" ] && continue
@@ -721,8 +719,6 @@ EOF
 
 scan_unread_surface_snapshot() {  # <state> <task-and-endpoint-snapshot>
   local state=$1 snapshot=$2 task endpoint ident f lines line
-  local _FM_STATUS_STAT_BATCH=''
-  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     f="$state/$task.status"
