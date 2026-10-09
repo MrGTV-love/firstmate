@@ -16,42 +16,49 @@ Commands (run --help on each for flags):
            document (see below), and exit.
            An open episode (--episode-file, default state/proc-guard.episode) makes
            the next watch wait silently until the count has stayed at or below 50%
-           for --hold seconds, so one pile-up yields one census across restarts.
+           for more than --hold seconds; the adapter header documents the
+           interrupted-capture ownership-handoff caveat.
 
 Thresholds (named here so a reader can audit every verdict):
   warning     60   percent of the limit above which the count is a pile-up (fixed)
-  critical    90   check only: percent at which forks are about to fail for everyone (fixed)
+  critical    90   check only: percent above which the verdict is CRITICAL (fixed)
   clear       50   percent at or below which an open episode closes (fixed)
   --hold       5   seconds the count must stay above warning (more than, not equal)
 
 Why a library call and not ps(1): the sampler must keep working at the cap.
 A sampler that forks cannot start its probe once the cap is reached, which is the
-moment it matters (measured: ps fails with EAGAIN, the library call still reads).
+moment it matters.
 macOS reads proc_listpids(PROC_UID_ONLY) and proc_pidinfo through libproc, and
 executable and script identifiers through the kern.procargs2 sysctl; Linux reads /proc.
 Neither path forks, execs, or writes to anything it measures.
 
-Count semantics, measured:
-  macOS  the count includes zombies, as the kernel's per-user count does, and runs
-         about 9 above it (long-lived root-forked processes that later became this
-         uid are listed but were charged to root), so the guard warns slightly early.
+Count semantics:
+  macOS  the count includes zombies, as the kernel's per-user count does.
+         UID-based enumeration can also include root-forked processes that later
+         became this uid but were charged to root, so it can warn early.
   Linux  RLIMIT_NPROC bounds threads belonging to the real UID, so the count sums
          that UID's threads. An unlimited RLIMIT_NPROC leaves the limit unknown.
+
+Census document (schema 2):
+  Counts by command and parent chain, up to five deepest ancestry chains with
+  leaf and repeated-command samples, and up to five oldest and newest PIDs.
+  Includes capture time, count/limit, trigger, and census wall/CPU cost.
+  The newest 20 census files are retained in the supplied state directory.
 
 Result document printed by watch (the process-event runner stores it verbatim):
   proc-guard: <source-id>
   status: pileup | error | idle
-  count/limit/threshold/held_seconds/census/summary/sampler_* lines; a census that
-  could not be built or saved is reported as a census_error line instead, because the
-  pile-up itself must still be reported
-  A pileup result is printed while the user still has headroom (the threshold sits
-  well below the cap), so the process that stores it can still fork.
+  count/limit/threshold/held_seconds/census/summary/sampler_* lines.
+  A census build/save failure or episode-record write failure adds census_error;
+  census is present only when saving succeeded, and the pile-up is still reported.
+  The threshold leaves headroom, but a runaway faster than the hold plus one tick
+  can exhaust it before delivery forks; a saved census remains available.
 
 Invariants:
   - Read-only diagnostics: never signals, kills, or changes any process.
     The only writes are the census, its pruning, and the episode record.
-  - Fail-open: an unreadable count skips that sample; thirty skipped samples in a row
-    make watch report status: error once instead of looping.
+  - Fail-open: an unreadable count skips that sample and resets both hold timers;
+    thirty skipped samples in a row make watch report status: error once.
   - Census identifiers contain only executable and interpreter script basenames,
     never arbitrary arguments; the file is mode 0600.
 """

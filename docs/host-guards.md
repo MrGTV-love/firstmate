@@ -15,23 +15,18 @@ The memory family is `fm-mem-guard`; its engine header owns Linux/macOS sources,
 It makes no Jev, model, or network call, so its former `fm-jev-mem-guard` name has been removed rather than kept as an alias.
 
 The process family is `fm-proc-guard`; its engine header owns the count semantics, thresholds, and census document.
-Its `check` and `census` commands follow the one-shot contract below.
-Its `watch` command is the one long-running mode: it samples without forking so it keeps working when the user is at the process cap, and `bin/fm-procevent-proc.sh` runs it as a standing process-event source that the primary home arms at bootstrap.
-Arming confirms a detached canonical listener; it does not depend on the watcher or an active turn.
-The standing adapter authorizes lifetime while its registration and physical state root remain present, and the runner retains its claim across captures without waiting for acknowledgement.
-An episode record under the machine-wide process-event claim root suppresses duplicate censuses across ownership handoffs; direct `watch` defaults to an episode in its supplied state directory.
-Warning/trigger and clear thresholds are fixed at 60% and 50%, respectively.
-Linux selects real-UID membership and counts threads against RLIMIT_NPROC; an unlimited per-user limit yields `UNKNOWN` unless `--limit` supplies a comparison.
-Census schema 2 retains command names plus executable/script basenames, not arbitrary command-line arguments.
+Only its `check` command follows the one-shot verdict contract below.
+Its `census` command writes a diagnostic artifact, while `watch` is the long-running, fork-free sampling mode.
+The [adapter header](../bin/fm-procevent-proc.sh) owns bootstrap arming, shared episode placement, and the interrupted-capture handoff caveat; [process-event configuration](configuration.md#process-to-event-sources-stateprocevent) owns standing-source lifetime.
 Behavioral coverage in `tests/fm-proc-guard.behavior.test.py`, `tests/fm-procevent-proc.test.sh`, and the bootstrap `proc-detector` case exercises real-UID accounting, privacy, fixed threshold boundaries, watcher-free lifetime, durable capture/wake delivery, cross-home episode suppression, and override-only home routing.
 
 ## Engine contract
 
-- Read-only diagnostics: a guard never writes to the system it measures and never mutates agent, session, or repository state.
-- Fail-open: permission errors, missing pseudo-files, and virtualized-environment gaps degrade to a graceful `UNKNOWN` verdict with a reason, never a crash and never a false alarm.
-- Bounded: one run finishes in well under a second on a healthy host; a guard that cannot answer in its budget reports `UNKNOWN` rather than blocking its caller.
-- Structured output: `--json` prints one JSON object with `name`, `checked_at`, `status`, `recommendation`, and the family's own measured fields; human output is a short list of the same facts.
-- Deterministic classification: `status` is one of `OK`, `WARNING`, `CRITICAL`, or `UNKNOWN` - the last only when fail-open withholds the verdict; thresholds live in the engine and are named in its header so a reader can audit the verdict.
+- Read-only diagnostics: a guard never changes the system it measures and never mutates agent, session, or repository state except for diagnostic artifacts expressly owned by its engine header.
+- Fail-open verdicts: permission errors, missing pseudo-files, and virtualized-environment gaps degrade to a graceful `UNKNOWN` verdict with a reason, never a false alarm.
+- One-shot verdict reads: a check does not enter a polling loop; each family's engine header owns its source budgets.
+- Structured verdict output: `--json` on a verdict read prints one JSON object with `name`, `checked_at`, `status`, `recommendation`, and the family's own measured fields; human output is a short list of the same facts.
+- Deterministic verdict classification: `status` is one of `OK`, `WARNING`, `CRITICAL`, or `UNKNOWN` - the last only when fail-open withholds the verdict; thresholds live in the engine and are named in its header so a reader can audit the verdict.
 
 ## Verdict semantics
 

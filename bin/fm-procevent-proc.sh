@@ -10,12 +10,11 @@
 #   fm-procevent-proc.sh retire
 #
 # arm        Register the standing pile-up detector. Its blocking child is
-#            bin/fm-proc-guard.sh watch: it samples the user's process count once
-#            per --interval (default 1s) and, when the count stays above
-#            60% of the per-user limit for more than --hold
-#            seconds (default 5), writes one census to state/proc-census.*.json
-#            and ends with a result that becomes the durable
-#            `check: procevent proc-guard:<seq>` wake. --limit overrides the host's
+#            bin/fm-proc-guard.sh watch: it samples once per --interval (default
+#            1s) and applies the engine's fixed threshold for more than --hold
+#            seconds (default 5), then returns a pile-up result after attempting
+#            the census. The runner captures that outcome before the durable
+#            `check: procevent proc proc-guard <seq>` wake. --limit overrides the host's
 #            limit for a host that cannot read it. Arming again with the same
 #            flags is idempotent. A host the guard cannot measure is refused
 #            with exit 3 and registers nothing. The detector never kills anything.
@@ -26,9 +25,13 @@
 # source-id  Print the canonical source id.
 # retire     Retire the registration.
 #
-# Arming establishes a detached listener. The registration authorizes its
-# standing lifetime, and the runner keeps its canonical claim across captures.
-# The canonical episode record suppresses repeat captures across homes.
+# Bootstrap arms this source only in a writable local primary home, never a
+# secondmate, disposable lab, or detect-only bootstrap.
+# Arming establishes a detached listener; docs/configuration.md owns its standing
+# lifetime, registration replacement, and continued listening.
+# The episode record lives at <process-event-claim-root>/proc-guard.episode so
+# completed captures suppress repeats across homes; direct engine watch defaults
+# to an episode in its supplied state directory.
 # An owner handoff mid-capture can produce at most one extra census.
 # bin/fm-proc-guard.py owns the thresholds, the count semantics, and the census
 # document.

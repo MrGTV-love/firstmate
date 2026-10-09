@@ -47,6 +47,7 @@ for expected in poll --hold 1.5 --interval 0.25 --limit 1000000000; do
   grep -qxF -- "$expected" "$registration" || fail "registration lost the argument $expected"
 done
 registration_inode=$(python3 -I -c 'import os, sys; print(os.stat(sys.argv[1]).st_ino)' "$registration")
+fm_test_wait_until 300 test -s "$HOME_A/state/procevent/proc-guard.runner" || fail "arm left no listener"
 prior_runner=$(cat "$HOME_A/state/procevent/proc-guard.runner")
 in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >/dev/null \
   || fail "arming twice with the same flags failed"
@@ -54,7 +55,6 @@ in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >
   || fail "an identical arm replaced the registration generation"
 [ "$(cat "$HOME_A/state/procevent/proc-guard.runner")" = "$prior_runner" ] \
   || fail "an identical arm replaced the listener"
-fm_test_wait_until 300 test -s "$HOME_A/state/procevent/proc-guard.runner" || fail "arm left no listener"
 sleep 3
 [ -s "$HOME_A/state/procevent/proc-guard.runner" ] || fail "arm left no listener"
 kill -0 "$(cat "$HOME_A/state/procevent/proc-guard.runner")" 2>/dev/null || fail "idle lease expired the standing listener"

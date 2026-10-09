@@ -180,8 +180,8 @@
 # registration only when that same claim still owns it and the registered
 # command is unchanged. A missing command, an error, or any other exit releases
 # the claim after that one result, exactly as before. The runner still does not
-# refresh the owner lease. A `standing` adapter instead authorizes lifetime with
-# its registration and physical state root, and may relisten before acknowledgement.
+# refresh the owner lease. docs/configuration.md owns the `standing` lifetime
+# and pre-acknowledgement relisten exception.
 #
 # Keyed captain answers from built-in adapters use one more seam of the same kind,
 # and this runner still decides nothing about them. Some sources carry the
@@ -203,32 +203,14 @@
 # while ACTING on it is firstmate's judgement, so the capture stays unacknowledged
 # and its `check` wake reaches the handler exactly as it would have anyway.
 #
-# A runner is bound to the HOME that owns it, not to the one session that armed
-# it: a persistent source is meant to outlive that session, so reconcile stops a
-# runner whose source is retired in a live home, and this lease is the backstop
-# for a home that is GONE. Detaching a runner into its own
-# process group is what lets a persistent source outlive the turn that armed it,
-# and with nothing else it is also what lets a runner outlive its whole home:
-# reparented to init, it keeps its blocking child - and everything that child
-# spawns - running with nobody left to reap it. So every runner starts a small
-# guard beside it, in its own separate process group, which re-reads the owning
-# state root's lease on a bounded cadence and stops the runner's whole process
-# group once that lease can no longer be proved fresh. Owner-presence operations
-# refresh the lease, an attached public start keeps it fresh while its caller
-# remains attached, and the watcher's reconcile cycle keeps it fresh in a live
-# home. A runner exports the inherited FM_PROCEVENT_IN_RUNNER marker and every
-# refresh is skipped under it, so a runner and its ordinary children do not
-# certify their own owner. That rule is CONFUSED-AGENT-GRADE, the grade
-# bin/fm-lease-lib.sh documents: a source that DELIBERATELY strips the marker
-# can still refresh, and adversarial-grade unforgeability is out of scope (see
-# docs/configuration.md). Scope is the owning state root and one runner
-# generation, never a script or process name, so a live source in
-# another home is untouched. See bin/fm-procevent-lib.sh for the lease itself.
+# docs/configuration.md owns home lifetime, standing-source registration
+# replacement, guard timing, and the no-self-refresh safety boundary.
+# bin/fm-procevent-lib.sh owns the lease record itself.
 #
 # Ownership is machine-wide per canonical source, because separate Firstmate
-# homes can share one underlying source store. A live owner is never displaced;
-# only a claim whose stale owner and independently absent process group prove
-# its whole generation gone is reclaimed. A crashed leader or reused pid whose
+# homes can share one underlying source store. Another home never displaces a
+# live owner. Automatic stale reclamation requires both a stale owner and an
+# independently absent process group. A crashed leader or reused pid whose
 # process group still has members cannot relax ownership cleanup. Reconcile
 # signals only a live identity-matched runner group and otherwise keeps the
 # claim without starting a replacement.
@@ -1539,8 +1521,9 @@ start_owner_guard() {  # <source-id>
 
 # The runner's owner guard, which bounds an accidentally orphaned detached
 # runner after its home ends. It revalidates the recorded physical state root
-# and its lease on a bounded cadence and, after two consecutive reads cannot prove
-# both, invokes the identity-gated stop for the runner's whole process group -
+# and lifetime authorization (home lease or standing registration) on a bounded
+# cadence and, after two consecutive reads cannot prove both, invokes the
+# identity-gated stop for the runner's whole process group -
 # which is what reaches the blocking child and everything that child spawned,
 # exactly as retirement does. A failed verified stop stays on the retry cadence;
 # an absent leader ends the guard without signalling an ambiguous group.
@@ -1548,13 +1531,13 @@ start_owner_guard() {  # <source-id>
 # Those two reads are spaced HALF a check interval apart, so the pair completes
 # within one check interval rather than costing two. That keeps the debounce -
 # one unreadable read still cannot end a live runner - while bounding detection
-# at the lease plus a single check interval. The spacing is what was tightened;
-# the second read is what must not be traded away for it.
+# at one check interval after authorization expires or the state root changes.
+# The second read must not be traded away for tighter detection.
 #
 # Scope is the owning state root and this one runner generation. It never
 # matches on a script name, a command line, or a process name: those are shared
 # by every home running the same adapter, and a live source in another home
-# proves its own owner through that home's own lease.
+# proves its own lifetime authorization in that home's state root.
 cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file> <state-device> <state-inode>
   local id=${1-} pid=${2-} identity=${3-} ready=${4-} state_device=${5-} state_inode=${6-}
   local lease tick half misses=0 pid_state state_identity current_device current_inode standing=0 adapter

@@ -132,7 +132,7 @@ Exercised by `tests/fm-procevent.test.sh` against a fake blocking source whose c
 | nested and force cleanup | normal, force, and nested secondmate removal invoke each target home's sweep at its final removal boundary, a failed removal restores and rearms registrations, and failed rearming at any nested level retains and reports its recovery backup with a distinct status |
 | teardown refusal ordering | a later public-followup refusal retains the home and its active process-event registration without invoking its sweep |
 | healthy-home invariance | homes with no registration or owned runner claim retain ordinary registration-only supervision and teardown behavior |
-| source-only supervision | a registered source with no task metadata trips the shared predicate and general guard |
+| source-only supervision | the shared predicate and general guard cover ordinary registered sources with no task metadata; `tests/fm-turnend-guard.test.sh` also covers the standing detector exception defined in [Supervision need](../turnend-guard.md#supervision-need) |
 | argv integrity | an argument containing spaces survives as one argument, a shell-looking argument is passed literally with no interpretation, and an unrepresentable newline is rejected at registration |
 | bounded output | output beyond `FM_PROCEVENT_MAX_OUTPUT_BYTES` is drained while only the bound is staged, then truncated and captured |
 | condition->action single-fire and trust | `tests/fm-procevent-when.test.sh` drives the public `when` adapter and generic runner with real commands, proving stable true fires once, a claimed fire restarts as ambiguous without a second action, concurrent arms publish one complete watch, and mutated specs or action executables are refused before execution |

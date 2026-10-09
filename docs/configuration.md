@@ -2585,9 +2585,7 @@ This section is the single owner of the runner's operating contract.
 - The watcher delivers a queued result on its ordinary cycle by reporting it as an actionable `check` wake, so a default or fallback publication reaches firstmate through the same rewake path every other wake uses and never waits for a manual drain.
 - A queued `check` delivery is reported at most once per captured source and sequence while any records for that key remain queued.
 - A durable handled acknowledgement stops future source re-announcement, while a record already queued remains under the durable queue's authority until the ordinary drain's sequence-bound post-handling acknowledgement consumes it.
-- By default, a runner releases its claim after one poll; an adapter that opts into `relisten` keeps that runner and claim across empty waits and captured results, adopting a replacement registration only when the registered command is unchanged and the claim still belongs to it.
-  A failed relisten check releases the claim; the runner never refreshes its own home lease.
-  The `bin/fm-procevent.sh` header owns the exact seam, and [remote secondmates](remote-secondmates.md#how-remote-lines-are-mirrored) owns the reply listener's behavior.
+- The [`bin/fm-procevent.sh` header](../bin/fm-procevent.sh) owns the `relisten` seam; [remote secondmates](remote-secondmates.md#how-remote-lines-are-mirrored) owns the reply listener's behavior, and the standing-source exception is defined below.
 
 **Reconcile sources**
 
@@ -2681,7 +2679,7 @@ Ownership is machine-wide per canonical source, because separate homes can share
 - Claims live under `$XDG_STATE_HOME/firstmate/procevent-claims` (override with `FM_PROCEVENT_CLAIM_ROOT`).
 - Each claim binds its caller-reported home and runner PID to a process identity, unique claim generation, exact registration-file generation, and resolved state-root identity.
 - Registration, acquisition, replacement, retirement, and generation-bound release are serialized at one machine-wide boundary per source.
-- A live identity-matched owner is never displaced, and release removes only the exact generation the caller acquired.
+- A live identity-matched owner is never displaced by another home, and release removes only the exact generation the caller acquired.
 
 **Prove ownership before stopping a runner**
 
@@ -2782,13 +2780,14 @@ Detaching a runner into its own process group is what lets a persistent source o
 - Those two reads are spaced half a check interval apart, so the pair the debounce requires completes inside one check interval instead of costing two of them.
 
 The built-in `proc` adapter opts into `standing` lifetime: its guard requires the recorded physical state root and its registration, rather than recent home activity.
+An identical standing registration is preserved; changing its command stops and releases only this home's identity-proved runner before publishing the replacement, leaving another home's canonical owner untouched.
 Bootstrap's `arm` confirms a detached canonical listener, and `relisten` continues after an unhandled pile-up capture while preserving that claim.
 Retirement and physical state-root disappearance still stop the detector through the same identity-gated runner cleanup.
 Other adapters retain the home-lease and handled-capture requirements.
 
 **Detection and stop timing**
 
-For a runner whose ownership can still be proved, the nominal detection bound is the lease plus one check interval.
+For a lease-bound runner whose ownership can still be proved, the nominal detection bound is the lease plus one check interval; for a standing source's missing registration or changed physical state root, it is one check interval.
 The verified stop then runs within its own grace period.
 The lease age is compared in whole seconds, so the configured lease is honoured until that age reads one second past it.
 
@@ -2808,8 +2807,8 @@ The group signal reaches the blocking child and everything under it exactly as r
 
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
-| `FM_PROCEVENT_OWNER_LEASE_SECONDS` | 600 | 1..86400 | How long a runner continues without activity in its owning home. |
-| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 15 | 1..3600 | Guard detection interval; it reads the lease and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval. |
+| `FM_PROCEVENT_OWNER_LEASE_SECONDS` | 600 | 1..86400 | How long a lease-bound runner continues without activity in its owning home; not the lifetime of a standing source. |
+| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 15 | 1..3600 | Guard detection interval; it reads lifetime authorization and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval. |
 | `FM_PROCEVENT_LAUNCH_FLOOR_SECONDS` | 1 | 1..3600 | Minimum time between consecutive launches of one registration generation's stored command; bounds immediately returning sources during the lease window. |
 
 The generation's first launch is immediate, later launches share its monotonic pacing timestamp, a timestamp from before a reboot is treated as expired, and replacing the registration starts a fresh pacing generation.
