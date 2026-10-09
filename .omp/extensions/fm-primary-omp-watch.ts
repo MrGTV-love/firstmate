@@ -325,9 +325,17 @@ function hostModeEnabled(): boolean {
   return result.status === 0;
 }
 
+function operationalHandback(message: string): boolean {
+  return /^(?:FIRSTMATE SUPERVISION HOST: )?supervision-host: (?:branch-outcome:|outcome [0-9]+\b|.*\bthe captain returned\b)/m.test(message);
+}
+
 // The host-mode wake message: every "supervision-host:" line in order, wake
 // lines capped at eight, and the away note while an away record exists.
 function hostWakeMessage(output: string): string {
+  if (!operationalHandback(output)) {
+    const wake = actionableLine(output);
+    return wake ? [wake, ...output.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line))].join("\n") : "";
+  }
   let shown = 0;
   const lines = output.split(/\r?\n/).filter((line) => {
     if (/^supervision-host:/.test(line)) return true;
@@ -385,7 +393,7 @@ function validatePendingActionable(value: unknown): PendingActionableClose {
     !/^[0-9]+-[0-9]+-[0-9]+$/.test((value as { token: string }).token) ||
     typeof (value as { message?: unknown }).message !== "string" ||
     (!/^wake-seq: [0-9]+$/m.test((value as { message: string }).message) &&
-      !/^FIRSTMATE SUPERVISION HOST: /.test((value as { message: string }).message)) ||
+      !/^(?:FIRSTMATE SUPERVISION HOST: )?(?:signal:|stale:|check:|heartbeat($|:)|supervision-host:)/m.test((value as { message: string }).message)) ||
     typeof (value as { predecessorArmPid?: unknown }).predecessorArmPid !== "string" ||
     !/^[0-9]*$/.test((value as { predecessorArmPid: string }).predecessorArmPid) ||
     ((value as { delivered?: unknown }).delivered !== undefined &&
@@ -409,7 +417,14 @@ function validateReplacementHandoff(value: unknown): PendingActionableClose[] {
   if (new Set(pending.map((item) => item.token)).size !== pending.length) {
     throw new Error(`invalid omp replacement actionable handoff at ${actionableHandoff}`);
   }
-  return pending;
+  return pending.filter((item) => {
+    if (operationalHandback(item.message)) {
+      if (!item.message.startsWith("FIRSTMATE SUPERVISION HOST: ")) item.message = `FIRSTMATE SUPERVISION HOST: ${item.message}`;
+      return true;
+    }
+    item.message = item.message.replace(/^FIRSTMATE SUPERVISION HOST: /, "");
+    return /^wake-seq: [0-9]+$/m.test(item.message);
+  });
 }
 
 function writeReplacementHandoff(pending: PendingActionableClose[]): void {
@@ -437,8 +452,15 @@ function persistReplacementHandoff(pending: PendingActionableClose[]): void {
 
 function loadReplacementHandoff(): PendingActionableClose[] {
   try {
-    const pending = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
-    replacementHandoff = pending;
+    const stored = JSON.parse(readFileSync(actionableHandoff, "utf8"));
+    const original = JSON.stringify(stored.pending);
+    const pending = validateReplacementHandoff(stored);
+    if (pending.length === 0) {
+      unlinkSync(actionableHandoff);
+    } else if (JSON.stringify(pending) !== original) {
+      writeReplacementHandoff(pending);
+    }
+    replacementHandoff = pending.length > 0 ? pending : null;
     return [...pending];
   } catch (error) {
     if (nodeErrorCode(error) === "ENOENT") {
@@ -450,19 +472,14 @@ function loadReplacementHandoff(): PendingActionableClose[] {
 }
 
 function mergeReplacementHandoff(pending: PendingActionableClose): void {
-  let stored: PendingActionableClose[] = [];
-  try {
-    stored = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
-  } catch (error) {
-    if (nodeErrorCode(error) !== "ENOENT") throw error;
-  }
+  const stored = loadReplacementHandoff();
   if (!stored.some((item) => item.token === pending.token)) stored.push(pending);
   writeReplacementHandoff(stored);
 }
 
 function clearReplacementHandoff(pending: PendingActionableClose): void {
   try {
-    const stored = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
+    const stored = loadReplacementHandoff();
     const remaining = stored.filter((item) => item.token !== pending.token);
     if (remaining.length === stored.length) return;
     if (remaining.length > 0) {
@@ -754,7 +771,7 @@ export default function (pi: ExtensionAPI) {
     if (!generationIsLive(owner)) return false;
     const content = encodeFirstmateOperationalInput(
       "watcher",
-      `${message.startsWith("FIRSTMATE SUPERVISION HOST: ") ? message : `FIRSTMATE WATCHER WAKE: ${message}`}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
+      `${operationalHandback(message) ? message : `FIRSTMATE WATCHER WAKE: ${message}`}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
     ).replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, "");
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
     return submitWake(owner, token, { content, pending });
@@ -766,7 +783,7 @@ export default function (pi: ExtensionAPI) {
     wake: UnconsumedWake,
     prepare?: () => boolean,
   ): Promise<"sent" | "held" | "dropped" | false> {
-    const watcher = wake.pending && !wake.pending.message.startsWith("FIRSTMATE SUPERVISION HOST: ");
+    const watcher = wake.pending && !operationalHandback(wake.pending.message);
     const owed = !wake.pending || await wakeOwed(wake.pending.message);
     if (!generationIsLive(owner)) return false;
     if (!owed) {
@@ -831,7 +848,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   async function wakeOwed(message: string): Promise<boolean> {
-    if (message.startsWith("FIRSTMATE SUPERVISION HOST: ")) return true;
+    if (operationalHandback(message)) return true;
     const sequences = [...message.matchAll(/^wake-seq: ([0-9]+)$/gm)].map((match) => match[1]);
     if (sequences.length === 0) return false;
     for (const sequence of sequences) {
@@ -867,7 +884,7 @@ export default function (pi: ExtensionAPI) {
   async function judgeWake(owner: SessionGeneration, pending: PendingActionableClose): Promise<"hold" | "send"> {
     await retireUnowedWakes(owner, pending);
     const another = [...owner.unconsumedWakes.values()].some(
-      (wake) => wake.pending && !wake.pending.message.startsWith("FIRSTMATE SUPERVISION HOST: ") && wake.pending !== pending && !wake.pending.delivered,
+      (wake) => wake.pending && !operationalHandback(wake.pending.message) && wake.pending !== pending && !wake.pending.delivered,
     );
     return !sessionIsIdle() || another ? "hold" : "send";
   }
@@ -907,7 +924,7 @@ export default function (pi: ExtensionAPI) {
     message: string,
     pending: PendingActionableClose,
   ): Promise<"sent" | "held" | "dropped" | false> {
-    if (pending.message.startsWith("FIRSTMATE SUPERVISION HOST: ")) return await sendWake(owner, message, pending);
+    if (operationalHandback(pending.message)) return await sendWake(owner, message, pending);
     const held: HeldWake = { pending, message };
     const verdict = owner.heldWakes.size > 0 ? "hold" : await judgeWake(owner, pending);
     if (!generationIsLive(owner)) return false;
