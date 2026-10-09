@@ -30,14 +30,15 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-if ! body=$("$backend" api "${rest[@]}" 2> "${TMPDIR:-/tmp}/gh-shim-err.$$"); then
+if body=$("$backend" api "${rest[@]}" 2> "${TMPDIR:-/tmp}/gh-shim-err.$$"); then
+  rm -f "${TMPDIR:-/tmp}/gh-shim-err.$$"
+else
   code=$?
   note counted
   cat "${TMPDIR:-/tmp}/gh-shim-err.$$" >&2
   rm -f "${TMPDIR:-/tmp}/gh-shim-err.$$"
   exit "$code"
 fi
-rm -f "${TMPDIR:-/tmp}/gh-shim-err.$$"
 etag=
 [ -n "${GH_SHIM_NO_ETAG:-}" ] || etag="\"$(printf '%s' "$body" | shasum | cut -c1-16)\""
 rate=$(printf 'X-Ratelimit-Limit: %s\r\nX-Ratelimit-Remaining: %s\r\nX-Ratelimit-Reset: %s\r\nX-Ratelimit-Resource: core\r\n' \

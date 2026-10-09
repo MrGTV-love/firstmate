@@ -108,6 +108,29 @@ test_refusals_exit_nonzero() {
   pass "argument and lookup refusals exit nonzero"
 }
 
+test_http_shim_preserves_backend_failures() {
+  local mode status
+  for mode in http passthrough nonapi; do
+    case "$mode" in
+      http) set -- api -i repos/o/r/unexpected ;;
+      passthrough) set -- api repos/o/r/unexpected ;;
+      nonapi) set -- pr -i unexpected ;;
+    esac
+    status=0
+    GH_SHIM_LOG="$TMP_ROOT/shim-failure-$mode.log" "$FAKEBIN/gh" "$@" \
+      >"$TMP_ROOT/shim-failure-$mode.out" 2>"$TMP_ROOT/shim-failure-$mode.err" || status=$?
+    assert_equals 91 "$status" "$mode shim lost the backend's exit status"
+    assert_contains "$(cat "$TMP_ROOT/shim-failure-$mode.err")" 'unexpected gh call:' \
+      "$mode shim swallowed the backend's error"
+    assert_equals '' "$(cat "$TMP_ROOT/shim-failure-$mode.out")" \
+      "$mode shim emitted a successful response for a backend failure"
+    assert_equals "counted $*" "$(cat "$TMP_ROOT/shim-failure-$mode.log")" \
+      "$mode shim did not log the failed call"
+  done
+  pass 'HTTP and passthrough shims preserve backend failures without a successful response'
+}
+
 test_candidates_use_api_logins_and_unique_commit_counts
 test_only_author_evidence_says_no_candidates
 test_refusals_exit_nonzero
+test_http_shim_preserves_backend_failures
