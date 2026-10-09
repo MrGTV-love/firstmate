@@ -475,7 +475,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
 
 test_spawn_raw_omp_expansions_pass_through_unchanged() {
   local rec id out status mode role command launch_dir first_arg
-  for mode in profile after-delimiter substitution backticks redirect glob tilde tilde-redirection tilde-user tilde-assignment process ansi locale braces heredoc punctuation; do
+  for mode in profile after-delimiter substitution backticks redirect glob long-glob tilde tilde-redirection tilde-user tilde-assignment process ansi locale braces heredoc punctuation; do
     for role in missing unlisted; do
       id="omp-expansion-$mode-$role"
       rec=$(make_spawn_case "expansion-$mode-$role" omp "$id")
@@ -507,6 +507,15 @@ test_spawn_raw_omp_expansions_pass_through_unchanged() {
           printf 'input\n' > "$CASE_DIR/input.txt"
           command="$command --auto-approve '$CASE_DIR'/*.txt"
           ;;
+        long-glob)
+          command="$command --auto-approve /work/vernant/generated/reports/abcdefghijklmnopqrstuvwxyz0123456789/input*.txt"
+          {
+            printf '#!/usr/bin/env bash\n. %q\n' "$ROOT/bin/fm-timeout-lib.sh"
+            printf 'fm_run_timed 3 %q "$@"\n' "$(command -v node)"
+            printf 'status=$?\nif fm_timed_out "$status"; then printf timeout > %q; fi\nexit "$status"\n' "$CASE_DIR/node-timeout"
+          } > "$FAKEBIN_DIR/node"
+          chmod +x "$FAKEBIN_DIR/node"
+          ;;
         tilde) command="$command --auto-approve ~/input.txt" ;;
         tilde-redirection) command="$command --auto-approve 2>~/omp-errors.log" ;;
         tilde-user) command="$command --auto-approve ~root/input.txt" ;;
@@ -523,6 +532,7 @@ EOF" ;;
       out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
       status=$?
+      assert_absent "$CASE_DIR/node-timeout" "a long literal prefix ending in a glob must classify within three seconds"
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
       assert_absent "$CASE_DIR/omp-env.log" "expanded raw launch must establish no catalog evidence"

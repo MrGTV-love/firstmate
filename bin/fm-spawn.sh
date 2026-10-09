@@ -2292,7 +2292,7 @@ class LaunchLexer extends Lexer {
 }
 const { tokens, error } = new LaunchLexer(process.argv[3]).tokenize();
 const readableToken = token => token.type === "word"
-  ? /^(?:[A-Za-z0-9_./:=,@%+-]+|\x27[^\x27]*\x27|\x22[^\x22\x24\x60\\]*\x22)+$/.test(token.source)
+  ? /^(?:[A-Za-z0-9_./:=,@%+-]|\x27[^\x27]*\x27|\x22[^\x22\x24\x60\\]*\x22)+$/.test(token.source)
   : token.type === "redir" && [">", ">>", "<", "<>", ">&", "<&"].includes(token.value);
 if (error || !tokens.every(readableToken)) process.exit(1);
 const words = [];
