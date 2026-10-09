@@ -1407,13 +1407,13 @@ EOF
 # headline comes only from a queued row. With nothing queued, a park boundary
 # sends nothing, while a diagnostic line is delivered with the fixed pointer.
 # An away record adds the away note to the mark.
-test_watch_extension_marks_host_closes_without_headlines() {  # <boundary|note|diagnostic|restore-boundary|restore-diagnostic>
+test_watch_extension_marks_host_closes_without_headlines() {  # <boundary|note|archived|diagnostic|restore-boundary|restore-diagnostic>
   local kind=${1:-boundary} repo home log out status
   repo="$TMP_ROOT/watch-host-mark-$kind/repo"; home="$TMP_ROOT/watch-host-mark-$kind/home"; log="$TMP_ROOT/watch-host-mark-$kind/arm.log"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
-  case "$kind" in note|diagnostic) : > "$home/state/.afk-contract" ;; esac
+  case "$kind" in note|archived|diagnostic) : > "$home/state/.afk-contract" ;; esac
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --handling-delivered ] && exit 0
@@ -1437,7 +1437,7 @@ case "$HOST_CLOSE_KIND:$count" in
     printf 'signal: close headline\n%s\n' "$diagnostic"
     exit 0
     ;;
-  note:1|restore-*:1)
+  note:1|archived:1|restore-*:1)
     sleep 1
     . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
     fm_wake_append signal queued.status 'signal: durable queued row' || exit 1
@@ -1454,7 +1454,7 @@ SH
   out=$(HOST_CLOSE_KIND="$kind" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 const state = `${process.env.FM_HOME}/state`;
 writeFileSync(`${state}/.lock`, `${process.pid}\n`);
 const handoff = `${state}/extensions/omp-primary-watch/session-replacement-actionable.json`;
@@ -1464,7 +1464,8 @@ const diagnostic = "supervision-host: the away session could not take this wake:
 const pointer = "FIRSTMATE WATCHER WAKE: check: wake may be due";
 const away = "not from the captain: it is not a return";
 const handlers = new Map(); let tool = null; const sent = []; let editor = "";
-const ctx = { hasUI: true, isIdle: () => true, hasPendingMessages: () => false,
+let idle = kind !== "archived";
+const ctx = { hasUI: true, isIdle: () => idle, hasPendingMessages: () => false,
   ui: { getEditorText: () => editor, setEditorText: (value) => { editor = value; } } };
 const pi = {
   on(e, h) { handlers.set(e, h); },
@@ -1483,8 +1484,16 @@ await handlers.get("before_agent_start")({}, ctx);
 await tool.execute();
 const hosts = () => (existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8") : "").trim().split("\n").filter((row) => row.startsWith("host="));
 const wanted = kind === "boundary" ? 4 : 2;
-const expected = { boundary: 0, note: 1, diagnostic: 1, "restore-boundary": 1, "restore-diagnostic": 2 }[kind];
+const expected = { boundary: 0, note: 1, archived: 1, diagnostic: 1, "restore-boundary": 1, "restore-diagnostic": 2 }[kind];
 const until = async (predicate) => { for (let i = 0; i < 150 && !predicate(); i += 1) await new Promise((r) => setTimeout(r, 100)); };
+if (kind === "archived") {
+  await until(() => hosts().length >= 2 && existsSync(`${state}/.wake-queue`));
+  await new Promise((r) => setTimeout(r, 1500));
+  if (sent.length !== 0) throw new Error(`a watcher wake was sent into a busy turn: ${JSON.stringify(sent)}`);
+  rmSync(`${state}/.afk-contract`);
+  idle = true;
+  await handlers.get("agent_end")({}, ctx);
+}
 if (restore) {
   await until(() => sent.length === 1);
   if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE WATCHER WAKE: signal: durable queued row")) throw new Error(`the queued row was not delivered first: ${JSON.stringify(sent)}`);
@@ -1498,9 +1507,10 @@ await new Promise((r) => setTimeout(r, 1500));
 if (hosts().length !== wanted) throw new Error(`expected ${wanted} host parks, saw ${hosts().length}: ${JSON.stringify(sent)}`);
 if (sent.length !== expected) throw new Error(`expected ${expected} injected wakes for ${kind}, saw ${sent.length}: ${JSON.stringify(sent)}`);
 if (sent.some(({ m, o }) => m.includes("signal: close headline") || m.includes("FAILED") || o?.deliverAs !== undefined)) throw new Error(`a close headline, failure, or follow-up was injected: ${JSON.stringify(sent)}`);
-if (kind === "note") {
+if (kind === "note" || kind === "archived") {
   if (!sent[0].m.includes("FIRSTMATE WATCHER WAKE: signal: durable queued row") || !sent[0].m.includes(diagnostic)) throw new Error(`the queue-read wake lost its row or host explanation: ${sent[0].m}`);
-  if (!sent[0].m.includes(away)) throw new Error(`a host mark under an away record lost the away note: ${sent[0].m}`);
+  if (kind === "note" && !sent[0].m.includes(away)) throw new Error(`a host mark under an away record lost the away note: ${sent[0].m}`);
+  if (kind === "archived" && sent[0].m.includes(away)) throw new Error(`the away note outlived the archived away record: ${sent[0].m}`);
 }
 if (kind === "diagnostic" || kind === "restore-diagnostic") {
   const last = sent[sent.length - 1].m;
@@ -1520,7 +1530,8 @@ EOF
 
 # The replacement handoff follows the same empty-queue rule: stored marks merge
 # into one, a diagnostic line is delivered with the fixed pointer, and a mark
-# with only the cycle-boundary line is cleared without a send.
+# with only the cycle-boundary line is cleared without a send. A stored away
+# note is never replayed: the note is decided when the wake is sent.
 test_watch_extension_replays_host_marks_from_the_handoff() {  # <diagnostic|boundary>
   local kind=${1:-diagnostic} repo home out status
   repo="$TMP_ROOT/watch-host-mark-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-mark-handoff-$kind/home"
@@ -1569,9 +1580,10 @@ if (process.env.HOST_CLOSE_KIND === "boundary") {
   if (sent.length !== 0) throw new Error(`a boundary-only handoff mark injected text with an empty queue: ${JSON.stringify(sent)}`);
 } else {
   if (sent.length !== 1) throw new Error(`expected one wake for the merged handoff mark: ${JSON.stringify(sent)}`);
-  for (const needle of ["FIRSTMATE WATCHER WAKE: check: wake may be due", boundary, diagnostic, away]) {
+  for (const needle of ["FIRSTMATE WATCHER WAKE: check: wake may be due", boundary, diagnostic]) {
     if (!sent[0].m.includes(needle)) throw new Error(`the handoff mark lost '${needle}': ${sent[0].m}`);
   }
+  if (sent[0].m.includes(away)) throw new Error(`a stored away note was replayed without an away record: ${sent[0].m}`);
 }
 await handlers.get("session_shutdown")({}, ctx);
 process.exit(0);
@@ -2581,6 +2593,7 @@ if [ "${1:-}" = --watch-queue ]; then
   test_watch_extension_delivers_host_handbacks busy
   test_watch_extension_marks_host_closes_without_headlines boundary
   test_watch_extension_marks_host_closes_without_headlines note
+  test_watch_extension_marks_host_closes_without_headlines archived
   test_watch_extension_marks_host_closes_without_headlines diagnostic
   test_watch_extension_marks_host_closes_without_headlines restore-boundary
   test_watch_extension_marks_host_closes_without_headlines restore-diagnostic
@@ -2620,6 +2633,7 @@ test_watch_extension_delivers_host_handbacks away-return
 test_watch_extension_delivers_host_handbacks busy
 test_watch_extension_marks_host_closes_without_headlines boundary
 test_watch_extension_marks_host_closes_without_headlines note
+test_watch_extension_marks_host_closes_without_headlines archived
 test_watch_extension_marks_host_closes_without_headlines diagnostic
 test_watch_extension_marks_host_closes_without_headlines restore-boundary
 test_watch_extension_marks_host_closes_without_headlines restore-diagnostic
