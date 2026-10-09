@@ -40,7 +40,7 @@ fm_idle_reap_refusal_stands() {
 }
 
 fm_idle_reap_classify() {
-  local home=$1 state=$2 data=$3 id=$4 meta="$2/$4.meta" pr remote busy verb note status msg evidence open age now hold_rc=0
+  local home=$1 state=$2 data=$3 id=$4 meta="$2/$4.meta" pr remote busy verb note status declared msg evidence open age now hold_rc=0
   IDLE_REAP_CLASS=active
   IDLE_REAP_KIND=-
   IDLE_REAP_AGE=-
@@ -67,10 +67,17 @@ fm_idle_reap_classify() {
   esac
   status="$state/$id.status"
   IDLE_REAP_LAST=$(last_status_line "$status")
+  declared=$(status_declared_wait_line "$status")
+  if status_is_paused_or_captain_held "$declared"; then
+    status_line_verb "$declared" verb
+    IDLE_REAP_CLASS=parked
+    IDLE_REAP_DETAIL="$verb: $(status_line_note "$declared")"
+    return 0
+  fi
   status_line_verb "$IDLE_REAP_LAST" verb
   note=$(status_line_note "$IDLE_REAP_LAST")
   case "$verb" in
-    paused|blocked|needs-decision|failed|captain-held)
+    blocked|needs-decision|failed)
       IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="$verb: $note"; return 0 ;;
   esac
   busy=$(fm_busy_classify_meta "$meta" "$id" "$state")

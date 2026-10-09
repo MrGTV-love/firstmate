@@ -202,51 +202,88 @@ test_selection_matrix() {
 }
 
 test_paused_reasons_survive_busy_and_steering_gates() {
-  local home out kind mode id busy reason
-  home=$(make_home paused-gates)
-  : > "$STUB_LOG"
-  for kind in ship scout; do
-    for mode in busy unknown steer; do
-      id="$kind-$mode"
-      busy=$mode
-      [ "$mode" != steer ] || busy=idle
-      reason="waiting for validation approval for $id"
-      mk_task "$home" "$id" "$kind" "$busy" "done [at=$OLD]: finished" "paused: $reason" \
-        -- pr=https://github.com/acme/widget/pull/41
-      if [ "$kind" = scout ]; then scout_report "$home" "$id"; else merge_marker "$home" "$id" acme/widget 41; fi
-      if [ "$mode" = steer ]; then
-        mkdir -p "$home/state/$id.inbox"
-        printf 'new instruction\n' > "$home/state/$id.inbox/007.msg"
-      fi
+  local home out kind mode id busy reason pause_verb sequence expected rc
+  for pause_verb in paused waiting; do
+    home=$(make_home "paused-gates-$pause_verb")
+    : > "$STUB_LOG"
+    for kind in ship scout; do
+      for mode in busy unknown none steer idle; do
+        for sequence in latest unrelated; do
+          id="$kind-$mode-$sequence"
+          busy=$mode
+          [ "$mode" != steer ] || busy=idle
+          reason="waiting for validation approval for $id"
+          if [ "$sequence" = latest ]; then
+            mk_task "$home" "$id" "$kind" "$busy" "done [at=$OLD]: finished" "$pause_verb: $reason" \
+              -- pr=https://github.com/acme/widget/pull/41
+          else
+            mk_task "$home" "$id" "$kind" "$busy" "done [at=$OLD]: finished" \
+              "$pause_verb [key=validation]: $reason" "resolved [key=policy]: answered" \
+              -- pr=https://github.com/acme/widget/pull/41
+          fi
+          if [ "$kind" = scout ]; then scout_report "$home" "$id"; else merge_marker "$home" "$id" acme/widget 41; fi
+          if [ "$mode" = steer ]; then
+            mkdir -p "$home/state/$id.inbox"
+            printf 'new instruction\n' > "$home/state/$id.inbox/007.msg"
+          fi
+        done
+      done
+    done
+    out=$(FM_CLASSIFY_PAUSED_VERB="$pause_verb" run_reap "$home" scan) || fail "paused scan failed: $out"
+    for kind in ship scout; do
+      for mode in busy unknown none steer idle; do
+        for sequence in latest unrelated; do
+          id="$kind-$mode-$sequence"
+          expect_class "$out" "$id" parked "a standing $pause_verb wait outranks $mode for reporting"
+          [ "$(row_detail "$out" "$id")" = "$pause_verb: waiting for validation approval for $id" ] \
+            || fail "scan lost $id's $pause_verb reason after $sequence events: $out"
+        done
+      done
+    done
+    out=$(FM_CLASSIFY_PAUSED_VERB="$pause_verb" run_reap "$home" reap) || fail "paused reap failed: $out"
+    for kind in ship scout; do
+      for mode in busy unknown none steer idle; do
+        for sequence in latest unrelated; do
+          id="$kind-$mode-$sequence"
+          assert_present "$home/state/$id.meta" "a paused $id remains untouched"
+          [ "$(row_detail "$(cat "$home/state/idle-sessions.report")" "$id")" = "$pause_verb: waiting for validation approval for $id" ] \
+            || fail "published report lost $id's $pause_verb reason"
+        done
+      done
+      id="$kind-idle-unrelated"
+      rc=0
+      out=$(FM_HOME="$home" FM_CLASSIFY_PAUSED_VERB="$pause_verb" FM_IDLE_REAP_ADMISSION=1 \
+        "$ROOT/bin/fm-teardown.sh" "$id" 2>&1) || rc=$?
+      expect_code 1 "$rc" "automatic teardown refuses a standing $pause_verb wait"
+      case "$out" in
+        *"automatic reap ineligible: parked: $pause_verb: waiting for validation approval for $id"*) ;;
+        *) fail "locked admission lost $id's standing wait: $out" ;;
+      esac
+      assert_present "$home/state/$id.meta" "locked admission preserves the waiting task"
+      printf 'resolved [key=validation]: approved\n' >> "$home/state/$id.status"
+    done
+    [ "$(calls)" = 0 ] || fail "paused tasks must never be offered to teardown"
+    out=$(FM_CLASSIFY_PAUSED_VERB="$pause_verb" run_reap "$home" scan) || fail "resolved scan failed: $out"
+    for kind in ship scout; do
+      expect_class "$out" "$kind-idle-unrelated" idle-unreported "a matching resolution retracts the wait without authorizing cleanup"
+      for mode in busy unknown none steer idle; do
+        for sequence in latest unrelated; do
+          printf 'done [at=%s]: finished again\n' "$OLD" >> "$home/state/$kind-$mode-$sequence.status"
+        done
+      done
+    done
+    out=$(FM_CLASSIFY_PAUSED_VERB="$pause_verb" run_reap "$home" scan) || fail "resumed scan failed: $out"
+    for kind in ship scout; do
+      for mode in busy unknown none steer idle; do
+        expected=active
+        case "$mode" in steer) expected=steer-pending ;; idle) expected=reap ;; esac
+        for sequence in latest unrelated; do
+          expect_class "$out" "$kind-$mode-$sequence" "$expected" "a newer done event clears the wait but preserves $mode safety gates"
+        done
+      done
     done
   done
-  out=$(run_reap "$home" scan) || fail "paused scan failed: $out"
-  for kind in ship scout; do
-    for mode in busy unknown steer; do
-      id="$kind-$mode"
-      expect_class "$out" "$id" parked "a declared pause outranks $mode for reporting"
-      [ "$(row_detail "$out" "$id")" = "paused: waiting for validation approval for $id" ] \
-        || fail "scan lost $id's pause reason: $out"
-    done
-  done
-  out=$(run_reap "$home" reap) || fail "paused reap failed: $out"
-  for kind in ship scout; do
-    for mode in busy unknown steer; do
-      id="$kind-$mode"
-      assert_present "$home/state/$id.meta" "a paused $id remains untouched"
-      [ "$(row_detail "$(cat "$home/state/idle-sessions.report")" "$id")" = "paused: waiting for validation approval for $id" ] \
-        || fail "published report lost $id's pause reason"
-      printf 'done [at=%s]: finished again\n' "$OLD" >> "$home/state/$id.status"
-    done
-  done
-  [ "$(calls)" = 0 ] || fail "paused tasks must never be offered to teardown"
-  out=$(run_reap "$home" scan) || fail "resumed scan failed: $out"
-  for kind in ship scout; do
-    expect_class "$out" "$kind-busy" active "a newer done event keeps the busy safety gate"
-    expect_class "$out" "$kind-unknown" active "a newer done event keeps the unknown safety gate"
-    expect_class "$out" "$kind-steer" steer-pending "a newer done event keeps the steering safety gate"
-  done
-  pass "busy, unknown, and steered workers retain declared pause reasons in scan and published reports"
+  pass "canonical declared waits retain reasons across keyed resolutions and configured verbs without weakening cleanup gates"
 }
 
 # --- reap ------------------------------------------------------------------
