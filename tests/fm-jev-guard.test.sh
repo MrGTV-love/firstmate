@@ -139,7 +139,7 @@ test_claude_result_screen() {
 test_ledger_privacy() {
   local ledger="$HOME_DIR/state/jev-guard.jsonl" mode
   [ -s "$ledger" ] || fail "no ledger rows were written"
-  mode=$(stat -f %Lp "$ledger" 2>/dev/null || stat -c %a "$ledger")
+  mode=$(node -e 'console.log((require("node:fs").statSync(process.argv[1]).mode & 0o7777).toString(8))' "$ledger")
   [ "$mode" = 600 ] || fail "the ledger must be private, got mode $mode"
   ! grep -q "$KEY\|fm-jev-guard-or-key" "$ledger" || fail "a key reached the ledger"
   ! grep -q 'IGNORE PREVIOUS\|plain text\|ledger-private-' "$ledger" || fail "request-derived text reached the ledger"
