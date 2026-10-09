@@ -16,8 +16,11 @@
 #            the census. The runner captures that outcome before the durable
 #            `check: procevent proc proc-guard <seq>` wake. --limit overrides the host's
 #            limit for a host that cannot read it. Arming again with the same
-#            flags is idempotent. A host the guard cannot measure is refused
-#            with exit 3 and registers nothing. The detector never kills anything.
+#            flags is idempotent. Arming starts a detached runner or confirms a
+#            live canonical owner without waiting for readiness. Consumers that
+#            need readiness use fm-procevent.sh ensure-listening. A host the guard
+#            cannot measure is refused with exit 3 and registers nothing.
+#            The detector never kills anything.
 # poll       The blocking child the generic runner executes; never run this
 #            directly in a conversational turn.
 # classify   Print the captured outcome class: pileup, error, or unknown.
@@ -27,7 +30,7 @@
 #
 # Bootstrap arms this source only in a writable local primary home, never a
 # secondmate, disposable lab, or detect-only bootstrap.
-# Arming establishes a detached listener; docs/configuration.md owns its standing
+# Arming requests a detached listener; docs/configuration.md owns its standing
 # lifetime, registration replacement, and continued listening.
 # The episode record lives at <process-event-claim-root>/proc-guard.episode so
 # completed captures suppress repeats across homes; direct engine watch defaults
@@ -98,11 +101,8 @@ cmd_arm() {
       printf 'unsupported: the process guard cannot measure this host\n' >&2
       exit 3 ;;
   esac
-  "$SCRIPT_DIR/fm-procevent.sh" register proc "$SOURCE_ID" \
+  "$SCRIPT_DIR/fm-procevent.sh" register proc "$SOURCE_ID" --detach \
     -- "$SCRIPT_DIR/fm-procevent-proc.sh" poll ${GUARD_FLAGS[@]+"${GUARD_FLAGS[@]}"} || exit 1
-  local rc=0
-  "$SCRIPT_DIR/fm-procevent.sh" ensure-listening "$SOURCE_ID" || rc=$?
-  [ "$rc" -eq 0 ] || [ "$rc" -eq 3 ] || return "$rc"
   printf 'armed: %s\n' "$SOURCE_ID"
 }
 

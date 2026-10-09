@@ -1675,6 +1675,8 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
   # disposable lab that would hold the claim away from it. Exit 3 is a host the
   # guard cannot measure and stays silent. The adapter always resolves beside
   # this script, never under a fake code root.
+  # Arming requests a detached runner without waiting for readiness; a consumer
+  # that needs a ready listener checks it through the process-event interface.
   if local_phase && [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] \
     && [ -x "$SCRIPT_DIR/fm-procevent-proc.sh" ]; then
     FM_ROOT_OVERRIDE='' FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-procevent-proc.sh" arm >/dev/null 2>&1 || [ "$?" -eq 3 ] \

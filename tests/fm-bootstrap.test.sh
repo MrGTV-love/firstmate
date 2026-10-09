@@ -1425,13 +1425,14 @@ if sys.platform == "linux":
 os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
 ' "$limit" "$@"
   }
-  local case_dir fakebin home sm lab out
+  local case_dir fakebin home sm lab other out real_perl bootstrap_pid runner
   case_dir="$TMP_ROOT/pileup-detector-arm"
   local FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60
   export FM_PROCEVENT_CLAIM_ROOT FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS
   home="$case_dir/home"
   sm="$case_dir/sm"
   lab="$case_dir/lab"
+  other="$case_dir/other"
   mkdir -p "$home/config" "$home/state" "$sm/config" "$sm/state" "$lab/config" "$lab/state"
   printf '%s\n' manual > "$home/config/backlog-backend"
   printf '%s\n' manual > "$sm/config/backlog-backend"
@@ -1440,6 +1441,26 @@ os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
   printf '%s\n' 'fm-lab-home v1' > "$lab/.fm-lab-home"
   fakebin=$(make_fake_toolchain "$case_dir")
   fm_test_track_procevent_home "$home" "$FM_PROCEVENT_CLAIM_ROOT"
+
+  # Hold the real detached launch before it can claim. Bootstrap must finish
+  # while this gate is still closed; readiness belongs to the consumer below.
+  real_perl=$(command -v perl) || fail "perl is required for process-event launches"
+  fm_test_track_process "$case_dir/cold-launch.pid" "$fakebin/perl"
+  cat > "$fakebin/perl" <<SH
+#!/usr/bin/env bash
+if [ "\${3-}" = detach ] && [ "\${5-}" = _start ] && [ "\${6-}" = proc-guard ]; then
+  fm_test_record_process '$case_dir/cold-launch.pid'
+  printf 'launch\n' >> '$case_dir/cold-launches'
+  : > '$case_dir/cold-started'
+  deadline=\$((SECONDS + \${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
+  while [ ! -e '$case_dir/cold-release' ]; do
+    [ "\$SECONDS" -lt "\$deadline" ] || exit 124
+    sleep 0.05
+  done
+fi
+exec '$real_perl' "\$@"
+SH
+  chmod +x "$fakebin/perl"
 
   out=$(PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/fm-bootstrap.sh")
@@ -1456,15 +1477,39 @@ os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
   assert_not_contains "$out" "pile-up detector" "a lab bootstrap reported on the detector"
   assert_absent "$lab/state/procevent/proc-guard.source" "a disposable lab home armed the host-wide detector"
 
-  out=$(bootstrap_with_limit finite env -u FM_HOME -u FM_STATE_OVERRIDE PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_ROOT_OVERRIDE="$home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  (
+    bootstrap_with_limit finite env -u FM_HOME -u FM_STATE_OVERRIDE PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_ROOT_OVERRIDE="$home" \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" > "$case_dir/cold.out" 2>&1
+    printf '%s\n' "$?" > "$case_dir/cold.done"
+  ) &
+  bootstrap_pid=$!
+  fm_test_wait_until 30 test -e "$case_dir/cold-started" || fail "bootstrap never launched the cold runner"
+  fm_test_wait_until 10 test -e "$case_dir/cold.done" || fail "bootstrap waited for the cold runner to become ready"
+  wait "$bootstrap_pid" || fail "cold bootstrap fixture failed"
+  expect_code 0 "$(cat "$case_dir/cold.done")" "a cold detector must not fail bootstrap"
+  out=$(cat "$case_dir/cold.out")
   assert_not_contains "$out" "pile-up detector" "arming the detector was not silent"
   assert_present "$home/state/procevent/proc-guard.source" "the primary home did not arm the detector"
+  assert_absent "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim" "the cold runner bypassed the launch gate"
+  assert_absent "$home/state/procevent/proc-guard.runner" "bootstrap waited for a cold listener"
+  touch "$case_dir/cold-release"
   fm_test_wait_until 300 test -s "$home/state/procevent/proc-guard.runner" || fail "bootstrap registered without listening"
-  kill -0 "$(cat "$home/state/procevent/proc-guard.runner")" 2>/dev/null || fail "bootstrap listener is not live"
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-procevent.sh" ensure-listening proc-guard \
+    || fail "the consumer could not establish readiness after bootstrap returned"
+  runner=$(cat "$home/state/procevent/proc-guard.runner")
+  kill -0 "$runner" 2>/dev/null || fail "bootstrap listener is not live"
   bootstrap_with_limit finite env PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" >/dev/null \
     || fail "a second bootstrap failed over the armed detector"
+  mkdir -p "$other/config" "$other/state"
+  printf '%s\n' manual > "$other/config/backlog-backend"
+  fm_test_track_procevent_home "$other" "$FM_PROCEVENT_CLAIM_ROOT"
+  bootstrap_with_limit finite env PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$other" FM_ROOT_OVERRIDE="$other" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" >/dev/null \
+    || fail "a competing primary bootstrap failed over the canonical owner"
+  [ "$(cat "$home/state/procevent/proc-guard.runner")" = "$runner" ] || fail "bootstrap replaced the live canonical runner"
+  [ "$(wc -l < "$case_dir/cold-launches" | tr -d ' ')" -eq 1 ] || fail "bootstrap launched again over a live canonical owner"
+  assert_absent "$other/state/procevent/proc-guard.runner" "a competing bootstrap started a second detector"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-procevent-proc.sh" retire >/dev/null \
     || fail "bootstrap detector retirement failed"
 

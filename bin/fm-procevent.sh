@@ -4,10 +4,10 @@
 # durable wakes.
 #
 # Usage:
-#   fm-procevent.sh register <adapter> <source-id> -- <argv>...
+#   fm-procevent.sh register <adapter> <source-id> [--detach] -- <argv>...
 #   fm-procevent.sh register-task <adapter> <source-id> <task-id> -- <argv>...
 #   fm-procevent.sh register-extension <adapter> <source-id> --config-ref <reference>
-#   fm-procevent.sh start <source-id>
+#   fm-procevent.sh start [--detach] <source-id>
 #   fm-procevent.sh ensure-listening <source-id>
 #   fm-procevent.sh reconcile
 #   fm-procevent.sh classify <result-file>
@@ -25,6 +25,8 @@
 #            executed directly, so there is no shell surface and no argument
 #            splitting. Built-in adapters register sources; nothing here parses
 #            user text.
+#            --detach also requests a non-blocking start through the same start
+#            boundary, avoiding a second framework invocation when arming.
 # register-task
 #            Record a worker-owned built-in source. Its one source record
 #            persists across rounds, and re-registration by the same task
@@ -53,6 +55,7 @@
 #            live listener from another registration generation still held the
 #            source when the window ended, so this generation cannot start until
 #            it is retired.
+#            Consumers that need readiness call this explicitly after arming.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for pending results. It then
 #            releases the claim, unless the adapter's `relisten` command says
@@ -64,6 +67,8 @@
 #            when it says so, so a source that has ended stops being restarted.
 #            A task-owned source instead keeps its terminal round open and
 #            registered until its owner concludes it with `handled`.
+#            --detach requests a launch without waiting for readiness, or returns
+#            immediately if a live canonical runner already holds the claim.
 # reconcile  Idempotent liveness entry the watcher calls on its ordinary cycle:
 #            republish every durably captured result with no handled
 #            acknowledgement yet - regardless of any earlier publication - and
@@ -505,8 +510,14 @@ extension_registration_replacement_safe_locked() {  # <source-id>
 }
 
 cmd_register() {
-  local adapter=${1-} id=${2-} sep=${3-}
-  shift 3 2>/dev/null || usage
+  local adapter=${1-} id=${2-} sep detached=0
+  shift 2 2>/dev/null || usage
+  if [ "${1-}" = --detach ]; then
+    detached=1
+    shift
+  fi
+  sep=${1-}
+  shift 1 2>/dev/null || usage
   fm_procevent_adapter_valid "$adapter" || die "adapter name must be lowercase alphanumeric or dash: $adapter"
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe and at most 64 characters: $id"
   [ "$sep" = -- ] || usage
@@ -532,7 +543,8 @@ cmd_register() {
       fm_procevent_source_lock_release "$id"
       owner_lease_refresh
       printf 'registered: %s (%s)\n' "$id" "$adapter"
-      return 0
+      [ "$detached" -eq 0 ] || cmd_start_public --detach "$id"
+      return $?
     fi
     if [ -e "$(fm_procevent_claim_path "$id")" ]; then
       if ! fm_procevent_claim_load_locked "$id"; then
@@ -565,6 +577,7 @@ cmd_register() {
   fm_procevent_source_lock_release "$id"
   owner_lease_refresh
   printf 'registered: %s (%s)\n' "$id" "$adapter"
+  [ "$detached" -eq 0 ] || cmd_start_public --detach "$id"
 }
 
 cmd_register_task() {
@@ -997,10 +1010,32 @@ owner_lease_keepalive() {  # <parent-pid> <parent-identity>
 }
 
 cmd_start_public() {
-  local id=${1-} identity keeper status
+  local id identity keeper status detached=0
+  if [ "${1-}" = --detach ]; then
+    detached=1
+    shift
+  fi
+  id=${1-}
   [ "$#" -eq 1 ] || usage
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   owner_lease_refresh
+  if [ "$detached" -eq 1 ]; then
+    fm_procevent_source_lock_acquire "$id" || die "cannot lock source: $id"
+    if [ ! -f "$(source_file "$id")" ] || [ -L "$(source_file "$id")" ]; then
+      fm_procevent_source_lock_release "$id"
+      die "source is not registered: $id"
+    fi
+    fm_procevent_claim_state_locked "$id"
+    status=$?
+    if [ "$status" -eq 1 ] && fm_procevent_claim_undisplaceable_locked "$id"; then
+      status=2
+    fi
+    fm_procevent_source_lock_release "$id"
+    [ "$status" -ne 0 ] || return 0
+    [ "$status" -eq 1 ] || die "cannot safely launch source: $id"
+    detach_runner "$id"
+    return $?
+  fi
   identity=$(fm_pid_identity "$$" 2>/dev/null) || die "cannot identify the attached owner"
   owner_lease_keepalive "$$" "$identity" &
   keeper=$!
