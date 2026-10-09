@@ -2,9 +2,9 @@
  * The side channel every agent level extension reports on.
  *
  * Firstmate copy of upstream apps/ten-levels/extensions/report.ts; ../SOURCE.md lists every change.
- * One JSON line per event goes to the owning home's private state/jev-guard.jsonl instead of the
- * lab's stderr stream. The same payload is appended to the pi session as a custom entry, so the
- * session file holds the permanent record.
+ * Firstmate reporting boundaries, ledger availability and session-entry retention are owned by
+ * docs/configuration.md "Jev guard". The payload contains request-derived text; report must
+ * not spread it into the metadata ledger.
  *
  * `decide` is the one way an extension calls Jev: it validates, calls, reports, and returns.
  * `extra` must not use the keys the report already sets: source, state, questions, answers, usage, model, ms.
@@ -63,7 +63,7 @@ function typesafeKey(): string {
   });
 }
 
-/** Firstmate: the OpenRouter fallback key from the same home .env, used only after TypeSafe direct fails. */
+/** Firstmate: fallback-key lookup is owned by fm_openrouter_key in bin/fm-typesafe-lib.sh. */
 function openrouterKey(): string {
   return execFileSync("bash", ["-c", '. "$1"; fm_openrouter_key "$2" && printf %s "$OPENROUTER_API_KEY_PRIVATE"', "jev-guard", lib, home], {
     encoding: "utf8",
@@ -129,8 +129,8 @@ export interface Decision {
 }
 
 /**
- * One Jev call from inside the harness. `source` names who asked, a hook or a tool, so the
- * window can label the row. The full state, questions, and answers travel on the side channel.
+ * One Jev call from inside the harness. `source` names who asked, a hook or a tool.
+ * Reporting and retention follow docs/configuration.md "Jev guard", not the upstream lab stream.
  */
 export async function decide(pi: any, source: string, state: State, questions: Questions, extra: Record<string, unknown> = {}): Promise<Decision> {
   validateQuestions(questions);

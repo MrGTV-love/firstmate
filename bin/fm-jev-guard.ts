@@ -2,11 +2,9 @@
 // there) into one Firstmate ship or scout worker session.
 // Usage: installJevGuard(pi, {home, config, state, task, worktree, data, project}) from the
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
-// The upstream extension runs unchanged. This glue only configures the owning
-// home for key, never-send policy and ledger, and picks the write gate's repo
-// root: a write or edit inside the task's data directory or the system temp
-// directory is judged against that root instead of being blocked as outside
-// the worktree; every other path is judged against the worktree.
+// The upstream extension runs unchanged. Firstmate's boundary and compatibility
+// requirements are owned by docs/configuration.md "Jev guard"; SOURCE.md records
+// why root selection, handler budgets and input restrictions are necessary.
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import jevGuard from "./ten-levels/extensions/jev-guard.ts";

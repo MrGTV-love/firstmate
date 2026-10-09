@@ -163,6 +163,9 @@
 # shared files that map to the suites naming them; a fixture under
 # tests/fixtures/<dir>/ is mapped by that directory instead. Curated family arms
 # above those also name individual tests/ files explicitly.
+# Deleted test assets still select remaining suites that reference them; an
+# unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
+# select the jev-guard behavior suite.
 set -eu
 
 now_ms() {

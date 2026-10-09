@@ -1581,7 +1581,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before each request is sent, every remaining string in it is checked for literal matches through `bin/fm-typesafe-lib.sh`: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; belay checks every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; for Jev guard, each string in the tool state before provider selection, not the fixed questions or model ID; belay checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -1679,7 +1679,7 @@ The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`]
 
 ## Jev guard
 
-Claude and omp ship and scout workers run the level 6 jev-guard from disler's ten-levels-of-jev, vendored unchanged under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
+Claude and omp ship and scout workers run the unchanged level 6 jev-guard from disler's ten-levels-of-jev under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md), with Firstmate-specific reporting and adapters.
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) there owns the upstream commit, the license, and every Firstmate change with its reason.
 `fm-spawn.sh` installs it at launch: omp loads it through the generated worker extension, and Claude runs it through `bin/fm-jev-guard-hook.sh` on `PreToolUse` for `Bash`, `Write` and `Edit` and on `PostToolUse` for `Bash` and `Read`.
 Existing sessions need a normal authorized relaunch to load it.
@@ -1687,11 +1687,12 @@ Primary and secondmate sessions and other harnesses do not run it.
 
 The guard asks Jev three things, exactly as upstream does:
 
-- Before a shell command runs, what it does to the machine and whether it aims to destroy something; an irreversible or destructive answer blocks the command.
-- Before a write or edit, a path outside the allowed roots blocks without a Jev call; inside them, Jev judges whether the content holds a real credential, which blocks the write.
+- Before a shell command runs, what it does to the machine and whether it aims to destroy something; an irreversible or destructive judgment meeting the [upstream thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts) blocks the command.
+- Before a write or edit, a path outside the allowed roots blocks without a Jev call; inside them, Jev judges whether the content holds a real credential or the target is a secrets file, blocking at the [upstream thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
 - After a shell command or file read, whether the output holds instructions aimed at the agent; flagged output reaches the agent with a warning banner.
 
 The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
+The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
 Write and edit paths must use a plain absolute or worktree-relative spelling.
 A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
 The shared guard blocks every other spelling without a Jev call because omp can rewrite such paths before execution, and tells the agent to use a plain path and report if that is not possible.
@@ -1705,15 +1706,18 @@ The captain data-egress decision 2026-10-08 authorizes Jev guard requests only f
 `fm-spawn.sh` determines the project once by comparing physical roots: `firstmate` when the project root equals the Firstmate code root, otherwise the project directory's basename.
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to TypeSafe or OpenRouter, with no provider fallback.
 This authorization check runs once at the shared `decide` preflight before either provider is selected.
-For `firstmate` only, the guard sends the command, the written content (first 4,000 characters) and the tool output (first 6,000 characters) to TypeSafe.
-It calls TypeSafe direct first, with the single primary-home `TYPESAFE_API_KEY` resolved at call time through `fm_typesafe_key`; no key ever enters the worker environment.
-Only when an authorized direct call is unavailable or fails does it ask OpenRouter, with `OPENROUTER_API_KEY` read through `fm_openrouter_key` from the same home and primary-home `.env` files, never from the process environment; with no such key there is no fallback call.
-A request whose text matches the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key) is withheld from both.
+For `firstmate` only, shell screening sends the command and working directory, write screening sends the path and first 4,000 characters of content, and result screening sends the tool name and first 6,000 characters of output.
+It calls TypeSafe direct first, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its client is first constructed; no key enters the worker environment.
+Only when an authorized direct call is unavailable or fails does it ask OpenRouter, using `fm_openrouter_key` from [`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh), which owns fallback-key lookup for both this guard and [worker skill selection](#worker-skill-selection); with no key there is no fallback call.
+Each provider client snapshots its credentials: omp reuses it for the session, while Claude constructs clients in each hook process.
+A tool state matching the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key), or an invalid or unreadable policy, is withheld from both providers.
 Each provider has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
-Both omp's native handler deadline and Claude's hook timeout remain 30 seconds, including result screening.
-A withheld request, missing keys, exhausted budget or any other failure lets the tool call proceed, as upstream does, while writes outside the allowed roots and unsupported write/edit path spellings still block without a Jev call.
-Each decision appends one line to the owning home's private `state/jev-guard.jsonl`, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
-Only the session entry retains the full upstream payload.
+omp's native tool-call deadline and both Claude hook timeouts are 30 seconds; omp result screening relies on the shared 25-second handler budget rather than `extensionHandlers.toolCallTimeoutMs`.
+A withheld request, missing keys, exhausted budget or any other inference failure lets the tool call proceed, as upstream does, while writes outside the allowed roots, unsupported path spellings and unsupported edit schemas still block without a Jev call.
+The guard supplements, never replaces, existing deterministic protections or required approvals.
+The owning home's private `state/jev-guard.jsonl` receives one line per reported `jev`, `hook` or `error` event, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
+Ledger writes are best-effort and do not gate execution; early adapter rejections for unsupported paths or edit schemas return before upstream reporting.
+omp session entries retain the full upstream report payload, including request-derived state; the Claude adapter supplies no session-entry writer.
 [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) is the portable regression, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) holds the live host evidence.
 
 ## Jev belay Stop hook
@@ -1773,9 +1777,9 @@ For a promoted scout's ship relaunch, skill selection retains the original Capta
 Legacy provenance uses the same fence and indentation exclusions as promotion.
 Privacy-hidden promotion instructions never revive the superseded spec.
 The picker uses the shared [TypeSafe key lookup](#typed-dispatch-resolution-env-typesafe_api_key), including the local primary-home fallback, and asks TypeSafe directly first when that key is available.
-When the TypeSafe key is absent or a direct request fails and `OPENROUTER_API_KEY` is set in the calling home's `.env`, the same request and the rest of that pick go through OpenRouter.
+When the TypeSafe key is absent or a direct request fails and `fm_openrouter_key` resolves a key, the same request and the rest of that pick go through OpenRouter.
 Privacy refusals, question-validation failures, and expiry of the picker's overall deadline stop selection without triggering provider fallback.
-Unlike the TypeSafe key, the OpenRouter key is read only from that home's `.env`, with no primary-home or ambient-environment fallback.
+[`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) owns the shared OpenRouter fallback-key lookup used by the picker and the [Jev guard](#jev-guard).
 This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
 Fallback provenance is retained for picked, no-selection, and unavailable outcomes.
 Missing optional catalog directories are skipped; failures inspecting existing catalogs are unavailable with their actionable reason, not successful no-selection results.
@@ -2916,8 +2920,8 @@ FMX_RELAY_URL=https://myfirstmate.io   # optional Relay endpoint override, mainl
 FMX_ENV_FILE=           # optional alternate .env file for direct Relay client invocations; bootstrap still checks $FM_HOME/.env
 FMX_DRY_RUN=            # truthy previews Relay replies and dismissals to state/x-outbox/ without posting or requiring a token
 FMX_X_REPLY_MAX_CHARS=280   # X reply per-message split budget; values below 50 clamp to 50
-TYPESAFE_API_KEY=       # TypeSafe opt-in; see "Typed dispatch resolution" and "Worker skill selection" above
-OPENROUTER_API_KEY=     # optional OpenRouter fallback for worker skill selection; read from this file only
+TYPESAFE_API_KEY=       # TypeSafe opt-in; see "Typed dispatch resolution", "Worker skill selection" and "Jev guard" above
+OPENROUTER_API_KEY=     # optional fallback; key lookup owner: bin/fm-typesafe-lib.sh
 FMX_DISCORD_REPLY_MAX_CHARS=1900   # Discord reply per-message split budget; values below 50 clamp to 50, values above 2000 reset to 1900
 FMX_X_THREAD_MAX=25     # maximum messages in one auto-split reply thread
 FMX_FOLLOWUP_MAX_AGE_SECS=604800   # local window for posting Relay completion follow-ups (7 days)
