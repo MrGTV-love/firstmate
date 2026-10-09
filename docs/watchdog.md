@@ -3,10 +3,10 @@
 The watchdog is a macOS launchd user agent that checks one Firstmate home's supervision from outside the session.
 It exists for the failure where the session's own supervision dies with the session.
 The watcher and the Claude Stop-hook arm both stop, no rewake ever reaches the idle session, and nothing inside the session can notice.
-Only a process that survives session death and reboot can catch that.
+The installed agent survives Firstmate session death and runs again after the user logs in following a reboot.
 
 The watchdog adds no second supervisor.
-It reads the evidence the home already keeps, calls the home-scoped recovery that already exists, and alarms through the existing [wedge alarm](wedge-alarm.md) channels.
+It reads the home's existing evidence, optionally runs an operator-owned resume command, and alarms through the existing [wedge alarm](wedge-alarm.md) channels when supervision remains down.
 
 ## Components
 
@@ -25,8 +25,8 @@ A launchd job runs outside every harness, so the check derives the supervision m
 `FM_SUPERVISION_MODEL` pins the model when that guess is wrong.
 Pi and omp homes use the extension model and are not covered by the derivation.
 
-The ordinary stale threshold is 900 seconds (`FM_WATCHDOG_STALE_SECS`).
-A live session with a rewake ledger bound to its session lock and current recovery generation gets a longer fixed limit of 3600 seconds for a legitimate handling turn.
+The ordinary stale threshold defaults to 900 seconds (`FM_WATCHDOG_STALE_SECS`).
+A live session with a rewake ledger bound to its session lock and current recovery generation has a separate fixed limit of 3600 seconds for a legitimate handling turn.
 The bound ledger must be at least as new as the beacon and have no exhausted-failure marker.
 At or beyond that limit, the watchdog reports `stale-watcher` even when `FM_WATCHDOG_STALE_SECS` is larger or the pull guard's separate mid-turn policy still considers the session healthy.
 
@@ -35,25 +35,13 @@ At or beyond that limit, the watchdog reports `stale-watcher` even when `FM_WATC
 The singleton records its PID and process start identity before publishing the lock.
 A live PID suppresses another check only when `fm_pid_identity` matches the recorded identity; missing or mismatched identity is stale and reclaimed without signalling that PID.
 
-For any verdict other than `idle` or `healthy`, the check runs these steps in order under the home's watchdog lock:
-
-1. If the watcher lock names a live process, stop that watcher with `bin/fm-watch-arm.sh --stop`.
-   This is the home-scoped stop, and it publishes downtime exactly as any watcher close does.
-   The check never signals a process itself and never uses `pkill`.
-2. Run `config/watchdog-resume`, the command that resumes the main session.
-3. Re-read the verdict for up to `FM_WATCHDOG_VERIFY_SECS`.
-
-A recovery that restores a healthy verdict ends the episode silently.
-A recovery that does not is a failed attempt.
-At most one attempt runs per `FM_WATCHDOG_RETRY_SECS`.
-After `FM_WATCHDOG_ALARM_AFTER` consecutive failed attempts the check raises the wedge alarm channels, and repeats at most once per `FM_WATCHDOG_ALARM_INTERVAL_SECS`.
-The captain hears about nothing else.
+The `bin/fm-watchdog-check.sh` header owns recovery ordering, retry timing, alarm escalation, and episode clearing.
 
 ### The resume command
 
 This repository has no supported route that relaunches a dead main session, so the captain's own launch command is that route.
 `config/watchdog-resume` is local and gitignored.
-Its first non-empty, non-comment line is run through `sh -c` with `FM_HOME`, `FM_ROOT`, and `FM_WATCHDOG_REASON` set to the verdict.
+Its first non-empty, non-comment line is run through `sh -c` with `FM_HOME` and `FM_ROOT` identifying the home and checkout, and `FM_WATCHDOG_REASON` set to the verdict.
 The command must be safe to run when the session is already alive and busy, and must do nothing then.
 It must start the session the way the captain starts it and let that session's own start-up reconcile durable state.
 An absent file makes the resume step a logged no-op, so the check can then only stop a hung watcher and alarm.
@@ -69,11 +57,10 @@ bin/fm-watchdog-install.sh status
 bin/fm-watchdog-install.sh uninstall
 ```
 
-The agent label is home-scoped, so two homes never share an agent.
-The agent runs every 120 seconds by default and at load, and it logs to `state/.watchdog.launchd.log`.
+The `bin/fm-watchdog-install.sh` header owns agent identity, scheduling, and path resolution.
+The agent logs to `state/.watchdog.launchd.log`.
 The check itself logs to `state/.watchdog.log`, and an open episode is recorded in `state/.watchdog-episode`.
 The installer bakes the `PATH` of the shell that runs it into the agent, because launchd starts agents with a minimal one.
-Relative `FM_HOME` and `FM_ROOT_OVERRIDE` paths are resolved against the installing shell's working directory before label generation and plist rendering; absolute spellings are preserved.
 
 ## Limits
 

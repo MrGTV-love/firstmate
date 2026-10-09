@@ -16,8 +16,8 @@
 #
 #   idle              no supervision is needed (fm_supervision_status), or the
 #                     evidence directory is absent. Nothing to do.
-#   healthy           fm_watcher_supervision_verdict accepts the beacon and
-#                     watcher for the pinned supervision model.
+#   healthy           fm_watcher_supervision_verdict accepts supervision, and
+#                     the watchdog freshness policy in docs/watchdog.md holds.
 #   session-missing   supervision is needed and the session lock names no live
 #                     harness process (fm_harness_pid_alive).
 #   dead-arm-owner    the session is live, the Claude auto-arm ledger still
@@ -29,11 +29,11 @@
 # The supervision model comes from FM_SUPERVISION_MODEL when set, else
 # `autoarm` when state/.claude-autoarm-epoch exists (a Claude primary), else
 # `persistent`. A launchd job runs outside every harness, so
-# bin/fm-harness.sh cannot detect the primary here. Staleness uses
-# FM_WATCHDOG_STALE_SECS (default 900), longer than the 300-second guard grace
-# so a long handling turn does not read as a lapse.
+# bin/fm-harness.sh cannot detect the primary here. docs/watchdog.md owns
+# the ordinary beacon threshold and the separate finite cap for a bound
+# rewake during a legitimate handling turn.
 #
-# Recovery, only for a non-healthy verdict, under this home's watchdog lock:
+# Recovery, only for a verdict other than healthy or idle, under this home's watchdog lock:
 #   1. When the watcher lock names a live pid, stop that watcher with
 #      `bin/fm-watch-arm.sh --stop`, the home-scoped stop that publishes
 #      downtime exactly as any watcher close does. Never pkill.
@@ -44,7 +44,7 @@
 #      command gets FM_HOME, FM_ROOT, and FM_WATCHDOG_REASON (the verdict).
 #      An absent file makes this step a recorded no-op.
 #   3. Re-read the verdict for up to FM_WATCHDOG_VERIFY_SECS (default 90).
-# A recovery that does not restore a healthy verdict is a failed attempt. At
+# A recovery that restores neither healthy nor idle is a failed attempt. At
 # most one attempt runs per FM_WATCHDOG_RETRY_SECS (default 240). After
 # FM_WATCHDOG_ALARM_AFTER (default 2) consecutive failed attempts the check
 # raises the existing wedge alarm channels (docs/wedge-alarm.md), at most once

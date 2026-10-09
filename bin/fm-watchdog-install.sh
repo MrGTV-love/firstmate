@@ -7,16 +7,16 @@
 #        fm-watchdog-install.sh uninstall
 #        fm-watchdog-install.sh status
 #
-# install renders docs/examples/fm-watchdog.plist for this checkout and home
-# (FM_HOME, default the checkout), writes it to ~/Library/LaunchAgents, and
-# loads it with launchctl bootstrap into the gui/<uid> domain, so it survives
-# session death and reboot. The label is home-scoped
-# (com.firstmate.watchdog.<8-digit checksum of FM_HOME>), so two homes never
-# share an agent. Re-running install replaces the agent in place. --print
-# renders the plist to stdout and changes nothing. The default interval is 120
-# seconds (FM_WATCHDOG_INTERVAL_SECS); the lowest accepted value is 30.
-# uninstall boots the agent out and deletes its plist; it never touches state.
-# status prints whether the plist exists and whether launchd has it loaded.
+# install renders docs/examples/fm-watchdog.plist into ~/Library/LaunchAgents
+# and bootstraps gui/<uid>. It survives session death and runs after user login
+# following a reboot. FM_HOME defaults to FM_ROOT (the checkout unless overridden).
+# Relative FM_HOME and FM_ROOT_OVERRIDE are resolved against the caller's working
+# directory before rendering and label generation; absolute spellings are preserved.
+# The label is com.firstmate.watchdog.<decimal cksum of resolved FM_HOME>.
+# Reinstall replaces the agent. --print renders the plist and changes nothing.
+# The interval defaults to 120 seconds (FM_WATCHDOG_INTERVAL_SECS), minimum 30.
+# uninstall boots out the agent and deletes its plist without touching state.
+# status reports whether the plist exists and launchd has the agent loaded.
 #
 # Installing is the captain's decision: nothing in this repository runs this
 # command. FM_WATCHDOG_AGENT_DIR and FM_WATCHDOG_LAUNCHCTL replace the agent

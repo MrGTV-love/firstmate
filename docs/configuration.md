@@ -557,10 +557,7 @@ See [`wedge-alarm.md`](wedge-alarm.md) for the current channel reference, [`veri
 
 ## Out-of-session watchdog (config/watchdog-resume)
 
-`config/watchdog-resume` is local and gitignored.
-Its first non-empty, non-comment line is the command the out-of-session watchdog runs to resume the main session when its supervision is down.
-An absent file makes that step a logged no-op.
-[`watchdog.md`](watchdog.md) owns the command's contract, the check, the recovery order, and the install steps.
+[`watchdog.md`](watchdog.md) owns the operator-managed `config/watchdog-resume` command contract and the watchdog's supported behavior.
 
 ## Trace context propagation (config/trace-context / FM_TRACE_CONTEXT)
 
@@ -3069,7 +3066,7 @@ FM_WEDGE_ALARM_CHANNEL=            # override config/wedge-alarm with one active
 FM_WEDGE_ALARM_EXEC=              # notifier seam: route every channel (osascript, herdr, command:) through this command as `<cmd> <channel> <summary>`; "discard" fires nothing; unset in production; the daemon defaults it to "discard" when sourced so no test posts a real notification (docs/wedge-alarm.md)
 FM_WEDGE_ALARM_TIMEOUT_SECS=10    # maximum seconds for each osascript, herdr, override, or command: notifier before its watchdog terminates it and continues to the next channel; invalid or zero values use 10
 # out-of-session watchdog (bin/fm-watchdog-check.sh); docs/watchdog.md owns the contract
-FM_WATCHDOG_STALE_SECS=900         # beacon age after which the watchdog reads supervision as stale
+FM_WATCHDOG_STALE_SECS=900         # ordinary beacon-age threshold; bound-rewake cap: docs/watchdog.md
 FM_WATCHDOG_VERIFY_SECS=90         # seconds the watchdog re-reads the verdict after a recovery
 FM_WATCHDOG_RETRY_SECS=240         # minimum seconds between recovery attempts
 FM_WATCHDOG_ALARM_AFTER=2          # consecutive failed recoveries before the wedge alarm fires
