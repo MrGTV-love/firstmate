@@ -94,6 +94,8 @@ PATH="$PUBLISH_FAKEBIN:$PATH" FM_HOME="$PUBLISH_HOME" FM_ROOT_OVERRIDE="$ROOT" \
   FM_TEST_REAL_MV="$REAL_MV" FM_TEST_PUBLISH_ENTERED="$PUBLISH_ENTERED" \
   FM_TEST_PUBLISH_RELEASE="$PUBLISH_RELEASE" \
   "$ROOT/bin/fm-remote-home-provision.sh" < "$PUBLISH_MANIFEST" >/dev/null 2>&1 &
+# The background PID is consumed within this test.
+# shellcheck disable=SC2031
 PUBLISH_PID=$!
 publish_wait=0
 while [ ! -f "$PUBLISH_ENTERED" ]; do

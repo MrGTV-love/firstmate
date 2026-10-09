@@ -21,6 +21,10 @@ set -u
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-composer-lib.sh"
 
+# rule_n <columns> -> a solid `─` rule of that many columns. A titled rule proves
+# its composer only at the closing rule's width, so fixtures size the closers.
+rule_n() { local n=$1 out='' i; for ((i = 0; i < n; i++)); do out+='─'; done; printf '%s' "$out"; }
+
 # classify <bordered> <content> [idle_re] -> echoes the verdict.
 classify() { fm_composer_classify_content "$@"; }
 
@@ -227,8 +231,12 @@ test_matrix_claude_titled_top_border() {
   # 2026-10-06 on herdr).
   local titled plain_rule empty typed claude_idle pi_idle screen
   claude_idle=$(printf 'claude\tidle'); pi_idle=$(printf 'pi\tidle')
-  titled='──────────────────────── Firstmate operational input waiting read Users ─'
-  plain_rule='────────────────────────────────────────────────────────────────────────'
+  # Claude draws the titled top rule and the closing rule at one width; the
+  # title is ASCII, so its character count is the same in every locale.
+  local title_text=' Firstmate operational input waiting read Users ' dashes i
+  titled="────────────────────────${title_text}─"
+  dashes=$((24 + ${#title_text} + 1)); plain_rule=''
+  for ((i = 0; i < dashes; i++)); do plain_rule+='─'; done
   empty=$'transcript line\n'"$titled"$'\n❯'"$NBSP"$'\n'"$plain_rule"$'\n  Sonnet 5.5 ░░░░░░░░░░ 9%\n  ⏵⏵ bypass permissions on'
   assert_screen "claude titled idle on tmux" empty "$CAPS_TMUX" "$empty" 2 probe-absent
   assert_screen "claude titled idle on herdr" empty "$CAPS_STYLED" "$empty" '' "$claude_idle"
@@ -277,7 +285,9 @@ assert_multiline_rule_pair() {
 
 test_rule_pair_equal_indentation() {
   local top bottom screen caps draft want verdict claude_idle
-  bottom='────────────────'
+  # Same width as the titled opener '──────── Session ─' (18 columns): a titled
+  # rule proves its composer only when it spans the closing rule's columns.
+  bottom='──────────────────'
   claude_idle=$(printf 'claude\tidle')
   for top in '──────── Session ─' "$bottom"; do
     for draft in '' 'keep this unsent text'; do
@@ -304,13 +314,16 @@ test_rule_pair_equal_indentation() {
 }
 
 test_rule_pair_ambiguity_is_candidate_scoped() {
-  local history top bottom draft screen caps cursor verdict want
-  bottom='────────────────'
+  local history top bottom draft screen caps cursor verdict want r22 r23
+  # Each closing rule spans its titled opener's columns: a titled rule proves
+  # its composer only when it does.
+  r22=$(rule_n 22); r23=$(rule_n 23)
+  bottom=$r23
   for history in \
-    $' ──────── Old example ─\n ❯ old example\n────────────────' \
-    $'──────── Old example ─\n❯ old example\n ────────────────' \
-    $'──────── Old example ─\n❯ old example\n────────────────\n❯ old continuation\n────────────────' \
-    $'──────── Old example ─\n❯ old example\n ──────── pasted title ─\n ❯\n────────────────' \
+    ' ──────── Old example ─'$'\n ❯ old example\n'"$r22" \
+    '──────── Old example ─'$'\n❯ old example\n '"$r22" \
+    '──────── Old example ─'$'\n❯ old example\n'"$r22"$'\n❯ old continuation\n'"$r22" \
+    '──────── Old example ─'$'\n❯ old example\n ──────── pasted title ─\n ❯\n'"$r23" \
     $'╭───╮\n│ ❯ │\n╰────╯'; do
     cursor=$(printf '%s\n' "$history" | wc -l)
     cursor=$((cursor + 2))
@@ -351,8 +364,9 @@ test_rule_pair_ambiguity_is_candidate_scoped() {
 }
 
 test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer() {
-  local history outside prefix draft screen cursor verdict caps
-  for history in $' ──────── Old example ─\n ❯ old example\n────────────────' ''; do
+  local history outside prefix draft screen cursor verdict caps r22 r23
+  r22=$(rule_n 22); r23=$(rule_n 23)
+  for history in ' ──────── Old example ─'$'\n ❯ old example\n'"$r22" ''; do
     for outside in \
       $'  ❯ /exit                       Exit the CLI\n    /context                    Visualize current context usage as a colored grid' \
       $'────────────────\n❯ old example\n────────────────\n\n❯ outside example'; do
@@ -363,7 +377,7 @@ test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer() {
       for draft in '/exit' ''; do
         verdict=empty
         [ -z "$draft" ] || verdict=pending
-        screen="$prefix"$'\n──────── Live session ─\n❯'"$NBSP $draft"$'\n────────────────\n  ⏵⏵ bypass permissions on'
+        screen="$prefix"$'\n──────── Live session ─\n❯'"$NBSP $draft"$'\n'"$r23"$'\n  ⏵⏵ bypass permissions on'
         assert_screen "outside glyph before titled $verdict on cursor" "$verdict" "$CAPS_TMUX" "$screen" "$cursor" probe-absent
         assert_selected_content "outside glyph before titled $verdict tmux extraction" "$draft" "$CAPS_TMUX" "$screen"
         for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
@@ -378,7 +392,9 @@ test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer() {
 
 test_multiline_rule_pair_retains_all_interior_rows() {
   local top bottom screen earlier later
-  bottom='────────────────'
+  # Same width as the titled opener '──────── Session ─' (18 columns): a titled
+  # rule proves its composer only when it spans the closing rule's columns.
+  bottom='──────────────────'
   for top in '──────── Session ─' "$bottom"; do
     screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n ❯\n'"$bottom"
     assert_multiline_rule_pair "$top concrete multiline draft" "$screen" 'keep this unsent text ❯' 2 3
@@ -403,10 +419,12 @@ test_multiline_rule_pair_retains_all_interior_rows() {
 
 test_rule_pair_continuations_never_prove_empty() {
   local top bottom pasted screen caps cursor literal want pi_idle
-  bottom='────────────────'
+  # Same width as the titled opener '──────── Session ─' (18 columns): a titled
+  # rule proves its composer only when it spans the closing rule's columns.
+  bottom='──────────────────'
   pi_idle=$(printf 'pi\tidle')
   for top in '──────── Session ─' "$bottom"; do
-    for pasted in ' ──────── pasted title ─' ' ────────────────' '──────── pasted title ─' "$bottom"; do
+    for pasted in ' ──────── pasted title ─' '──────── pasted title ─' ' ──────── Pasted! ─' ' ────────────────' '──────── Pasted! ─' "$bottom"; do
       screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n'"$pasted"$'\n ❯\n'"$bottom"
       for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
         assert_screen "$top ambiguous pasted rule $pasted" unknown "$caps" "$screen" '' probe-absent
@@ -438,9 +456,44 @@ test_rule_pair_continuations_never_prove_empty() {
   pass "rule-like continuations refuse proof and literal side characters remain draft content"
 }
 
+test_rejected_titled_rule_pair_retains_refusal() {
+  local top bottom screen caps cursor later
+  for top in '──────── pasted title ─' '──────── Café ─'; do
+    bottom=$(rule_n 18)
+    [ "$top" != '──────── Café ─' ] || bottom=$(rule_n 15)
+    screen="$top"$'\n❯\n keep this unsent text\n ❯\n'"$bottom"
+    for caps in "$CAPS_TMUX" "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      assert_screen "$top rejected pair cursorless" unknown "$caps" "$screen" '' probe-absent
+      if fm_composer_extract_selected_content "$caps" "$screen"; then
+        fail "$top rejected pair must refuse extraction"
+      fi
+      if LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"; then
+        fail "$top rejected pair must refuse extraction under LC_ALL=C"
+      fi
+    done
+    for cursor in 1 2 3; do
+      assert_screen "$top rejected pair on cursor row $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+    done
+    for later in '' 'newer draft'; do
+      screen="$top"$'\n❯\n keep this unsent text\n ❯\n'"$bottom"$'\n\n──────── Live session ─\n❯ '"$later"$'\n'"$(rule_n 23)"
+      if [ -z "$later" ]; then
+        assert_screen "$top before newer empty composer" empty "$CAPS_TMUX" "$screen" 7 probe-absent
+        assert_screen "$top before newer empty composer cursorless" empty "$CAPS_STYLED_NOID" "$screen"
+      else
+        assert_screen "$top before newer draft" pending "$CAPS_TMUX" "$screen" 7 probe-absent
+        assert_screen "$top before newer draft cursorless" pending "$CAPS_STYLED_NOID" "$screen"
+      fi
+      assert_selected_content "$top before newer composer extraction" "$later" "$CAPS_STYLED_NOID" "$screen"
+    done
+  done
+  pass "rejected titled rule pairs refuse fallback without poisoning newer composers"
+}
+
 test_rule_pair_pasted_containers_remain_literal() {
   local top bottom pasted screen want later cursor caps
-  bottom='────────────────'
+  # Same width as the titled opener '──────── Session ─' (18 columns): a titled
+  # rule proves its composer only when it spans the closing rule's columns.
+  bottom='──────────────────'
   for top in '──────── Session ─' "$bottom"; do
     screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n ╭───╮\n │ │\n ╰───╯\n'"$bottom"
     assert_multiline_rule_pair "$top indented pasted rounded box" "$screen" 'keep this unsent text ╭───╮ │ │ ╰───╯' 2 5
@@ -483,7 +536,7 @@ test_rule_pair_pasted_containers_remain_literal() {
     screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
     assert_multiline_rule_pair "$top nested opencode leftbar" "$screen" "$want" 2 7
     for later in \
-      $'────────────────\n❯ newer draft\n────────────────' \
+      "$bottom"$'\n❯ newer draft\n'"$bottom" \
       $'╭────────────────────────╮\n│ ❯ newer draft          │\n╰────────────────────────╯'; do
       later="$screen"$'\n\n'"$later"
       for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
@@ -506,7 +559,9 @@ test_rule_pair_pasted_containers_remain_literal() {
 
 test_rule_pair_braille_is_literal_content() {
   local top bottom literal screen caps
-  bottom='────────────────'
+  # Same width as the titled opener '──────── Session ─' (18 columns): a titled
+  # rule proves its composer only when it spans the closing rule's columns.
+  bottom='──────────────────'
   for top in '──────── Session ─' "$bottom"; do
     for literal in '⠋' '⠧' '⠀' '⣿⠿'; do
       screen=$'transcript line\n'"$top"$'\n❯ '"$literal"$'\n'"$bottom"
@@ -1321,6 +1376,59 @@ test_matrix_grok_titled_bottom_border() {
   pass "matrix: grok's real oversized titled bottom is empty while typed and unproved panes stay safe"
 }
 
+test_matrix_claude_titled_top_rule() {
+  # A named Claude Code session draws its title into the composer's TOP rule
+  # (issues #5601 and #5558; observed on herdr as
+  # `─── Firstmate operational input 1790546042 ─`). The strict separator
+  # predicate rejects that row, so the pair never opened, the closing rule
+  # read as a lower unmatched separator, and a visibly empty composer read
+  # `unknown` on every cursorless backend, refusing steers, exit, and relaunch.
+  local rule title top bottom footer screen ansi typed claude_idle
+  local scrollback short nonascii flush blank
+  claude_idle=$(printf 'claude\tidle')
+  rule='────────────────────────────────────────────────────────────'
+  title=' Firstmate operational input 1790546042 '
+  top="${rule}───${title}─"
+  bottom="${rule}────────────────────────────────────────────"
+  footer='  ⏵⏵ bypass permissions on (shift+tab to cycle)'
+  screen="recap: earlier work"$'\n'"$top"$'\n❯'"$NBSP"$'\n'"$bottom"$'\n'"$footer"
+  ansi="${ESC}[38;2;128;130;131mrecap: earlier work${ESC}[0m"$'\n'
+  ansi+="${ESC}[0m${ESC}[38;2;121;129;134m${rule}─── ${ESC}[38;2;177;185;249m${title# }${ESC}[38;2;121;129;134m─${ESC}[0m"$'\n'
+  ansi+="${ESC}[0m${ESC}[38;2;128;130;131m❯${NBSP}${ESC}[0m"$'\n'
+  ansi+="${ESC}[0m${ESC}[38;2;121;129;134m${bottom}${ESC}[0m"$'\n'"$footer"
+  assert_screen "titled claude idle on herdr" empty "$CAPS_STYLED" "$screen" '' "$claude_idle"
+  assert_screen "titled claude idle on herdr (ansi)" empty "$CAPS_STYLED" "$ansi" '' "$claude_idle"
+  assert_screen "titled claude idle on zellij (ansi)" empty "$CAPS_STYLED_NOID" "$ansi"
+  assert_screen "titled claude idle on cmux/orca" empty "$CAPS_PLAIN" "$screen"
+  assert_screen "titled claude idle on tmux" empty "$CAPS_TMUX" "$ansi" 2 probe-absent
+  typed="$top"$'\n❯ fix the login bug\n'"$bottom"$'\n'"$footer"
+  assert_screen "titled claude typed on herdr" pending "$CAPS_STYLED" "$typed" '' "$claude_idle"
+  assert_screen "titled claude typed on zellij" pending "$CAPS_STYLED_NOID" "$typed"
+  assert_screen "titled claude typed on tmux" pending "$CAPS_TMUX" "$typed" 1 probe-absent
+  assert_screen "titled claude typed on plain backends" pending "$CAPS_PLAIN" "$typed"
+  # The staleness rule still holds: a titled sandwich stranded in scrollback,
+  # with transcript rows between it and a lower unmatched rule, stays unknown.
+  scrollback="$top"$'\n❯'"$NBSP"$'\n'"$bottom"$'\nlater transcript output\n'"$bottom"$'\nmore output'
+  assert_screen "titled sandwich in scrollback" unknown "$CAPS_STYLED_NOID" "$scrollback"
+  # Width is proven, not assumed: a titled rule narrower than its closing rule
+  # is not that composer's top edge.
+  short="${rule}${title}─"$'\n❯'"$NBSP"$'\n'"$bottom"
+  assert_screen "mismatched titled rule width" unknown "$CAPS_STYLED_NOID" "$short"
+  # A non-ASCII title leaves residue and refuses rather than guessing width.
+  nonascii="${rule}─── ✳ Firstmate operational input 179054604 ─"$'\n❯'"$NBSP"$'\n'"$bottom"
+  assert_screen "non-ASCII titled rule" unknown "$CAPS_STYLED_NOID" "$nonascii"
+  # The rule must open with the strict separator's dash run.
+  flush=" Firstmate operational input 1790546042 ${rule}────"$'\n❯'"$NBSP"$'\n'"$bottom"
+  assert_screen "title flush at the rule's start" unknown "$CAPS_STYLED_NOID" "$flush"
+  # The strict blank-row posture is untouched: no glyph row, no proof.
+  blank="$top"$'\n\n'"$bottom"
+  assert_screen "titled rule over a blank row" unknown "$CAPS_STYLED_NOID" "$blank"
+  # The untitled pair keeps its verdict alongside the new shape.
+  assert_screen "untitled claude idle on herdr" empty "$CAPS_STYLED" \
+    "$bottom"$'\n❯'"$NBSP"$'\n'"$bottom"$'\n'"$footer" '' "$claude_idle"
+  pass "matrix: claude's titled top rule proves an idle composer empty and a draft pending (#5601, #5558)"
+}
+
 test_matrix_kimi_bordered_shell_glyph_box() {
   # Kimi's bordered `│ > │` composer - the shape fm-spawn.sh's retired
   # spawn-local regex used to own. Now the shared owner proves it everywhere,
@@ -1629,6 +1737,7 @@ test_rule_pair_ambiguity_is_candidate_scoped
 test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer
 test_multiline_rule_pair_retains_all_interior_rows
 test_rule_pair_continuations_never_prove_empty
+test_rejected_titled_rule_pair_retains_refusal
 test_rule_pair_pasted_containers_remain_literal
 test_rule_pair_braille_is_literal_content
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape
@@ -1650,6 +1759,7 @@ test_matrix_pi_separated_needs_identity
 test_matrix_pi_dollar_status_footer_is_empty
 test_matrix_opencode_leftbar_signals
 test_matrix_grok_titled_bottom_border
+test_matrix_claude_titled_top_rule
 test_matrix_kimi_bordered_shell_glyph_box
 test_matrix_claude_inside_zellij_ansi_dump
 test_strict_blank_row_divergence
@@ -1708,6 +1818,161 @@ test_queued_enter_requires_supported_harness
 test_queued_enter_verdict_busy_pending_is_empty
 test_queued_enter_verdict_idle_pending_stays_pending
 test_queued_enter_verdict_does_not_convert_other_states
+
+# The selected row sits on cursor row 1 so a tmux read whose cursor is that
+# row, and a cursorless read, both still see unsubmitted text.
+exit_picker_screen() {
+  printf '%s\n' \
+    'Background work is running' \
+    '❯ 1. Exit and stop tasks' \
+    'The following will stop when you exit:' \
+    'shell · sleep 300' \
+    '  2. Move to background and exit' \
+    '  3. Stay' \
+    'Enter to confirm · Esc to cancel'
+}
+
+fm_test_picker_send() {
+  printf 'Enter\n' >> "$FM_TEST_PICKER_ENTERS"
+}
+
+fm_test_picker_state() {
+  fm_composer_classify_screen 'styled=1' "$FM_TEST_PICKER_SCREEN" 1
+}
+
+test_background_exit_picker_stays_pending_and_blocks_retry() {
+  local screen out rc sink enters
+  screen=$(exit_picker_screen)
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 0 ] || fail "the recorded picker should match"
+  [ "$out" = 'Claude background-task exit picker' ] || fail "dialog name was '$out'"
+  out=$(fm_composer_blocking_dialog 'Background work is running'); rc=$?
+  [ "$rc" -eq 1 ] || fail "a heading alone must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' 'Background work is running' 'Exit and stop tasks')"); rc=$?
+  [ "$rc" -eq 1 ] || fail "two of the three strings must not match"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' "$screen" '' '')"); rc=$?
+  [ "$rc" -eq 0 ] || fail "blank rows below the footer should still match"
+  sink=$(mktemp)
+  FM_COMPOSER_DIALOG_SINK=$sink
+  out=$(fm_composer_classify_screen 'styled=1' "$screen" 1)
+  [ "$out" = pending ] || fail "cursor on the selected row should stay pending, got '$out'"
+  [ "$(cat "$sink")" = 'Claude background-task exit picker' ] || fail "classify should note the dialog, got '$(cat "$sink")'"
+  out=$(fm_composer_classify_screen 'styled=1' "$screen")
+  [ "$out" = pending ] || fail "a styled cursorless picker should stay pending, got '$out'"
+  unset FM_COMPOSER_DIALOG_SINK
+  rm -f "$sink"
+  FM_TEST_PICKER_SCREEN=$screen
+  FM_TEST_PICKER_ENTERS=$(mktemp)
+  : > "$FM_TEST_PICKER_ENTERS"
+  fm_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
+  sink=$FM_COMPOSER_DIALOG_SINK
+  out=$(fm_composer_submit_retry_core fm_test_picker_send fm_test_picker_state win 3 0)
+  fm_composer_dialog_sink_release
+  [ ! -e "$sink" ] || fail "the release should remove a sink that prepare created"
+  [ -z "${FM_COMPOSER_DIALOG_SINK:-}" ] || fail "the release should unset a sink that prepare created"
+  enters=$(grep -c '^Enter$' "$FM_TEST_PICKER_ENTERS" || true)
+  [ "$out" = unknown ] || fail "a picker must stop the retry as unknown, got '$out'"
+  [ "$enters" -eq 1 ] || fail "a picker must receive one Enter, got $enters"
+  rm -f "$FM_TEST_PICKER_ENTERS"
+  unset FM_TEST_PICKER_SCREEN FM_TEST_PICKER_ENTERS
+  pass "the Claude background-task exit picker stays pending and receives no confirming Enter"
+}
+
+# The picker's own text, shown the way a worker pane shows it when it prints
+# this repository's diff, verification note, or a test fixture: quoted above a
+# normal composer. No picker is open, so the next Enter confirms nothing.
+quoted_exit_picker_screen() {
+  printf '%s\n' \
+    '● Here is the fixture the test uses:' \
+    "+    'Background work is running' \\" \
+    "+    '❯ 1. Exit and stop tasks' \\" \
+    "+    'Enter to confirm · Esc to cancel'" \
+    '  The selected row is "❯ 1. Exit and stop tasks" and the footer is "Enter to confirm · Esc to cancel".' \
+    'Background work is running' \
+    '❯ 1. Exit and stop tasks' \
+    'Enter to confirm · Esc to cancel' \
+    '' \
+    '╭──────────────╮' \
+    '│ > next steer │' \
+    '╰──────────────╯'
+}
+
+test_dialog_heading_and_footer_must_be_the_recorded_lines() {
+  local screen out rc
+  screen=$(printf '%s\n' \
+    'The fixture mentions Background work is running in a sentence' \
+    '❯ 1. Exit and stop tasks' \
+    'Enter to confirm · Esc to cancel')
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a heading buried in a sentence must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  screen=$(printf '%s\n' \
+    'Background work is running' \
+    '❯ 1. Exit and stop tasks' \
+    'Enter to confirm the deployment')
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a last line that only starts with the confirm words must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  pass "a buried heading or a different last line is not the exit picker"
+}
+
+test_dialog_note_skips_the_match_when_no_sink_is_set() {
+  local screen out rc before after
+  screen=$(exit_picker_screen)
+  unset FM_COMPOSER_DIALOG_SINK
+  out=$(fm_composer_note_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a note without a sink should return 1, got $rc"
+  [ -z "$out" ] || fail "a note without a sink should print nothing, got '$out'"
+  [ -z "${FM_COMPOSER_DIALOG_SINK:-}" ] || fail "a note without a sink must not create one"
+  out=$(fm_composer_classify_screen 'styled=1' "$screen" 1)
+  [ "$out" = pending ] || fail "classify without a sink should stay pending, got '$out'"
+  trap 'true' RETURN
+  before=$(trap -p RETURN)
+  fm_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
+  fm_composer_dialog_sink_release
+  after=$(trap -p RETURN)
+  trap - RETURN
+  [ "$before" = "$after" ] || fail "release replaced the caller RETURN trap: $after"
+  pass "a dialog note without a sink skips the match, and release leaves a caller RETURN trap"
+}
+
+test_quoted_exit_picker_text_is_not_a_dialog() {
+  local screen out rc sink enters
+  screen=$(quoted_exit_picker_screen)
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "picker text quoted above a normal composer must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' \
+    'Background work is running' \
+    "+    '❯ 1. Exit and stop tasks' \\" \
+    'Enter to confirm · Esc to cancel')"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a selected row that is not alone on its row must not match"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' \
+    '❯ 1. Exit and stop tasks' \
+    'Background work is running' \
+    'Enter to confirm · Esc to cancel')"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a selected row above the heading must not match"
+  FM_TEST_PICKER_SCREEN=$screen
+  FM_TEST_PICKER_ENTERS=$(mktemp)
+  : > "$FM_TEST_PICKER_ENTERS"
+  fm_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
+  sink=$FM_COMPOSER_DIALOG_SINK
+  out=$(fm_composer_submit_retry_core fm_test_picker_send fm_test_picker_state win 3 0)
+  [ ! -s "$sink" ] || fail "quoted picker text must not be noted as a dialog, got '$(cat "$sink")'"
+  fm_composer_dialog_sink_release
+  enters=$(grep -c '^Enter$' "$FM_TEST_PICKER_ENTERS" || true)
+  [ "$out" = pending ] || fail "quoted picker text must keep the ordinary pending verdict, got '$out'"
+  [ "$enters" -eq 3 ] || fail "quoted picker text must keep the ordinary Enter retries, got $enters"
+  rm -f "$FM_TEST_PICKER_ENTERS"
+  unset FM_TEST_PICKER_SCREEN FM_TEST_PICKER_ENTERS
+  pass "picker text quoted above a normal composer is not read as a live picker"
+}
+
+test_background_exit_picker_stays_pending_and_blocks_retry
+test_dialog_heading_and_footer_must_be_the_recorded_lines
+test_dialog_note_skips_the_match_when_no_sink_is_set
+test_quoted_exit_picker_text_is_not_a_dialog
 
 test_cursorless_submit_refreshes_pending_before_retry() (
   local dir backend initial final out

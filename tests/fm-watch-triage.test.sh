@@ -109,12 +109,6 @@ wait_poll_cycle() {  # <state> <pid> [limit-ticks]
   return 1
 }
 
-# Every wait_for_exit budget in this file is 100 ticks (10s), not because any
-# watcher takes that long to decide, but because fm-watch.sh does bounded
-# startup work before its first poll: a tighter budget reaps the process while
-# it is still starting and reports a spurious "did not surface" failure. A
-# generous budget can only remove that false negative - a watcher that never
-# exits still fails the assertion when the budget runs out.
 wait_numeric_file() {
   local file=$1 limit=${2:-30} i=0 value
   while [ "$i" -lt "$limit" ]; do
@@ -2011,6 +2005,38 @@ test_actionable_signal_surfaced() {
   pass "captain-relevant signal is surfaced (queue + exit) and marked surfaced"
 }
 
+assert_watch_offer() {
+  STATE="$1" WATCH_OUT="$2" EXPECT_ELIGIBLE="$3" EXPECT_UNSCOPED="$4" \
+    EXPECT_TASKS="${5:-}" DISPATCH="$ROOT/bin/fm-branch-dispatch.mjs" node --input-type=module <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+const message = readFileSync(process.env.WATCH_OUT, "utf8");
+assert.equal(message.trim().split("\n").length, 1, "one headline per cycle");
+const rows = readFileSync(`${process.env.STATE}/.wake-queue`, "utf8").trim().split("\n").map(line => line.split("\t"));
+for (const away of [false, true]) {
+  const result = spawnSync(process.execPath, [process.env.DISPATCH, "offer", ...(away ? ["--afk"] : [])], {
+    input: message, encoding: "utf8", env: { ...process.env, FM_STATE_OVERRIDE: process.env.STATE },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const offer = Object.fromEntries(result.stdout.trim().split("\n").map(line => {
+    const index = line.indexOf("=");
+    return [line.slice(0, index), line.slice(index + 1)];
+  }));
+  assert.equal(offer.corrupted, "0");
+  assert.equal(offer.eligible, away ? "1" : process.env.EXPECT_ELIGIBLE, `routing for ${message.trim()}`);
+  if (away) continue;
+  assert.equal(offer.unscoped, process.env.EXPECT_UNSCOPED, "heartbeat retains fleet-wide scope");
+  assert.deepEqual(offer.tasks.split(/\s+/).filter(Boolean).sort(), process.env.EXPECT_TASKS.split(/\s+/).filter(Boolean).sort());
+  const offered = new Set(offer.rows.split(/\s+/));
+  for (const row of rows.filter(row => row[2] === "heartbeat")) {
+    assert.equal(offered.has(row[1]), process.env.EXPECT_UNSCOPED === "1", "heartbeat row claim follows headline");
+  }
+}
+JS
+  [ "$?" -eq 0 ] || fail "branch offer rejected the expected routing: $(cat "$2")"
+}
+
 # A signal that lands while the watcher is mid-cycle, a signal that landed while
 # no watcher ran, and a keyed decision all surface as a signal wake on the first
 # classification pass. These pin the two shapes the missed-done report named
@@ -2024,6 +2050,8 @@ test_done_and_keyed_lines_surface_between_and_during_cycles() {
       'blocked [key=shared-prereq] [at=1791488660]: waiting on the shared service'; do
       dir=$(make_case "late-signal-$kind-${line%% *}"); state="$dir/state"; fakebin="$dir/fakebin"
       out="$dir/watch.out"; status_file="$state/task.status"
+      mkdir -p "$dir/approved"
+      printf 'project=%s/approved\nkind=scout\n' "$dir" > "$state/task.meta"
       printf 'working: setup\n' > "$status_file"
       prime_status_seen "$state" "$status_file"
       if [ "$kind" = between ]; then
@@ -2036,32 +2064,32 @@ test_done_and_keyed_lines_surface_between_and_during_cycles() {
         wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "watcher never completed a quiet cycle ($kind/${line%% *})"; }
         printf '%s\n' "$line" >> "$status_file"
       fi
-      wait_for_exit "$pid" 100 || fail "watcher did not signal a ${line%% *} line written $kind cycles"
+      wait_for_exit "$pid" 300 || fail "watcher did not signal a ${line%% *} line written $kind cycles"
       grep -F "signal: $status_file" "$out" >/dev/null \
         || fail "watcher exited for ${line%% *} written $kind cycles without a signal reason: $(cat "$out")"
+      case "$line" in
+        needs-decision*) assert_watch_offer "$state" "$out" 0 0 '' ;;
+        *) assert_watch_offer "$state" "$out" 1 0 task ;;
+      esac
     done
   done
   pass "done, keyed needs-decision, and keyed blocked lines surface whether written between cycles or during one"
 }
 
-# Mark <status-file> as already classified and reported at its current end, so a
-# test's own earlier lines are not an unreported signal.
-prime_status_seen() {  # <state> <status-file>
-  local base
-  base=$(basename "$2" | tr '.' '_')
-  printf '%s' "$(seen_sig "$2")" > "$1/.seen-$base" || fail "could not prime the seen marker for $2"
-}
 
-# The signal scan must not wait behind the cycle's other work. A due check that
-# blocks for its whole timeout used to hold every unreported status line behind
-# it, so a lane's done or decision line reached firstmate only after the check.
 test_signal_not_held_behind_a_blocked_check() {
-  local dir state fakebin out status_file pid
-  dir=$(make_case signal-before-blocked-check); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; status_file="$state/task.status"
-  printf 'working: setup\n' > "$status_file"
-  prime_status_seen "$state" "$status_file"
-  cat > "$state/slow.check.sh" <<'SH'
+  local dir state fakebin out status_file pid line result tasks next_out
+  for result in quiet actionable; do
+    for line in 'done [at=1791490597]: finished during the check' \
+      'needs-decision [key=pick-one] [at=1791488659]: choose A or B' \
+      'blocked [key=shared-prereq] [at=1791488660]: waiting on the shared service'; do
+      dir=$(make_case "signal-in-check-$result-${line%% *}"); state="$dir/state"; fakebin="$dir/fakebin"
+      out="$dir/watch.out"; status_file="$state/task.status"
+      mkdir -p "$dir/approved"
+      printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/task.meta"
+      printf 'working: setup\n' > "$status_file"
+      prime_status_seen "$state" "$status_file" || fail "could not prime the status fixture"
+      cat > "$state/slow.check.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-started"
 n=0
@@ -2069,21 +2097,453 @@ while [ ! -e "$FM_STATE_OVERRIDE/check-release" ] && [ "$n" -lt $(( ${FM_TEST_ST
   sleep 0.1
   n=$((n + 1))
 done
+[ "$FM_TEST_CHECK_RESULT" = quiet ] || printf 'check completed\n'
 SH
-  chmod 0700 "$state/slow.check.sh"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null \
-    || fail "could not register the blocked check"
-  printf 'done [at=1791490597]: finished while the check is blocked\n' >> "$status_file"
-  watch_bg "$state" "$fakebin" "$out" env FM_CHECK_TIMEOUT=120 FM_CHECK_INTERVAL=1
+      chmod 0700 "$state/slow.check.sh"
+      FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null \
+        || fail "could not register the blocked check"
+      watch_bg "$state" "$fakebin" "$out" env FM_CHECK_TIMEOUT=120 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT="$result"
+      pid=$!
+      wait_numeric_file "$state/check-started" 300 \
+        || { reap "$pid"; fail "the check never started: $(cat "$out")"; }
+      printf '%s\n' "$line" >> "$status_file"
+      touch "$state/check-release"
+      wait_for_exit "$pid" 300 \
+        || { reap "$pid"; fail "${line%% *} appended during a $result check was not delivered"; }
+      grep -F "$(printf 'signal\ttask.status\t')" "$state/.wake-queue" >/dev/null \
+        || fail "the $result check exited without queuing ${line%% *}: $(cat "$out")"
+      if [ "$result" = actionable ]; then
+        grep -F 'check completed' "$out" >/dev/null \
+          || fail "the actionable check result was lost: $(cat "$out")"
+        grep -F "$(printf 'check\t%s\t' "$state/slow.check.sh")" "$state/.wake-queue" >/dev/null \
+          || fail "the check result was not queued alongside the signal"
+      else
+        grep -F "signal: $status_file" "$out" >/dev/null \
+          || fail "the quiet check did not yield a signal wake: $(cat "$out")"
+      fi
+      tasks=task
+      case "$line" in needs-decision*) tasks='' ;; esac
+      if [ "$result" = actionable ]; then
+        assert_watch_offer "$state" "$out" 0 0 "$tasks"
+        next_out="$dir/follow-up.out"
+        watch_bg "$state" "$fakebin" "$next_out" env FM_WATCH_HANDLING_SUCCESSOR=1
+        pid=$!
+        wait_for_exit "$pid" 300 || { reap "$pid"; fail "check signal follow-up did not deliver"; }
+        [ "$(cat "$next_out")" = "signal: $status_file" ] || fail "check follow-up lost its signal headline"
+        assert_watch_offer "$state" "$next_out" "$(( ${#tasks} > 0 ))" 0 "$tasks"
+      else
+        assert_watch_offer "$state" "$out" "$(( ${#tasks} > 0 ))" 0 "$tasks"
+      fi
+      [ ! -e "$state/.watch-late-signals" ] || fail "delivered check signal retained a follow-up marker"
+    done
+  done
+  pass "done and keyed decision signals appended during quiet and actionable checks are delivered"
+}
+
+test_flushed_signals_preserve_main_owned_routing() {
+  local dir state fakebin out pid mode ownership id line expected window key decision tasks next_out quiet_out
+  for mode in two-checks stale stale-main; do
+    for ownership in decision routine ship-blocked mate-blocked mate-blocked-unkeyed mate-resolution \
+      mate-reference mate-held mate-routine host-open host-closed; do
+      [ "$mode" != stale-main ] || [ "$ownership" = routine ] || continue
+      dir=$(make_case "flushed-routing-$mode-$ownership"); state="$dir/state"; fakebin="$dir/fakebin"
+      out="$dir/watch.out"; window=test:fm-b; key=test_fm-b
+      mkdir -p "$dir/approved" "$dir/config"
+      for id in a b; do
+        printf 'project=%s/approved\nwindow=test:fm-%s\nkind=ship\n' "$dir" "$id" > "$state/$id.meta"
+        printf 'working: setup\n' > "$state/$id.status"
+      done
+      case "$ownership" in
+        decision) line='needs-decision [key=pick-one]: choose A or B' ;;
+        routine|host-open|host-closed) line='done: first task completed' ;;
+        mate-blocked|ship-blocked) line='blocked [key=access]: need access' ;;
+        mate-blocked-unkeyed) line='blocked: need access' ;;
+        mate-resolution) line='resolved [key=access]: access granted' ;;
+        mate-reference) line='note [key=access]: access request updated' ;;
+        mate-held) line='captain-held [key=access]: awaiting the captain' ;;
+        mate-routine) line='note: parent update after the decision closed' ;;
+      esac
+      case "$ownership" in
+        mate-*) printf 'project=%s/approved\nwindow=test:fm-a\nkind=secondmate\n' "$dir" > "$state/a.meta" ;;
+      esac
+      case "$ownership" in
+        mate-resolution|host-open|host-closed|mate-routine)
+          printf 'needs-decision [key=access]: need access\n' >> "$state/a.status" ;;
+        mate-reference)
+          printf 'blocked [key=access]: need access\n' >> "$state/a.status" ;;
+      esac
+      case "$ownership" in
+        host-closed|mate-routine)
+          printf 'resolved [key=access]: access granted\n' >> "$state/a.status" ;;
+      esac
+      if [ "$mode" = stale-main ]; then
+        printf 'needs-decision [key=budget]: approve the budget\n' >> "$state/b.status"
+      fi
+      for id in a b; do
+        prime_status_seen "$state" "$state/$id.status" || fail "could not prime signal $id"
+        printf '%s\t%s\t%s\t\n' "$id" "$(_fm_open_decisions_file_ident "$state/$id.status")" \
+          "$(size_of "$state/$id.status")" >> "$state/.status-presentation-cursor"
+      done
+      if [ "$mode" = two-checks ]; then
+        for id in a b; do
+          printf '#!/usr/bin/env bash\nid=%s\n' "$id" > "$state/$id.check.sh"
+          cat >> "$state/$id.check.sh" <<'SH'
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-started-$id"
+n=0
+while [ ! -e "$FM_STATE_OVERRIDE/check-release-$id" ] && [ "$n" -lt 1200 ]; do
+  sleep 0.1
+  n=$((n + 1))
+done
+SH
+          chmod 0700 "$state/$id.check.sh"
+          FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null \
+            || fail "could not register check $id"
+        done
+        watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+          FM_CHECK_TIMEOUT=120 FM_CHECK_INTERVAL=1
+        pid=$!
+        wait_numeric_file "$state/check-started-a" 300 \
+          || { reap "$pid"; fail "first check never started"; }
+        printf '%s\n' "$line" >> "$state/a.status"
+        touch "$state/check-release-a"
+        wait_numeric_file "$state/check-started-b" 300 \
+          || { reap "$pid"; fail "second check never started"; }
+        printf 'done: second task completed\n' >> "$state/b.status"
+        touch "$state/check-release-b"
+        expected="signal: $state/a.status $state/b.status"
+      else
+        printf 'idle prompt, finished' > "$dir/pane.txt"
+        printf '%s' "$(hash_text 'idle prompt, finished')" > "$state/.hash-$key"
+        printf '1\n' > "$state/.count-$key"
+        cat > "$fakebin/fm-crew-state.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = b ] && [ "$(cat "$FM_STATE_OVERRIDE/.count-test_fm-b" 2>/dev/null)" = 2 ] \
+  && [ ! -e "$FM_STATE_OVERRIDE/routing-appended" ]; then
+  touch "$FM_STATE_OVERRIDE/routing-appended"
+  printf '%s\n' "$FM_TEST_ROUTING_LINE" >> "$FM_STATE_OVERRIDE/a.status"
+fi
+printf 'state: unknown · source: none · no running pipeline\n'
+SH
+        watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+          FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$dir/pane.txt" FM_TEST_ROUTING_LINE="$line"
+        pid=$!
+        expected="stale: $window"
+      fi
+      wait_for_exit "$pid" 300 || { reap "$pid"; fail "$mode/$ownership watcher did not deliver"; }
+      [ "$(cat "$out")" = "$expected" ] \
+        || fail "$mode/$ownership emitted the wrong routing trigger: $(cat "$out")"
+      if [ "$mode" != two-checks ]; then
+        grep -F "$(printf 'stale\t%s\tstale: %s' "$window" "$window")" "$state/.wake-queue" >/dev/null \
+          || fail "the original stale wake was not preserved"
+      fi
+      decision=0
+      case "$ownership" in
+        decision|mate-blocked|mate-blocked-unkeyed|mate-resolution|mate-reference|mate-held|host-open) decision=1 ;;
+      esac
+      tasks=b
+      [ "$mode" != stale-main ] || tasks=''
+      [ "$decision" -eq 1 ] || tasks="a${tasks:+ $tasks}"
+      if [ "$mode" = stale-main ] || { [ "$mode" = two-checks ] && [ "$decision" -eq 1 ]; }; then
+        assert_watch_offer "$state" "$out" 0 0 "$tasks"
+      else
+        assert_watch_offer "$state" "$out" 1 0 "$tasks"
+      fi
+      if [ "$mode" != two-checks ]; then
+        [ -s "$state/.watch-late-signals" ] || fail "late signal follow-up was not persisted"
+        next_out="$dir/follow-up.out"
+        watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+          FM_WATCH_HANDLING_SUCCESSOR=1
+        pid=$!
+        wait_for_exit "$pid" 300 || { reap "$pid"; fail "$mode/$ownership follow-up did not deliver"; }
+        [ "$(cat "$next_out")" = "signal: $state/a.status" ] \
+          || fail "$mode/$ownership lost its independent signal headline: $(cat "$next_out")"
+        assert_watch_offer "$state" "$next_out" "$((1 - decision))" 0 "$tasks"
+      fi
+      [ ! -e "$state/.watch-late-signals" ] || fail "delivered signal retained its follow-up marker"
+      if [ "$ownership" = routine ]; then
+        quiet_out="$dir/quiet.out"
+        watch_bg "$state" "$fakebin" "$quiet_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+          FM_WATCH_HANDLING_SUCCESSOR=1
+        pid=$!
+        wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "$mode/$ownership follow-up loop: $(cat "$quiet_out")"; }
+        [ ! -s "$quiet_out" ] || { reap "$pid"; fail "an unchanged unread batch woke again"; }
+        reap "$pid"
+      fi
+    done
+  done
+  pass "late signals keep original stale routing and wake once independently, including Main-owned stale rows"
+}
+
+test_heartbeat_late_signal_retains_fleet_scope() {
+  local dir state fakebin out next_out quiet_out pid id real_touch
+  dir=$(make_case heartbeat-late-signal); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  mkdir -p "$dir/approved" "$dir/config"
+  for id in a b; do
+    printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/$id.meta"
+  done
+  printf 'working: setup\n' > "$state/a.status"
+  prime_status_seen "$state" "$state/a.status" || fail "could not prime the late heartbeat signal"
+  printf 'done: missed by the per-signal path\n' > "$state/b.status"
+  printf '%s' "$(seen_sig "$state/b.status")" > "$state/.seen-b_status"
+  touch "$state/.last-heartbeat"
+  set_mtime "$(( $(date +%s) - 60 ))" "$state/.last-heartbeat"
+  real_touch=$(command -v touch)
+  printf '#!/usr/bin/env bash\nreal_touch=%q\n' "$real_touch" > "$fakebin/touch"
+  cat >> "$fakebin/touch" <<'SH'
+if [ "${1:-}" = "$FM_STATE_OVERRIDE/.last-heartbeat" ] && [ ! -e "$FM_STATE_OVERRIDE/heartbeat-appended" ]; then
+  "$real_touch" "$FM_STATE_OVERRIDE/heartbeat-appended"
+  printf 'done: finished during heartbeat publication\n' >> "$FM_STATE_OVERRIDE/a.status"
+fi
+exec "$real_touch" "$@"
+SH
+  chmod 0700 "$fakebin/touch"
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+    FM_HEARTBEAT=1
   pid=$!
-  if ! wait_for_exit "$pid" 100; then
-    touch "$state/check-release"
-    fail "a done line stayed unsignaled while a due check blocked the cycle"
-  fi
-  touch "$state/check-release"
-  grep -F "signal: $status_file" "$out" >/dev/null \
-    || fail "watcher exited without the done signal: $(cat "$out")"
-  pass "a done line is signaled before a blocked check is waited on"
+  wait_for_exit "$pid" 300 || { reap "$pid"; fail "heartbeat with a late signal did not deliver"; }
+  [ "$(cat "$out")" = heartbeat ] || fail "late routine signal replaced heartbeat scope: $(cat "$out")"
+  [ "$(cat "$state/.heartbeat-streak")" = 1 ] || fail "heartbeat delivery lost its cadence"
+  grep -F "$(printf 'signal\ta.status\t')" "$state/.wake-queue" >/dev/null || fail "heartbeat omitted the late signal row"
+  assert_watch_offer "$state" "$out" 1 1 a
+  next_out="$dir/follow-up.out"
+  watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" FM_WATCH_HANDLING_SUCCESSOR=1
+  pid=$!
+  wait_for_exit "$pid" 300 || { reap "$pid"; fail "heartbeat signal follow-up did not deliver"; }
+  [ "$(cat "$next_out")" = "signal: $state/a.status" ] || fail "heartbeat follow-up lost its signal headline"
+  assert_watch_offer "$state" "$next_out" 1 0 a
+  [ ! -e "$state/.watch-late-signals" ] || fail "heartbeat follow-up retained its marker"
+  quiet_out="$dir/quiet.out"
+  watch_bg "$state" "$fakebin" "$quiet_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" FM_WATCH_HANDLING_SUCCESSOR=1
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "heartbeat signal follow-up looped: $(cat "$quiet_out")"; }
+  [ ! -s "$quiet_out" ] || { reap "$pid"; fail "heartbeat batch woke twice"; }
+  reap "$pid"
+  pass "a late routine signal preserves heartbeat fleet scope and gets one task-scoped follow-up"
+}
+
+test_late_signal_follow_up_filters_drained_rows() {
+  local dir state fakebin out next_out quiet_out pid id consume seq
+  for consume in all partial unwritable; do
+    dir=$(make_case "late-signal-consumed-$consume"); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+    mkdir -p "$dir/approved" "$dir/config"
+    for id in a b; do
+      printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/$id.meta"
+      printf 'working: setup\n' > "$state/$id.status"
+      prime_status_seen "$state" "$state/$id.status" || fail "could not prime late signal $id"
+    done
+    cat > "$state/late.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'run\n' >> "$FM_STATE_OVERRIDE/late-check-runs"
+[ ! -e "$FM_STATE_OVERRIDE/late-check-injected" ] || exit 0
+touch "$FM_STATE_OVERRIDE/late-check-injected"
+printf 'needs-decision [key=access]: need access\n' >> "$FM_STATE_OVERRIDE/a.status"
+printf 'done: routine task completed\n' >> "$FM_STATE_OVERRIDE/b.status"
+[ ! -e "$FM_STATE_OVERRIDE/late-marker-unwritable" ] || mkdir "$FM_STATE_OVERRIDE/.watch-late-signals"
+printf 'late check completed\n'
+SH
+    chmod 0700 "$state/late.check.sh"
+    FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" late >/dev/null || fail "could not register late signal check"
+    [ "$consume" != unwritable ] || touch "$state/late-marker-unwritable"
+    watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" FM_CHECK_INTERVAL=1 \
+      FM_WATCH_HANDLING_SUCCESSOR=1
+    pid=$!
+    if [ "$consume" = unwritable ]; then
+      wait_for_exit "$pid" 300 || { reap "$pid"; fail "marker-store failure did not deliver its queued signals"; }
+      [ "$(cat "$out")" = "signal: $state/a.status $state/b.status" ] \
+        || fail "marker-store failure lost its accumulated signal headline: $(cat "$out")"
+      assert_watch_offer "$state" "$out" 0 0 b
+      [ "$(cat "$state/.prelude-progress")" = 10 ] || fail "signal fallback skipped unfinished checks"
+      [ "$(grep -Fc "$(printf 'check\t%s\tcheck: %s: late check completed' "$state/late.check.sh" "$state/late.check.sh")" "$state/.wake-queue")" -eq 1 ] \
+        || fail "marker-store failure lost the completed one-shot check row"
+      rmdir "$state/.watch-late-signals"
+      next_out="$dir/recovery.out"
+      watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1
+      pid=$!
+      wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "successor did not finish the interrupted checks: $(cat "$next_out")"; }
+      [ ! -s "$next_out" ] || { reap "$pid"; fail "marker failure caused a duplicate signal wake"; }
+      [ ! -e "$state/.prelude-progress" ] || { reap "$pid"; fail "successor left completed maintenance owed"; }
+      [ "$(wc -l < "$state/late-check-runs" | tr -d '[:space:]')" -ge 2 ] \
+        || { reap "$pid"; fail "successor did not rerun the one-shot check"; }
+      [ "$(grep -Fc "$(printf 'check\t%s\tcheck: %s: late check completed' "$state/late.check.sh" "$state/late.check.sh")" "$state/.wake-queue")" -eq 1 ] \
+        || { reap "$pid"; fail "successor duplicated or lost the one-shot check row"; }
+      reap "$pid"
+      continue
+    fi
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "late signal check did not deliver"; }
+    case "$(cat "$out")" in check:*'late check completed'*) ;; *) fail "late signals changed the check headline" ;; esac
+    assert_watch_offer "$state" "$out" 0 0 b
+    [ -s "$state/.watch-late-signals" ] || fail "check omitted its durable follow-up"
+    if [ "$consume" = partial ]; then
+      seq=$(STATE="$state" node --input-type=module -e 'import { readFileSync } from "node:fs"; console.log(readFileSync(`${process.env.STATE}/.wake-queue`, "utf8").split("\n").map(line => line.split("\t")).find(row => row[2] === "signal" && row[3] === "b.status")[1]);')
+      FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" activate "$$" late-signal-test || fail "could not reserve the routine signal"
+      FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" publish late-signal-test "$seq" || fail "could not grant the routine signal"
+    fi
+    ack_stopped_cycle "$state" || fail "Main could not drain the late signals"
+    if [ "$consume" = partial ]; then
+      FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" deactivate "$$" late-signal-test || fail "could not release the routine signal"
+    fi
+    next_out="$dir/follow-up.out"
+    watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" FM_WATCH_HANDLING_SUCCESSOR=1
+    pid=$!
+    if [ "$consume" = partial ]; then
+      wait_for_exit "$pid" 300 || { reap "$pid"; fail "remaining late signal was not delivered"; }
+      [ "$(cat "$next_out")" = "signal: $state/b.status" ] || fail "follow-up included an already-drained signal"
+      assert_watch_offer "$state" "$next_out" 1 0 b
+      quiet_out="$dir/quiet.out"
+      watch_bg "$state" "$fakebin" "$quiet_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" FM_WATCH_HANDLING_SUCCESSOR=1
+      pid=$!
+    else
+      quiet_out=$next_out
+    fi
+    wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "drained late signal follow-up was not skipped: $(cat "$quiet_out")"; }
+    [ ! -s "$quiet_out" ] || { reap "$pid"; fail "consumed late signal woke again"; }
+    [ ! -e "$state/.watch-late-signals" ] || { reap "$pid"; fail "consumed late signal marker remained"; }
+    reap "$pid"
+  done
+  pass "follow-ups filter drained rows and marker-store failures preserve one-shot check results in successor posture"
+}
+
+test_late_signal_output_failure_retries() {
+  local dir state fakebin out next_out quiet_out fifo pid reader rc mode queue
+  for mode in follow-up prelude; do
+    dir=$(make_case "late-signal-output-failure-$mode"); state="$dir/state"; fakebin="$dir/fakebin"
+    out="$dir/watch.out"; fifo="$dir/output.fifo"
+    mkdir -p "$dir/approved" "$dir/config"
+    printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/task.meta"
+    printf 'working: setup\n' > "$state/task.status"
+    prime_status_seen "$state" "$state/task.status" || fail "could not prime output-failure signal"
+    cat > "$state/late.check.sh" <<'SH'
+#!/usr/bin/env bash
+[ ! -e "$FM_STATE_OVERRIDE/late-check-injected" ] || exit 0
+touch "$FM_STATE_OVERRIDE/late-check-injected"
+printf 'done: finished during the check\n' >> "$FM_STATE_OVERRIDE/task.status"
+[ "$FM_TEST_CHECK_RESULT" = quiet ] || printf 'late check completed\n'
+SH
+    chmod 0700 "$state/late.check.sh"
+    FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" late >/dev/null \
+      || fail "could not register output-failure check"
+    if [ "$mode" = follow-up ]; then
+      watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=actionable
+      pid=$!
+      wait_for_exit "$pid" 300 || { reap "$pid"; fail "initial check did not deliver"; }
+      case "$(cat "$out")" in check:*'late check completed') ;; *) fail "initial check lost its headline" ;; esac
+      assert_watch_offer "$state" "$out" 0 0 task
+      [ -s "$state/.watch-late-signals" ] || fail "initial check omitted the follow-up marker"
+      printf '10\n' > "$state/.prelude-progress"
+      queue=$(cat "$state/.wake-queue")
+    fi
+    mkfifo "$fifo"
+    sh -c ': < "$1"' _ "$fifo" & reader=$!
+    watch_bg "$state" "$fakebin" "$fifo" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=quiet \
+      bash -c 'trap "" PIPE; exec "$@"' _ 2> "$dir/failed-output.err"
+    pid=$!
+    wait "$reader" || fail "failed-output reader did not close"
+    rc=0
+    wait_for_exit "$pid" 300 || rc=$?
+    [ "$rc" -eq 1 ] || fail "$mode did not report an output-write failure (rc=$rc)"
+    [ -s "$state/.watch-late-signals" ] || fail "$mode consumed its marker before successful output"
+    grep -F "$(printf 'signal\ttask.status\t')" "$state/.wake-queue" >/dev/null \
+      || fail "$mode lost its durable signal row"
+    if [ "$mode" = follow-up ]; then
+      [ "$(cat "$state/.wake-queue")" = "$queue" ] || fail "failed follow-up changed its durable batch"
+    fi
+    queue=$(cat "$state/.wake-queue")
+    if [ "$mode" = follow-up ]; then
+      [ "$(cat "$state/.prelude-progress")" = 10 ] || fail "failed follow-up advanced interrupted maintenance"
+    fi
+    next_out="$dir/retry.out"
+    watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=quiet
+    pid=$!
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$mode did not ring after output recovered"; }
+    [ "$(cat "$next_out")" = "signal: $state/task.status" ] || fail "$mode retry lost its signal headline"
+    assert_watch_offer "$state" "$next_out" 1 0 task
+    [ ! -e "$state/.watch-late-signals" ] || fail "$mode successful retry retained its marker"
+    [ "$(cat "$state/.wake-queue")" = "$queue" ] || fail "$mode retry changed its durable batch"
+    if [ "$mode" = follow-up ]; then
+      [ "$(cat "$state/.prelude-progress")" = 10 ] || fail "successful follow-up skipped interrupted maintenance"
+    fi
+    quiet_out="$dir/quiet.out"
+    watch_bg "$state" "$fakebin" "$quiet_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1 FM_TEST_CHECK_RESULT=quiet
+    pid=$!
+    wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "$mode repeated its delivered signal"; }
+    [ ! -s "$quiet_out" ] || { reap "$pid"; fail "$mode successful retry caused a follow-up loop"; }
+    [ ! -e "$state/.prelude-progress" ] || { reap "$pid"; fail "$mode did not finish owed maintenance"; }
+    [ "$(cat "$state/.wake-queue")" = "$queue" ] \
+      || { reap "$pid"; fail "$mode retry duplicated or lost a queued row"; }
+    reap "$pid"
+  done
+  pass "follow-up and end-of-prelude output failures preserve signal markers until one successful successor ring"
+}
+
+
+test_late_signal_marker_failure_before_procevent() {
+  local dir state fakebin out next_out pid fault real_mv marker
+  for fault in directory write rename; do
+    dir=$(make_case "late-marker-procevent-$fault"); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+    mkdir -p "$dir/approved" "$dir/config"
+    printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/a.meta"
+    printf 'working: setup\n' > "$state/a.status"
+    prime_status_seen "$state" "$state/a.status" || fail "could not prime process-event late signal"
+    append_wake "$state" check procevent:late-marker:1 'check: process-event fixture' \
+      || fail "could not queue process-event fixture"
+    printf '6\n' > "$state/.prelude-progress"
+    printf '%s\n' "$fault" > "$state/late-marker-fault"
+    real_mv=$(command -v mv)
+    printf '#!/usr/bin/env bash\nreal_mv=%q\n' "$real_mv" > "$fakebin/mv"
+    cat >> "$fakebin/mv" <<'SH'
+dest=${!#}
+if [ "$dest" = "$FM_STATE_OVERRIDE/.prelude-progress" ] \
+  && [ ! -e "$FM_STATE_OVERRIDE/late-signal-injected" ]; then
+  "$real_mv" "$@" || exit
+  [ "$(cat "$dest")" = 7 ] || exit 0
+  touch "$FM_STATE_OVERRIDE/late-signal-injected"
+  printf 'done: finished before process-event delivery\n' >> "$FM_STATE_OVERRIDE/a.status"
+  case "$(cat "$FM_STATE_OVERRIDE/late-marker-fault")" in
+    directory) mkdir "$FM_STATE_OVERRIDE/.watch-late-signals" ;;
+    write) mkdir "$FM_STATE_OVERRIDE/.watch-late-signals.tmp.$(cat "$FM_STATE_OVERRIDE/.watch.lock/pid")" ;;
+  esac
+  exit 0
+fi
+if [ "$dest" = "$FM_STATE_OVERRIDE/.watch-late-signals" ] \
+  && [ "$(cat "$FM_STATE_OVERRIDE/late-marker-fault" 2>/dev/null)" = rename ]; then
+  exit 1
+fi
+exec "$real_mv" "$@"
+SH
+    chmod 0700 "$fakebin/mv"
+    watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1
+    pid=$!
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$fault marker failure lost the queued signal"; }
+    [ "$(cat "$out")" = "signal: $state/a.status" ] \
+      || fail "$fault marker failure emitted the wrong headline: $(cat "$out")"
+    assert_watch_offer "$state" "$out" 1 0 a
+    [ "$(cat "$state/.prelude-progress")" = 7 ] || fail "signal fallback advanced process-event maintenance"
+    for marker in "$state"/.seen-procevent-*; do
+      [ ! -e "$marker" ] || fail "signal fallback marked the process-event headline delivered"
+    done
+    [ ! -e "$state/.wake-queue.lock" ] || fail "signal fallback retained the process-event queue lock"
+    case "$fault" in
+      directory) rmdir "$state/.watch-late-signals" ;;
+      write) rmdir "$state/.watch-late-signals.tmp.$pid" ;;
+    esac
+    rm -f "$state/late-marker-fault"
+    next_out="$dir/follow-up.out"
+    watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1
+    pid=$!
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$fault marker failure lost the interrupted process-event wake"; }
+    [ "$(cat "$next_out")" = 'check: process-event result captured: procevent:late-marker:1' ] \
+      || fail "successor did not deliver the interrupted process-event headline: $(cat "$next_out")"
+    [ "$(cat "$state/.prelude-progress")" = 8 ] || fail "successful process-event delivery did not advance maintenance"
+    [ ! -e "$state/.wake-queue.lock" ] || fail "process-event delivery retained its queue lock"
+  done
+  pass "late marker failures deliver signals and leave interrupted process-event wakes owed"
 }
 
 # A low-priority wake used to pre-empt the signal scan: an overdue-ledger wake
@@ -2099,43 +2559,91 @@ test_signal_not_preempted_by_an_overdue_ledger() {
   printf 'done [at=1791490597]: finished behind an overdue ledger\n' >> "$status_file"
   watch_bg "$state" "$fakebin" "$out" env FM_OPEN_LOOPS_INTERVAL=999999
   pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher did not exit for a done line behind an overdue ledger"
+  wait_for_exit "$pid" 300 || fail "watcher did not exit for a done line behind an overdue ledger"
   grep -F "signal: $status_file" "$out" >/dev/null \
     || fail "an overdue ledger pre-empted the done signal: $(cat "$out")"
   ack_stopped_cycle "$state" || fail "could not acknowledge the signal wake"
   watch_bg "$state" "$fakebin" "$second_out" env FM_OPEN_LOOPS_INTERVAL=999999
   pid=$!
-  wait_for_exit "$pid" 100 || fail "the overdue ledger never surfaced after the signal wake"
+  wait_for_exit "$pid" 300 || fail "the overdue ledger never surfaced after the signal wake"
   grep -F 'check: open-loop-ledger' "$second_out" >/dev/null \
     || fail "the ledger wake did not follow the signal wake: $(cat "$second_out")"
   pass "the signal wake goes first and the overdue ledger surfaces on the next cycle"
 }
 
-# Signals-first is bounded: after FM_PRELUDE_MAX_DEFER consecutive signal wakes the
-# cycle's other work runs first once, so a chatty fleet cannot starve it forever.
 test_cycle_work_runs_after_bounded_signal_deferrals() {
-  local dir state fakebin status_file pid n out order=''
+  local dir state fakebin status_file pid n out order='' id
   dir=$(make_case bounded-signal-deferral); state="$dir/state"; fakebin="$dir/fakebin"
   status_file="$state/task.status"
   printf 'working: setup\n' > "$status_file"
   prime_status_seen "$state" "$status_file"
   write_overdue_ledger "$state"
-  for n in 1 2 3 4; do
+  for id in a b; do
+    cat > "$state/$id.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$(basename "$0")" >> "$FM_STATE_OVERRIDE/checks-ran"
+printf 'maintenance completed\n'
+SH
+    chmod 0700 "$state/$id.check.sh"
+    FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null \
+      || fail "could not register maintenance check $id"
+  done
+  for n in 1 2 3 4 5 6 7 8; do
+    write_overdue_ledger "$state" "lost-launcher-$n"
+    if [ "$n" -eq 5 ]; then
+      for id in a b; do
+        mkdir -p "$dir/mate-$id/state"
+        printf 'mate-%s\n' "$id" > "$dir/mate-$id/.fm-secondmate-home"
+        printf 'kind=secondmate\nhome=%s\n' "$dir/mate-$id" > "$state/mate-$id.meta"
+        printf '100\t7\tcheck\tmaintenance\tcheck: unfinished maintenance\n' > "$dir/mate-$id/state/.wake-queue"
+        printf '%s\t100-7\n' "$(( $(date +%s) - 100 ))" > "$state/.secondmate-wake-progress-mate-$id"
+      done
+    fi
+    if [ "$n" -eq 6 ]; then
+      append_wake "$state" check procevent:maintenance:captured:1 "check: process-event maintenance completed" \
+        || fail "could not queue the process-event fixture"
+    fi
     printf 'done [at=%s]: chatty finish %s\n' "$((1791490000 + n))" "$n" >> "$status_file"
     out="$dir/watch-$n.out"
-    watch_bg "$state" "$fakebin" "$out" env FM_OPEN_LOOPS_INTERVAL=999999 FM_PRELUDE_MAX_DEFER=2
+    watch_bg "$state" "$fakebin" "$out" env FM_OPEN_LOOPS_INTERVAL=999999 FM_CHECK_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=1 FM_SECONDMATE_WAKE_STALL_SECS=1
     pid=$!
-    wait_for_exit "$pid" 100 || fail "watcher $n did not exit under a chatty fleet"
+    wait_for_exit "$pid" 300 || fail "watcher $n did not exit under a chatty fleet: $(cat "$out")"
     case "$(cat "$out")" in
       signal:*) order="$order signal" ;;
       'check: open-loop-ledger'*) order="$order ledger" ;;
+      'check: secondmate wake-loop stalled:'*) order="$order stall" ;;
+      'check: process-event'*) order="$order procevent" ;;
+      *'maintenance completed'*) order="$order checks" ;;
       *) order="$order other" ;;
+    esac
+    case "$n" in
+      4|5|6)
+        [ -e "$state/.prelude-deferred" ] && [ -e "$state/.prelude-progress" ] \
+          || fail "early wake $n cleared unfinished maintenance debt"
+        if [ "$n" -eq 5 ]; then
+          for id in a b; do
+            grep -F "$(printf 'check\tsecondmate-wake-loop-mate-%s-100-7\t' "$id")" "$state/.wake-queue" >/dev/null \
+              || fail "the first stalled mate skipped sibling mate $id"
+          done
+        fi
+        ;;
+      7)
+        [ -e "$state/.secondmate-liveness-tick" ] || fail "liveness never ran after the ledger wake"
+        [ "$(wc -l < "$state/checks-ran" | tr -d '[:space:]')" -eq 2 ] \
+          || fail "one actionable check skipped its sibling"
+        for id in a b; do
+          grep -F "$(printf 'check\t%s\t' "$state/$id.check.sh")" "$state/.wake-queue" >/dev/null \
+            || fail "maintenance check $id was not delivered"
+        done
+        [ ! -e "$state/.prelude-deferred" ] && [ ! -e "$state/.prelude-progress" ] \
+          || fail "completed maintenance retained its debt"
+        ;;
     esac
     ack_stopped_cycle "$state" || fail "could not acknowledge wake $n"
   done
-  [ "$order" = ' signal signal ledger signal' ] \
-    || fail "bounded deferral order was:$order (want: signal signal ledger signal)"
-  pass "the cycle's other work runs after two deferred cycles and signals resume first"
+  [ "$order" = ' signal signal signal ledger stall procevent checks signal' ] \
+    || fail "bounded deferral order was:$order"
+  pass "maintenance debt survives early wakes until both stalled mates, process-events, and every due check run"
 }
 
 # A bad deferral marker must fall back to the previous order, never starve signals
@@ -2151,15 +2659,17 @@ test_invalid_prelude_deferral_marker_restores_the_previous_order() {
   printf 'done [at=1791490597]: finished\n' >> "$status_file"
   watch_bg "$state" "$fakebin" "$out" env FM_OPEN_LOOPS_INTERVAL=999999
   pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher did not exit with an invalid deferral marker"
+  wait_for_exit "$pid" 300 || fail "watcher did not exit with an invalid deferral marker"
   grep -F 'check: open-loop-ledger' "$out" >/dev/null \
     || fail "an invalid deferral marker did not restore the previous order: $(cat "$out")"
+  grep -F "$(printf 'signal\ttask.status\t')" "$state/.wake-queue" >/dev/null \
+    || fail "an owed ledger wake omitted the pending done signal"
   pass "an invalid deferral marker restores the previous cycle order"
 }
 
-write_overdue_ledger() {  # <state>
-  printf '{"schema":"fm-open-loops.v1","generated_epoch":%s,"home":"%s","complete":true,"rows":[{"id":"lost-launcher","category":"missing_worker","subject":"lost-launcher","owner":"firstmate","next_action":"recover","age_seconds":9999,"limit_seconds":600,"overdue":true}]}\n' \
-    "$(date +%s)" "${FM_HOME:-${FM_ROOT_OVERRIDE:-$ROOT}}" > "$1/open-loops.json"
+write_overdue_ledger() {
+  printf '{"schema":"fm-open-loops.v1","generated_epoch":%s,"home":"%s","complete":true,"rows":[{"id":"%s","category":"missing_worker","subject":"lost-launcher","owner":"firstmate","next_action":"recover","age_seconds":9999,"limit_seconds":600,"overdue":true}]}\n' \
+    "$(date +%s)" "${FM_HOME:-${FM_ROOT_OVERRIDE:-$ROOT}}" "${2:-lost-launcher}" > "$1/open-loops.json"
 }
 
 # A needs-decision status append surfaced through this actionable signal path
@@ -6604,6 +7114,66 @@ test_captain_held_never_rechecked_while_away_record_exists() {
   pass "a captain-held item is never rechecked while the away-posture record exists, and the recheck returns once the record is archived"
 }
 
+# Quiet mode's record is a present captain (bin/fm-afk-contract.sh AWAY OR
+# QUIET), so it silences nothing: the same hold is rechecked with that record
+# live, both on the watcher's own cadence and through the one-shot handoff a
+# running quiet daemon owns.
+write_quiet_record() {  # <state>
+  if ! FM_HOME="$(dirname "$1")" FM_STATE_OVERRIDE="$1" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1; then
+    fail "could not write quiet mode's record in $1"
+  fi
+}
+
+test_captain_held_rechecked_under_a_quiet_record() {
+  local dir state fakebin out capture_file statusf window key back pid
+  dir=$(make_case quiet-record-held); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-hold.status"
+  window="test:fm-secondmate-hold"
+  printf 'idle awaiting the captain\n' > "$capture_file"
+  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-hold.meta"
+  printf 'captain-held [key=route]: tracked by task-decision-route\n' > "$statusf"
+  back=$(( $(date +%s) - 500 ))
+  if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
+  else touch -m -d "@$back" "$statusf"; fi
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-secondmate-hold_status"
+  key=$(printf '%s' "$window" | tr '.:/' '___')
+  printf '%s' "$(hash_text "idle awaiting the captain")" > "$state/.hash-$key"
+  printf '1\n' > "$state/.count-$key"
+  write_quiet_record "$state"
+  export FM_FAKE_CREW_STATE='state: unknown · source: none · no current-state source available'
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "a captain-held item was not rechecked beside quiet mode's record"; }
+  unset FM_FAKE_CREW_STATE
+  grep -F "awaiting the captain" "$out" >/dev/null || fail "the recheck beside a quiet record did not name the captain: $(cat "$out")"
+  ! grep -F 'never rechecked while the away-posture record exists' "$state/.watch-triage.log" >/dev/null 2>&1 \
+    || fail "quiet mode's record silenced a captain-held item as if the captain were away: $(cat "$state/.watch-triage.log")"
+  [ -f "$state/.afk-contract" ] || fail "fixture: quiet mode's record is gone"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the captain-held recheck"
+
+  dir=$(make_case quiet-daemon-held-oneshot); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/held-afk.status"
+  window="test:fm-held-afk"
+  printf 'idle awaiting the captain\n' > "$capture_file"
+  printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/held-afk.meta"
+  printf 'captain-held [key=route]: tracked by task-decision-route\n' > "$statusf"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-held-afk_status"
+  key=$(printf '%s' "$window" | tr '.:/' '___')
+  printf 'quiet\n' > "$state/.afk"
+  write_quiet_record "$state"
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_FAKE_TMUX_CURRENT_COMMAND=zsh \
+    FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "the quiet daemon's one-shot never handed off a captain-held pane"; }
+  grep -F "stale: $window" "$state/.wake-queue" >/dev/null \
+    || fail "the quiet daemon's one-shot did not queue the captain-held pane for the daemon: $(cat "$state/.wake-queue" 2>/dev/null)"
+  pass "quiet mode's record silences no captain-held recheck, on the watcher's cadence or through a quiet daemon's one-shot"
+}
+
 test_live_captain_held_first_sight_silenced_by_away_record() {
   local dir state fakebin out capture_file statusf window key sig pid
   dir=$(make_case away-record-held-live); state="$dir/state"; fakebin="$dir/fakebin"
@@ -6821,6 +7391,11 @@ test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines
 test_actionable_signal_surfaced
 test_done_and_keyed_lines_surface_between_and_during_cycles
 test_signal_not_held_behind_a_blocked_check
+test_flushed_signals_preserve_main_owned_routing
+test_heartbeat_late_signal_retains_fleet_scope
+test_late_signal_follow_up_filters_drained_rows
+test_late_signal_output_failure_retries
+test_late_signal_marker_failure_before_procevent
 test_signal_not_preempted_by_an_overdue_ledger
 test_cycle_work_runs_after_bounded_signal_deferrals
 test_invalid_prelude_deferral_marker_restores_the_previous_order
@@ -6910,6 +7485,7 @@ test_captain_held_never_rechecked_while_away_record_exists
 test_live_captain_held_first_sight_silenced_by_away_record
 test_backlog_hold_never_rechecked_while_away_record_exists
 test_afk_one_shot_never_hands_off_captain_held_under_away_record
+test_captain_held_rechecked_under_a_quiet_record
 test_paused_until_near_future_is_quiet_before_the_cadence
 test_paused_until_wrong_year_is_bounded_by_the_cadence
 test_paused_until_that_passed_is_rechecked_before_the_cadence

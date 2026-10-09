@@ -24,6 +24,9 @@
 # Primary config/claude-permission-mode is a captain-wide safety preference
 # (bypass or auto for every claude launch), so it flows down too and a
 # secondmate's own claude crewmates launch on the same permission posture.
+# Primary config/supervision-host-off is the fleet's supervision-host opt-out,
+# so a primary that opts out opts every secondmate home out too, while each
+# home's config/supervision-host engine line stays its own.
 # config/keep-ai-trailers is home-local and never inherited: each home chooses
 # its own commit-attribution policy.
 # It also pushes
@@ -81,7 +84,7 @@ FM_SHARED_CAPTAIN_MODE="444"
 # The declared inheritable set (space-separated, config-dir-relative item paths).
 # Extend here to inherit more of the primary's local config; override via the
 # environment only in tests. Items must not contain whitespace.
-FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-model-index.json crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist compact-adviser session-launch-policy claude-permission-mode claude-launcher lavish-axi-host}"
+FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-model-index.json crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist compact-adviser session-launch-policy claude-permission-mode claude-launcher lavish-axi-host supervision-host-off}"
 
 # Items whose value is a home-SESSION enablement decision rather than durable
 # local configuration. They are inherited at the launch convergence point, where
