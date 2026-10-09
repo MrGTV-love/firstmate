@@ -1,0 +1,21 @@
+/Users/charlesabrooker/tmp/fm-lab.Jkx1BU
+trusted: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.L9r9fn/wt
+trusted (project root): /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.L9r9fn/proj
+Isolated Claude auth: {
+  "loggedIn": true,
+  "authMethod": "oauth_token",
+  "apiProvider": "firstParty"
+}
+Claude version: 2.1.295 (Claude Code)
+Tmux version: tmux 3.5a
+starting from a genuine stopped-task shell in private endpoint primary:worker
+stopped endpoint: genuine shell, classifier=dead endpoint=primary:worker
+monitor parser: accepted URL=https://github.com/example/repo/pull/90
+watcher dispatch gate: accepted provider=github URL=https://github.com/example/repo/pull/90 number=90
+home session tracing: off
+
+SCENARIO: recorded PR relaunch, tracing off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Jkx1BU
+REFUSED: tmux endpoint 'primary:worker' is malformed or does not belong to task prrelaunch27092; preserving task state.
+not ok - tracing-off relaunch failed
+cleanup: private fm-lab tmux server, marked lab home and worktree fixture removed

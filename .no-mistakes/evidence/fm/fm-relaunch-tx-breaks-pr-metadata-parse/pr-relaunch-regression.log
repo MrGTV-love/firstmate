@@ -1,0 +1,20 @@
+Targeted existing regression: test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring
+Executed alone using a disposable driver containing the existing test definitions; no repository-wide suite was run.
+These hermetic checks use a stubbed runtime and are supporting regression evidence, NOT live-product scenarios.
+
+TARGET
+$ bash tests/.pr-relaunch-regression-validation.sh
+ok - fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing off
+ok - fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing on
+exit=0
+
+ORIGINAL BASE COMMIT WRITER
+$ env FM_TEST_ALT_BIN="$PWD/tests/.pr-relaunch-baseline-bin" bash tests/.pr-relaunch-regression-validation.sh
+not ok - PR monitoring must still parse the relaunched task record with tracing off (got: rejected)
+exit=1 (expected reproduction)
+
+TRANSACTION ORDER FIX PRESENT, TRACE WRITER RESTORED TO OLD APPEND BEHAVIOR
+$ env FM_TEST_ALT_BIN="$PWD/tests/.pr-relaunch-trace-before-bin" bash tests/.pr-relaunch-regression-validation.sh
+ok - fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing off
+not ok - PR monitoring must still parse the relaunched task record with tracing on (got: rejected)
+exit=1 (expected reproduction of confirmed R1)

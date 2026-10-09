@@ -1,0 +1,48 @@
+/Users/charlesabrooker/tmp/fm-lab.F9IWOD
+trusted: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.ZAOwnV/wt
+trusted (project root): /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.ZAOwnV/proj
+Claude version: 2.1.295 (Claude Code)
+Tmux version: tmux 3.5a
+setup: approving worktree-contained instruction imports in private Claude config
+export FM_HOME='/Users/charlesabrooker/tmp/fm-lab.F9IWOD' CLAUDE_CONFIG_DIR='/Users/charlesabrooker/.no-mistakes/worktre
+es/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.ZAOwnV/claude-config' CLAUDE_SECURE
+STORAGE_CONFIG_DIR='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/t
+est-tmp/fm-pr-relaunch-tmux.ZAOwnV/claude-config' DISABLE_AUTOUPDATER=1; unset FM_GATE_REFUSE_BYPASS FM_ROOT_OVERRIDE FM
+_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE; claude -n 'PR monitoring relaunch validation'
+charlesabrooker@Mac-Studio wt % export FM_HOME='/Users/charlesabrooker/tmp/fm-lab.F9IWOD' CLAUDE_CONFIG_DIR='/Users/char
+lesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.ZAO
+wnV/claude-config' CLAUDE_SECURESTORAGE_CONFIG_DIR='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNB
+HH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.ZAOwnV/claude-config' DISABLE_AUTOUPDATER=1; unset FM_GATE_R
+EFUSE_BYPASS FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE; claude -n 'PR
+monitoring relaunch validation'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+not ok - Claude readiness unavailable (agent=alive composer=unknown)
+cleanup: private fm-lab tmux server, marked lab home and worktree fixture removed

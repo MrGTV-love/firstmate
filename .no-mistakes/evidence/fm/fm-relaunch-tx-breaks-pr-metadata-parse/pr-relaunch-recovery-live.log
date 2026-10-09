@@ -1,0 +1,164 @@
+/Users/charlesabrooker/tmp/fm-lab.ojtloB
+trusted: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+trusted (project root): /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/proj
+Isolated Claude auth: {
+  "loggedIn": true,
+  "authMethod": "oauth_token",
+  "apiProvider": "firstParty"
+}
+Claude version: 2.1.295 (Claude Code)
+Tmux version: tmux 3.5a
+starting from a genuine stopped-task shell in private endpoint primary:fm-prrelaunch59644
+stopped endpoint: genuine shell, classifier=dead endpoint=primary:fm-prrelaunch59644
+monitor parser: accepted URL=https://github.com/example/repo/pull/90
+watcher dispatch gate: accepted provider=github URL=https://github.com/example/repo/pull/90 number=90
+home session tracing: off
+
+SCENARIO: recorded PR relaunch, tracing off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no ship branch; defaulting to legacy branch fm/prrelaunch59644
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: prrelaunch59644 ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for prrelaunch59644: unavailable - no TypeSafe or OpenRouter key
+relaunched prrelaunch59644 harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-prrelaunch59644 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+monitor parser: accepted URL=https://github.com/example/repo/pull/90
+watcher dispatch gate: accepted provider=github URL=https://github.com/example/repo/pull/90 number=90
+carrier count=0
+Published task metadata:
+window=primary:fm-prrelaunch59644
+endpoint_task_id=prrelaunch59644
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/proj
+harness=claude
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/prrelaunch59644
+tasktmp=/tmp/fm-prrelaunch59644
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791515070.92353.23710
+spawn_gen=s1791515071.84372.19872
+control_relaunch_tx=80573.20261009T030426Z.11348
+pr=https://github.com/example/repo/pull/90
+pr_head=0123456789abcdef0123456789abcdef01234567
+x_request=request-90
+ok - LIVE: tracing-off relaunch keeps recorded PR accepted by monitoring
+stopped endpoint: genuine shell, classifier=dead endpoint=primary:fm-prrelaunch59644
+monitor parser: accepted URL=https://github.com/example/repo/pull/90
+watcher dispatch gate: accepted provider=github URL=https://github.com/example/repo/pull/90 number=90
+home session tracing: on
+
+SCENARIO: traced recorded PR relaunch, attempt 1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no ship branch; defaulting to legacy branch fm/prrelaunch59644
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: prrelaunch59644 ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for prrelaunch59644: unavailable - no TypeSafe or OpenRouter key
+relaunched prrelaunch59644 harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-prrelaunch59644 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+replacement Claude: alive in the preserved endpoint
+monitor parser: accepted URL=https://github.com/example/repo/pull/90
+watcher dispatch gate: accepted provider=github URL=https://github.com/example/repo/pull/90 number=90
+carrier count=1 value=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+Published task metadata:
+window=primary:fm-prrelaunch59644
+endpoint_task_id=prrelaunch59644
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/proj
+harness=claude
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/prrelaunch59644
+tasktmp=/tmp/fm-prrelaunch59644
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791515079.21440.6587
+spawn_gen=s1791515080.13172.14619
+control_relaunch_tx=6504.20261009T030437Z.18156
+traceparent=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+pr=https://github.com/example/repo/pull/90
+pr_head=0123456789abcdef0123456789abcdef01234567
+x_request=request-90
+ok - LIVE: tracing-on relaunch attempt 1 preserves parseable PR and one stable carrier
+stopped endpoint: genuine shell, classifier=dead endpoint=primary:fm-prrelaunch59644
+
+SCENARIO: traced recorded PR relaunch, attempt 2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no ship branch; defaulting to legacy branch fm/prrelaunch59644
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: prrelaunch59644 ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for prrelaunch59644: unavailable - no TypeSafe or OpenRouter key
+relaunched prrelaunch59644 harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-prrelaunch59644 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+replacement Claude: alive in the preserved endpoint
+monitor parser: accepted URL=https://github.com/example/repo/pull/90
+watcher dispatch gate: accepted provider=github URL=https://github.com/example/repo/pull/90 number=90
+carrier count=1 value=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+Published task metadata:
+window=primary:fm-prrelaunch59644
+endpoint_task_id=prrelaunch59644
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/proj
+harness=claude
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/prrelaunch59644
+tasktmp=/tmp/fm-prrelaunch59644
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791515086.34232.4934
+spawn_gen=s1791515087.30647.16573
+control_relaunch_tx=28402.20261009T030444Z.25557
+traceparent=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+pr=https://github.com/example/repo/pull/90
+pr_head=0123456789abcdef0123456789abcdef01234567
+x_request=request-90
+ok - LIVE: tracing-on relaunch attempt 2 preserves parseable PR and one stable carrier
+stopped endpoint: genuine shell, classifier=dead endpoint=primary:fm-prrelaunch59644
+
+ADVERSARIAL: replay old invalid publication order against monitor consumer
+old transaction-after-PR record: REJECTED
+old carrier-after-PR record: REJECTED
+
+SCENARIO: traced relaunch without recorded PR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no ship branch; defaulting to legacy branch fm/prrelaunch59644
+warning: /Users/charlesabrooker/tmp/fm-lab.ojtloB/data/prrelaunch59644/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: prrelaunch59644 ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for prrelaunch59644: unavailable - no TypeSafe or OpenRouter key
+relaunched prrelaunch59644 harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-prrelaunch59644 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+Published no-PR task metadata:
+window=primary:fm-prrelaunch59644
+endpoint_task_id=prrelaunch59644
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/proj
+harness=claude
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/prrelaunch59644
+tasktmp=/tmp/fm-prrelaunch59644
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791515092.55699.11774
+spawn_gen=s1791515093.50016.24167
+control_relaunch_tx=46719.20261009T030450Z.10356
+traceparent=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+ok - LIVE: traced no-PR relaunch retains one carrier at end of record
+stopped endpoint: genuine shell, classifier=dead endpoint=primary:fm-prrelaunch59644
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ojtloB
+already-stopped prrelaunch59644 harness=claude backend=tmux endpoint=primary:fm-prrelaunch59644 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCNBHH0RJC0P3T69ZP04Q/.no-mistakes/test-tmp/fm-pr-relaunch-tmux.oaAUTI/wt
+cleanup: private fm-lab tmux server, marked lab home and worktree fixture removed
