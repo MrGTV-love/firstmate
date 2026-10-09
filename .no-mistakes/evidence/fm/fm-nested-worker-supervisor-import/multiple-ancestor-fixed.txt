@@ -1,0 +1,50 @@
+COMMAND: env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/cfg-multiple-ancestor-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{"claudeMdExcludes": ["/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.local.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/AGENTS.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/CLAUDE.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/rules/**", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.local.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/AGENTS.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/CLAUDE.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/rules/**", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md", "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"]}'
+
+ ▐▛███▛█   Claude Code v2.1.295
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/…/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/projects/proj/.claude/worktrees/task
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents                                                                                         ◐ medium · /effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

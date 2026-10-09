@@ -1,0 +1,3 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46
+skill selection for nested-raw: undelivered - raw launch command has no supported brief transport
+spawned nested-raw harness=claude kind=scout window=controller:fm-nested-raw worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/pool/.treehouse/proj-5d0a06/1/proj

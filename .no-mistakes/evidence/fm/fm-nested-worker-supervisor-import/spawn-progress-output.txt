@@ -1,0 +1,3 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5
+skill selection for progress: unavailable - no TypeSafe or OpenRouter key
+spawned progress harness=claude kind=scout window=controller:fm-progress worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5/projects/pool/.treehouse/proj-18b02c/1/proj

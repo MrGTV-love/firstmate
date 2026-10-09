@@ -1,0 +1,48 @@
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:proj charlesabrooker$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/pool/.treehouse/proj-5d0a06/1/proj. Type '
+exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:proj charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/pool/.treehouse/proj-5d0a
+06/1/proj'
+Mac-Studio:proj charlesabrooker$ export GOTMPDIR=/tmp/fm-nested-raw/gotmp
+Mac-Studio:proj charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:proj charlesabrooker$ export FM_TASK_ID=nested-raw
+Mac-Studio:proj charlesabrooker$ . '/tmp/fm-nested-raw+efa40cb404d4f230628348f825770ba593005a16a9e80cadd45a0ca2b7f45aa0/launch.s1791528166.10291.28995.sh'
+ ▐▛███▛█   Claude Code v2.1.295
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/pool/.treehouse/proj-5d0a06/1/proj
+
+⚠ Remote managed settings failed to load (unexpected error) · no remote policy applied · /status for details
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

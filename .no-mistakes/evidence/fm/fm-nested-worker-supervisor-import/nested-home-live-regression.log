@@ -1,0 +1,22 @@
+Command: TMPDIR="$PWD/.validation/tmp" FM_CLAUDE_NESTED_HOME_LIVE=1 bash tests/fm-claude-nested-home-live-e2e.test.sh
+Exit: 1
+# live claude version: 2.1.295 (Claude Code)
+ok - control: a copy that is not nested under a firstmate home reaches the composer
+ok - reproduction: a nested copy without the exclusion parks on 'Allow external CLAUDE.md file imports?'
+ok - fixed: the same nested copy launched with the production exclusion reaches the composer with no dialog
+not ok - special-path: the nested copy still parked on a startup dialog with the production exclusion:
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for third-party repositories.
+
+  External imports:
+    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/tmp/fm-nested-home.WwfY96/R&D [home] it's {x}/AGENTS.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel

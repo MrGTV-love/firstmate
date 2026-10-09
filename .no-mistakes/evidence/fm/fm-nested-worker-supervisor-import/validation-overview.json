@@ -1,0 +1,453 @@
+{
+  "claude_version": "2.1.295",
+  "checks": {
+    "live-results.json": [
+      {
+        "name": "control",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-control ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "reproduction",
+        "passed": true,
+        "expected": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/AGENTS.md",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-reproduction ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        },
+        "classification": "unknown launch-prompt"
+      },
+      {
+        "name": "canonical-fixed",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-canonical-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "special-path-fixed",
+        "passed": false,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-special-path-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "raw-fixed",
+        "passed": false,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-raw-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/bin/fm-claude-memory-lib.sh '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' claude --setting-sources project,local",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "raw-inline-fixed",
+        "passed": false,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-raw-inline-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/bin/fm-claude-memory-lib.sh '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' claude --setting-sources project,local '--settings={\"feedbackDrafts\": \"off\", \"claudeMdExcludes\": [\"project/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "raw-file-fixed",
+        "passed": false,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-raw-file-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/bin/fm-claude-memory-lib.sh '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\\\[home\\\\] it'\"'\"'s \\\\{x\\\\}/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' claude --setting-sources project,local --settings /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/caller-settings.json",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/R&D \\[home\\] it's \\{x\\}/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "project-import-preserved",
+        "passed": true,
+        "expected": "legitimate.md",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-project-import-preserved ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/home/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        },
+        "classification": "unknown launch-prompt"
+      },
+      {
+        "name": "home-root-preserved",
+        "passed": true,
+        "expected": "root-external.md",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime/cfg-home-root-preserved ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        },
+        "classification": "unknown launch-prompt"
+      }
+    ],
+    "dialog-live-results.json": [
+      {
+        "name": "bypass-permissions",
+        "passed": true,
+        "classification": "unknown launch-prompt",
+        "dialog": "bypass-permissions confirmation",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/dialog-lab/bypass-permissions ANTHROPIC_API_KEY=sk-ant-fm-start-dialog-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\":[\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' --dangerously-skip-permissions"
+      },
+      {
+        "name": "custom-api-key",
+        "passed": true,
+        "classification": "unknown launch-prompt",
+        "dialog": "custom API key choice",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/dialog-lab/custom-api-key ANTHROPIC_API_KEY=sk-ant-fm-start-dialog-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\":[\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'"
+      },
+      {
+        "name": "workspace-trust",
+        "passed": true,
+        "classification": "unknown launch-prompt",
+        "dialog": "workspace trust (Quick safety check)",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/dialog-lab/workspace-trust ANTHROPIC_API_KEY=sk-ant-fm-start-dialog-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\":[\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'"
+      }
+    ],
+    "exclusion-consumer-isolation.json": [
+      {
+        "name": "ampersand-only",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-ampersand-only ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/R&D only/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "brackets-only",
+        "passed": false,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-brackets-only ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\\\[home\\\\]/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\\\[home\\\\]/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\\\[home\\\\]/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\\\[home\\\\]/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\\\[home\\\\]/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\[home\\]/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\[home\\]/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\[home\\]/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\[home\\]/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square \\[home\\]/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "braces-only",
+        "passed": false,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-braces-only ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\\\{x\\\\}/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\\\{x\\\\}/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\\\{x\\\\}/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\\\{x\\\\}/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\\\{x\\\\}/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\{x\\}/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\{x\\}/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\{x\\}/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\{x\\}/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/brace \\{x\\}/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "apostrophe-only",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-apostrophe-only ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it'\"'\"'s/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it'\"'\"'s/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it'\"'\"'s/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it'\"'\"'s/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it'\"'\"'s/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it's/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it's/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it's/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it's/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/quote it's/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "brackets-character-class-control",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-brackets-character-class-control ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/square [[]home[]]/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "raw-normal-none",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-raw-normal-none ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/bin/fm-claude-memory-lib.sh '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' claude --setting-sources project,local",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "raw-normal-inline",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-raw-normal-inline ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/bin/fm-claude-memory-lib.sh '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' claude --setting-sources project,local '--settings={\"feedbackDrafts\": \"off\", \"claudeMdExcludes\": [\"project/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "raw-normal-file",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/cfg-raw-normal-file ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/bin/fm-claude-memory-lib.sh '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' claude --setting-sources project,local --settings /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/caller.json",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-isolate/normal/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      }
+    ],
+    "topology-live-results.json": [
+      {
+        "name": "secondmate-reproduction",
+        "passed": true,
+        "expected": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/AGENTS.md",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/cfg-secondmate-reproduction ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        },
+        "classification": "unknown launch-prompt"
+      },
+      {
+        "name": "multiple-ancestor-fixed",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/cfg-multiple-ancestor-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**"
+          ]
+        }
+      },
+      {
+        "name": "symlink-ancestor-fixed",
+        "passed": false,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/cfg-symlink-ancestor-fixed ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/secondmate/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-topology/outer/.claude/rules/**"
+          ]
+        }
+      }
+    ],
+    "symlink-live-results.json": [
+      {
+        "name": "symlink-ancestor-fixed-redrive",
+        "passed": true,
+        "expected": "composer",
+        "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/cfg-symlink-ancestor-fixed-redrive ANTHROPIC_API_KEY=sk-ant-fm-nested-home-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\": [\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/CLAUDE.local.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/AGENTS.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/.claude/CLAUDE.md\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/.claude/rules/**\"]}'",
+        "settings": {
+          "claudeMdExcludes": [
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/CLAUDE.local.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/AGENTS.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/.claude/CLAUDE.md",
+            "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/runtime-symlink/home/.claude/rules/**"
+          ]
+        }
+      }
+    ]
+  },
+  "live_scope": "Real Claude startup on isolated private tmux servers; no prompts submitted and no credentials changed. New exclusion helper and raw-launch merger were exercised with the actual CLI. Full fm-spawn real-primary lifecycle was blocked by the marked-home/workspace boundary conflict.",
+  "baseline": "Startup-confirmation and busy-state suites passed. Initial dispatch-profile and nested-home live suites encountered workspace-nesting fixture refusals. The live fixture was repaired, then re-driven and failed only its new special-path consumer regression.",
+  "test_change": "tests/fm-claude-nested-home-live-e2e.test.sh now isolates configs, excludes surrounding non-fixture homes, uses a nonzero terminal grid, and retains a genuine special-character live regression."
+}

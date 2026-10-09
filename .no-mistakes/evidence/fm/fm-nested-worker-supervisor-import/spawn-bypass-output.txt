@@ -1,0 +1,4 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.s8lMBg
+skill selection for bypass: undelivered - raw launch command has no supported brief transport
+warning: claude worker bypass is stopped on its startup dialog 'bypass-permissions confirmation' and has not begun its instructions; send no keys, a person must answer it in window controller:fm-bypass
+spawned bypass harness=claude kind=scout window=controller:fm-bypass worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.s8lMBg/projects/pool/.treehouse/proj-683b9f/1/proj

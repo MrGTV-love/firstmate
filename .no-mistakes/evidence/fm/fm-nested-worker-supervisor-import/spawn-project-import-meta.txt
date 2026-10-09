@@ -1,0 +1,14 @@
+window=controller:fm-project-import
+endpoint_task_id=project-import
+worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/pool/.treehouse/proj-5d0a06/2/proj
+project=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/proj
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-project-import
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+api_key=allow
+busy_gen=g1791528258.51369.28329
+spawn_gen=s1791528264.12493.22524

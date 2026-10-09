@@ -1,0 +1,14 @@
+window=controller:fm-progress
+endpoint_task_id=progress
+worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5/projects/pool/.treehouse/proj-18b02c/1/proj
+project=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5/projects/proj
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-progress
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+api_key=allow
+busy_gen=g1791528880.27786.16770
+spawn_gen=s1791528882.88907.9357

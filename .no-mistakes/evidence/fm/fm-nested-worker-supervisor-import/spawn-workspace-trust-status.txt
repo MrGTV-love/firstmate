@@ -1,0 +1,1 @@
+blocked [at=1791528800]: claude is stopped on its startup dialog 'workspace trust (Quick safety check)' and has not begun its instructions; a person must answer it in window controller:fm-workspace-trust

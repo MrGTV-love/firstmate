@@ -1,0 +1,48 @@
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:proj charlesabrooker$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.s8lMBg/projects/pool/.treehouse/proj-683b9f/1/proj. Type '
+exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:proj charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.s8lMBg/projects/pool/.treehouse/proj-683b
+9f/1/proj'
+Mac-Studio:proj charlesabrooker$ export GOTMPDIR=/tmp/fm-bypass/gotmp
+Mac-Studio:proj charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:proj charlesabrooker$ export FM_TASK_ID=bypass
+Mac-Studio:proj charlesabrooker$ . '/tmp/fm-bypass+5f4c1e3e6da4bf89892e773fe2ed571f435f500dfbf3e5c5c9371c70932c79b6/launch.s1791528572.10279.11994.sh'
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  WARNING: Claude Code running in Bypass Permissions mode
+
+  In Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous commands.
+  This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged.
+
+  By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.
+
+  https://code.claude.com/docs/en/security
+
+  ❯ No, exit
+    Yes, I accept
+
+  Enter to confirm · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

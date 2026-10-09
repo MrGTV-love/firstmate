@@ -1,0 +1,34 @@
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:proj charlesabrooker$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5/projects/pool/.treehouse/proj-18b02c/1/proj. Type '
+exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:proj charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5/projects/pool/.treehouse/proj-18b0
+2c/1/proj'
+Mac-Studio:proj charlesabrooker$ export GOTMPDIR=/tmp/fm-progress/gotmp
+Mac-Studio:proj charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:proj charlesabrooker$ export FM_TASK_ID=progress
+Mac-Studio:proj charlesabrooker$ . '/tmp/fm-progress+69b86a3c4aa1b5cf61537c9b390b45a33ce3a6b8db7592020a4c0b5f8806cb48/launch.s1791528882.88907.9357.sh'
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for third-party repositories.
+
+  External imports:
+    /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5/reference.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel
+

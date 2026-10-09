@@ -1,0 +1,1 @@
+blocked [at=1791528373]: claude is stopped on its startup dialog 'Allow external CLAUDE.md file imports?' and has not begun its instructions; a person must answer it in window controller:fm-project-import

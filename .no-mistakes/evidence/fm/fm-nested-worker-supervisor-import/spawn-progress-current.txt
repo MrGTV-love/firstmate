@@ -1,0 +1,12 @@
+
+❯ : Firstmate operational input waiting: read
+  '/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.BVCQy5/state/operational-inbox/1791528883-75b32c4aa545bb53.msg' and handle
+  its contents as Firstmate operational input.
+
+✻ Fiddle-faddling… (running UserPromptSubmit hook · 4s)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt · ← for agents                                                                    ◐ medium · /effort
+

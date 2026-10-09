@@ -1,0 +1,14 @@
+window=controller:fm-workspace-trust
+endpoint_task_id=workspace-trust
+worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.s8lMBg/projects/pool/.treehouse/proj-683b9f/2/proj
+project=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.s8lMBg/projects/proj
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-workspace-trust
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+api_key=allow
+busy_gen=g1791528725.45057.10732
+spawn_gen=s1791528727.59759.25653

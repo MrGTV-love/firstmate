@@ -1,0 +1,3 @@
+Command: bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/fm-lab-primary
+Exit: 1
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/fm-lab-primary': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"

@@ -1,0 +1,5 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46
+WARNING: watcher still down (same stale episode; last beat: 228s ago, grace 900s) - full banner already printed this episode.
+skill selection for api-choice: undelivered - raw launch command has no supported brief transport
+warning: claude worker api-choice is stopped on its startup dialog 'custom API key choice' and has not begun its instructions; send no keys, a person must answer it in window controller:fm-api-choice
+spawned api-choice harness=claude kind=scout window=controller:fm-api-choice worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/pool/.treehouse/proj-5d0a06/3/proj

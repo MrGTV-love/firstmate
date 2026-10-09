@@ -1,0 +1,7 @@
+Real-primary fm-spawn lifecycle checks were not driven live.
+
+The supported bin/fm-lab-home.sh create under the worktree exited 1: a lab home must live outside the repository (see lab-home-refusal.log). This phase permits intentional fixture/configuration writes only inside the worktree. Neither changing backends nor using the normal existing login resolves that home-authorization conflict. Forging a marker, moving the lab elsewhere, or using a bypass was not attempted.
+
+For re-run, explicitly authorize a disposable outside-repository FM_HOME, then follow the supplied marked-home/private-tmux real-primary recipe. tmux, claude, and omp were present on PATH. teamclaude was absent; its live integration additionally needs the genuine CLI and an authenticated proxy without changing production credentials.
+
+The startup-confirmation suite passed its fixture reporting and progress-over-history cases, but those are not live lifecycle evidence. Genuine Claude dialogs were separately rendered and passed through production busy-state classification, not fm-spawn stderr/status publication from a real primary.

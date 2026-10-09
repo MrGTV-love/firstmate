@@ -1,0 +1,14 @@
+window=controller:fm-api-choice
+endpoint_task_id=api-choice
+worktree=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/pool/.treehouse/proj-5d0a06/3/proj
+project=/Users/charlesabrooker/.no-mistakes/evidence/01M4EXCFFXV5ZVRXQ95RXK339W/fm-lab.u3nu46/projects/proj
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-api-choice
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+api_key=allow
+busy_gen=g1791528398.75503.13345
+spawn_gen=s1791528405.17697.5330

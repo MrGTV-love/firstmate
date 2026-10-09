@@ -1,0 +1,23 @@
+[
+  {
+    "name": "bypass-permissions",
+    "passed": true,
+    "classification": "unknown launch-prompt",
+    "dialog": "bypass-permissions confirmation",
+    "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/dialog-lab/bypass-permissions ANTHROPIC_API_KEY=sk-ant-fm-start-dialog-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\":[\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}' --dangerously-skip-permissions"
+  },
+  {
+    "name": "custom-api-key",
+    "passed": true,
+    "classification": "unknown launch-prompt",
+    "dialog": "custom API key choice",
+    "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/dialog-lab/custom-api-key ANTHROPIC_API_KEY=sk-ant-fm-start-dialog-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\":[\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'"
+  },
+  {
+    "name": "workspace-trust",
+    "passed": true,
+    "classification": "unknown launch-prompt",
+    "dialog": "workspace trust (Quick safety check)",
+    "command": "env CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/dialog-lab/workspace-trust ANTHROPIC_API_KEY=sk-ant-fm-start-dialog-throwaway DISABLE_AUTOUPDATER=1 claude --setting-sources project,local --settings '{\"claudeMdExcludes\":[\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/CLAUDE.local.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/CLAUDE.md\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.claude/rules/**\"]}'"
+  }
+]

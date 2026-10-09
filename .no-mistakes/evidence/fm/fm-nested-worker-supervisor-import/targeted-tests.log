@@ -1,0 +1,84 @@
+FM_TEST_BEGIN 2026-10-09T05:51:09Z tests/fm-spawn-claude-start-confirm.test.sh family=unclassified expected_gate_skip=none
+ok - a claude worker parked on any of its startup dialogs is reported loudly and stays recorded
+ok - verified active and completed turns override all four historical dialog signatures
+ok - absence of proof without a dialog is not a fault
+ok - a dialog that clears inside the window is not reported
+ok - an unreadable pane ends the start wait immediately
+# all fm-spawn-claude-start-confirm tests passed
+FM_TEST_END 2026-10-09T06:06:55Z tests/fm-spawn-claude-start-confirm.test.sh exit=0 duration_ms=945417 gate_skip=false
+FM_TEST_BEGIN 2026-10-09T06:06:55Z tests/fm-spawn-dispatch-profile.test.sh family=backend-dispatch expected_gate_skip=none
+ok - allowlist=absent preserves the operational floor and filters only when opted in
+ok - allowlist=missing-config preserves the operational floor and filters only when opted in
+ok - allowlist=enabled preserves the operational floor and filters only when opted in
+ok - allowlist=empty preserves the operational floor and filters only when opted in
+ok - invalid allowlist names refuse before launch or task publication
+ok - inaccessible config with present allowlist refuses before launch or task publication
+ok - inaccessible config with absent allowlist refuses before launch or task publication
+ok - inaccessible ancestor with present allowlist refuses before launch or task publication
+ok - inaccessible ancestor with absent allowlist refuses before launch or task publication
+not ok - secondmate with an allowlist should spawn: error: secondmate home cannot be inside the firstmate repo: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCFFXV5ZVRXQ95RXK339W/.validation/tmp/fm-spawn-dispatch-profile.G97M2p/env-secondmate/secondmate-home: expected exit 0, got 1
+FM_TEST_END 2026-10-09T06:13:29Z tests/fm-spawn-dispatch-profile.test.sh exit=1 duration_ms=393011 gate_skip=false
+FM_TEST_BEGIN 2026-10-09T06:13:29Z tests/fm-busy-state.test.sh family=standalone expected_gate_skip=none
+ok - native progress is generation-bound, separately recorded, and cleared on arm and retire
+ok - arm mints a gen sidecar and seeds busy fm-spawn at seq=1
+ok - apply advances seq under the armed gen and attributes the writing source
+ok - firstmate-owned interrupt and recovery events bind to the current gen
+ok - apply is refused for a task whose busy contract was never armed
+ok - retire waits for the writer lock and cannot remove a new incarnation
+ok - retire treats only an absent sidecar as already retired
+ok - the writer breaks a stale lock instead of dying on GNU stat output
+ok - a late event from a previous incarnation is rejected, record unchanged
+ok - a record from a stale incarnation classifies unknown, never idle
+ok - a converted adapter with no record classifies unknown, never idle
+ok - malformed records classify unknown malformed, never busy or idle
+ok - a record with no armed gen sidecar classifies unknown
+ok - a record is trusted only by the adapter whose source wrote it
+ok - converted adapters never classify busy from rendered footer text
+ok - a Claude launch parked on any of its four startup dialogs classifies unknown launch-prompt
+ok - a Pi-family launch (pi, pi-signed, omp) parked on the project-trust dialog classifies unknown launch-prompt
+ok - the Pi signature requires both the dialog heading and its decline option, not the bare word trust
+ok - a Gemini launch parked on its trust, auth-picker, or API-key dialog classifies unknown launch-prompt
+ok - the launch-prompt backstop never reclassifies a genuinely working launch
+ok - the launch-prompt backstop is scoped to harnesses with a verified signature
+ok - the launch-prompt backstop only ever touches the untouched fm-spawn seed
+ok - the launch-prompt backstop never runs without a captured tail
+ok - the grok fallback is regex-scoped to grok and classifies only grok tasks
+ok - codex classifies unknown until a semantic source passes its verification gate
+ok - standalone kimi classifies unknown until the live verification gate opens
+ok - cursor classifies only from its transcript fold, never rendered text or native state
+ok - endpoint death is the only process-level override and yields dead, never busy
+ok - herdr's native verdict is trusted for busy only, and records outrank it
+ok - record parsing never clobbers the caller's positional parameters, glob setting, or fields
+ok - the boolean view reports busy only on an exact busy verdict
+all fm-busy-state tests passed
+FM_TEST_END 2026-10-09T06:14:11Z tests/fm-busy-state.test.sh exit=0 duration_ms=42063 gate_skip=false
+FM_TEST_BEGIN 2026-10-09T06:14:11Z tests/fm-claude-nested-home-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+# live claude version: 2.1.295 (Claude Code)
+not ok - control: a copy outside any firstmate home parked on a dialog:
+
+────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current
+  working directory. Never allow this for third-party repositories.
+
+  External imports:
+    /Users/charlesabrooker/.no-mistakes/…/01M4EXCFFXV5ZVRXQ95RXK339W/AGENTS.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted
+  files may pose security risks https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel
+FM_TEST_END 2026-10-09T06:14:38Z tests/fm-claude-nested-home-live-e2e.test.sh exit=1 duration_ms=26768 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=2 skipped_gate=0 duration_ms=1410720
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=393011 failed=1
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=26768 failed=1
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=42063 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=945417 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-claude-start-confirm.test.sh duration_ms=945417
+FM_TEST_SLOWEST rank=2 script=tests/fm-spawn-dispatch-profile.test.sh duration_ms=393011
+FM_TEST_SLOWEST rank=3 script=tests/fm-busy-state.test.sh duration_ms=42063
+FM_TEST_SLOWEST rank=4 script=tests/fm-claude-nested-home-live-e2e.test.sh duration_ms=26768
