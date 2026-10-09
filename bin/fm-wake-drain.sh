@@ -335,6 +335,7 @@ EOF
 print_status_outcome_backstop_section() {  # <task-and-endpoint-snapshot>
   local snapshot=$1 task endpoint ident event event_endpoint line verb key receipt store lock ready
   local output='' used=0 shown=0 omitted=0 bytes item_bytes=220 global_bytes=4000 rc=0
+  local _FM_STATUS_STAT_BATCH=''
   [ "$ACTOR" = main ] || return 0
 
   store="$STATE/branch-outcomes.jsonl"
@@ -360,6 +361,7 @@ print_status_outcome_backstop_section() {  # <task-and-endpoint-snapshot>
   fi
 
   STATUS_OUTCOME_BACKSTOP_ACKNOWLEDGED=
+  _fm_status_stat_batch_into "$STATE" _FM_STATUS_STAT_BATCH
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     status_outcome_backstop_cursor_offset "$STATE/$task.status" receipt || { rc=1; break; }
@@ -432,13 +434,7 @@ EOF
 # when the fold later advances the cursor. Prints nothing when nothing is
 # unread, which is the common case.
 print_unread_status_section() {
-  local snapshot=${1:-} unread task line shown=0
-
-  if [ -n "$snapshot" ]; then
-    unread=$(scan_unread_surface_snapshot "$STATE" "$snapshot") || return 1
-  else
-    unread=$(scan_unread_surface_lines "$STATE") || return 1
-  fi
+  local unread=$1 task line shown=0
   [ -n "$unread" ] || return 0
 
   while IFS=$'\t' read -r task line; do
@@ -756,13 +752,13 @@ cap_outcome_line() {  # <line> <max-bytes>
 }
 
 print_status_sections() {
-  local snapshot=${1:-} fully_presented=${2:-} acknowledged prepared
+  local snapshot=${1:-} fully_presented=${2:-} acknowledged unread prepared
   if [ -z "$snapshot" ]; then snapshot=$(status_presentation_snapshot "$STATE") || return 1; fi
   [ -n "$snapshot" ] || return 0
-  acknowledged=$(status_acknowledge_presented_snapshot "$STATE" "$snapshot" "$fully_presented") || return 1
+  status_acknowledge_presented_snapshot "$STATE" "$snapshot" "$fully_presented" acknowledged unread || return 1
   prepared=$(mktemp "$STATE/.status-presentation.prepared.XXXXXX") || return 1
   if ! {
-    print_unread_status_section "$snapshot" \
+    print_unread_status_section "$unread" \
       && print_status_outcome_backstop_section "$snapshot" \
       && print_open_decisions_section "$snapshot" \
       && print_record_divergence_section
