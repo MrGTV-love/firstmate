@@ -601,7 +601,8 @@ test_spawn_raw_omp_literal_evidence_still_refuses() {
 }
 
 test_spawn_raw_omp_guard_uses_the_launch_model() {
-  local rec id out status command expected index=0
+  # Inline replacement quotes are removed by Bash 5.2; variable contents stay literal.
+  local rec id out status command expected index=0 model_flag="--model 'openai-codex/gpt-6-astra' "
   local model_args=()
   while IFS='|' read -r command expected; do
     index=$((index + 1))
@@ -619,7 +620,7 @@ test_spawn_raw_omp_guard_uses_the_launch_model() {
     expect_code "$expected" "$status" "raw omp guard must follow the effective model in '$command': $out"
     if [ "$expected" = 0 ]; then
       assert_present "$HOME_DIR/state/$id.meta" "a pinned raw launch must publish the task"
-      assert_contains "$(cat "$LAUNCH_LOG")" "${command//__MODELFLAG__/--model 'openai-codex/gpt-6-astra' }" "raw model selection did not reach the launch"
+      assert_contains "$(cat "$LAUNCH_LOG")" "${command//__MODELFLAG__/$model_flag}" "raw model selection did not reach the launch"
     else
       assert_contains "$out" "omp modelRoles.default is not set" "an unpinned raw launch must refuse the missing role"
       assert_absent "$HOME_DIR/state/$id.meta" "a refused raw launch must publish no record"
