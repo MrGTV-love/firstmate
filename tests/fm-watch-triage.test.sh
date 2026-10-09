@@ -2546,15 +2546,6 @@ SH
   pass "late marker failures deliver signals and leave interrupted process-event wakes owed"
 }
 
-test_late_signal_routing_regressions() {
-  test_done_and_keyed_lines_surface_between_and_during_cycles
-  test_signal_not_held_behind_a_blocked_check
-  test_flushed_signals_preserve_main_owned_routing
-  test_heartbeat_late_signal_retains_fleet_scope
-  test_late_signal_follow_up_filters_drained_rows
-  test_late_signal_marker_failure_before_procevent
-}
-
 # A low-priority wake used to pre-empt the signal scan: an overdue-ledger wake
 # exited the cycle first, so a done line waited for one more firstmate round trip.
 # The signal wake goes first; the ledger row still surfaces on the next cycle.
