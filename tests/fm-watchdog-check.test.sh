@@ -487,7 +487,11 @@ test_installer_resolves_relative_paths() {
   plist="$dir/agents/$label.plist"
   mkdir -p "$home/state" "$dir/agents"
   ln -s "$ROOT" "$root"
-  printf '#!/bin/sh\ncase "$1" in print) exit 1 ;; esac\nexit 0\n' > "$dir/launchctl.sh"
+  cat > "$dir/launchctl.sh" <<'STUB'
+#!/bin/sh
+case "$1" in print) exit 1 ;; esac
+exit 0
+STUB
   chmod +x "$dir/launchctl.sh"
   OUT=$(cd "$dir" && env FM_HOME=homes/main FM_ROOT_OVERRIDE=checkout \
     FM_WATCHDOG_AGENT_DIR="$dir/agents" FM_WATCHDOG_LAUNCHCTL="$dir/launchctl.sh" \
