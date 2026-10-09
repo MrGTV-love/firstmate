@@ -91,7 +91,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
-- The finished-session sweep's report `state/idle-sessions.report` and its teardown-refusal memos under `state/.idle-reap/`, written by `bin/fm-idle-session-reap.sh`.
+- The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -2876,11 +2876,8 @@ FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this ho
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
-FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-session sweeps (bin/fm-idle-session-reap.sh); 0 turns the sweep off; the first sweep waits one full interval; invalid values use 900
-FM_IDLE_REAP_GRACE_SECS=1800   # how long a finished task's done line, report, or merge marker must have been unchanged before the sweep asks teardown about it
-FM_IDLE_REAP_RETRY_SECS=21600   # how long a recorded teardown refusal stands before the sweep asks again; a new status line lifts it at once
-FM_IDLE_REAP_BUDGET=3   # teardowns the sweep may start in one pass
-FM_IDLE_REAP_TEARDOWN_SECS=600   # seconds bounding each teardown the sweep starts
+FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-session sweeps (bin/fm-idle-session-reap.sh); 0 turns the sweep off without changing its deadline; an unscheduled home waits one full interval, and watcher handoffs retain the deadline; invalid values use 900
+# Finished-session reap policy is fixed: 1800-second grace, 21600-second refusal retry, at most 3 teardowns per pass, and a 600-second teardown timeout.
 FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-idle-session-reap.sh
 FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of bin/fm-teardown.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60

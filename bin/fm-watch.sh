@@ -336,10 +336,6 @@ case "$OPEN_LOOPS_RESURFACE" in
 esac
 [ "$OPEN_LOOPS_RESURFACE" -gt 0 ] || OPEN_LOOPS_RESURFACE=21600
 OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-$SCRIPT_DIR/fm-open-loops.sh}
-# Finished-session cleanup (bin/fm-idle-session-reap.sh) runs detached at this cadence;
-# 0 disables it. The first sweep waits one full interval so a fresh watcher does not
-# add teardown work to a session start. The next-due time is held in memory, which
-# keeps the poll free of a stat per cycle; a restart only delays the next sweep.
 IDLE_REAP_INTERVAL=${FM_IDLE_REAP_INTERVAL:-900}
 case "$IDLE_REAP_INTERVAL" in
   ''|*[!0-9]*) IDLE_REAP_INTERVAL=900 ;;
@@ -2642,11 +2638,22 @@ idle_reap_tick() {
   [ "$IDLE_REAP_INTERVAL" -gt 0 ] || return 0
   fm_epoch_seconds_to now
   if [ -z "$IDLE_REAP_NEXT" ]; then
+    if [ -r "$STATE/.idle-reap-next" ]; then
+      IFS= read -r IDLE_REAP_NEXT < "$STATE/.idle-reap-next" || true
+    fi
+    case "$IDLE_REAP_NEXT" in
+      ''|*[!0-9]*) IDLE_REAP_NEXT= ;;
+      *) IDLE_REAP_NEXT=$((10#$IDLE_REAP_NEXT)) ;;
+    esac
+  fi
+  if [ -z "$IDLE_REAP_NEXT" ]; then
     IDLE_REAP_NEXT=$((now + IDLE_REAP_INTERVAL))
+    printf '%s\n' "$IDLE_REAP_NEXT" > "$STATE/.idle-reap-next"
     return 0
   fi
   [ "$now" -ge "$IDLE_REAP_NEXT" ] || return 0
   IDLE_REAP_NEXT=$((now + IDLE_REAP_INTERVAL))
+  printf '%s\n' "$IDLE_REAP_NEXT" > "$STATE/.idle-reap-next"
   if [ -n "$IDLE_REAP_PID" ]; then
     if kill -0 "$IDLE_REAP_PID" 2>/dev/null; then
       return 0

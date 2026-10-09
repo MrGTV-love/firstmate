@@ -562,6 +562,20 @@ fm_backlog_record_present "$META" "task record" "$STATE" || {
   echo "error: teardown refused after locking: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
+if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
+  if [ -n "$FORCE" ] || ! (
+    trap - EXIT
+    teardown_require_source "$SCRIPT_DIR/fm-idle-reap-lib.sh"
+    . "$SCRIPT_DIR/fm-idle-reap-lib.sh"
+    fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
+    if [ "$IDLE_REAP_CLASS" != reap ]; then
+      printf 'REFUSED: automatic reap ineligible: %s: %s\n' "$IDLE_REAP_CLASS" "$IDLE_REAP_DETAIL" >&2
+      exit 1
+    fi
+  ); then
+    exit 1
+  fi
+fi
 TEARDOWN_META_KIND=$(fm_meta_get "$META" kind)
 [ -n "$TEARDOWN_META_KIND" ] || TEARDOWN_META_KIND=ship
 if [ "$FORCE" = --force ] && { [ "$TEARDOWN_META_KIND" != secondmate ] || [ -n "$DROP_FILE" ]; }; then
