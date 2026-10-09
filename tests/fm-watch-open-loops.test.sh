@@ -171,8 +171,10 @@ ack_stopped_cycle() {  # <state>
 watch_ledger() {  # <state> <fakebin> <out> [extra env...]
   local state=$1 fakebin=$2 out=$3
   shift 3
+  # age_of reports missing files as 999999: unrelated cadence work must stay
+  # disabled even before its publication or cadence marker exists.
   PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_HOME_SUMMARY_INTERVAL=999999 \
+    FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 \
     FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err" &
   WATCH_TEST_OUT=$out
 }
@@ -418,7 +420,7 @@ test_blocked_publication_does_not_commit_cooldown() {
 }
 
 test_retained_collector_survives_watcher_restart_without_overlap() {
-  local dir state fakebin out pid scanner scans retained
+  local dir state fakebin out pid scanner scans retained deadline
   dir=$(make_case ledger-retained-collector)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
@@ -461,6 +463,19 @@ SH
   retained=0
   kill -0 "$scanner" 2>/dev/null && retained=1
   : > "$dir/.collector-release"
+  # Collection and delivery have separate milestones, just as the synchronous real
+  # collector fixtures below do. Do not charge collection to the watcher-exit wait,
+  # or mistake an old ledger or a degraded coverage row for the retained publication.
+  deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+  while ! jq -e '.complete == true and any(.rows[]; .subject == "retained-obligation" and .category == "missing_worker" and .overdue)' \
+    "$state/open-loops.json" >/dev/null 2>&1; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      watch_wait_diagnostics "$pid"
+      reap "$pid"
+      fail "the retained scan did not publish its actual owned obligation"
+    fi
+    sleep 0.1
+  done
   wait_watch_exit "$pid" 100 \
     || { reap "$pid"; fail "the retained scan did not publish and wake the restarted watcher"; }
   [ "$retained" -eq 1 ] || fail "the original scan did not survive its watcher's actionable exit"

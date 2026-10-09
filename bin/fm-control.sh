@@ -25,16 +25,9 @@
 # explicitly clear recovery after ordinary automatic-backlog admission.
 # It neither launches an agent nor delivers instructions; then use fm-send for
 # a new continuation instruction, or ordinary relaunch for an exited owner.
-# --worktree is relaunch-only and ship-only: it rebinds a task whose recorded
-# worktree is PROVEN GONE onto a fresh isolated copy of the same repository that
-# the caller already prepared, checked out on the recorded branch at a head that
-# contains the recorded head. It never creates, moves or removes a copy, never
-# touches one that exists, and never overwrites or deletes a harness file the
-# fresh copy already holds. bin/fm-control-worktree-lib.sh owns the proof and the
-# evidence order; docs/agent-control.md "Relocating a task whose worktree is
-# gone" owns the procedure. The journal keeps relocation_from, relocation_to,
-# relocation_head and relocation_head_source through every rewrite, failures
-# included.
+# --worktree <path> accepts a prepared absolute destination for a ship relaunch.
+# docs/agent-control.md "Relocating a task whose worktree is gone" owns eligibility
+# and recovery guarantees; bin/fm-control-worktree-lib.sh owns their proof.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
@@ -100,6 +93,9 @@
 #              home's config/claude-launcher selection
 #              (bin/fm-claude-launcher-lib.sh), so a malformed file or a
 #              stopped TeamClaude proxy refuses before the old agent stops.
+#              The same pre-stop refusal applies to this home's worker tool
+#              exclusions (bin/fm-exclude-tools-lib.sh): a malformed list, or a
+#              replacement runtime that cannot hide the listed tools.
 #              config/session-launch-policy is checked against the resolved
 #              replacement before checkpointing or stopping the current agent.
 #              --note is required for a ship or scout, whose replacement
@@ -207,6 +203,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-secondmate-registry-lib.sh
+. "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-api-key-guard-lib.sh
@@ -219,6 +217,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+# shellcheck source=bin/fm-exclude-tools-lib.sh
+. "$SCRIPT_DIR/fm-exclude-tools-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -252,6 +252,11 @@ control_cleanup() {
   if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
     CONTROL_META_LOCK_HELD=0
     fm_lock_release "$CONTROL_META_LOCK" || true
+  fi
+  # Remove the dialog file while the lock is still held: once it is released,
+  # the next lifecycle command for this task writes the same path.
+  if [ -n "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
+    rm -f "$FM_COMPOSER_DIALOG_SINK"
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -377,6 +382,11 @@ trap control_cleanup EXIT
 fm_lock_try_acquire "$CONTROL_LOCK" \
   || die "another lifecycle action is already running for task $ID"
 CONTROL_LOCK_HELD=1
+# do_exit runs in a command substitution. That subshell does not run this
+# EXIT trap, so the parent has to hold the path the trap removes. Set it
+# only once the lock is held: a process that loses the lock runs the same
+# trap, and would remove the file the lock holder is reading.
+FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
 META="$STATE/$ID.meta"
 if [ ! -f "$META" ]; then
   case "$RAW_ID" in
@@ -494,6 +504,13 @@ wait_agent_state() {  # <timeout> <wanted>...
 require_state_verified_backend() {  # <verb>
   fm_control_backend_state_verified "$BACKEND" && return 0
   die "task $ID runs on the $BACKEND backend, which has no recovery-grade agent-state classifier, so '$1' cannot prove the agent actually stopped; refusing rather than reporting an unproven transition as done"
+}
+
+# refuse_blocking_prompt: the screen is a dialog a confirming Enter would
+# answer. Name it and stop. Do not type Escape or an option: both dismiss
+# or choose.
+refuse_blocking_prompt() {  # <dialog-name>
+  die "task $ID is blocked on a prompt: $1. Refusing to type Enter into it."
 }
 
 # rendered_matches <ere>: whether any row of the visible viewport matches.
@@ -654,16 +671,72 @@ do_interrupt() {
   printf '%s cancel=%s' "$proof" "$cancel"
 }
 
+# Drop busy_gen from the task record when it still names <gen>.
+# fm-busy-event.sh owns the sidecar and the record; fm_backlog_atomic_transition
+# publish owns the task record. Clearing the line inside the busy writer would
+# take the task-record lock that teardown and spawn already hold; the busy
+# writer is their child process, so it would wait on a live holder that is
+# itself waiting on the child, and neither would ever proceed.
+clear_retired_meta_busy_gen() {  # <gen>
+  local gen=$1 meta="$STATE/$ID.meta" lock tmp current line
+  [ -n "$gen" ] || return 0
+  [ -f "$meta" ] && [ ! -L "$meta" ] || return 0
+  if ! declare -F fm_backlog_atomic_transition >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-tasks-axi-lib.sh
+    . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
+    # shellcheck source=bin/fm-backlog-transition-lib.sh
+    . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+  fi
+  lock=$(fm_meta_lock_path "$meta") || return 1
+  fm_lock_acquire_wait "$lock"
+  current=$(fm_meta_get "$meta" busy_gen)
+  if [ "$current" != "$gen" ]; then
+    fm_lock_release "$lock"
+    return 0
+  fi
+  tmp=$(mktemp "$STATE/.$ID.meta.retire.XXXXXX") || {
+    fm_lock_release "$lock"
+    return 1
+  }
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      busy_gen=*) ;;
+      *)
+        printf '%s\n' "$line" >> "$tmp" || {
+          rm -f "$tmp"
+          fm_lock_release "$lock"
+          return 1
+        }
+        ;;
+    esac
+  done < "$meta" || {
+    rm -f "$tmp"
+    fm_lock_release "$lock"
+    return 1
+  }
+  if ! fm_backlog_atomic_transition publish "$tmp" "$meta" "task record" "$STATE"; then
+    rm -f "$tmp"
+    fm_lock_release "$lock"
+    return 1
+  fi
+  fm_lock_release "$lock"
+}
+
 retire_busy_incarnation() {
+  local gen=
   if [ -f "$STATE/$ID.busy-gen" ]; then
-    "$SCRIPT_DIR/fm-busy-event.sh" retire "$STATE" "$ID" --current-gen >/dev/null 2>&1 || true
+    gen=$(fm_busy_current_gen "$STATE" "$ID" 2>/dev/null || true)
+    if [ -n "$gen" ] \
+      && "$SCRIPT_DIR/fm-busy-event.sh" retire "$STATE" "$ID" --gen "$gen" >/dev/null 2>&1; then
+      clear_retired_meta_busy_gen "$gen" || true
+    fi
   fi
 }
 
 # do_exit: stop the running agent, preserving endpoint and worktree. Prints
 # `already-stopped`, `endpoint-gone`, or `stopped`.
 do_exit() {
-  local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed
+  local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed dialog
   require_state_verified_backend exit
   state=$(agent_state)
   case "$state" in
@@ -730,8 +803,16 @@ do_exit() {
   if [ -n "$hazard" ] && rendered_matches "$hazard"; then
     die "task $ID shows the $HARNESS revert picker, where typed text becomes a search and Enter reverts file changes; refusing to type the $cmd exit command. Close it with $(fm_control_interrupt_key "$HARNESS"), never Enter, then retry '$VERB'"
   fi
+  : > "$FM_COMPOSER_DIALOG_SINK" \
+    || die "task $ID's dialog check could not be recorded"
   composer_state=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) \
     || composer_state=unknown
+  # The classify that filled the sink ran in a subshell, so read the file
+  # rather than a function that subshell sourced.
+  if [ -s "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
+    dialog=$(cat "$FM_COMPOSER_DIALOG_SINK")
+    refuse_blocking_prompt "$dialog"
+  fi
   case "$composer_state" in
     empty) ;;
     pending)
@@ -767,7 +848,23 @@ do_exit() {
     [ "$VERB" != exit ] || rm -f -- "$STATE/$ID.control-exit"
     die "the exit command could not be sent to task $ID on $BACKEND"
   fi
+  # another Enter would confirm the selected row. A dead agent may leave the
+  # same text behind; that is not a prompt still waiting.
+  if [ -s "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
+    dialog=$(cat "$FM_COMPOSER_DIALOG_SINK")
+    if [ "$(agent_state)" != dead ]; then
+      refuse_blocking_prompt "$dialog"
+    fi
+  fi
   state=$(wait_agent_state "$EXIT_WAIT" dead) || {
+    # A submit can return before any read sees the picker: a native busy
+    # verdict needs no composer read, and a cleared composer can be read
+    # before the picker renders. Read the screen once more here.
+    : > "$FM_COMPOSER_DIALOG_SINK" || true
+    fm_backend_composer_state "$BACKEND" "$T" "$LABEL" >/dev/null 2>&1 || true
+    if [ -s "$FM_COMPOSER_DIALOG_SINK" ]; then
+      refuse_blocking_prompt "$(cat "$FM_COMPOSER_DIALOG_SINK")"
+    fi
     die "exit-delivered $ID interrupt=$interrupt_result exit-command=delivered agent-state=$state exit=unconfirmed; the agent did not stop within ${EXIT_WAIT}s"
   }
   # The incarnation is over: retire its busy wiring so no stale record or
@@ -796,6 +893,20 @@ RELOCATE_FROM=
 RELOCATE_DEST=
 RELOCATE_HEAD=
 RELOCATE_HEAD_SOURCE=
+PRIOR_RELOCATE_FROM=
+PRIOR_RELOCATE_TO=
+PRIOR_RELOCATE_HEAD=
+PRIOR_RELOCATE_HEAD_SOURCE=
+if [ "$VERB" = relaunch ] && { [ -e "$JOURNAL" ] || [ -L "$JOURNAL" ]; }; then
+  [ -f "$JOURNAL" ] && [ ! -L "$JOURNAL" ] && cat "$JOURNAL" >/dev/null 2>&1 \
+    || die "control journal $JOURNAL cannot be read; refusing to overwrite recorded recovery evidence"
+  if [ "$(fm_meta_get "$JOURNAL" task)" = "$ID" ]; then
+    PRIOR_RELOCATE_FROM=$(fm_meta_get "$JOURNAL" relocation_from)
+    PRIOR_RELOCATE_TO=$(fm_meta_get "$JOURNAL" relocation_to)
+    PRIOR_RELOCATE_HEAD=$(fm_meta_get "$JOURNAL" relocation_head)
+    PRIOR_RELOCATE_HEAD_SOURCE=$(fm_meta_get "$JOURNAL" relocation_head_source)
+  fi
+fi
 RELAUNCH_TX=
 RELAUNCH_BRIEF=
 PRIOR_HARNESS=$HARNESS
@@ -836,9 +947,14 @@ journal_write() {  # <phase> [extra-line]...
       echo "relocation_to=$RELOCATE_DEST"
       echo "relocation_head=$RELOCATE_HEAD"
       echo "relocation_head_source=$RELOCATE_HEAD_SOURCE"
+    else
+      [ -z "$PRIOR_RELOCATE_FROM" ] || echo "relocation_from=$PRIOR_RELOCATE_FROM"
+      [ -z "$PRIOR_RELOCATE_TO" ] || echo "relocation_to=$PRIOR_RELOCATE_TO"
+      [ -z "$PRIOR_RELOCATE_HEAD" ] || echo "relocation_head=$PRIOR_RELOCATE_HEAD"
+      [ -z "$PRIOR_RELOCATE_HEAD_SOURCE" ] || echo "relocation_head_source=$PRIOR_RELOCATE_HEAD_SOURCE"
     fi
     local line
-    for line in "$@"; do
+    for line in "${CHECKPOINT_LINES[@]}" "$@"; do
       echo "$line"
     done
   } > "$JOURNAL.tmp" && mv -f "$JOURNAL.tmp" "$JOURNAL"; then
@@ -1027,6 +1143,12 @@ resolve_relaunch_profile() {
     FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" fm_worker_account_check_entry "$TARGET_WORKER_ACCOUNT" \
       "$SCRIPT_DIR/fm-model-index.sh" "$TARGET_HARNESS" "$account_model" "$catalog_context" || return 1
   fi
+  # Likewise config/crew-exclude-tools: a malformed file, or a replacement
+  # runtime that cannot hide the listed tools, refuses here, before the old
+  # agent stops. Secondmate agents are not covered.
+  if [ "$KIND" != secondmate ]; then
+    fm_exclude_tools_check "$TARGET_HARNESS" 0 "$config" >/dev/null || return 1
+  fi
 }
 
 # safe_checkpoint: prove, before anything is stopped, that the work a relaunch
@@ -1133,7 +1255,7 @@ record_note() {
         elif [ "$RELOCATING" = 1 ]; then
           echo "This task was relaunched in $RELOCATE_DEST because its recorded local copy"
           echo "($RELOCATE_FROM) was proven absent. The new copy is a fresh checkout of the same branch"
-          echo "and contains every commit the task had ($RELOCATE_HEAD_SOURCE: $RELOCATE_HEAD)."
+          echo "and contains every surviving recorded head ($RELOCATE_HEAD_SOURCE), proven at $RELOCATE_HEAD."
           echo "Uncommitted changes in the vanished copy are not recoverable; check the branch"
           echo "and the status log for what is missing before continuing."
         else
@@ -1219,10 +1341,10 @@ do_relaunch() {
   fi
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
-  journal_write checkpoint "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write checkpoint "$note_line"
 
   record_note
-  journal_write noted "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write noted "$note_line"
 
   # Refuse before stopping the current worker, using the replacement harness,
   # account pin, allowlist, and backend that fm-spawn will use.
@@ -1231,14 +1353,14 @@ do_relaunch() {
   fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
     "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" \
     || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker"
-  journal_write stopping "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write stopping "$note_line"
   exit_result=$(do_exit)
-  journal_write exited "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
+  journal_write exited "$note_line" "exit_result=$exit_result"
 
   # The launch owner (fm-spawn --relaunch) clears the previous incarnation's
   # per-task harness wiring before arming the new one, so nothing to do here.
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
-  journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
+  journal_write launching "$note_line" "relaunch_tx=$RELAUNCH_TX"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
   [ "$RECONCILE_ONLY" = 0 ] || spawn_args+=(--reconcile-only)
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
@@ -1272,8 +1394,10 @@ do_relaunch() {
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi
   else
-    [ "$(fm_meta_get "$META" control_relaunch_tx)" != "$RELAUNCH_TX" ] \
-      || RELAUNCH_META_PUBLISHED=1
+    if [ "$(fm_meta_get "$META" control_relaunch_tx)" = "$RELAUNCH_TX" ]; then
+      RELAUNCH_META_PUBLISHED=1
+      WT=$(fm_meta_get "$META" worktree)
+    fi
     die "the replacement agent for $ID could not be launched on $TARGET_HARNESS"
   fi
 
@@ -1282,7 +1406,7 @@ do_relaunch() {
   }
   RELAUNCH_AGENT_CONFIRMED=1
 
-  journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
+  journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }
