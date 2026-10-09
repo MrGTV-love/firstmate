@@ -300,6 +300,7 @@ fm_backend_validate_spawn() {  # <name>
 #   - jq, for the JSON-emitting adapters (herdr, zellij, cmux) whose spawn/liveness
 #     paths parse the backend's JSON output (see each adapter's
 #     tool check, e.g. fm_backend_herdr_tool_check);
+#   - python3 for Herdr's kernel-backed process-environment ownership reader;
 #   - the treehouse worktree provider for every session-provider-only backend
 #     (tmux, herdr, zellij, cmux); orca owns its own task worktree and terminal,
 #     so it drops both treehouse and any other backend's session CLI.

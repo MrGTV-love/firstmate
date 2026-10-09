@@ -75,7 +75,7 @@ The tmux reader is a thin adapter over the [fleet-wide classifier and its shape 
 Real text in an identified shape is pending, while only positively proven emptiness reads empty.
 A blank or otherwise unidentified cursor row is `unknown`, so guards requiring proven emptiness defer, except that a foreground process proven to be Cursor is re-read cursorlessly because Cursor parks its terminal cursor below its footer.
 That identity-gated exception preserves the strict container-proof rule for fail-closed injection into every other pane; the [inbox ring owner](../bin/fm-task-inbox-lib.sh) separately defines the advisory doorbell pre-check.
-The shared supported shapes, prompt-glyph limits, and plain-capture safety boundary are owned by [Composer and injection safety](herdr-backend.md#composer-and-injection-safety).
+The operator-facing injection boundary is documented in [Composer and injection safety](herdr-backend.md#composer-and-injection-safety); the classifier above owns shared shapes and prompt-glyph limits.
 
 Busy state is not read from rendered text on this backend.
 A task's busy, idle, unknown, or dead verdict comes from the semantic busy-state contract owned by `bin/fm-busy-lib.sh`; [architecture](architecture.md#busy-state-is-semantic-per-adapter) owns its boundaries.
@@ -87,8 +87,7 @@ The supervisor guard selects only the detected primary harness's signature rathe
 It types a message once and retries Enter only until the composer clears.
 Only a positively identified omp foreground process receives the pre-retry refresh: after pending or unproven pending, a fresh empty or unreadable composer receives no further Enter. Identification uses tmux's foreground command and the existing foreground-process-group probe, and remains attached to the submission attempt.
 The submit primitive returns `empty` only after composer-clearance proof or one of the delivery-proof exceptions below.
-Text left in established structure remains `pending`, text in ambiguous structure remains unproven, and unreadable or unsafe state remains unknown except that an unconfirmed omp submit or unavailable initial identity returns `pending`.
-A verdict that identifies draft risk (`unknown-draft`) is preserved for omp or unavailable foreground identity and when legacy transition proof is absent, except that the deliberate legacy non-omp idle-to-busy exception below can confirm delivery as `empty`; omp keeps the more specific draft-risk verdict instead of `pending`.
+The [submit core](../bin/fm-tmux-lib.sh) owns how unconfirmed composer verdicts, including identified draft risk, propagate.
 An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
 
@@ -100,7 +99,7 @@ The legacy non-omp tmux path accepts structurally proven pending text in a busy 
 It also preserves main's baseline-gated conversion for an unreadable mid-turn composer (including Pi's `pi-launcher`): an idle baseline before typing and a busy footer after Enter confirm delivery, using the same legacy matcher on both sides.
 The legacy matcher excludes omp's spinner-only, spinner-box, and Waiting signals; the widened omp matcher remains available to positively identified omp and identityless delivery guards.
 All non-omp harnesses retain main's Enter retry behavior without the new refresh.
-omp and unavailable initial identity never receive either busy-only conversion: an independent watcher turn cannot prove that Enter consumed the typed payload, so an unreadable composer returns `pending` even when busy. There is no omp busy-baseline confirmation boundary; only a positively empty composer confirms submission.
+omp and unavailable initial identity never receive either busy-only conversion: an independent watcher turn cannot prove that Enter consumed the typed payload; only a positively empty composer confirms submission.
 `tests/fm-tmux-submit-busy.test.sh` covers busy and idle panes with proven, ambiguous, and cleared composers, including a dropped Enter followed by an independent omp watcher turn and a cursor/screen redraw race.
 
 ## Limits and regression entry points

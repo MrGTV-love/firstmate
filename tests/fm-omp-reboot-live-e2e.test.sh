@@ -241,7 +241,7 @@ exercise_native_refusals() {
 }
 
 exercise_native_pane() {
-  local proof composer live environment launch start
+  local proof composer live environment launch start screen previous='' stable=0
   printf -v launch '%q ' env "${NATIVE_ENV[@]}" omp "--resume=$REF"
   printf '#!/usr/bin/env bash\nexec %s\n' "$launch" > "$TMP/native-launch.sh"
   printf -v launch '%q ' bash "$TMP/native-launch.sh"
@@ -291,6 +291,24 @@ PY
   # Opt-in cleanup smoke uses both real native launches but skips the unchanged
   # lifecycle matrix below; its proof is emitted by the shared EXIT cleanup.
   [ "${FM_OMP_REBOOT_CLEANUP_SMOKE:-0}" != 1 ] || return 0
+  # The composer can become idle before omp finishes replaying the resumed
+  # transcript. Snapshot only after that real UI has rendered and settled.
+  for _ in $(seq 1 60); do
+    screen=$(run pane read "$PANE" --format text) || fail 'native screen could not be read'
+    case "$screen" in
+      *'FIRSTMATE_OP: v1 launch-brief:'*)
+        if [ "$screen" = "$previous" ]; then
+          stable=$((stable + 1))
+        else
+          stable=0
+        fi
+        [ "$stable" -lt 5 ] || break
+        ;;
+    esac
+    previous=$screen
+    sleep 0.2
+  done
+  [ "$stable" -ge 5 ] || fail 'native resumed transcript did not settle before preservation checks'
   RETAINED_GEN=$("$ROOT/bin/fm-busy-event.sh" arm "$FM_STATE_OVERRIDE" "$TASK_ID" \
     --state busy --source omp-ext --event agent_start)
   printf 'busy_gen=%s\n' "$RETAINED_GEN" >> "$META"

@@ -5,9 +5,8 @@ Firstmate talks to a running agent two ways, and they are not the same channel.
 The **data plane** is [`bin/fm-send.sh`](../bin/fm-send.sh): conversational text for the agent to read.
 For a `kind=secondmate` target it always prepends the from-firstmate routing marker, because a secondmate is itself a firstmate and its reply must come back through the status path rather than a chat nobody reads.
 
-A typed-plane send that has sent text and Enter but reads back `pending` or `unknown-draft` exits 3 (delivered-unconfirmed), preserves any pending-reply expectation, and leaves `--resolve-key` decisions open.
-Do not retype or blindly resend: inspect the pane with `fm-peek.sh`, then resend `--key Enter` only if the composer still holds the text.
-This post-submit result does not change the inbox doorbell's pre-submit deferral for pending text or identified draft risk.
+The [`fm-send.sh` header](../bin/fm-send.sh) owns typed-plane delivered-unconfirmed results, pending-reply retention, decision closure, and safe resend guidance; the [inbox ring owner](../bin/fm-task-inbox-lib.sh) owns pre-submit draft-risk deferral.
+Do not retype or blindly resend after an unconfirmed submit.
 
 The **control plane** is [`bin/fm-control.sh`](../bin/fm-control.sh): allowlisted lifecycle verbs addressed to an exact task id.
 
@@ -57,7 +56,6 @@ omp sends no clear key; queued follow-ups can return to its composer, with watch
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `unknown-draft`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
 The [shared composer classifier and its shape catalogue](../bin/fm-composer-lib.sh) own continuation containment, draft-risk verdicts, extraction, and known limits; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
-The native omp band accepts both the ordinary `📁` path and linked-worktree `🌳` path, while still requiring its model, branch, usage meters, and empty input floor; typed hints and pasted frames remain drafts.
 The [inbox ring owner](../bin/fm-task-inbox-lib.sh) separately defines the advisory doorbell pre-check.
 `exit` also refuses, naming the dialog as `blocked on a prompt`, when the screen shows a recognised dialog that a further Enter would answer, whether the dialog was open before the exit command was typed or the submitting Enter opened it; it sends no Escape and chooses no option, so closing the dialog is left to the operator.
 A stopped agent whose pane still shows the dialog text is not refused.

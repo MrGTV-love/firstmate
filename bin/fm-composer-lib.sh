@@ -61,8 +61,9 @@
 #                side-bordered rows, and `╰─ <input> ─╯` input-bearing floor.
 #                Unlike ordinary boxes, the floor is content, not just a rule.
 #                Rule-only floors and misaligned body rows remain unproven.
-#   omp-band   - native omp's `π > model > 📁 path > ⑂ branch ▶…%…┃…` status
-#                header, one column inset from its `╰─` input row, followed by
+#   omp-band   - native omp's `π > model > path > ⑂ branch ▶…%…┃…` status
+#                header accepts `📁` ordinary and `🌳` linked-worktree paths.
+#                It is one column inset from its `╰─` input row, followed by
 #                literal three-space-gutter continuations. The floor and every
 #                owned continuation are input; no right closing border exists.
 #                Blank-boundary or insufficient-gutter continuations retain
@@ -108,8 +109,8 @@
 #                the glyph row inside, a printable ASCII title, and an opener
 #                spanning exactly the closing rule's columns. A glyph-bearing
 #                pair rejected by that proof stays ambiguous: classification
-#                returns unknown and extraction refuses, never falling back to
-#                a bare prompt inside the rejected region.
+#                returns `unknown` or, for identified input risk, `unknown-draft`;
+#                extraction refuses, never falling back to a bare prompt inside it.
 #
 # KNOWN LIMIT: pasted omp frames inside drafts have unsafe Enter variants
 # tracked by follow-up fm-omp-composer-pasted-frame-variants. The native-band
@@ -133,7 +134,7 @@
 # staleness checks resume past the zone.
 #
 # THE ASYMMETRY that bounds it: `empty` is the one verdict that authorizes
-# fm-send to type into a pane, so this rule may move a verdict only toward
+# fail-closed injection, so this rule may move a verdict only toward
 # REFUSING, never toward `empty`. A false refusal costs one undelivered
 # message; a false `empty` overwrites a visible draft or types into a working
 # agent. So the zone counts only when EVERY row in it is demonstrably furniture
@@ -579,9 +580,9 @@ FM_COMPOSER_PI_STATUS_RE_DEFAULT='^\$[0-9]+(\.[0-9]+)?([[:space:]]|$)'
 # codex-cli 0.154.0, gpt-6-astra, fast mode). The cells are truecolor greys
 # whose luminance straddles FM_COMPOSER_GHOST_LUMA_MAX, so the brighter ones
 # survive ghost stripping. The rule, applied by shape rather than style:
-#   - a row whose non-whitespace content is entirely braille cells is screen
-#     furniture; it never counts as wrapped typed content and it bounds a bare
-#     composer's wrap region exactly as the status rows above do;
+#   - an unowned row whose non-whitespace content is entirely braille cells is
+#     screen furniture and bounds a bare composer's wrap region; proven literal
+#     continuations retain those cells as input, like status-shaped draft rows;
 #   - braille cells behind the glyph row's content are stripped before that
 #     row's emptiness decision when NOTHING else follows the glyph;
 #   - a row that mixes braille with any other non-whitespace text stays typed
@@ -1866,9 +1867,9 @@ _fm_composer_row_is_pi_status() {  # <trimmed-row>
 
 # _fm_composer_row_is_braille_furniture: 0 when the row is non-blank and its
 # non-whitespace content is entirely braille cells (fm_composer_strip_braille
-# above). Treat it as animation furniture at bare-wrap and footer boundaries,
-# not inside a proven rule pair. A blank row is not furniture (the blank-row
-# rules own it), and a row mixing braille with anything else is not either.
+# above). It is a furniture candidate at unowned bare-wrap and footer boundaries,
+# not inside literal continuations or a proven rule pair. A blank row is not
+# furniture (the blank-row rules own it), nor is a row mixing braille with other text.
 _fm_composer_row_is_braille_furniture() {  # <row>
   local row=$1 rest
   fm_composer_normalize_trim_var row
@@ -2063,7 +2064,7 @@ _fm_composer_row_is_composer_furniture() {  # <trimmed-row> <proof-glyph>
 # the whole run unclaimed activity, the envelope above it stale, and this
 # function return 1. That is the asymmetry this rule is held to - it may only
 # ever move a verdict toward refusing, never toward `empty`, because `empty` is
-# the one verdict that authorizes fm-send to type into the pane. Returns 1 too
+# the one verdict that authorizes fail-closed injection. Returns 1 too
 # when no envelope is glyph-proven, when a blank row sits directly beneath it,
 # or when the run holds no bare candidate at all (nothing to demote).
 _fm_composer_locate_footer_zone() {  # <plain>
@@ -2787,9 +2788,9 @@ _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <i
 }
 
 # The pi separated-shape verdict: identity + structure conjunction (herdr's
-# rule, now fleet-wide). A missing identity capability keeps the shape
-# unknown; an unfetched identity on an identity-capable backend asks the
-# adapter to probe (lazily) and re-call. Proven input remains pending for every
+# rule, now fleet-wide). Missing identity leaves the shape unproven, preserving
+# identified draft risk. An unfetched identity on an identity-capable backend asks
+# the adapter to probe (lazily) and re-call. Proven input remains pending for every
 # live pi state, while only an idle/done pi proves an empty composer. A blocked
 # pi is parked on an interactive prompt waiting for a human keystroke: its menu
 # is drawn above the separator pair, so the composer region looks free while the

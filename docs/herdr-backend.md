@@ -652,6 +652,7 @@ On an idle or done native baseline, submit confirmation proceeds in this order:
 2. If native status stays idle, or identity is ineligible for native-transition-only proof, use the shared composer verdict as the next positive signal.
    A cleared composer is delivery; pending and unproven pending text without a recognized blocking dialog receive a fresh composer read before another Enter is allowed.
    If the initial or refreshed composer reads unknown, every positively identified non-omp harness receives another native confirmation window against the same idle baseline, without sending another Enter; omp and missing or unavailable identity remain fail-closed.
+   An identified draft-risk verdict returns unconfirmed without another Enter; the [send header](../bin/fm-send.sh) owns the typed-plane response to that result.
 3. After the retry budget, `fm_composer_queued_enter_verdict` accepts retained proven pending text only for positively identified OpenCode with native `working`, whose Enter queue semantics are verified.
    omp, Claude, unknown harnesses, and idle or unreadable busy signals remain pending; a different active turn is not delivery proof.
 
@@ -711,7 +712,6 @@ omp's rounded box carries its status in the top border: its identity glyph while
 
 A blocked Pi is parked on an interactive prompt, so its blank composer region is a menu's and not a free composer's.
 That state defers instead of proving emptiness.
-A working Pi, pending middle row, missing identity, incomplete separator pair, or over-tall candidate remains unknown or pending.
 Identity stays a lazy read, consulted only when a separator pair or a composer row the two ghost ceilings strip differently could change the verdict.
 
 The [shared classifier](../bin/fm-composer-lib.sh) owns literal draft containment, including omp-looking floors inside Pi input; [runtime verification](verification/runtime-backends.md#bare-native-omp-restoration-and-managed-recovery) records the regression evidence.

@@ -168,7 +168,7 @@ The workflow retains per-PR supersession without cancelling main pushes or chang
 ## Local entry points
 
 [CONTRIBUTING.md](../CONTRIBUTING.md) owns the local test policy and common entry points.
-`bin/fm-test-run.sh --help` owns exact lane names, selection flags, and bounded `--jobs` mechanics.
+`bin/fm-test-run.sh --list-lanes` owns exact lane names; `--help` owns selection flags and bounded `--jobs` mechanics.
 
 ## Timeouts
 

@@ -2537,6 +2537,7 @@ The private boxed-composer profile, built-in model, and fixture-only placeholder
 All Herdr calls, including production-adapter calls, pass through the session-pinning lab helper.
 The native processes use private HOME and XDG roots, config and agent directories, and profile selectors; Firstmate's state, data, config, and projects overrides point at the private fixture home.
 The guard checks that unmanaged task and secondmate agents remain unchanged for empty, prose, `!git diff`, and `$ print(1)` composers across interrupt, exit, relaunch, direct launch inspection, and reboot sweeps.
+Before snapshotting the native screen, the guard waits for the encoded launch brief to render and the resumed transcript to settle; an idle composer alone can precede that startup replay.
 Preservation assertions cover live PID, screen, busy generation/state, task metadata and instructions, recorded profile, charter and child records, branch, HEAD, and dirty work.
 The [destructive lab safety contract](../herdr-backend.md#destructive-lab-safety) owns teardown-gated dependency cleanup and the default-session tripwire.
 This guard does not modify remote secondmates, unrelated panes, shared worktree pools, or global Herdr configuration.
