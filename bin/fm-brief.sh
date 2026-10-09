@@ -620,10 +620,9 @@ EOF
 PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE%$'\n'}
 PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE//__PAUSED_VERB__/$PAUSED_VERB}
 
-# Teardown removes a task's Docker stacks only when they carry evidence of the
-# task (bin/fm-task-docker-lib.sh owns the rules), and an unmarked container has
-# none: the three throwaway databases left behind for days in 2026-09/10 carried
-# no label, mount, or task id. FM_TASK_ID is exported by bin/fm-spawn.sh.
+# Explicit task markers avoid depending on the library's name/project/path
+# heuristics; bin/fm-task-docker-lib.sh owns attribution. FM_TASK_ID is exported
+# by bin/fm-spawn.sh.
 IFS= read -r -d '' DOCKER_MARKER_RULE <<'EOF' || true
 9. Mark every Docker object you start with your task id, so teardown removes it with your task:
    pass `--label fm.task=$FM_TASK_ID` to `docker run`, `docker create`, `docker network create`, and
