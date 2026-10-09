@@ -449,6 +449,10 @@
       "audience": "operator-example"
     },
     {
+      "path": "docs/examples/fm-watchdog.plist",
+      "audience": "operator-example"
+    },
+    {
       "path": "docs/examples/wedge-alarm",
       "audience": "operator-example"
     },
@@ -618,6 +622,10 @@
     },
     {
       "path": "docs/voice-relay.md",
+      "audience": "operator-current"
+    },
+    {
+      "path": "docs/watchdog.md",
       "audience": "operator-current"
     },
     {

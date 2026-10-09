@@ -64,6 +64,16 @@ fm_pid_alive() {
   kill -0 "$pid" 2>/dev/null
 }
 
+fm_lock_owner_alive() {
+  local lockdir=$1 pid=$2 recorded identity
+  fm_pid_alive "$pid" || return 1
+  [ "${_fm_lock_identity_bound:-pid}" = identity ] || return 0
+  recorded=$(cat "${3:-$lockdir/pid-identity}" 2>/dev/null) || return 1
+  [ -n "$recorded" ] || return 1
+  identity=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
+  [ -n "$identity" ] && [ "$identity" = "$recorded" ]
+}
+
 fm_pid_identity() {
   local pid=$1 out proc_root stat_line starttime cmdline_hex identity_key
   local -a stat_fields
@@ -464,6 +474,7 @@ fm_lock_clean_known_files() {
     "$lockdir/pid" \
     "$lockdir/fm-home" \
     "$lockdir/pid-identity" \
+    "$lockdir"/reaper-*-identity \
     "$lockdir/role" \
     "$lockdir/watcher-path" \
     2>/dev/null || true
@@ -502,8 +513,13 @@ fm_lock_owner_dir() {
 }
 
 fm_lock_prepare_owner() {
-  local ownerdir=$1 mypid back
+  local ownerdir=$1 mypid back identity
   fm_current_pid mypid || return 1
+  if [ "${_fm_lock_identity_bound:-pid}" = identity ]; then
+    identity=$(fm_pid_identity "$mypid" 2>/dev/null) || return 1
+    [ -n "$identity" ] || return 1
+    printf '%s\n' "$identity" > "$ownerdir/pid-identity" 2>/dev/null || return 1
+  fi
   printf '%s\n' "$mypid" > "$ownerdir/pid" 2>/dev/null || return 1
   back=$(cat "$ownerdir/pid" 2>/dev/null || true)
   [ "$back" = "$mypid" ]
@@ -637,7 +653,7 @@ fm_lock_recheck_stale_owner() {
   fi
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$actual_pid" = "$expected_pid" ] || return 1
-  if fm_pid_alive "$actual_pid"; then
+  if fm_lock_owner_alive "$lockdir" "$actual_pid"; then
     return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$actual_pid"; then
@@ -1108,7 +1124,7 @@ fm_recovery_marker_handover_restore() {  # <marker> <snapshot-token> <snapshot-s
 # later reaper re-elects itself by renaming that dead reaper's tombstone, and a
 # reaper whose own election a trap interrupted resumes it from its tombstone.
 fm_lock_reap_dead_link() {
-  local lockdir=$1 owner pid token tomb current
+  local lockdir=$1 owner pid token tomb current identity
   [ -L "$lockdir" ] || return 1
   owner=$(fm_lock_link_owner "$lockdir" 2>/dev/null) || return 1
   fm_current_pid current || return 1
@@ -1121,11 +1137,17 @@ fm_lock_reap_dead_link() {
     for tomb in "$owner".reaped.*; do
       [ -d "$tomb" ] || continue
       if [ "${tomb##*.reaped.}" != "$current" ]; then
-        fm_pid_alive "${tomb##*.reaped.}" && return 1
+        fm_lock_owner_alive "$tomb" "${tomb##*.reaped.}" \
+          "$tomb/reaper-${tomb##*.reaped.}-identity" && return 1
       fi
       token=$tomb
     done
     [ -n "$token" ] || return 1
+  fi
+  if [ "${_fm_lock_identity_bound:-pid}" = identity ]; then
+    identity=$(fm_pid_identity "$current" 2>/dev/null) || return 1
+    [ -n "$identity" ] || return 1
+    printf '%s\n' "$identity" > "$token/reaper-$current-identity" 2>/dev/null || return 1
   fi
   tomb="$owner.reaped.$current"
   if [ "$token" != "$tomb" ]; then
@@ -1158,6 +1180,7 @@ fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
 
 fm_lock_try_acquire() {
   local lockdir=$1 pid steal cur rc steal_owner primary_owner current
+  local _fm_lock_identity_bound=${2:-pid}
   FM_LOCK_HELD_PID=
   FM_LOCK_OWNER_DIR=
   FM_LOCK_RECOVERED_PID=
@@ -1184,7 +1207,7 @@ fm_lock_try_acquire() {
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     return 1
   fi
-  if fm_pid_alive "$pid"; then
+  if fm_lock_owner_alive "$lockdir" "$pid"; then
     FM_LOCK_HELD_PID=$pid
     return 1
   fi
@@ -1202,7 +1225,7 @@ fm_lock_try_acquire() {
   steal_owner=${FM_LOCK_OWNER_DIR:-}
 
   cur=$(cat "$lockdir/pid" 2>/dev/null || true)
-  if fm_pid_alive "$cur"; then
+  if fm_lock_owner_alive "$lockdir" "$cur"; then
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$cur
     FM_LOCK_OWNER_DIR=
