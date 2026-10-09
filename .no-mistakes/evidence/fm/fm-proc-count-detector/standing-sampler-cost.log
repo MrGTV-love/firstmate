@@ -1,0 +1,9 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-proc-guard.sh watch --state-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/idle-state --limit 1000000000 --duration 30
+proc-guard: proc-guard
+status: idle
+armed: yes
+sampler_samples: 30
+sampler_cpu_ms_per_sample: 0.294
+sampler_peak_rss_kb: 21440
+
+exit=0; elapsed=30.736s

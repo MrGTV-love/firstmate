@@ -1,0 +1,5 @@
+$ python3 -I /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/measure.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-proc-guard.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/fork-denied-state
+
+VALIDATION TIMEOUT
+
+exit=-15; elapsed=120.029s

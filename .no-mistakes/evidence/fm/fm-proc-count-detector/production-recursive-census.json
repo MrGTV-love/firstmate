@@ -1,0 +1,4031 @@
+{
+ "name": "fm-proc-guard",
+ "schema": 2,
+ "captured_at": "2026-10-09T05:19:06Z",
+ "epoch": 1791523146,
+ "platform": "darwin",
+ "uid": 501,
+ "user_process_count": 1930,
+ "limit": 1,
+ "limit_source": "--limit",
+ "threshold": 0.6,
+ "percent_of_limit": 193000.0,
+ "trigger": {
+  "reason": "count above threshold",
+  "held_seconds": 5.2,
+  "hold_seconds": 5.0
+ },
+ "census_processes": 1900,
+ "census_unreadable": 36,
+ "census_zombies": 0,
+ "census_cost_ms": 1303.4,
+ "census_cpu_ms": 16.7,
+ "summary": "1930 of 1 processes; most common command bash x384; deepest ancestry 105",
+ "by_command": [
+  {
+   "command": "bash",
+   "count": 384
+  },
+  {
+   "command": "zsh",
+   "count": 281
+  },
+  {
+   "command": "treehouse",
+   "count": 101
+  },
+  {
+   "command": "python3.12",
+   "count": 95
+  },
+  {
+   "command": "node",
+   "count": 91
+  },
+  {
+   "command": "omp",
+   "count": 85
+  },
+  {
+   "command": "perl",
+   "count": 63
+  },
+  {
+   "command": "sleep",
+   "count": 43
+  },
+  {
+   "command": "Google Chrome Helper",
+   "count": 39
+  },
+  {
+   "command": "Google Chrome Helper (Renderer)",
+   "count": 39
+  },
+  {
+   "command": "2.1.292",
+   "count": 38
+  },
+  {
+   "command": "2.1.293",
+   "count": 30
+  },
+  {
+   "command": "2.1.294",
+   "count": 28
+  },
+  {
+   "command": "no-mistakes",
+   "count": 21
+  },
+  {
+   "command": "SetStoreUpdateService",
+   "count": 20
+  },
+  {
+   "command": "python3.13",
+   "count": 20
+  },
+  {
+   "command": "2.1.295",
+   "count": 19
+  },
+  {
+   "command": "gtimeout",
+   "count": 14
+  },
+  {
+   "command": "GoogleUpdater",
+   "count": 13
+  },
+  {
+   "command": "ruff",
+   "count": 13
+  },
+  {
+   "command": "uv",
+   "count": 13
+  },
+  {
+   "command": "chrome_crashpad_handler",
+   "count": 11
+  },
+  {
+   "command": "com.apple.WebKit.WebContent",
+   "count": 11
+  },
+  {
+   "command": "Google Chrome",
+   "count": 10
+  },
+  {
+   "command": "caffeinate",
+   "count": 10
+  },
+  {
+   "command": "time",
+   "count": 9
+  },
+  {
+   "command": "shellcheck",
+   "count": 8
+  },
+  {
+   "command": "herdr",
+   "count": 5
+  },
+  {
+   "command": "Google Chrome Helper (GPU)",
+   "count": 4
+  },
+  {
+   "command": "MTLCompilerService",
+   "count": 3
+  },
+  {
+   "command": "com.apple.WebKit.GPU",
+   "count": 3
+  },
+  {
+   "command": "com.docker.backend",
+   "count": 3
+  },
+  {
+   "command": "git",
+   "count": 3
+  },
+  {
+   "command": "tail",
+   "count": 3
+  },
+  {
+   "command": "1Password",
+   "count": 2
+  },
+  {
+   "command": "1Password Helper",
+   "count": 2
+  },
+  {
+   "command": "Docker Desktop Helper",
+   "count": 2
+  },
+  {
+   "command": "QuickLookUIService",
+   "count": 2
+  },
+  {
+   "command": "codex",
+   "count": 2
+  },
+  {
+   "command": "com.apple.SafariPlatformSupport",
+   "count": 2
+  },
+  {
+   "command": "com.apple.WebKit.Networking",
+   "count": 2
+  },
+  {
+   "command": "tmux",
+   "count": 2
+  },
+  {
+   "command": "1Password Browser Helper",
+   "count": 1
+  },
+  {
+   "command": "1Password Helper (Renderer)",
+   "count": 1
+  },
+  {
+   "command": "1Password-Crash-Handler",
+   "count": 1
+  },
+  {
+   "command": "AMPDeviceDiscoveryAgent",
+   "count": 1
+  },
+  {
+   "command": "AccessibilitySettingsWidgetExte",
+   "count": 1
+  },
+  {
+   "command": "AccessibilityUIServer",
+   "count": 1
+  },
+  {
+   "command": "Activity Monitor",
+   "count": 1
+  },
+  {
+   "command": "AirPlayUIAgent",
+   "count": 1
+  },
+  {
+   "command": "AppPredictionIntentsHelperServi",
+   "count": 1
+  },
+  {
+   "command": "AppSSOAgent",
+   "count": 1
+  },
+  {
+   "command": "AppearanceIntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "AppleIDSettings",
+   "count": 1
+  },
+  {
+   "command": "AppleIntelligenceReportingSELFI",
+   "count": 1
+  },
+  {
+   "command": "AppleSpell",
+   "count": 1
+  },
+  {
+   "command": "AssetCacheLocatorService",
+   "count": 1
+  },
+  {
+   "command": "AudioComponentRegistrar",
+   "count": 1
+  },
+  {
+   "command": "AudiovisualThumbnailExtension",
+   "count": 1
+  },
+  {
+   "command": "AuthenticationServicesAgent",
+   "count": 1
+  },
+  {
+   "command": "BTLEServerAgent",
+   "count": 1
+  },
+  {
+   "command": "BackgroundTaskManagementAgent",
+   "count": 1
+  },
+  {
+   "command": "BatteriesAvocadoWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "BatterySettingsIntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "BiomeAgent",
+   "count": 1
+  },
+  {
+   "command": "BiomeSELFIngestor",
+   "count": 1
+  },
+  {
+   "command": "BluetoothSettingsAppIntentsWidg",
+   "count": 1
+  },
+  {
+   "command": "CMFSyncAgent",
+   "count": 1
+  },
+  {
+   "command": "CalculatorWidget",
+   "count": 1
+  },
+  {
+   "command": "Calendar",
+   "count": 1
+  },
+  {
+   "command": "CalendarIntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "CalendarWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "CampoRemoteService",
+   "count": 1
+  },
+  {
+   "command": "ClassroomSettings",
+   "count": 1
+  },
+  {
+   "command": "CommCenter",
+   "count": 1
+  },
+  {
+   "command": "ContactsCoreSpotlightExtension",
+   "count": 1
+  },
+  {
+   "command": "ContainerMetadataExtractor",
+   "count": 1
+  },
+  {
+   "command": "ContextService",
+   "count": 1
+  },
+  {
+   "command": "ContextStoreAgent",
+   "count": 1
+  },
+  {
+   "command": "ContinuityCaptureAgent",
+   "count": 1
+  },
+  {
+   "command": "ControlCenter",
+   "count": 1
+  },
+  {
+   "command": "ControlCenterSettingsIntents",
+   "count": 1
+  },
+  {
+   "command": "CoreLocationAgent",
+   "count": 1
+  },
+  {
+   "command": "CoreServicesUIAgent",
+   "count": 1
+  },
+  {
+   "command": "CursorUIViewService",
+   "count": 1
+  },
+  {
+   "command": "DateTimeIntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "DefaultExtensionEnablement",
+   "count": 1
+  },
+  {
+   "command": "DesktopSettingsIntents",
+   "count": 1
+  },
+  {
+   "command": "Disk Utility",
+   "count": 1
+  },
+  {
+   "command": "DiskArbitrationAgent",
+   "count": 1
+  },
+  {
+   "command": "DiskUnmountWatcher",
+   "count": 1
+  },
+  {
+   "command": "DisplayControls",
+   "count": 1
+  },
+  {
+   "command": "DisplaysSettingsIntentsExtensio",
+   "count": 1
+  },
+  {
+   "command": "Dock",
+   "count": 1
+  },
+  {
+   "command": "DockControls",
+   "count": 1
+  },
+  {
+   "command": "Docker Desktop",
+   "count": 1
+  },
+  {
+   "command": "Docker Desktop Helper (Renderer",
+   "count": 1
+  },
+  {
+   "command": "FSKitModuleManagement",
+   "count": 1
+  },
+  {
+   "command": "FamilyIntents",
+   "count": 1
+  },
+  {
+   "command": "FamilySettings",
+   "count": 1
+  },
+  {
+   "command": "FeatureAccessAgent",
+   "count": 1
+  },
+  {
+   "command": "FindMyWidgetItems",
+   "count": 1
+  },
+  {
+   "command": "FindMyWidgetPeople",
+   "count": 1
+  },
+  {
+   "command": "Finder",
+   "count": 1
+  },
+  {
+   "command": "FollowUpSettingsExtension",
+   "count": 1
+  },
+  {
+   "command": "GMSSELFIngestor",
+   "count": 1
+  },
+  {
+   "command": "GeneralSettings",
+   "count": 1
+  },
+  {
+   "command": "Google Chrome Helper (Alerts)",
+   "count": 1
+  },
+  {
+   "command": "HeadphoneSettingsExtension",
+   "count": 1
+  },
+  {
+   "command": "HomeEnergyWidgetsExtension",
+   "count": 1
+  },
+  {
+   "command": "HomeWidget",
+   "count": 1
+  },
+  {
+   "command": "HomeWidgetIntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "IFTelemetrySELFIngestor",
+   "count": 1
+  },
+  {
+   "command": "IFTranscriptSELFIngestor",
+   "count": 1
+  },
+  {
+   "command": "IMDPersistenceAgent",
+   "count": 1
+  },
+  {
+   "command": "ImageThumbnailExtension",
+   "count": 1
+  },
+  {
+   "command": "IntelligencePlatformComputeServ",
+   "count": 1
+  },
+  {
+   "command": "IntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "JournalWidgets",
+   "count": 1
+  },
+  {
+   "command": "JournalWidgetsSecure",
+   "count": 1
+  },
+  {
+   "command": "Keychain Circle Notification",
+   "count": 1
+  },
+  {
+   "command": "LegacyPluginEnablement",
+   "count": 1
+  },
+  {
+   "command": "LoginItems",
+   "count": 1
+  },
+  {
+   "command": "MENotificationAgent",
+   "count": 1
+  },
+  {
+   "command": "MTLAssetUpgraderD",
+   "count": 1
+  },
+  {
+   "command": "ManagedSettingsAgent",
+   "count": 1
+  },
+  {
+   "command": "MediaExtensionsSettingsControll",
+   "count": 1
+  },
+  {
+   "command": "MenuBarAgent",
+   "count": 1
+  },
+  {
+   "command": "Messages",
+   "count": 1
+  },
+  {
+   "command": "Messages Assistant Extension",
+   "count": 1
+  },
+  {
+   "command": "MessagesActionExtension",
+   "count": 1
+  },
+  {
+   "command": "MessagesBlastDoorService",
+   "count": 1
+  },
+  {
+   "command": "MobileDeviceUpdater",
+   "count": 1
+  },
+  {
+   "command": "MobileTimerIntents",
+   "count": 1
+  },
+  {
+   "command": "NeptuneOneWallpaper",
+   "count": 1
+  },
+  {
+   "command": "NewsTag",
+   "count": 1
+  },
+  {
+   "command": "NewsToday2",
+   "count": 1
+  },
+  {
+   "command": "NewsTodayIntents",
+   "count": 1
+  },
+  {
+   "command": "NotificationCenter",
+   "count": 1
+  },
+  {
+   "command": "NotificationsSettingsIntents",
+   "count": 1
+  },
+  {
+   "command": "ObsidianQuickLook",
+   "count": 1
+  },
+  {
+   "command": "OfficeThumbnailExtension",
+   "count": 1
+  },
+  {
+   "command": "PAH_Extension",
+   "count": 1
+  },
+  {
+   "command": "PasswordBreachAgent",
+   "count": 1
+  },
+  {
+   "command": "PeopleWidget_macOSExtension",
+   "count": 1
+  },
+  {
+   "command": "PerplexityXPC",
+   "count": 1
+  },
+  {
+   "command": "PhotosPosterProvider",
+   "count": 1
+  },
+  {
+   "command": "PhotosReliveWidget",
+   "count": 1
+  },
+  {
+   "command": "PodcastsWidget",
+   "count": 1
+  },
+  {
+   "command": "PrintCenterWidgetExtension.macO",
+   "count": 1
+  },
+  {
+   "command": "ProtectedCloudKeySyncing",
+   "count": 1
+  },
+  {
+   "command": "RecordWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "RemindersIntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "RemindersWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "ReportCrash",
+   "count": 1
+  },
+  {
+   "command": "SAExtensionOrchestrator",
+   "count": 1
+  },
+  {
+   "command": "Safari",
+   "count": 1
+  },
+  {
+   "command": "SafariBookmarksSyncAgent",
+   "count": 1
+  },
+  {
+   "command": "SafariLaunchAgent",
+   "count": 1
+  },
+  {
+   "command": "SafariLinkExtension",
+   "count": 1
+  },
+  {
+   "command": "SafariNotificationAgent",
+   "count": 1
+  },
+  {
+   "command": "SafariWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "ScopedBookmarkAgent",
+   "count": 1
+  },
+  {
+   "command": "Screen Sharing",
+   "count": 1
+  },
+  {
+   "command": "ScreenTimeAgent",
+   "count": 1
+  },
+  {
+   "command": "ScreenTimeSettingsAgent",
+   "count": 1
+  },
+  {
+   "command": "ScreenTimeWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "ScreenTimeWidgetIntentsExtensio",
+   "count": 1
+  },
+  {
+   "command": "ScreenshotControls",
+   "count": 1
+  },
+  {
+   "command": "SecurityAgent",
+   "count": 1
+  },
+  {
+   "command": "SelectPerson_iOS",
+   "count": 1
+  },
+  {
+   "command": "SettingsImportExtension",
+   "count": 1
+  },
+  {
+   "command": "SettingsSystemExtensionControll",
+   "count": 1
+  },
+  {
+   "command": "ShortcutLiveActivityWidgetExten",
+   "count": 1
+  },
+  {
+   "command": "ShortcutsViewService",
+   "count": 1
+  },
+  {
+   "command": "ShortcutsWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "SidecarRelay",
+   "count": 1
+  },
+  {
+   "command": "Siri",
+   "count": 1
+  },
+  {
+   "command": "Siri AI",
+   "count": 1
+  },
+  {
+   "command": "SiriSuggestionsBookkeepingServi",
+   "count": 1
+  },
+  {
+   "command": "SoftRAID-Worker",
+   "count": 1
+  },
+  {
+   "command": "SoftRAID_Monitor",
+   "count": 1
+  },
+  {
+   "command": "SoftwareUpdateNotificationManag",
+   "count": 1
+  },
+  {
+   "command": "SoundIntentsExtension",
+   "count": 1
+  },
+  {
+   "command": "StatusKitAgent",
+   "count": 1
+  },
+  {
+   "command": "StocksWidget",
+   "count": 1
+  },
+  {
+   "command": "System Settings",
+   "count": 1
+  },
+  {
+   "command": "SystemUIServer",
+   "count": 1
+  },
+  {
+   "command": "Terminal",
+   "count": 1
+  },
+  {
+   "command": "TextInputMenuAgent",
+   "count": 1
+  },
+  {
+   "command": "TextThumbnailExtension",
+   "count": 1
+  },
+  {
+   "command": "ThemeWidgetControlViewService",
+   "count": 1
+  },
+  {
+   "command": "Tips",
+   "count": 1
+  },
+  {
+   "command": "TipsWidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "UIKitSystem",
+   "count": 1
+  },
+  {
+   "command": "UniversalControl",
+   "count": 1
+  },
+  {
+   "command": "UsageTrackingAgent",
+   "count": 1
+  },
+  {
+   "command": "UserEventAgent",
+   "count": 1
+  },
+  {
+   "command": "UserNotificationCenter",
+   "count": 1
+  },
+  {
+   "command": "VTDecoderXPCService",
+   "count": 1
+  },
+  {
+   "command": "ViewBridgeAuxiliary",
+   "count": 1
+  },
+  {
+   "command": "VoiceMemosSettingsWidgetExtensi",
+   "count": 1
+  },
+  {
+   "command": "WallpaperAerialsExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperAgent",
+   "count": 1
+  },
+  {
+   "command": "WallpaperControlsExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperDynamicExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperGradientExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperImageExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperLegacyExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperMacintoshExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperSequoiaExtension",
+   "count": 1
+  },
+  {
+   "command": "WallpaperSettingsIntents",
+   "count": 1
+  },
+  {
+   "command": "WallpaperSonomaExtension",
+   "count": 1
+  },
+  {
+   "command": "WeatherIntents",
+   "count": 1
+  },
+  {
+   "command": "WeatherWidget",
+   "count": 1
+  },
+  {
+   "command": "WebThumbnailExtension",
+   "count": 1
+  },
+  {
+   "command": "WiFiAgent",
+   "count": 1
+  },
+  {
+   "command": "WindowManager",
+   "count": 1
+  },
+  {
+   "command": "WindowManagerControlsExtension",
+   "count": 1
+  },
+  {
+   "command": "WorldClockWidget",
+   "count": 1
+  },
+  {
+   "command": "accountsd",
+   "count": 1
+  },
+  {
+   "command": "agentstored",
+   "count": 1
+  },
+  {
+   "command": "akd",
+   "count": 1
+  },
+  {
+   "command": "amsaccountsd",
+   "count": 1
+  },
+  {
+   "command": "amsengagementd",
+   "count": 1
+  },
+  {
+   "command": "analyticsagent",
+   "count": 1
+  },
+  {
+   "command": "appleaccountd",
+   "count": 1
+  },
+  {
+   "command": "appstoreagent",
+   "count": 1
+  },
+  {
+   "command": "assessmentagent",
+   "count": 1
+  },
+  {
+   "command": "assistant_cdmd",
+   "count": 1
+  },
+  {
+   "command": "assistantd",
+   "count": 1
+  },
+  {
+   "command": "audioaccessoryd",
+   "count": 1
+  },
+  {
+   "command": "avconferenced",
+   "count": 1
+  },
+  {
+   "command": "axassetsd",
+   "count": 1
+  },
+  {
+   "command": "biomesyncd",
+   "count": 1
+  },
+  {
+   "command": "bird",
+   "count": 1
+  },
+  {
+   "command": "bluetoothuserd",
+   "count": 1
+  },
+  {
+   "command": "calaccessd",
+   "count": 1
+  },
+  {
+   "command": "callservicesd",
+   "count": 1
+  },
+  {
+   "command": "cfprefsd",
+   "count": 1
+  },
+  {
+   "command": "chronod",
+   "count": 1
+  },
+  {
+   "command": "cloudd",
+   "count": 1
+  },
+  {
+   "command": "cloudphotod",
+   "count": 1
+  },
+  {
+   "command": "com.apple.CalendarWeatherKitSer",
+   "count": 1
+  },
+  {
+   "command": "com.apple.CloudDocs.iCloudDrive",
+   "count": 1
+  },
+  {
+   "command": "com.apple.Notes.IntentsExtensio",
+   "count": 1
+  },
+  {
+   "command": "com.apple.Notes.WidgetExtension",
+   "count": 1
+  },
+  {
+   "command": "com.apple.Safari.History",
+   "count": 1
+  },
+  {
+   "command": "com.apple.Safari.SafeBrowsing.S",
+   "count": 1
+  },
+  {
+   "command": "com.apple.Safari.SandboxBroker",
+   "count": 1
+  },
+  {
+   "command": "com.apple.Safari.SearchHelper",
+   "count": 1
+  },
+  {
+   "command": "com.apple.Virtualization.Virtua",
+   "count": 1
+  },
+  {
+   "command": "com.apple.WebKit.WebContent.Enh",
+   "count": 1
+  },
+  {
+   "command": "com.apple.accessibility.mediaac",
+   "count": 1
+  },
+  {
+   "command": "com.apple.appkit.xpc.openAndSav",
+   "count": 1
+  },
+  {
+   "command": "com.apple.dock.extra",
+   "count": 1
+  },
+  {
+   "command": "com.apple.geod",
+   "count": 1
+  },
+  {
+   "command": "com.apple.hiservices-xpcservice",
+   "count": 1
+  },
+  {
+   "command": "com.apple.iCloudHelper",
+   "count": 1
+  },
+  {
+   "command": "com.apple.quicklook.ThumbnailsA",
+   "count": 1
+  },
+  {
+   "command": "com.apple.siri.embeddedspeech",
+   "count": 1
+  },
+  {
+   "command": "com.apple.tonelibraryd",
+   "count": 1
+  },
+  {
+   "command": "com.docker.build",
+   "count": 1
+  },
+  {
+   "command": "com.docker.virtualization",
+   "count": 1
+  },
+  {
+   "command": "commerce",
+   "count": 1
+  },
+  {
+   "command": "contactsd",
+   "count": 1
+  },
+  {
+   "command": "containermanagerd",
+   "count": 1
+  },
+  {
+   "command": "coreautha",
+   "count": 1
+  },
+  {
+   "command": "coreauthd",
+   "count": 1
+  },
+  {
+   "command": "corespeechd",
+   "count": 1
+  },
+  {
+   "command": "corespotlightd",
+   "count": 1
+  },
+  {
+   "command": "ctkahp",
+   "count": 1
+  },
+  {
+   "command": "ctkd",
+   "count": 1
+  },
+  {
+   "command": "cut",
+   "count": 1
+  },
+  {
+   "command": "dataaccessd",
+   "count": 1
+  },
+  {
+   "command": "deleted",
+   "count": 1
+  },
+  {
+   "command": "devicecheckd",
+   "count": 1
+  },
+  {
+   "command": "diagnostics_agent",
+   "count": 1
+  },
+  {
+   "command": "distnoted",
+   "count": 1
+  },
+  {
+   "command": "dmd",
+   "count": 1
+  },
+  {
+   "command": "docker-agent",
+   "count": 1
+  },
+  {
+   "command": "donotdisturbd",
+   "count": 1
+  },
+  {
+   "command": "duetexpertd",
+   "count": 1
+  },
+  {
+   "command": "facetimemessagestored",
+   "count": 1
+  },
+  {
+   "command": "familycircled",
+   "count": 1
+  },
+  {
+   "command": "feedbackd",
+   "count": 1
+  },
+  {
+   "command": "fileproviderd",
+   "count": 1
+  },
+  {
+   "command": "findmydevice-user-agent",
+   "count": 1
+  },
+  {
+   "command": "findmylocateagent",
+   "count": 1
+  },
+  {
+   "command": "followupd",
+   "count": 1
+  },
+  {
+   "command": "fontd",
+   "count": 1
+  },
+  {
+   "command": "fontworker",
+   "count": 1
+  },
+  {
+   "command": "gamecontrolleragentd",
+   "count": 1
+  },
+  {
+   "command": "generativeexperiencesd",
+   "count": 1
+  },
+  {
+   "command": "geodMachServiceBridge",
+   "count": 1
+  },
+  {
+   "command": "gh",
+   "count": 1
+  },
+  {
+   "command": "head",
+   "count": 1
+  },
+  {
+   "command": "heard",
+   "count": 1
+  },
+  {
+   "command": "helpd",
+   "count": 1
+  },
+  {
+   "command": "homed",
+   "count": 1
+  },
+  {
+   "command": "homeenergyd",
+   "count": 1
+  },
+  {
+   "command": "hybridsearchd",
+   "count": 1
+  },
+  {
+   "command": "icdd",
+   "count": 1
+  },
+  {
+   "command": "iconservicesagent",
+   "count": 1
+  },
+  {
+   "command": "identityservicesd",
+   "count": 1
+  },
+  {
+   "command": "imagent",
+   "count": 1
+  },
+  {
+   "command": "imageplaygroundd",
+   "count": 1
+  },
+  {
+   "command": "imklaunchagent",
+   "count": 1
+  },
+  {
+   "command": "intelligencecontextd",
+   "count": 1
+  },
+  {
+   "command": "intelligenceflowd",
+   "count": 1
+  },
+  {
+   "command": "intelligentroutingd",
+   "count": 1
+  },
+  {
+   "command": "itunescloudd",
+   "count": 1
+  },
+  {
+   "command": "keyboardservicesd",
+   "count": 1
+  },
+  {
+   "command": "knowledge-agent",
+   "count": 1
+  },
+  {
+   "command": "languageassetd",
+   "count": 1
+  },
+  {
+   "command": "linkd",
+   "count": 1
+  },
+  {
+   "command": "liveactivitiesd",
+   "count": 1
+  },
+  {
+   "command": "localizationswitcherd",
+   "count": 1
+  },
+  {
+   "command": "loginwindow",
+   "count": 1
+  },
+  {
+   "command": "lsd",
+   "count": 1
+  },
+  {
+   "command": "maild",
+   "count": 1
+  },
+  {
+   "command": "managedcorespotlightd",
+   "count": 1
+  },
+  {
+   "command": "mbuseragent",
+   "count": 1
+  },
+  {
+   "command": "mdbulkimport",
+   "count": 1
+  },
+  {
+   "command": "mdwrite",
+   "count": 1
+  },
+  {
+   "command": "mediaanalysisd",
+   "count": 1
+  },
+  {
+   "command": "mediaanalysisd-access",
+   "count": 1
+  },
+  {
+   "command": "mediaremoteagent",
+   "count": 1
+  },
+  {
+   "command": "migrationhelper",
+   "count": 1
+  },
+  {
+   "command": "mlhostd",
+   "count": 1
+  },
+  {
+   "command": "mobiletimerd",
+   "count": 1
+  },
+  {
+   "command": "naturallanguaged",
+   "count": 1
+  },
+  {
+   "command": "neagent",
+   "count": 1
+  },
+  {
+   "command": "networkserviceproxy",
+   "count": 1
+  },
+  {
+   "command": "nsurlsessiond",
+   "count": 1
+  },
+  {
+   "command": "parsec-fbf",
+   "count": 1
+  },
+  {
+   "command": "parsecd",
+   "count": 1
+  },
+  {
+   "command": "passd",
+   "count": 1
+  },
+  {
+   "command": "path_helper",
+   "count": 1
+  },
+  {
+   "command": "pboard",
+   "count": 1
+  },
+  {
+   "command": "pbs",
+   "count": 1
+  },
+  {
+   "command": "peopled",
+   "count": 1
+  },
+  {
+   "command": "photoanalysisd",
+   "count": 1
+  },
+  {
+   "command": "photolibraryd",
+   "count": 1
+  },
+  {
+   "command": "pkd",
+   "count": 1
+  },
+  {
+   "command": "proactived",
+   "count": 1
+  },
+  {
+   "command": "promotedcontentd",
+   "count": 1
+  },
+  {
+   "command": "rapportd",
+   "count": 1
+  },
+  {
+   "command": "recentsd",
+   "count": 1
+  },
+  {
+   "command": "redis-server",
+   "count": 1
+  },
+  {
+   "command": "remotepairingd",
+   "count": 1
+  },
+  {
+   "command": "replayd",
+   "count": 1
+  },
+  {
+   "command": "routined",
+   "count": 1
+  },
+  {
+   "command": "searchpartyuseragent",
+   "count": 1
+  },
+  {
+   "command": "secd",
+   "count": 1
+  },
+  {
+   "command": "secinitd",
+   "count": 1
+  },
+  {
+   "command": "sharedfilelistd",
+   "count": 1
+  },
+  {
+   "command": "sharingd",
+   "count": 1
+  },
+  {
+   "command": "siriactionsd",
+   "count": 1
+  },
+  {
+   "command": "siriappintentsd",
+   "count": 1
+  },
+  {
+   "command": "siriinferenced",
+   "count": 1
+  },
+  {
+   "command": "siriknowledged",
+   "count": 1
+  },
+  {
+   "command": "sociallayerd",
+   "count": 1
+  },
+  {
+   "command": "speechmaintenanced",
+   "count": 1
+  },
+  {
+   "command": "spindump_agent",
+   "count": 1
+  },
+  {
+   "command": "spotlightknowledged",
+   "count": 1
+  },
+  {
+   "command": "spotlightknowledged.importer",
+   "count": 1
+  },
+  {
+   "command": "spotlightknowledged.updater",
+   "count": 1
+  },
+  {
+   "command": "ssh-agent",
+   "count": 1
+  },
+  {
+   "command": "stickersd",
+   "count": 1
+  },
+  {
+   "command": "studentd",
+   "count": 1
+  },
+  {
+   "command": "suggestd",
+   "count": 1
+  },
+  {
+   "command": "superwhisper",
+   "count": 1
+  },
+  {
+   "command": "swcd",
+   "count": 1
+  },
+  {
+   "command": "syncdefaultsd",
+   "count": 1
+  },
+  {
+   "command": "systemsettingsagent",
+   "count": 1
+  },
+  {
+   "command": "talagentd",
+   "count": 1
+  },
+  {
+   "command": "tccd",
+   "count": 1
+  },
+  {
+   "command": "temporal-sdk-python-1.24.0",
+   "count": 1
+  },
+  {
+   "command": "temporal-test-server-sdk-python",
+   "count": 1
+  },
+  {
+   "command": "textcomposerd",
+   "count": 1
+  },
+  {
+   "command": "textunderstandingd",
+   "count": 1
+  },
+  {
+   "command": "tipsd",
+   "count": 1
+  },
+  {
+   "command": "translationd",
+   "count": 1
+  },
+  {
+   "command": "transparencyd",
+   "count": 1
+  },
+  {
+   "command": "triald",
+   "count": 1
+  },
+  {
+   "command": "trustd",
+   "count": 1
+  },
+  {
+   "command": "universalAccessAuthWarn",
+   "count": 1
+  },
+  {
+   "command": "universalaccessd",
+   "count": 1
+  },
+  {
+   "command": "useractivityd",
+   "count": 1
+  },
+  {
+   "command": "usernoted",
+   "count": 1
+  },
+  {
+   "command": "usernotificationsd",
+   "count": 1
+  },
+  {
+   "command": "webinspectord",
+   "count": 1
+  }
+ ],
+ "by_parent_chain": [
+  {
+   "chain": "herdr > zsh",
+   "count": 138
+  },
+  {
+   "chain": "herdr > zsh > treehouse",
+   "count": 101
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh",
+   "count": 101
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.13 > bash+",
+   "count": 101
+  },
+  {
+   "chain": "bash+",
+   "count": 64
+  },
+  {
+   "chain": "bash",
+   "count": 62
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+",
+   "count": 60
+  },
+  {
+   "chain": "herdr > zsh > omp > bash+",
+   "count": 32
+  },
+  {
+   "chain": "bash+ > gtimeout > bash+",
+   "count": 30
+  },
+  {
+   "chain": "bash > perl",
+   "count": 28
+  },
+  {
+   "chain": "bash > sleep",
+   "count": 26
+  },
+  {
+   "chain": "bash+ > node",
+   "count": 25
+  },
+  {
+   "chain": "bash+ > perl",
+   "count": 25
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294",
+   "count": 24
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+ > Google Chrome > Google Chrome Helper (Renderer)",
+   "count": 23
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.292",
+   "count": 22
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293",
+   "count": 22
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp+",
+   "count": 21
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+ > Google Chrome > Google Chrome Helper",
+   "count": 21
+  },
+  {
+   "chain": "no-mistakes > node",
+   "count": 21
+  },
+  {
+   "chain": "no-mistakes > node > omp",
+   "count": 21
+  },
+  {
+   "chain": "SetStoreUpdateService",
+   "count": 20
+  },
+  {
+   "chain": "node+",
+   "count": 18
+  },
+  {
+   "chain": "node+ > Google Chrome > Google Chrome Helper",
+   "count": 18
+  },
+  {
+   "chain": "herdr > zsh > omp+",
+   "count": 16
+  },
+  {
+   "chain": "node+ > Google Chrome > Google Chrome Helper (Renderer)",
+   "count": 16
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292",
+   "count": 15
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295",
+   "count": 15
+  },
+  {
+   "chain": "no-mistakes > node > omp > bash+",
+   "count": 14
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp > python3.12",
+   "count": 13
+  },
+  {
+   "chain": "chrome_crashpad_handler",
+   "count": 11
+  },
+  {
+   "chain": "com.apple.WebKit.WebContent",
+   "count": 11
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294 > zsh",
+   "count": 11
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp",
+   "count": 10
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp+ > ruff",
+   "count": 10
+  },
+  {
+   "chain": "GoogleUpdater",
+   "count": 9
+  },
+  {
+   "chain": "bash+ > gtimeout > bash+ > gtimeout > bash+",
+   "count": 9
+  },
+  {
+   "chain": "herdr > zsh > omp",
+   "count": 9
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh",
+   "count": 8
+  },
+  {
+   "chain": "no-mistakes > bash+",
+   "count": 8
+  },
+  {
+   "chain": "no-mistakes > bash+ > time",
+   "count": 8
+  },
+  {
+   "chain": "no-mistakes > bash+ > time > perl",
+   "count": 8
+  },
+  {
+   "chain": "no-mistakes > bash+ > time > perl > shellcheck",
+   "count": 8
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.13",
+   "count": 8
+  },
+  {
+   "chain": "node",
+   "count": 8
+  },
+  {
+   "chain": "herdr > zsh > omp > bash",
+   "count": 7
+  },
+  {
+   "chain": "herdr > zsh > omp > node",
+   "count": 7
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh",
+   "count": 7
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp > uv",
+   "count": 7
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp > uv > python3.12",
+   "count": 7
+  },
+  {
+   "chain": "no-mistakes > bash",
+   "count": 7
+  },
+  {
+   "chain": "bash+ > gtimeout > bash+ > gtimeout",
+   "count": 6
+  },
+  {
+   "chain": "bash+ > gtimeout > bash+ > gtimeout > bash",
+   "count": 6
+  },
+  {
+   "chain": "herdr > zsh > omp > python3.13",
+   "count": 6
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294 > zsh > sleep",
+   "count": 6
+  },
+  {
+   "chain": "node+ > Google Chrome",
+   "count": 6
+  },
+  {
+   "chain": "tmux > 2.1.295 > bash > time > bash > gtimeout > bash+",
+   "count": 5
+  },
+  {
+   "chain": "bash+ > sleep",
+   "count": 4
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294 > zsh > no-mistakes",
+   "count": 4
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+ > Google Chrome",
+   "count": 4
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+ > Google Chrome > Google Chrome Helper (GPU)",
+   "count": 4
+  },
+  {
+   "chain": "no-mistakes > node > bash+",
+   "count": 4
+  },
+  {
+   "chain": "no-mistakes > node > omp+",
+   "count": 4
+  },
+  {
+   "chain": "MTLCompilerService",
+   "count": 3
+  },
+  {
+   "chain": "bash > herdr > zsh > omp > bash+",
+   "count": 3
+  },
+  {
+   "chain": "bash+ > gtimeout",
+   "count": 3
+  },
+  {
+   "chain": "com.apple.WebKit.GPU",
+   "count": 3
+  },
+  {
+   "chain": "herdr > zsh > omp > python3.12",
+   "count": 3
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > caffeinate",
+   "count": 3
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh > no-mistakes",
+   "count": 3
+  },
+  {
+   "chain": "no-mistakes > bash > uv",
+   "count": 3
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12",
+   "count": 3
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+ > Google Chrome > GoogleUpdater",
+   "count": 3
+  },
+  {
+   "chain": "no-mistakes > node > bash",
+   "count": 3
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.12",
+   "count": 3
+  },
+  {
+   "chain": "no-mistakes > node > zsh > bash+",
+   "count": 3
+  },
+  {
+   "chain": "python3.13",
+   "count": 3
+  },
+  {
+   "chain": "zsh",
+   "count": 3
+  },
+  {
+   "chain": "1Password",
+   "count": 2
+  },
+  {
+   "chain": "1Password > 1Password Helper",
+   "count": 2
+  },
+  {
+   "chain": "2.1.293",
+   "count": 2
+  },
+  {
+   "chain": "2.1.293+",
+   "count": 2
+  },
+  {
+   "chain": "2.1.293+ > bash+",
+   "count": 2
+  },
+  {
+   "chain": "QuickLookUIService",
+   "count": 2
+  },
+  {
+   "chain": "bash+ > gtimeout > bash",
+   "count": 2
+  },
+  {
+   "chain": "com.apple.SafariPlatformSupport",
+   "count": 2
+  },
+  {
+   "chain": "com.apple.WebKit.Networking",
+   "count": 2
+  },
+  {
+   "chain": "com.docker.backend+",
+   "count": 2
+  },
+  {
+   "chain": "com.docker.backend+ > Docker Desktop > Docker Desktop Helper",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292 > caffeinate",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > 2.1.293",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > 2.1.293 > zsh",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > 2.1.293 > zsh > no-mistakes",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > 2.1.294",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > node",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > node > 2.1.293",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > node > 2.1.293 > 2.1.295+",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > omp > bash+ > herdr",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > omp+ > ruff",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > bash",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > bash+",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > bash+ > no-mistakes",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > tail",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh+",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > caffeinate",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh > sleep",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp+ > node",
+   "count": 2
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp+ > node+",
+   "count": 2
+  },
+  {
+   "chain": "no-mistakes > node > omp > bash",
+   "count": 2
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.13 > bash",
+   "count": 2
+  },
+  {
+   "chain": "no-mistakes > node > omp > uv",
+   "count": 2
+  },
+  {
+   "chain": "no-mistakes > node > omp > uv > python3.12",
+   "count": 2
+  },
+  {
+   "chain": "no-mistakes > node > zsh",
+   "count": 2
+  },
+  {
+   "chain": "omp+",
+   "count": 2
+  },
+  {
+   "chain": "tmux",
+   "count": 2
+  },
+  {
+   "chain": "zsh > node",
+   "count": 2
+  },
+  {
+   "chain": "1Password > 1Password Helper (Renderer)",
+   "count": 1
+  },
+  {
+   "chain": "1Password > 1Password-Crash-Handler",
+   "count": 1
+  },
+  {
+   "chain": "1Password Browser Helper",
+   "count": 1
+  },
+  {
+   "chain": "2.1.293+ > bash",
+   "count": 1
+  },
+  {
+   "chain": "2.1.293+ > caffeinate",
+   "count": 1
+  },
+  {
+   "chain": "2.1.293+ > zsh",
+   "count": 1
+  },
+  {
+   "chain": "2.1.293+ > zsh > node",
+   "count": 1
+  },
+  {
+   "chain": "2.1.294",
+   "count": 1
+  },
+  {
+   "chain": "2.1.294+",
+   "count": 1
+  },
+  {
+   "chain": "AMPDeviceDiscoveryAgent",
+   "count": 1
+  },
+  {
+   "chain": "AccessibilitySettingsWidgetExte",
+   "count": 1
+  },
+  {
+   "chain": "AccessibilityUIServer",
+   "count": 1
+  },
+  {
+   "chain": "Activity Monitor",
+   "count": 1
+  },
+  {
+   "chain": "AirPlayUIAgent",
+   "count": 1
+  },
+  {
+   "chain": "AppPredictionIntentsHelperServi",
+   "count": 1
+  },
+  {
+   "chain": "AppSSOAgent",
+   "count": 1
+  },
+  {
+   "chain": "AppearanceIntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "AppleIDSettings",
+   "count": 1
+  },
+  {
+   "chain": "AppleIntelligenceReportingSELFI",
+   "count": 1
+  },
+  {
+   "chain": "AppleSpell",
+   "count": 1
+  },
+  {
+   "chain": "AssetCacheLocatorService",
+   "count": 1
+  },
+  {
+   "chain": "AudioComponentRegistrar",
+   "count": 1
+  },
+  {
+   "chain": "AudiovisualThumbnailExtension",
+   "count": 1
+  },
+  {
+   "chain": "AuthenticationServicesAgent",
+   "count": 1
+  },
+  {
+   "chain": "BTLEServerAgent",
+   "count": 1
+  },
+  {
+   "chain": "BackgroundTaskManagementAgent",
+   "count": 1
+  },
+  {
+   "chain": "BatteriesAvocadoWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "BatterySettingsIntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "BiomeAgent",
+   "count": 1
+  },
+  {
+   "chain": "BiomeSELFIngestor",
+   "count": 1
+  },
+  {
+   "chain": "BluetoothSettingsAppIntentsWidg",
+   "count": 1
+  },
+  {
+   "chain": "CMFSyncAgent",
+   "count": 1
+  },
+  {
+   "chain": "CalculatorWidget",
+   "count": 1
+  },
+  {
+   "chain": "Calendar",
+   "count": 1
+  },
+  {
+   "chain": "CalendarIntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "CalendarWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "CampoRemoteService",
+   "count": 1
+  },
+  {
+   "chain": "ClassroomSettings",
+   "count": 1
+  },
+  {
+   "chain": "CommCenter",
+   "count": 1
+  },
+  {
+   "chain": "ContactsCoreSpotlightExtension",
+   "count": 1
+  },
+  {
+   "chain": "ContainerMetadataExtractor",
+   "count": 1
+  },
+  {
+   "chain": "ContextService",
+   "count": 1
+  },
+  {
+   "chain": "ContextStoreAgent",
+   "count": 1
+  },
+  {
+   "chain": "ContinuityCaptureAgent",
+   "count": 1
+  },
+  {
+   "chain": "ControlCenter",
+   "count": 1
+  },
+  {
+   "chain": "ControlCenterSettingsIntents",
+   "count": 1
+  },
+  {
+   "chain": "CoreLocationAgent",
+   "count": 1
+  },
+  {
+   "chain": "CoreServicesUIAgent",
+   "count": 1
+  },
+  {
+   "chain": "CursorUIViewService",
+   "count": 1
+  },
+  {
+   "chain": "DateTimeIntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "DefaultExtensionEnablement",
+   "count": 1
+  },
+  {
+   "chain": "DesktopSettingsIntents",
+   "count": 1
+  },
+  {
+   "chain": "Disk Utility",
+   "count": 1
+  },
+  {
+   "chain": "DiskArbitrationAgent",
+   "count": 1
+  },
+  {
+   "chain": "DiskUnmountWatcher",
+   "count": 1
+  },
+  {
+   "chain": "DisplayControls",
+   "count": 1
+  },
+  {
+   "chain": "DisplaysSettingsIntentsExtensio",
+   "count": 1
+  },
+  {
+   "chain": "Dock",
+   "count": 1
+  },
+  {
+   "chain": "DockControls",
+   "count": 1
+  },
+  {
+   "chain": "FSKitModuleManagement",
+   "count": 1
+  },
+  {
+   "chain": "FamilyIntents",
+   "count": 1
+  },
+  {
+   "chain": "FamilySettings",
+   "count": 1
+  },
+  {
+   "chain": "FeatureAccessAgent",
+   "count": 1
+  },
+  {
+   "chain": "FindMyWidgetItems",
+   "count": 1
+  },
+  {
+   "chain": "FindMyWidgetPeople",
+   "count": 1
+  },
+  {
+   "chain": "Finder",
+   "count": 1
+  },
+  {
+   "chain": "FollowUpSettingsExtension",
+   "count": 1
+  },
+  {
+   "chain": "GMSSELFIngestor",
+   "count": 1
+  },
+  {
+   "chain": "GeneralSettings",
+   "count": 1
+  },
+  {
+   "chain": "HeadphoneSettingsExtension",
+   "count": 1
+  },
+  {
+   "chain": "HomeEnergyWidgetsExtension",
+   "count": 1
+  },
+  {
+   "chain": "HomeWidget",
+   "count": 1
+  },
+  {
+   "chain": "HomeWidgetIntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "IFTelemetrySELFIngestor",
+   "count": 1
+  },
+  {
+   "chain": "IFTranscriptSELFIngestor",
+   "count": 1
+  },
+  {
+   "chain": "IMDPersistenceAgent",
+   "count": 1
+  },
+  {
+   "chain": "ImageThumbnailExtension",
+   "count": 1
+  },
+  {
+   "chain": "IntelligencePlatformComputeServ",
+   "count": 1
+  },
+  {
+   "chain": "IntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "JournalWidgets",
+   "count": 1
+  },
+  {
+   "chain": "JournalWidgetsSecure",
+   "count": 1
+  },
+  {
+   "chain": "Keychain Circle Notification",
+   "count": 1
+  },
+  {
+   "chain": "LegacyPluginEnablement",
+   "count": 1
+  },
+  {
+   "chain": "LoginItems",
+   "count": 1
+  },
+  {
+   "chain": "MENotificationAgent",
+   "count": 1
+  },
+  {
+   "chain": "MTLAssetUpgraderD",
+   "count": 1
+  },
+  {
+   "chain": "ManagedSettingsAgent",
+   "count": 1
+  },
+  {
+   "chain": "MediaExtensionsSettingsControll",
+   "count": 1
+  },
+  {
+   "chain": "MenuBarAgent",
+   "count": 1
+  },
+  {
+   "chain": "Messages",
+   "count": 1
+  },
+  {
+   "chain": "Messages Assistant Extension",
+   "count": 1
+  },
+  {
+   "chain": "MessagesActionExtension",
+   "count": 1
+  },
+  {
+   "chain": "MessagesBlastDoorService",
+   "count": 1
+  },
+  {
+   "chain": "MobileDeviceUpdater",
+   "count": 1
+  },
+  {
+   "chain": "MobileTimerIntents",
+   "count": 1
+  },
+  {
+   "chain": "NeptuneOneWallpaper",
+   "count": 1
+  },
+  {
+   "chain": "NewsTag",
+   "count": 1
+  },
+  {
+   "chain": "NewsToday2",
+   "count": 1
+  },
+  {
+   "chain": "NewsTodayIntents",
+   "count": 1
+  },
+  {
+   "chain": "NotificationCenter",
+   "count": 1
+  },
+  {
+   "chain": "NotificationsSettingsIntents",
+   "count": 1
+  },
+  {
+   "chain": "ObsidianQuickLook",
+   "count": 1
+  },
+  {
+   "chain": "OfficeThumbnailExtension",
+   "count": 1
+  },
+  {
+   "chain": "PAH_Extension",
+   "count": 1
+  },
+  {
+   "chain": "PasswordBreachAgent",
+   "count": 1
+  },
+  {
+   "chain": "PeopleWidget_macOSExtension",
+   "count": 1
+  },
+  {
+   "chain": "PerplexityXPC",
+   "count": 1
+  },
+  {
+   "chain": "PhotosPosterProvider",
+   "count": 1
+  },
+  {
+   "chain": "PhotosReliveWidget",
+   "count": 1
+  },
+  {
+   "chain": "PodcastsWidget",
+   "count": 1
+  },
+  {
+   "chain": "PrintCenterWidgetExtension.macO",
+   "count": 1
+  },
+  {
+   "chain": "ProtectedCloudKeySyncing",
+   "count": 1
+  },
+  {
+   "chain": "RecordWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "RemindersIntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "RemindersWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "ReportCrash",
+   "count": 1
+  },
+  {
+   "chain": "SAExtensionOrchestrator",
+   "count": 1
+  },
+  {
+   "chain": "Safari",
+   "count": 1
+  },
+  {
+   "chain": "SafariBookmarksSyncAgent",
+   "count": 1
+  },
+  {
+   "chain": "SafariLaunchAgent",
+   "count": 1
+  },
+  {
+   "chain": "SafariLinkExtension",
+   "count": 1
+  },
+  {
+   "chain": "SafariNotificationAgent",
+   "count": 1
+  },
+  {
+   "chain": "SafariWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "ScopedBookmarkAgent",
+   "count": 1
+  },
+  {
+   "chain": "Screen Sharing",
+   "count": 1
+  },
+  {
+   "chain": "ScreenTimeAgent",
+   "count": 1
+  },
+  {
+   "chain": "ScreenTimeSettingsAgent",
+   "count": 1
+  },
+  {
+   "chain": "ScreenTimeWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "ScreenTimeWidgetIntentsExtensio",
+   "count": 1
+  },
+  {
+   "chain": "ScreenshotControls",
+   "count": 1
+  },
+  {
+   "chain": "SecurityAgent",
+   "count": 1
+  },
+  {
+   "chain": "SelectPerson_iOS",
+   "count": 1
+  },
+  {
+   "chain": "SettingsImportExtension",
+   "count": 1
+  },
+  {
+   "chain": "SettingsSystemExtensionControll",
+   "count": 1
+  },
+  {
+   "chain": "ShortcutLiveActivityWidgetExten",
+   "count": 1
+  },
+  {
+   "chain": "ShortcutsViewService",
+   "count": 1
+  },
+  {
+   "chain": "ShortcutsWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "SidecarRelay",
+   "count": 1
+  },
+  {
+   "chain": "Siri",
+   "count": 1
+  },
+  {
+   "chain": "Siri AI",
+   "count": 1
+  },
+  {
+   "chain": "SiriSuggestionsBookkeepingServi",
+   "count": 1
+  },
+  {
+   "chain": "SoftRAID_Monitor",
+   "count": 1
+  },
+  {
+   "chain": "SoftRAID_Monitor > SoftRAID-Worker",
+   "count": 1
+  },
+  {
+   "chain": "SoftwareUpdateNotificationManag",
+   "count": 1
+  },
+  {
+   "chain": "SoundIntentsExtension",
+   "count": 1
+  },
+  {
+   "chain": "StatusKitAgent",
+   "count": 1
+  },
+  {
+   "chain": "StocksWidget",
+   "count": 1
+  },
+  {
+   "chain": "System Settings",
+   "count": 1
+  },
+  {
+   "chain": "SystemUIServer",
+   "count": 1
+  },
+  {
+   "chain": "Terminal",
+   "count": 1
+  },
+  {
+   "chain": "TextInputMenuAgent",
+   "count": 1
+  },
+  {
+   "chain": "TextThumbnailExtension",
+   "count": 1
+  },
+  {
+   "chain": "ThemeWidgetControlViewService",
+   "count": 1
+  },
+  {
+   "chain": "Tips",
+   "count": 1
+  },
+  {
+   "chain": "TipsWidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "UIKitSystem",
+   "count": 1
+  },
+  {
+   "chain": "UniversalControl",
+   "count": 1
+  },
+  {
+   "chain": "UsageTrackingAgent",
+   "count": 1
+  },
+  {
+   "chain": "UserEventAgent",
+   "count": 1
+  },
+  {
+   "chain": "UserNotificationCenter",
+   "count": 1
+  },
+  {
+   "chain": "VTDecoderXPCService",
+   "count": 1
+  },
+  {
+   "chain": "ViewBridgeAuxiliary",
+   "count": 1
+  },
+  {
+   "chain": "VoiceMemosSettingsWidgetExtensi",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperAerialsExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperAgent",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperControlsExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperDynamicExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperGradientExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperImageExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperLegacyExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperMacintoshExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperSequoiaExtension",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperSettingsIntents",
+   "count": 1
+  },
+  {
+   "chain": "WallpaperSonomaExtension",
+   "count": 1
+  },
+  {
+   "chain": "WeatherIntents",
+   "count": 1
+  },
+  {
+   "chain": "WeatherWidget",
+   "count": 1
+  },
+  {
+   "chain": "WebThumbnailExtension",
+   "count": 1
+  },
+  {
+   "chain": "WiFiAgent",
+   "count": 1
+  },
+  {
+   "chain": "WindowManager",
+   "count": 1
+  },
+  {
+   "chain": "WindowManagerControlsExtension",
+   "count": 1
+  },
+  {
+   "chain": "WorldClockWidget",
+   "count": 1
+  },
+  {
+   "chain": "accountsd",
+   "count": 1
+  },
+  {
+   "chain": "agentstored",
+   "count": 1
+  },
+  {
+   "chain": "akd",
+   "count": 1
+  },
+  {
+   "chain": "amsaccountsd",
+   "count": 1
+  },
+  {
+   "chain": "amsengagementd",
+   "count": 1
+  },
+  {
+   "chain": "analyticsagent",
+   "count": 1
+  },
+  {
+   "chain": "appleaccountd",
+   "count": 1
+  },
+  {
+   "chain": "appstoreagent",
+   "count": 1
+  },
+  {
+   "chain": "assessmentagent",
+   "count": 1
+  },
+  {
+   "chain": "assistant_cdmd",
+   "count": 1
+  },
+  {
+   "chain": "assistantd",
+   "count": 1
+  },
+  {
+   "chain": "audioaccessoryd",
+   "count": 1
+  },
+  {
+   "chain": "avconferenced",
+   "count": 1
+  },
+  {
+   "chain": "axassetsd",
+   "count": 1
+  },
+  {
+   "chain": "bash > herdr",
+   "count": 1
+  },
+  {
+   "chain": "bash > herdr > zsh",
+   "count": 1
+  },
+  {
+   "chain": "bash > herdr > zsh > omp",
+   "count": 1
+  },
+  {
+   "chain": "bash > herdr > zsh > omp > bash",
+   "count": 1
+  },
+  {
+   "chain": "bash > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "bash+ > gtimeout+",
+   "count": 1
+  },
+  {
+   "chain": "biomesyncd",
+   "count": 1
+  },
+  {
+   "chain": "bird",
+   "count": 1
+  },
+  {
+   "chain": "bluetoothuserd",
+   "count": 1
+  },
+  {
+   "chain": "calaccessd",
+   "count": 1
+  },
+  {
+   "chain": "callservicesd",
+   "count": 1
+  },
+  {
+   "chain": "cfprefsd",
+   "count": 1
+  },
+  {
+   "chain": "chronod",
+   "count": 1
+  },
+  {
+   "chain": "cloudd",
+   "count": 1
+  },
+  {
+   "chain": "cloudphotod",
+   "count": 1
+  },
+  {
+   "chain": "codex",
+   "count": 1
+  },
+  {
+   "chain": "codex+",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.CalendarWeatherKitSer",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.CloudDocs.iCloudDrive",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.Notes.IntentsExtensio",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.Notes.WidgetExtension",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.Safari.History",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.Safari.SafeBrowsing.S",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.Safari.SandboxBroker",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.Safari.SearchHelper",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.Virtualization.Virtua",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.WebKit.WebContent.Enh",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.accessibility.mediaac",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.appkit.xpc.openAndSav",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.dock.extra",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.geod",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.hiservices-xpcservice",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.iCloudHelper",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.quicklook.ThumbnailsA",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.siri.embeddedspeech",
+   "count": 1
+  },
+  {
+   "chain": "com.apple.tonelibraryd",
+   "count": 1
+  },
+  {
+   "chain": "com.docker.backend",
+   "count": 1
+  },
+  {
+   "chain": "com.docker.backend+ > Docker Desktop",
+   "count": 1
+  },
+  {
+   "chain": "com.docker.backend+ > Docker Desktop > Docker Desktop Helper (Renderer",
+   "count": 1
+  },
+  {
+   "chain": "com.docker.backend+ > com.docker.build",
+   "count": 1
+  },
+  {
+   "chain": "com.docker.backend+ > com.docker.virtualization",
+   "count": 1
+  },
+  {
+   "chain": "com.docker.backend+ > docker-agent",
+   "count": 1
+  },
+  {
+   "chain": "commerce",
+   "count": 1
+  },
+  {
+   "chain": "contactsd",
+   "count": 1
+  },
+  {
+   "chain": "containermanagerd",
+   "count": 1
+  },
+  {
+   "chain": "coreautha",
+   "count": 1
+  },
+  {
+   "chain": "coreauthd",
+   "count": 1
+  },
+  {
+   "chain": "corespeechd",
+   "count": 1
+  },
+  {
+   "chain": "corespotlightd",
+   "count": 1
+  },
+  {
+   "chain": "ctkahp",
+   "count": 1
+  },
+  {
+   "chain": "ctkd",
+   "count": 1
+  },
+  {
+   "chain": "dataaccessd",
+   "count": 1
+  },
+  {
+   "chain": "deleted",
+   "count": 1
+  },
+  {
+   "chain": "devicecheckd",
+   "count": 1
+  },
+  {
+   "chain": "diagnostics_agent",
+   "count": 1
+  },
+  {
+   "chain": "distnoted",
+   "count": 1
+  },
+  {
+   "chain": "dmd",
+   "count": 1
+  },
+  {
+   "chain": "donotdisturbd",
+   "count": 1
+  },
+  {
+   "chain": "duetexpertd",
+   "count": 1
+  },
+  {
+   "chain": "facetimemessagestored",
+   "count": 1
+  },
+  {
+   "chain": "familycircled",
+   "count": 1
+  },
+  {
+   "chain": "feedbackd",
+   "count": 1
+  },
+  {
+   "chain": "fileproviderd",
+   "count": 1
+  },
+  {
+   "chain": "findmydevice-user-agent",
+   "count": 1
+  },
+  {
+   "chain": "findmylocateagent",
+   "count": 1
+  },
+  {
+   "chain": "followupd",
+   "count": 1
+  },
+  {
+   "chain": "fontd",
+   "count": 1
+  },
+  {
+   "chain": "fontworker",
+   "count": 1
+  },
+  {
+   "chain": "gamecontrolleragentd",
+   "count": 1
+  },
+  {
+   "chain": "generativeexperiencesd",
+   "count": 1
+  },
+  {
+   "chain": "geodMachServiceBridge",
+   "count": 1
+  },
+  {
+   "chain": "heard",
+   "count": 1
+  },
+  {
+   "chain": "helpd",
+   "count": 1
+  },
+  {
+   "chain": "herdr",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292 > zsh",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292 > zsh > cut",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292 > zsh > head",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292 > zsh > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292 > zsh+",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > 2.1.292 > zsh+ > 2.1.292",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > 2.1.293 > caffeinate",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > node > 2.1.293 > 2.1.295",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > omp > bash+ > gtimeout",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > omp > bash+ > gtimeout > bash",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > omp > bash+ > gtimeout > bash+",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.292 > zsh",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.292 > zsh > bash",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.292 > zsh > bash > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > perl",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > python3.13",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > python3.13+",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > python3.13+ > node",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > python3.13+ > node > gh",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh > sleep",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh+ > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.293 > zsh+ > sleep",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294 > caffeinate",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294 > zsh > tail",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294 > zsh+",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.294 > zsh+ > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh > bash",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh > bash+",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh > bash+ > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh+",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > 2.1.295 > zsh+ > no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "herdr > zsh > treehouse > zsh > omp+ > python3.12",
+   "count": 1
+  },
+  {
+   "chain": "homed",
+   "count": 1
+  },
+  {
+   "chain": "homeenergyd",
+   "count": 1
+  },
+  {
+   "chain": "hybridsearchd",
+   "count": 1
+  },
+  {
+   "chain": "icdd",
+   "count": 1
+  },
+  {
+   "chain": "iconservicesagent",
+   "count": 1
+  },
+  {
+   "chain": "identityservicesd",
+   "count": 1
+  },
+  {
+   "chain": "imagent",
+   "count": 1
+  },
+  {
+   "chain": "imageplaygroundd",
+   "count": 1
+  },
+  {
+   "chain": "imklaunchagent",
+   "count": 1
+  },
+  {
+   "chain": "intelligencecontextd",
+   "count": 1
+  },
+  {
+   "chain": "intelligenceflowd",
+   "count": 1
+  },
+  {
+   "chain": "intelligentroutingd",
+   "count": 1
+  },
+  {
+   "chain": "itunescloudd",
+   "count": 1
+  },
+  {
+   "chain": "keyboardservicesd",
+   "count": 1
+  },
+  {
+   "chain": "knowledge-agent",
+   "count": 1
+  },
+  {
+   "chain": "languageassetd",
+   "count": 1
+  },
+  {
+   "chain": "linkd",
+   "count": 1
+  },
+  {
+   "chain": "liveactivitiesd",
+   "count": 1
+  },
+  {
+   "chain": "localizationswitcherd",
+   "count": 1
+  },
+  {
+   "chain": "loginwindow",
+   "count": 1
+  },
+  {
+   "chain": "lsd",
+   "count": 1
+  },
+  {
+   "chain": "maild",
+   "count": 1
+  },
+  {
+   "chain": "managedcorespotlightd",
+   "count": 1
+  },
+  {
+   "chain": "mbuseragent",
+   "count": 1
+  },
+  {
+   "chain": "mdbulkimport",
+   "count": 1
+  },
+  {
+   "chain": "mdwrite",
+   "count": 1
+  },
+  {
+   "chain": "mediaanalysisd",
+   "count": 1
+  },
+  {
+   "chain": "mediaanalysisd-access",
+   "count": 1
+  },
+  {
+   "chain": "mediaremoteagent",
+   "count": 1
+  },
+  {
+   "chain": "migrationhelper",
+   "count": 1
+  },
+  {
+   "chain": "mlhostd",
+   "count": 1
+  },
+  {
+   "chain": "mobiletimerd",
+   "count": 1
+  },
+  {
+   "chain": "naturallanguaged",
+   "count": 1
+  },
+  {
+   "chain": "neagent",
+   "count": 1
+  },
+  {
+   "chain": "networkserviceproxy",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+ > Google Chrome > Google Chrome Helper (Alerts)",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > bash > uv > python3.12+ > Google Chrome > GoogleUpdater+",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > bash > git",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > bash+ > git",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > bash+ > gtimeout",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > bash+ > gtimeout > bash",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > bash+ > gtimeout > bash > perl",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > bash+ > gtimeout",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > bash+ > gtimeout > bash",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > bash+ > gtimeout > bash > node",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > bash+ > sleep",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > git",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.12 > uv",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.12 > uv > python3.12",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.13 > bash+ > node",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.13 > bash+ > sleep",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > python3.13+",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > omp > ruff",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > python3.12",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > zsh > bash",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes > node > zsh > path_helper",
+   "count": 1
+  },
+  {
+   "chain": "no-mistakes+",
+   "count": 1
+  },
+  {
+   "chain": "nsurlsessiond",
+   "count": 1
+  },
+  {
+   "chain": "omp",
+   "count": 1
+  },
+  {
+   "chain": "parsec-fbf",
+   "count": 1
+  },
+  {
+   "chain": "parsecd",
+   "count": 1
+  },
+  {
+   "chain": "passd",
+   "count": 1
+  },
+  {
+   "chain": "pboard",
+   "count": 1
+  },
+  {
+   "chain": "pbs",
+   "count": 1
+  },
+  {
+   "chain": "peopled",
+   "count": 1
+  },
+  {
+   "chain": "photoanalysisd",
+   "count": 1
+  },
+  {
+   "chain": "photolibraryd",
+   "count": 1
+  },
+  {
+   "chain": "pkd",
+   "count": 1
+  },
+  {
+   "chain": "proactived",
+   "count": 1
+  },
+  {
+   "chain": "promotedcontentd",
+   "count": 1
+  },
+  {
+   "chain": "python3.12",
+   "count": 1
+  },
+  {
+   "chain": "rapportd",
+   "count": 1
+  },
+  {
+   "chain": "recentsd",
+   "count": 1
+  },
+  {
+   "chain": "redis-server",
+   "count": 1
+  },
+  {
+   "chain": "remotepairingd",
+   "count": 1
+  },
+  {
+   "chain": "replayd",
+   "count": 1
+  },
+  {
+   "chain": "routined",
+   "count": 1
+  },
+  {
+   "chain": "searchpartyuseragent",
+   "count": 1
+  },
+  {
+   "chain": "secd",
+   "count": 1
+  },
+  {
+   "chain": "secinitd",
+   "count": 1
+  },
+  {
+   "chain": "sharedfilelistd",
+   "count": 1
+  },
+  {
+   "chain": "sharingd",
+   "count": 1
+  },
+  {
+   "chain": "siriactionsd",
+   "count": 1
+  },
+  {
+   "chain": "siriappintentsd",
+   "count": 1
+  },
+  {
+   "chain": "siriinferenced",
+   "count": 1
+  },
+  {
+   "chain": "siriknowledged",
+   "count": 1
+  },
+  {
+   "chain": "sociallayerd",
+   "count": 1
+  },
+  {
+   "chain": "speechmaintenanced",
+   "count": 1
+  },
+  {
+   "chain": "spindump_agent",
+   "count": 1
+  },
+  {
+   "chain": "spotlightknowledged",
+   "count": 1
+  },
+  {
+   "chain": "spotlightknowledged.importer",
+   "count": 1
+  },
+  {
+   "chain": "spotlightknowledged.updater",
+   "count": 1
+  },
+  {
+   "chain": "ssh-agent",
+   "count": 1
+  },
+  {
+   "chain": "stickersd",
+   "count": 1
+  },
+  {
+   "chain": "studentd",
+   "count": 1
+  },
+  {
+   "chain": "suggestd",
+   "count": 1
+  },
+  {
+   "chain": "superwhisper",
+   "count": 1
+  },
+  {
+   "chain": "swcd",
+   "count": 1
+  },
+  {
+   "chain": "syncdefaultsd",
+   "count": 1
+  },
+  {
+   "chain": "systemsettingsagent",
+   "count": 1
+  },
+  {
+   "chain": "talagentd",
+   "count": 1
+  },
+  {
+   "chain": "tccd",
+   "count": 1
+  },
+  {
+   "chain": "temporal-sdk-python-1.24.0",
+   "count": 1
+  },
+  {
+   "chain": "temporal-test-server-sdk-python",
+   "count": 1
+  },
+  {
+   "chain": "textcomposerd",
+   "count": 1
+  },
+  {
+   "chain": "textunderstandingd",
+   "count": 1
+  },
+  {
+   "chain": "tipsd",
+   "count": 1
+  },
+  {
+   "chain": "tmux > 2.1.295",
+   "count": 1
+  },
+  {
+   "chain": "tmux > 2.1.295 > bash",
+   "count": 1
+  },
+  {
+   "chain": "tmux > 2.1.295 > bash > time",
+   "count": 1
+  },
+  {
+   "chain": "tmux > 2.1.295 > bash > time > bash",
+   "count": 1
+  },
+  {
+   "chain": "tmux > 2.1.295 > bash > time > bash > gtimeout",
+   "count": 1
+  },
+  {
+   "chain": "tmux > 2.1.295 > bash > time > bash > gtimeout > bash",
+   "count": 1
+  },
+  {
+   "chain": "tmux > bash",
+   "count": 1
+  },
+  {
+   "chain": "tmux > bash > sleep",
+   "count": 1
+  },
+  {
+   "chain": "translationd",
+   "count": 1
+  },
+  {
+   "chain": "transparencyd",
+   "count": 1
+  },
+  {
+   "chain": "triald",
+   "count": 1
+  },
+  {
+   "chain": "trustd",
+   "count": 1
+  },
+  {
+   "chain": "universalAccessAuthWarn",
+   "count": 1
+  },
+  {
+   "chain": "universalaccessd",
+   "count": 1
+  },
+  {
+   "chain": "useractivityd",
+   "count": 1
+  },
+  {
+   "chain": "usernoted",
+   "count": 1
+  },
+  {
+   "chain": "usernotificationsd",
+   "count": 1
+  },
+  {
+   "chain": "webinspectord",
+   "count": 1
+  },
+  {
+   "chain": "zsh > herdr",
+   "count": 1
+  }
+ ],
+ "deepest_chains": [
+  {
+   "depth": 105,
+   "chain": "no-mistakes > node > omp > python3.13 > bash(x100) > sleep",
+   "leaf": {
+    "pid": 12288,
+    "command": "sleep",
+    "executable": "sleep",
+    "script": ""
+   },
+   "run_length": 100,
+   "run_samples": [
+    {
+     "pid": 7158,
+     "command": "bash",
+     "executable": "bash",
+     "script": "nest.sh"
+    },
+    {
+     "pid": 11511,
+     "command": "bash",
+     "executable": "bash",
+     "script": "nest.sh"
+    },
+    {
+     "pid": 12280,
+     "command": "bash",
+     "executable": "bash",
+     "script": "nest.sh"
+    }
+   ]
+  },
+  {
+   "depth": 15,
+   "chain": "bash(x4) > gtimeout > bash(x6) > gtimeout > bash(x3)",
+   "leaf": {
+    "pid": 27849,
+    "command": "bash",
+    "executable": "",
+    "script": ""
+   },
+   "run_length": 6,
+   "run_samples": [
+    {
+     "pid": 91493,
+     "command": "bash",
+     "executable": "bash",
+     "script": ""
+    },
+    {
+     "pid": 20870,
+     "command": "bash",
+     "executable": "bash",
+     "script": "fm-fleet-snapshot.sh"
+    },
+    {
+     "pid": 21355,
+     "command": "bash",
+     "executable": "bash",
+     "script": "fm-fleet-snapshot.sh"
+    }
+   ]
+  },
+  {
+   "depth": 15,
+   "chain": "bash(x4) > gtimeout > bash(x6) > gtimeout > bash(x3)",
+   "leaf": {
+    "pid": 28157,
+    "command": "bash",
+    "executable": "",
+    "script": ""
+   },
+   "run_length": 6,
+   "run_samples": [
+    {
+     "pid": 91493,
+     "command": "bash",
+     "executable": "bash",
+     "script": ""
+    },
+    {
+     "pid": 20888,
+     "command": "bash",
+     "executable": "bash",
+     "script": "fm-fleet-snapshot.sh"
+    },
+    {
+     "pid": 21395,
+     "command": "bash",
+     "executable": "bash",
+     "script": "fm-fleet-snapshot.sh"
+    }
+   ]
+  },
+  {
+   "depth": 15,
+   "chain": "bash(x4) > gtimeout > bash(x6) > gtimeout > bash(x3)",
+   "leaf": {
+    "pid": 36154,
+    "command": "bash",
+    "executable": "",
+    "script": ""
+   },
+   "run_length": 6,
+   "run_samples": [
+    {
+     "pid": 91493,
+     "command": "bash",
+     "executable": "bash",
+     "script": ""
+    },
+    {
+     "pid": 20947,
+     "command": "bash",
+     "executable": "",
+     "script": ""
+    },
+    {
+     "pid": 21475,
+     "command": "bash",
+     "executable": "",
+     "script": ""
+    }
+   ]
+  },
+  {
+   "depth": 14,
+   "chain": "bash(x4) > gtimeout > bash(x6) > gtimeout > bash(x2)",
+   "leaf": {
+    "pid": 21799,
+    "command": "bash",
+    "executable": "",
+    "script": ""
+   },
+   "run_length": 6,
+   "run_samples": [
+    {
+     "pid": 91493,
+     "command": "bash",
+     "executable": "bash",
+     "script": ""
+    },
+    {
+     "pid": 20992,
+     "command": "bash",
+     "executable": "",
+     "script": ""
+    },
+    {
+     "pid": 21627,
+     "command": "bash",
+     "executable": "",
+     "script": ""
+    }
+   ]
+  }
+ ],
+ "oldest": [
+  {
+   "pid": 1070,
+   "command": "distnoted",
+   "executable": "distnoted",
+   "script": "",
+   "ppid": 1,
+   "started": "2026-10-06T04:59:30Z",
+   "age_seconds": 260376
+  },
+  {
+   "pid": 1074,
+   "command": "cfprefsd",
+   "executable": "cfprefsd",
+   "script": "",
+   "ppid": 1,
+   "started": "2026-10-06T04:59:30Z",
+   "age_seconds": 260376
+  },
+  {
+   "pid": 1075,
+   "command": "lsd",
+   "executable": "lsd",
+   "script": "",
+   "ppid": 1,
+   "started": "2026-10-06T04:59:30Z",
+   "age_seconds": 260375
+  },
+  {
+   "pid": 1080,
+   "command": "trustd",
+   "executable": "trustd",
+   "script": "",
+   "ppid": 1,
+   "started": "2026-10-06T04:59:30Z",
+   "age_seconds": 260375
+  },
+  {
+   "pid": 1365,
+   "command": "secd",
+   "executable": "secd",
+   "script": "",
+   "ppid": 1,
+   "started": "2026-10-06T04:59:42Z",
+   "age_seconds": 260364
+  }
+ ],
+ "newest": [
+  {
+   "pid": 36176,
+   "command": "bash",
+   "executable": "",
+   "script": "",
+   "ppid": 35835,
+   "started": "2026-10-09T05:19:05Z",
+   "age_seconds": 1
+  },
+  {
+   "pid": 36164,
+   "command": "bash",
+   "executable": "",
+   "script": "",
+   "ppid": 35444,
+   "started": "2026-10-09T05:19:05Z",
+   "age_seconds": 1
+  },
+  {
+   "pid": 36161,
+   "command": "bash",
+   "executable": "",
+   "script": "",
+   "ppid": 31415,
+   "started": "2026-10-09T05:19:05Z",
+   "age_seconds": 1
+  },
+  {
+   "pid": 36156,
+   "command": "bash",
+   "executable": "",
+   "script": "",
+   "ppid": 36148,
+   "started": "2026-10-09T05:19:05Z",
+   "age_seconds": 1
+  },
+  {
+   "pid": 36154,
+   "command": "bash",
+   "executable": "",
+   "script": "",
+   "ppid": 21672,
+   "started": "2026-10-09T05:19:05Z",
+   "age_seconds": 1
+  }
+ ]
+}

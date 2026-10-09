@@ -1,0 +1,55 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-procevent-proc.sh arm --limit 1000000000 --hold 1 --interval 0.2
+registered: proc-guard (proc)
+armed: proc-guard
+exit=0
+
+$ bash -c . "$1/bin/fm-supervision-lib.sh"; fm_supervision_needed "$2" 300; rc=$?; printf "needs_supervision_exit=%s sources=%s needed=%s\n" "$rc" "$FM_SUP_SOURCES" "$FM_SUP_NEEDED"; [ "$rc" -eq 1 ] && [ "$FM_SUP_SOURCES" -eq 0 ] _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/event-home/state
+needs_supervision_exit=1 sources=0 needed=false
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-procevent-proc.sh arm --limit 1000000000 --hold 1 --interval 0.2
+registered: proc-guard (proc)
+armed: proc-guard
+exit=0
+
+Identical arm preserved registration inode=159839964 and runner pid=14074
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-procevent-proc.sh arm --limit 1 --hold 1 --interval 0.2
+registered: proc-guard (proc)
+armed: proc-guard
+exit=0
+
+Changed arm: old runner 14074 replaced by 54591
+Captured product result:
+proc-guard: proc-guard
+status: pileup
+count: 1714
+limit: 1
+threshold: 0
+held_seconds: 1.11
+census: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/event-home/state/proc-census.1791523778.70086.json
+summary: 1714 of 1 processes; most common command zsh x275; deepest ancestry 14
+sampler_samples: 6
+sampler_cpu_ms_per_sample: 0.254
+sampler_peak_rss_kb: 24720
+Durable wake queue:
+1791523782	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+
+After 4 more high seconds: one census, one result, one durable wake; listener still alive.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+proc-guard                   proc         live       1
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-procevent.sh handled proc-guard 1
+handled: proc-guard 1
+exit=0
+
+Scoped retirement:
+retired: proc-guard
+exit=0
+
+Final scoped sweep:
+swept: attempted=0
+exit=0

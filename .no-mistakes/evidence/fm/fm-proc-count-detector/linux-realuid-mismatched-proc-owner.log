@@ -1,0 +1,24 @@
+$ docker run --rm --network none --read-only -e PYTHONDONTWRITEBYTECODE=1 --mount type=bind,source=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,target=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,readonly --workdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 ghcr.io/astral-sh/uv:python3.12-bookworm python3 -I /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-uid-mismatch.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05
+{
+  "workload_identity": {
+    "real": 10001,
+    "effective": 10002
+  },
+  "proc_directory_owner": 10002,
+  "workload_threads": 17,
+  "observer_real_uid": 10001,
+  "public_check": {
+    "name": "fm-proc-guard",
+    "checked_at": "2026-10-09T05:26:14Z",
+    "count": 18,
+    "limit": 28,
+    "limit_source": "--limit",
+    "read_cpu_ms": 0.145,
+    "percent_of_limit": 64.3,
+    "status": "WARNING",
+    "recommendation": "The user process count is high but forks still work; run the census to see what is piling up."
+  },
+  "proof": "17 threads count toward the real UID despite mismatching /proc directory ownership"
+}
+
+exit=0; elapsed=3.169s

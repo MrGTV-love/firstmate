@@ -1,0 +1,22 @@
+$ bash tests/fm-proc-guard.test.sh
+..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.975s
+
+OK
+ok - guard real-UID, limit, privacy, and fixed-boundary behavior
+ok - check reads the user's process count and reports its limit or UNKNOWN
+ok - check classifies the count against the limit and --check exits on WARNING or CRITICAL
+ok - threshold and retention customization are refused, as are invalid remaining options
+ok - census names the tree: command counts, parent chains, deepest chains with run samples and leaf, oldest and newest
+ok - census only reads: every measured process is still alive
+ok - a count above the threshold for more than the hold writes one census and reports it
+ok - while the count stays high an open episode keeps watch silent: one census per episode
+ok - an episode closes once the count stays at or below the clear threshold
+ok - a pile-up after the episode closed is reported again
+ok - a count below the threshold writes nothing
+ok - a census that cannot be saved still reports the pile-up, with the reason
+ok - a dip below the threshold resets the hold, so only a continuous pile-up reports
+ok - a reported pile-up is never killed
+
+exit=0; elapsed=93.115s

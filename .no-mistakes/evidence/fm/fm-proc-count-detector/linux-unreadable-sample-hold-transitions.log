@@ -1,0 +1,29 @@
+$ docker run --rm --network none --read-only --user 10001:10001 -e PYTHONDONTWRITEBYTECODE=1 --mount type=bind,source=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,target=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,readonly --mount type=bind,source=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-errors,target=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-errors --workdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 ghcr.io/astral-sh/uv:python3.12-bookworm python3 -I /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-unreadable.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-errors
+High -> EMFILE -> high: 2.341s after restoring reads
+proc-guard: proc-guard
+status: pileup
+count: 2
+limit: 1
+threshold: 0
+held_seconds: 2.20
+census: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-errors/proc-census.1791523633.7.json
+summary: 2 of 1 processes; most common command python3 x2; deepest ancestry 2
+sampler_samples: 15
+sampler_cpu_ms_per_sample: 0.232
+sampler_peak_rss_kb: 17624
+
+Low -> EMFILE -> low: episode remains open without two continuous quiet seconds
+proc-guard: proc-guard
+status: idle
+armed: no
+sampler_samples: 11
+sampler_cpu_ms_per_sample: 0.232
+sampler_peak_rss_kb: 17672
+
+Persistent EMFILE: bounded error, no crash
+proc-guard: proc-guard
+status: error
+detail: 30 unreadable samples in a row: /proc unreadable: [Errno 24] Too many open files: '/proc'
+
+
+exit=0; elapsed=13.814s

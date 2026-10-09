@@ -1,0 +1,16 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-proc-guard.sh watch --state-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/production-state --limit 1 --duration 25
+proc-guard: proc-guard
+status: pileup
+count: 1930
+limit: 1
+threshold: 0
+held_seconds: 5.15
+census: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/production-state/proc-census.1791523146.16588.json
+summary: 1930 of 1 processes; most common command bash x384; deepest ancestry 105
+sampler_samples: 6
+sampler_cpu_ms_per_sample: 0.319
+sampler_peak_rss_kb: 24720
+
+exit=0; elapsed=9.297s
+Default hold=5s, interval=1s; explicit limit=1 exercises high-count detection without changing any kernel limit.
+Census mode: 0600; secret sentinel absent; measured 100-level recursive workload still alive.

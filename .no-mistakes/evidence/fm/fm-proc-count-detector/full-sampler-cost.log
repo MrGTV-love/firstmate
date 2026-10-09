@@ -1,0 +1,15 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-proc-guard.sh watch --state-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/full-cost-state --limit 1000000000 --duration 30
+proc-guard: proc-guard
+status: idle
+armed: yes
+sampler_samples: 30
+sampler_cpu_ms_per_sample: 0.289
+sampler_peak_rss_kb: 21760
+
+exit=0; elapsed=31.165s
+{
+  "elapsed_seconds": 31.1907,
+  "whole_process_cpu_seconds": 0.0758,
+  "whole_process_one_core_percent": 0.2429,
+  "note": "Includes interpreter startup and 30 seconds of the real sampler; excludes the existing process-event framework."
+}

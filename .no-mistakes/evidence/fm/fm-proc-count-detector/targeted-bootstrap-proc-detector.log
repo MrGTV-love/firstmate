@@ -1,0 +1,4 @@
+$ bash tests/fm-bootstrap.test.sh proc-detector
+ok - bootstrap arms the process pile-up detector in a primary home only, silently, and not when read-only, a secondmate, a lab, or unmeasurable
+
+exit=0; elapsed=39.154s

@@ -1,0 +1,43 @@
+$ python3 -I /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/measure.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/bin/fm-proc-guard.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/fork-denied-state
+{
+  "platform": "darwin",
+  "uid": 501,
+  "comparison": [
+    {
+      "design": "product-library",
+      "samples": 20,
+      "mean_wall_ms": 1.6057,
+      "median_wall_ms": 0.5082,
+      "min_count": 1822,
+      "max_count": 1840
+    },
+    {
+      "design": "forked-ps",
+      "samples": 20,
+      "mean_wall_ms": 1389.3201,
+      "median_wall_ms": 1202.6915,
+      "min_count": 1762,
+      "max_count": 1871
+    }
+  ]
+}
+forked-ps-at-denied-fork: errno=35 detail=[Errno 35] Resource temporarily unavailable
+Executing real guard watch while process creation is denied:
+proc-guard: proc-guard
+status: pileup
+count: 1778
+limit: 1
+threshold: 0
+held_seconds: 0.47
+census: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/fork-denied-state/proc-census.1791523381.89786.json
+summary: 1778 of 1 processes; most common command bash x303; deepest ancestry 14
+sampler_samples: 2
+sampler_cpu_ms_per_sample: 0.282
+sampler_peak_rss_kb: 28272
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/measure.py", line 52, in <module>
+    resource.setrlimit(resource.RLIMIT_NPROC, original)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: not allowed to raise maximum limit
+
+exit=1; elapsed=31.422s

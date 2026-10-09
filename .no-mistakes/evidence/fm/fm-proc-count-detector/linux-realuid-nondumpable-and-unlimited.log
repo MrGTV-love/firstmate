@@ -1,0 +1,8 @@
+$ docker run --rm --network none --read-only --user 10001:10001 -e PYTHONDONTWRITEBYTECODE=1 --mount type=bind,source=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,target=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,readonly --mount type=bind,source=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-state,target=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-state --workdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 ghcr.io/astral-sh/uv:python3.12-bookworm python3 -I /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-live.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-state
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-live.py", line 32, in <module>
+    assert owner == 0 and os.getuid() != 0, (owner, os.getuid())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (10001, 10001)
+
+exit=1; elapsed=7.406s

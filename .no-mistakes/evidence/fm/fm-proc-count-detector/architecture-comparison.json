@@ -1,0 +1,38 @@
+{
+  "platform": "darwin",
+  "uid": 501,
+  "comparison": [
+    {
+      "design": "product-library",
+      "samples": 20,
+      "mean_wall_ms": 0.2083,
+      "median_wall_ms": 0.1692,
+      "min_count": 1736,
+      "max_count": 1741
+    },
+    {
+      "design": "forked-ps",
+      "samples": 20,
+      "mean_wall_ms": 2023.4717,
+      "median_wall_ms": 1857.7465,
+      "min_count": 1731,
+      "max_count": 1817
+    }
+  ],
+  "standing_measurement": {
+    "elapsed_seconds": 31.1907,
+    "whole_process_cpu_seconds": 0.0758,
+    "whole_process_one_core_percent": 0.2429,
+    "note": "Includes interpreter startup and 30 seconds of the real sampler; excludes the existing process-event framework."
+  },
+  "fork_denial": {
+    "scope": "Disposable macOS subprocess RLIMIT_NPROC=1; shared kern.maxprocperuid unchanged",
+    "forked_ps_errno": 35,
+    "library_watcher": "Persisted census and returned status: pileup despite EAGAIN"
+  },
+  "limitations": [
+    "Measurements reflect the current loaded host, not the author's earlier machine or interpreter.",
+    "Library and ps counts were observed at different times and fluctuate with unrelated host activity.",
+    "Linux counts real-UID threads; macOS enumerates user processes."
+  ]
+}

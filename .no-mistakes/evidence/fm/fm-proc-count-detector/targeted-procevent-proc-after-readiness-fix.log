@@ -1,0 +1,12 @@
+$ bash tests/fm-procevent-proc.test.sh
+ok - help renders only the complete header
+ok - arm starts an idempotent standing listener without a watcher or fresh owner lease
+ok - arm refuses malformed flags and registers nothing
+ok - arm refuses a host the guard cannot measure with exit 3
+ok - classify and terminal: a pile-up keeps listening, an error ends the source
+ok - a pile-up becomes one census and one durable wake, and the detector stays registered
+ok - the same canonical runner keeps listening after capture and retire stops it
+ok - the canonical episode suppresses duplicates across owner homes
+ok - the wake is acknowledged through the generic handled command
+
+exit=0; elapsed=196.390s

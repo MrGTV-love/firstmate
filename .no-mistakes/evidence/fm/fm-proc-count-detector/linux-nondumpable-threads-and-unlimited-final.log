@@ -1,0 +1,26 @@
+$ docker run --rm --network none --read-only --user 10001:10001 -e PYTHONDONTWRITEBYTECODE=1 --mount type=bind,source=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,target=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05,readonly --mount type=bind,source=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-state,target=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-state --workdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 ghcr.io/astral-sh/uv:python3.12-bookworm python3 -I /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-live.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FERXPKYBBSRY170ZZ68R05/.proc-live-validation/manual/linux-state
+{
+  "uid": 10001,
+  "non_dumpable_pid": 7,
+  "dumpable": 0,
+  "proc_directory_owner": 10001,
+  "baseline_threads": 1,
+  "count_with_non_dumpable_threads": 18,
+  "check": {
+    "name": "fm-proc-guard",
+    "checked_at": "2026-10-09T05:25:45Z",
+    "count": 19,
+    "limit": 30,
+    "limit_source": "--limit",
+    "read_cpu_ms": 0.17,
+    "percent_of_limit": 63.3,
+    "status": "WARNING",
+    "recommendation": "The user process count is high but forks still work; run the census to see what is piling up."
+  },
+  "census_summary": "19 of 30 processes; most common command python3 x3; deepest ancestry 2",
+  "real_uid_process_selected": true
+}
+Unlimited check: {"name": "fm-proc-guard", "checked_at": "2026-10-09T05:25:45Z", "count": 2, "limit": null, "limit_source": "RLIMIT_NPROC is unlimited; no per-user process limit", "read_cpu_ms": 0.114, "status": "UNKNOWN", "reason": "RLIMIT_NPROC is unlimited; no per-user process limit", "recommendation": "No limit to compare against; the caller should continue unchanged."}
+Unlimited arm: exit=3 stderr=unsupported: the process guard cannot measure this host registration_absent=true
+
+exit=0; elapsed=2.517s
