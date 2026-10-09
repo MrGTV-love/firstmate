@@ -204,8 +204,10 @@ The launch owner repeats the proof before publication; a later refusal can there
 - **Its HEAD contains every surviving recorded head:** the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.
   A task with no PR and no prior control relaunch has only the reflog, so prepare the copy with `git worktree add -f <path> <branch>` and do not run `git worktree prune` first.
-  If the registration was already pruned, give the PR head or a known commit of the branch: write one line, `pr_head=<sha>`, into the task record (`state/<id>.meta`).
-  The refusal names this remedy.
+  If the registration was already pruned, give a known commit of the branch as evidence, scoped by task:
+  a task with no recorded `pr=` takes one line, `pr_head=<sha>`, in its task record (`state/<id>.meta`);
+  a task with a recorded `pr=` takes the three lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` in its control journal (`state/<id>.control-relaunch`), never a hand-written `pr_head=`, because `bin/fm-dod-lib.sh` and `bin/fm-review-diff.sh` read `pr_head` as the head the forge reported.
+  The refusal names the remedy that fits the task.
   The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
   Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
 - **No other task of any local Firstmate home records it** (the root home and every registered local secondmate home, the same walk teardown uses); an unreadable home or registry refuses. Records are checked by path or alias in both `worktree` and `home`, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
@@ -229,8 +231,9 @@ It cannot check the branch out while git still lists the vanished path as that b
 It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a 60-second isolation poll and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 The caller prepares the copy with `git worktree add -f <path> <branch>`, never after `git worktree prune`: the forced add keeps the vanished copy's registration, whose reflog may be the task's only recorded head.
-If that registration is already gone and no other head survives, the refusal asks for the PR head or a known commit as one `pr_head=<sha>` line in the task record (`state/<id>.meta`).
-Editing the record by hand has none of those checks, no journal, and no lock against a concurrent launch.
+If that registration is already gone and no other head survives, the refusal asks for a known commit as evidence: one `pr_head=<sha>` line in the task record for a task with no recorded `pr=`, or the three control journal lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` for a task with one.
+That evidence only gives the proof a head to check; the proof and the launch owner still make every change.
+Rebinding the task by hand-editing its `worktree=` has none of those checks, no journal, and no lock against a concurrent launch.
 
 ### Failure and rollback
 

@@ -208,7 +208,11 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   [ -n "${heads[*]-}" ] || {
     echo "error: no recorded head exists for branch '$branch', so the fresh copy cannot be shown to contain the task's work" >&2
     echo "  Re-create the copy with 'git worktree add -f <path> $branch' and do not run 'git worktree prune' first: the vanished copy's registration keeps its reflog head." >&2
-    echo "  If the registration was already pruned, give the PR head or a known commit of the branch: write one line, pr_head=<sha>, into the task record $meta." >&2
+    if [ -z "$(fm_meta_get "$meta" pr)" ]; then
+      echo "  If the registration was already pruned, give a known commit of the branch: write one line, pr_head=<sha>, into the task record $meta." >&2
+    else
+      echo "  If the registration was already pruned, give the PR head or a known commit of the branch: write the three lines task=$id, worktree=$old, worktree_head=<sha> into the control journal $journal." >&2
+    fi
     return 1
   }
   for i in "${!heads[@]}"; do

@@ -2957,6 +2957,21 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
   expect_code 1 "$rc" "relocation must refuse (no-head remedy)"$'\n'"$out"
   assert_contains "$out" "pr_head=<sha>, into the task record" "no-head refusal must name the pr_head= route"
   assert_not_contains "$out" "worktree_head=" "no-head refusal must not name the journal worktree_head= hint"
+  id=rl102noheadpr
+  dir=$(new_case relocate-no-head-pr "$id")
+  make_relocation_case "$dir" "$id"
+  set_case_meta_field "$dir" "$id" pr_head ""
+  set_case_meta_field "$dir" "$id" pr "https://github.com/example/repo/pull/7"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+  expect_code 1 "$rc" "relocation must refuse (no-head remedy with a recorded PR)"$'\n'"$out"
+  assert_contains "$out" "task=$id, worktree=$dir/wt, worktree_head=<sha> into the control journal $dir/home/state/$id.control-relaunch" \
+    "no-head refusal for a task with a PR must name the three journal lines"
+  assert_not_contains "$out" "pr_head=" "no-head refusal must not tell a task with a PR to hand-write pr_head="
+  printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/committed-head")" > "$dir/home/state/$id.control-relaunch"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+  expect_code 0 "$rc" "the named journal lines must let a task with a PR relocate"$'\n'"$out"
+  [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-worktree_head ] \
+    || fail "the journal remedy was not the checked source ($(journal_field "$dir" "$id" relocation_head_source))"
   pass "relocation: every surviving recorded head must be contained, and no evidence refuses"
 }
 
