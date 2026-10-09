@@ -129,11 +129,17 @@
 # An unnested runner takes one pass per executed script from the host-wide pool
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), outside its
 # per-script bound, so participating test bursts across worktrees take turns.
-# A runner already inside a pass (FM_CPU_PASS_HELD set) runs directly with at
-# most that many concurrent scripts, reporting a reduced --jobs on stderr.
+# A runner already inside a pass (FM_CPU_PASS_HELD set) takes no additional pass
+# and runs at most that many concurrent scripts, reporting a reduced --jobs on stderr.
 # The marker must be a nonnegative decimal integer or execution exits 125;
-# 0 denotes degraded work and imposes no budget.
-# Without python3 or the pool tool beside it, scripts run directly.
+# 0 denotes degraded work with no CPU-pass concurrency limit.
+# Without python3 or the pool tool beside it, scripts run without a CPU pass.
+#
+# When the sibling bin/fm-proc-budget.sh is present and executable, every
+# executed script runs through it; its header owns the process-budget contract.
+# The budget is taken when the script starts, after any pass wait. If the budget
+# cannot be set, that script fails with wrapper exit 125 rather than running
+# unbudgeted. Without the executable wrapper, scripts run without this budget.
 # With a usable pool, --jobs above its size still starts that many workers,
 # but only pool-size scripts run at once.
 #
@@ -338,7 +344,7 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -428,7 +434,7 @@ family_for_basename() {
       ;;
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|\
     fm-pr-merge.test.sh|fm-pr-reviewers.test.sh|fm-pr-state.test.sh|fm-gh-rest.test.sh|\
-    fm-review-diff.test.sh|fm-teardown.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
+    fm-review-diff.test.sh|fm-teardown.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -804,6 +810,7 @@ tests/fm-home-summary-refresh-ownership.test.sh 20922
 tests/fm-home-summary-refresh.test.sh 180746
 tests/fm-host-mirror-live-e2e.test.sh 79
 tests/fm-host-mirror.test.sh 11587
+tests/fm-idle-session-reap.test.sh 35000
 tests/fm-inactive-reconcile.test.sh 60823
 tests/fm-inbox.test.sh 6062
 tests/fm-jev-guardrail-home.test.sh 10731
@@ -851,6 +858,7 @@ tests/fm-pr-check-security.test.sh 300675
 tests/fm-pr-reviewers.test.sh 273
 tests/fm-pr-state-live-e2e.test.sh 47
 tests/fm-pr-state.test.sh 531
+tests/fm-proc-budget.test.sh 8000
 tests/fm-procevent-quota.test.sh 2459
 tests/fm-procevent-when.test.sh 25674
 tests/fm-procevent.test.sh 370820
@@ -916,6 +924,7 @@ tests/fm-startup-network.test.sh 72106
 tests/fm-stat-shadowing.test.sh 75
 tests/fm-stow-cascade.test.sh 3058
 tests/fm-supervision-events.test.sh 673
+tests/fm-supervision-fork-budget.test.sh 7400
 tests/fm-supervision-host-attended-live-e2e.test.sh 49
 tests/fm-supervision-host-live-e2e.test.sh 75
 tests/fm-supervision-host-hook.test.sh 70651
@@ -951,6 +960,7 @@ tests/fm-wake-drain-unread-status.test.sh 24251
 tests/fm-wake-queue.test.sh 165906
 tests/fm-watch-arm.test.sh 113076
 tests/fm-watch-checkpoint.test.sh 11234
+tests/fm-watch-idle-reap.test.sh 45000
 tests/fm-watch-open-loops.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59092
 tests/fm-watch-triage.test.sh 1074843
@@ -1753,7 +1763,7 @@ families_for_changed_path() {
       printf '%s\n' watcher-wake-lock
       printf '%s\n' "__script__:fm-procevent-quota.test.sh"
       ;;
-    bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-review-diff.sh|\
+    bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
       printf '%s\n' pr-forge
       ;;
@@ -2501,6 +2511,10 @@ elif ! command -v python3 >/dev/null 2>&1; then
   CPU_PASS_ACTIVE=0
   log "running without CPU passes: python3 not found"
 fi
+PROC_BUDGET_ACTIVE=1
+if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
+  PROC_BUDGET_ACTIVE=0
+fi
 if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
   SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
 fi
@@ -2680,6 +2694,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
     cmd=(bash -c 'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out")
   else
     cmd=(bash "$script")
+  fi
+  if [ "$PROC_BUDGET_ACTIVE" -eq 1 ]; then
+    # Innermost, so the budget is taken when the script starts, not before a
+    # pass wait or after another script has already grown the process count.
+    cmd=("$ROOT/bin/fm-proc-budget.sh" -- "${cmd[@]}")
   fi
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
     # The bound runs inside the pass holder so the pass wait stays outside it.

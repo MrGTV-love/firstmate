@@ -2168,6 +2168,65 @@ SH
   pass "the runner reaps the stub a killed script left behind"
 }
 
+# A script that forks without bound must stop at its own limit instead of
+# filling the user's process table for every other lane (the 2026-10-08
+# fork-EAGAIN incident), so the runner starts each script under the per-tree
+# process budget of bin/fm-proc-budget.sh. The fixture reports the limit it
+# runs under; the runner's own limit is the comparison.
+test_each_script_runs_under_a_process_budget() {
+  local tmp repo fixture inherited seen expected count
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-budget.XXXXXX")
+  repo="$tmp/repo"
+  fixture=tests/fm-budget-fixture.test.sh
+  mkdir -p "$repo/bin" "$repo/tests" "$tmp/failing-ps" "$tmp/budget-ps"
+  cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-proc-budget.sh" "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  cat >"$repo/$fixture" <<'SH'
+#!/usr/bin/env bash
+echo "ok - fixture runs under limit $(ulimit -u)"
+SH
+  printf '#!/bin/sh\nexit 1\n' >"$tmp/failing-ps/ps"
+  case "$(uname -s)" in
+    Linux) count=$(set -o pipefail; ps -L -U "$(id -u)" -o lwp= | wc -l) || fail "cannot read the baseline task count" ;;
+    *) count=$(set -o pipefail; ps -U "$(id -u)" -o pid= | wc -l) || fail "cannot read the baseline process count" ;;
+  esac
+  cat >"$tmp/budget-ps/ps" <<SH
+#!/bin/sh
+i=0
+while [ "\$i" -lt "$count" ]; do
+  echo "\$i"
+  i=\$((i + 1))
+done
+SH
+  chmod +x "$repo/bin/fm-test-run.sh" "$repo/$fixture" "$tmp/failing-ps/ps" "$tmp/budget-ps/ps"
+  inherited=$(ulimit -S -u)
+  expected=$((count + 1500))
+  case "$inherited" in
+    ''|*[!0-9]*) ;;
+    *) [ "$expected" -lt "$inherited" ] || expected=$inherited ;;
+  esac
+
+  PATH="$tmp/budget-ps:$PATH" "$repo/bin/fm-test-run.sh" "$fixture" >"$tmp/out" 2>"$tmp/err" \
+    || fail "the budgeted run failed: $(cat "$tmp/out" "$tmp/err")"
+  seen=$(sed -n 's/.*fixture runs under limit //p' "$tmp/out")
+  case "$seen" in
+    ''|*[!0-9]*) fail "the fixture did not report a numeric limit (got '$seen'): $(cat "$tmp/out")" ;;
+  esac
+  assert_equals "$expected" "$seen" "the script budget must be capped by its inherited limit"
+
+  if PATH="$tmp/failing-ps:$PATH" "$repo/bin/fm-test-run.sh" "$fixture" >"$tmp/out4" 2>"$tmp/err4"; then
+    fail "a runner with an unreadable process count must fail"
+  fi
+  assert_not_contains "$(cat "$tmp/out4" "$tmp/err4")" "fixture runs under limit" \
+    "a failed budget must prevent fixture execution"
+  assert_contains "$(cat "$tmp/out4" "$tmp/err4")" "cannot read the process count" \
+    "a failed budget must report the wrapper's refusal"
+
+  rm -rf "$tmp"
+  pass "each script runs under a per-tree process budget"
+}
+
 # The duration regression this guard exists for: a suite whose scripts are all
 # green but whose wall clock outgrew its caller's invocation budget. The caller
 # gets killed mid-run and retries invisibly, so an over-budget run has to be a
@@ -2531,6 +2590,7 @@ test_changed_shared_fixture_selects_its_readers
 test_concurrent_runs_are_ordered_longest_first
 test_per_script_timeout_bounds_a_hang
 test_runner_reaps_stubs_a_killed_script_left_behind
+test_each_script_runs_under_a_process_budget
 test_changed_bound_gives_slow_watcher_suites_headroom
 test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation

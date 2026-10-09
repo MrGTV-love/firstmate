@@ -485,6 +485,7 @@ test_perl_bound_forwards_a_term_to_the_command() {
     . "$ROOT/bin/fm-timeout-lib.sh"
     PATH="$PERL_ONLY" FM_STUB_PIDFILE="$dir/pid" fm_timeout_perl_bound 60 "$stub"
   ) &
+  # shellcheck disable=SC2031 # This shell just launched the child; the sourced printf -v helper does not modify $!.
   owner=$!
   wait_for_file "$dir/pid"
   bound=$(pgrep -P "$owner" perl | head -1)

@@ -185,8 +185,18 @@ fm_busy_codex_semantic_source() {
   fm_busy_codex_appserver_observable || fm_busy_codex_hooks_verified
 }
 
+# The path helpers have assigning forms so the per-task cycle scans can build a
+# path without a command substitution (one process) around a printf.
+fm_busy_record_path_to() {  # <out-var> <state-dir> <id>
+  printf -v "$1" '%s/%s.busy-state' "$2" "$3"
+}
+
 fm_busy_record_path() {  # <state-dir> <id>
   printf '%s/%s.busy-state' "$1" "$2"
+}
+
+fm_busy_gen_path_to() {  # <out-var> <state-dir> <id>
+  printf -v "$1" '%s/%s.busy-gen' "$2" "$3"
 }
 
 fm_busy_gen_path() {  # <state-dir> <id>
@@ -204,13 +214,19 @@ fm_busy_token_valid() {  # <value>
 
 # fm_busy_current_gen: the task's armed gen token, or failure when the busy
 # contract has never been armed for this task.
+fm_busy_current_gen_to() {  # <out-var> <state-dir> <id>
+  local _fm_bg_file _fm_bg_gen
+  fm_busy_gen_path_to _fm_bg_file "$2" "$3"
+  [ -f "$_fm_bg_file" ] || return 1
+  IFS= read -r _fm_bg_gen < "$_fm_bg_file" 2>/dev/null || _fm_bg_gen=
+  fm_busy_token_valid "$_fm_bg_gen" || return 1
+  printf -v "$1" '%s' "$_fm_bg_gen"
+}
+
 fm_busy_current_gen() {  # <state-dir> <id>
-  local gen_file gen
-  gen_file=$(fm_busy_gen_path "$1" "$2")
-  [ -f "$gen_file" ] || return 1
-  IFS= read -r gen < "$gen_file" 2>/dev/null || gen=
-  fm_busy_token_valid "$gen" || return 1
-  printf '%s' "$gen"
+  local _fm_bg_out
+  fm_busy_current_gen_to _fm_bg_out "$1" "$2" || return 1
+  printf '%s' "$_fm_bg_out"
 }
 
 # fm_busy_sources_for_harness: the semantic sources trusted to classify a
@@ -262,12 +278,12 @@ fm_busy_source_trusted() {  # <harness> <source>
 fm_busy_record_read() {  # <state-dir> <id>
   local state=$1 id=$2 rec gen line extra ver f
   local r_gen='' r_seq='' r_state='' r_source='' r_event='' r_ts=''
-  rec=$(fm_busy_record_path "$state" "$id")
+  fm_busy_record_path_to rec "$state" "$id"
   if [ ! -f "$rec" ]; then
     printf 'missing'
     return 1
   fi
-  if ! gen=$(fm_busy_current_gen "$state" "$id"); then
+  if ! fm_busy_current_gen_to gen "$state" "$id"; then
     # A record without an armed gen has no incarnation to bind to.
     printf 'malformed'
     return 1

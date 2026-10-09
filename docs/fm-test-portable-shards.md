@@ -125,6 +125,7 @@ The retained open-work scan fixture observes the complete ledger's actual overdu
 The runner and CPU-pass fixtures resolve their generated Python wrappers' shebangs through `sys.executable`, not `command -v`: a PATH entry can be a shell-based version-manager shim, which macOS cannot use to interpret another script's Python body.
 [`tests/fm-open-loops.test.sh`](../tests/fm-open-loops.test.sh) owns collector deadline coverage for origins, PR checks, PR state, and questions, including proof that the named reader triggers cancellation rather than the REST helper's cache or lock reads.
 The Jev guard suite reads ledger permission bits through Node's filesystem API on both Linux and macOS; a BSD/GNU `stat` fallback can mix filesystem diagnostics into the mode and falsely reject a private ledger.
+The bearings Perl-timeout fixture includes `uname` for the PR library's cached platform lookup during contribution coverage, while still excluding `timeout` and `gtimeout`. A stalled GitHub read must therefore reach the Perl bound and return the ordinary snapshot with PR availability disclosed, rather than exit during dependency initialization.
 
 ## Timing artifacts
 
@@ -148,6 +149,7 @@ The shared Claude-launcher library uses that caller-provided configuration depen
 Spawn also obtains classification and PR helpers through its definition-of-done import, and timeout helpers through its backlog-transition import, instead of duplicating those source graphs with direct imports.
 The policy library's lazy wake import uses the existing canonical-owner analysis boundary, while the wake owner remains in the complete lint inventory.
 `tests/fm-test-run.test.sh` verifies changed status and UTC owners through the runner's authoritative consuming-family map.
+ShellCheck 0.11.0 can treat a dynamically named `printf -v` in a subshell-sourced library as a write to `$!`. The timeout TERM-forwarding and Herdr recovery fixtures annotate only the resulting SC2031 false positives at immediate background-PID captures; launches, waits, and cleanup assertions remain unchanged.
 
 A same-host Darwin cold comparison on 2026-10-04 (UTC), using ShellCheck 0.11.0 with `/usr/bin/time -l "$SHELLCHECK" --norc --external-sources -- <root>`, recorded the following direct analyzer high-water RSS in bytes, wall seconds, and starting 1-minute load.
 The before source was the pre-partition implementation; the after source was the ownership-corrected working copy, not a committed-head or CI validation.

@@ -27,6 +27,9 @@
 # destructive call.
 # Provision records the running default session as a fleet-state tripwire and
 # teardown requires that record to be identical afterward.
+# Provision's server and the viewer launcher start through bin/fm-proc-budget.sh;
+# its header owns the inherited process-budget contract. Status, stop, and
+# teardown client calls are not wrapped, so budget setup cannot block cleanup.
 # The viewer command attaches or detaches one real foreground Herdr client on
 # an owned lab session over a fixed 40-row by 120-column pty;
 # bin/fm-herdr-lab-viewer.py owns the pty mechanics.
@@ -302,7 +305,7 @@ fm_herdr_lab_viewer_start() { # <session>
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 130' INT
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 143' TERM
   fi
-  nohup python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
+  nohup "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-proc-budget.sh" -- python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
   launcher_pid=$!
 
   waited=0
@@ -434,7 +437,7 @@ fm_herdr_lab_provision() { # <session>
   else
     fm_herdr_lab_prepare "$name" || return 1
   fi
-  fm_herdr_lab_raw "$name" server >/dev/null 2>&1 &
+  HERDR_SESSION="$name" "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-proc-budget.sh" -- herdr server --session "$name" >/dev/null 2>&1 &
   server_pid=$!
   attempt=0
   max_attempts=300
