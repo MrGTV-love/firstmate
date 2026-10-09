@@ -276,8 +276,10 @@ function markLoaded(): void {
   writeFileSync(marker, record);
 }
 
+const headlinePattern = /^(signal:|stale:|check:|heartbeat($|:))/;
+
 function actionableLine(output: string): string {
-  return output.split(/\r?\n/).find((line) => /^(signal:|stale:|check:|heartbeat($|:))/.test(line)) || "";
+  return output.split(/\r?\n/).find((line) => headlinePattern.test(line)) || "";
 }
 
 function completedActionableLine(output: string): string {
@@ -309,23 +311,26 @@ function operationalHandback(message: string): boolean {
   return /^(?:FIRSTMATE SUPERVISION HOST: )?supervision-host: (?:branch-outcome:|outcome [0-9]+\b|.*\bthe captain returned\b)/m.test(message);
 }
 
+function hostNotes(message: string): string[] {
+  return [...new Set(message.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line)))];
+}
+
+function watcherMark(message: string): string {
+  return [wakeDueMessage, ...hostNotes(message)].join("\n");
+}
+
+function operationalMessage(message: string): string {
+  const lines = message.replace(/^FIRSTMATE SUPERVISION HOST: /, "").split(/\r?\n/).filter((line) => !headlinePattern.test(line));
+  return `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}`;
+}
+
 // Operational hand-backs carry outcomes even without a durable wake row;
-// ordinary host watcher headlines are only hints until the queue is read.
+// every other host close is only a hint until the queue is read.
 function hostWakeMessage(output: string): string {
+  const lines = hostNotes(output);
   if (!operationalHandback(output)) {
-    const wake = actionableLine(output);
-    return wake ? [wake, ...output.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line))].join("\n") : "";
+    return actionableLine(output) || lines.length > 0 ? watcherMark(output) : "";
   }
-  let shown = 0;
-  const lines = output.split(/\r?\n/).filter((line) => {
-    if (/^supervision-host:/.test(line)) return true;
-    if (/^(signal:|stale:|check:|heartbeat($|:))/.test(line) && shown < 8) {
-      shown += 1;
-      return true;
-    }
-    return false;
-  });
-  if (lines.length === 0) return "";
   if (awayRecordPresent()) {
     lines.push("This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.");
   }
@@ -360,7 +365,7 @@ function createPendingActionable(message: string, predecessorArmPid: string): Pe
   return {
     version: 1,
     token: `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`,
-    message: operationalHandback(message) ? message : wakeDueMessage,
+    message: operationalHandback(message) ? message : watcherMark(message),
     predecessorArmPid,
   };
 }
@@ -396,16 +401,19 @@ function validateReplacementHandoff(value: unknown): PendingActionableClose[] {
   if (new Set(pending.map((item) => item.token)).size !== pending.length) {
     throw new Error(`invalid omp replacement actionable handoff at ${actionableHandoff}`);
   }
-  let watcherSeen = false;
+  let watcher: PendingActionableClose | undefined;
   return pending.filter((item) => {
     if (operationalHandback(item.message)) {
-      if (!item.message.startsWith("FIRSTMATE SUPERVISION HOST: ")) item.message = `FIRSTMATE SUPERVISION HOST: ${item.message}`;
+      item.message = operationalMessage(item.message);
       return true;
     }
-    item.message = wakeDueMessage;
+    item.message = watcherMark(item.message);
     if (item.delivered) return true;
-    if (watcherSeen) return false;
-    watcherSeen = true;
+    if (watcher) {
+      watcher.message = watcherMark(`${watcher.message}\n${item.message}`);
+      return false;
+    }
+    watcher = item;
     return true;
   });
 }
@@ -909,7 +917,8 @@ export default function (pi: ExtensionAPI) {
       }
       const pending = held[0].pending;
       const headline = rows[0].split("\t").slice(4).join("\t");
-      const message = `${headline}${rows.length > 1 ? `\nand ${rows.length - 1} more queued` : ""}`;
+      const notes = hostNotes(held.map((item) => item.pending.message).join("\n"));
+      const message = [`${headline}${rows.length > 1 ? `\nand ${rows.length - 1} more queued` : ""}`, ...notes].join("\n");
       const delivered = await submitWake(owner, pending.token, { content: wakeContent(message), pending });
       if (delivered === "sent") {
         owner.heldWakes.delete(pending.token);
@@ -1028,7 +1037,7 @@ export default function (pi: ExtensionAPI) {
     if (!operationalHandback(pending.message)) {
       const failure = pending.message.indexOf("\n\nwatcher: FAILED - ");
       if (failure >= 0) surfaceFailure(owner, pending.message.slice(failure + 2));
-      pending.message = wakeDueMessage;
+      pending.message = watcherMark(pending.message);
     }
     const existing = owner.pendingActionables.find((item) => item.token === pending.token);
     if (existing && !owner.stopping) return;
@@ -1423,7 +1432,6 @@ export default function (pi: ExtensionAPI) {
       if (classification.kind === "actionable") {
         const pending = (owner.stopping && !operationalHandback(classification.message) ? undefined : armPendingActionable.get(armChild))
           ?? createPendingActionable(classification.message, predecessor);
-        pending.message = operationalHandback(classification.message) ? classification.message : wakeDueMessage;
         enqueuePendingActionable(owner, pending);
         if (!generationIsLive(owner)) return;
         owner.retryFailures = 0;

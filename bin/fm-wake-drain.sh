@@ -15,8 +15,8 @@
 # It prints append-order TSV rows (epoch, sequence, kind, key, payload), preserving
 # row fields without same-key deduplication. FM_SUPERVISION_ACTOR defaults to main:
 # main sees rows not reserved by a live branch grant; branch sees only that grant.
-# A missing/stale grant reserves nothing. This mode takes no locks, creates no
-# state, repairs nothing, and emits no status sections, liveness checks, or
+# A missing/stale grant reserves nothing. This mode takes no locks, repairs
+# nothing, and emits no status sections, liveness checks, or
 # WAKE_ACK_REQUIRED. Missing/empty queues succeed with no rows; unreadable paths,
 # failed reads, or malformed rows fail without returning even a valid prefix.
 # Valid rows have exactly five fields, decimal epoch/sequence, and kind signal,

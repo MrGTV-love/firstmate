@@ -1262,8 +1262,8 @@ if (!rows.includes(`confirmed generation=gen-2 watcher=${hosts[1].replace(/^host
   throw new Error(`the handling handoff was not confirmed against the successor host's cycle: ${rows.join(" | ")}`);
 }
 if (sent.length !== 1) throw new Error(`expected one follow-up wake, saw ${sent.length}: ${JSON.stringify(sent)}`);
+if (sent[0].m.includes("signal: omp-host done")) throw new Error(`the hand-back injected a close headline with no queued row: ${sent[0].m}`);
 for (const needle of [
-  "signal: omp-host done",
   "supervision-host: the away session could not take this wake: fixture; this wake is yours",
   "supervision-host: outcome 1 for demo [captain]: fixture",
 ]) {
@@ -1387,8 +1387,9 @@ await handlers.get("before_agent_start")({}, ctx);
 await tool.execute();
 for (let i = 0; i < 60 && sent.length < 1; i += 1) await new Promise((r) => setTimeout(r, 100));
 if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE SUPERVISION HOST:")) throw new Error(`host hand-back was not delivered once: ${JSON.stringify(sent)}`);
-const expected = process.env.HAND_BACK_KIND === "away-return" ? "signal: already handled original" : "branch-outcome:";
+const expected = process.env.HAND_BACK_KIND === "away-return" ? "the captain returned" : "branch-outcome:";
 if (!sent[0].m.includes(expected)) throw new Error(`host hand-back lost its outcome: ${sent[0].m}`);
+if (sent[0].m.includes("signal: already handled original")) throw new Error(`host hand-back injected a handled headline: ${sent[0].m}`);
 if (process.env.HAND_BACK_KIND === "busy" ? sent[0].o?.deliverAs !== "followUp" : sent[0].o?.deliverAs !== undefined) throw new Error("host hand-back changed its idle/busy delivery routing");
 await handlers.get("message_start")({ message: { role: "user", content: sent[0].m } }, ctx);
 await handlers.get("session_shutdown")({}, {});
@@ -1400,6 +1401,89 @@ EOF
   expect_code 0 "$status" "omp watch extension host-only handoff: $out"
   [ -z "$out" ] || fail "omp watch extension host-only handoff test printed output: $out"
   pass ".omp watch extension: an unqueued host hand-back is delivered once ($kind)"
+}
+
+# A host close that is not an operational hand-back is a queue-read mark: a
+# park boundary with nothing queued restores the next park and sends nothing,
+# and a hand-back explanation rides with the queued row's headline.
+test_watch_extension_marks_host_closes_without_headlines() {  # <boundary|note>
+  local kind=${1:-boundary} repo home log out status
+  repo="$TMP_ROOT/watch-host-mark-$kind/repo"; home="$TMP_ROOT/watch-host-mark-$kind/home"; log="$TMP_ROOT/watch-host-mark-$kind/arm.log"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+exit 1
+SH
+  cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+count=$(grep -c '^host=' "$FM_ARM_LOG")
+case "$HOST_CLOSE_KIND:$count" in
+  boundary:[123])
+    sleep 1
+    printf 'supervision-host: cycle boundary - the park ended with nothing for main\n'
+    exit 0
+    ;;
+  note:1)
+    sleep 1
+    . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+    fm_wake_append signal queued.status 'signal: durable queued row' || exit 1
+    printf 'signal: close headline\nsupervision-host: the away session could not take this wake: fixture; this wake is yours\n'
+    exit 0
+    ;;
+esac
+sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
+  out=$(HOST_CLOSE_KIND="$kind" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+const boundary = process.env.HOST_CLOSE_KIND === "boundary";
+const handlers = new Map(); let tool = null; const sent = [];
+const ctx = { isIdle: () => true };
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage(m, o) {
+    sent.push({ m, o });
+    handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
+    return undefined;
+  },
+};
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("before_agent_start")({}, ctx);
+await tool.execute();
+const hosts = () => (existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8") : "").trim().split("\n").filter((row) => row.startsWith("host="));
+const wanted = boundary ? 4 : 2;
+for (let i = 0; i < 150 && (hosts().length < wanted || (!boundary && sent.length < 1) || existsSync(handoff)); i += 1) await new Promise((r) => setTimeout(r, 100));
+await new Promise((r) => setTimeout(r, 300));
+if (hosts().length !== wanted) throw new Error(`expected ${wanted} host parks, saw ${hosts().length}: ${JSON.stringify(sent)}`);
+if (boundary) {
+  if (sent.length !== 0) throw new Error(`a park boundary with an empty queue injected text: ${JSON.stringify(sent)}`);
+} else {
+  if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE WATCHER WAKE: signal: durable queued row")) throw new Error(`the host close was not delivered as one queue-read wake: ${JSON.stringify(sent)}`);
+  if (sent[0].m.includes("signal: close headline")) throw new Error(`the close headline was injected: ${sent[0].m}`);
+  if (!sent[0].m.includes("supervision-host: the away session could not take this wake: fixture; this wake is yours")) throw new Error(`the host explanation was dropped: ${sent[0].m}`);
+  if (sent[0].o?.deliverAs !== undefined) throw new Error("a watcher wake was queued as a follow-up");
+}
+if (existsSync(handoff)) throw new Error("a settled host close retained its handoff");
+await handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension host close mark ($kind): $out"
+  [ -z "$out" ] || fail "omp watch extension host close mark test printed output ($kind): $out"
+  pass ".omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline ($kind)"
 }
 
 test_watch_extension_migrates_legacy_handoffs() {
@@ -1447,7 +1531,7 @@ const pi = {
 (await import(pathToFileURL(process.env.EXT).href)).default(pi);
 await handlers.get("session_start")({}, ctx);
 for (let i = 0; i < 100 && (sent.length < 3 || existsSync(handoff)); i += 1) await new Promise((r) => setTimeout(r, 50));
-if (sent.length !== 3 || sent.some(({ m }) => m.includes("FAILED") || m.includes("uncorrelated") || m.includes("still queued"))) throw new Error(`legacy migration failed: ${JSON.stringify(sent)}`);
+if (sent.length !== 3 || sent.some(({ m }) => m.includes("FAILED") || m.includes("uncorrelated") || m.includes("still queued") || m.includes("handled original"))) throw new Error(`legacy migration failed: ${JSON.stringify(sent)}`);
 for (const expected of ["branch-outcome:", "the captain returned", "check: current queued work"]) {
   if (!sent.some(({ m }) => m.includes(expected))) throw new Error(`migration lost ${expected}`);
 }
@@ -1537,8 +1621,9 @@ mod.default(pi);
 await handlers.get("before_agent_start")({}, { isIdle: () => true });
 await tool.execute();
 for (let i = 0; i < 80 && sent.length < 2; i += 1) await new Promise((r) => setTimeout(r, 100));
-const second = sent.filter((item) => item.m.includes("signal: omp-host second"));
+const second = sent.filter((item) => item.m.includes("outcome 2 for demo"));
 if (second.length !== 1) throw new Error(`expected one follow-up for the split close, saw ${second.length}: ${JSON.stringify(sent)}`);
+if (sent.some((item) => item.m.includes("signal: omp-host second"))) throw new Error(`the split close injected a headline with no queued row: ${JSON.stringify(sent)}`);
 if (!second[0].m.includes("supervision-host: outcome 2 for demo [captain]: fixture split")) {
   throw new Error(`the split close was delivered without its outcome line: ${second[0].m}`);
 }
@@ -2397,6 +2482,8 @@ if [ "${1:-}" = --watch-queue ]; then
   test_watch_extension_delivers_host_handbacks outcome
   test_watch_extension_delivers_host_handbacks away-return
   test_watch_extension_delivers_host_handbacks busy
+  test_watch_extension_marks_host_closes_without_headlines boundary
+  test_watch_extension_marks_host_closes_without_headlines note
   test_watch_extension_delivers_a_split_host_close_whole
   test_watch_extension_migrates_legacy_handoffs
   test_watch_extension_queue_read_delivery
@@ -2429,6 +2516,8 @@ test_watch_extension_keeps_the_arm_without_the_file_or_with_off
 test_watch_extension_delivers_host_handbacks outcome
 test_watch_extension_delivers_host_handbacks away-return
 test_watch_extension_delivers_host_handbacks busy
+test_watch_extension_marks_host_closes_without_headlines boundary
+test_watch_extension_marks_host_closes_without_headlines note
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_migrates_legacy_handoffs
 test_watch_extension_queue_read_delivery

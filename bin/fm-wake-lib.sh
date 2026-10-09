@@ -18,10 +18,7 @@ FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
 _FM_UNAME=$(uname 2>/dev/null || echo unknown)
-case "${BASH_SOURCE[1]:-}:${1:-}" in
-  */fm-wake-drain.sh:--queued|fm-wake-drain.sh:--queued) ;;
-  *) mkdir -p "$STATE" ;;
-esac
+mkdir -p "$STATE"
 
 _fm_wake_require_status() {
   command -v status_observed_signature >/dev/null 2>&1 && return 0
@@ -2465,16 +2462,11 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
 
 fm_wake_actor_rows() {
   [ "$#" -eq 1 ] || return 1
-  local actor=$1 rows="$STATE/.branch-eligible-rows" queued parent previous
+  local actor=$1 rows="$STATE/.branch-eligible-rows" queued parent
   local owner="$STATE/.branch-eligible-owner" grant=''
   case "$actor" in main|branch) ;; *) return 1 ;; esac
   if [ ! -e "$FM_WAKE_QUEUE" ] && [ ! -L "$FM_WAKE_QUEUE" ]; then
     fm_dirname_to parent "$FM_WAKE_QUEUE"
-    while [ ! -e "$parent" ] && [ ! -L "$parent" ]; do
-      previous=$parent
-      fm_dirname_to parent "$parent"
-      [ "$parent" != "$previous" ] || return 1
-    done
     [ -d "$parent" ] && [ -x "$parent" ] || return 1
     return 0
   fi
