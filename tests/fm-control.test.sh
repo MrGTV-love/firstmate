@@ -33,8 +33,7 @@ SEND="$ROOT/bin/fm-send.sh"
 TMP_ROOT=$(fm_test_tmproot fm-control)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
-PROBE_PIDS=
-trap '[ -z "$PROBE_PIDS" ] || kill $PROBE_PIDS 2>/dev/null; rm -rf "$TMP_ROOT"' EXIT
+trap 'fm_test_cleanup; rm -rf "$TMP_ROOT"' EXIT
 
 VERIFIED_HARNESSES="claude codex opencode pi pi-signed grok kimi cursor muse omp devin"
 
@@ -840,7 +839,9 @@ make_herdr_claude_stub() {  # <case-dir>
   gen="probe-$$-$RANDOM"
   FM_SPAWN_GEN=$gen python3 -c 'import time; time.sleep(600)' &
   probe_pid=$!
-  PROBE_PIDS="$PROBE_PIDS $probe_pid"
+  fm_test_record_process "$1/fake/probe-process" "$probe_pid" \
+    || fail "could not record the Herdr launch probe identity"
+  fm_test_track_process "$1/fake/probe-process" "time.sleep(600)"
   printf '%s' "$probe_pid" > "$1/fake/probe-pid"
   printf 'launch_proof=env-v1\nspawn_gen=%s\n' "$gen" >> "$1/home/state/t1.meta"
   cat > "$fb/herdr" <<'SH'

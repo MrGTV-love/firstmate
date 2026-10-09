@@ -61,6 +61,12 @@ for state in empty pending; do
 done
 pass "saved omp 18.6.3 native empty and command draft bands agree across public APIs and locales"
 
+# A shell launch line above the transcript is not the idle band's draft root.
+screen=$'❯ omp\n'"$(cat "$ROOT/tests/fixtures/omp-native-band-empty.ansi")"
+assert_screen "idle native band below its shell launch line" empty "$CAPS_STYLED" "$screen"
+assert_content "idle native band below its shell launch line" '' "$CAPS_STYLED" "$screen"
+pass "an idle native band keeps its own boundary below a transcript-separated shell line"
+
 # The live 18.8.1 meter fills the remaining width and marks its limit with ╎.
 # Its linked-worktree path uses 🌳 rather than the ordinary directory's 📁.
 for layout in '' '-worktree'; do

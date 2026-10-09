@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # Launch proof: live kernel environment pins and conservative foreground identity.
 set -eu
-export TMPDIR="$PWD"
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-TMP=$(mktemp -d "$ROOT/.fm-launch-proof.XXXXXX")
+TMP=$(fm_test_tmproot fm-launch-proof)
 PID=
-cleanup() { [ -z "$PID" ] || kill "$PID" 2>/dev/null || true; rm -rf "$TMP"; fm_test_cleanup; }
+cleanup() { [ -z "$PID" ] || kill "$PID" 2>/dev/null || true; fm_test_cleanup; }
 trap cleanup EXIT
 export FM_HOME="$TMP/home"
 mkdir -p "$FM_HOME/state"

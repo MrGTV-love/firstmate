@@ -590,6 +590,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
       status=$?
       expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
+      ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "profile selection must establish no catalog evidence"
       case "$mode" in
         env-omp | env-pi) ;;
         *) assert_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
@@ -674,6 +675,7 @@ EOF" ;;
       fi
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
+      ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "expanded raw launch must establish no catalog evidence"
       assert_absent "$CASE_DIR/expanded" "validation must not evaluate command substitutions"
       assert_absent "$CASE_DIR/errors.log" "validation must not evaluate redirections"
       assert_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
@@ -723,6 +725,8 @@ test_spawn_raw_omp_literal_evidence_still_refuses() {
       assert_absent "$CASE_DIR/errors.log" "validation must not execute a literal redirection"
       if [ "$role" = unlisted ]; then
         assert_grep "models:$launch_dir" "$CASE_DIR/omp-env.log" "literal evidence must probe the launch directory's catalog"
+      else
+        ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "a missing literal default must refuse without a catalog probe"
       fi
     done
   done

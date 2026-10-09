@@ -497,7 +497,7 @@ require_live_task_attribution() {
     alive) ;;
     *) return 1 ;;
   esac
-  [ "$(fm_launch_proof_herdr "$META")" = managed ]
+  fm_launch_proof_herdr_authorizes "$META"
 }
 
 # wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
@@ -510,7 +510,7 @@ wait_agent_state() {  # <timeout> <wanted>...
     for want in "$@"; do
       if [ "$state" = "$want" ]; then
         if [ "$want" = alive ] && [ "$BACKEND" = herdr ] \
-          && [ "$(fm_launch_proof_herdr "$META")" != managed ]; then
+          && ! fm_launch_proof_herdr_authorizes "$META"; then
           continue
         fi
         printf '%s' "$state"

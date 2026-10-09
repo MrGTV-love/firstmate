@@ -19,7 +19,6 @@
 #      agent exited.
 set -u
 unset FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE FM_ROOT_OVERRIDE
-export TMPDIR="$PWD"
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -55,6 +54,7 @@ relaunch_cleanup() {
     [ -n "$d" ] && fm_test_remove_tree "$d"
   done
   fm_test_remove_tree "$TMP_ROOT"
+  fm_test_cleanup
 }
 trap relaunch_cleanup EXIT
 
@@ -4402,6 +4402,7 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
   for proof in ${3:-env-v1 legacy}; do
     for action in ${4:-exit busy-exit relaunch interrupt spawn}; do
       for scenario in ${1:-different-cwd same-cwd-personal historical-startup in-process-personal pinned-personal mismatched unreadable missing-registration}; do
+        [ "$proof" != legacy ] || [ "$action" = spawn ] || continue
         case_index=$((case_index + 1))
         recovery_case_or_skip "ownership-$kind-$proof-$action-$scenario" "owner-$case_index" \
           || fail "live lifecycle ownership regression requires jq"
@@ -4480,6 +4481,42 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
   done
   done
   pass "all lifecycle verbs refuse native startup and pinned personal session switches without input or task mutation"
+}
+
+test_legacy_herdr_record_keeps_prior_lifecycle_rule() {
+  local dir id action out rc gen before CONTROL="$ROOT/bin/fm-control.sh"
+  for action in exit relaunch; do
+    recovery_case_or_skip "legacy-lifecycle-$action" "legacy-$action" \
+      || fail "legacy lifecycle regression requires jq"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    prepare_herdr_recovery "$dir" "$id" ship
+    printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+    gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" \
+      --state idle --source omp-ext --event agent-start) || fail "could not arm legacy lifecycle fixture"
+    printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
+    printf 'working: preserve legacy task progress\n' > "$dir/home/state/$id.status"
+    before=$(shasum -a 256 "$dir/wt/unlanded.txt")
+    rc=0
+    if [ "$action" = relaunch ]; then
+      out=$(run_control "$dir" "$id" relaunch --note "continue legacy work") || rc=$?
+    else
+      out=$(run_control "$dir" "$id" exit) || rc=$?
+    fi
+    expect_code 0 "$rc" "legacy record without a launch pin must keep $action"$'\n'"$out"
+    [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt")" ] || fail "legacy $action changed preserved work"
+    if [ "$action" = relaunch ]; then
+      [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "legacy relaunch did not complete"
+      [ "$(meta_field "$dir" "$id" launch_proof)" = env-v1 ] || fail "legacy relaunch must publish a proven launch"
+      [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "legacy relaunch kept the old incarnation"
+      assert_present "$dir/fake/launched-command" "legacy relaunch must deliver its replacement"
+      assert_present "$dir/fake/herdr-agent-live" "legacy relaunch must leave a live replacement"
+    else
+      assert_contains "$out" "stopped $id" "legacy exit must report a confirmed stop"
+      assert_absent "$dir/fake/herdr-agent-live" "legacy exit must stop its agent"
+    fi
+    assert_absent "$dir/home/state/.control-$id.lock" "legacy $action must release its control lock"
+  done
+  pass "legacy Herdr records without a launch pin keep exit and relaunch"
 }
 
 test_herdr_shell_only_ordinary_lifecycle_accepts_missing_registration() {
@@ -4997,6 +5034,58 @@ test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation() {
   pass 'bounded ticks inspect one recorded unmanaged launch, rotate past drafts, and wrap without mutation'
 }
 
+test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once() {
+  local home id_home dir id n tick out rc notices seen noticed pid
+  local CONTROL="$ROOT/bin/fm-reboot-recover.sh"
+  recovery_case_or_skip reboot-notice-home notice-home fmlab-h || return 0
+  home=$HERDR_CASE_DIR id_home=$HERDR_CASE_ID
+  prepare_herdr_recovery "$home" "$id_home" ship
+  mkdir -p "$home/fake/herdr-sessions" "$home/fake/herdr-pids"
+  for n in 1 2 3 4; do
+    recovery_case_or_skip "reboot-notice-$n" "notice-$n" "fmlab-$n" || return 0
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    prepare_herdr_recovery "$dir" "$id" ship
+    printf '%s' "$((2000000000 + n))" > "$dir/fake/recovery-pid"
+    cp "$dir/home/state/$id.meta" "$home/home/state/$id.meta"
+    mkdir -p "$home/home/data/$id"
+    cp "$dir/home/data/$id/brief.md" "$home/home/data/$id/brief.md"
+    write_recovery_native_launch "$dir" "$home/home" "$id" ship
+    printf '%s\n' "$dir/fake" > "$home/fake/herdr-sessions/fmlab-$n"
+    printf '%s\n' "$dir/fake" > "$home/fake/herdr-pids/$((2000000000 + n))"
+  done
+  notices=0 seen=' '
+  for tick in $(seq 1 15); do
+    rc=0
+    out=$(run_control "$home" recover --one) || rc=$?
+    expect_code 0 "$rc" "tick $tick must inspect without failing"$'\n'"$out"
+    [ -n "$out" ] || continue
+    notices=$((notices + 1))
+    assert_contains "$out" "live launch is unmanaged" "tick $tick must report an unmanaged launch"
+    [ "$tick" -le 5 ] || fail "tick $tick repeated an unchanged unmanaged notice: $out"
+    noticed=$(cat "$home/home/state/.reboot-recovery-cursor")
+    case "$seen" in *" $noticed "*) fail "unmanaged $noticed woke twice" ;; esac
+    seen="$seen$noticed "
+  done
+  [ "$notices" = 5 ] || fail "5 unmanaged agents must wake once each across 15 ticks, got $notices"
+  pid=2000000009
+  printf '%s' "$pid" > "$dir/fake/recovery-pid"
+  printf '%s\n' "$dir/fake" > "$home/fake/herdr-pids/$pid"
+  notices=0
+  for tick in 1 2 3 4 5 6 7 8 9 10; do
+    rc=0
+    out=$(run_control "$home" recover --one) || rc=$?
+    expect_code 0 "$rc" "restored identity tick $tick must inspect without failing"$'\n'"$out"
+    [ -n "$out" ] || continue
+    notices=$((notices + 1))
+    assert_contains "$out" "$id: live launch is unmanaged" "only the restored identity may notify again"
+  done
+  [ "$notices" = 1 ] || fail "a changed restored-agent identity must notify exactly once, got $notices"
+  out=$(run_control "$home" recover) || true
+  [ "$(printf '%s\n' "$out" | grep -c 'live launch is unmanaged')" = 5 ] \
+    || fail "unbounded recover must still report every unmanaged launch: $out"
+  pass 'bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes'
+}
+
 test_bounded_reboot_recovery_advances_after_interrupted_inspection() {
   local a b c dir id id_a id_b id_c session out rc before_a before_b head_b
   local CONTROL
@@ -5132,6 +5221,7 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
 fi
 
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
+test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once
 test_bounded_reboot_recovery_advances_after_interrupted_inspection
 test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
@@ -5254,6 +5344,7 @@ test_reboot_recovery_skips_busy_native_drafts_without_mutation
 test_recovery_fixture_claims_only_owned_temp_directories
 test_reboot_recovery_inspects_without_native_attribution
 test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation
+test_legacy_herdr_record_keeps_prior_lifecycle_rule
 test_live_herdr_lifecycle_accepts_managed_launches
 test_herdr_shell_only_ordinary_lifecycle_accepts_missing_registration
 test_managed_herdr_relaunch_refuses_unproven_replacement_env

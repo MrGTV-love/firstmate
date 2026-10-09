@@ -1309,6 +1309,8 @@ if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
   relaunch ios notaharness - - > "$TMP_ROOT/relaunch-unverified.out" 2>&1; then
   fail "an unverified runtime should refuse a remote restart"
 fi
+assert_contains "$(cat "$TMP_ROOT/relaunch-unverified.out")" 'unverified remote secondmate harness' \
+  "the remote restart verb did not refuse an unverified runtime"
 RELAUNCH_ROUTE_META="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$RELAUNCH_ROUTE_META" "$TMP_ROOT/ios-before-relaunch.meta"
 mkdir -p "$TMP_ROOT/not-a-checkout"
@@ -1319,6 +1321,9 @@ if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
   relaunch ios codex - - > "$TMP_ROOT/relaunch-checkpoint.out" 2>&1; then
   fail "a restart with no accountable checkout should refuse"
 fi
+grep -Eq 'cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint|refusing to relaunch without a checkout whose unlanded work can be accounted for' \
+  "$TMP_ROOT/relaunch-checkpoint.out" \
+  || fail "the host-local restart did not refuse in the control plane's own pre-stop gates: $(cat "$TMP_ROOT/relaunch-checkpoint.out")"
 cmp -s "$TMP_ROOT/ios-unaccountable.meta" "$RELAUNCH_ROUTE_META" \
   || fail "a refused remote restart changed its route metadata"
 cp "$TMP_ROOT/ios-before-relaunch.meta" "$RELAUNCH_ROUTE_META"

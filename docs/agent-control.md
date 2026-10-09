@@ -117,6 +117,8 @@ That native restore is unmanaged: neither its resume path nor the original launc
 The script's [header and help](../bin/fm-reboot-recover.sh) own invocation, bounded-scan scheduling, and its durable cursor.
 Deferred startup inspection follows the existing bootstrap sweeps, which keep their recovery responsibilities.
 The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and emits each sweep's diagnostics as an independently keyed `check` wake.
+A bounded scan reports a task's notice once per verdict and restored-agent identity (pane, PID, and start time), so an unchanged unmanaged agent wakes Firstmate once rather than on every scan; `state/<id>.reboot-notice` holds that last notice, and relaunch and teardown remove it.
+The unbounded startup sweep always reports.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
 Unreadable endpoint inspection is reported as a task-specific failure without lifecycle action, not silently treated as a missing or stopped agent.
 The sweep never discovers other homes' panes or recursively enters a secondmate home.
@@ -132,7 +134,8 @@ Drafts, busy state, task instructions, profile axes, charters, child records, an
 `bin/fm-launch-proof-lib.sh` owns launch attribution, and runtime lifecycle paths to a live Herdr agent use one shared positive task-attribution guard before lifecycle input or a relaunch checkpoint, note, or record mutation.
 A recorded endpoint or matching cwd alone never proves live task ownership.
 The stopped-agent exception requires process-backed absence even when Herdr has not registered an agent; a live process still requires launch attribution, and unreadable process evidence refuses recovery.
-Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch.
+Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch of a record with `launch_proof`.
+A record published before launch proofs existed (empty `launch_proof`) keeps the earlier rule: its live agent at the validated endpoint is attributed without a pin, and its relaunch publishes a proven launch.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.
 An enabled `config/launch-env-allowlist` still selects the existing cleared-environment POSIX-sh boundary.
@@ -147,7 +150,7 @@ Resume arguments, native session-file headers, original launch briefs, task inbo
 An in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
 Every other recorded harness remains unknown with missing or mismatched pins.
 Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
-Neither unmanaged nor unknown proof authorizes lifecycle action.
+Neither unmanaged nor unknown proof authorizes lifecycle action for a record with `launch_proof`.
 Every Herdr replacement must have matching managed-launch proof, including current-session proof for omp, before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 

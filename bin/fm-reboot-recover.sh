@@ -14,6 +14,11 @@
 # STATE/.reboot-recovery-cursor holds that id. It advances atomically before
 # backend inspection, so the next tick follows it even if inspection is interrupted.
 # Unbounded recover does not read or change that scheduling cursor.
+# STATE/<id>.reboot-notice holds a task's last notice with its verdict and
+# restored-agent identity (pane, PID and start time). --one stays quiet while
+# both are unchanged; the record clears when no notice applies, and relaunch
+# and teardown remove it. Unbounded recover always reports and does not read or
+# change that notice state.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() { sed -n '2,${/^#/!q;p;}' "$0" | sed 's/^# \{0,1\}//'; }
@@ -43,6 +48,24 @@ STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
 . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
 fm_backend_source herdr
 result=0
+# notice <id> <verdict-and-identity> <line>: 1 when --one suppressed it.
+# forget <id>: a bounded tick clears the task's notice when none applies.
+notice() {
+  local file="$STATE/$1.reboot-notice" last='' tmp
+  [ "$ONE" = 1 ] || { echo "$3"; return 0; }
+  if [ -f "$file" ] && [ ! -L "$file" ]; then
+    IFS= read -r last < "$file" || true
+    [ "$last" != "$2" ] || return 1
+  fi
+  echo "$3"
+  tmp=$(umask 077; mktemp "$STATE/.reboot-notice.XXXXXX") || return 0
+  if ! printf '%s\n' "$2" > "$tmp" || ! mv -f -- "$tmp" "$file"; then
+    rm -f -- "$tmp"
+  fi
+}
+forget() {
+  [ "$ONE" = 0 ] || rm -f -- "$STATE/$1.reboot-notice"
+}
 records=("$STATE"/*.meta)
 count=${#records[@]}
 [ "$count" -gt 0 ] || exit 0
@@ -89,25 +112,36 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
   target=$FM_BACKEND_VALIDATED_TARGET
   case "$(fm_backend_agent_state herdr "$target")" in
     alive) ;;
-    dead|missing) continue ;;
+    dead|missing) forget "$id"; continue ;;
     unreadable)
-      echo "REBOOT_RECOVERY: $id: agent state is unreadable; no lifecycle action taken"
-      result=1
+      notice "$id" "state-unreadable $target" \
+        "REBOOT_RECOVERY: $id: agent state is unreadable; no lifecycle action taken" && result=1
       continue
       ;;
     *) result=1; continue ;;
   esac
-  proof=$(fm_launch_proof_herdr "$meta")
+  born=''
+  if pid=$(fm_launch_proof_herdr_pid "$meta"); then
+    proof=$(fm_launch_proof_herdr_verdict "$meta" "$pid")
+    born=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null | awk '{$1=$1; print}') || born=''
+  else
+    pid='' proof=unknown
+  fi
+  identity="$target $pid $born"
   case "$proof" in
-    managed) continue ;;
+    managed) forget "$id"; continue ;;
     unknown)
-      [ -n "$(fm_meta_get "$meta" launch_proof)" ] || continue
-      echo "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken"
-      result=1
+      if [ -z "$(fm_meta_get "$meta" launch_proof)" ]; then
+        forget "$id"
+        continue
+      fi
+      notice "$id" "launch-unreadable $identity" \
+        "REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" && result=1
       continue
       ;;
     unmanaged)
-      echo "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken"
+      notice "$id" "unmanaged $identity" \
+        "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" || true
       ;;
     *) result=1 ;;
   esac

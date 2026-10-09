@@ -4,7 +4,8 @@
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
 # For omp, a matching pin also requires extension-recorded current-session proof.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
-# Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action.
+# Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action
+# for a proven record; a legacy record keeps its pre-proof attribution rule.
 # No endpoint discovery: callers supply this home's validated exact endpoint.
 
 _FM_LAUNCH_PROOF_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
@@ -29,13 +30,13 @@ fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
   fi
 }
 
-fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
-  local meta=$1 target session pane info foreground pid proof gen verdict
-  local candidates ids='' name argv0 parents group record task_file current_file
+fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
+  local meta=$1 target session pane info foreground pid
+  local candidates ids='' name argv0 parents group
   target=$(fm_meta_get "$meta" window)
   session=${target%%:*}; pane=${target#*:}
   info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane" 2>/dev/null) \
-    || { printf unknown; return; }
+    || return 1
   # The process-group leader may be a launcher shell, and omp helpers share
   # the group. Attribute the unique ancestor-most non-shell process instead.
   candidates=$(printf '%s' "$info" | jq -ec --arg pane "$pane" '
@@ -47,7 +48,7 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
     | if $view.foreground_process_group_id != null then
         select(any(.[]; .pid == $view.foreground_process_group_id))
       else select(length == 1) end' 2>/dev/null) \
-    || { printf unknown; return; }
+    || return 1
   while IFS=$'\t' read -r pid name argv0; do
     [ "$(fm_agent_process_classify_name "$name" "$argv0")" = shell ] || ids="$ids $pid"
   done < <(printf '%s' "$candidates" | jq -r '.[] | [.pid, (.name // ""), (.argv0 // "")] | @tsv')
@@ -58,7 +59,7 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
     parents=$(ps -axo pid=,ppid= 2>/dev/null | jq -Rnc '
       [inputs | capture("^\\s*(?<pid>[0-9]+)\\s+(?<ppid>[0-9]+)\\s*$")
         | {key:.pid,value:(.ppid | tonumber)}] | from_entries') \
-      || { printf unknown; return; }
+      || return 1
     candidates=$(printf '%s' "$candidates" | jq -ec --argjson parents "$parents" --argjson group "$group" '
       map(.pid) as $ids
       | def below($pid; $targets; $seen):
@@ -70,19 +71,26 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
             else below($parent; $targets; $seen + [$parent]) end;
         map(select(below(.pid; $ids; [.pid]) | not))
         | map(select(.pid == $group or below(.pid; [$group]; [.pid])))' 2>/dev/null) \
-      || { printf unknown; return; }
+      || return 1
   fi
-  foreground=$(printf '%s' "$candidates" | jq -ec 'select(length == 1) | .[0]') \
-    || { printf unknown; return; }
+  foreground=$(printf '%s' "$candidates" | jq -ec 'select(length == 1) | .[0]') || return 1
+  printf '%s' "$foreground" | jq -er '.pid | select(type == "number" and . > 1) | floor' 2>/dev/null
+}
+
+fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
+  local pid
+  pid=$(fm_launch_proof_herdr_pid "$1") || { printf unknown; return; }
+  fm_launch_proof_herdr_verdict "$1" "$pid"
+}
+
+fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|unknown
+  local meta=$1 pid=$2 proof gen verdict record task_file current_file
   proof=$(fm_meta_get "$meta" launch_proof)
   case "$proof" in
     env-v1|'') ;;
     *) printf unknown; return ;;
   esac
   gen=$(fm_meta_get "$meta" spawn_gen)
-  pid=$(printf '%s' "$foreground" | jq -er '.pid
-    | select(type == "number" and . > 1) | floor' 2>/dev/null) \
-    || { printf unknown; return; }
   verdict=$(fm_launch_proof_pid "$pid" "$gen")
   if [ "$verdict" = managed ] && [ "$(fm_meta_get "$meta" harness)" = omp ]; then
     # Launch argv and the environment survive /resume. Only the extension's
@@ -111,4 +119,10 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
       fi
       ;;
   esac
+}
+
+# Lifecycle authorization for a live recorded Herdr agent. A record published
+# before launch proofs existed (empty launch_proof) has no pin to compare.
+fm_launch_proof_herdr_authorizes() { # <meta>
+  [ -z "$(fm_meta_get "$1" launch_proof)" ] || [ "$(fm_launch_proof_herdr "$1")" = managed ]
 }

@@ -2565,3 +2565,24 @@ test_cursorless_submit_refreshes_pending_before_retry() (
   pass "cmux orca and zellij submit refresh pending frames without retyping"
 )
 test_cursorless_submit_refreshes_pending_before_retry
+
+test_glyph_led_continuations_stay_pending_and_bounded() {
+  local screen quoted rows=0 started
+  for quoted in '  > quoted' '   > quoted' '  # heading' '  $ command'; do
+    screen=$'────────────\n❯ please review\n'"$quoted"$'\n────────────'
+    assert_screen "unstyled rule pair keeps glyph-led draft row '$quoted' pending" pending \
+      $'styled=0\ncursor=0' "$screen"
+  done
+  screen='❯ x'
+  while [ "$rows" -lt 120 ]; do
+    rows=$((rows + 1))
+    screen="$screen"$'\n'"  # heading $rows"
+  done
+  started=$SECONDS
+  [ "$(fm_composer_classify_screen "$CAPS_STYLED_NOID" "$screen")" = pending ] \
+    || fail "glyph-led continuation rows must stay one pending draft"
+  [ "$((SECONDS - started))" -le 10 ] \
+    || fail "120 glyph-led continuation rows took $((SECONDS - started))s to classify"
+  pass "glyph-led continuation rows keep Enter-retry proof and classify without re-walking the draft"
+}
+test_glyph_led_continuations_stay_pending_and_bounded

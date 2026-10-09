@@ -881,6 +881,7 @@ _fm_composer_titled_rule_row() {  # <trimmed-row>
 # has no nameref); they are internal to this owner.
 _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local pane=$1 cy=${2:-}
+  _FM_COMPOSER_ROWS_LOADED=0
   local line indent left_stripped trimmed kind family side_family
   local top_inner top_spaces='' geometry_check=0 geometry_ambiguous=0
   local content_inner content_spaces bottom_inner bottom_spaces glyph
@@ -984,7 +985,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     fi
     if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -ge 0 ] \
        && [ "$row" -eq "$((FM_COMPOSER_SCAN_BARE_AMBIG_LAST + 1))" ]; then
-      bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" "$pane")
+      _fm_composer_screen_row_var bare_line "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" "$pane"
       bare_indent=${bare_line%%[![:space:]]*}
       case "${bare_line#"$bare_indent"}" in
         '❯'|'❯ '*)
@@ -1009,7 +1010,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
        && [ "$row" -gt "$FM_COMPOSER_SCAN_BARE_ROW" ] \
        && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
             || fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; then
-      bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
+      _fm_composer_screen_row_var bare_line "$FM_COMPOSER_SCAN_BARE_ROW" "$pane"
       bare_indent=${bare_line%%[![:space:]]*}
       case "${bare_line#"$bare_indent"}" in
         '❯'|'❯ '*)
@@ -1063,7 +1064,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     fi
     if [ "$kind" = top ] && { [ "$family" = omp-band ] || _fm_composer_top_is_omp_box "$trimmed"; } \
        && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ]; then
-      bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
+      _fm_composer_screen_row_var bare_line "$FM_COMPOSER_SCAN_BARE_ROW" "$pane"
       bare_indent=${bare_line%%[![:space:]]*}
       literal_owned=0
       if [ "${#indent}" -gt "${#bare_indent}" ]; then
@@ -1084,7 +1085,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         literal_row=$((row + 1))
         literal_rows="${row}|"
         if [ "$family" = omp-band ]; then
-          literal_line=$(_fm_composer_screen_row "$literal_row" "$pane")
+          _fm_composer_screen_row_var literal_line "$literal_row" "$pane"
           literal_indent=${literal_line%%[![:space:]]*}
           fm_composer_normalize_trim_var literal_line
           if [ "$indent" = "$literal_indent " ] \
@@ -1142,7 +1143,7 @@ EOF
           fi
         else
         while :; do
-          literal_line=$(_fm_composer_screen_row "$literal_row" "$pane")
+          _fm_composer_screen_row_var literal_line "$literal_row" "$pane"
           literal_indent=${literal_line%%[![:space:]]*}
           [ "$literal_indent" = "$indent" ] || break
           fm_composer_normalize_trim_var literal_line
@@ -1614,6 +1615,60 @@ _fm_composer_screen_row() {  # <n> <screen>
   printf '%s\n' "$2" | sed -n "$(($1 + 1))p"
 }
 
+# Rows of the scanned screen and their content-only furniture classes are read
+# once per scan, so continuation walks below a root never re-read the screen.
+_fm_composer_rows_load() {  # <screen>
+  local __fmrl_line __fmrl_i=0
+  if [ "${_FM_COMPOSER_ROWS_LOADED:-0}" = 1 ] && [ "$_FM_COMPOSER_ROWS_SRC" = "$1" ]; then
+    return 0
+  fi
+  _FM_COMPOSER_ROWS=()
+  _FM_COMPOSER_ROW_CLASS=()
+  while IFS= read -r __fmrl_line; do
+    _FM_COMPOSER_ROWS[__fmrl_i]=$__fmrl_line
+    __fmrl_i=$((__fmrl_i + 1))
+  done <<EOF
+$1
+EOF
+  _FM_COMPOSER_ROWS_SRC=$1
+  _FM_COMPOSER_ROWS_LOADED=1
+}
+
+_fm_composer_screen_row_var() {  # <out-varname> <n> <screen>
+  _fm_composer_rows_load "$3"
+  if [ "$2" -ge 0 ] && [ "$2" -lt "${#_FM_COMPOSER_ROWS[@]}" ]; then
+    printf -v "$1" '%s' "${_FM_COMPOSER_ROWS[$2]}"
+  else
+    printf -v "$1" '%s' ''
+  fi
+}
+
+# Class letters: 0 blank; otherwise 1 plus e (edge), f (omp status or braille
+# furniture), s (shell glyph) and a (agent glyph).
+_fm_composer_row_class_var() {  # <out-varname> <n> <screen>
+  local __fmrc_line __fmrc_class __fmrc_glyph
+  _fm_composer_rows_load "$3"
+  __fmrc_class=${_FM_COMPOSER_ROW_CLASS[$2]-}
+  if [ -z "$__fmrc_class" ]; then
+    __fmrc_line=${_FM_COMPOSER_ROWS[$2]-}
+    fm_composer_normalize_trim_var __fmrc_line
+    if [ -z "$__fmrc_line" ]; then
+      __fmrc_class=0
+    else
+      __fmrc_class=1
+      if fm_composer_row_has_edge "$__fmrc_line"; then __fmrc_class="${__fmrc_class}e"; fi
+      if _fm_composer_row_is_omp_status "$__fmrc_line" \
+         || _fm_composer_row_is_braille_furniture "$__fmrc_line"; then
+        __fmrc_class="${__fmrc_class}f"
+      fi
+      if fm_composer_leading_shell_glyph_var __fmrc_glyph "$__fmrc_line"; then __fmrc_class="${__fmrc_class}s"; fi
+      if fm_composer_leading_agent_glyph_var __fmrc_glyph "$__fmrc_line"; then __fmrc_class="${__fmrc_class}a"; fi
+    fi
+    _FM_COMPOSER_ROW_CLASS[$2]=$__fmrc_class
+  fi
+  printf -v "$1" '%s' "$__fmrc_class"
+}
+
 # Shared row content keeps classification and selected-content extraction in
 # agreement. omp's bright effort keys survive ghost stripping; treat that
 # remnant as furniture only on a styled bare ❯ row ending in the exact hint,
@@ -1906,18 +1961,20 @@ _fm_composer_row_is_bare_literal() {  # <row>
 # possible-continuation probe for conservative ambiguity; its success must never
 # establish ownership or authorize empty classification across a blank.
 _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-blank]
-  local plain=$1 g=$2 cy=$3 allow_blank=${4:-0} row line trimmed glyph ambiguous=0
+  local plain=$1 g=$2 cy=$3 allow_blank=${4:-0} row line class ambiguous=0 blocked=0
   local root root_indent indent
   if [ "$allow_blank" = 1 ]; then
-    root=$(_fm_composer_screen_row "$g" "$plain")
+    _fm_composer_screen_row_var root "$g" "$plain"
     root_indent=${root%%[![:space:]]*}
   fi
   row=$((g + 1))
   while [ "$row" -le "$cy" ]; do
-    line=$(_fm_composer_screen_row "$row" "$plain")
-    trimmed=$line
-    fm_composer_normalize_trim_var trimmed
-    if [ -z "$trimmed" ] && ! _fm_composer_row_is_bare_literal "$row"; then
+    if _fm_composer_row_is_bare_literal "$row"; then
+      row=$((row + 1))
+      continue
+    fi
+    _fm_composer_row_class_var class "$row" "$plain"
+    if [ "$class" = 0 ]; then
       [ "$allow_blank" = 1 ] || return 1
       row=$((row + 1))
       continue
@@ -1926,15 +1983,16 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
     if [ "$allow_blank" = 1 ] && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
        && [ "$row" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
        && [ "$row" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then ambiguous=1; fi
-    if { [ "$ambiguous" = 0 ] && ! _fm_composer_row_is_bare_literal "$row" \
-         && fm_composer_row_has_edge "$trimmed"; } \
-       || { ! _fm_composer_row_is_bare_literal "$row" && _fm_composer_row_is_omp_status "$trimmed"; } \
-       || { ! _fm_composer_row_is_bare_literal "$row" && _fm_composer_row_is_braille_furniture "$trimmed"; } \
-       || { ! _fm_composer_row_is_bare_literal "$row" \
-            && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
-                 || { [ "$allow_blank" = 1 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; }; }; then
+    blocked=0
+    case "$class" in *f*|*s*) blocked=1 ;; esac
+    case "$class" in *e*) [ "$ambiguous" = 1 ] || blocked=1 ;; esac
+    case "$class" in *a*) [ "$allow_blank" = 0 ] || blocked=1 ;; esac
+    if [ "$blocked" = 1 ] || { [ "$allow_blank" = 1 ] && [ "$ambiguous" = 0 ]; }; then
       [ "$allow_blank" = 1 ] || return 1
-      case "${root#"$root_indent"}" in '❯'|'❯ '*) ;; *) return 1 ;; esac
+      if [ "$blocked" = 1 ]; then
+        case "${root#"$root_indent"}" in '❯'|'❯ '*) ;; *) return 1 ;; esac
+      fi
+      _fm_composer_screen_row_var line "$row" "$plain"
       indent=${line%%[![:space:]]*}
       case "$indent" in "$root_indent  "*) ;; *) return 1 ;; esac
     fi
@@ -1964,6 +2022,7 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <first-row> <last-row>
     if [ -n "$content" ]; then
       text_seen=1
       if [ "$row" -gt "$g" ] && _fm_composer_row_is_bare_literal "$row"; then literal_seen=1; fi
+      if [ "$styled" = 1 ] || [ "$literal_seen" = 1 ]; then break; fi
     fi
     row=$((row + 1))
   done
@@ -2247,7 +2306,7 @@ _fm_composer_select_cursorless() {
   if [ "$FM_COMPOSER_SELECTED_KIND" = bare ]; then
     next=$((FM_COMPOSER_SELECTED_LAST + 1))
     while :; do
-      raw=$(_fm_composer_screen_row "$next" "$plain")
+      _fm_composer_screen_row_var raw "$next" "$plain"
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
       [ -n "$trimmed" ] || _fm_composer_row_is_bare_literal "$next" || break
@@ -2745,20 +2804,32 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
 # _fm_composer_pair_glyph_verdict: verdict for a rule pair whose interior holds
 # the proving agent-glyph row. Owned native-omp rows under that glyph cannot be
 # told from furniture without styling, so an unstyled capture never proves
-# them input unless the backend identity is exactly Pi.
+# them input unless the backend identity is exactly Pi. Owned prompt-led rows
+# only keep that uncertainty when no unowned interior row carries the draft.
 _fm_composer_pair_glyph_verdict() {  # <screen> <styled> <has-identity> <identity>
-  local state row
+  local state row raw line glyph literal=0 text=0
   state=$(_fm_composer_classify_bare_pi_overlap "$1" "$2" "$3" "$4")
   if [ "$2" != 1 ] && [ "$state" = pending ] \
      && [ "${4%%$'\t'*}" != pi ]; then
     row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
     while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
+      raw=$(_fm_composer_screen_row "$row" "$1")
       if _fm_composer_row_is_bare_literal "$row"; then
-        state=unknown-draft
-        break
+        literal=1
+        line=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+        if ! fm_composer_leading_shell_glyph_var glyph "$line" \
+           && ! fm_composer_leading_agent_glyph_var glyph "$line"; then
+          state=unknown-draft
+          break
+        fi
+      else
+        line=$(_fm_composer_rule_pair_row_content "$raw" "$2" "$row" "$FM_COMPOSER_SCAN_PI_GLYPH_ROW")
+        fm_composer_normalize_trim_var line
+        [ -z "$line" ] || text=1
       fi
       row=$((row + 1))
     done
+    if [ "$literal" = 1 ] && [ "$text" = 0 ]; then state=unknown-draft; fi
   fi
   printf '%s' "$state"
 }

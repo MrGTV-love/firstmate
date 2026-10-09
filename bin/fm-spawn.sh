@@ -1789,6 +1789,7 @@ clear_relaunch_harness_wiring() {
   done <<EOF
 $(fm_control_harness_wiring_paths "$harness" "$wt" "$state" "$id")
 EOF
+  rm -f -- "$state/$id.reboot-notice"
 }
 
 spawn_herdr_presentation_order_lock_release() {

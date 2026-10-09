@@ -196,7 +196,8 @@ SH
   done
   for RECOVERY_SERVER_STATE in running unknown stopped; do
     for RECOVERY_MODE in unbounded one; do
-      rm -f "$RECOVERY_INSPECTION_HOME/state/.reboot-recovery-cursor"
+      rm -f "$RECOVERY_INSPECTION_HOME/state/.reboot-recovery-cursor" \
+        "$RECOVERY_INSPECTION_HOME"/state/*.reboot-notice
       RECOVERY_ATTEMPTS=(1)
       [ "$RECOVERY_MODE" != one ] || RECOVERY_ATTEMPTS=(1 2 3)
       for RECOVERY_ATTEMPT in "${RECOVERY_ATTEMPTS[@]}"; do
@@ -220,6 +221,9 @@ SH
         if [ "$RECOVERY_SERVER_STATE" = stopped ]; then
           expect_code 0 "$RECOVERY_SCAN_RC" "$RECOVERY_MODE recovery must leave positively stopped endpoints to liveness recovery"
           [ -z "$RECOVERY_SCAN_OUT" ] || fail "stopped endpoint recovery unexpectedly reported: $RECOVERY_SCAN_OUT"
+        elif [ "$RECOVERY_MODE" = one ] && [ "$RECOVERY_ATTEMPT" = 3 ]; then
+          expect_code 0 "$RECOVERY_SCAN_RC" "$RECOVERY_SERVER_STATE unchanged unreadable notice must not fail again"
+          [ -z "$RECOVERY_SCAN_OUT" ] || fail "$RECOVERY_SERVER_STATE repeated an unchanged unreadable notice: $RECOVERY_SCAN_OUT"
         else
           expect_code 1 "$RECOVERY_SCAN_RC" "$RECOVERY_SERVER_STATE/$RECOVERY_MODE unreadable inspection must fail"
           for RECOVERY_ID in "${RECOVERY_EXPECTED_IDS[@]}"; do
@@ -382,12 +386,29 @@ EOF
   RECOVERY_OWNER=
   RECOVERY_PARENT=
   RECOVERY_CHILD=
-  # shellcheck disable=SC2154 # recovery_pid is assigned by the for loop inside the trap.
+  RECOVERY_STATE=
+  recovery_test_register() {  # <name> <pid> <command-needle>
+    fm_test_record_process "$RECOVERY_STATE/$1.identity" "$2" || return 0
+    fm_test_track_process "$RECOVERY_STATE/$1.identity" "$3"
+  }
+  # shellcheck disable=SC2329 # invoked from the EXIT trap below
+  recovery_test_kill() {  # <name> <command-needle>
+    local pid pgid
+    fm_test_process_alive "$RECOVERY_STATE/$1.identity" "$2" || return 0
+    pid=$FM_TEST_PROCESS_PID
+    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+    if [ -n "$pgid" ] && [ "$pgid" = "$pid" ]; then
+      kill -KILL -- "-$pgid" 2>/dev/null || true
+    fi
+    kill -KILL "$pid" 2>/dev/null || true
+  }
   trap '
-    [ -z "$RECOVERY_PARENT" ] || kill -KILL -- "-$RECOVERY_PARENT" 2>/dev/null || true
-    for recovery_pid in "$RECOVERY_CHILD" "$RECOVERY_PARENT" "$RECOVERY_OWNER" "$RECOVERY_RUNNER_PID"; do
-      [ -z "$recovery_pid" ] || kill -KILL "$recovery_pid" 2>/dev/null || true
-    done
+    if [ -n "$RECOVERY_STATE" ]; then
+      recovery_test_kill parent "$RECOVERY_FIXTURE/bin/fm-reboot-recover.sh"
+      recovery_test_kill child RECOVERY_CHILD_PID
+      recovery_test_kill owner "$RECOVERY_FIXTURE/bin/fm-watch.sh"
+      recovery_test_kill runner "$RECOVERY_FIXTURE/bin/fm-watch"
+    fi
     [ -z "$RECOVERY_RUNNER_PID" ] || wait "$RECOVERY_RUNNER_PID" 2>/dev/null || true
   ' EXIT
   recovery_test_alive() {
@@ -424,6 +445,7 @@ EOF
         "$RECOVERY_FIXTURE/bin/fm-watch.sh" > "$RECOVERY_STATE/output" 2> "$RECOVERY_STATE/error" &
     fi
     RECOVERY_RUNNER_PID=$!
+    recovery_test_register runner "$RECOVERY_RUNNER_PID" "$RECOVERY_FIXTURE/bin/fm-watch"
     RECOVERY_OWNER=
     RECOVERY_PARENT=
     RECOVERY_CHILD=
@@ -436,6 +458,9 @@ EOF
     [ ! -s "$RECOVERY_OWNER_PID" ] || RECOVERY_OWNER=$(cat "$RECOVERY_OWNER_PID")
     [ ! -s "$RECOVERY_PARENT_PID" ] || RECOVERY_PARENT=$(cat "$RECOVERY_PARENT_PID")
     [ ! -s "$RECOVERY_CHILD_PID" ] || RECOVERY_CHILD=$(cat "$RECOVERY_CHILD_PID")
+    [ -z "$RECOVERY_OWNER" ] || recovery_test_register owner "$RECOVERY_OWNER" "$RECOVERY_FIXTURE/bin/fm-watch.sh"
+    [ -z "$RECOVERY_PARENT" ] || recovery_test_register parent "$RECOVERY_PARENT" "$RECOVERY_FIXTURE/bin/fm-reboot-recover.sh"
+    [ -z "$RECOVERY_CHILD" ] || recovery_test_register child "$RECOVERY_CHILD" RECOVERY_CHILD_PID
     [ -n "$RECOVERY_OWNER" ] && [ -n "$RECOVERY_PARENT" ] && [ -n "$RECOVERY_CHILD" ] \
       || fail "$RECOVERY_CASE recovery subprocess tree did not start"
     recovery_test_alive "$RECOVERY_PARENT" && recovery_test_alive "$RECOVERY_CHILD" \

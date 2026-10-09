@@ -474,7 +474,7 @@ The [timeout owner](../bin/fm-timeout-lib.sh) defines descendant termination, Pe
 Cleanup allows the bounded child's one-second TERM grace before retiring its controller.
 Recovery output and exit status remain available for the existing durable wake and completion cooldown.
 The bounded reboot-recovery tick runs after ordinary due supervision, including SessionEnd recovery, queued process events, task checks, signals, pane/inbox checks, and heartbeat handling, and before the terminal wait.
-An unchanged unmanaged-launch notice therefore cannot preempt that work on each delayed foreground rearm; quiet cycles still publish the notice and retain the completion cooldown.
+The bounded scan suppresses an unchanged unmanaged-launch notice itself, and a new notice cannot preempt that work on a delayed foreground rearm; quiet cycles still publish it and retain the completion cooldown.
 The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `FM_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
 A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lock wait: on timeout the recovery transition fails without releasing the singleton, leaving dead-pid stale evidence for the next arm to republish and clear.
