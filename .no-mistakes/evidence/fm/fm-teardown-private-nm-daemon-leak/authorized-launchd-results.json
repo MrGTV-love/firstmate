@@ -1,0 +1,33 @@
+{
+  "verdict": "inconclusive",
+  "product_changes": false,
+  "live_driver_exit": 0,
+  "observed": [
+    "Authorized private KeepAlive sleep service remained loaded after normal and forced teardown; CLI refused on unproven descendant process custody, retaining task copy, metadata, and plist.",
+    "Loaded shared-home and foreign-task sleep fixtures remained running with unchanged observed PIDs after successful teardown.",
+    "Loaded registered nested-lane sleep fixture remained running with unchanged observed PID after forced teardown refused to signal the nested process.",
+    "All four authorized fixture services were booted out in cleanup; each subsequent launchctl print returned service-not-found, and launchctl list filtered to com.firstmate.lab had no rows."
+  ],
+  "not_proven": [
+    "Private no-mistakes KeepAlive service retirement before process cleanup",
+    "Forced refusal specifically following a failed bootout of a loaded private no-mistakes service",
+    "No-mistakes launch-agent classifier exclusion of loaded foreign services: permitted sleep fixtures do not reach that classifier."
+  ],
+  "blocker": "Authorized labels and ProgramArguments cannot match the unmodified product selector; compatible fixture authorization is required.",
+  "attempts": [
+    "Initial four-case targeted regression command reached its 300-second deadline after reporting passing retirement and foreign-agent cases; no pass claimed for the remaining cases.",
+    "Initial captured live driver attempt timed out without a retained result; no pass claimed for that attempt.",
+    "Live driver retried via a finite background command and completed, including cleanup."
+  ],
+  "artifacts": [
+    "authorized-launchd-transcript.log",
+    "authorized-launchd-contract.txt"
+  ],
+  "focused_regressions": {
+    "private_retirement": "pass",
+    "foreign_agents": "pass",
+    "nested_agents": "pass (focused retry)",
+    "bootout_failure_refusal": "pass (focused retry)",
+    "complete_suite": "not run"
+  }
+}

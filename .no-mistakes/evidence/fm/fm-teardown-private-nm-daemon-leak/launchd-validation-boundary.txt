@@ -1,0 +1,5 @@
+Real launchctl absence probe returned exit 113 (service not found) in gui/501.
+
+The workspace boundary forbids modifying system state outside the worktree. Creating a disposable KeepAlive launchd agent would require bootstrap into gui/501, which changes that system domain. An existing operator service cannot be used. No bootstrap/load/enable/disable or operator-service bootout was attempted. The real unloaded-agent path is exercised live; loaded-agent retirement and failed-unload refusal are covered only with the explicitly requested fake-launchctl regression fixtures, not marked live.
+
+For loaded-service proof, authorize a narrowly scoped disposable agent in the GUI launchd domain with files under the disposable workspace, or rerun in a dedicated macOS user/VM where bootstrap and bootout are authorized. Production services and credentials need not be touched.

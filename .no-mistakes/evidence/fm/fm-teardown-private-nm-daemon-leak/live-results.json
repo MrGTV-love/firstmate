@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Archive unloaded private agents with equivalent roots and finish teardown",
+    "result": "pass",
+    "live": true,
+    "detail": "Seven byte-identical plists archived under task data; installed copies removed; task metadata and actual private tmux worker window removed; real treehouse return completed."
+  },
+  {
+    "name": "Leave shared, other-task, prefix-lookalike, escaping and malformed agents untouched",
+    "result": "pass",
+    "live": true,
+    "detail": "All six outside-root plists and malformed plist remained byte-identical; no foreign archive was created."
+  },
+  {
+    "name": "Recover an absent task copy without retiring a missing nested lane",
+    "result": "pass",
+    "live": true,
+    "detail": "Real launchctl confirmed two absent-copy private services unloaded; their plists were archived and task retired. A nested lane registered by a sibling clone, despite deleted directories, kept its exact plist and task record."
+  },
+  {
+    "name": "Refuse archive failure even when forced and retain recovery state",
+    "result": "pass",
+    "live": true,
+    "detail": "Real mkdir failure caused explicit refusal with installed plist, task copy, task metadata, and private worker window preserved."
+  },
+  {
+    "name": "Generate ship and scout cleanup instructions with the configured parking verb",
+    "result": "pass",
+    "live": true,
+    "detail": "The real scaffold CLI emitted matching private-service rules for all three ship modes and scouts under paused and awaiting, including status naming, literal bootout, and shared-daemon prohibition. The secondmate charter omitted this worker-only rule."
+  }
+]

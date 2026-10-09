@@ -1,0 +1,33 @@
+{
+  "scenarios": [
+    {
+      "name": "Generated ship and scout briefs instruct private-service cleanup before parking or finishing (exercised in initial transcript)",
+      "result": "pass"
+    },
+    {
+      "name": "Loaded KeepAlive private service is booted out before process cleanup and remains gone",
+      "result": "pass"
+    },
+    {
+      "name": "Unavailable bootout refuses forced cleanup while preserving the loaded private service",
+      "result": "pass"
+    },
+    {
+      "name": "Loaded shared, foreign-task, and damaged nested-lane look-alikes remain untouched",
+      "result": "pass"
+    },
+    {
+      "name": "Equivalent private roots retire while symlink and missing-component escapes stay protected",
+      "result": "pass"
+    },
+    {
+      "name": "Absent-copy recovery retires private services while preserving registered missing nested lanes",
+      "result": "pass"
+    },
+    {
+      "name": "Already-unloaded private agent metadata is archived to prevent later reload",
+      "result": "pass"
+    }
+  ],
+  "cleanup_ok": true
+}

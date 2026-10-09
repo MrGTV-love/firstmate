@@ -1,0 +1,698 @@
+bg_2 [bash] — completed — /bin/bash .fm-launchd-validation/driver.sh
+ok - a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/launchagents/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 99140
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411442
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411443
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 9s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/code-root/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/code-root/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 99140 (lstart=Thu Oct  8 23:38:21 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt/.no-mistakes/h beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt/.no-mistakes/h for task-x1 (descendant cwd holds process 99140 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+OBSERVED authorized private sleep agent teardown force=no exit=1
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/launchagents/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 99140
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411442
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411443
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+WARNING: watcher still down (same stale episode; last beat: 66s ago, grace 900s) - full banner already printed this episode.
+REFUSED: process 99140 (lstart=Thu Oct  8 23:38:21 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt/.no-mistakes/h beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt/.no-mistakes/h for task-x1 (descendant cwd holds process 99140 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+OBSERVED authorized private sleep agent teardown force=yes exit=1
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/launchagents/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-private/wt/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 99140
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411442
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411443
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+LIMITATION: permitted labels and sleep arguments do not exercise private no-mistakes retirement or its bootout-failure refusal; both CLI runs refuse at process custody instead.
+gui/501/com.firstmate.lab.01M4EY8M.2 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/launchagents/com.firstmate.lab.01M4EY8M.2.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/home/.no-mistakes
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.2
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 67030
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411444
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	jetsam coalition = {
+		ID = 411445
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+gui/501/com.firstmate.lab.01M4EY8M.3 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/launchagents/com.firstmate.lab.01M4EY8M.3.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/other-wt/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.3
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 74928
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411446
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	jetsam coalition = {
+		ID = 411447
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 12s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/code-root/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/code-root/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+gui/501/com.firstmate.lab.01M4EY8M.2 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/launchagents/com.firstmate.lab.01M4EY8M.2.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/home/.no-mistakes
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.2
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 67030
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411444
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	jetsam coalition = {
+		ID = 411445
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+gui/501/com.firstmate.lab.01M4EY8M.3 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/launchagents/com.firstmate.lab.01M4EY8M.3.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-foreign/other-wt/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.3
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 74928
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411446
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	jetsam coalition = {
+		ID = 411447
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+OBSERVED loaded shared-home and foreign-task sleep look-alikes survive successful real teardown CLI (no-mistakes infrastructure and treehouse/tmux are fixture doubles).
+gui/501/com.firstmate.lab.01M4EY8M.4 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/launchagents/com.firstmate.lab.01M4EY8M.4.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/wt/other-lane/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.4
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 92110
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411448
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	jetsam coalition = {
+		ID = 411449
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 9s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/code-root/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/code-root/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 92110 (lstart=Thu Oct  8 23:40:45 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/wt/other-lane/.no-mistakes/h inside registered nested worktree lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/wt/other-lane, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/wt/other-lane for task-x1 (registered nested worktree lane holds process 92110); preserving the worktree/tasktmp for manual inspection or retry.
+gui/501/com.firstmate.lab.01M4EY8M.4 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/launchagents/com.firstmate.lab.01M4EY8M.4.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-launchd-validation/fm-teardown-tests.D7FBjG/live-authorized-nested/wt/other-lane/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.4
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 92110
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411448
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	jetsam coalition = {
+		ID = 411449
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+OBSERVED loaded nested-lane sleep look-alike survives forced teardown refusal; this does not exercise the no-mistakes launch-agent selection branch.
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.1" in domain for user gui: 501
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.2" in domain for user gui: 501
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.3" in domain for user gui: 501
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.4" in domain for user gui: 501
+Final launchctl list filtered to com.firstmate.lab: <none>
+
+
+Wall time: 279.51 seconds

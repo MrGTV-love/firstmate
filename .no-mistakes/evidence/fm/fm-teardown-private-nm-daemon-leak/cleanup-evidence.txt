@@ -1,0 +1,5 @@
+Completed live driver: private fm-lab tmux server kill-server exited 0; fm-lab-home.sh teardown exited 0; disposable lab directory removed.
+Initial interrupted regression driver: ps -p 43683 returned no process.
+After the focused regressions completed, no process command named this validation run’s .fm-validation fixture directory. Their EXIT cleanup reported a Directory not empty race for the last fixture; residual fixture directories from that run and the initial interrupted invocation were removed explicitly.
+rm -rf .fm-validation exited 0. Final filesystem check: .fm-validation does not exist.
+No permanent source, test, documentation, or configuration changes were made by this test phase. Evidence files remain in the dedicated evidence directory.

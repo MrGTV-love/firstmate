@@ -1,0 +1,1816 @@
+SCENARIO PASS: Generated ship and scout briefs instruct private-service cleanup before parking or finishing (exercised in initial transcript)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+exit=0
+/tmp/fml.K1yp5D
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.K1yp5D/lab new-session -d -s fm-lab-private-keepalive -n control -x 80 -y 24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product /bin/sleep 600
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project commit -q --allow-empty -m baseline
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project remote set-head origin main
+exit=0
+
+$ treehouse get --lease --no-fetch
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project' to release it.
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project checkout -q -b fm/private-keepalive
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project add .gitignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project commit -q -m fixture ignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project merge -q --ff-only fm/private-keepalive
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project fetch -q origin
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab1; authorized real service=com.firstmate.lab.01M4EY8M.1; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+exit=0
+
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 57505
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411461
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411462
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 2
+	pid = 86354
+	immediate reason = inefficient
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last terminating signal = Killed: 9
+
+	resource coalition = {
+		ID = 411461
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411462
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: KeepAlive respawned the actual sleep process after kill
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh private-keepalive
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 86354 (lstart=Thu Oct  8 23:53:54 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project, whose ownership by private-keepalive is not proven; preserving it and task private-keepalive without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h for private-keepalive (descendant cwd holds process 86354 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+Launchctl adapter calls:
+
+Observed: running launchd-owned descendant blocks cleanup without recognition metadata
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.1
+exit=0
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 2
+	pid = 86354
+	immediate reason = inefficient
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last terminating signal = Killed: 9
+
+	resource coalition = {
+		ID = 411461
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411462
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: baseline refusal leaves real agent loaded
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh private-keepalive
+exit=0
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown private-keepalive complete (window fm-lab-private-keepalive:fm-private-keepalive, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project)
+Backlog: private-keepalive just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive/data/backlog.md - move private-keepalive to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab1 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive/data/private-keepalive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab1.plist
+
+Launchctl adapter calls:
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab1 => gui/501/com.firstmate.lab.01M4EY8M.1
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab1 => gui/501/com.firstmate.lab.01M4EY8M.1
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab1 => gui/501/com.firstmate.lab.01M4EY8M.1
+
+Observed: teardown completes after private-agent retirement
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.1
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.1" in domain for user gui: 501
+
+Observed: real launchd reports private service absent after teardown
+Observed: recognition plist archived under task data
+Observed: task record removed after successful teardown
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.1
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.1" in domain for user gui: 501
+
+Observed: KeepAlive does not respawn after real bootout
+SCENARIO PASS: Loaded KeepAlive private service is booted out before process cleanup and remains gone
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unload-refusal
+exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unload-refusal
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unload-refusal
+exit=0
+/tmp/fml.hub6xG
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.hub6xG/lab new-session -d -s fm-lab-unload-refusal -n control -x 80 -y 24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product /bin/sleep 600
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project commit -q --allow-empty -m baseline
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project remote set-head origin main
+exit=0
+
+$ treehouse get --lease --no-fetch
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project' to release it.
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project checkout -q -b fm/unload-refusal
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project add .gitignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project commit -q -m fixture ignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project merge -q --ff-only fm/unload-refusal
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/project fetch -q origin
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project/.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab2; authorized real service=com.firstmate.lab.01M4EY8M.2; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/com.firstmate.lab.01M4EY8M.2.plist
+exit=0
+
+gui/501/com.firstmate.lab.01M4EY8M.2 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/com.firstmate.lab.01M4EY8M.2.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.2
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 91485
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411463
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	jetsam coalition = {
+		ID = 411464
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh unload-refusal --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/drop.txt
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unload-refusal
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab2 (rooted in unload-refusal's copy) is still loaded after launchctl bootout; preserving the worktree and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/recognition-plists/com.kunchenguid.no-mistakes.daemon.lab2.plist.
+
+Launchctl adapter calls:
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+fault injection: bootout unavailable, exit 5; real agent stays loaded
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab2 => gui/501/com.firstmate.lab.01M4EY8M.2
+
+Observed: force refuses while a real service stays loaded after injected bootout failure
+gui/501/com.firstmate.lab.01M4EY8M.2 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/com.firstmate.lab.01M4EY8M.2.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unload-refusal/pool/.treehouse/project-38e176/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.2
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 91485
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411463
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	jetsam coalition = {
+		ID = 411464
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.2
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: refusal did not signal or restart the actual service process
+Observed: refusal preserves plist, copy, and task record
+SCENARIO PASS: Unavailable bootout refuses forced cleanup while preserving the loaded private service
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.2
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-foreign-protection
+exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-foreign-protection
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-foreign-protection
+exit=0
+/tmp/fml.eyXhii
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.eyXhii/lab new-session -d -s fm-lab-foreign-protection -n control -x 80 -y 24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product /bin/sleep 600
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project commit -q --allow-empty -m baseline
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project remote set-head origin main
+exit=0
+
+$ treehouse get --lease --no-fetch
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project' to release it.
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project checkout -q -b fm/foreign-protection
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project add .gitignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project commit -q -m fixture ignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project merge -q --ff-only fm/foreign-protection
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project fetch -q origin
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/shared-home/.no-mistakes; recognition=com.kunchenguid.no-mistakes.daemon.lab3; authorized real service=com.firstmate.lab.01M4EY8M.3; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.3.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/other-task/.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab4; authorized real service=com.firstmate.lab.01M4EY8M.4; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.4.plist
+exit=0
+
+$ git clone -q /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/project /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/sibling-project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/sibling-project worktree add -q --detach /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane main
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/sibling-project worktree lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane
+exit=0
+
+fixture root=/Users/charlesabrooker/./.no-mistakes//worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane/./.no-mistakes//h; recognition=com.kunchenguid.no-mistakes.daemon.lab5; authorized real service=com.firstmate.lab.01M4EY8M.5; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.5.plist
+exit=0
+
+gui/501/com.firstmate.lab.01M4EY8M.3 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.3.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/shared-home/.no-mistakes
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.3
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 22441
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411465
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	jetsam coalition = {
+		ID = 411466
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+gui/501/com.firstmate.lab.01M4EY8M.4 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.4.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/other-task/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.4
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 22478
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411467
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	jetsam coalition = {
+		ID = 411468
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+gui/501/com.firstmate.lab.01M4EY8M.5 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.5.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.5
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 22812
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411469
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.5
+	}
+
+	jetsam coalition = {
+		ID = 411470
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.5
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh foreign-protection --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/drop.txt
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-foreign-protection
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 22812 (lstart=Thu Oct  8 23:56:33 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane/.no-mistakes/h inside registered nested worktree lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane, whose ownership by foreign-protection is not proven; preserving it and task foreign-protection without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane for foreign-protection (registered nested worktree lane holds process 22812); preserving the worktree/tasktmp for manual inspection or retry.
+
+Launchctl adapter calls:
+
+Observed: forced cleanup refuses the foreign nested process with a missing .git file
+Observed: no launchctl calls address shared, foreign-task, or nested-lane look-alikes
+gui/501/com.firstmate.lab.01M4EY8M.3 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.3.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/shared-home/.no-mistakes
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.3
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 22441
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411465
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	jetsam coalition = {
+		ID = 411466
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.3
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: foreign loaded agent and metadata preserved: com.firstmate.lab.01M4EY8M.3
+gui/501/com.firstmate.lab.01M4EY8M.4 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.4.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/other-task/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.4
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 22478
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411467
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	jetsam coalition = {
+		ID = 411468
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.4
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: foreign loaded agent and metadata preserved: com.firstmate.lab.01M4EY8M.4
+gui/501/com.firstmate.lab.01M4EY8M.5 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/com.firstmate.lab.01M4EY8M.5.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/foreign-protection/pool/.treehouse/project-123d03/1/project/other-lane/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.5
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 22812
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411469
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.5
+	}
+
+	jetsam coalition = {
+		ID = 411470
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.5
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: foreign loaded agent and metadata preserved: com.firstmate.lab.01M4EY8M.5
+SCENARIO PASS: Loaded shared, foreign-task, and damaged nested-lane look-alikes remain untouched
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.3
+exit=0
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.4
+exit=0
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.5
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots
+exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots
+exit=0
+/tmp/fml.PQlSLG
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.PQlSLG/lab new-session -d -s fm-lab-equivalent-roots -n control -x 80 -y 24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product /bin/sleep 600
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project commit -q --allow-empty -m baseline
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project remote set-head origin main
+exit=0
+
+$ treehouse get --lease --no-fetch
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project' to release it.
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project checkout -q -b fm/equivalent-roots
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project add .gitignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project commit -q -m fixture ignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project merge -q --ff-only fm/equivalent-roots
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/project fetch -q origin
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project/./.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab6; authorized real service=com.firstmate.lab.01M4EY8M.6; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.6.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project//.no-mistakes//h/; recognition=com.kunchenguid.no-mistakes.daemon.lab7; authorized real service=com.firstmate.lab.01M4EY8M.7; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.7.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project/.no-mistakes/staging/../h; recognition=com.kunchenguid.no-mistakes.daemon.lab8; authorized real service=com.firstmate.lab.01M4EY8M.8; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.8.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/private-link; recognition=com.kunchenguid.no-mistakes.daemon.lab9; authorized real service=com.firstmate.lab.01M4EY8M.9; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.9.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project/.no-mistakes/outside/h; recognition=com.kunchenguid.no-mistakes.daemon.lab10; authorized real service=com.firstmate.lab.01M4EY8M.10; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.10.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project/missing/../../escape/h; recognition=com.kunchenguid.no-mistakes.daemon.lab11; authorized real service=com.firstmate.lab.01M4EY8M.11; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.11.plist
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh equivalent-roots
+exit=0
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown equivalent-roots complete (window fm-lab-equivalent-roots:fm-equivalent-roots, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project)
+Backlog: equivalent-roots just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots/data/backlog.md - move equivalent-roots to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab6 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project/./.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots/data/equivalent-roots/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab6.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab7 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project//.no-mistakes//h/); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots/data/equivalent-roots/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab7.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab8 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/pool/.treehouse/project-b5bab3/1/project/.no-mistakes/staging/../h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots/data/equivalent-roots/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab8.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab9 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/private-link); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots/data/equivalent-roots/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab9.plist
+
+Launchctl adapter calls:
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab6 => gui/501/com.firstmate.lab.01M4EY8M.6
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab6 => gui/501/com.firstmate.lab.01M4EY8M.6
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab6 => gui/501/com.firstmate.lab.01M4EY8M.6
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab7 => gui/501/com.firstmate.lab.01M4EY8M.7
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab7 => gui/501/com.firstmate.lab.01M4EY8M.7
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab7 => gui/501/com.firstmate.lab.01M4EY8M.7
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab8 => gui/501/com.firstmate.lab.01M4EY8M.8
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab8 => gui/501/com.firstmate.lab.01M4EY8M.8
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab8 => gui/501/com.firstmate.lab.01M4EY8M.8
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab9 => gui/501/com.firstmate.lab.01M4EY8M.9
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab9 => gui/501/com.firstmate.lab.01M4EY8M.9
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab9 => gui/501/com.firstmate.lab.01M4EY8M.9
+
+Observed: canonical private paths allow completed teardown
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.6
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.6" in domain for user gui: 501
+
+Observed: equivalent private spelling unloaded and archived: com.firstmate.lab.01M4EY8M.6
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.7
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.7" in domain for user gui: 501
+
+Observed: equivalent private spelling unloaded and archived: com.firstmate.lab.01M4EY8M.7
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.8
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.8" in domain for user gui: 501
+
+Observed: equivalent private spelling unloaded and archived: com.firstmate.lab.01M4EY8M.8
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.9
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.9" in domain for user gui: 501
+
+Observed: equivalent private spelling unloaded and archived: com.firstmate.lab.01M4EY8M.9
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.10
+exit=0
+gui/501/com.firstmate.lab.01M4EY8M.10 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.10.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/escape/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.10
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 4463
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411480
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.10
+	}
+
+	jetsam coalition = {
+		ID = 411481
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.10
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: path escaping the copy left loaded and installed: com.firstmate.lab.01M4EY8M.10
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.11
+exit=0
+gui/501/com.firstmate.lab.01M4EY8M.11 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/com.firstmate.lab.01M4EY8M.11.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/equivalent-roots/escape/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.11
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 4510
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411482
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.11
+	}
+
+	jetsam coalition = {
+		ID = 411483
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.11
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: path escaping the copy left loaded and installed: com.firstmate.lab.01M4EY8M.11
+SCENARIO PASS: Equivalent private roots retire while symlink and missing-component escapes stay protected
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.10
+exit=0
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.11
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy
+exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy
+exit=0
+/tmp/fml.5d37bo
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.5d37bo/lab new-session -d -s fm-lab-absent-copy -n control -x 80 -y 24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product /bin/sleep 600
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project commit -q --allow-empty -m baseline
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project remote set-head origin main
+exit=0
+
+$ treehouse get --lease --no-fetch
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project' to release it.
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project checkout -q -b fm/absent-copy
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project add .gitignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project commit -q -m fixture ignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project merge -q --ff-only fm/absent-copy
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project worktree add -q --detach /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project/other-lane main
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/project worktree lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project/other-lane
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project; recognition=com.kunchenguid.no-mistakes.daemon.lab12; authorized real service=com.firstmate.lab.01M4EY8M.12; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/com.firstmate.lab.01M4EY8M.12.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project/.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab13; authorized real service=com.firstmate.lab.01M4EY8M.13; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/com.firstmate.lab.01M4EY8M.13.plist
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project/other-lane/.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab14; authorized real service=com.firstmate.lab.01M4EY8M.14; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/com.firstmate.lab.01M4EY8M.14.plist
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh absent-copy --force --drop-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/drop.txt
+exit=0
+teardown absent-copy complete (window fm-lab-absent-copy:fm-absent-copy, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project)
+Backlog: absent-copy just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy/data/backlog.md - move absent-copy to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab12 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy/data/absent-copy/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab12.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab13 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/pool/.treehouse/project-273da4/1/project/.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy/data/absent-copy/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab13.plist
+
+Launchctl adapter calls:
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab12 => gui/501/com.firstmate.lab.01M4EY8M.12
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab12 => gui/501/com.firstmate.lab.01M4EY8M.12
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab12 => gui/501/com.firstmate.lab.01M4EY8M.12
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab13 => gui/501/com.firstmate.lab.01M4EY8M.13
+bootout gui/501/com.kunchenguid.no-mistakes.daemon.lab13 => gui/501/com.firstmate.lab.01M4EY8M.13
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab13 => gui/501/com.firstmate.lab.01M4EY8M.13
+
+Observed: authorized forced recovery completes with the copy already absent
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.12
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.12" in domain for user gui: 501
+
+Observed: absent-copy private service unloaded and archived: com.firstmate.lab.01M4EY8M.12
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.13
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.13" in domain for user gui: 501
+
+Observed: absent-copy private service unloaded and archived: com.firstmate.lab.01M4EY8M.13
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.14
+exit=0
+gui/501/com.firstmate.lab.01M4EY8M.14 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/absent-copy/com.firstmate.lab.01M4EY8M.14.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.14
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 18501
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411584
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.14
+	}
+
+	jetsam coalition = {
+		ID = 411585
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.14
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: missing nested-lane registry still protects foreign service
+SCENARIO PASS: Absent-copy recovery retires private services while preserving registered missing nested lanes
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.14
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unloaded-plist
+exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unloaded-plist
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unloaded-plist
+exit=0
+/tmp/fml.EOD9CU
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.EOD9CU/lab new-session -d -s fm-lab-unloaded-plist -n control -x 80 -y 24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product /bin/sleep 600
+exit=0
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project commit -q --allow-empty -m baseline
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project remote set-head origin main
+exit=0
+
+$ treehouse get --lease --no-fetch
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project' to release it.
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project checkout -q -b fm/unloaded-plist
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project add .gitignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project commit -q -m fixture ignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project merge -q --ff-only fm/unloaded-plist
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/project fetch -q origin
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project/.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab15; authorized real service=com.firstmate.lab.01M4EY8M.15; argv=/bin/sleep 600
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh unloaded-plist
+exit=0
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown unloaded-plist complete (window fm-lab-unloaded-plist:fm-unloaded-plist, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project)
+Backlog: unloaded-plist just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unloaded-plist/data/backlog.md - move unloaded-plist to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unloaded-plist
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.lab15 (root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/unloaded-plist/pool/.treehouse/project-608e40/1/project/.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unloaded-plist/data/unloaded-plist/launchagent-backup/com.kunchenguid.no-mistakes.daemon.lab15.plist
+
+Launchctl adapter calls:
+print gui/501/com.kunchenguid.no-mistakes.daemon.lab15 => gui/501/com.firstmate.lab.01M4EY8M.15
+
+Observed: already-unloaded agent metadata archived and task cleanup completed
+SCENARIO PASS: Already-unloaded private agent metadata is archived to prevent later reload
+Cleaning only authorized disposable labels:
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.1
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.1
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.1" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.2
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.2
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.2" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.3
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.3
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.3" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.4
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.4
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.4" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.5
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.5
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.5" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.6
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.6
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.6" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.7
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.7
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.7" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.8
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.8
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.8" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.9
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.9
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.9" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.10
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.10
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.10" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.11
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.11
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.11" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.12
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.12
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.12" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.13
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.13
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.13" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.14
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.14
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.14" in domain for user gui: 501
+
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.15
+exit=3
+Boot-out failed: 3: No such process
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.15
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.15" in domain for user gui: 501
+
+$ launchctl list | grep com.firstmate.lab
+exit=1
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.K1yp5D/lab kill-server
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+exit=0
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.hub6xG/lab kill-server
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unload-refusal
+exit=0
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.eyXhii/lab kill-server
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-foreign-protection
+exit=0
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.PQlSLG/lab kill-server
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-equivalent-roots
+exit=0
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.5d37bo/lab kill-server
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-absent-copy
+exit=0
+
+$ /opt/homebrew/bin/tmux -S /tmp/fml.EOD9CU/lab kill-server
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-unloaded-plist
+exit=0
+
+Cleanup proof: True; scratch lab homes and plists removed

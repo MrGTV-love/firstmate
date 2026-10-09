@@ -1,0 +1,61 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud
+/tmp/fml.iFbm2V
+
+exit=0
+$ tmux -L fm-lab new-session -d -s validation -c /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud sleep 1800
+
+exit=0
+$ tmux -L fm-lab display-message -p -t validation #{socket_path},#{pid},0
+/private/tmp/fml.iFbm2V/tmux-501/fm-lab,89864,0
+
+exit=0
+$ tmux -L fm-lab display-message -p -t validation #{pane_id}
+%0
+
+exit=0
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud/projects/fixture
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud/projects/fixture -c user.name=Live validation -c user.email=live@example.invalid commit -q --allow-empty -m disposable baseline
+
+exit=0
+$ treehouse get --lease --no-fetch --base main
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/pool/.treehouse/fixture-73331f/1/fixture. Run 'treehouse return ~/pool/.treehouse/fixture-73331f/1/fixture' to release it.
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud/pool/.treehouse/fixture-73331f/1/fixture
+
+exit=0
+$ tmux -L fm-lab new-window -d -t validation -n fm-live-archive -c /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud sleep 900
+
+exit=0
+$ launchctl print gui/501/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-0
+Bad request.
+Could not find service "com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-0" in domain for user gui: 501
+
+exit=113
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-teardown.sh live-archive
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 10s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: origin live-archive has no completed captain-call inventory
+REFUSED: scout task live-archive has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+
+exit=1
+ERROR RuntimeError("[PosixPath('/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-teardown.sh'), 'live-archive']: expected 0, got 1: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n●  WATCHER DOWN - SUPERVISION IS OFF\n●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 10s ago).\n●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n●  This is a supervision warning only; the guarded operation WILL still run.\n●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nfm-captain-hold: origin live-archive has no completed captain-call inventory\nREFUSED: scout task live-archive has not passed the captain-call completion gate.\nInventory its report and any visual review through bin/fm-captain-hold.sh before teardown.\n")
+$ tmux -L fm-lab kill-server
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.ff3bmdud
+
+exit=0
+CLEANUP: private tmux server stopped and disposable lab removed.

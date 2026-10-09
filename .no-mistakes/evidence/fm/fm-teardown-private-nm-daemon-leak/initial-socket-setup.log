@@ -1,0 +1,14 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.jgyouo5u
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.jgyouo5u
+
+exit=0
+$ tmux -L fm-lab new-session -d -s validation -c /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.jgyouo5u sleep 1800
+error connecting to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.jgyouo5u/tmux/tmux-501/fm-lab (File name too long)
+
+exit=1
+ERROR RuntimeError("['tmux', '-L', 'fm-lab', 'new-session', '-d', '-s', 'validation', '-c', '/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.jgyouo5u', 'sleep 1800']: expected 0, got 1: error connecting to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.jgyouo5u/tmux/tmux-501/fm-lab (File name too long)\n")
+$ tmux -L fm-lab kill-server
+error connecting to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.jgyouo5u/tmux/tmux-501/fm-lab (File name too long)
+
+exit=1
+CLEANUP: private tmux server stopped and disposable lab removed.

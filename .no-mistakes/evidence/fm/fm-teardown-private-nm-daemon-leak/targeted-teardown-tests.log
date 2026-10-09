@@ -1,0 +1,12 @@
+$ /bin/bash tests/fm-teardown.test.sh test_private_nm_launch_agent_is_retired_before_teardown test_private_nm_launch_agent_equivalent_roots_are_retired test_foreign_nm_launch_agents_are_left_alone test_nested_nm_launch_agents_are_left_alone test_absent_copy_nm_launch_agents_preserve_nested_ownership test_private_nm_launch_agent_bootout_failure_refuses test_private_nm_launch_agent_not_loaded_is_archived
+ok - a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes
+ok - equivalent private roots unload their agents and allow teardown to finish
+ok - agents rooted outside the task's copy, and unparsable plists, are never unloaded or moved
+ok - nested-lane agents remain loaded and installed across registry, path, and lane-damage variants
+ok - absent-copy recovery retires private agents but preserves nested agents registered by local task projects
+ok - an agent that stays loaded after bootout stops teardown with its plist and the task copy intact
+ok - a private no-mistakes plist with no loaded service is still archived
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-validation/fm-teardown-tests.473x8g/private-nm-agent-unloaded/state: Directory not empty
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-validation/fm-teardown-tests.473x8g/private-nm-agent-unloaded: Directory not empty
+rm: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.fm-validation/fm-teardown-tests.473x8g: Directory not empty
+exit=0

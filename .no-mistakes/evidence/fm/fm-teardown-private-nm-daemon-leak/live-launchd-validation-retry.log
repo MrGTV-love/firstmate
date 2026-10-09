@@ -1,0 +1,297 @@
+SCENARIO PASS: Generated ship and scout briefs instruct private-service cleanup before parking or finishing (exercised in initial transcript)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project commit -q --allow-empty -m baseline
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project fetch -q origin
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project remote set-head origin main
+exit=0
+
+$ treehouse get --lease --no-fetch
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project' to release it.
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project checkout -q -b fm/private-keepalive
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project add .gitignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project commit -q -m fixture ignore
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project merge -q --ff-only fm/private-keepalive
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/project fetch -q origin
+exit=0
+
+fixture root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h; recognition=com.kunchenguid.no-mistakes.daemon.lab1; authorized real service=com.firstmate.lab.01M4EY8M.1; argv=/bin/sleep 600
+$ /bin/launchctl bootstrap gui/501 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+exit=0
+
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 1
+	pid = 87393
+	immediate reason = speculative
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	resource coalition = {
+		ID = 411459
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411460
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 2
+	pid = 16835
+	immediate reason = inefficient
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last terminating signal = Killed: 9
+
+	resource coalition = {
+		ID = 411459
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411460
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: KeepAlive respawned the actual sleep process after kill
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh private-keepalive
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+REFUSED: task private-keepalive has a missing, empty, or ambiguous window endpoint; preserving task state.
+
+Launchctl adapter calls:
+
+Observed: running launchd-owned descendant blocks cleanup without recognition metadata
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.1
+exit=0
+gui/501/com.firstmate.lab.01M4EY8M.1 = {
+	active count = 1
+	path = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/com.firstmate.lab.01M4EY8M.1.plist
+	type = LaunchAgent
+	state = running
+
+	program = /bin/sleep
+	arguments = {
+		/bin/sleep
+		600
+	}
+
+	working directory = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/private-keepalive/pool/.treehouse/project-7972f6/1/project/.no-mistakes/h
+
+	inherited environment = {
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.7HNvjk7m7o/Listeners
+	}
+
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		XPC_SERVICE_NAME => com.firstmate.lab.01M4EY8M.1
+	}
+
+	domain = gui/501 [100155]
+	asid = 100155
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 2
+	pid = 16835
+	immediate reason = inefficient
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last terminating signal = Killed: 9
+
+	resource coalition = {
+		ID = 411459
+		type = resource
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	jetsam coalition = {
+		ID = 411460
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.firstmate.lab.01M4EY8M.1
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	sanitizer flags = 0x0
+
+	properties = keepalive | runatload | inferred program
+}
+
+Observed: baseline refusal leaves real agent loaded
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/product/bin/fm-teardown.sh private-keepalive
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/scratch-home-private-keepalive
+REFUSED: task private-keepalive has a missing, empty, or ambiguous window endpoint; preserving task state.
+
+Launchctl adapter calls:
+
+DRIVER ERROR: AssertionError('teardown completes after private-agent retirement')
+Cleaning only authorized disposable labels:
+$ /bin/launchctl bootout gui/501/com.firstmate.lab.01M4EY8M.1
+exit=0
+
+$ /bin/launchctl print gui/501/com.firstmate.lab.01M4EY8M.1
+exit=113
+Bad request.
+Could not find service "com.firstmate.lab.01M4EY8M.1" in domain for user gui: 501
+
+$ launchctl list | grep com.firstmate.lab
+exit=1
+
+Cleanup proof: True; scratch lab homes and plists removed

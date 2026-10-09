@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.kunchenguid.no-mistakes.daemon.00000008</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/no-mistakes</string>
+    <string>daemon</string>
+    <string>run</string>
+    <string>--root</string>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/tmp/fm-teardown-tests.MyEc9j/foreign-nm-agents/wt/.no-mistakes/outside/../.no-mistakes/h</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.live-validation/tmp/fm-teardown-tests.MyEc9j/foreign-nm-agents/wt/.no-mistakes/outside/../.no-mistakes/h</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>

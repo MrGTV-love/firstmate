@@ -1,0 +1,8 @@
+Initial four-case invocation timed out at 300 seconds after these observed outputs:
+ok - a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes
+ok - agents rooted outside the task's copy, and unparsable plists, are never unloaded or moved
+
+Focused retry completed:
+ok - nested-lane agents remain loaded and installed across registry, path, and lane-damage variants
+ok - an agent that stays loaded after bootout stops teardown with its plist and the task copy intact
+Exit 0; elapsed 257.22 seconds.

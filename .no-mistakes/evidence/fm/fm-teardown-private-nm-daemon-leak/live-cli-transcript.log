@@ -1,0 +1,178 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7
+/tmp/fml.sCa5wU
+
+exit=0
+$ tmux -L fm-lab new-session -d -s validation -c /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7 sleep 1800
+
+exit=0
+$ tmux -L fm-lab display-message -p -t validation #{socket_path},#{pid},0
+/private/tmp/fml.sCa5wU/tmux-501/fm-lab,41141,0
+
+exit=0
+$ tmux -L fm-lab display-message -p -t validation #{pane_id}
+%0
+
+exit=0
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/projects/fixture
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/projects/fixture -c user.name=Live validation -c user.email=live@example.invalid commit -q --allow-empty -m disposable baseline
+
+exit=0
+$ treehouse get --lease --no-fetch --base main
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/pool/.treehouse/fixture-5ecfcf/1/fixture. Run 'treehouse return ~/pool/.treehouse/fixture-5ecfcf/1/fixture' to release it.
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-captain-hold.sh complete live-archive --none
+complete: live-archive captain-call inventory reviewed
+
+exit=0
+$ tmux -L fm-lab new-window -d -t validation -n fm-live-archive -c /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7 sleep 900
+
+exit=0
+$ launchctl print gui/501/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-0
+Bad request.
+Could not find service "com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-0" in domain for user gui: 501
+
+exit=113
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-teardown.sh live-archive
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 23s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-0 (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture/.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-0.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-1 (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture/./.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-1.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-2 (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture//.no-mistakes//h/); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-2.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-3 (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture/.no-mistakes/staging/../h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-3.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-4 (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/private-alias); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-4.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-5 (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture/missing/../.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-5.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-6 (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture/.); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-private-6.plist
+teardown: leaving unreadable no-mistakes launch agent /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/launchagents/com.kunchenguid.no-mistakes.daemon.live-malformed.plist as found; its root cannot be proven to be live-archive's
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown live-archive complete (window validation:fm-live-archive, worktree /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture)
+Backlog: live-archive just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/backlog.md - move live-archive to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+exit=0
+$ tmux -L fm-lab list-windows -t validation
+0: zsh* (1 panes) [80x24] [layout b25d,80x24,0,0,0] @0 (active)
+
+exit=0
+$ treehouse status
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     available    ~/pool/.treehouse/fixture-5ecfcf/1/fixture  (detached)
+
+exit=0
+OBSERVED Archive unloaded private agents with equivalent roots and finish teardown: Seven byte-identical plists archived under task data; installed copies removed; task metadata and actual private tmux worker window removed; real treehouse return completed.
+OBSERVED Leave shared, other-task, prefix-lookalike, escaping and malformed agents untouched: All six outside-root plists and malformed plist remained byte-identical; no foreign archive was created.
+$ git clone -q /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/projects/fixture /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/projects/sibling
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/projects/sibling worktree add -q --detach /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/absent-task/other-lane main
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/projects/sibling worktree lock /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/absent-task/other-lane
+
+exit=0
+$ tmux -L fm-lab new-window -d -t validation -n fm-live-absent -c /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7 sleep 900
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-teardown.sh live-absent --force --drop-file /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/captain-words.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7
+WARNING: watcher still down (same stale episode; last beat: 88s ago, grace 900s) - full banner already printed this episode.
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-absent-child (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/absent-task/missing/../.no-mistakes/h); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-absent/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-absent-child.plist
+teardown: retired task-private no-mistakes launch agent com.kunchenguid.no-mistakes.daemon.live-01M4EY8-absent-root (root /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/absent-task); plist archived to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-absent/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-absent-root.plist
+teardown: leaving unreadable no-mistakes launch agent /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/launchagents/com.kunchenguid.no-mistakes.daemon.live-malformed.plist as found; its root cannot be proven to be live-absent's
+teardown live-absent complete (window validation:fm-live-absent, worktree /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/absent-task)
+Backlog: live-absent just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/backlog.md - move live-absent to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+exit=0
+OBSERVED Recover an absent task copy without retiring a missing nested lane: Real launchctl confirmed two absent-copy private services unloaded; their plists were archived and task retired. A nested lane registered by a sibling clone, despite deleted directories, kept its exact plist and task record.
+$ treehouse get --lease --no-fetch --base main
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/pool/.treehouse/fixture-5ecfcf/1/fixture. Run 'treehouse return ~/pool/.treehouse/fixture-5ecfcf/1/fixture' to release it.
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/pool/.treehouse/fixture-5ecfcf/1/fixture
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-captain-hold.sh complete live-archive-failure --none
+complete: live-archive-failure captain-call inventory reviewed
+
+exit=0
+$ tmux -L fm-lab new-window -d -t validation -n fm-live-archive-failure -c /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7 sleep 900
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-teardown.sh live-archive-failure --force --drop-file /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/captain-words.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7
+WARNING: watcher still down (same stale episode; last beat: 126s ago, grace 900s) - full banner already printed this episode.
+mkdir: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive-failure/launchagent-backup: File exists
+REFUSED: could not archive no-mistakes launch agent plist /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/launchagents/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-archive-failure.plist to /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/live-archive-failure/launchagent-backup/com.kunchenguid.no-mistakes.daemon.live-01M4EY8-archive-failure.plist; preserving the worktree.
+
+exit=1
+$ tmux -L fm-lab list-windows -t validation
+0: zsh* (1 panes) [80x24] [layout b25d,80x24,0,0,0] @0 (active)
+1: fm-live-archive-failure (1 panes) [80x24] [layout b260,80x24,0,0,3] @3
+
+exit=0
+OBSERVED Refuse archive failure even when forced and retain recovery state: Real mkdir failure caused explicit refusal with installed plist, task copy, task metadata, and private worker window preserved.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-paused-no-mistakes fixture --mode no-mistakes
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-paused-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-paused-direct-PR fixture --mode direct-PR
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-paused-direct-PR/brief.md (ship, mode=direct-PR; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-paused-local-only fixture --mode local-only
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-paused-local-only/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-paused-scout fixture --scout
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-paused-scout/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-awaiting-no-mistakes fixture --mode no-mistakes
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-awaiting-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-awaiting-direct-PR fixture --mode direct-PR
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-awaiting-direct-PR/brief.md (ship, mode=direct-PR; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-awaiting-local-only fixture --mode local-only
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-awaiting-local-only/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-awaiting-scout fixture --scout
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-awaiting-scout/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-brief.sh brief-mate --secondmate fixture
+scaffolded: /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7/data/brief-mate/brief.md (secondmate charter)
+
+exit=0
+OBSERVED Generate ship and scout cleanup instructions with the configured parking verb: The real scaffold CLI emitted matching private-service rules for all three ship modes and scouts under paused and awaiting, including status naming, literal bootout, and shared-daemon prohibition. The secondmate charter omitted this worker-only rule.
+$ tmux -L fm-lab kill-server
+
+exit=0
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY8MVGAEEDGBGYD6HZR4HG/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY8MVGAEEDGBGYD6HZR4HG/fm-lab.polhxgj7
+
+exit=0
+CLEANUP: private tmux server stopped and disposable lab removed.
