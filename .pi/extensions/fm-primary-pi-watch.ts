@@ -686,6 +686,7 @@ export default function (pi: ExtensionAPI) {
     if (recoveryPending) scheduleSuccessorExpiry(generation);
     void generationStopped.catch(() => {});
   }
+  instance.previous = null;
 
   function clearSuccessorTimer(): void {
     if (successorTimer) clearTimeout(successorTimer);

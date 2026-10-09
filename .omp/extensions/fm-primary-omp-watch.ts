@@ -640,6 +640,7 @@ export default function (pi: ExtensionAPI) {
     if (recoveryPending) scheduleSelfHeal(generation);
     void generationStopped.catch(() => {});
   }
+  instance.previous = null;
 
   function clearHealTimer(): void {
     if (healTimer) clearTimeout(healTimer);

@@ -60,16 +60,17 @@ export type WatchInstanceBinding<T> = {
 export function bindWatchInstance<T>(registryKey: string, home: string): WatchInstanceBinding<T> {
   const holder = globalThis as typeof globalThis & Record<string, WatchInstanceRegistry | undefined>;
   const registry = holder[registryKey] ??= { nextId: 0, slots: new Map() };
-  const previous = (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null;
   const slot: WatchInstanceSlot<T> = { id: ++registry.nextId, api: null };
-  registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
-  return {
+  const binding: WatchInstanceBinding<T> = {
     id: slot.id,
-    previous,
+    previous: (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null,
     isCurrent: () => registry.slots.get(home) === slot,
     current: () => (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null,
     publish: (api: T) => {
+      binding.previous = null;
       slot.api = api;
     },
   };
+  registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
+  return binding;
 }

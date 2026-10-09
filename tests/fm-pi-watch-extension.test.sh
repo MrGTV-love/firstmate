@@ -5570,6 +5570,42 @@ EOF
   pass "OpenCode healthy arm output does not suppress the turn-end guard"
 }
 
+test_watch_instance_rebind_releases_predecessors() {
+  local out status
+  out=$(LIFECYCLE_MODULE="$ROOT/.pi/extensions/lib/fm-watch-lifecycle.ts" node --input-type=module 2>&1 <<'EOF'
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+const { bindWatchInstance } = await import(pathToFileURL(process.env.LIFECYCLE_MODULE).href);
+const registry = "__firstmateWatchRetentionRegression";
+const otherHome = bindWatchInstance(registry, "other-home");
+otherHome.publish({ binding: () => otherHome });
+const bindings = [];
+for (let i = 0; i < 12; i++) {
+  const previous = bindings.at(-1)?.current() ?? null;
+  const binding = bindWatchInstance(registry, "home");
+  assert.equal(binding.previous, previous, "a successor must expose its predecessor for handoff");
+  if (previous) assert.equal(previous.api.binding(), bindings.at(-1));
+  binding.publish({ binding: () => binding });
+  bindings.push(binding);
+  const current = binding.current();
+  assert.equal(current.id, binding.id);
+  assert.equal(current.api.binding(), binding);
+  for (const owner of bindings) {
+    assert.equal(owner.previous, null, "published and retired bindings must release their predecessors");
+    assert.equal(owner.isCurrent(), owner === binding, "only the latest binding owns the home");
+    assert.equal(owner.current(), current, "stale bindings must still find the current owner");
+  }
+  assert.equal(otherHome.isCurrent(), true, "rebinding one home must not supersede another");
+  assert.equal(otherHome.current().api.binding(), otherHome);
+}
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "watch instance predecessor release across repeated rebinds: $out"
+  [ -z "$out" ] || fail "watch instance rebind test printed output: $out"
+  pass "watch instance rebinds release predecessor chains while preserving home ownership"
+}
+
 test_pi_lifecycle_deadline_diagnostics() {
   local repo="$TMP_ROOT/pi-expiry-root" out status
   install_pi_watch_extension_fixture "$repo"
@@ -5579,6 +5615,7 @@ test_pi_lifecycle_deadline_diagnostics() {
   pass "Pi shutdown, readiness, and unready retirement each log one expiry"
 }
 
+test_watch_instance_rebind_releases_predecessors
 test_pi_lifecycle_deadline_diagnostics
 test_pi_extension_reports_external_healthy_watcher
 test_pi_missing_successor_reports_without_rearming
