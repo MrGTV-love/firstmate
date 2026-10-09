@@ -2612,6 +2612,84 @@ SH
   pass "late marker failures deliver signals and leave interrupted process-event wakes owed"
 }
 
+# A process-event wake prints while it holds the wake-queue lock, and the scan
+# before every non-signal wake lingers one grace period on a fresh status line.
+# That linger must never run under the lock: every other queue writer and the
+# drain would wait on it. Both race shapes are driven with a real queue writer.
+test_procevent_wake_never_lingers_under_the_queue_lock() {
+  local dir state fakebin out next_out pid shape real_bin hook n i t0 waited max_wait
+  for shape in before-lock under-lock; do
+    dir=$(make_case "procevent-grace-lock-$shape"); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+    mkdir -p "$dir/approved" "$dir/config"
+    printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/a.meta"
+    printf 'working: setup\n' > "$state/a.status"
+    prime_status_seen "$state" "$state/a.status" || fail "could not prime $shape status"
+    append_wake "$state" check procevent:grace-lock:1 'check: process-event fixture' \
+      || fail "could not queue $shape process-event fixture"
+    printf '6\n' > "$state/.prelude-progress"
+    case "$shape" in
+      before-lock) hook=mv ;;
+      under-lock) hook=ln ;;
+    esac
+    real_bin=$(command -v "$hook")
+    printf '#!/usr/bin/env bash\nreal_bin=%q\nhook=%q\n' "$real_bin" "$hook" > "$fakebin/$hook"
+    cat >> "$fakebin/$hook" <<'SH'
+dest=${!#}
+inject() {
+  [ ! -e "$FM_STATE_OVERRIDE/late-signal-injected" ] || return 0
+  [ "$(cat "$FM_STATE_OVERRIDE/.prelude-progress" 2>/dev/null)" = 7 ] || return 0
+  printf 'done: finished beside process-event delivery\n' >> "$FM_STATE_OVERRIDE/a.status"
+  touch "$FM_STATE_OVERRIDE/late-signal-injected"
+}
+if [ "$hook" = mv ] && [ "$dest" = "$FM_STATE_OVERRIDE/.prelude-progress" ]; then
+  "$real_bin" "$@" || exit
+  inject
+  exit 0
+fi
+if [ "$hook" = ln ] && [ "$dest" = "$FM_STATE_OVERRIDE/.wake-queue.lock" ]; then
+  inject
+fi
+exec "$real_bin" "$@"
+SH
+    chmod 0700 "$fakebin/$hook"
+    watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_SIGNAL_GRACE=6
+    pid=$!
+    i=0
+    while [ ! -e "$state/late-signal-injected" ] && [ "$i" -lt 300 ]; do
+      sleep 0.1
+      i=$((i + 1))
+    done
+    [ -e "$state/late-signal-injected" ] || { reap "$pid"; fail "$shape status line was never appended"; }
+    n=0; max_wait=0
+    while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 600 ]; do
+      n=$((n + 1))
+      t0=$(date +%s)
+      append_wake "$state" check "queue-writer:$n" 'check: concurrent queue writer' \
+        || { reap "$pid"; fail "$shape concurrent queue writer failed"; }
+      waited=$(( $(date +%s) - t0 ))
+      [ "$waited" -le "$max_wait" ] || max_wait=$waited
+      sleep 0.05
+    done
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$shape process-event wake never exited"; }
+    [ "$max_wait" -lt 3 ] \
+      || fail "$shape queue writer waited ${max_wait}s on the 6s signal grace"
+    [ "$(cat "$out")" = 'check: process-event result captured: procevent:grace-lock:1' ] \
+      || fail "$shape emitted the wrong headline: $(cat "$out")"
+    awk -F '\t' '$3 == "signal" && $4 == "a.status" { found = 1 } END { exit !found }' "$state/.wake-queue" \
+      || fail "$shape status line was not queued as a signal"
+    [ ! -e "$state/.wake-queue.lock" ] || fail "$shape process-event wake retained the queue lock"
+    next_out="$dir/follow-up.out"
+    watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1
+    pid=$!
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$shape successor never delivered the signal"; }
+    [ "$(cat "$next_out")" = "signal: $state/a.status" ] \
+      || fail "$shape successor emitted the wrong headline: $(cat "$next_out")"
+  done
+  pass "a process-event wake never holds the queue lock across the signal grace and still delivers the signal"
+}
+
 # A low-priority wake used to pre-empt the signal scan: an overdue-ledger wake
 # exited the cycle first, so a done line waited for one more firstmate round trip.
 # The signal wake goes first; the ledger row still surfaces on the next cycle.
@@ -7681,6 +7759,7 @@ test_heartbeat_late_signal_retains_fleet_scope
 test_late_signal_follow_up_filters_drained_rows
 test_late_signal_output_failure_retries
 test_late_signal_marker_failure_before_procevent
+test_procevent_wake_never_lingers_under_the_queue_lock
 test_signal_not_preempted_by_an_overdue_ledger
 test_cycle_work_runs_after_bounded_signal_deferrals
 test_invalid_prelude_deferral_marker_restores_the_previous_order

@@ -2099,6 +2099,7 @@ procevent_surface_queued() {
   local key reason captured="" stranded="" unstarted=""
   PROCEVENT_SURFACED=
   [ -s "$FM_WAKE_QUEUE" ] || return 0
+  signal_phase_flush
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
   while IFS= read -r key; do
     case "$key" in procevent:*) ;; *) continue ;; esac
@@ -3223,7 +3224,7 @@ signal_phase() {
   # signature for an already-pending file (last write wins below).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
-    sleep "$SIGNAL_GRACE"
+    [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
     pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
     # The final coalesced signal set is the watcher-carried status-change
     # trigger for this home's published summary. Start it before either
