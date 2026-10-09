@@ -209,8 +209,9 @@ Standalone secondmate retirement skips its own Docker cleanup. Forced secondmate
 cleanup first closes each child's endpoint, aborts its own parked or executing
 (`running`, `fixing`, or `ci`) pipeline attributed to its branch and head, confirms
 that exact run is terminal or not found, and reaps its owned worktree and
-temporary-directory processes before taking the Docker snapshot. An unconfirmed
-abort refuses child retirement and keeps its identity records and worktree.
+temporary-directory processes before taking the Docker snapshot. A failed initial
+status query, failed required ledger query, or unconfirmed abort refuses child
+retirement and keeps its identity records and worktree.
 Reassigned worktree slots are not reaped or used for pipeline
 cleanup. Nested secondmate process events are swept before Docker cleanup and
 recursive descendant retirement. Docker cleanup uses each child's own metadata;
@@ -224,9 +225,10 @@ A retry can complete after the failure is resolved.
 Docker absent is a silent skip; Docker installed but unreachable is a refusal
 on paths that perform Docker cleanup.
 `FM_TASK_DOCKER_TIMEOUT_SECS` continues to bound each Docker call.
-Residual: top-level teardown retains parked-only pipeline cancellation and leaves
-its endpoint live during Docker cleanup. A still-live producer can create a stack
-after the final listing; snapshot cleanup cannot stop a live producer.
+Residual: top-level teardown retains best-effort discovery queries, parked-only
+pipeline cancellation, and its live endpoint during Docker cleanup. A still-live
+producer can create a stack after the final listing; snapshot cleanup cannot stop
+a live producer.
 Path attribution requires `python3`; reading a present shared Supabase config
 requires its standard-library `tomllib` parser.
 
