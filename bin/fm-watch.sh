@@ -1205,17 +1205,12 @@ FM_WEDGE_DEMAND_INSPECT_COUNT=${FM_WEDGE_DEMAND_INSPECT_COUNT:-3}
 # without a scoped declaration keep the timestamp body. Shared by the
 # declared-pause absorb and the worktree-write deferral so the two cadences cannot
 # drift apart; each caller owns its own marker and reason.
-# Returns without waking while either the absorb or the throttle is inside the
-# window; wake() itself exits the cycle, exactly as it does inline. An optional
-# <min-age> replaces the cadence as the absorb-age gate for one call (0 lets a
-# declared `until` time that has just passed re-surface at once), while the
-# throttle keeps the cadence between repeats.
 resurface_absorbed() {  # <window> <throttle-marker> <age> <reason> [scope] [min-age]
   local win=$1 throttle=$2 age=$3 reason=$4 scope=${5-} min_age=${6:-$PAUSE_RESURFACE_SECS}
-  if [ -z "$scope" ] || [ ! -e "$throttle" ] \
-    || [ "$(cat "$throttle" 2>/dev/null || true)" = "$scope" ]; then
+  if [ ! -e "$throttle" ]; then
     [ "$age" -ge "$min_age" ] || return 0
-    [ "$(age_of "$throttle")" -ge "$PAUSE_RESURFACE_SECS" ] || return 0   # 999999 when no prior re-surface
+  elif [ -z "$scope" ] || [ "$(cat "$throttle" 2>/dev/null || true)" = "$scope" ]; then
+    [ "$(age_of "$throttle")" -ge "$PAUSE_RESURFACE_SECS" ] || return 0
   fi
   fm_wake_append stale "$win" "$reason" || exit 1
   if [ -n "$scope" ]; then printf '%s' "$scope" > "$throttle"; else date +%s > "$throttle"; fi
@@ -1623,14 +1618,7 @@ busy_turn_over_age() {  # <task>
 
 # Absorb a stale pane under a declared external-wait pause (paused:) or a
 # dead-agent captain-held transfer, and re-surface it once every
-# PAUSE_RESURFACE_SECS for a recheck so it cannot rot invisibly. Called on any
-# stale poll once pause_state_class permits the bounded cadence, so it must be
-# cheap: it NEVER re-reads crew state. The re-surface age is anchored on the
-# status file mtime, not a per-hash marker, so a churny idle pane (a ticking
-# clock, a token counter) cannot keep resetting the cadence the way a hash-tied
-# timer would. The bounded re-surface itself is the shared resurface_absorbed
-# above, throttled by this window's own .paused-resurfaced-<key> marker. Advances
-# the stale suppressor to <hash> and flags the key paused.
+# PAUSE_RESURFACE_SECS for a recheck so it cannot rot invisibly.
 #
 # The recheck distinguishes the declared dependency from a captain decision:
 # the legacy external-wait wording for paused: (bin/fm-classify-lib.sh), and the
@@ -1652,6 +1640,9 @@ handle_paused_stale() {  # <window> <task> <hash>
   last=$(status_declared_wait_line "$statusf")
   min_age=$PAUSE_RESURFACE_SECS
   declaration=$(declared_wait_scope "$statusf")
+  case "$(cat "$STATE/.paused-resurfaced-$key" 2>/dev/null || true)" in
+    "$declaration"|"$declaration:due") age=$(age_of "$STATE/.paused-resurfaced-$key") ;;
+  esac
   if status_is_captain_held "$last"; then
     if away_record_present; then
       triage_log "absorbed stale (captain-held, never rechecked while the away-posture record exists): $win"

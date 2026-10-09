@@ -627,10 +627,45 @@ test_status_declared_wait_identity() {
   printf 'paused [key=k] [at=1]: a\n' > "$f"; one=$(FM_CLASSIFY_EVENT_WINDOW_LINES=3 ident)
   printf 'paused [key=k] [at=2]: b\npaused [key=k] [at=3]: c\npaused [key=k] [at=4]: d\npaused [key=k] [at=5]: e\n' >> "$f"
   two=$(FM_CLASSIFY_EVENT_WINDOW_LINES=3 ident)
-  [ "$(printf '%s' "$one" | cut -d: -f1,2)" = "$(printf '%s' "$two" | cut -d: -f1,2)" ] \
+  [ "$one" = "$two" ] \
     || fail "an episode longer than the read window lost its first line: $one vs $two"
+  printf 'paused [key=k] [at=1]: a\n' > "$f"; one=$(ident)
+  for two in $(seq 1 200); do printf 'Continuation prose.\n\n' >> "$f"; done
+  [ "$(status_declared_wait_line "$f")" = 'paused [key=k] [at=1]: a' ] \
+    || fail "continuation prose hid the declared wait"
+  two=$(ident)
+  [ "$one" = "$two" ] || fail "a tail without an opener lost the wait identity: $one vs $two"
+  printf 'Further continuation prose.\n' >> "$f"
+  [ "$(ident)" = "$one" ] || fail "continuation appends changed the widened wait identity"
   unset -f ident
   pass "status_declared_wait_identity: restatements share an identity; new keys, re-declared keys, and keyless text do not"
+}
+
+test_wait_identity_concurrent_append_uses_one_snapshot() {
+  local dir f one two countfile i
+  dir=$(make_case wait-identity-concurrent); f="$dir/t.status"; countfile="$dir/tail-count"
+  for i in $(seq 1 298); do printf 'Continuation prose.\n'; done > "$f"
+  printf 'working: resumed\npaused [key=k]: original wait\n' >> "$f"
+  one=$(status_declared_wait_identity "$f")
+  [ "${one##*:}" = 300 ] || fail "initial wait identity had the wrong line position: $one"
+  printf '0\n' > "$countfile"
+  tail() {
+    local calls
+    calls=$(cat "$countfile")
+    printf '%s\n' "$((calls + 1))" > "$countfile"
+    if [ "$calls" -eq 1 ]; then
+      printf 'paused [key=k]: restated during the read\n' >> "$f"
+    fi
+    command tail "$@"
+  }
+  two=$(status_declared_wait_identity "$f")
+  unset -f tail
+  [ "$(command tail -n 1 "$f")" = 'paused [key=k]: restated during the read' ] \
+    || fail "the concurrent append fixture did not append during the read"
+  [ "$one" = "$two" ] || fail "a concurrent restatement changed the episode position: $one vs $two"
+  [ "$(status_declared_wait_identity "$f")" = "$one" ] \
+    || fail "the next consistent read changed the episode identity again"
+  pass "a concurrent status append cannot mix declaration and episode positions"
 }
 
 # crew_absorb_class: the single fm-crew-state.sh read that returns BOTH absorb
@@ -3062,6 +3097,82 @@ test_live_keyed_wait_restatement_is_not_a_new_wait() {
     "$state/.wake-queue" 2>/dev/null || echo 0)
   [ "$wakes" -eq 1 ] || fail "a re-declared keyed wait produced $wakes first wakes instead of one"
   pass "restating a keyed wait stays inside its window, while a new key or a re-declared resolved key still surfaces"
+}
+
+test_restated_wait_recheck_uses_last_surface_time() {
+  local mode phase dir state fakebin out capture statusf window key throttle before pid wakes
+  local kind harness command verdict line future
+  future=$(iso_utc_at "$(( $(date +%s) + 31536000 ))")
+  for mode in live stopped secondmate secondmate-until secondmate-held busy busy-changing; do
+    dir=$(make_case "restated-cadence-$mode"); state="$dir/state"; fakebin="$dir/fakebin"
+    out="$dir/watch.out"; capture="$dir/pane.txt"; statusf="$state/parked.status"
+    window=test:fm-parked; key=$(printf '%s' "$window" | tr ':/.' '___')
+    throttle="$state/.paused-resurfaced-$key"
+    kind=ship; harness=grok; command=grok
+    verdict='state: paused · source: status-log · parked'
+    line='paused [key=k]: waiting on validation'
+    case "$mode" in
+      stopped) command=zsh; verdict='state: stopped · source: pane · bare shell' ;;
+      secondmate*) kind=secondmate ;;
+      busy*) harness=pi; command=pi; verdict='state: working · source: pane · harness busy (pi-ext)' ;;
+    esac
+    case "$mode" in
+      secondmate-until) line="paused [key=k]: waiting until $future" ;;
+      secondmate-held) line='captain-held [key=k]: awaiting the captain' ;;
+    esac
+    printf 'window=%s\nkind=%s\nharness=%s\nbackend=tmux\n' "$window" "$kind" "$harness" > "$state/parked.meta"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$state/parked.meta"
+    case "$mode" in busy*) record_pi_busy "$state" parked ;; esac
+    printf '%s\n' "$line" > "$statusf"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$statusf"
+    printf 'parked on validation\n' > "$capture"
+    printf '%s' "$(hash_text "$(cat "$capture")")" > "$state/.hash-$key"
+    printf '1\n' > "$state/.count-$key"
+
+    for phase in initial restated due; do
+      case "$phase" in
+        restated|due)
+          printf '%s (fresh progress)\n' "$line" >> "$statusf"
+          if [ "$phase" = restated ]; then
+            set_mtime "$(( $(date +%s) - 480 ))" "$throttle"
+          else
+            set_mtime "$(( $(date +%s) - 20000 ))" "$throttle"
+          fi
+          before=$(file_mtime "$throttle")
+          ;;
+      esac
+      case "$mode" in busy-changing) printf 'Working... %s\n' "$phase" > "$capture" ;; esac
+      printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+      PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture" \
+        FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_CREW_STATE="$verdict" \
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+        FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+        FM_PAUSE_RESURFACE_SECS=14400 FM_BUSY_TURN_MAX_SECS=1 \
+        FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+        "$WATCH" >> "$out" &
+      pid=$!
+      if [ "$phase" = restated ]; then
+        wait_poll_cycle "$state" "$pid" \
+          || { reap "$pid"; fail "[$mode] a restatement re-alarmed inside the four-hour cadence"; }
+        wakes=$(wedge_stale_wakes "$state" "$window")
+        [ "$wakes" -eq 0 ] || { reap "$pid"; fail "[$mode] a restatement queued $wakes stale wakes"; }
+        [ "$(file_mtime "$throttle")" = "$before" ] \
+          || { reap "$pid"; fail "[$mode] absorbing a restatement advanced the surface timestamp"; }
+        reap "$pid"
+      else
+        wait_for_exit "$pid" 100 \
+          || { reap "$pid"; fail "[$mode] $phase did not surface on the four-hour cadence"; }
+        wakes=$(wedge_stale_wakes "$state" "$window")
+        [ "$wakes" -eq 1 ] || fail "[$mode] $phase queued $wakes stale wakes instead of one"
+        [ -e "$throttle" ] || fail "[$mode] $phase did not record its actual surface"
+        if [ "$phase" = due ]; then
+          [ "$(file_mtime "$throttle")" -gt "$before" ] || fail "[$mode] the recheck did not reset its cadence"
+        fi
+      fi
+      ack_stopped_cycle "$state" || fail "[$mode] could not acknowledge $phase"
+    done
+  done
+  pass "restated waits recheck four hours after their last surface on every absorbed path"
 }
 
 test_live_paused_until_controls_recheck_time() {
@@ -6783,6 +6894,7 @@ test_unrecognized_status_prefix_is_visible
 test_crew_is_provably_working_classifier
 test_status_is_paused_classifier
 test_status_declared_wait_identity
+test_wait_identity_concurrent_append_uses_one_snapshot
 test_crew_absorb_class_classifier
 test_crew_worktree_written_since_classifier
 test_empty_write_prune_widens_the_probe
@@ -6867,6 +6979,7 @@ test_own_work_wait_keeps_first_alert_then_long_cadence
 test_absorbed_replacement_wait_does_not_inherit_the_old_throttle
 test_live_declared_wait_churn_honors_the_resurface_throttle
 test_live_keyed_wait_restatement_is_not_a_new_wait
+test_restated_wait_recheck_uses_last_surface_time
 test_live_paused_until_controls_recheck_time
 test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
 test_wedge_threshold_keeps_a_wait_past_a_default_key_answer

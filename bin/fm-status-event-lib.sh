@@ -324,24 +324,30 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
 # replacement. <cksum> and <line> bind the identity to that first line's text and
 # position, so two identical lines in different episodes stay distinct.
 status_declared_wait_identity() {  # <status-file>
-  local f=$1 declared verb key resolve legacy_re total window rec idx text
-  declared=$(status_declared_wait_line "$f")
-  [ -n "$declared" ] && [ -f "$f" ] && [ -r "$f" ] || return 1
+  local f=$1 declared verb key resolve legacy_re total window rec idx text endpoint snapshot
+  [ -f "$f" ] && [ -r "$f" ] || return 1
+  endpoint=$(_fm_status_file_size "$f") || return 1
+  endpoint=${endpoint//[[:space:]]/}
+  snapshot="$(_fm_status_span_scratch "$f").wait"
+  _fm_status_read_span "$f" 0 "$endpoint" > "$snapshot" 2>/dev/null \
+    || { rm -f "$snapshot"; return 1; }
+  declared=$(status_declared_wait_line "$snapshot")
+  [ -n "$declared" ] || { rm -f "$snapshot"; return 1; }
   status_line_verb "$declared" verb
   key=$(_fm_decision_key "$declared" '') || key=
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
-  total=$(grep -c '' "$f" 2>/dev/null) || return 1
+  total=$(grep -c '' "$snapshot" 2>/dev/null) || { rm -f "$snapshot"; return 1; }
   window=$FM_CLASSIFY_EVENT_WINDOW_LINES
   [ "$window" -le "$total" ] || window=$total
-  # Read the bounded tail first and widen to the whole file only when the episode
-  # may reach back past the window.
-  rec=$(tail -n "$window" "$f" 2>/dev/null \
-    | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || return 1
-  if [ "${rec%%$'\t'*}" = open ]; then
-    rec=$(_fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key" < "$f") || return 1
+  rec=$(tail -n "$window" "$snapshot" 2>/dev/null \
+    | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || rec=
+  if [ -z "$rec" ] || [ "${rec%%$'\t'*}" = open ]; then
+    rec=$(_fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key" < "$snapshot") \
+      || { rm -f "$snapshot"; return 1; }
     window=$total
   fi
+  rm -f "$snapshot"
   rec=${rec#*$'\t'}
   idx=${rec%%$'\t'*}
   text=${rec#*$'\t'}
