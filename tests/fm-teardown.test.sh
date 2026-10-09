@@ -5756,6 +5756,74 @@ test_nested_nm_launch_agents_are_left_alone() {
   pass "nested-lane agents remain loaded and installed across registry, path, and lane-damage variants"
 }
 
+test_absent_copy_nm_launch_agents_preserve_nested_ownership() {
+  local recovery registrar case_dir wt registry nested home hash label root rc head
+  local -a flags
+  for recovery in merged forced; do
+    for registrar in project sibling; do
+      case_dir=$(make_case "absent-nm-agent-$recovery-$registrar")
+      write_meta "$case_dir" no-mistakes ship
+      add_fake_launchctl "$case_dir"
+      wt=$(cd "$case_dir/wt" && pwd -P)
+      registry="$case_dir/project"
+      home="$case_dir/primary-home"
+      if [ "$registrar" = sibling ]; then
+        registry="$case_dir/sibling-clone"
+        git clone -q "$case_dir/origin.git" "$registry"
+        home="$case_dir/mate-home"
+        mkdir -p "$case_dir/primary-home/data"
+        printf -- '- mate-x - fixture scope (home: %s; scope: fixture; projects: alpha; added 2026-07-14)\n' \
+          "$home" > "$case_dir/primary-home/data/secondmates.md"
+      fi
+      mkdir -p "$home/state"
+      nested="$wt/other-lane"
+      git -C "$registry" worktree add -q --detach "$nested" main
+      git -C "$registry" worktree lock "$nested"
+      fm_write_meta "$home/state/other-lane.meta" "worktree=$nested" "project=$registry" "kind=ship"
+      flags=()
+      if [ "$recovery" = merged ]; then
+        append_pr_meta_url "$case_dir"
+        head=$(git -C "$wt" rev-parse HEAD)
+        add_gh_pr_merged_for_head "$case_dir" "$head"
+      else
+        flags=(--force --drop-file "$(fm_test_drop_file)")
+      fi
+      hash=0
+      for root in "$wt" "$wt/.no-mistakes/h" "$wt" "$wt/.no-mistakes/h"; do
+        hash=$((hash + 1))
+        add_nm_launch_agent "$case_dir" "$hash" "$root"
+        [ "$hash" -gt 2 ] || : > "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.$hash"
+      done
+      add_nm_launch_agent "$case_dir" nested "$nested/.no-mistakes/h"
+      : > "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.nested"
+      rm -rf "$wt"
+
+      rc=0
+      FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+        run_teardown "$case_dir" "${flags[@]+"${flags[@]}"}" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "absent-nm-agent-$recovery-$registrar: recovery refused: $(cat "$case_dir/stderr")"
+      for hash in 1 2 3 4; do
+        label="$NM_AGENT_PREFIX.$hash"
+        assert_absent "$case_dir/launchctl-loaded/$label" "absent-nm-agent: private agent remains loaded"
+        assert_absent "$case_dir/launchagents/$label.plist" "absent-nm-agent: private plist remains installed"
+        assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" "absent-nm-agent: private plist not archived"
+        if [ "$hash" -le 2 ]; then
+          assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" "absent-nm-agent: loaded private agent not booted out"
+        fi
+      done
+      label="$NM_AGENT_PREFIX.nested"
+      assert_present "$case_dir/launchctl-loaded/$label" "absent-nm-agent: nested agent was unloaded"
+      assert_present "$case_dir/launchagents/$label.plist" "absent-nm-agent: nested plist was removed"
+      assert_no_grep "$label" "$case_dir/launchctl-calls" "absent-nm-agent: nested agent was addressed"
+      assert_absent "$case_dir/data/task-x1/launchagent-backup/$label.plist" "absent-nm-agent: nested plist was archived"
+      assert_present "$home/state/other-lane.meta" "absent-nm-agent: nested task record was removed"
+      assert_absent "$case_dir/state/task-x1.meta" "absent-nm-agent: recovered task record remains"
+    done
+  done
+  pass "absent-copy recovery retires private agents but preserves nested agents registered by local task projects"
+}
+
 # Every agent whose root is not inside THIS task's copy stays loaded and
 # installed: the shared ~/.no-mistakes agent, another task's agent, a sibling
 # directory that only shares a name prefix, and a root that climbs out with `..`.
@@ -6239,6 +6307,7 @@ test_private_nm_launch_agent_is_retired_before_teardown
 test_private_nm_launch_agent_equivalent_roots_are_retired
 test_foreign_nm_launch_agents_are_left_alone
 test_nested_nm_launch_agents_are_left_alone
+test_absent_copy_nm_launch_agents_preserve_nested_ownership
 test_private_nm_launch_agent_bootout_failure_refuses
 test_private_nm_launch_agent_not_loaded_is_archived
 )

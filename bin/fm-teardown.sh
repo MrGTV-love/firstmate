@@ -2212,7 +2212,7 @@ task_nested_lane_for_path() {  # <root> <path>
   done
   dir=$path
   while [ ! -d "$dir" ]; do
-    case "$dir" in "$root"/*) dir=${dir%/*} ;; *) return 1 ;; esac
+    case "$dir" in "$root"/*) dir=${dir%/*} ;; "$root") return 0 ;; *) return 1 ;; esac
   done
   while :; do
     if ! top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null); then
@@ -2236,7 +2236,7 @@ task_nested_lane_for_path() {  # <root> <path>
 
 # Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
 # entries, that the project or a git-backed scan root's repository registers
-# strictly beneath a scan root. No git-backed root means no registry is read.
+# strictly beneath a scan root.
 task_registered_lanes_under_roots() {  # <canonical-root>...
   local root src registry line lane state_dir meta project
   local -a sources
@@ -2245,9 +2245,9 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
   for root in "$@"; do
     git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
   done
-  [ "${#sources[@]}" -gt 0 ] || return 0
   [ -z "$PROJ" ] || sources+=("$PROJ")
-  for state_dir in "$STATE" ${TREEHOUSE_OWNER_STATES[@]+"${TREEHOUSE_OWNER_STATES[@]}"}; do
+  collect_local_firstmate_states "$STATE" || return 1
+  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       project=$(fm_meta_get "$meta" project)
