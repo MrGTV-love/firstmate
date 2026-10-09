@@ -361,14 +361,14 @@ status_declared_wait_identity() {  # <status-file>
 # otherwise. Returns 1 when the stream holds no declared wait.
 _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <key>
   local resolve=$1 legacy_re=$2 want_verb=$3 want_key=$4 line verb key i=0 first='' first_line='' state=open
-  local -a lines=()
+  local -a _fm_wait_scan_lines=()
   while IFS= read -r line || [ -n "$line" ]; do
-    lines[i]=$line
+    _fm_wait_scan_lines[i]=$line
     i=$((i + 1))
   done
   while [ "$i" -gt 0 ]; do
     i=$((i - 1))
-    line=${lines[i]}
+    line=${_fm_wait_scan_lines[i]}
     case "$line" in *[![:space:]]*) ;; *) continue ;; esac
     _fm_status_line_is_event "$line" "$legacy_re" || continue
     status_line_verb "$line" verb

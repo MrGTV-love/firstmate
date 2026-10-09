@@ -649,6 +649,7 @@ test_wait_identity_concurrent_append_uses_one_snapshot() {
   one=$(status_declared_wait_identity "$f")
   [ "${one##*:}" = 300 ] || fail "initial wait identity had the wrong line position: $one"
   printf '0\n' > "$countfile"
+  # shellcheck disable=SC2329 # Invoked indirectly by status_declared_wait_identity.
   tail() {
     local calls
     calls=$(cat "$countfile")
