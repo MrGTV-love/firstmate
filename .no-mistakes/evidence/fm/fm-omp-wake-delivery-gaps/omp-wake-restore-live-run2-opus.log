@@ -1,0 +1,8 @@
+ok - live omp idle wake: omp (omp/18.8.7) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
+ok - live omp stranded wake: omp (omp/18.8.7) on herdr 0.9.1 delivered wake text an older wiring left unsent in an idle composer as its own turn, cleared only that wake, and left the operator draft as typed
+ok - live omp wake restore: omp (omp/18.8.7) on herdr 0.9.1 re-submitted a wake that Esc restored to the composer, and the lane handled it
+ok - live omp wake restore: omp (omp/18.8.7) on herdr 0.9.1 left the operator's draft exactly as typed while it re-submitted the wake
+ok - live omp markers: omp (omp/18.8.7) on herdr 0.9.1 kept both loaded markers on the session pid 14110 before parent repair and after the parent resumed
+ok - live omp busy composer: omp (omp/18.8.7) on herdr 0.9.1 reads empty and pending while a turn runs
+ok - live omp busy composer: omp (omp/18.8.7) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
+exit=0

@@ -1,0 +1,33 @@
+ok - live omp idle wake: omp (omp/18.8.7) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
+ok - live omp stranded wake: omp (omp/18.8.7) on herdr 0.9.1 delivered wake text an older wiring left unsent in an idle composer as its own turn, cleared only that wake, and left the operator draft as typed
+
+                                                                                                                                                ████████████
+                                                                                                                                                   ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                                                                                   ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                                                                                   ▒▒  ██                  █
+                                                                                                                                                       ██       v18.8.7
+
+                                                                                                                            Tip: Lint/type errors piling up? `omp cleanse` (or /cleanse right here)
+                                                                                                                              hunts project diagnostics and fixes them with parallel subagents — ⎋
+                                                                                                                                                            cancels
+
+
+ FIRSTMATE_OP: v1 launch-brief: Live wake recovery lab: arm watcher when asked, perform only requested checks, and otherwise stay idle.
+
+
+ Error: Codex error event: The usage limit has been reached (code=usage_limit_reached)
+
+ Error: Retry failed after 1 attempts: Provider requested 365560302ms wait, exceeds retry.maxDelayMs (300000ms). Original error: Codex error event: The usage limit has been reached (code=usage_limit_reached)
+
+
+ Call the fm_watch_arm_omp tool exactly once now, then reply with only the word ARMED.
+
+
+ Error: Codex error event: The usage limit has been reached (code=usage_limit_reached)
+
+ Error: Retry failed after 1 attempts: Provider requested 365557677ms wait, exceeds retry.maxDelayMs (300000ms). Original error: Codex error event: The usage limit has been reached (code=usage_limit_reached)
+
+╭── π > ◔ GPT-6-Astra 👁 > 🗑 fm-omp-wake-restore.VrPE35/project > ⑂ fm/fm-omp-wake-delivery-gaps *1 ?1 > (sub) ▶────────────────9%─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╎───────────────────┃───────────────────────────272K─◀ 🆔 01a122aa ──╮
+╰─                                                                                                                                                                                                                                                                                                                            ─╯
+not ok - omp (omp/18.8.7) on herdr 0.9.1 never armed the watcher for wake-ext
+exit=1
