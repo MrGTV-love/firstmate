@@ -8,7 +8,8 @@
 # The proof is read-only and allocates, moves and removes nothing: the caller
 # prepares the fresh copy (docs/agent-control.md "Relocating a task whose
 # worktree is gone" owns the procedure and why it is not allocated here).
-# Requires fm-backend.sh (fm_meta_get) and, for slot ownership, fm-wake-lib.sh.
+# Requires fm-backend.sh (fm_meta_get), fm-wake-lib.sh (slot ownership and
+# fm_local_firstmate_state_dirs), and fm-secondmate-registry-lib.sh for that walk.
 #
 # fm_control_worktree_relocation <meta> <id> <state-dir> <destination>
 #   Returns 0 and sets, for the caller to journal and publish:
@@ -29,8 +30,8 @@
 #   - the destination is an isolated worktree root of the SAME repository as the
 #     recorded project, checked out on the recorded branch, with no uncommitted
 #     changes, and its HEAD contains the recorded head;
-#   - no other task of this home records the destination, and a Treehouse pool
-#     slot is not claimed by another task;
+#   - no other task of any local Firstmate home (fm_local_firstmate_state_dirs)
+#     records the destination, and a Treehouse pool slot is not claimed by another task;
 #   - the destination holds none of the per-task harness files the launch writes
 #     over and deletes (fm_control_worktree_wiring_free), so nothing a project
 #     or another tool owns is ever overwritten or deleted.
@@ -72,7 +73,7 @@ fm_control_worktree_registered_head() {  # <git-common-dir> <path>
 fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   local meta=$1 id=$2 state=$3 dest=$4
   local kind old probe parent real top project common project_common git_dir branch checked
-  local head='' evidence='' journal other owned status source i owner_home this_home
+  local head='' evidence='' journal other owned status source i owner_home this_home s field
   local -a heads=() sources=()
 
   kind=$(fm_meta_get "$meta" kind)
@@ -178,17 +179,18 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   if [ -n "$head" ]; then heads+=("$head"); sources+=("meta-worktree_head"); fi
   head=$(fm_control_worktree_registered_head "$common" "$old")
   if [ -n "$head" ]; then heads+=("$head"); sources+=("registered-worktree"); fi
-  head=
   journal="$state/$id.control-relaunch"
   if [ -f "$journal" ] && [ ! -L "$journal" ] \
      && [ "$(fm_meta_get "$journal" task)" = "$id" ]; then
     if [ "$(fm_meta_get "$journal" relocation_from)" = "$old" ] \
        || [ "$(fm_meta_get "$journal" relocation_to)" = "$old" ]; then
       head=$(fm_meta_get "$journal" relocation_head)
-    elif [ "$(fm_meta_get "$journal" worktree)" = "$old" ]; then
-      head=$(fm_meta_get "$journal" worktree_head)
+      if [ -n "$head" ]; then heads+=("$head"); sources+=("journal-relocation_head"); fi
     fi
-    if [ -n "$head" ]; then heads+=("$head"); sources+=("journal"); fi
+    if [ "$(fm_meta_get "$journal" worktree)" = "$old" ]; then
+      head=$(fm_meta_get "$journal" worktree_head)
+      if [ -n "$head" ]; then heads+=("$head"); sources+=("journal-worktree_head"); fi
+    fi
   fi
   head=$(fm_meta_get "$meta" pr_head)
   if [ -n "$head" ]; then heads+=("$head"); sources+=("meta-pr_head"); fi
@@ -218,20 +220,31 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   done
   head=$(git -C "$real" rev-parse --verify HEAD) || return 1
 
-  # No other task of this home may record the destination, by path or alias.
-  for other in "$state"/*.meta; do
-    [ "$other" != "$meta" ] || continue
-    [ -e "$other" ] || [ -L "$other" ] || continue
-    if [ ! -f "$other" ] || [ -L "$other" ] || ! cat "$other" >/dev/null 2>&1; then
-      echo "error: another task record ($other) cannot be read, so the fresh copy's ownership cannot be ruled out" >&2
+  fm_local_firstmate_state_dirs "$state" || {
+    echo "error: $FM_LOCAL_FIRSTMATE_ERROR, so the fresh copy's ownership cannot be ruled out" >&2
+    return 1
+  }
+  for s in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    if [ -e "$s" ] && { [ ! -d "$s" ] || [ ! -r "$s" ] || [ ! -x "$s" ]; }; then
+      echo "error: local Firstmate state directory $s cannot be read, so the fresh copy's ownership cannot be ruled out" >&2
       return 1
     fi
-    owned=$(fm_meta_get "$other" worktree)
-    [ -n "$owned" ] || continue
-    if [ "$owned" = "$real" ] || [ "$(cd "$owned" 2>/dev/null && pwd -P)" = "$real" ]; then
-      echo "error: the fresh copy $dest is recorded by another task ($(basename "$other" .meta))" >&2
-      return 1
-    fi
+    for other in "$s"/*.meta; do
+      [ "${other##*/}" = "${meta##*/}" ] && [ "$other" -ef "$meta" ] && continue
+      [ -e "$other" ] || [ -L "$other" ] || continue
+      if [ ! -f "$other" ] || [ -L "$other" ] || ! cat "$other" >/dev/null 2>&1; then
+        echo "error: another task record ($other) cannot be read, so the fresh copy's ownership cannot be ruled out" >&2
+        return 1
+      fi
+      for field in worktree home; do
+        owned=$(fm_meta_get "$other" "$field")
+        [ -n "$owned" ] || continue
+        if [ "$owned" = "$real" ] || [ "$(cd "$owned" 2>/dev/null && pwd -P)" = "$real" ]; then
+          echo "error: the fresh copy $dest is recorded by another task ($(basename "$other" .meta)$([ "$s" -ef "$state" ] || printf ' of home %s' "${s%/state}"))" >&2
+          return 1
+        fi
+      done
+    done
   done
   # A Treehouse slot also carries a claim, written by whichever task took it.
   if declare -F fm_treehouse_pool_slot >/dev/null 2>&1 && fm_treehouse_pool_slot "$project" "$real"; then

@@ -200,19 +200,20 @@ It accepts the relocation only when all of these hold, and it refuses every othe
   An unmounted volume looks like a deleted copy, so do not relocate while one is offline.
 - **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
 - **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
-- **Its HEAD contains every surviving recorded head:** the record's own `worktree_head`, the last head in git's reflog for the vanished copy, this task's prior control journal for that path, and the record's `pr_head`.
+- **Its HEAD contains every surviving recorded head:** the record's own `worktree_head`, the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, or when history was rewritten between two recorded heads and the copy cannot contain both.
   The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
   Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
-- **No other task of this home records it**, by path or by alias, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
+- **No other task of any local Firstmate home records it** (the root home and every registered local secondmate home, the same walk teardown uses); an unreadable home or registry refuses. Records are checked by path or alias in both `worktree` and `home`, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
   A slot that is free is claimed for this task under the shared project lock, as a fresh spawn does.
-- **It holds none of the harness files the launch overwrites or deletes** (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`).
+- **It holds none of the harness files the launch overwrites or deletes** (the worktree-resident paths of `fm_control_harness_wiring_paths` in bin/fm-control-lib.sh).
   The control plane checks, and the launch owner checks again at the moment it would write.
   A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
 
 The journal keeps `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, including failure phases and later ordinary relaunches, and a repeated relocation is judged against that proof.
-Only the record's `worktree=` moves, and only at the launch owner's single atomic publication.
-The task id, endpoint, brief, status log, and armed poll are untouched, and the `--note` requirement still applies.
+The record's `worktree=` moves only at the launch owner's single atomic publication, alongside the ordinary relaunch profile updates (including an explicit harness switch).
+A surviving endpoint is reused; a proven-gone endpoint follows the normal reclaim rules above.
+The task id, status log, and armed poll are preserved. The `--note` requirement still applies, and the progress note is appended to the existing brief.
 Uncommitted changes in the vanished copy are not recoverable, and the progress note says so.
 
 **Why the caller prepares the copy.**
