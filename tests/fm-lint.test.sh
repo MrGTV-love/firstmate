@@ -1172,6 +1172,70 @@ test_host_load_shrinks_slots_to_the_floor() {
   pass "host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them"
 }
 
+test_host_load_preserves_the_cap_until_the_threshold() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-slots-threshold)
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "host load boundary regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+my $command = q{
+    use Time::HiRes qw(time sleep);
+    my ($started, $release) = @ARGV;
+    open(my $fh, '>', $started) or die "$!";
+    close $fh;
+    my $deadline = time() + 15;
+    until (-e $release) { exit 1 if time() > $deadline; sleep 0.01; }
+};
+for my $cap ('', 6) {
+    local $ENV{FM_LINT_HOST_SLOTS} = $cap;
+    for my $load (30, 36, 37) {
+        local $ENV{FM_TEST_SEAM} = 1;
+        local $ENV{FM_LINT_SLOT_LOAD} = $load;
+        my $full = $cap || 9;
+        my $expected = $load == 37 ? $full - 1 : $full;
+        my $dir = "$tmp/$full.$load";
+        make_path($dir);
+        my @pids;
+        for my $index (0 .. $full) {
+            my $pid = fork();
+            die "fork: $!" unless defined $pid;
+            if (!$pid) {
+                exec $^X, $gate, 'gate', "$dir/slots", 18, "$dir/wait.$index",
+                    '--', $^X, '-e', $command, "$dir/started.$index", "$dir/release";
+                die "exec: $!";
+            }
+            push @pids, $pid;
+        }
+        my $error;
+        eval {
+            my $deadline = time() + 10;
+            while (1) {
+                my @started = glob "$dir/started.*";
+                last if @started >= $expected;
+                die "admission deadline exceeded\n" if time() > $deadline;
+                sleep 0.01;
+            }
+            sleep 0.25;
+            my @started = glob "$dir/started.*";
+            die "admitted @started; expected $expected commands\n" unless @started == $expected;
+        };
+        $error = $@;
+        open(my $release, '>', "$dir/release") or die "release: $!";
+        close $release;
+        for my $pid (@pids) {
+            waitpid($pid, 0);
+            $error ||= "gated command exited with status $?\n" if $?;
+        }
+        die "cap $full, load $load: $error" if $error;
+    }
+}
+PL
+  pass "default and explicit host caps remain full through twice the cores and shrink only by excess load"
+}
+
 test_slot_pool_can_be_disabled_or_misconfigured() {
   local tmp rc out
   tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
@@ -2889,6 +2953,7 @@ test_clean_fixture_passes
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
 test_host_load_shrinks_slots_to_the_floor
+test_host_load_preserves_the_cap_until_the_threshold
 test_slot_pool_can_be_disabled_or_misconfigured
 test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree

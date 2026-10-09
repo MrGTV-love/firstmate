@@ -65,10 +65,10 @@
 # (flock files under FM_LINT_SLOT_DIR, default
 # ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots; "off" disables) and
 # many concurrent runs queue instead of each adding workers. FM_LINT_HOST_SLOTS
-# sets the slot count, default half the cores and at least two. While 1-minute
-# load is within two times the cores every slot is usable; each point of load
-# above that removes one, down to a floor of two (one run's own workers), so a
-# lone run is never throttled and queued roots always make progress. Queue time
+# sets the slot count, default half the cores and at least two. The full cap is
+# available until 1-minute load exceeds two times the cores; only the excess
+# load is subtracted from the cap, down to a floor of two (one run's own workers),
+# so a lone run is never throttled and queued roots always make progress. Queue time
 # is excluded from the root deadline and the recorded root duration. The pool
 # is shared by every worktree and home of the same user. A slot directory that
 # cannot be used is reported and lint runs ungated; it never fails lint.

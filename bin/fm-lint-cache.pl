@@ -18,8 +18,8 @@ use File::Basename qw(dirname basename);
 # Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <wait-file> -- <command...>
 # Slots are flock files, so the kernel frees one when its holder dies. The slot
 # count is FM_LINT_HOST_SLOTS, else half the cores, but never below two (one
-# run's default workers); while 1-minute load is within two times the cores,
-# all slots may be taken, and each point of load past that takes one away, down
+# run's default workers). The full cap is available until 1-minute load exceeds
+# two times the cores; only the excess load is subtracted from the cap, down
 # to the two-slot floor. A slot directory that cannot be used lets the command
 # run ungated. The wait is written in milliseconds to <wait-file> so the caller
 # can keep queue time out of its own timings.
@@ -57,7 +57,7 @@ if (($ARGV[0] // '') eq 'gate') {
         $waited_from = Time::HiRes::time();
         while (!$slot) {
             exit 128 + $signal_number{$caught} if $caught;
-            my $allowed = int(2 * $ncpu - $slot_load->() + 0.5);
+            my $allowed = int($cap + 2 * $ncpu - $slot_load->() + 0.5);
             $allowed = $floor if $allowed < $floor;
             $allowed = $cap if $allowed > $cap;
             for my $index (0 .. $allowed - 1) {
