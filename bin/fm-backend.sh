@@ -333,33 +333,61 @@ fm_backend_required_tool_available() {  # <backend> <tool>
 # errors) if the file or key is absent. Mirrors the ad hoc `grep '^key=' |
 # tail -1 | cut -d= -f2-` snippet every fm-*.sh script used to repeat inline.
 fm_meta_get() {  # <meta-file> <key>
-  local meta=$1 key=$2 line value=''
-  [ -f "$meta" ] || return 0
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      "$key="*) value=${line#*=} ;;
-    esac
-  done < "$meta" 2>/dev/null || true
-  printf '%s' "$value"
+  local _fm_mg_out
+  fm_meta_get_to _fm_mg_out "$1" "$2"
+  printf '%s' "$_fm_mg_out"
+}
+
+# The same read assigned to <out-var>: a per-task loop that reads several keys
+# pays for the file read alone, not also for a command substitution (one
+# process) around each key. The result is empty when the file or key is absent.
+fm_meta_get_to() {  # <out-var> <meta-file> <key>
+  local _fm_mg_line _fm_mg_value=''
+  if [ -f "$2" ]; then
+    while IFS= read -r _fm_mg_line || [ -n "$_fm_mg_line" ]; do
+      case "$_fm_mg_line" in
+        "$3="*) _fm_mg_value=${_fm_mg_line#*=} ;;
+      esac
+    done < "$2" 2>/dev/null || true
+  fi
+  printf -v "$1" '%s' "$_fm_mg_value"
 }
 
 # fm_backend_of_meta: the backend recorded in <meta-file>, defaulting to
 # `tmux` when the field is absent - the P1 compatibility contract.
+fm_backend_of_meta_to() {  # <out-var> <meta-file>
+  local _fm_bo_v
+  fm_meta_get_to _fm_bo_v "$2" backend
+  printf -v "$1" '%s' "${_fm_bo_v:-tmux}"
+}
+
 fm_backend_of_meta() {  # <meta-file>
-  local v
-  v=$(fm_meta_get "$1" backend)
-  printf '%s' "${v:-tmux}"
+  local _fm_bo_out
+  fm_backend_of_meta_to _fm_bo_out "$1"
+  printf '%s' "$_fm_bo_out"
+}
+
+# Assigns the target and returns 0, or assigns nothing and returns 1 when the
+# record names no target, exactly as the printing form prints or does not print.
+fm_backend_target_of_meta_to() {  # <out-var> <meta-file>
+  local _fm_bt_meta=$2 _fm_bt_backend _fm_bt_terminal _fm_bt_window
+  fm_backend_of_meta_to _fm_bt_backend "$_fm_bt_meta"
+  if [ "$_fm_bt_backend" = orca ]; then
+    fm_meta_get_to _fm_bt_terminal "$_fm_bt_meta" terminal
+    if [ -n "$_fm_bt_terminal" ]; then
+      printf -v "$1" '%s' "$_fm_bt_terminal"
+      return 0
+    fi
+  fi
+  fm_meta_get_to _fm_bt_window "$_fm_bt_meta" window
+  [ -n "$_fm_bt_window" ] || return 1
+  printf -v "$1" '%s' "$_fm_bt_window"
 }
 
 fm_backend_target_of_meta() {  # <meta-file>
-  local meta=$1 backend terminal window
-  backend=$(fm_backend_of_meta "$meta")
-  if [ "$backend" = orca ]; then
-    terminal=$(fm_meta_get "$meta" terminal)
-    [ -n "$terminal" ] && { printf '%s' "$terminal"; return 0; }
-  fi
-  window=$(fm_meta_get "$meta" window)
-  [ -n "$window" ] && printf '%s' "$window"
+  local _fm_bt_out
+  fm_backend_target_of_meta_to _fm_bt_out "$1" || return 1
+  printf '%s' "$_fm_bt_out"
 }
 
 # fm_backend_validate_task_endpoint: validate a task cleanup record entirely
@@ -935,18 +963,15 @@ fm_backend_composer_state() {  # <backend> <target> [expected-label] -> empty|pe
 # session: for herdr this deliberately queries the pane directly instead of
 # going through fm_backend_herdr_target_ready (which auto-starts the herdr
 # server as a side effect via fm_backend_herdr_server_ensure - fine for an
-# operation that is about to use the pane, wrong for a passive liveness
-# probe). A gone tmux window or an unqueryable herdr pane (server down, pane
-# closed), missing zellij pane, or unreadable Orca terminal simply fails, which
-# IS "does not exist" for this purpose.
-# Mirrors fm-crew-state.sh's pane_readable check; exists here as one shared
-# primitive so callers that only need a fast alive/dead read (recovery
-# digests, the session-start fleet digest) do not re-derive it inline.
+# operation that is about to use the pane, wrong for a passive liveness probe).
+# Backs fm-crew-state.sh's pane_readable check for tmux; exists here as one
+# shared primitive for recovery digests and the session-start fleet digest.
 fm_backend_target_exists() {  # <backend> <target> [expected-label]
   local backend=$1 target=$2 expected_label=${3:-} session pane
   case "$backend" in
     tmux)
-      tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
+      fm_backend_source tmux || return 2
+      fm_backend_tmux_target_exists "$target"
       ;;
     herdr)
       fm_backend_source herdr || return 1
@@ -993,8 +1018,9 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # Only `dead` and `missing` license recovery. Every `alive` is proven at
 # process level through the shared classifier in bin/fm-agent-process-lib.sh,
 # never from a registration or a rendered title alone. The tmux adapter
-# requires a successful session inventory and returns `missing` only when it
-# omits the exact window; the Herdr adapter reuses its strict husk classifier -
+# requires exact recorded session and window membership, with inventory-read
+# classification owned by fm_backend_tmux_window_inventory; the Herdr adapter
+# reuses its strict husk classifier -
 # which verifies a registered agent against `pane process-info` and the real
 # process table, so a registration Herdr kept over a shell-only pane reads
 # `dead` here (issue #4115) - then maps a positively stopped session server to

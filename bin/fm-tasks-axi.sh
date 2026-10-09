@@ -304,9 +304,9 @@ if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
   case "$STATE" in /*) task_state=$STATE ;; *) task_state="$CALLER_DIR/$STATE" ;; esac
   TASK_CONTROL_LOCK="$task_state/.control-$TASK_ID.lock"
   TASK_META_LOCK=$(fm_meta_lock_path "$task_state/$TASK_ID.meta") || fail "cannot resolve the task record lock for $TASK_ID"
-  fm_lock_acquire_wait "$TASK_CONTROL_LOCK"
+  fm_lock_acquire_wait "$TASK_CONTROL_LOCK" || exit 1
   TASK_CONTROL_LOCK_HELD=1
-  fm_lock_acquire_wait "$TASK_META_LOCK"
+  fm_lock_acquire_wait "$TASK_META_LOCK" || exit 1
   TASK_META_LOCK_HELD=1
 fi
 guard_completion

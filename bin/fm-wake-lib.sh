@@ -64,6 +64,16 @@ fm_pid_alive() {
   kill -0 "$pid" 2>/dev/null
 }
 
+fm_lock_owner_alive() {
+  local lockdir=$1 pid=$2 recorded identity
+  fm_pid_alive "$pid" || return 1
+  [ "${_fm_lock_identity_bound:-pid}" = identity ] || return 0
+  recorded=$(cat "${3:-$lockdir/pid-identity}" 2>/dev/null) || return 1
+  [ -n "$recorded" ] || return 1
+  identity=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
+  [ -n "$identity" ] && [ "$identity" = "$recorded" ]
+}
+
 fm_pid_identity() {
   local pid=$1 out proc_root stat_line starttime cmdline_hex identity_key
   local -a stat_fields
@@ -103,7 +113,19 @@ fm_pid_identity() {
   # same width for the same reason.
   out=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null) || return 1
   [ -n "$out" ] || return 1
-  printf '%s\n' "$out" | sed 's/^[[:space:]]*//'
+  # Strip each line's leading blanks in the shell instead of through a sed
+  # process: this runs on every liveness probe. The loop covers a command that
+  # itself holds a newline, so the result stays byte-identical to sed's.
+  case "$out" in
+    *$'\n'*)
+      local ps_line ps_trimmed=''
+      while IFS= read -r ps_line || [ -n "$ps_line" ]; do
+        ps_trimmed="$ps_trimmed${ps_line#"${ps_line%%[![:space:]]*}"}"$'\n'
+      done <<< "$out"
+      printf '%s' "$ps_trimmed"
+      ;;
+    *) printf '%s\n' "${out#"${out%%[![:space:]]*}"}" ;;
+  esac
 }
 
 fm_path_mtime() {
@@ -464,6 +486,7 @@ fm_lock_clean_known_files() {
     "$lockdir/pid" \
     "$lockdir/fm-home" \
     "$lockdir/pid-identity" \
+    "$lockdir"/reaper-*-identity \
     "$lockdir/role" \
     "$lockdir/watcher-path" \
     2>/dev/null || true
@@ -502,8 +525,13 @@ fm_lock_owner_dir() {
 }
 
 fm_lock_prepare_owner() {
-  local ownerdir=$1 mypid back
+  local ownerdir=$1 mypid back identity
   fm_current_pid mypid || return 1
+  if [ "${_fm_lock_identity_bound:-pid}" = identity ]; then
+    identity=$(fm_pid_identity "$mypid" 2>/dev/null) || return 1
+    [ -n "$identity" ] || return 1
+    printf '%s\n' "$identity" > "$ownerdir/pid-identity" 2>/dev/null || return 1
+  fi
   printf '%s\n' "$mypid" > "$ownerdir/pid" 2>/dev/null || return 1
   back=$(cat "$ownerdir/pid" 2>/dev/null || true)
   [ "$back" = "$mypid" ]
@@ -637,7 +665,7 @@ fm_lock_recheck_stale_owner() {
   fi
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$actual_pid" = "$expected_pid" ] || return 1
-  if fm_pid_alive "$actual_pid"; then
+  if fm_lock_owner_alive "$lockdir" "$actual_pid"; then
     return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$actual_pid"; then
@@ -1108,7 +1136,7 @@ fm_recovery_marker_handover_restore() {  # <marker> <snapshot-token> <snapshot-s
 # later reaper re-elects itself by renaming that dead reaper's tombstone, and a
 # reaper whose own election a trap interrupted resumes it from its tombstone.
 fm_lock_reap_dead_link() {
-  local lockdir=$1 owner pid token tomb current
+  local lockdir=$1 owner pid token tomb current identity
   [ -L "$lockdir" ] || return 1
   owner=$(fm_lock_link_owner "$lockdir" 2>/dev/null) || return 1
   fm_current_pid current || return 1
@@ -1121,11 +1149,17 @@ fm_lock_reap_dead_link() {
     for tomb in "$owner".reaped.*; do
       [ -d "$tomb" ] || continue
       if [ "${tomb##*.reaped.}" != "$current" ]; then
-        fm_pid_alive "${tomb##*.reaped.}" && return 1
+        fm_lock_owner_alive "$tomb" "${tomb##*.reaped.}" \
+          "$tomb/reaper-${tomb##*.reaped.}-identity" && return 1
       fi
       token=$tomb
     done
     [ -n "$token" ] || return 1
+  fi
+  if [ "${_fm_lock_identity_bound:-pid}" = identity ]; then
+    identity=$(fm_pid_identity "$current" 2>/dev/null) || return 1
+    [ -n "$identity" ] || return 1
+    printf '%s\n' "$identity" > "$token/reaper-$current-identity" 2>/dev/null || return 1
   fi
   tomb="$owner.reaped.$current"
   if [ "$token" != "$tomb" ]; then
@@ -1158,6 +1192,7 @@ fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
 
 fm_lock_try_acquire() {
   local lockdir=$1 pid steal cur rc steal_owner primary_owner current
+  local _fm_lock_identity_bound=${2:-pid}
   FM_LOCK_HELD_PID=
   FM_LOCK_OWNER_DIR=
   FM_LOCK_RECOVERED_PID=
@@ -1184,7 +1219,7 @@ fm_lock_try_acquire() {
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     return 1
   fi
-  if fm_pid_alive "$pid"; then
+  if fm_lock_owner_alive "$lockdir" "$pid"; then
     FM_LOCK_HELD_PID=$pid
     return 1
   fi
@@ -1202,7 +1237,7 @@ fm_lock_try_acquire() {
   steal_owner=${FM_LOCK_OWNER_DIR:-}
 
   cur=$(cat "$lockdir/pid" 2>/dev/null || true)
-  if fm_pid_alive "$cur"; then
+  if fm_lock_owner_alive "$lockdir" "$cur"; then
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$cur
     FM_LOCK_OWNER_DIR=
@@ -1256,9 +1291,29 @@ fm_lock_try_acquire() {
   return "$rc"
 }
 
+# fm_lock_acquire_wait <lockdir>
+#
+# Waits without a contention deadline while the lock's parent directory exists.
+# Returns 1 after that parent stays absent for five seconds, because no lock can
+# be created there and retrying would leave a deleted fixture or scratch copy
+# spinning indefinitely. A parent that returns inside the grace resets the wait.
+# Callers must stop before entering the critical section on failure, even if the
+# parent returns afterward; set held flags only on success and release any
+# already-held sibling locks. tests/fm-wake-queue.test.sh covers the grace, and
+# tests/fm-orphan-safety.test.sh covers failure propagation with returning state.
 fm_lock_acquire_wait() {
-  local lockdir=$1
+  local lockdir=$1 parent gone_since=
+  parent=${lockdir%/*}
+  [ "$parent" != "$lockdir" ] || parent=.
+  [ -n "$parent" ] || parent=/
   while ! fm_lock_try_acquire "$lockdir"; do
+    if [ -d "$parent" ]; then
+      gone_since=
+    elif [ -z "$gone_since" ]; then
+      gone_since=$SECONDS
+    elif [ $((SECONDS - gone_since)) -ge 5 ]; then
+      return 1
+    fi
     sleep 0.1
   done
 }
@@ -2109,7 +2164,7 @@ fm_wake_clean_field() {
 
 fm_wake_append() {
   local status=0
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
   fm_wake_append_locked "$@" || status=$?
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   return "$status"
@@ -2169,7 +2224,7 @@ fm_wake_queued_keys() {
     signal|stale|check|heartbeat) ;;
     *) printf 'fm_wake_queued_keys: invalid wake kind: %s\n' "$kind" >&2; return 2 ;;
   esac
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
   fm_wake_queued_keys_locked "$kind"
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
 }
@@ -2452,10 +2507,36 @@ fm_wake_signal_sig() {  # <file> -> reported-state signature
   esac
 }
 
+# Assigning the signature avoids an outer command substitution in per-file
+# scans; status_observed_signature_to owns the status-path reads and encoding.
+fm_wake_signal_sig_to() {  # <out-var> <file>
+  local _fm_ws_sig
+  case "$2" in
+    *.status)
+      _fm_wake_require_status || return 1
+      status_observed_signature_to "$1" "$2"
+      ;;
+    *)
+      if [ "$_FM_UNAME" = Darwin ]; then
+        _fm_ws_sig=$(/usr/bin/stat -f '%z:%Fm' "$2" 2>/dev/null) || return 1
+      else
+        _fm_ws_sig=$(stat -c '%s:%Y' "$2" 2>/dev/null) || return 1
+      fi
+      printf -v "$1" '%s' "$_fm_ws_sig"
+      ;;
+  esac
+}
+
+fm_wake_signal_seen_path_to() {  # <out-var> <state> <file>
+  local _fm_ws_task
+  fm_basename_to _fm_ws_task "$3"
+  printf -v "$1" '%s/.seen-%s' "$2" "${_fm_ws_task//./_}"
+}
+
 fm_wake_signal_seen_path() {  # <state> <file>
-  local task
-  fm_basename_to task "$2"
-  printf '%s/.seen-%s' "$1" "${task//./_}"
+  local _fm_ws_path
+  fm_wake_signal_seen_path_to _fm_ws_path "$1" "$2"
+  printf '%s' "$_fm_ws_path"
 }
 
 # The byte size recorded in <file>'s seen marker, or 0 when no marker exists, it
@@ -2488,17 +2569,22 @@ fm_wake_signal_seen_size() {  # <state> <file>
 # This predicate never consults the owned-append ledger, which is what makes it
 # the safe gate for a captain-facing surface: a line must never be withheld from
 # presentation merely because this home is the writer that appended it.
-fm_wake_signal_reported_current() {  # <state> <file>
-  local sig marker
-  sig=$(fm_wake_signal_sig "$2") || return 1
+fm_wake_signal_reported_current() {  # <state> <file> [current-signature]
+  local sig=${3-} marker seen
+  if [ -z "$sig" ]; then
+    fm_wake_signal_sig_to sig "$2" || return 1
+  fi
   [ -n "$sig" ] || return 1
-  marker=$(fm_wake_signal_seen_path "$1" "$2")
+  fm_wake_signal_seen_path_to marker "$1" "$2"
   case "$2" in
     *.status)
       _fm_wake_require_status || return 1
       status_presentation_marker_reported_matches "$marker" "$sig"
       ;;
-    *) [ "$(cat "$marker" 2>/dev/null)" = "$sig" ] ;;
+    *)
+      seen=$(cat "$marker" 2>/dev/null)
+      [ "$seen" = "$sig" ]
+      ;;
   esac
 }
 
@@ -2511,9 +2597,9 @@ fm_wake_signal_reported_current() {  # <state> <file>
 # This is the wake-scan predicate and answers only "should this wake the home?".
 # Presentation asks the different question and uses
 # fm_wake_signal_reported_current.
-fm_wake_signal_seen_current() {  # <state> <file>
+fm_wake_signal_seen_current() {  # <state> <file> [current-signature]
   local classified size
-  fm_wake_signal_reported_current "$1" "$2" && return 0
+  fm_wake_signal_reported_current "$1" "$2" "${3-}" && return 0
   case "$2" in *.status) ;; *) return 1 ;; esac
   _fm_wake_require_status || return 1
   classified=$(fm_wake_signal_seen_size "$1" "$2")
@@ -2586,7 +2672,7 @@ fm_wake_status_mark_current() {  # <state> <status-file>
 fm_wake_status_append_self_announced() {  # <state> <status-file> <line>...
   local state=$1 file=$2 line appended=0 pre_size='' pre_ident='' post_size post_ident
   local classified folded lag span_rc=0
-  local LC_ALL=C stamped=()
+  local stamped=()
   shift 2
   _fm_wake_require_status || return 1
   for line in "$@"; do
@@ -2602,7 +2688,13 @@ fm_wake_status_append_self_announced() {  # <state> <status-file> <line>...
   post_ident=$(_fm_open_decisions_file_ident "$file") || return 1
   case "$post_size" in ''|*[!0-9]*) return 1 ;; esac
   [ -n "$pre_ident" ] && [ "$post_ident" = "$pre_ident" ] || return 1
-  for line in "${stamped[@]}"; do appended=$((appended + ${#line} + 1)); done
+  # Only byte accounting uses C; checkpoint validation and classification must
+  # retain the caller's parsing locale.
+  appended=$(
+    local LC_ALL=C
+    for line in "${stamped[@]}"; do appended=$((appended + ${#line} + 1)); done
+    printf '%s' "$appended"
+  )
   [ "$post_size" -eq $((pre_size + appended)) ] || return 1
   status_home_appends_record "$file" "$pre_size" "$post_size" || return 1
   classified=$(fm_wake_signal_seen_size "$state" "$file")
@@ -2740,7 +2832,6 @@ fm_wake_latest_event() {  # <validated-status-path> <tail-byte-cap>
 fm_wake_print_annotations() {  # <deduped-raw-rows> [<presentation-snapshot>]
   local rows=$1 snapshot=${2:-} manifest status_key mode path prefix line task endpoint
   local snapshot_task snapshot_endpoint _snapshot_ident offset last_event event_line
-  local LC_ALL=C
 
   manifest=$(fm_wake_annotation_manifest "$rows" | awk -F '\t' '
     {
