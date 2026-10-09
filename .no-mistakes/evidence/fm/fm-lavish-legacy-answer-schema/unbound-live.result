@@ -1,0 +1,9 @@
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[1]{uid,prompt,selector,tag,text}:
+  "1","Unbound ordinary choice\n\nContext data:\n{\n  \"question\": \"unbound-call\",\n  \"answer\": \"A\",\n  \"note\": \"\"\n}",form#row-0,choice,Unbound ordinary choice
+next_step: This was the last feedback before the user ended the session. Stop polling /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html and do not reopen it - deliver any remaining updates directly in this conversation instead. Only run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html --reopen` if the user explicitly asks for further review or something genuinely important needs their visual attention.
+dom_snapshot: "uid=2 body \"Live legacy answer validation: unbound Disposable review deck. Queue the choices\"\n  uid=3 h1 \"Live legacy answer validation: unbound\"\n  uid=4 p \"Disposable review deck. Queue the choices below, then use Lavish’s Send to Agent\"\n  uid=5 main \"Unbound ordinary choice { 'question': 'unbound-call', 'answer': 'A', 'note': '' \"\n    uid=1 form \"Unbound ordinary choice { 'question': 'unbound-call', 'answer': 'A', 'note': '' \"\n      uid=6 p \"Unbound ordinary choice\"\n      uid=7 pre \"{ 'question': 'unbound-call', 'answer': 'A', 'note': '' }\"\n      uid=8 button \"Queued: Unbound ordinary choice\"\n  uid=9 script \"const rows = [{'label': 'Unbound ordinary choice', 'data': {'question': 'unbound\"\n  uid=10 script"

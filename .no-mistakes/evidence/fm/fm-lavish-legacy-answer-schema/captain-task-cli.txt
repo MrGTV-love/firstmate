@@ -1,0 +1,115 @@
+$ (cd isolated-home && tasks-axi show backpass-path --full)
+task:
+  id: backpass-path
+  title: Live validation backpass-path
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-09
+  deps: none
+  links: none
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 77c460e7307299a3f392918dafea845ac185515e30c4ff9e79de1ef69a802258\nResolution mode: answered\n\nCaptain decision:\nCaptain answered this call through the captured result lavish-53b7a2f80d4ae0c6 sequence 1.\nTask: backpass-path\nAnswer: A-upstream-optin-plus-fork-bridge\nAnswer as shown to the captain: Backpass A — empty note"
+
+
+$ (cd isolated-home && tasks-axi show legacy-note --full)
+task:
+  id: legacy-note
+  title: Live validation legacy-note
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-09
+  deps: none
+  links: none
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: a32e3a618759d57fef79d82b74d7a3ef14c53d528d9eb29e69a4763394aa6b3f\nResolution mode: answered\n\nCaptain decision:\nCaptain answered this call through the captured result lavish-53b7a2f80d4ae0c6 sequence 1.\nTask: legacy-note\nAnswer: Other: see note\nAnswer as shown to the captain: Other: see note - Edit the plan first; keep the fork bridge"
+
+
+$ (cd isolated-home && tasks-axi show suppress-0 --full)
+task:
+  id: suppress-0
+  title: Live validation suppress-0
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: 2026-10-09
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-09T08:27:25Z"
+
+
+$ (cd isolated-home && tasks-axi show reverse-3 --full)
+task:
+  id: reverse-3
+  title: Live validation reverse-3
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: 2026-10-09
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-09T08:34:41Z"
+
+
+$ (cd isolated-home && tasks-axi show unbound-call --full)
+task:
+  id: unbound-call
+  title: Live validation unbound-call
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: 2026-10-09
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-09T08:36:18Z"
+
+$ fm-captain-hold.sh reconcile list
+reverse-3	requested=2026-10-09T08:38:05Z	source=the captured result lavish-69722a80cbcb9b20 sequence 1; captain note: latest reality check
+reconcile-requests: 1
+
+$ replay captured legacy answers with identical source and sequence
+closed: backpass-path
+closed: legacy-extras
+closed: legacy-note
+closed: legacy-alias
+answers: closed=4 skipped=0
+Persisted backlog byte-for-byte unchanged: True

@@ -1,0 +1,1033 @@
+[
+  {
+    "command": [
+      "lavish-axi",
+      "--version"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "0.1.79\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "backpass-path",
+      "--title",
+      "Live validation backpass-path",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "backpass-path\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "legacy-alias",
+      "--title",
+      "Live validation legacy-alias",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "legacy-alias\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "legacy-extras",
+      "--title",
+      "Live validation legacy-extras",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "legacy-extras\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "legacy-note",
+      "--title",
+      "Live validation legacy-note",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "legacy-note\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html\n  url: \"http://127.0.0.1:54468/session/53b7a2f80d4ae0c6?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "lavish-53b7a2f80d4ae0c6\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "bind",
+      "lavish-53b7a2f80d4ae0c6"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "bound: lavish-53b7a2f80d4ae0c6 -> (any)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent.sh",
+      "register",
+      "lavish",
+      "lavish-53b7a2f80d4ae0c6",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "poll",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/ordinary.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "registered: lavish-53b7a2f80d4ae0c6 (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-0",
+      "--title",
+      "Live validation suppress-0",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-0\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-1",
+      "--title",
+      "Live validation suppress-1",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-1\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-10",
+      "--title",
+      "Live validation suppress-10",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-10\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-11",
+      "--title",
+      "Live validation suppress-11",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-11\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-12",
+      "--title",
+      "Live validation suppress-12",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-12\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-13",
+      "--title",
+      "Live validation suppress-13",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-13\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-14",
+      "--title",
+      "Live validation suppress-14",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-14\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-15",
+      "--title",
+      "Live validation suppress-15",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-15\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-2",
+      "--title",
+      "Live validation suppress-2",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-2\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-3",
+      "--title",
+      "Live validation suppress-3",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-3\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-4",
+      "--title",
+      "Live validation suppress-4",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-4\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-5",
+      "--title",
+      "Live validation suppress-5",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-5\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-6",
+      "--title",
+      "Live validation suppress-6",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-6\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-7",
+      "--title",
+      "Live validation suppress-7",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-7\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-8",
+      "--title",
+      "Live validation suppress-8",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-8\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "suppress-9",
+      "--title",
+      "Live validation suppress-9",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "suppress-9\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "unrelated-answer",
+      "--title",
+      "Live validation unrelated-answer",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "unrelated-answer\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html\n  url: \"http://127.0.0.1:54468/session/5ead1811a4f6977c?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "lavish-5ead1811a4f6977c\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "bind",
+      "lavish-5ead1811a4f6977c"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "bound: lavish-5ead1811a4f6977c -> (any)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent.sh",
+      "register",
+      "lavish",
+      "lavish-5ead1811a4f6977c",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "poll",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/suppress.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "registered: lavish-5ead1811a4f6977c (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "reverse-0",
+      "--title",
+      "Live validation reverse-0",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-0\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "reverse-1",
+      "--title",
+      "Live validation reverse-1",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-1\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "reverse-2",
+      "--title",
+      "Live validation reverse-2",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-2\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "reverse-3",
+      "--title",
+      "Live validation reverse-3",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-3\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html\n  url: \"http://127.0.0.1:54468/session/69722a80cbcb9b20?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "lavish-69722a80cbcb9b20\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "bind",
+      "lavish-69722a80cbcb9b20"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "bound: lavish-69722a80cbcb9b20 -> (any)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent.sh",
+      "register",
+      "lavish",
+      "lavish-69722a80cbcb9b20",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "poll",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/reverse.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "registered: lavish-69722a80cbcb9b20 (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-close",
+      "--title",
+      "Live validation guard-close",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-close\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-empty",
+      "--title",
+      "Live validation guard-empty",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-empty\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-freeform",
+      "--title",
+      "Live validation guard-freeform",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-freeform\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-invalid-latest",
+      "--title",
+      "Live validation guard-invalid-latest",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-invalid-latest\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-note-object",
+      "--title",
+      "Live validation guard-note-object",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-note-object\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-object",
+      "--title",
+      "Live validation guard-object",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-object\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-schema",
+      "--title",
+      "Live validation guard-schema",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-schema\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "guard-selection",
+      "--title",
+      "Live validation guard-selection",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-selection\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html\n  url: \"http://127.0.0.1:54468/session/5d3eb6e808355bd6?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "lavish-5d3eb6e808355bd6\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "bind",
+      "lavish-5d3eb6e808355bd6"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "bound: lavish-5d3eb6e808355bd6 -> (any)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent.sh",
+      "register",
+      "lavish",
+      "lavish-5d3eb6e808355bd6",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "poll",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/guards.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "registered: lavish-5d3eb6e808355bd6 (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "hold",
+      "unbound-call",
+      "--title",
+      "Live validation unbound-call",
+      "--reason",
+      "isolated legacy decision validation",
+      "--repo",
+      "sample"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "unbound-call\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html\n  url: \"http://127.0.0.1:54468/session/32f5e6ea360f1c1b?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "lavish-32f5e6ea360f1c1b\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent.sh",
+      "register",
+      "lavish",
+      "lavish-32f5e6ea360f1c1b",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "poll",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/unbound.html"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "registered: lavish-32f5e6ea360f1c1b (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "answers",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-53b7a2f80d4ae0c6.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "backpass-path\tA-upstream-optin-plus-fork-bridge\tBackpass A — empty note\nlegacy-extras\tA\tBookkeeping fields\nlegacy-note\tOther: see note\tOther: see note - Edit the plan first; keep the fork bridge\nlegacy-alias\tB (published examples)\tChoice alias\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "reconciles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-53b7a2f80d4ae0c6.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "answers",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-5ead1811a4f6977c.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "unrelated-answer\tB\tIndependent answer B\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "reconciles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-5ead1811a4f6977c.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "answers",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-69722a80cbcb9b20.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-0\tA\treverse-0: latest legacy-answer\nreverse-1\tA\treverse-1: latest legacy-choice\nreverse-2\tA\treverse-2: latest versioned-answer\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "reconciles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-69722a80cbcb9b20.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-3\tlatest reality check\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "answers",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-5d3eb6e808355bd6.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "guard-invalid-latest\tA\tInvalid latest row — earlier valid A\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "reconciles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-5d3eb6e808355bd6.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "answers",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-32f5e6ea360f1c1b.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "unbound-call\tA\tUnbound ordinary choice\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-procevent-lavish.sh",
+      "reconciles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-32f5e6ea360f1c1b.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "reconcile",
+      "list"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-3\trequested=2026-10-09T08:38:05Z\tsource=the captured result lavish-69722a80cbcb9b20 sequence 1; captain note: latest reality check\nreconcile-requests: 1\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/.gate-lavish-baseline.sh",
+      "answers",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home/state/procevent-inbox/lavish-53b7a2f80d4ae0c6.1.result"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tasks-axi",
+      "show",
+      "backpass-path",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home",
+    "status": 0,
+    "stdout": "task:\n  id: backpass-path\n  title: Live validation backpass-path\n  state: done\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24=\"\n  hold_kind: captain\n  hold_until: \"-\"\n  kind: captain\n  repo: sample\n  priority: \"-\"\n  created: \"-\"\n  closed: 2026-10-09\n  deps: none\n  links: none\n  body: \"Resolution recorded by fm-captain-hold.\\nDecision digest: 77c460e7307299a3f392918dafea845ac185515e30c4ff9e79de1ef69a802258\\nResolution mode: answered\\n\\nCaptain decision:\\nCaptain answered this call through the captured result lavish-53b7a2f80d4ae0c6 sequence 1.\\nTask: backpass-path\\nAnswer: A-upstream-optin-plus-fork-bridge\\nAnswer as shown to the captain: Backpass A — empty note\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tasks-axi",
+      "show",
+      "legacy-note",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home",
+    "status": 0,
+    "stdout": "task:\n  id: legacy-note\n  title: Live validation legacy-note\n  state: done\n  blocked: no\n  blocked_by: none\n  held: no\n  hold_reason: \"fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24=\"\n  hold_kind: captain\n  hold_until: \"-\"\n  kind: captain\n  repo: sample\n  priority: \"-\"\n  created: \"-\"\n  closed: 2026-10-09\n  deps: none\n  links: none\n  body: \"Resolution recorded by fm-captain-hold.\\nDecision digest: a32e3a618759d57fef79d82b74d7a3ef14c53d528d9eb29e69a4763394aa6b3f\\nResolution mode: answered\\n\\nCaptain decision:\\nCaptain answered this call through the captured result lavish-53b7a2f80d4ae0c6 sequence 1.\\nTask: legacy-note\\nAnswer: Other: see note\\nAnswer as shown to the captain: Other: see note - Edit the plan first; keep the fork bridge\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tasks-axi",
+      "show",
+      "suppress-0",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home",
+    "status": 0,
+    "stdout": "task:\n  id: suppress-0\n  title: Live validation suppress-0\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: yes\n  hold_reason: \"fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24=\"\n  hold_kind: captain\n  hold_until: \"-\"\n  kind: captain\n  repo: sample\n  priority: \"-\"\n  created: 2026-10-09\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"Captain hold set: 2026-10-09T08:27:25Z\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tasks-axi",
+      "show",
+      "reverse-3",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home",
+    "status": 0,
+    "stdout": "task:\n  id: reverse-3\n  title: Live validation reverse-3\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: yes\n  hold_reason: \"fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24=\"\n  hold_kind: captain\n  hold_until: \"-\"\n  kind: captain\n  repo: sample\n  priority: \"-\"\n  created: 2026-10-09\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"Captain hold set: 2026-10-09T08:34:41Z\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tasks-axi",
+      "show",
+      "unbound-call",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/.gate-lavish-verify-current/home",
+    "status": 0,
+    "stdout": "task:\n  id: unbound-call\n  title: Live validation unbound-call\n  state: queued\n  blocked: no\n  blocked_by: none\n  held: yes\n  hold_reason: \"fm-hold-v1:aXNvbGF0ZWQgbGVnYWN5IGRlY2lzaW9uIHZhbGlkYXRpb24=\"\n  hold_kind: captain\n  hold_until: \"-\"\n  kind: captain\n  repo: sample\n  priority: \"-\"\n  created: 2026-10-09\n  closed: \"-\"\n  deps: none\n  links: none\n  body: \"Captain hold set: 2026-10-09T08:36:18Z\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW/bin/fm-captain-hold.sh",
+      "reconcile",
+      "list"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FNRD2AJ451SEXVEK0B3FHW",
+    "status": 0,
+    "stdout": "reverse-3\trequested=2026-10-09T08:38:05Z\tsource=the captured result lavish-69722a80cbcb9b20 sequence 1; captain note: latest reality check\nreconcile-requests: 1\n",
+    "stderr": ""
+  }
+]
