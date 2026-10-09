@@ -2086,6 +2086,106 @@ SH
   pass "done and keyed decision signals appended during quiet and actionable checks are delivered"
 }
 
+test_flushed_signals_preserve_main_owned_routing() {
+  local dir state fakebin out pid mode ownership id line expected window key
+  for mode in two-checks stale; do
+    for ownership in decision routine; do
+      dir=$(make_case "flushed-routing-$mode-$ownership"); state="$dir/state"; fakebin="$dir/fakebin"
+      out="$dir/watch.out"; window=test:fm-b; key=test_fm-b
+      mkdir -p "$dir/approved" "$dir/config"
+      for id in a b; do
+        printf 'project=%s/approved\nwindow=test:fm-%s\nkind=ship\n' "$dir" "$id" > "$state/$id.meta"
+        printf 'working: setup\n' > "$state/$id.status"
+        prime_status_seen "$state" "$state/$id.status" || fail "could not prime signal $id"
+      done
+      if [ "$ownership" = decision ]; then
+        line='needs-decision [key=pick-one]: choose A or B'
+      else
+        line='done: first task completed'
+      fi
+      if [ "$mode" = two-checks ]; then
+        for id in a b; do
+          printf '#!/usr/bin/env bash\nid=%s\n' "$id" > "$state/$id.check.sh"
+          cat >> "$state/$id.check.sh" <<'SH'
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-started-$id"
+n=0
+while [ ! -e "$FM_STATE_OVERRIDE/check-release-$id" ] && [ "$n" -lt 1200 ]; do
+  sleep 0.1
+  n=$((n + 1))
+done
+SH
+          chmod 0700 "$state/$id.check.sh"
+          FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null \
+            || fail "could not register check $id"
+        done
+        watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+          FM_CHECK_TIMEOUT=120 FM_CHECK_INTERVAL=1
+        pid=$!
+        wait_numeric_file "$state/check-started-a" 300 \
+          || { reap "$pid"; fail "first check never started"; }
+        printf '%s\n' "$line" >> "$state/a.status"
+        touch "$state/check-release-a"
+        wait_numeric_file "$state/check-started-b" 300 \
+          || { reap "$pid"; fail "second check never started"; }
+        printf 'done: second task completed\n' >> "$state/b.status"
+        touch "$state/check-release-b"
+        expected="signal: $state/a.status $state/b.status"
+      else
+        printf 'idle prompt, finished' > "$dir/pane.txt"
+        printf '%s' "$(hash_text 'idle prompt, finished')" > "$state/.hash-$key"
+        printf '1\n' > "$state/.count-$key"
+        cat > "$fakebin/fm-crew-state.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = b ] && [ "$(cat "$FM_STATE_OVERRIDE/.count-test_fm-b" 2>/dev/null)" = 2 ]; then
+  printf '%s\n' "$FM_TEST_ROUTING_LINE" >> "$FM_STATE_OVERRIDE/a.status"
+fi
+printf 'state: unknown · source: none · no running pipeline\n'
+SH
+        watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+          FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$dir/pane.txt" FM_TEST_ROUTING_LINE="$line"
+        pid=$!
+        if [ "$ownership" = decision ]; then
+          expected="signal: $state/a.status"
+        else
+          expected="stale: $window"
+        fi
+      fi
+      wait_for_exit "$pid" 300 || { reap "$pid"; fail "$mode/$ownership watcher did not deliver"; }
+      [ "$(cat "$out")" = "$expected" ] \
+        || fail "$mode/$ownership emitted the wrong routing trigger: $(cat "$out")"
+      if [ "$mode" = stale ]; then
+        grep -F "$(printf 'stale\t%s\tstale: %s' "$window" "$window")" "$state/.wake-queue" >/dev/null \
+          || fail "the original stale wake was not preserved"
+      fi
+      STATE="$state" WATCH_OUT="$out" OWNERSHIP="$ownership" MODE="$mode" \
+        LIB="$ROOT/.pi/extensions/lib/fm-branch-dispatch.ts" node --input-type=module <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { branchOfferForWake } = await import(pathToFileURL(process.env.LIB).href);
+const state = process.env.STATE;
+const message = readFileSync(process.env.WATCH_OUT, "utf8").trim();
+const rows = readFileSync(`${state}/.wake-queue`, "utf8").trim().split("\n").map(line => line.split("\t"));
+const signal = task => rows.find(row => row[2] === "signal" && row[3] === `${task}.status`);
+const decision = process.env.OWNERSHIP === "decision";
+assert.ok(signal("a"), "first flushed signal is durable");
+assert.match(signal("a")[4], decision ? /^needs-decision:/ : /^signal:/);
+if (process.env.MODE === "two-checks") assert.ok(signal("b"), "second flushed signal is durable");
+for (const attendedHost of [false, true]) {
+  const verdict = branchOfferForWake(state, message, false, attendedHost);
+  assert.equal(verdict.scope.corrupted, false);
+  assert.equal(verdict.scope.eligible, true, "an unrelated branch-eligible row must remain available");
+  assert.equal(verdict.eligible, !decision, "Main-owned signals must route the close to Main");
+  if (decision) assert.ok(verdict.scope.needsDecisionKeys.includes("a.status"));
+  assert.equal(branchOfferForWake(state, message, true, attendedHost).eligible, true, "away routing remains eligible");
+}
+JS
+      [ "$?" -eq 0 ] || fail "$mode/$ownership branch offer violated signal ownership"
+    done
+  done
+  pass "successive check flushes and pre-stale flushes preserve Main-owned triggers and durable wakes"
+}
+
 # A low-priority wake used to pre-empt the signal scan: an overdue-ledger wake
 # exited the cycle first, so a done line waited for one more firstmate round trip.
 # The signal wake goes first; the ledger row still surfaces on the next cycle.
@@ -6931,6 +7031,7 @@ test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines
 test_actionable_signal_surfaced
 test_done_and_keyed_lines_surface_between_and_during_cycles
 test_signal_not_held_behind_a_blocked_check
+test_flushed_signals_preserve_main_owned_routing
 test_signal_not_preempted_by_an_overdue_ledger
 test_cycle_work_runs_after_bounded_signal_deferrals
 test_invalid_prelude_deferral_marker_restores_the_previous_order

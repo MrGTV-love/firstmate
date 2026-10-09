@@ -92,19 +92,19 @@ triage_log() {
 
 # Exit after reporting one actionable wake. Tests override this callback.
 wake() {
-  local output_status=0 post_output_status=0
+  local output_status=0 post_output_status=0 FM_WAKE_OUTPUT_REASON=$1
   [ -z "$FM_WAKE_BEFORE_OUTPUT_ACTION" ] || "$FM_WAKE_BEFORE_OUTPUT_ACTION" "$1" || exit 1
-  case "$1" in
+  case "$FM_WAKE_OUTPUT_REASON" in
     heartbeat*) echo $(( $(cat "$STATE/.heartbeat-streak" 2>/dev/null || echo 0) + 1 )) > "$STATE/.heartbeat-streak" ;;
     *) echo 0 > "$STATE/.heartbeat-streak" ;;
   esac
   trap '' HUP INT TERM
   [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || trap '' PIPE
-  if echo "$1"; then
+  if echo "$FM_WAKE_OUTPUT_REASON"; then
     output_status=0
-    watch_delivery_publish "$1" || true
+    watch_delivery_publish "$FM_WAKE_OUTPUT_REASON" || true
     # shellcheck disable=SC2034 # Read by bin/fm-watch.sh's EXIT cleanup.
-    FM_WATCH_DELIVERED_REASON=$1
+    FM_WATCH_DELIVERED_REASON=$FM_WAKE_OUTPUT_REASON
   else
     output_status=1
   fi

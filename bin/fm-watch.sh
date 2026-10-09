@@ -2826,6 +2826,7 @@ PRELUDE_PROGRESS_MARKER="$STATE/.prelude-progress"
 PRELUDE_NEXT_STEP=
 SIGNAL_PHASE_DELIVERY_ONLY=0
 SIGNAL_PHASE_QUEUED_REASON=
+SIGNAL_PHASE_MAIN_REQUIRED=0
 
 # Loads the persisted count into PRELUDE_DEFER_COUNT without a subshell: absent
 # reads 0, anything unreadable or non-numeric reads as the bound (work owed).
@@ -2873,10 +2874,28 @@ signal_phase_flush() {
   signal_phase
   SIGNAL_PHASE_DELIVERY_ONLY=0
 }
+signal_phase_note_queued() {
+  local f
+  local -a queued_files
+  [ -n "$SIGNAL_PHASE_QUEUED_REASON" ] || SIGNAL_PHASE_QUEUED_REASON=signal:
+  read -r -a queued_files <<< "$1"
+  for f in "${queued_files[@]}"; do
+    case " ${SIGNAL_PHASE_QUEUED_REASON#signal:} " in
+      *" $f "*) ;;
+      *) SIGNAL_PHASE_QUEUED_REASON="$SIGNAL_PHASE_QUEUED_REASON $f" ;;
+    esac
+  done
+  [ -z "$FM_SIGNAL_NEEDS_DECISION_FILES" ] || SIGNAL_PHASE_MAIN_REQUIRED=1
+  return 0
+}
 
 watch_before_wake() {
-  case "$1" in signal:*) return 0 ;; esac
-  signal_phase_flush
+  case "$1" in signal:*) ;; *) signal_phase_flush ;; esac
+  case "$1" in
+    check:*) ;;
+    signal:*) FM_WAKE_OUTPUT_REASON=$SIGNAL_PHASE_QUEUED_REASON ;;
+    *) [ "$SIGNAL_PHASE_MAIN_REQUIRED" -eq 0 ] || FM_WAKE_OUTPUT_REASON=$SIGNAL_PHASE_QUEUED_REASON ;;
+  esac
 }
 
 watch_after_wake() {
@@ -3224,7 +3243,7 @@ EOF
 $FM_SIGNAL_SURFACE_ENDPOINTS
 EOF
       signal_phase_note_deferred_prelude
-      SIGNAL_PHASE_QUEUED_REASON=$reason
+      signal_phase_note_queued "$files"
       [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
       wake "$reason"
     else
@@ -3245,12 +3264,14 @@ EOF
       if [ "$signal_commit_error" -ne 0 ]; then
         while IFS=$(printf '\t') read -r sf sig f; do
           [ -n "$sf" ] || continue
-          "$signal_append" signal "$(basename "$f")" "$reason" || exit 1
+          file_reason="$reason"
+          case " $FM_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
+          "$signal_append" signal "$(basename "$f")" "$file_reason" || exit 1
         done <<EOF
 $pending
 EOF
         signal_phase_note_deferred_prelude
-        SIGNAL_PHASE_QUEUED_REASON=$reason
+        signal_phase_note_queued "$files"
         [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
         wake "$reason"
       fi
