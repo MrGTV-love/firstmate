@@ -11,6 +11,16 @@
 # retirement; docs/watcher-continuity.md owns the recovery contract.
 # --reemit is the context-refresh presentation mode; the same document's
 # "Who presents queued wakes between turns" section owns its delivery exclusion.
+# --queued is a standalone read-only query, not a presentation or acknowledgement.
+# It prints append-order TSV rows (epoch, sequence, kind, key, payload), preserving
+# row fields without same-key deduplication. FM_SUPERVISION_ACTOR defaults to main:
+# main sees rows not reserved by a live branch grant; branch sees only that grant.
+# A missing/stale grant reserves nothing. This mode takes no locks, creates no
+# state, repairs nothing, and emits no status sections, liveness checks, or
+# WAKE_ACK_REQUIRED. Missing/empty queues succeed with no rows; unreadable paths,
+# failed reads, or malformed rows fail without returning even a valid prefix.
+# Valid rows have exactly five fields, decimal epoch/sequence, and kind signal,
+# stale, check, or heartbeat. Extra query arguments and invalid actors exit 2.
 # Every scratch file this script mints (.main-eligible-rows.tmp.*,
 # .wake-rows.consume.*, .wake-queue.retire.*, .wake-queue.ack.*,
 # .wake-queue.actor-view.*) is created and removed under the queue lock, so one
