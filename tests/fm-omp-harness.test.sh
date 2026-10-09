@@ -475,7 +475,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
 
 test_spawn_raw_omp_expansions_pass_through_unchanged() {
   local rec id out status mode role command launch_dir first_arg
-  for mode in profile after-delimiter substitution backticks redirect glob; do
+  for mode in profile after-delimiter substitution backticks redirect glob tilde tilde-redirection tilde-user tilde-assignment process ansi locale braces heredoc punctuation; do
     for role in missing unlisted; do
       id="omp-expansion-$mode-$role"
       rec=$(make_spawn_case "expansion-$mode-$role" omp "$id")
@@ -507,6 +507,18 @@ test_spawn_raw_omp_expansions_pass_through_unchanged() {
           printf 'input\n' > "$CASE_DIR/input.txt"
           command="$command --auto-approve '$CASE_DIR'/*.txt"
           ;;
+        tilde) command="$command --auto-approve ~/input.txt" ;;
+        tilde-redirection) command="$command --auto-approve 2>~/omp-errors.log" ;;
+        tilde-user) command="$command --auto-approve ~root/input.txt" ;;
+        tilde-assignment) command="EXTRA_DIR=~ $command --auto-approve" ;;
+        process) command="$command --auto-approve <(printf input)" ;;
+        ansi) command="$command --auto-approve \$'input'" ;;
+        locale) command="$command --auto-approve \$\"input\"" ;;
+        braces) command="$command --auto-approve {a,b}" ;;
+        heredoc) command="$command --auto-approve <<'EOF'
+input
+EOF" ;;
+        punctuation) command="$command --auto-approve input!" ;;
       esac
       out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
@@ -528,10 +540,47 @@ test_spawn_raw_omp_expansions_pass_through_unchanged() {
           [ "$(cat "$CASE_DIR/expanded")" = evaluated ] || fail "the pane must evaluate the command substitution"
           ;;
         redirect) assert_present "$CASE_DIR/errors.log" "the pane must evaluate the redirection" ;;
+        tilde-redirection) assert_present "$HOME_DIR/user-home/omp-errors.log" "the pane must expand the tilde redirection" ;;
       esac
     done
   done
   pass "fm-spawn: any expanded raw token passes through unchanged without evaluating it or probing the default-role catalog"
+}
+
+test_spawn_raw_omp_literal_evidence_still_refuses() {
+  local rec id out status quoting role command launch_dir
+  for quoting in unquoted single double; do
+    for role in missing unlisted; do
+      id="omp-literal-$quoting-$role"
+      rec=$(make_spawn_case "literal-$quoting-$role" omp "$id")
+      read_case_record "$rec"
+      launch_dir=$(dirname "$GLOBAL_CONFIG")
+      if [ "$role" = missing ]; then
+        printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
+      else
+        printf 'modelRoles:\n  default: openai-codex/gpt-gone\n' > "$GLOBAL_CONFIG"
+      fi
+      case "$quoting" in
+        unquoted) command="PI_CODING_AGENT_DIR=$launch_dir omp --auto-approve 2>$CASE_DIR/errors.log" ;;
+        single) command="PI_CODING_AGENT_DIR='$launch_dir' omp '--auto-approve' 'literal ~ \$ value' 2>'$CASE_DIR/errors.log'" ;;
+        double) command="PI_CODING_AGENT_DIR=\"$launch_dir\" omp \"--auto-approve\" \"literal ~ value\" 2>\"$CASE_DIR/errors.log\"" ;;
+      esac
+      out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+        run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
+      status=$?
+      expect_code 1 "$status" "literal-only raw command must refuse the $role role ($quoting): $out"
+      assert_contains "$out" "error: omp modelRoles.default" "literal evidence must reach the default-role guard"
+      assert_absent "$HOME_DIR/state/$id.meta" "a refused literal launch must publish no record"
+      [ ! -s "$LAUNCH_LOG" ] || fail "a refused literal launch must record no command"
+      assert_absent "$CASE_DIR/errors.log" "validation must not execute a literal redirection"
+      if [ "$role" = unlisted ]; then
+        assert_grep "models:$launch_dir" "$CASE_DIR/omp-env.log" "literal evidence must probe the launch directory's catalog"
+      else
+        assert_absent "$CASE_DIR/omp-env.log" "a missing literal default must refuse without a catalog probe"
+      fi
+    done
+  done
+  pass "fm-spawn: unquoted, single-quoted, and double-quoted literal evidence still refuses invalid defaults"
 }
 
 test_spawn_raw_omp_guard_uses_the_launch_model() {
@@ -1746,6 +1795,7 @@ test_spawn_raw_omp_guard_uses_the_launch_model
 test_spawn_raw_omp_guard_uses_the_launch_agent_dir
 test_spawn_omp_profiles_leave_directory_evidence_unreadable
 test_spawn_raw_omp_expansions_pass_through_unchanged
+test_spawn_raw_omp_literal_evidence_still_refuses
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle

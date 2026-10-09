@@ -2291,11 +2291,13 @@ class LaunchLexer extends Lexer {
   }
 }
 const { tokens, error } = new LaunchLexer(process.argv[3]).tokenize();
-if (error || tokens.some(token => token.type === "word" && (!token.literal || token.unquotedExpansion))) process.exit(1);
+const readableToken = token => token.type === "word"
+  ? /^(?:[A-Za-z0-9_./:=,@%+-]+|\x27[^\x27]*\x27|\x22[^\x22\x24\x60\\]*\x22)+$/.test(token.source)
+  : token.type === "redir" && [">", ">>", "<", "<>", ">&", "<&"].includes(token.value);
+if (error || !tokens.every(readableToken)) process.exit(1);
 const words = [];
 for (let i = 0; i < tokens.length; i++) {
   const token = tokens[i];
-  if (token.type === "op" || token.type === "group") break;
   if (token.type === "redir") {
     if (!token.inlineTarget) i++;
     continue;
@@ -2304,10 +2306,10 @@ for (let i = 0; i < tokens.length; i++) {
 }
 let i = 0;
 let agentDir = "";
-let certain = tokens.every(token => token.type === "word" || token.type === "redir");
+let certain = true;
 while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
   const word = words[i++];
-  if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(word.source) || word.source.includes("\\")) certain = false;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(word.source)) certain = false;
   if (word.value.startsWith("PI_CODING_AGENT_DIR=")) {
     agentDir = word.value.slice("PI_CODING_AGENT_DIR=".length);
   }
