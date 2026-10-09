@@ -1152,6 +1152,7 @@ The current classification and plain-hint safety boundary is owned by [Composer 
 
 The live guard launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands.
 It now verifies that direct native launches remain unmanaged and that interrupt, exit, and ordinary relaunch preserve their live PID, screen, draft, endpoint, instructions, and dirty work.
+After guarded lab teardown, cleanup waits up to 10 seconds for the captured native PID/start incarnation to exit before removing its private worktree and overlay. Failed teardown, uncaptured launch identity, or unconfirmed exit retains the private tree and fails the test, including on early failures.
 The default-on checks spend no tokens wherever omp, herdr, jq, and python3 are installed:
 
 ```sh

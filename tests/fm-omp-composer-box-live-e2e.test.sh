@@ -25,12 +25,42 @@ FAKEBIN="$TMP_ROOT/fakebin"
 mkdir -p "$FAKEBIN"
 TASK_ID="ompbox$$"
 OWNED_SESSION=0
+NATIVE_LAUNCH_PENDING=0
+PID=
+NATIVE_START=
+
+wait_native_exit() {
+  local current_start deadline=$((SECONDS + 10))
+  [ "$NATIVE_LAUNCH_PENDING" = 0 ] || {
+    printf 'native launch identity was not captured; refusing private tree removal\n' >&2
+    return 1
+  }
+  [ -n "$PID" ] || return 0
+  while kill -0 "$PID" 2>/dev/null; do
+    current_start=$(LC_ALL=C ps -p "$PID" -o lstart= 2>/dev/null) || current_start=
+    if [ -n "$current_start" ] && [ "$current_start" != "$NATIVE_START" ]; then
+      break
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      printf 'native child exit not confirmed within 10s: pid=%s start=%s current=%s\n' \
+        "$PID" "$NATIVE_START" "${current_start:-<unreadable>}" >&2
+      return 1
+    fi
+    sleep 0.1
+  done
+  printf 'native child exit confirmed: pid=%s start=%s\n' "$PID" "$NATIVE_START"
+}
 
 cleanup() {
   local rc=$?
   trap - EXIT
   if [ "$OWNED_SESSION" = 1 ] && ! PATH="$ORIGINAL_PATH" "$LAB_HELPER" teardown "$SESSION"; then
     printf "guarded teardown failed for session '%s'; retained private tree for manual cleanup: %s\n" \
+      "$SESSION" "$TMP_ROOT" >&2
+    exit 1
+  fi
+  if ! wait_native_exit; then
+    printf "native cleanup refused for session '%s'; retained private tree for manual cleanup: %s\n" \
       "$SESSION" "$TMP_ROOT" >&2
     exit 1
   fi
@@ -118,6 +148,7 @@ herdr_pane_id=$PANE
 EOF
 TARGET="$SESSION:$PANE"
 
+NATIVE_LAUNCH_PENDING=1
 lab pane run "$PANE" "env OMP_SKIP_SETUP=1 FM_OMP_HARNESS=omp omp --config '$BOX_OVERLAY' --auto-approve --cwd '$WORKTREE'" >/dev/null \
   || fail "could not launch $SUBJECT in the isolated pane"
 
@@ -161,6 +192,9 @@ native_pid() {
     | select(length == 1) | .[0].pid'
 }
 PID=$(native_pid) || fail "$SUBJECT: the native omp PID could not be identified"
+NATIVE_START=$(LC_ALL=C ps -p "$PID" -o lstart=) \
+  && [ -n "$NATIVE_START" ] || fail "$SUBJECT: native omp process start identity could not be captured"
+NATIVE_LAUNCH_PENDING=0
 environment=$(fm_remote_herdr_process_env "$PID") || fail "$SUBJECT: native live environment could not be read"
 printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' \
   || fail "$SUBJECT: native live environment was not positively readable"
