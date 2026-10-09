@@ -28,6 +28,12 @@
 # Aggregation (no suite execution):
 #   fm-test-run.sh --aggregate-json <out.json> <lane.json> [more lane.json...]
 #
+# Leftovers: after each script finishes, the runner invokes the reaper beside it
+# in its own checkout, including when running from a scratch copy. The
+# bin/fm-test-reap-orphans.sh header owns ended lab/test ownership proof.
+# A script killed before cleanup completes can leave stubs behind; the sweep
+# logs its reaper output and never changes the script's result.
+#
 # Options:
 #   --json <path>   write a deterministic timing artifact after the run. Each
 #                   script record carries its family, expected gate-skip class,
@@ -333,7 +339,7 @@ family_for_basename() {
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
     fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-task-inbox.test.sh|\
-    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh)
+    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     fm-afk-inject-herdr-e2e.test.sh|fm-afk-launch.test.sh|fm-backend-autodetect-smoke.test.sh|\
@@ -381,13 +387,14 @@ family_for_basename() {
     fm-grok-stop-live-e2e.test.sh|fm-harness-adapter-instructions-live-e2e.test.sh|\
     fm-harness-liveness-drift-live-e2e.test.sh|\
     fm-devin-signals-live-e2e.test.sh|fm-muse-signals-live-e2e.test.sh|fm-rovo-signals-live-e2e.test.sh|fm-agy-signals-live-e2e.test.sh|\
-    fm-launch-prompt-signals-live-e2e.test.sh|\
+    fm-launch-prompt-signals-live-e2e.test.sh|fm-claude-nested-home-live-e2e.test.sh|\
     fm-pi-seeded-home-trust-live-e2e.test.sh|\
     fm-herdr-version-floor-live-e2e.test.sh|\
     fm-herdr-pi-stale-registration-live-e2e.test.sh|\
     fm-worker-account-live-e2e.test.sh|fm-teamclaude-launch-live-e2e.test.sh|\
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
+    fm-pi-watch-loader-live.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
@@ -924,6 +931,7 @@ tests/fm-teardown.test.sh 202132
 tests/fm-test-fixture-cleanup.test.sh 937
 tests/fm-test-fixtures.test.sh 1802
 tests/fm-test-isolation-proof.test.sh 2866
+tests/fm-test-reap-orphans.test.sh 10537
 tests/fm-timeout-lib.test.sh 10750
 tests/fm-tmux-agent-liveness.test.sh 3770
 tests/fm-tool-update-check.test.sh 14383
@@ -947,6 +955,7 @@ tests/fm-watch-open-loops.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59092
 tests/fm-watch-triage.test.sh 1074843
 tests/fm-watcher-lock.test.sh 108940
+tests/fm-watchdog-check.test.sh 23000
 tests/fm-worker-account-live-e2e.test.sh 3179
 tests/fm-worker-account.test.sh 125208
 EOF
@@ -1480,6 +1489,13 @@ families_for_changed_path() {
       # report.ts are exercised only through the jev-guard behavior suite.
       printf '%s\n' "__script__:fm-jev-guard.test.sh"
       ;;
+    tests/fm-pi-watch-loader-live.test.mjs)
+      printf '%s\n' __script__:fm-pi-watch-loader-live.test.sh
+      ;;
+    tests/watch-lifecycle-expiry.mjs)
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      ;;
     tests/assets/gh-http-shim.sh)
       # The HTTP-faithful gh double behind fm_gh_http_shim.
       printf '%s\n' "__script__:fm-pr-state.test.sh"
@@ -1673,6 +1689,17 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-supervision-host-hook.test.sh
       # Whether an arriving outcome still lets the captain type is a fact only
       # a real Pi TUI can answer, so the live guards are selected too.
+      printf '%s\n' live-harness-optin
+      ;;
+    .pi/extensions/lib/fm-watch-lifecycle.ts)
+      # The primary watcher extensions' shared lifecycle record and instance
+      # registry: the suites that load either watcher extension, plus the Pi
+      # typecheck and the live guards that load the real harness.
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' __script__:fm-watch-recovery-loop.test.sh
+      printf '%s\n' __script__:fm-calm-pi-extension.test.sh
+      printf '%s\n' __script__:fm-pi-primary-types.test.sh
       printf '%s\n' live-harness-optin
       ;;
     .pi/extensions/lib/fm-operational-input.ts)
@@ -2618,6 +2645,16 @@ record_script_result() {
   TOTAL=$((TOTAL + 1))
 }
 
+# Run the header's leftovers sweep before this worker moves to its next script.
+reap_script_leftovers() {  # <script>
+  local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line
+  [ -x "$reaper" ] || return 0
+  while IFS= read -r line; do
+    [ -z "$line" ] || log "reaped after $1: $line"
+  done < <("$reaper" 2>/dev/null || true)
+  return 0
+}
+
 # Run <script>, capturing output to <out>. <stream> 1 also echoes it live.
 # <id> only has to be unique within this run. When PER_SCRIPT_TIMEOUT_SECS is
 # positive, a script that outruns it is terminated and reported as exit 124: a
@@ -2666,6 +2703,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"
     [ "$stream" -eq 1 ] && tail -1 "$out"
   fi
+  reap_script_leftovers "$script"
   return "$rc"
 }
 

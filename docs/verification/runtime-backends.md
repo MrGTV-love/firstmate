@@ -776,6 +776,58 @@ ok - unseeded path without --approve still prompts on Trust project folder?
 
 Portable launch-command coverage lives in `tests/fm-spawn-dispatch-profile.test.sh` (`test_pi_seeded_secondmate_preapproves_project_trust`, `test_pi_worker_launch_omits_seeded_home_approve`, `test_pi_approve_probe_omits_unsupported_flag`).
 
+## Nested firstmate home memory exclusion
+
+Without the exclusion, a Claude task copy nested under a firstmate home (`<home>/projects/<project>/.claude/worktrees/<task>`) can read the home's `CLAUDE.md` (`@AGENTS.md`) as a parent file, park on "Allow external CLAUDE.md file imports?", and, once the import is allowed, load the supervisor contract into a project worker.
+[`bin/fm-claude-memory-lib.sh`](../../bin/fm-claude-memory-lib.sh) owns the production exclusion and raw-launch settings-merger contract verified here.
+`tests/fm-claude-nested-home-live-e2e.test.sh` drives the installed binary in a scratch config with no prompt submitted and no dialog answered, so it spends no model tokens: a copy outside any home reaches the composer, the nested copy without the exclusion parks on the imports dialog, and the same copy with the production fragment reaches the composer with no dialog.
+It also exercises a home containing ampersands, apostrophes, brackets, and braces through direct settings and the raw-launch merger with absent, inline, and file-based settings.
+`tests/fm-spawn-dispatch-profile.test.sh` executes canonical and raw launches to verify the delivered settings for nested copies, while copies outside a home and panes at the home root retain their own memory.
+Focused argv probes passed for direct and TeamClaude raw commands with absent, inline, and file-based settings: the exclusions merge without dropping caller keys or exclusions, and the model arguments, brief doorbell, environment assignments, and TeamClaude proxy remain intact.
+
+Literal glob metacharacters in ancestor-home paths use character classes: Claude Code 2.1.295 does not honor backslash-escaped brackets and braces in exclusion patterns.
+The live guard verifies that these paths reach the composer through both the production fragment and the raw-launch settings merger.
+The literal-data substitution invariant and Bash compatibility rationale are recorded beside the shell-quote substitution in `bin/fm-claude-memory-lib.sh`.
+
+`tests/fm-spawn-claude-start-confirm.test.sh` passed all four parked-dialog cases and active/completed hook-progress cases with retained dialog text, plus a cleared dialog retained in scrollback, a quiet pane, and early termination of unreadable captures.
+[`bin/fm-spawn.sh`](../../bin/fm-spawn.sh)'s Claude start-confirmation header owns the polling, semantic-progress precedence, and capture contract.
+
+Verified 2026-10-09 on Claude Code 2.1.295.
+
+```sh
+mkdir -p .validation/tmp
+TMPDIR="$PWD/.validation/tmp" FM_CLAUDE_NESTED_HOME_LIVE=1 bash tests/fm-claude-nested-home-live-e2e.test.sh
+```
+
+```
+# live claude version: 2.1.295 (Claude Code)
+ok - control: a copy that is not nested under a firstmate home reaches the composer
+ok - reproduction: a nested copy without the exclusion parks on 'Allow external CLAUDE.md file imports?'
+ok - fixed: the same nested copy launched with the production exclusion reaches the composer with no dialog
+ok - a nested home with ampersands, quotes, and glob metacharacters reaches the composer
+ok - raw launch with none settings excludes special-character ancestor memory
+ok - raw launch with inline settings excludes special-character ancestor memory
+ok - raw launch with file settings excludes special-character ancestor memory
+# checked the nested-home memory exclusion against 2.1.295 (Claude Code)
+```
+
+The reproduction pane, launched from a nested copy with no exclusion:
+
+```
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for third-party
+  repositories.
+
+  External imports:
+    <lab>/fmhome/AGENTS.md
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel
+```
+
 ## Launch-prompt backstop signatures
 
 `bin/fm-busy-lib.sh`'s launch-prompt backstop (`fm_busy_launch_prompt_parked`) reclassifies a launch whose busy record is still pinned at the fm-spawn seed as `unknown launch-prompt`, rather than `busy fm-spawn`, when the captured pane matches that harness's own recognized trust, sign-in, or first-run dialog.
@@ -798,6 +850,35 @@ ok - pi, pi-signed, omp: a real Pi-engine launch parked on its own rendered trus
 # live gemini version: 0.60.0
 ok - gemini: a real launch parked on its own rendered auth or trust dialog surfaces through the watcher gate
 # checked 3 launch-prompt signature(s) against real installed binaries
+```
+
+The Claude signature also covers the external-imports dialog (captured above in "Nested firstmate home memory exclusion"), the machine-level bypass-permissions confirmation, and the custom-API-key choice.
+The last two were captured 2026-10-08 on Claude Code 2.1.294 in a scratch `CLAUDE_CONFIG_DIR`, launching `claude --dangerously-skip-permissions` with onboarding complete and, for the second, `ANTHROPIC_API_KEY` set to a throwaway value that was not yet approved:
+
+```
+  WARNING: Claude Code running in Bypass Permissions mode
+
+  In Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous commands.
+  This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged.
+  By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.
+
+  ❯ No, exit
+    Yes, I accept
+
+  Enter to confirm · Esc to cancel
+```
+
+```
+  Detected a custom API key in your environment
+
+  ANTHROPIC_API_KEY: sk-ant-...<last 20 characters>
+
+  Do you want to use this API key?
+
+    Yes
+  ❯ No (recommended)
+
+  Enter to confirm · Esc to cancel
 ```
 
 Claude, launched `--dangerously-skip-permissions` into a brand-new worktree under the operator's own already-onboarded config (the shape a real crewmate spawn produces):

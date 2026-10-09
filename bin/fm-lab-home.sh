@@ -4,7 +4,8 @@
 # A lab home is a throwaway FM_HOME that a no-mistakes GATE agent may drive
 # through the fleet lifecycle entrypoints: bin/fm-gate-refuse-lib.sh refuses
 # those calls inside a gate agent unless FM_HOME carries the marker file this
-# helper writes (the lib owns the marker format and authorization decision;
+# helper writes (the lib owns the gate token and authorization decision;
+# bin/fm-test-reap-orphans.sh owns the reaping provenance requirements, and
 # this script is the supported writer).
 #
 # Usage:
@@ -64,6 +65,10 @@ case "${1:-}" in
       fm_lab_home_error "refusing '$dir': a lab marker is only ever stamped on a fresh empty dir"
       exit 1
     }
+    # shellcheck source=bin/fm-wake-lib.sh
+    FM_STATE_OVERRIDE="$dir" . "$SCRIPT_DIR/fm-wake-lib.sh"
+    owner_identity=$(fm_pid_identity "$PPID") || { fm_lab_home_error "cannot identify the lab owner"; exit 1; }
+    printf 'owner_pid=%s\nowner_identity=%s\n' "$PPID" "$owner_identity" >> "$dir/.fm-lab-home" || exit 1
     mkdir -p "$dir/state" "$dir/data" "$dir/config" "$dir/projects" || exit 1
     printf '%s\n' "$dir"
     ;;

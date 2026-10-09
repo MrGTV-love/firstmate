@@ -1120,7 +1120,8 @@ for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
         (deadline_home / name).mkdir(parents=True)
     deadline_bin.mkdir()
     shutil.copytree(code / 'bin', deadline_code / 'bin')
-    (deadline_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=1)))
+    # The named reader injects SIGALRM; allow normal REST-helper startup on loaded hosts.
+    (deadline_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=30)))
     deadline_tasks = []
     if reader == 'pr-state':
         deadline_tasks = [task('failed-' + str(i), deadline_root / 'absent', state='failed', pr=PR_URL + str(i))
@@ -1171,9 +1172,9 @@ sys.exit(1)
     deadline_env = dict(env, FM_HOME=str(deadline_home), DEADLINE_READER=reader,
                         PATH=f'{deadline_bin}:{env["PATH"]}')
     deadline_report = json.loads(out([deadline_code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'],
-                                    env=deadline_env, timeout=60))
+                                    env=deadline_env, timeout=120))
     assert not deadline_report['complete'] and len(rows(deadline_report, 'coverage')) == 1, deadline_report
-    assert 'collection exceeded its deadline' in rows(deadline_report, 'coverage')['ledger degraded']['evidence']
+    assert 'collection exceeded its deadline' in rows(deadline_report, 'coverage')['ledger degraded']['evidence'], (reader, deadline_report)
     attempts = [json.loads(line) for line in (deadline_home / 'attempts').read_text().splitlines()]
     expected_requests = {
         'origins': [['git', '-C', str(deadline_home / 'projects' / str(i)),

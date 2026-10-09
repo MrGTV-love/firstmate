@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
-| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -558,6 +558,10 @@ An absent file means `auto`, i.e. default-on on macOS: the alarm exists precisel
 A missing or failing channel logs and falls through to the next, never crashing the daemon.
 See [`wedge-alarm.md`](wedge-alarm.md) for the current channel reference, [`verification/supervision.md`](verification/supervision.md#wedge-alarm-channels) for active evidence, and [`examples/wedge-alarm`](examples/wedge-alarm) for a copyable config.
 
+## Out-of-session watchdog (config/watchdog-resume)
+
+[`watchdog.md`](watchdog.md) owns the operator-managed `config/watchdog-resume` command contract and the watchdog's supported behavior.
+
 ## Trace context propagation (config/trace-context / FM_TRACE_CONTEXT)
 
 The optional local, gitignored `config/trace-context` presence flag enables default-off native W3C trace-context propagation.
@@ -696,6 +700,7 @@ The contributions poll also checks the recorded core quota before its final Grap
 The PR-state and reviewer advisory commands remain available below the sweep floor; their shared REST reads still update the quota record.
 Responses carrying valid `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Resource` headers update the recorded quota, including on a 304 or an error.
 Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
+Cache and quota recording is best-effort: an unwritable state directory or a recording lock unavailable within a two-second wait silently skips recording without changing the read result.
 The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
 
 When the recorded core remaining quota is below the configured floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
@@ -1007,7 +1012,8 @@ Its `remove` action excises only the marker-delimited Firstmate region and remov
 For Pi and pi-signed secondmate launches, `fm-spawn.sh` starts the selected executable with `-e` pointed at the secondmate home's own tracked `.pi/extensions/fm-primary-pi-watch.ts` and `.pi/extensions/fm-primary-turnend-guard.ts`, both already present from the secondmate home's git worktree.
 Pi-family secondmates can start unattended in Firstmate-seeded homes without accepting project trust manually; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the capability requirement, session-only approval scope, and older-version fallback, with [regression evidence](verification/runtime-backends.md#pi-seeded-secondmate-project-trust).
 
-For omp session posture, worker-only memory scope, and safe secondmate extension loading, see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
+For omp session posture, worker-only memory scope, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
+The [portable omp regression suite](../tests/fm-omp-harness.test.sh) covers default-role admission and raw-command model selection without an omp installation; its model-flag expectations preserve literal shell quoting across Bash versions.
 
 ## Claude permission mode (config/claude-permission-mode)
 
@@ -1061,7 +1067,7 @@ Firstmate requires any nonempty override to be an absolute path.
 The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
-A raw launch command admitted by the [session launch policy](#session-launch-policy-configsession-launch-policy) whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
+A raw launch command admitted by the [session launch policy](#session-launch-policy-configsession-launch-policy) whose harness resolves to `claude` passes the same check and runs through the launcher's `--exec`, so it receives the same proxy environment; ancestor-memory settings enforcement is owned by [`bin/fm-claude-memory-lib.sh`](../bin/fm-claude-memory-lib.sh), not bypassed by raw commands.
 That raw command then runs under `/bin/sh`, not the pane's own shell, so it must be POSIX sh compatible.
 The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.
 `tests/fm-teamclaude-launch-live-e2e.test.sh` checks the launcher against the installed TeamClaude CLI and running proxy.
@@ -2973,10 +2979,12 @@ FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm waits to confirm a fresh watc
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
 FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds the OpenCode primary watcher plugin waits for an arm attempt to report started, healthy, wake, or failure; default 35000 on Windows to stay above the MSYS confirm budget
 FM_PI_ARM_READY_TIMEOUT_MS=12000   # milliseconds the Pi watcher extension waits for a successor arm to report started or attached; default 35000 on Windows to stay above the MSYS confirm budget
-FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/OpenCode wait for an unready successor arm to exit before abandoning retries
-FM_WATCH_REARM_RETRY_BASE_MS=250   # Pi/OpenCode adapter base delay for continuity restoration retries
-FM_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/OpenCode adapter cap for exponential continuity retry delay
-FM_WATCH_REARM_RETRY_LIMIT=5   # Pi/OpenCode adapter launch-failure retries before surfacing restoration failure
+FM_PI_SUCCESSOR_GRACE_MS=15000   # milliseconds after a Pi replacement shutdown before recording missing-successor diagnostics and expiry; never activates the outgoing runtime, and never applies to terminal quit
+FM_OMP_SUCCESSOR_GRACE_MS=15000   # milliseconds after omp shutdown retirement before missing-successor recovery checks home-lock ownership; an explicit arm call can repair sooner (.omp/extensions/fm-primary-omp-watch.ts header)
+FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for an unready successor arm to exit before abandoning retries; Pi/omp also bound shutdown child-close waits
+FM_WATCH_REARM_RETRY_BASE_MS=250   # Pi/omp/OpenCode adapter base delay for continuity restoration retries
+FM_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/omp/OpenCode adapter cap for exponential continuity retry delay
+FM_WATCH_REARM_RETRY_LIMIT=5   # Pi/omp/OpenCode adapter launch-failure retries before surfacing restoration failure
 FM_WATCH_CYCLE_LOG_MAX_BYTES=262144   # size cap for the arm-owned watcher lifecycle ledger
 FM_WATCH_CYCLE_LOG_KEEP_LINES=1000   # newest complete lifecycle rows considered when the ledger is capped
 FM_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (state/.watch-extension.log); unset, empty, non-numeric, zero, or negative disables logging, a positive value keeps that many newest rows; logging never changes supervision behavior
@@ -2987,9 +2995,9 @@ FM_WATCHER_CLEANUP_LOCK_BOUND=   # optional watcher EXIT marker-lock wait; defau
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present
 FM_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:|PR ready|checks green|ready in branch|merged'   # captain-relevant status regex; nonterminal progress verbs remain excluded even when their prose matches
 FM_CLASSIFY_PAUSED_VERB=paused     # leading declared-wait status verb; bin/fm-status-event-lib.sh owns its meaning and legacy external-wait label; excluded from FM_CAPTAIN_RE and distinct from blocked
-FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stale pane escalates, unless that pane's own worker declared a wait that has not elapsed, or, where config/wedge-defer-parked-gate arms it, that pane's crew is parked at a validation gate awaiting the supervisor's decision on it that the crew raised under that run's key and nobody has answered yet, either of which takes the FM_PAUSE_RESURFACE_SECS recheck below instead; stale panes whose crew is not provably working surface immediately unless admitted directly to the declared-wait cadence, while a live idle declared wait still surfaces once before that cadence bounds repeats; at that same escalation moment a recovery-grade agent-state probe (docs/architecture.md owns that dead-record contract) reports a pane whose endpoint is proven `dead` or `missing` once and stops re-escalating it while it stays that way
+FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stale pane escalates, unless that pane's own worker declared a wait that has not elapsed, or, where config/wedge-defer-parked-gate arms it, that pane's crew is parked at a validation gate awaiting the supervisor's decision on it that the crew raised under that run's key and nobody has answered yet, either of which takes the FM_PAUSE_RESURFACE_SECS recheck below instead; stale panes whose crew is not provably working surface immediately unless admitted directly to the declared-wait cadence (docs/architecture.md "Event-driven supervision" owns initial surfaces and deadline exceptions); at that same escalation moment a recovery-grade agent-state probe (docs/architecture.md owns that dead-record contract) reports a pane whose endpoint is proven `dead` or `missing` once and stops re-escalating it while it stays that way
 FM_BUSY_TURN_MAX_SECS=3600         # maximum age without a completed turn or explicit native-harness progress (bin/fm-watch.sh owns marker selection), before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait, an attended verified captain-held transfer, or - where config/wedge-defer-parked-gate arms it - a validation gate of the crew's own awaiting the supervisor's still-unanswered decision takes the FM_PAUSE_RESURFACE_SECS recheck below instead
-FM_PAUSE_RESURFACE_SECS=14400      # four hours between bounded rechecks of a declared external wait or verified captain-held transfer, and between repeated new-hash stale alarms for an ordinary crew task with an open backlog captain call; a structured until time can make an external-wait recheck occur sooner but cannot extend this bound; this includes a live idle pane after its first inconclusive stale wake, a provably-working pane whose own unelapsed declared wait or, where config/wedge-defer-parked-gate arms it, unanswered supervisor-owed validation gate defers its FM_STALE_ESCALATE_SECS escalation, and a live busy pane past FM_BUSY_TURN_MAX_SECS, while the away-mode daemon uses the same setting and ages its window against the crew's own latest status line rather than pane busy state; docs/architecture.md "Event-driven supervision" owns posture-sensitive captain-held suppression, while an armed validation gate awaiting the supervisor's decision keeps this recheck in either posture
+FM_PAUSE_RESURFACE_SECS=14400      # seconds between bounded wait/hold rechecks (four hours); docs/architecture.md "Event-driven supervision" owns watcher cadence, declaration episodes, deadlines, and posture; daemon routing and aging: .agents/skills/afk/SKILL.md "Classification policy"
 FM_SECONDMATE_WAKE_STALL_SECS=180  # no-progress interval before a durable parent wake-loop-stall notification; docs/architecture.md "Event-driven supervision" owns queue observation, busy bounds, idle-ring eligibility, and episode deduplication; zero or invalid values use 180
 FM_SECONDMATE_LIVENESS_SECS=60   # seconds between watcher probes of each registered secondmate's recorded endpoint through bin/fm-secondmate-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded fm-spawn.sh --secondmate path and emits exactly one check wake per relaunch; zero or invalid values use 60
 FM_SECONDMATE_LIVENESS_TIMEOUT=120   # seconds bounding one watcher-driven relaunch, so a wedged spawn cannot stall the poll; zero or invalid values use 120
@@ -3028,6 +3036,14 @@ FM_MAX_DEFER_SECS=300              # max buffered escalation age before retry pl
 FM_WEDGE_ALARM_CHANNEL=            # override config/wedge-alarm with one active-alert directive for the wedge alarm; off|auto|osascript|herdr|command:<cmd>; absent = auto (macOS -> an OS notification)
 FM_WEDGE_ALARM_EXEC=              # notifier seam: route every channel (osascript, herdr, command:) through this command as `<cmd> <channel> <summary>`; "discard" fires nothing; unset in production; the daemon defaults it to "discard" when sourced so no test posts a real notification (docs/wedge-alarm.md)
 FM_WEDGE_ALARM_TIMEOUT_SECS=10    # maximum seconds for each osascript, herdr, override, or command: notifier before its watchdog terminates it and continues to the next channel; invalid or zero values use 10
+# out-of-session watchdog (bin/fm-watchdog-check.sh); docs/watchdog.md owns the contract
+FM_WATCHDOG_STALE_SECS=900         # ordinary beacon-age threshold; bound-rewake cap: docs/watchdog.md
+FM_WATCHDOG_VERIFY_SECS=90         # seconds the watchdog re-reads the verdict after a recovery
+FM_WATCHDOG_RETRY_SECS=240         # minimum seconds between recovery attempts
+FM_WATCHDOG_ALARM_AFTER=2          # consecutive failed recoveries before the wedge alarm fires
+FM_WATCHDOG_ALARM_INTERVAL_SECS=3600   # minimum seconds between repeated alarms
+FM_WATCHDOG_STEP_SECS=60           # bound for each recovery step
+FM_WATCHDOG_INTERVAL_SECS=120      # agent run interval chosen at install time (bin/fm-watchdog-install.sh)
 FM_INJECT_FAIL_SLEEP=30            # seconds to back off when the supervisor pane is unavailable
 FM_INJECT_CONFIRM_RETRIES=3        # daemon Enter-retry attempts after typing a digest once
 FM_INJECT_CONFIRM_SLEEP=0.5        # seconds between daemon submit checks
