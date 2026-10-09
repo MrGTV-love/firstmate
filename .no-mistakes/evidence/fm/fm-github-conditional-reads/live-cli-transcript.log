@@ -1,0 +1,184 @@
+$ gh --version
+exit=0 elapsed=2.61s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=0.2s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=5.67s
+contribution-wake: check: contributions delivery 
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh: line 371: shasum: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=5.8s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=8.7s
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh: line 371: shasum: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh --contribution-input
+exit=0 elapsed=0.36s
+{
+  "backlog": {
+    "records": [
+      {
+        "hold_kind": null,
+        "captain_drop": false,
+        "kind": "ship",
+        "order": 1,
+        "body_lines": [],
+        "done": null,
+        "local_note": null,
+        "repo": "sample",
+        "reported": null,
+        "priority": null,
+        "since": null,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "hold_set": null,
+        "merged": null,
+        "blocked_by": null,
+        "hold_until": null,
+        "current_role": "queued",
+        "checked": false,
+        "blocked_reason": null,
+        "report_path": null,
+        "body_excerpt": null,
+        "hold_reason": null,
+        "unresolved_blocker_ids": [],
+        "id": "delivery",
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "pr_url": "https://github.com/o/r/pull/8",
+        "requires_child_metadata": false,
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "structured": true,
+        "captain_actionable": false,
+        "title": "Contribution",
+        "raw": "- [ ] delivery - Contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "state": "queued",
+        "blocked_by_ids": []
+      }
+    ],
+    "present": true,
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-acceptance/data/backlog.md"
+  },
+  "tasks": []
+}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-acceptance/input.json --all
+exit=0 elapsed=0.3s
+{
+  "known": 1,
+  "checked": 1,
+  "counts": {
+    "captain": 0,
+    "fleet": 1,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": true,
+  "proven_clear": true,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 1791504900,
+  "captain": [],
+  "captain_omitted": 0,
+  "rows": [
+    {
+      "task": "delivery",
+      "url": "https://github.com/o/r/pull/8",
+      "kind": "pr",
+      "checked_at": "2026-10-09T00:00:00Z",
+      "checked": true,
+      "final": false,
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": null,
+      "reviews": [
+        {
+          "id": 1,
+          "user": {
+            "login": "reviewer"
+          },
+          "state": "CHANGES_REQUESTED",
+          "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "submitted_at": "2026-10-09T00:00:00Z",
+          "updated_at": "2026-10-09T00:00:00Z",
+          "author_association": "OWNER",
+          "html_url": "https://github.com/o/r/pull/8#pullrequestreview-1",
+          "body": "Please fix this",
+          "freshness": "current"
+        }
+      ],
+      "distinct_checks": 1,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [
+        {
+          "token": "comment:12:2026-10-09T00:00:00Z:",
+          "type": "comment",
+          "source": "https://github.com/o/r/pull/8#issuecomment-12",
+          "head": null,
+          "author": "maintainer",
+          "body": "new signal"
+        },
+        {
+          "token": "review:1:2026-10-09T00:00:00Z:CHANGES_REQUESTED",
+          "type": "review",
+          "source": "https://github.com/o/r/pull/8#pullrequestreview-1",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "author": "reviewer",
+          "body": "Please fix this"
+        }
+      ],
+      "actor": "fleet",
+      "reason": "incoming maintainer signal needs triage",
+      "tasks": [
+        "delivery"
+      ]
+    }
+  ]
+}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r
+exit=0 elapsed=0.56s
+{"permissions":{"push":true}}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=1.0s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=7.81s
+contribution-wake: check: contributions delivery 
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh: line 371: shasum: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=5.37s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=8.56s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale
+

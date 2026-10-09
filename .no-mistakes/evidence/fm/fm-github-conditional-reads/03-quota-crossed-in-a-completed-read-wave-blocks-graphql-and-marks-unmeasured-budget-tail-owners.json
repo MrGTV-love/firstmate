@@ -1,0 +1,394 @@
+{
+  "scenario": "Quota crossed in a completed read wave blocks GraphQL and marks unmeasured budget-tail owners",
+  "result": "pass",
+  "detail": [
+    {
+      "mode": "pr",
+      "output": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/repos/o/r/pulls/8",
+          "conditional": null,
+          "etag": "\"b4d470e32236e750\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r",
+          "conditional": null,
+          "etag": "\"87f3c349e2cea577\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+          "conditional": null,
+          "etag": "\"4f53cda18c2baa0c\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+          "conditional": null,
+          "etag": "\"336dab579fb7578c\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r/pulls/8/comments?per_page=100",
+          "conditional": null,
+          "etag": "\"4f53cda18c2baa0c\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+          "conditional": null,
+          "etag": "\"c283964f3cde5ec5\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r/issues/8/comments?per_page=100",
+          "conditional": null,
+          "etag": "\"4f53cda18c2baa0c\"",
+          "status": 200,
+          "remaining": 500,
+          "reset": 1791541832,
+          "barrier": null
+        }
+      ],
+      "records": {
+        "delivery": {
+          "url": "https://github.com/o/r/pull/8",
+          "kind": "pr",
+          "checked_at": "2026-10-09T00:00:00Z",
+          "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z",
+          "pending": [],
+          "seen": [],
+          "notified": [],
+          "verdict": null,
+          "observation": {
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "state": "open",
+            "draft": false,
+            "mergeable": "mergeable",
+            "review_decision": "APPROVED",
+            "can_merge": true,
+            "checks": [
+              {
+                "name": "test",
+                "id": 1,
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-10-09T00:00:00Z"
+              }
+            ],
+            "reviews": [],
+            "events": []
+          }
+        },
+        "duplicate": {
+          "url": "https://github.com/o/r/pull/8",
+          "kind": "pr",
+          "checked_at": "2026-10-09T00:00:00Z",
+          "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z",
+          "pending": [],
+          "seen": [],
+          "notified": [],
+          "verdict": null,
+          "observation": {
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "state": "open",
+            "draft": false,
+            "mergeable": "mergeable",
+            "review_decision": "APPROVED",
+            "can_merge": true,
+            "checks": [
+              {
+                "name": "test",
+                "id": 1,
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-10-09T00:00:00Z"
+              }
+            ],
+            "reviews": [],
+            "events": []
+          }
+        },
+        "tail": {
+          "url": "https://github.com/o/r/pull/9",
+          "kind": "pr",
+          "checked_at": "2026-10-09T00:00:00Z",
+          "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z",
+          "pending": [],
+          "seen": [],
+          "notified": [],
+          "verdict": null,
+          "observation": {
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "state": "open",
+            "draft": false,
+            "mergeable": "mergeable",
+            "review_decision": "APPROVED",
+            "can_merge": true,
+            "checks": [
+              {
+                "name": "test",
+                "id": 1,
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-10-09T00:00:00Z"
+              }
+            ],
+            "reviews": [],
+            "events": []
+          }
+        }
+      }
+    },
+    {
+      "mode": "issue",
+      "output": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/repos/o/r/issues/9",
+          "conditional": null,
+          "etag": "\"73455331388d9c2d\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r/issues/9/events?per_page=100",
+          "conditional": null,
+          "etag": "\"4f53cda18c2baa0c\"",
+          "status": 200,
+          "remaining": 500,
+          "reset": 1791541832,
+          "barrier": null
+        },
+        {
+          "method": "GET",
+          "path": "/repos/o/r/issues/9/comments?per_page=100",
+          "conditional": null,
+          "etag": "\"4f53cda18c2baa0c\"",
+          "status": 200,
+          "remaining": 500,
+          "reset": 1791541832,
+          "barrier": null
+        }
+      ],
+      "records": {
+        "filed": {
+          "url": "https://github.com/o/r/issues/9",
+          "kind": "issue",
+          "checked_at": "2026-10-09T00:00:00Z",
+          "error": null,
+          "pending": [],
+          "seen": [],
+          "notified": [],
+          "verdict": null,
+          "observation": {
+            "state": "open",
+            "head": null,
+            "ready": false,
+            "checks": [],
+            "reviews": [],
+            "events": [],
+            "absent_checks": [
+              "test"
+            ]
+          }
+        },
+        "delivery": {
+          "url": "https://github.com/o/r/pull/8",
+          "kind": "pr",
+          "checked_at": "2026-10-09T00:00:00Z",
+          "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z",
+          "pending": [],
+          "seen": [],
+          "notified": [],
+          "verdict": null,
+          "observation": {
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "state": "open",
+            "draft": false,
+            "mergeable": "mergeable",
+            "review_decision": "APPROVED",
+            "can_merge": true,
+            "checks": [
+              {
+                "name": "test",
+                "id": 1,
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-10-09T00:00:00Z"
+              }
+            ],
+            "reviews": [],
+            "events": []
+          }
+        },
+        "duplicate": {
+          "url": "https://github.com/o/r/pull/8",
+          "kind": "pr",
+          "checked_at": "2026-10-09T00:00:00Z",
+          "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z",
+          "pending": [],
+          "seen": [],
+          "notified": [],
+          "verdict": null,
+          "observation": {
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "state": "open",
+            "draft": false,
+            "mergeable": "mergeable",
+            "review_decision": "APPROVED",
+            "can_merge": true,
+            "checks": [
+              {
+                "name": "test",
+                "id": 1,
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-10-09T00:00:00Z"
+              }
+            ],
+            "reviews": [],
+            "events": []
+          }
+        }
+      }
+    }
+  ],
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=5.37s\ncontributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=8.56s\ncontributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": null,
+      "etag": "\"b4d470e32236e750\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+      "conditional": null,
+      "etag": "\"336dab579fb7578c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+      "conditional": null,
+      "etag": "\"c283964f3cde5ec5\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/8/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/9",
+      "conditional": null,
+      "etag": "\"73455331388d9c2d\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/9/events?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/9/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541832,
+      "barrier": null
+    }
+  ]
+}

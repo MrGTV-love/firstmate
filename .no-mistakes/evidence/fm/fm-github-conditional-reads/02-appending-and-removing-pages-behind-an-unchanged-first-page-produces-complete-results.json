@@ -1,0 +1,111 @@
+{
+  "scenario": "Appending and removing pages behind an unchanged first page produces complete results",
+  "result": "pass",
+  "detail": {
+    "expanded": [
+      [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ],
+      [
+        {
+          "id": 3
+        }
+      ]
+    ],
+    "contracted": [
+      [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    ],
+    "omitted_link_responses": "retain latest generation pagination"
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp\nexit=0\n[[{\"id\":1},{\"id\":2}]]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp\nexit=0\n[[{\"id\":1},{\"id\":2}],[{\"id\":3}]]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp\nexit=0\n[[{\"id\":1},{\"id\":2}],[{\"id\":3}]]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp\nexit=0\n[[{\"id\":1},{\"id\":2}]]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp\nexit=0\n[[{\"id\":1},{\"id\":2}]]\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": null,
+      "etag": "\"de6a5226a697486b\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": "\"de6a5226a697486b\"",
+      "etag": "\"de6a5226a697486b\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    }
+  ]
+}

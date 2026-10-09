@@ -1,0 +1,131 @@
+{
+  "scenario": "Repeated REST reads reuse 304 bodies while changes and corrupt caches fetch fresh data",
+  "result": "pass",
+  "detail": {
+    "initial": [
+      {
+        "id": 1
+      }
+    ],
+    "changed": [
+      {
+        "id": 1
+      },
+      {
+        "id": 2
+      }
+    ],
+    "response_sequence": [
+      200,
+      304,
+      200,
+      304,
+      200,
+      200,
+      200
+    ],
+    "fallbacks": "corrupt entry, unparsable cached body, deleted cache: ordinary GET",
+    "query_request": {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbb&path=dir%2Fa%20b.ts&per_page=100",
+      "conditional": null,
+      "etag": "\"adffc6cb2963134d\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    }
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items\nexit=0\n[{\"id\":1}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items\nexit=0\n[{\"id\":1}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items\nexit=0\n[{\"id\":1},{\"id\":2}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items\nexit=0\n[{\"id\":1},{\"id\":2}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items\nexit=0\n[{\"id\":1},{\"id\":2}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items\nexit=0\n[{\"id\":1},{\"id\":2}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items\nexit=0\n[{\"id\":1},{\"id\":2}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/commits -f sha=bbb -f path=dir/a b.ts -f per_page=100\nexit=0\n[{\"sha\":\"c1\",\"author\":{\"login\":\"alice\",\"type\":\"User\"}},{\"sha\":\"shared\",\"author\":{\"login\":\"alice\",\"type\":\"User\"}},{\"sha\":\"self\",\"author\":{\"login\":\"author\",\"type\":\"User\"}},{\"sha\":\"bot\",\"author\":{\"login\":\"robot\",\"type\":\"Bot\"}}]\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": "\"01aa8ec06990002e\"",
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": "\"01aa8ec06990002e\"",
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbb&path=dir%2Fa%20b.ts&per_page=100",
+      "conditional": null,
+      "etag": "\"adffc6cb2963134d\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540138,
+      "barrier": null
+    }
+  ]
+}

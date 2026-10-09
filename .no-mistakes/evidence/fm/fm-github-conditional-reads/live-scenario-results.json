@@ -1,0 +1,23 @@
+[
+  {
+    "name": "A contribution poll rechecks unchanged PRs conditionally and still publishes new maintainer signals",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/01-a-contribution-poll-rechecks-unchanged-prs-conditionally-and-still-publishes-new-maintainer-signals.json",
+    "reason": ""
+  },
+  {
+    "name": "After quota reset a contribution poll refreshes the observation and clears its stale error",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/02-after-quota-reset-a-contribution-poll-refreshes-the-observation-and-clears-its-stale-error.json",
+    "reason": ""
+  },
+  {
+    "name": "Quota crossed in a completed read wave blocks GraphQL and marks unmeasured budget-tail owners",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/03-quota-crossed-in-a-completed-read-wave-blocks-graphql-and-marks-unmeasured-budget-tail-owners.json",
+    "reason": ""
+  }
+]

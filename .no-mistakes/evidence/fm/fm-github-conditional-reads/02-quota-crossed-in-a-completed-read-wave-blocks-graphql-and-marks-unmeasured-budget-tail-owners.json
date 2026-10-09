@@ -1,0 +1,114 @@
+{
+  "scenario": "Quota crossed in a completed read wave blocks GraphQL and marks unmeasured budget-tail owners",
+  "result": "fail",
+  "detail": {
+    "exception": "AssertionError()",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 189, in scenario\n    detail=fn()\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 366, in waves\n    if mode=='issue' and t=='filed': assert current['error'] is None and current['observation']['state']=='open'\n                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=7.99s\ncontributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:27:55Z; last observations kept, marked stale\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=16.14s\ncontributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:27:55Z; last observations kept, marked stale\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": null,
+      "etag": "\"b4d470e32236e750\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+      "conditional": null,
+      "etag": "\"c283964f3cde5ec5\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+      "conditional": null,
+      "etag": "\"336dab579fb7578c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/8/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/9",
+      "conditional": null,
+      "etag": "\"73455331388d9c2d\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/9/events?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541675,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/9/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541675,
+      "barrier": null
+    }
+  ]
+}

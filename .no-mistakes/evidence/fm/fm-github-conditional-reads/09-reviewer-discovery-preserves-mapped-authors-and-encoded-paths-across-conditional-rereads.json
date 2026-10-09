@@ -1,0 +1,178 @@
+{
+  "scenario": "Reviewer discovery preserves mapped authors and encoded paths across conditional rereads",
+  "result": "pass",
+  "detail": {
+    "first_output": "alice\t2 recent commits\nbob\t1 recent commit",
+    "repeat_output": "alice\t2 recent commits\nbob\t1 recent commit",
+    "changed_output": "alice\t2 recent commits\ncarol\t1 recent commit",
+    "repeat_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8",
+        "conditional": "\"b4d470e32236e750\"",
+        "etag": "\"b4d470e32236e750\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791540802,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/files?per_page=100",
+        "conditional": "\"3048915c6965209f\"",
+        "etag": "\"3048915c6965209f\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791540802,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100",
+        "conditional": "\"adffc6cb2963134d\"",
+        "etag": "\"adffc6cb2963134d\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791540802,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=other.ts&per_page=100",
+        "conditional": "\"bfcec1dacab37ed8\"",
+        "etag": "\"bfcec1dacab37ed8\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791540802,
+        "barrier": null
+      }
+    ]
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8\nexit=0 elapsed=34.51s\nalice\t2 recent commits\nbob\t1 recent commit\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8\nexit=0 elapsed=21.39s\nalice\t2 recent commits\nbob\t1 recent commit\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8\nexit=0 elapsed=10.29s\nalice\t2 recent commits\ncarol\t1 recent commit\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": null,
+      "etag": "\"b4d470e32236e750\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/files?per_page=100",
+      "conditional": null,
+      "etag": "\"3048915c6965209f\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100",
+      "conditional": null,
+      "etag": "\"adffc6cb2963134d\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=other.ts&per_page=100",
+      "conditional": null,
+      "etag": "\"bfcec1dacab37ed8\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": "\"b4d470e32236e750\"",
+      "etag": "\"b4d470e32236e750\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/files?per_page=100",
+      "conditional": "\"3048915c6965209f\"",
+      "etag": "\"3048915c6965209f\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100",
+      "conditional": "\"adffc6cb2963134d\"",
+      "etag": "\"adffc6cb2963134d\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=other.ts&per_page=100",
+      "conditional": "\"bfcec1dacab37ed8\"",
+      "etag": "\"bfcec1dacab37ed8\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": "\"b4d470e32236e750\"",
+      "etag": "\"b4d470e32236e750\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/files?per_page=100",
+      "conditional": "\"3048915c6965209f\"",
+      "etag": "\"3048915c6965209f\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100",
+      "conditional": "\"adffc6cb2963134d\"",
+      "etag": "\"adffc6cb2963134d\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=other.ts&per_page=100",
+      "conditional": "\"bfcec1dacab37ed8\"",
+      "etag": "\"8a55e20c8b6eaeec\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    }
+  ]
+}

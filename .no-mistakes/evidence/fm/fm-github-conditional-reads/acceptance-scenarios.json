@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Repeated REST reads reuse 304 bodies while changes and corrupt caches fetch fresh data",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/01-repeated-rest-reads-reuse-304-bodies-while-changes-and-corrupt-caches-fetch-fresh-data.json",
+    "reason": ""
+  },
+  {
+    "name": "Appending and removing pages behind an unchanged first page produces complete results",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/02-appending-and-removing-pages-behind-an-unchanged-first-page-produces-complete-results.json",
+    "reason": ""
+  },
+  {
+    "name": "Concurrent delayed reads cannot substitute another body or pagination for a validated ETag",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/03-concurrent-delayed-reads-cannot-substitute-another-body-or-pagination-for-a-validated-etag.json",
+    "reason": ""
+  },
+  {
+    "name": "Header-derived quota guards enforce boundaries and stop pagination without partial output",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/04-header-derived-quota-guards-enforce-boundaries-and-stop-pagination-without-partial-output.json",
+    "reason": ""
+  },
+  {
+    "name": "A contribution poll rechecks unchanged PRs conditionally and still publishes new maintainer signals",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/01-a-contribution-poll-rechecks-unchanged-prs-conditionally-and-still-publishes-new-maintainer-signals.json",
+    "reason": ""
+  },
+  {
+    "name": "Low-quota polling preserves every owner and suppresses repeat announcements including late registrations",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/01-low-quota-polling-preserves-every-owner-and-suppresses-repeat-announcements-including-late-registrations.json",
+    "reason": ""
+  },
+  {
+    "name": "After quota reset a contribution poll refreshes the observation and clears its stale error",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/02-after-quota-reset-a-contribution-poll-refreshes-the-observation-and-clears-its-stale-error.json",
+    "reason": ""
+  },
+  {
+    "name": "Quota crossed in a completed read wave blocks GraphQL and marks unmeasured budget-tail owners",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/03-quota-crossed-in-a-completed-read-wave-blocks-graphql-and-marks-unmeasured-budget-tail-owners.json",
+    "reason": ""
+  },
+  {
+    "name": "The open-work ledger holds all dated rows at low quota and clears stale coverage after reset",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/08-the-open-work-ledger-holds-all-dated-rows-at-low-quota-and-clears-stale-coverage-after-reset.json",
+    "reason": ""
+  },
+  {
+    "name": "Reviewer discovery preserves mapped authors and encoded paths across conditional rereads",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/09-reviewer-discovery-preserves-mapped-authors-and-encoded-paths-across-conditional-rereads.json",
+    "reason": ""
+  },
+  {
+    "name": "PR state retains blocking reviews on 304 and reflects later reviewer decisions",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/04-pr-state-retains-blocking-reviews-on-304-and-reflects-later-reviewer-decisions.json",
+    "reason": ""
+  },
+  {
+    "name": "Six concurrent contribution REST reads complete within the existing five-second bound",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/01-six-concurrent-contribution-rest-reads-complete-within-the-existing-five-second-bound.json",
+    "reason": ""
+  }
+]

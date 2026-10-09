@@ -1,0 +1,446 @@
+[
+  {
+    "method": "GET",
+    "path": "/repos/o/r",
+    "conditional": null,
+    "etag": "\"87f3c349e2cea577\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8",
+    "conditional": null,
+    "etag": "\"b4d470e32236e750\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/comments?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+    "conditional": null,
+    "etag": "\"c283964f3cde5ec5\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r",
+    "conditional": null,
+    "etag": "\"87f3c349e2cea577\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/8/comments?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+    "conditional": null,
+    "etag": "\"336dab579fb7578c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "POST",
+    "path": "/graphql",
+    "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {headRefOid,reviewDecision,id,number}\n\t\t}\n\t}",
+    "variables": {
+      "owner": "o",
+      "pr_number": 8,
+      "repo": "r"
+    },
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8",
+    "conditional": "\"b4d470e32236e750\"",
+    "etag": "\"b4d470e32236e750\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+    "conditional": "\"336dab579fb7578c\"",
+    "etag": "\"336dab579fb7578c\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/8/comments?per_page=100",
+    "conditional": "\"4f53cda18c2baa0c\"",
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+    "conditional": "\"c283964f3cde5ec5\"",
+    "etag": "\"c283964f3cde5ec5\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/comments?per_page=100",
+    "conditional": "\"4f53cda18c2baa0c\"",
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+    "conditional": "\"4f53cda18c2baa0c\"",
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r",
+    "conditional": "\"87f3c349e2cea577\"",
+    "etag": "\"87f3c349e2cea577\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "POST",
+    "path": "/graphql",
+    "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {headRefOid,reviewDecision,id,number}\n\t\t}\n\t}",
+    "variables": {
+      "owner": "o",
+      "pr_number": 8,
+      "repo": "r"
+    },
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8",
+    "conditional": "\"b4d470e32236e750\"",
+    "etag": "\"b4d470e32236e750\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r",
+    "conditional": "\"87f3c349e2cea577\"",
+    "etag": "\"87f3c349e2cea577\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+    "conditional": "\"4f53cda18c2baa0c\"",
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/8/comments?per_page=100",
+    "conditional": "\"4f53cda18c2baa0c\"",
+    "etag": "\"2cdd05f570aa0b0d\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+    "conditional": "\"336dab579fb7578c\"",
+    "etag": "\"336dab579fb7578c\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+    "conditional": "\"c283964f3cde5ec5\"",
+    "etag": "\"c283964f3cde5ec5\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/comments?per_page=100",
+    "conditional": "\"4f53cda18c2baa0c\"",
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "POST",
+    "path": "/graphql",
+    "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {headRefOid,reviewDecision,id,number}\n\t\t}\n\t}",
+    "variables": {
+      "owner": "o",
+      "pr_number": 8,
+      "repo": "r"
+    },
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r",
+    "conditional": null,
+    "etag": "\"87f3c349e2cea577\"",
+    "status": 200,
+    "remaining": 500,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8",
+    "conditional": null,
+    "etag": "\"b4d470e32236e750\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791545432,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/8/comments?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791545432,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r",
+    "conditional": "\"87f3c349e2cea577\"",
+    "etag": "\"87f3c349e2cea577\"",
+    "status": 304,
+    "remaining": 4000,
+    "reset": 1791545432,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+    "conditional": null,
+    "etag": "\"c283964f3cde5ec5\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791545432,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791545432,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+    "conditional": null,
+    "etag": "\"336dab579fb7578c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791545432,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/comments?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791545432,
+    "barrier": null
+  },
+  {
+    "method": "POST",
+    "path": "/graphql",
+    "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {headRefOid,reviewDecision,id,number}\n\t\t}\n\t}",
+    "variables": {
+      "owner": "o",
+      "pr_number": 8,
+      "repo": "r"
+    },
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8",
+    "conditional": null,
+    "etag": "\"b4d470e32236e750\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r",
+    "conditional": null,
+    "etag": "\"87f3c349e2cea577\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+    "conditional": null,
+    "etag": "\"336dab579fb7578c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/pulls/8/comments?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+    "conditional": null,
+    "etag": "\"c283964f3cde5ec5\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/8/comments?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 500,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/9",
+    "conditional": null,
+    "etag": "\"73455331388d9c2d\"",
+    "status": 200,
+    "remaining": 4000,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/9/events?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 500,
+    "reset": 1791541832,
+    "barrier": null
+  },
+  {
+    "method": "GET",
+    "path": "/repos/o/r/issues/9/comments?per_page=100",
+    "conditional": null,
+    "etag": "\"4f53cda18c2baa0c\"",
+    "status": 200,
+    "remaining": 500,
+    "reset": 1791541832,
+    "barrier": null
+  }
+]

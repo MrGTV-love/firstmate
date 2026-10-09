@@ -1,0 +1,422 @@
+[
+  {
+    "label": "baseline-gh",
+    "attempt": 1,
+    "elapsed": 0.28,
+    "reads": [
+      {
+        "endpoint": "repos/o/r/issues/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/reviews?per_page=100",
+        "returncode": 0,
+        "stdout": "[{\"id\": 1, \"user\": {\"login\": \"reviewer\"}, \"state\": \"CHANGES_REQUESTED\", \"commit_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"submitted_at\": \"2026-10-09T00:00:00Z\", \"updated_at\": \"2026-10-09T00:00:00Z\", \"author_association\": \"OWNER\", \"html_url\": \"https://github.com/o/r/pull/8#pullrequestreview-1\", \"body\": \"Please fix this\"}]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "returncode": 0,
+        "stdout": "{\"check_runs\": [{\"id\": 1, \"name\": \"test\", \"status\": \"completed\", \"conclusion\": \"success\", \"started_at\": \"2026-10-09T00:00:00Z\", \"completed_at\": \"2026-10-09T00:00:00Z\", \"app\": {\"id\": 1}}]}",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "returncode": 0,
+        "stdout": "[]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r",
+        "returncode": 0,
+        "stdout": "{\"permissions\": {\"push\": true}}",
+        "stderr": ""
+      }
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": null,
+        "etag": "\"c283964f3cde5ec5\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": null,
+        "etag": "\"87f3c349e2cea577\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+        "conditional": null,
+        "etag": "\"336dab579fb7578c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      }
+    ]
+  },
+  {
+    "label": "baseline-gh",
+    "attempt": 2,
+    "elapsed": 0.48,
+    "reads": [
+      {
+        "endpoint": "repos/o/r/issues/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/reviews?per_page=100",
+        "returncode": 0,
+        "stdout": "[{\"id\": 1, \"user\": {\"login\": \"reviewer\"}, \"state\": \"CHANGES_REQUESTED\", \"commit_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"submitted_at\": \"2026-10-09T00:00:00Z\", \"updated_at\": \"2026-10-09T00:00:00Z\", \"author_association\": \"OWNER\", \"html_url\": \"https://github.com/o/r/pull/8#pullrequestreview-1\", \"body\": \"Please fix this\"}]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "returncode": 0,
+        "stdout": "{\"check_runs\": [{\"id\": 1, \"name\": \"test\", \"status\": \"completed\", \"conclusion\": \"success\", \"started_at\": \"2026-10-09T00:00:00Z\", \"completed_at\": \"2026-10-09T00:00:00Z\", \"app\": {\"id\": 1}}]}",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "returncode": 0,
+        "stdout": "[]",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r",
+        "returncode": 0,
+        "stdout": "{\"permissions\": {\"push\": true}}",
+        "stderr": ""
+      }
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": null,
+        "etag": "\"c283964f3cde5ec5\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": null,
+        "etag": "\"87f3c349e2cea577\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+        "conditional": null,
+        "etag": "\"336dab579fb7578c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      }
+    ]
+  },
+  {
+    "label": "conditional-helper",
+    "attempt": 1,
+    "elapsed": 2.88,
+    "reads": [
+      {
+        "endpoint": "repos/o/r/issues/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/reviews?per_page=100",
+        "returncode": 0,
+        "stdout": "[{\"id\":1,\"user\":{\"login\":\"reviewer\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"submitted_at\":\"2026-10-09T00:00:00Z\",\"updated_at\":\"2026-10-09T00:00:00Z\",\"author_association\":\"OWNER\",\"html_url\":\"https://github.com/o/r/pull/8#pullrequestreview-1\",\"body\":\"Please fix this\"}]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "returncode": 0,
+        "stdout": "{\"check_runs\":[{\"id\":1,\"name\":\"test\",\"status\":\"completed\",\"conclusion\":\"success\",\"started_at\":\"2026-10-09T00:00:00Z\",\"completed_at\":\"2026-10-09T00:00:00Z\",\"app\":{\"id\":1}}]}\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "returncode": 0,
+        "stdout": "[]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r",
+        "returncode": 0,
+        "stdout": "{\"permissions\":{\"push\":true}}\n",
+        "stderr": ""
+      }
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+        "conditional": null,
+        "etag": "\"336dab579fb7578c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": null,
+        "etag": "\"c283964f3cde5ec5\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": null,
+        "etag": "\"87f3c349e2cea577\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      }
+    ]
+  },
+  {
+    "label": "conditional-helper",
+    "attempt": 2,
+    "elapsed": 2.45,
+    "reads": [
+      {
+        "endpoint": "repos/o/r/issues/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/reviews?per_page=100",
+        "returncode": 0,
+        "stdout": "[{\"id\":1,\"user\":{\"login\":\"reviewer\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"submitted_at\":\"2026-10-09T00:00:00Z\",\"updated_at\":\"2026-10-09T00:00:00Z\",\"author_association\":\"OWNER\",\"html_url\":\"https://github.com/o/r/pull/8#pullrequestreview-1\",\"body\":\"Please fix this\"}]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/pulls/8/comments?per_page=100",
+        "returncode": 0,
+        "stdout": "[]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "returncode": 0,
+        "stdout": "{\"check_runs\":[{\"id\":1,\"name\":\"test\",\"status\":\"completed\",\"conclusion\":\"success\",\"started_at\":\"2026-10-09T00:00:00Z\",\"completed_at\":\"2026-10-09T00:00:00Z\",\"app\":{\"id\":1}}]}\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "returncode": 0,
+        "stdout": "[]\n",
+        "stderr": ""
+      },
+      {
+        "endpoint": "repos/o/r",
+        "returncode": 0,
+        "stdout": "{\"permissions\":{\"push\":true}}\n",
+        "stderr": ""
+      }
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": "\"4f53cda18c2baa0c\"",
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": "\"c283964f3cde5ec5\"",
+        "etag": "\"c283964f3cde5ec5\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/comments?per_page=100",
+        "conditional": "\"4f53cda18c2baa0c\"",
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/8/comments?per_page=100",
+        "conditional": "\"4f53cda18c2baa0c\"",
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": "\"87f3c349e2cea577\"",
+        "etag": "\"87f3c349e2cea577\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+        "conditional": "\"336dab579fb7578c\"",
+        "etag": "\"336dab579fb7578c\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791541777,
+        "barrier": null
+      }
+    ]
+  }
+]

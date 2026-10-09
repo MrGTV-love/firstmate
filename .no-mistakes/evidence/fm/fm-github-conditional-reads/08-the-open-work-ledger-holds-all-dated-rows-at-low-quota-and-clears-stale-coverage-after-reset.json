@@ -1,0 +1,260 @@
+{
+  "scenario": "The open-work ledger holds all dated rows at low quota and clears stale coverage after reset",
+  "result": "pass",
+  "detail": {
+    "healthy_ledger": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791537269,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued",
+      "complete": true,
+      "rows": [
+        {
+          "id": "1dcb3562fe18a73a00243658",
+          "category": "open_pr",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "route the green PR's review and obtain merge approval",
+          "age_seconds": 33269,
+          "limit_seconds": 3600,
+          "overdue": true,
+          "evidence": ""
+        },
+        {
+          "id": "e051ac14c874f6bd9f07f1a8",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true
+        }
+      ]
+    },
+    "held_ledger": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791537269,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued",
+      "complete": false,
+      "rows": [
+        {
+          "id": "5e99f4d8dcb14f17ee4f094c",
+          "category": "coverage",
+          "subject": "ledger stale",
+          "owner": "firstmate",
+          "next_action": "wait for the GitHub quota window to reset; the next run refreshes every row",
+          "age_seconds": null,
+          "limit_seconds": 0,
+          "overdue": false,
+          "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z",
+          "informational": true
+        },
+        {
+          "id": "1dcb3562fe18a73a00243658",
+          "category": "open_pr",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "route the green PR's review and obtain merge approval",
+          "age_seconds": 33269,
+          "limit_seconds": 3600,
+          "overdue": true,
+          "evidence": "",
+          "stale": true
+        },
+        {
+          "id": "e051ac14c874f6bd9f07f1a8",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true,
+          "stale": true
+        }
+      ],
+      "stale": true,
+      "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z",
+      "stale_until_epoch": 1791540802
+    },
+    "no_prior_ledger": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791537298,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-no-prior-continued",
+      "complete": false,
+      "rows": [
+        {
+          "id": "2f7c02aec9e09e1ec97fd638",
+          "category": "coverage",
+          "subject": "ledger degraded",
+          "owner": "firstmate",
+          "next_action": "restore the unreadable sources and rerun the reconciler",
+          "age_seconds": null,
+          "limit_seconds": 0,
+          "overdue": true,
+          "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z"
+        }
+      ],
+      "stale": true,
+      "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z",
+      "stale_until_epoch": 1791540802
+    },
+    "recovered_ledger": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791537299,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued",
+      "complete": true,
+      "rows": [
+        {
+          "id": "1dcb3562fe18a73a00243658",
+          "category": "open_pr",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "route the green PR's review and obtain merge approval",
+          "age_seconds": 33299,
+          "limit_seconds": 3600,
+          "overdue": true,
+          "evidence": ""
+        },
+        {
+          "id": "e051ac14c874f6bd9f07f1a8",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true
+        }
+      ]
+    }
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat\nexit=0 elapsed=16.33s\n{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791537252, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued\", \"complete\": true, \"rows\": [{\"id\": \"1dcb3562fe18a73a00243658\", \"category\": \"open_pr\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"route the green PR's review and obtain merge approval\", \"age_seconds\": 33252, \"limit_seconds\": 3600, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"e051ac14c874f6bd9f07f1a8\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}]}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat\nexit=0 elapsed=15.43s\n{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791537269, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued\", \"complete\": true, \"rows\": [{\"id\": \"1dcb3562fe18a73a00243658\", \"category\": \"open_pr\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"route the green PR's review and obtain merge approval\", \"age_seconds\": 33269, \"limit_seconds\": 3600, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"e051ac14c874f6bd9f07f1a8\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}]}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r\nexit=0 elapsed=4.05s\n{\"permissions\":{\"push\":true}}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat\nexit=0 elapsed=5.7s\n{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791537269, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued\", \"complete\": false, \"rows\": [{\"id\": \"5e99f4d8dcb14f17ee4f094c\", \"category\": \"coverage\", \"subject\": \"ledger stale\", \"owner\": \"firstmate\", \"next_action\": \"wait for the GitHub quota window to reset; the next run refreshes every row\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": false, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z\", \"informational\": true}, {\"id\": \"1dcb3562fe18a73a00243658\", \"category\": \"open_pr\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"route the green PR's review and obtain merge approval\", \"age_seconds\": 33269, \"limit_seconds\": 3600, \"overdue\": true, \"evidence\": \"\", \"stale\": true}, {\"id\": \"e051ac14c874f6bd9f07f1a8\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true, \"stale\": true}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z\", \"stale_until_epoch\": 1791540802}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat\nexit=0 elapsed=2.43s\n{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791537269, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued\", \"complete\": false, \"rows\": [{\"id\": \"5e99f4d8dcb14f17ee4f094c\", \"category\": \"coverage\", \"subject\": \"ledger stale\", \"owner\": \"firstmate\", \"next_action\": \"wait for the GitHub quota window to reset; the next run refreshes every row\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": false, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z\", \"informational\": true}, {\"id\": \"1dcb3562fe18a73a00243658\", \"category\": \"open_pr\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"route the green PR's review and obtain merge approval\", \"age_seconds\": 33269, \"limit_seconds\": 3600, \"overdue\": true, \"evidence\": \"\", \"stale\": true}, {\"id\": \"e051ac14c874f6bd9f07f1a8\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true, \"stale\": true}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z\", \"stale_until_epoch\": 1791540802}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r\nexit=0 elapsed=2.07s\n{\"permissions\":{\"push\":true}}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat\nexit=0 elapsed=0.85s\n{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791537298, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-no-prior-continued\", \"complete\": false, \"rows\": [{\"id\": \"2f7c02aec9e09e1ec97fd638\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z\"}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z\", \"stale_until_epoch\": 1791540802}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat\nexit=0 elapsed=12.73s\n{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791537299, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued\", \"complete\": true, \"rows\": [{\"id\": \"1dcb3562fe18a73a00243658\", \"category\": \"open_pr\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"route the green PR's review and obtain merge approval\", \"age_seconds\": 33299, \"limit_seconds\": 3600, \"overdue\": true, \"evidence\": \"\"}, {\"id\": \"e051ac14c874f6bd9f07f1a8\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}]}\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls?state=open&per_page=100",
+      "conditional": null,
+      "etag": "\"26804b18e8ecb455\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100",
+      "conditional": null,
+      "etag": "\"c283964f3cde5ec5\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls?state=open&per_page=100",
+      "conditional": "\"26804b18e8ecb455\"",
+      "etag": "\"26804b18e8ecb455\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100",
+      "conditional": "\"c283964f3cde5ec5\"",
+      "etag": "\"c283964f3cde5ec5\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": "\"4f53cda18c2baa0c\"",
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls?state=open&per_page=100",
+      "conditional": "\"26804b18e8ecb455\"",
+      "etag": "\"26804b18e8ecb455\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791544402,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100",
+      "conditional": "\"c283964f3cde5ec5\"",
+      "etag": "\"c283964f3cde5ec5\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791544402,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": "\"4f53cda18c2baa0c\"",
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791544402,
+      "barrier": null
+    }
+  ]
+}

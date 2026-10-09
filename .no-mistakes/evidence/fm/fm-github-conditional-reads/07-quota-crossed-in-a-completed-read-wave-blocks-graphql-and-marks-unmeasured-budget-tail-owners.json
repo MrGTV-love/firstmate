@@ -1,0 +1,63 @@
+{
+  "scenario": "Quota crossed in a completed read wave blocks GraphQL and marks unmeasured budget-tail owners",
+  "result": "fail",
+  "detail": {
+    "exception": "FileNotFoundError(2, 'No such file or directory')",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 163, in scenario\n    detail=fn()\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 317, in waves\n    h=home('wave-'+mode,owners); poll(h); old={t:record(h,t) for t,_,_ in owners}\n                                                 ~~~~~~^^^^^\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 145, in record\n    def record(h,task): return json.loads((h/'data'/task/'contributions.json').read_text())['records'][0]\n                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_local.py\", line 546, in read_text\n    return PathBase.read_text(self, encoding, errors, newline)\n           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_abc.py\", line 632, in read_text\n    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:\n         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_local.py\", line 537, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/wave-pr-continued/data/delivery/contributions.json'\n"
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=18.28s\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": null,
+      "etag": "\"b4d470e32236e750\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+      "conditional": null,
+      "etag": "\"c283964f3cde5ec5\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/8/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791540802,
+      "barrier": null
+    }
+  ]
+}

@@ -1,0 +1,1173 @@
+$ gh --version
+exit=0 elapsed=3.55s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=1.53s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=8.74s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=14.16s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=18.28s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat
+exit=0 elapsed=16.33s
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791537252, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued", "complete": true, "rows": [{"id": "1dcb3562fe18a73a00243658", "category": "open_pr", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 33252, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "e051ac14c874f6bd9f07f1a8", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true}]}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat
+exit=0 elapsed=15.43s
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791537269, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued", "complete": true, "rows": [{"id": "1dcb3562fe18a73a00243658", "category": "open_pr", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 33269, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "e051ac14c874f6bd9f07f1a8", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true}]}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r
+exit=0 elapsed=4.05s
+{"permissions":{"push":true}}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat
+exit=0 elapsed=5.7s
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791537269, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued", "complete": false, "rows": [{"id": "5e99f4d8dcb14f17ee4f094c", "category": "coverage", "subject": "ledger stale", "owner": "firstmate", "next_action": "wait for the GitHub quota window to reset; the next run refreshes every row", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z", "informational": true}, {"id": "1dcb3562fe18a73a00243658", "category": "open_pr", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 33269, "limit_seconds": 3600, "overdue": true, "evidence": "", "stale": true}, {"id": "e051ac14c874f6bd9f07f1a8", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true, "stale": true}], "stale": true, "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z", "stale_until_epoch": 1791540802}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat
+exit=0 elapsed=2.43s
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791537269, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued", "complete": false, "rows": [{"id": "5e99f4d8dcb14f17ee4f094c", "category": "coverage", "subject": "ledger stale", "owner": "firstmate", "next_action": "wait for the GitHub quota window to reset; the next run refreshes every row", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z", "informational": true}, {"id": "1dcb3562fe18a73a00243658", "category": "open_pr", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 33269, "limit_seconds": 3600, "overdue": true, "evidence": "", "stale": true}, {"id": "e051ac14c874f6bd9f07f1a8", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true, "stale": true}], "stale": true, "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z", "stale_until_epoch": 1791540802}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r
+exit=0 elapsed=2.07s
+{"permissions":{"push":true}}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat
+exit=0 elapsed=0.85s
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791537298, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-no-prior-continued", "complete": false, "rows": [{"id": "2f7c02aec9e09e1ec97fd638", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z"}], "stale": true, "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:13:22Z", "stale_until_epoch": 1791540802}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh --json --heartbeat
+exit=0 elapsed=12.73s
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791537299, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/ledger-continued", "complete": true, "rows": [{"id": "1dcb3562fe18a73a00243658", "category": "open_pr", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 33299, "limit_seconds": 3600, "overdue": true, "evidence": ""}, {"id": "e051ac14c874f6bd9f07f1a8", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true}]}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8
+exit=0 elapsed=34.51s
+alice	2 recent commits
+bob	1 recent commit
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8
+exit=0 elapsed=21.39s
+alice	2 recent commits
+bob	1 recent commit
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8
+exit=0 elapsed=10.29s
+alice	2 recent commits
+carol	1 recent commit
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh https://github.com/o/r/pull/8
+exit=2 elapsed=3.98s
+struct field for "repository" doesn't exist in any of 1 places to unmarshal
+fm-pr-state: could not read required checks for https://github.com/o/r/pull/8
+
+
+$ gh --version
+exit=0 elapsed=3.27s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=1.41s
+{"permissions": {"push": true}}
+
+$ bash -x /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=17.08s
++ set -eu
++++ dirname /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh
+++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin
+++ pwd
++ SCRIPT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin
++ FM_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN
++ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic
++ STATE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
++ DATA=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/data
++ export FM_HOME FM_STATE_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
++ FM_STATE_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-lib.sh
+++ FM_PR_PROVIDER=
+++ FM_PR_URL=
+++ FM_PR_HOST=
+++ FM_PR_PATH=
+++ FM_PR_OWNER=
+++ FM_PR_REPO=
+++ FM_PR_NUMBER=
+++ FM_PR_DATA_PROVIDER=
+++ FM_PR_DATA_URL=
+++ FM_PR_DATA_HOST=
+++ FM_PR_DATA_PATH=
+++ FM_PR_DATA_NUMBER=
+++ FM_PR_META_PROVIDER=
+++ FM_PR_META_URL=
+++ FM_PR_META_HOST=
+++ FM_PR_META_PATH=
+++ FM_PR_META_NUMBER=
+++ FM_PR_REG_ID=
+++ FM_PR_REG_PROVIDER=
+++ FM_PR_REG_URL=
+++ FM_PR_REG_HOST=
+++ FM_PR_REG_PATH=
+++ FM_PR_REG_NUMBER=
+++ FM_PR_REG_DATA_HASH=
+++ FM_PR_REG_TEMPLATE_HASH=
+++ FM_PR_REG_DATA_IDENTITY=
+++ FM_PR_REG_CHECK_IDENTITY=
+++ FM_PR_POLL_DATA_TMP=
+++ FM_PR_POLL_CHECK_TMP=
+++ FM_PR_POLL_REG_TMP=
+++ FM_PR_POLL_DATA_DEST=
+++ FM_PR_POLL_CHECK_DEST=
+++ FM_PR_POLL_REG_DEST=
+++ FM_PR_POLL_EXPECT_ID=
+++ FM_PR_POLL_EXPECT_PROVIDER=
+++ FM_PR_POLL_EXPECT_URL=
+++ FM_PR_POLL_EXPECT_HOST=
+++ FM_PR_POLL_EXPECT_PATH=
+++ FM_PR_POLL_EXPECT_NUMBER=
+++ FM_PR_POLL_EXPECT_DATA_HASH=
+++ FM_PR_POLL_EXPECT_TEMPLATE_HASH=
+++ FM_PR_POLL_EXPECT_DATA_IDENTITY=
+++ FM_PR_POLL_EXPECT_CHECK_IDENTITY=
+++ FM_PR_POLL_TEMPLATE=
+++ FM_PR_POLL_STATE_DEVICE=
+++ FM_PR_POLL_SNAPSHOT_ID=
+++ FM_PR_POLL_SNAPSHOT_PROVIDER=
+++ FM_PR_POLL_SNAPSHOT_URL=
+++ FM_PR_POLL_SNAPSHOT_HOST=
+++ FM_PR_POLL_SNAPSHOT_PATH=
+++ FM_PR_POLL_SNAPSHOT_NUMBER=
+++ FM_PR_POLL_SNAPSHOT_DATA_HASH=
+++ FM_PR_POLL_SNAPSHOT_TEMPLATE_HASH=
+++ FM_PR_POLL_SNAPSHOT_DATA_IDENTITY=
+++ FM_PR_POLL_SNAPSHOT_CHECK_IDENTITY=
+++ FM_PR_POLL_SNAPSHOT_REG_HASH=
+++ FM_PR_POLL_SNAPSHOT_REG_IDENTITY=
+++ FM_PR_POLL_REARM_DATA_IDENTITY=
+++ FM_PR_POLL_REARM_CHECK_IDENTITY=
+++ FM_PR_RETIRE_ID=
+++ FM_PR_RETIRE_PROVIDER=
+++ FM_PR_RETIRE_URL=
+++ FM_PR_RETIRE_HOST=
+++ FM_PR_RETIRE_PATH=
+++ FM_PR_RETIRE_NUMBER=
+++ FM_PR_RETIRE_DATA_HASH=
+++ FM_PR_RETIRE_TEMPLATE_HASH=
+++ FM_PR_RETIRE_DATA_IDENTITY=
+++ FM_PR_RETIRE_CHECK_IDENTITY=
+++ FM_PR_RETIRE_REG_HASH=
+++ FM_PR_RETIRE_REG_IDENTITY=
+++ FM_PR_RETIRE_RECEIPT_HASH=
+++ FM_PR_RETIRE_RECEIPT_IDENTITY=
+++ FM_PR_RECORD_STATE=
+++ FM_PR_RECORD_MERGED=
+++ FM_PR_POLL_RETIREMENT_REJECTED=
++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-timeout-lib.sh
+++ set -u
++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-path-lib.sh
++ case "${1:-}" in
++ command -v jq
++ NOW=2026-10-09T00:00:00Z
+++ jq -nr --arg now 2026-10-09T00:00:00Z '$now | fromdateiso8601'
++ EPOCH=1791504000
++ MAX_AGE=900
++ BUDGET=20
++ case "$MAX_AGE" in
++ case "$BUDGET" in
++ '[' 20 -ge 1 ']'
++ '[' 20 -le 25 ']'
++ CHECK_TIMEOUT=30
++ case "$CHECK_TIMEOUT" in
++ BUDGET_CAP=27
++ '[' 27 -ge 1 ']'
++ '[' 20 -le 27 ']'
+++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.XXXXXX
++ TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c
++ LOCK_HELD=0
++ trap cleanup EXIT
++ trap 'exit 1' HUP INT TERM
++ case "${1:-}" in
++ poll
++ local task url old kind error observed
++ local -a row
++ acquire
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state ']'
++ '[' '!' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state ']'
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/data ']'
++ '[' '!' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/data ']'
++ FM_WAKE_QUEUE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.wake-queue
++ FM_WAKE_QUEUE_LOCK=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.wake-queue.lock
++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-wake-lib.sh
++++ d=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin
++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-wake-lib.sh ']'
++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin
++++ pwd
+++ FM_WAKE_LIB_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin
++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/..
++++ pwd
+++ FM_WAKE_DEFAULT_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN
+++ FM_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN
+++ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic
+++ STATE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
+++ FM_WAKE_QUEUE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.wake-queue
+++ FM_WAKE_QUEUE_LOCK=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.wake-queue.lock
+++ FM_LOCK_STALE_AFTER=2
+++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-path-lib.sh
+++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-secondmate-parent-lib.sh
++++ uname
+++ _FM_UNAME=Darwin
+++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
+++ '[' 3 -gt 4 ']'
+++ '[' 3 -eq 4 ']'
+++ FM_WATCHER_MATCHED_IDENTITY=
+++ FM_WATCHER_HEALTHY_PID=
+++ FM_WATCHER_HEALTHY_IDENTITY=
+++ FM_WATCHER_VERDICT_OK=false
+++ FM_WATCHER_VERDICT_REASON=stale-beacon
+++ FM_RECOVERY_MARKER_TOKEN=
+++ FM_RECOVERY_MARKER_ACTION=none
+++ FM_RECOVERY_MARKER_WRITTEN_TOKEN=
+++ FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
+++ FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+++ FM_RECOVERY_HANDOVER_TOKEN=
+++ FM_RECOVERY_HANDOVER_SEQ=
+++ FM_WAKE_STATUS_KEY=
+++ FM_WAKE_STATUS_HISTORICAL=false
+++ FM_WAKE_EVENT_LINE=
+++ FM_WAKE_UNREAD_LINES=
++ fm_lock_acquire_wait /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ fm_lock_try_acquire /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock pid steal cur rc steal_owner primary_owner current
++ FM_LOCK_HELD_PID=
++ FM_LOCK_OWNER_DIR=
++ FM_LOCK_RECOVERED_PID=
++ fm_lock_try_create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock allowed_steal_owner= ownerdir
++ FM_LOCK_OWNER_DIR=
+++ fm_lock_owner_dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock lock_abs
++++ fm_lock_abs_path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++++ local path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock dir base
++++ fm_dirname_to dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++++ case "$fm_path" in
++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++++ case "$fm_path" in
++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
++++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state ']'
++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state ']'
++++ printf -v dir %s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
++++ fm_basename_to base /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++++ case "$fm_path" in
++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++++ fm_path=.contributions.lock
++++ '[' .contributions.lock '!=' .contributions.lock ']'
++++ printf -v base %s .contributions.lock
+++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
+++++ pwd -P
++++ dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state
++++ printf '%s/%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state .contributions.lock
+++ lock_abs=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
+++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.XXXXXX
++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ']'
++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ']'
++ fm_lock_prepare_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm mypid back
++ fm_current_pid mypid
++ local fm_pid
+++ exec sh -c 'printf "%s\n" "$PPID"'
++ fm_pid=99556
++ case "$fm_pid" in
++ '[' 1 -gt 0 ']'
++ printf -v mypid %s 99556
++ printf '%s\n' 99556
+++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/pid
++ back=99556
++ '[' 99556 = 99556 ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm actual
+++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm ']'
++ fm_lock_claim /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm ''
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm allowed_steal_owner= mypid back
++ fm_current_pid mypid
++ local fm_pid
+++ exec sh -c 'printf "%s\n" "$PPID"'
++ fm_pid=99556
++ case "$fm_pid" in
++ '[' 1 -gt 0 ']'
++ printf -v mypid %s 99556
+++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/pid
++ back=99556
++ '[' 99556 '!=' 99556 ']'
++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm actual
+++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm ']'
++ fm_lock_claim_blocked_by_steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ''
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock allowed_steal_owner= steal
++ steal=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.steal
++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.steal ']'
++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.steal ']'
++ return 1
++ return 0
++ FM_LOCK_OWNER_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ return 0
++ return 0
++ LOCK_HELD=1
++ get_input
++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh --contribution-input
++ read_saved
++ local file dir task
++ :
++ ERRORS=0
++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/data ']'
++ for file in '"$DATA"/*/contributions.json'
++ '[' -e '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/data/*/contributions.json' ']'
++ '[' -L '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/data/*/contributions.json' ']'
++ continue
++ jq -s . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/saved.jsonl
++ '[' 0 -eq 0 ']'
++ jq_lib -nr --slurpfile input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/input.json --slurpfile saved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/saved.json '
+    known($input[0];$saved[0])
+    | group_by(.url) | map({url:.[0].url,tasks:(map(.task) | unique)})
+    | .[] | [.url] + .tasks | @tsv'
++ local 'program=
+    known($input[0];$saved[0])
+    | group_by(.url) | map({url:.[0].url,tasks:(map(.task) | unique)})
+    | .[] | [.url] + .tasks | @tsv'
++ set -- -nr --slurpfile input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/input.json --slurpfile saved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/saved.json
++ jq -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin -nr --slurpfile input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/input.json --slurpfile saved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/saved.json 'include "fm-contributions"; 
+    known($input[0];$saved[0])
+    | group_by(.url) | map({url:.[0].url,tasks:(map(.task) | unique)})
+    | .[] | [.url] + .tasks | @tsv'
++ :
++ IFS='	'
++ read -r -a row
++ '[' 2 -ge 2 ']'
++ url=https://github.com/o/r/pull/8
++ jq -ne --slurpfile saved /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/saved.json --arg url https://github.com/o/r/pull/8 --args 'any($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;
+        . != null and (.observation.state | IN("merged","closed")))' delivery
++ IFS='	'
++ printf '%s\n' 'https://github.com/o/r/pull/8	delivery'
++ IFS='	'
++ read -r -a row
++ jq -Rnr --argjson bucket 5971680 '
+    [inputs] | if length == 0 then . else ($bucket % length) as $offset | .[$offset:] + .[:$offset] end
+    | .[]'
+++ date +%s
++ DEADLINE=1791537496
++ OBSERVATION_RESERVE=15
++ QUOTA_ANNOUNCE=0
++ QUOTA_REASON=
++ IFS='	'
++ read -r -a row
++ '[' -n '' ']'
+++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard
++ QUOTA_REASON=
++ '[' -n '' ']'
+++ date +%s
++ '[' 19 -ge 15 ']'
++ url=https://github.com/o/r/pull/8
++ observed=0
++ observe https://github.com/o/r/pull/8
++ local url=https://github.com/o/r/pull/8 part number kind endpoint head after label
++ case "$url" in
++ part=o/r/pull/8
++ number=8
++ part=o/r/pull
++ kind=pull
++ part=o/r
++ case "$kind" in
++ endpoint=repos/o/r/pulls/8
++ rm -f -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/budget-exhausted /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/forge-unavailable /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/quota-low
++ BUDGET_EXHAUSTED=0
++ forge api repos/o/r/pulls/8
++ local remaining rc=0 forge_err=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/forge.err
+++ date +%s
++ remaining=19
++ '[' 19 -gt 0 ']'
++ '[' 19 -le 5 ']'
++ remaining=5
++ '[' api = api ']'
++ shift
++ fm_run_timed 5 env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get --floor repos/o/r/pulls/8
++ rc=124
++ '[' 124 -eq 75 ']'
++ '[' 124 -eq 124 ']'
++ BUDGET_EXHAUSTED=1
++ :
++ return 124
++ return 1
++ observed=1
++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c/quota-low ']'
++ '[' 1 -ne 0 ']'
+++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard
++ QUOTA_REASON=
++ '[' -n '' ']'
++ '[' 1 -eq 0 ']'
++ continue
++ IFS='	'
++ read -r -a row
++ '[' 0 -eq 0 ']'
++ cleanup
++ '[' 1 = 0 ']'
++ fm_lock_release /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock pid current ownerdir
++ fm_current_pid current
++ local fm_pid
+++ exec sh -c 'printf "%s\n" "$PPID"'
++ fm_pid=99556
++ case "$fm_pid" in
++ '[' 1 -gt 0 ']'
++ printf -v current %s 99556
++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ']'
+++ fm_lock_link_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm ']'
+++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/pid
++ pid=99556
++ '[' 99556 = 99556 ']'
++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm actual
+++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm ']'
++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock
++ fm_lock_discard_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm ']'
++ fm_lock_clean_known_files /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/pid /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/fm-home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/pid-identity /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/role /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm/watcher-path
++ rmdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/state/.contributions.lock.owner.tdrSZm
++ return 0
++ rm -rf -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-diagnostic/tmp/fm-contributions.fNc85c
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh https://github.com/o/r/pull/8
+exit=2 elapsed=11.52s
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x2 addr=0x220 pc=0x103706240]
+
+goroutine 1 [running]:
+github.com/cli/cli/v2/pkg/cmd/pr/checks.populateStatusChecks(0x36d9c07864b0?, {0x104d19638, 0x36d9c0b681b0}, 0x36d9c08d6c08, 0x1, 0x0?)
+	github.com/cli/cli/v2/pkg/cmd/pr/checks/checks.go:286 +0x1a0
+github.com/cli/cli/v2/pkg/cmd/pr/checks.checksRun(0x36d9c08df180)
+	github.com/cli/cli/v2/pkg/cmd/pr/checks/checks.go:184 +0x2d4
+github.com/cli/cli/v2/pkg/cmd/pr/checks.NewCmdChecks.func1(0x36d9c06fac08, {0x36d9c078bc80, 0x1, 0x0?})
+	github.com/cli/cli/v2/pkg/cmd/pr/checks/checks.go:113 +0x3e8
+github.com/cli/cli/v2/pkg/cmdutil.RecordTelemetry.func2(0x36d9c06fac08, {0x36d9c078bc80?, 0x1?, 0x6?})
+	github.com/cli/cli/v2/pkg/cmdutil/telemetry.go:40 +0x30
+github.com/spf13/cobra.(*Command).execute(0x36d9c06fac08, {0x36d9c078bbc0, 0x6, 0x6})
+	github.com/spf13/cobra@v1.10.2/command.go:1015 +0x82c
+github.com/spf13/cobra.(*Command).ExecuteC(0x36d9c0912008)
+	github.com/spf13/cobra@v1.10.2/command.go:1148 +0x340
+github.com/spf13/cobra.(*Command).ExecuteContextC(...)
+	github.com/spf13/cobra@v1.10.2/command.go:1080
+github.com/cli/cli/v2/internal/ghcmd.Main()
+	github.com/cli/cli/v2/internal/ghcmd/cmd.go:187 +0xd08
+main.main()
+	github.com/cli/cli/v2/cmd/gh/main.go:10 +0x1c
+fm-pr-state: could not read required checks for https://github.com/o/r/pull/8
+
+
+$ gh --version
+exit=0 elapsed=6.12s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=2.1s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=8.08s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=20.61s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=17.3s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh https://github.com/o/r/pull/8
+exit=0 elapsed=14.72s
+CHECKS: none reported yet
+REVIEW DECISION: CHANGES_REQUESTED
+REVIEW: reviewer CHANGES_REQUESTED
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh https://github.com/o/r/pull/8
+exit=0 elapsed=12.16s
+CHECKS: none reported yet
+REVIEW DECISION: CHANGES_REQUESTED
+REVIEW: reviewer CHANGES_REQUESTED
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh https://github.com/o/r/pull/8
+exit=0 elapsed=5.05s
+CHECKS: none reported yet
+REVIEW DECISION: CHANGES_REQUESTED
+REVIEW: other CHANGES_REQUESTED
+
+
+$ gh --version
+exit=0 elapsed=0.71s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=0.95s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=1 elapsed=2.38s
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-hold-reason-lib.sh: line 22: perl: command not found
+fm-fleet-snapshot: backlog read failed
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/items
+exit=0 elapsed=7.2s
+[{"id":1}]
+
+
+$ gh --version
+exit=0 elapsed=13.83s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=4.72s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=32.61s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=22.67s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=24.02s
+
+
+$ gh --version
+exit=0 elapsed=1.07s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=1.76s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r
+exit=0 elapsed=3.23s
+{"permissions":{"push":true}}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=9.44s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z; last observations kept, marked stale
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r
+exit=0 elapsed=13.89s
+{"permissions":{"push":true}}
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh: line 118: cmp: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=17.58s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=15.66s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh --contribution-input
+exit=0 elapsed=1.02s
+{
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/stale-owners-stateproof/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "hold_until": null,
+        "raw": "- [ ] delivery - Contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "state": "queued",
+        "reported": null,
+        "captain_drop": false,
+        "pr_url": "https://github.com/o/r/pull/8",
+        "captain_actionable": false,
+        "current_role": "queued",
+        "hold_reason": null,
+        "requires_child_metadata": false,
+        "unresolved_blocker_ids": [],
+        "blocked_reason": null,
+        "title": "Contribution",
+        "kind": "ship",
+        "blocked_by": null,
+        "hold_kind": null,
+        "report_path": null,
+        "blocked_by_ids": [],
+        "hold_age_days": null,
+        "merged": null,
+        "hold_bucket": null,
+        "hold_set": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "structured": true,
+        "body_excerpt": null,
+        "priority": null,
+        "id": "delivery",
+        "since": null,
+        "order": 1,
+        "local_note": null,
+        "body_lines": [],
+        "done": null,
+        "checked": false,
+        "repo": "sample"
+      },
+      {
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "priority": null,
+        "body_excerpt": null,
+        "structured": true,
+        "report_path": null,
+        "blocked_by_ids": [],
+        "hold_bucket": null,
+        "merged": null,
+        "hold_age_days": null,
+        "hold_set": null,
+        "body_lines": [],
+        "done": null,
+        "checked": false,
+        "repo": "sample",
+        "id": "duplicate",
+        "order": 2,
+        "since": null,
+        "local_note": null,
+        "reported": null,
+        "captain_drop": false,
+        "pr_url": "https://github.com/o/r/pull/8",
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "hold_until": null,
+        "raw": "- [ ] duplicate - Contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "state": "queued",
+        "kind": "ship",
+        "blocked_reason": null,
+        "title": "Contribution",
+        "hold_kind": null,
+        "blocked_by": null,
+        "captain_actionable": false,
+        "hold_reason": null,
+        "current_role": "queued",
+        "unresolved_blocker_ids": [],
+        "requires_child_metadata": false
+      },
+      {
+        "title": "Contribution",
+        "blocked_reason": null,
+        "kind": "ship",
+        "blocked_by": null,
+        "hold_kind": null,
+        "current_role": "queued",
+        "hold_reason": null,
+        "requires_child_metadata": false,
+        "unresolved_blocker_ids": [],
+        "captain_actionable": false,
+        "captain_drop": false,
+        "pr_url": "https://github.com/o/r/pull/9",
+        "reported": null,
+        "raw": "- [ ] tail - Contribution https://github.com/o/r/pull/9 (repo: sample) (kind: ship)",
+        "state": "queued",
+        "links": [
+          "https://github.com/o/r/pull/9"
+        ],
+        "hold_until": null,
+        "repo": "sample",
+        "body_lines": [],
+        "checked": false,
+        "done": null,
+        "since": null,
+        "order": 3,
+        "local_note": null,
+        "id": "tail",
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "structured": true,
+        "body_excerpt": null,
+        "priority": null,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "merged": null,
+        "hold_set": null,
+        "report_path": null,
+        "blocked_by_ids": []
+      },
+      {
+        "hold_kind": null,
+        "blocked_by": null,
+        "kind": "ship",
+        "title": "Late owner",
+        "blocked_reason": null,
+        "unresolved_blocker_ids": [],
+        "requires_child_metadata": false,
+        "hold_reason": null,
+        "current_role": "queued",
+        "captain_actionable": false,
+        "pr_url": "https://github.com/o/r/pull/8",
+        "captain_drop": false,
+        "reported": null,
+        "state": "queued",
+        "raw": "- [ ] aaa - Late owner https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "hold_until": null,
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "repo": "sample",
+        "done": null,
+        "checked": false,
+        "body_lines": [],
+        "local_note": null,
+        "order": 4,
+        "since": null,
+        "id": "aaa",
+        "body_excerpt": null,
+        "priority": null,
+        "structured": true,
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "hold_set": null,
+        "merged": null,
+        "hold_bucket": null,
+        "hold_age_days": null,
+        "blocked_by_ids": [],
+        "report_path": null
+      },
+      {
+        "id": "new-url",
+        "local_note": null,
+        "since": null,
+        "order": 5,
+        "checked": false,
+        "done": null,
+        "body_lines": [],
+        "repo": "sample",
+        "blocked_by_ids": [],
+        "report_path": null,
+        "hold_set": null,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "merged": null,
+        "structured": true,
+        "body_excerpt": null,
+        "priority": null,
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "captain_actionable": false,
+        "requires_child_metadata": false,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "hold_reason": null,
+        "blocked_by": null,
+        "hold_kind": null,
+        "blocked_reason": null,
+        "title": "Late URL",
+        "kind": "ship",
+        "hold_until": null,
+        "links": [
+          "https://github.com/o/r/pull/10"
+        ],
+        "state": "queued",
+        "raw": "- [ ] new-url - Late URL https://github.com/o/r/pull/10 (repo: sample) (kind: ship)",
+        "reported": null,
+        "pr_url": "https://github.com/o/r/pull/10",
+        "captain_drop": false
+      }
+    ]
+  },
+  "tasks": []
+}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/stale-owners-stateproof/input.json --all
+exit=0 elapsed=0.75s
+{
+  "known": 3,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 3,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0,
+  "rows": [
+    {
+      "task": "new-url",
+      "url": "https://github.com/o/r/pull/10",
+      "kind": "pr",
+      "checked_at": null,
+      "checked": false,
+      "final": false,
+      "head": null,
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 0,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [],
+      "actor": "fleet",
+      "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+      "tasks": [
+        "new-url"
+      ]
+    },
+    {
+      "task": "aaa",
+      "url": "https://github.com/o/r/pull/8",
+      "kind": "pr",
+      "checked_at": null,
+      "checked": false,
+      "final": false,
+      "head": null,
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 0,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [],
+      "actor": "fleet",
+      "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+      "tasks": [
+        "aaa",
+        "delivery",
+        "duplicate"
+      ]
+    },
+    {
+      "task": "tail",
+      "url": "https://github.com/o/r/pull/9",
+      "kind": "pr",
+      "checked_at": "2026-10-09T00:00:00Z",
+      "checked": false,
+      "final": false,
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 1,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [],
+      "actor": "fleet",
+      "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+      "tasks": [
+        "tail"
+      ]
+    }
+  ]
+}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r
+exit=0 elapsed=1.96s
+{"permissions":{"push":true}}
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh: line 118: cmp: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=5.61s
+contributions: GitHub core quota low (300 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T11:25:34Z; last observations kept, marked stale
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=11.77s
+
+
+$ gh --version
+exit=0 elapsed=1.02s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=0.66s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=11.35s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=7.99s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:27:55Z; last observations kept, marked stale
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=16.14s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:27:55Z; last observations kept, marked stale
+
+
+$ gh --version
+exit=0 elapsed=0.2s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=0.23s
+{"permissions": {"push": true}}
+
+$ gh --version
+exit=0 elapsed=2.61s
+gh version 2.101.0 (2026-09-15)
+https://github.com/cli/cli/releases/tag/v2.101.0
+
+
+$ gh api repos/o/r
+exit=0 elapsed=0.2s
+{"permissions": {"push": true}}
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=5.67s
+contribution-wake: check: contributions delivery 
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh: line 371: shasum: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=5.8s
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=8.7s
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh: line 371: shasum: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh --contribution-input
+exit=0 elapsed=0.36s
+{
+  "backlog": {
+    "records": [
+      {
+        "hold_kind": null,
+        "captain_drop": false,
+        "kind": "ship",
+        "order": 1,
+        "body_lines": [],
+        "done": null,
+        "local_note": null,
+        "repo": "sample",
+        "reported": null,
+        "priority": null,
+        "since": null,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "hold_set": null,
+        "merged": null,
+        "blocked_by": null,
+        "hold_until": null,
+        "current_role": "queued",
+        "checked": false,
+        "blocked_reason": null,
+        "report_path": null,
+        "body_excerpt": null,
+        "hold_reason": null,
+        "unresolved_blocker_ids": [],
+        "id": "delivery",
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "pr_url": "https://github.com/o/r/pull/8",
+        "requires_child_metadata": false,
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "structured": true,
+        "captain_actionable": false,
+        "title": "Contribution",
+        "raw": "- [ ] delivery - Contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "state": "queued",
+        "blocked_by_ids": []
+      }
+    ],
+    "present": true,
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-acceptance/data/backlog.md"
+  },
+  "tasks": []
+}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/contributions-acceptance/input.json --all
+exit=0 elapsed=0.3s
+{
+  "known": 1,
+  "checked": 1,
+  "counts": {
+    "captain": 0,
+    "fleet": 1,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": true,
+  "proven_clear": true,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 1791504900,
+  "captain": [],
+  "captain_omitted": 0,
+  "rows": [
+    {
+      "task": "delivery",
+      "url": "https://github.com/o/r/pull/8",
+      "kind": "pr",
+      "checked_at": "2026-10-09T00:00:00Z",
+      "checked": true,
+      "final": false,
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": null,
+      "reviews": [
+        {
+          "id": 1,
+          "user": {
+            "login": "reviewer"
+          },
+          "state": "CHANGES_REQUESTED",
+          "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "submitted_at": "2026-10-09T00:00:00Z",
+          "updated_at": "2026-10-09T00:00:00Z",
+          "author_association": "OWNER",
+          "html_url": "https://github.com/o/r/pull/8#pullrequestreview-1",
+          "body": "Please fix this",
+          "freshness": "current"
+        }
+      ],
+      "distinct_checks": 1,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [
+        {
+          "token": "comment:12:2026-10-09T00:00:00Z:",
+          "type": "comment",
+          "source": "https://github.com/o/r/pull/8#issuecomment-12",
+          "head": null,
+          "author": "maintainer",
+          "body": "new signal"
+        },
+        {
+          "token": "review:1:2026-10-09T00:00:00Z:CHANGES_REQUESTED",
+          "type": "review",
+          "source": "https://github.com/o/r/pull/8#pullrequestreview-1",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "author": "reviewer",
+          "body": "Please fix this"
+        }
+      ],
+      "actor": "fleet",
+      "reason": "incoming maintainer signal needs triage",
+      "tasks": [
+        "delivery"
+      ]
+    }
+  ]
+}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r
+exit=0 elapsed=0.56s
+{"permissions":{"push":true}}
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=1.0s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=7.81s
+contribution-wake: check: contributions delivery 
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh: line 371: shasum: command not found
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=5.37s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll
+exit=0 elapsed=8.56s
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale
+
+

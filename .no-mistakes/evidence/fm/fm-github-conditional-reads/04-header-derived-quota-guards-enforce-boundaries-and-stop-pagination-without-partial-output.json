@@ -1,0 +1,147 @@
+{
+  "scenario": "Header-derived quota guards enforce boundaries and stop pagination without partial output",
+  "result": "pass",
+  "detail": {
+    "boundary_refusal": "GitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:02:18Z",
+    "final_concurrent_bucket": {
+      "resource": "core",
+      "limit": 5000,
+      "remaining": 749,
+      "reset": 1791543738,
+      "observed": 1791537032
+    },
+    "page_floor": "one response then exit 75 and no partial stdout for both 200 and 304",
+    "error_bucket_remaining": 600,
+    "reset_recovery": "guard permits after reset"
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items\nexit=0\n[{\"id\":1}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard\nexit=0\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items\nexit=0\n[{\"id\":1}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard\nexit=75\nGitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:02:18Z\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items --floor\nexit=75\nGitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:02:18Z\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard\nexit=0\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard\nexit=75\nGitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:02:18Z\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/error\nexit=1\ngh: service unavailable (HTTP 502)\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r/older\nexit=0\n[]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/items\nexit=0\n[{\"id\":1}]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard\nexit=0\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard\nexit=75\nGitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T11:02:18Z\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/paged --floor --paginate --slurp\nexit=75\nGitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T11:02:18Z\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/paged --paginate --slurp\nexit=0\n[[{\"id\":1}],[{\"id\":2}]]\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get /repos/o/r/paged --floor --paginate --slurp\nexit=75\nGitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T11:02:18Z\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh guard\nexit=0\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 200,
+      "remaining": 750,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": "\"01aa8ec06990002e\"",
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 304,
+      "remaining": 749,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/error",
+      "conditional": null,
+      "etag": "\"76dda76b5858aaf6\"",
+      "status": 502,
+      "remaining": 600,
+      "reset": 1791540138,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/older",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4999,
+      "reset": 1791536538,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": "\"01aa8ec06990002e\"",
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791543738,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/high",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 750,
+      "reset": 1791543738,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/low",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 749,
+      "reset": 1791543738,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/paged",
+      "conditional": null,
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791543738,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/paged",
+      "conditional": null,
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791543738,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/paged?page=2",
+      "conditional": null,
+      "etag": "\"65bf30e84fe08f8a\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791543738,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/paged",
+      "conditional": "\"01aa8ec06990002e\"",
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 304,
+      "remaining": 500,
+      "reset": 1791543738,
+      "barrier": null
+    }
+  ]
+}

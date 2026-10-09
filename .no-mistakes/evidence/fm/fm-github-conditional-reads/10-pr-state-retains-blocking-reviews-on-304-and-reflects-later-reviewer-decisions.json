@@ -1,0 +1,49 @@
+{
+  "scenario": "PR state retains blocking reviews on 304 and reflects later reviewer decisions",
+  "result": "fail",
+  "detail": {
+    "exception": "AssertionError((['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh', 'https://github.com/o/r/pull/8'], 2, '', 'struct field for \"repository\" doesn\\'t exist in any of 1 places to unmarshal\\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\\n'))",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 163, in scenario\n    detail=fn()\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 385, in blockers\n    first=command(h,[ROOT/'bin/fm-pr-state.sh',url]); assert 'REVIEW: reviewer CHANGES_REQUESTED' in first,first\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/drive.py\", line 138, in command\n    assert done.returncode==expect, (args,done.returncode,done.stdout,done.stderr)\n           ^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: (['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh', 'https://github.com/o/r/pull/8'], 2, '', 'struct field for \"repository\" doesn\\'t exist in any of 1 places to unmarshal\\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\\n')\n"
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh https://github.com/o/r/pull/8\nexit=2 elapsed=3.98s\nstruct field for \"repository\" doesn't exist in any of 1 places to unmarshal\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\n"
+  ],
+  "http_requests": [
+    {
+      "method": "POST",
+      "path": "/graphql",
+      "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {state,mergedAt,isDraft,headRefOid,author{login,...on User{id,name}},mergeable,reviewDecision,id,number}\n\t\t}\n\t}",
+      "variables": {
+        "owner": "o",
+        "pr_number": 8,
+        "repo": "r"
+      },
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/graphql",
+      "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {number,headRefName,id}\n\t\t}\n\t}",
+      "variables": {
+        "owner": "o",
+        "pr_number": 8,
+        "repo": "r"
+      },
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/graphql",
+      "query": "query PullRequest_fields{PullRequest: __type(name: \"PullRequest\"){fields(includeDeprecated: true){name}},StatusCheckRollupContextConnection: __type(name: \"StatusCheckRollupContextConnection\"){fields(includeDeprecated: true){name}}}",
+      "variables": null,
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/graphql",
+      "query": "query PullRequest_fields2{WorkflowRun: __type(name: \"WorkflowRun\"){fields(includeDeprecated: true){name}}}",
+      "variables": null,
+      "status": 200
+    }
+  ]
+}

@@ -1,0 +1,283 @@
+{
+  "scenario": "After quota reset a contribution poll refreshes the observation and clears its stale error",
+  "result": "pass",
+  "detail": {
+    "held": {
+      "url": "https://github.com/o/r/pull/8",
+      "kind": "pr",
+      "checked_at": "2026-10-09T00:00:00Z",
+      "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z",
+      "pending": [],
+      "seen": [],
+      "notified": [],
+      "verdict": null,
+      "observation": {
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "state": "open",
+        "draft": false,
+        "mergeable": "mergeable",
+        "review_decision": "APPROVED",
+        "can_merge": true,
+        "checks": [
+          {
+            "name": "test",
+            "id": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-10-09T00:00:00Z"
+          }
+        ],
+        "reviews": [],
+        "events": []
+      }
+    },
+    "resumed": {
+      "url": "https://github.com/o/r/pull/8",
+      "kind": "pr",
+      "checked_at": "2026-10-09T00:01:00Z",
+      "error": null,
+      "pending": [
+        {
+          "token": "review:1:2026-10-09T00:00:00Z:CHANGES_REQUESTED",
+          "type": "review",
+          "source": "https://github.com/o/r/pull/8#pullrequestreview-1",
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "author": "reviewer",
+          "body": "Please fix this"
+        }
+      ],
+      "seen": [
+        "review:1:2026-10-09T00:00:00Z:CHANGES_REQUESTED"
+      ],
+      "notified": [
+        "review:1:2026-10-09T00:00:00Z:CHANGES_REQUESTED"
+      ],
+      "verdict": null,
+      "observation": {
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "state": "open",
+        "draft": false,
+        "mergeable": "mergeable",
+        "can_merge": true,
+        "review_decision": "CHANGES_REQUESTED",
+        "reviews": [
+          {
+            "id": 1,
+            "user": {
+              "login": "reviewer"
+            },
+            "state": "CHANGES_REQUESTED",
+            "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "submitted_at": "2026-10-09T00:00:00Z",
+            "updated_at": "2026-10-09T00:00:00Z",
+            "author_association": "OWNER",
+            "html_url": "https://github.com/o/r/pull/8#pullrequestreview-1",
+            "body": "Please fix this"
+          }
+        ],
+        "checks": [
+          {
+            "name": "test",
+            "id": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-10-09T00:00:00Z"
+          }
+        ],
+        "events": [
+          {
+            "token": "review:1:2026-10-09T00:00:00Z:CHANGES_REQUESTED",
+            "type": "review",
+            "source": "https://github.com/o/r/pull/8#pullrequestreview-1",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "author": "reviewer",
+            "body": "Please fix this"
+          }
+        ],
+        "absent_checks": []
+      }
+    },
+    "output": "contribution-wake: check: contributions delivery",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8",
+        "conditional": null,
+        "etag": "\"b4d470e32236e750\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791545432,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791545432,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": "\"87f3c349e2cea577\"",
+        "etag": "\"87f3c349e2cea577\"",
+        "status": 304,
+        "remaining": 4000,
+        "reset": 1791545432,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": null,
+        "etag": "\"c283964f3cde5ec5\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791545432,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791545432,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+        "conditional": null,
+        "etag": "\"336dab579fb7578c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791545432,
+        "barrier": null
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/comments?per_page=100",
+        "conditional": null,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "status": 200,
+        "remaining": 4000,
+        "reset": 1791545432,
+        "barrier": null
+      },
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {headRefOid,reviewDecision,id,number}\n\t\t}\n\t}",
+        "variables": {
+          "owner": "o",
+          "pr_number": 8,
+          "repo": "r"
+        },
+        "status": 200
+      }
+    ]
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r\nexit=0 elapsed=0.56s\n{\"permissions\":{\"push\":true}}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=1.0s\ncontributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:30:32Z; last observations kept, marked stale\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=7.81s\ncontribution-wake: check: contributions delivery \n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh: line 371: shasum: command not found\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541832,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": null,
+      "etag": "\"b4d470e32236e750\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791545432,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/8/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791545432,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": "\"87f3c349e2cea577\"",
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791545432,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+      "conditional": null,
+      "etag": "\"c283964f3cde5ec5\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791545432,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791545432,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+      "conditional": null,
+      "etag": "\"336dab579fb7578c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791545432,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/comments?per_page=100",
+      "conditional": null,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791545432,
+      "barrier": null
+    },
+    {
+      "method": "POST",
+      "path": "/graphql",
+      "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {headRefOid,reviewDecision,id,number}\n\t\t}\n\t}",
+      "variables": {
+        "owner": "o",
+        "pr_number": 8,
+        "repo": "r"
+      },
+      "status": 200
+    }
+  ]
+}

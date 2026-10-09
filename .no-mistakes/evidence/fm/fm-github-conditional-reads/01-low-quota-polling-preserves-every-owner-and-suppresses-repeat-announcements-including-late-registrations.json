@@ -1,0 +1,252 @@
+{
+  "scenario": "Low-quota polling preserves every owner and suppresses repeat announcements including late registrations",
+  "result": "pass",
+  "detail": {
+    "first_episode_output": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z; last observations kept, marked stale",
+    "new_window_output": "contributions: GitHub core quota low (300 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T11:25:34Z; last observations kept, marked stale",
+    "late_owners_and_preserved_rows": {
+      "delivery": {
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "error": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+        "pending": [],
+        "seen": [],
+        "notified": [],
+        "verdict": null,
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "review_decision": "APPROVED",
+          "can_merge": true,
+          "checks": [
+            {
+              "name": "test",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T00:00:00Z"
+            }
+          ],
+          "reviews": [],
+          "events": []
+        }
+      },
+      "duplicate": {
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "error": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+        "pending": [],
+        "seen": [],
+        "notified": [],
+        "verdict": null,
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "review_decision": "APPROVED",
+          "can_merge": true,
+          "checks": [
+            {
+              "name": "test",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T00:00:00Z"
+            }
+          ],
+          "reviews": [],
+          "events": []
+        }
+      },
+      "tail": {
+        "url": "https://github.com/o/r/pull/9",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "error": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+        "pending": [],
+        "seen": [],
+        "notified": [],
+        "verdict": null,
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "review_decision": "APPROVED",
+          "can_merge": true,
+          "checks": [
+            {
+              "name": "test",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T00:00:00Z"
+            }
+          ],
+          "reviews": [],
+          "events": []
+        }
+      },
+      "aaa": {
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": null,
+        "observation": null,
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z"
+      },
+      "new-url": {
+        "url": "https://github.com/o/r/pull/10",
+        "kind": "pr",
+        "checked_at": null,
+        "observation": null,
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z"
+      }
+    },
+    "quota_snapshot": {
+      "known": 3,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 3,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": false,
+      "proven_clear": false,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 0,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0,
+      "rows": [
+        {
+          "task": "new-url",
+          "url": "https://github.com/o/r/pull/10",
+          "kind": "pr",
+          "checked_at": null,
+          "checked": false,
+          "final": false,
+          "head": null,
+          "verdict": null,
+          "reviews": [],
+          "distinct_checks": 0,
+          "missing_verdicts": 0,
+          "pending_checks": 0,
+          "failed_checks": 0,
+          "stale_verdicts": 0,
+          "signals": [],
+          "actor": "fleet",
+          "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+          "tasks": [
+            "new-url"
+          ]
+        },
+        {
+          "task": "aaa",
+          "url": "https://github.com/o/r/pull/8",
+          "kind": "pr",
+          "checked_at": null,
+          "checked": false,
+          "final": false,
+          "head": null,
+          "verdict": null,
+          "reviews": [],
+          "distinct_checks": 0,
+          "missing_verdicts": 0,
+          "pending_checks": 0,
+          "failed_checks": 0,
+          "stale_verdicts": 0,
+          "signals": [],
+          "actor": "fleet",
+          "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+          "tasks": [
+            "aaa",
+            "delivery",
+            "duplicate"
+          ]
+        },
+        {
+          "task": "tail",
+          "url": "https://github.com/o/r/pull/9",
+          "kind": "pr",
+          "checked_at": "2026-10-09T00:00:00Z",
+          "checked": false,
+          "final": false,
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "verdict": null,
+          "reviews": [],
+          "distinct_checks": 1,
+          "missing_verdicts": 0,
+          "pending_checks": 0,
+          "failed_checks": 0,
+          "stale_verdicts": 0,
+          "signals": [],
+          "actor": "fleet",
+          "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z",
+          "tasks": [
+            "tail"
+          ]
+        }
+      ]
+    },
+    "saved_record_origin": "Disposable fm-contributions.v1 data; staleness and late-owner mutations performed by real poll"
+  },
+  "commands": [
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r\nexit=0 elapsed=3.23s\n{\"permissions\":{\"push\":true}}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=9.44s\ncontributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z; last observations kept, marked stale\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r\nexit=0 elapsed=13.89s\n{\"permissions\":{\"push\":true}}\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh: line 118: cmp: command not found\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=17.58s\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=15.66s\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh --contribution-input\nexit=0 elapsed=1.02s\n{\n  \"backlog\": {\n    \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/stale-owners-stateproof/data/backlog.md\",\n    \"present\": true,\n    \"records\": [\n      {\n        \"links\": [\n          \"https://github.com/o/r/pull/8\"\n        ],\n        \"hold_until\": null,\n        \"raw\": \"- [ ] delivery - Contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\",\n        \"state\": \"queued\",\n        \"reported\": null,\n        \"captain_drop\": false,\n        \"pr_url\": \"https://github.com/o/r/pull/8\",\n        \"captain_actionable\": false,\n        \"current_role\": \"queued\",\n        \"hold_reason\": null,\n        \"requires_child_metadata\": false,\n        \"unresolved_blocker_ids\": [],\n        \"blocked_reason\": null,\n        \"title\": \"Contribution\",\n        \"kind\": \"ship\",\n        \"blocked_by\": null,\n        \"hold_kind\": null,\n        \"report_path\": null,\n        \"blocked_by_ids\": [],\n        \"hold_age_days\": null,\n        \"merged\": null,\n        \"hold_bucket\": null,\n        \"hold_set\": null,\n        \"completion\": {\n          \"verb\": null,\n          \"date\": null\n        },\n        \"structured\": true,\n        \"body_excerpt\": null,\n        \"priority\": null,\n        \"id\": \"delivery\",\n        \"since\": null,\n        \"order\": 1,\n        \"local_note\": null,\n        \"body_lines\": [],\n        \"done\": null,\n        \"checked\": false,\n        \"repo\": \"sample\"\n      },\n      {\n        \"completion\": {\n          \"date\": null,\n          \"verb\": null\n        },\n        \"priority\": null,\n        \"body_excerpt\": null,\n        \"structured\": true,\n        \"report_path\": null,\n        \"blocked_by_ids\": [],\n        \"hold_bucket\": null,\n        \"merged\": null,\n        \"hold_age_days\": null,\n        \"hold_set\": null,\n        \"body_lines\": [],\n        \"done\": null,\n        \"checked\": false,\n        \"repo\": \"sample\",\n        \"id\": \"duplicate\",\n        \"order\": 2,\n        \"since\": null,\n        \"local_note\": null,\n        \"reported\": null,\n        \"captain_drop\": false,\n        \"pr_url\": \"https://github.com/o/r/pull/8\",\n        \"links\": [\n          \"https://github.com/o/r/pull/8\"\n        ],\n        \"hold_until\": null,\n        \"raw\": \"- [ ] duplicate - Contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\",\n        \"state\": \"queued\",\n        \"kind\": \"ship\",\n        \"blocked_reason\": null,\n        \"title\": \"Contribution\",\n        \"hold_kind\": null,\n        \"blocked_by\": null,\n        \"captain_actionable\": false,\n        \"hold_reason\": null,\n        \"current_role\": \"queued\",\n        \"unresolved_blocker_ids\": [],\n        \"requires_child_metadata\": false\n      },\n      {\n        \"title\": \"Contribution\",\n        \"blocked_reason\": null,\n        \"kind\": \"ship\",\n        \"blocked_by\": null,\n        \"hold_kind\": null,\n        \"current_role\": \"queued\",\n        \"hold_reason\": null,\n        \"requires_child_metadata\": false,\n        \"unresolved_blocker_ids\": [],\n        \"captain_actionable\": false,\n        \"captain_drop\": false,\n        \"pr_url\": \"https://github.com/o/r/pull/9\",\n        \"reported\": null,\n        \"raw\": \"- [ ] tail - Contribution https://github.com/o/r/pull/9 (repo: sample) (kind: ship)\",\n        \"state\": \"queued\",\n        \"links\": [\n          \"https://github.com/o/r/pull/9\"\n        ],\n        \"hold_until\": null,\n        \"repo\": \"sample\",\n        \"body_lines\": [],\n        \"checked\": false,\n        \"done\": null,\n        \"since\": null,\n        \"order\": 3,\n        \"local_note\": null,\n        \"id\": \"tail\",\n        \"completion\": {\n          \"verb\": null,\n          \"date\": null\n        },\n        \"structured\": true,\n        \"body_excerpt\": null,\n        \"priority\": null,\n        \"hold_age_days\": null,\n        \"hold_bucket\": null,\n        \"merged\": null,\n        \"hold_set\": null,\n        \"report_path\": null,\n        \"blocked_by_ids\": []\n      },\n      {\n        \"hold_kind\": null,\n        \"blocked_by\": null,\n        \"kind\": \"ship\",\n        \"title\": \"Late owner\",\n        \"blocked_reason\": null,\n        \"unresolved_blocker_ids\": [],\n        \"requires_child_metadata\": false,\n        \"hold_reason\": null,\n        \"current_role\": \"queued\",\n        \"captain_actionable\": false,\n        \"pr_url\": \"https://github.com/o/r/pull/8\",\n        \"captain_drop\": false,\n        \"reported\": null,\n        \"state\": \"queued\",\n        \"raw\": \"- [ ] aaa - Late owner https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\",\n        \"hold_until\": null,\n        \"links\": [\n          \"https://github.com/o/r/pull/8\"\n        ],\n        \"repo\": \"sample\",\n        \"done\": null,\n        \"checked\": false,\n        \"body_lines\": [],\n        \"local_note\": null,\n        \"order\": 4,\n        \"since\": null,\n        \"id\": \"aaa\",\n        \"body_excerpt\": null,\n        \"priority\": null,\n        \"structured\": true,\n        \"completion\": {\n          \"date\": null,\n          \"verb\": null\n        },\n        \"hold_set\": null,\n        \"merged\": null,\n        \"hold_bucket\": null,\n        \"hold_age_days\": null,\n        \"blocked_by_ids\": [],\n        \"report_path\": null\n      },\n      {\n        \"id\": \"new-url\",\n        \"local_note\": null,\n        \"since\": null,\n        \"order\": 5,\n        \"checked\": false,\n        \"done\": null,\n        \"body_lines\": [],\n        \"repo\": \"sample\",\n        \"blocked_by_ids\": [],\n        \"report_path\": null,\n        \"hold_set\": null,\n        \"hold_age_days\": null,\n        \"hold_bucket\": null,\n        \"merged\": null,\n        \"structured\": true,\n        \"body_excerpt\": null,\n        \"priority\": null,\n        \"completion\": {\n          \"date\": null,\n          \"verb\": null\n        },\n        \"captain_actionable\": false,\n        \"requires_child_metadata\": false,\n        \"unresolved_blocker_ids\": [],\n        \"current_role\": \"queued\",\n        \"hold_reason\": null,\n        \"blocked_by\": null,\n        \"hold_kind\": null,\n        \"blocked_reason\": null,\n        \"title\": \"Late URL\",\n        \"kind\": \"ship\",\n        \"hold_until\": null,\n        \"links\": [\n          \"https://github.com/o/r/pull/10\"\n        ],\n        \"state\": \"queued\",\n        \"raw\": \"- [ ] new-url - Late URL https://github.com/o/r/pull/10 (repo: sample) (kind: ship)\",\n        \"reported\": null,\n        \"pr_url\": \"https://github.com/o/r/pull/10\",\n        \"captain_drop\": false\n      }\n    ]\n  },\n  \"tasks\": []\n}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh snapshot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.live-validation/stale-owners-stateproof/input.json --all\nexit=0 elapsed=0.75s\n{\n  \"known\": 3,\n  \"checked\": 0,\n  \"counts\": {\n    \"captain\": 0,\n    \"fleet\": 3,\n    \"maintainer\": 0,\n    \"nobody\": 0\n  },\n  \"unmeasured\": 0,\n  \"complete\": false,\n  \"proven_clear\": false,\n  \"stale_verdicts\": 0,\n  \"missing_verdicts\": 0,\n  \"unreadable_records\": 0,\n  \"valid_until\": 900,\n  \"captain\": [],\n  \"captain_omitted\": 0,\n  \"rows\": [\n    {\n      \"task\": \"new-url\",\n      \"url\": \"https://github.com/o/r/pull/10\",\n      \"kind\": \"pr\",\n      \"checked_at\": null,\n      \"checked\": false,\n      \"final\": false,\n      \"head\": null,\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 0,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [],\n      \"actor\": \"fleet\",\n      \"reason\": \"GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z\",\n      \"tasks\": [\n        \"new-url\"\n      ]\n    },\n    {\n      \"task\": \"aaa\",\n      \"url\": \"https://github.com/o/r/pull/8\",\n      \"kind\": \"pr\",\n      \"checked_at\": null,\n      \"checked\": false,\n      \"final\": false,\n      \"head\": null,\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 0,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [],\n      \"actor\": \"fleet\",\n      \"reason\": \"GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z\",\n      \"tasks\": [\n        \"aaa\",\n        \"delivery\",\n        \"duplicate\"\n      ]\n    },\n    {\n      \"task\": \"tail\",\n      \"url\": \"https://github.com/o/r/pull/9\",\n      \"kind\": \"pr\",\n      \"checked_at\": \"2026-10-09T00:00:00Z\",\n      \"checked\": false,\n      \"final\": false,\n      \"head\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 1,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [],\n      \"actor\": \"fleet\",\n      \"reason\": \"GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T10:25:34Z\",\n      \"tasks\": [\n        \"tail\"\n      ]\n    }\n  ]\n}\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh get repos/o/r\nexit=0 elapsed=1.96s\n{\"permissions\":{\"push\":true}}\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh: line 118: cmp: command not found\n",
+    "$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh poll\nexit=0 elapsed=5.61s\ncontributions: GitHub core quota low (300 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T11:25:34Z; last observations kept, marked stale\n"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 200,
+      "remaining": 500,
+      "reset": 1791541534,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": "\"87f3c349e2cea577\"",
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 304,
+      "remaining": 400,
+      "reset": 1791541534,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": "\"87f3c349e2cea577\"",
+      "etag": "\"87f3c349e2cea577\"",
+      "status": 304,
+      "remaining": 300,
+      "reset": 1791545134,
+      "barrier": null
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "scenario": "Diagnose the real five-second helper execution boundary",
+  "result": "pass",
+  "detail": [
+    {
+      "label": "baseline-gh",
+      "attempt": 1,
+      "returncode": 0,
+      "elapsed": 1.37,
+      "stdout": "[{\"id\": 1}]",
+      "stderr": "",
+      "http_requests": [
+        {
+          "method": "GET",
+          "path": "/repos/o/r/items",
+          "conditional": null,
+          "etag": "\"01aa8ec06990002e\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541534,
+          "barrier": null
+        }
+      ]
+    },
+    {
+      "label": "baseline-gh",
+      "attempt": 2,
+      "returncode": 0,
+      "elapsed": 1.0,
+      "stdout": "[{\"id\": 1}]",
+      "stderr": "",
+      "http_requests": [
+        {
+          "method": "GET",
+          "path": "/repos/o/r/items",
+          "conditional": null,
+          "etag": "\"01aa8ec06990002e\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541534,
+          "barrier": null
+        }
+      ]
+    },
+    {
+      "label": "conditional-helper",
+      "attempt": 1,
+      "returncode": 0,
+      "elapsed": 1.48,
+      "stdout": "[{\"id\":1}]\n",
+      "stderr": "",
+      "http_requests": [
+        {
+          "method": "GET",
+          "path": "/repos/o/r/items",
+          "conditional": null,
+          "etag": "\"01aa8ec06990002e\"",
+          "status": 200,
+          "remaining": 4000,
+          "reset": 1791541534,
+          "barrier": null
+        }
+      ]
+    },
+    {
+      "label": "conditional-helper",
+      "attempt": 2,
+      "returncode": 0,
+      "elapsed": 1.7,
+      "stdout": "[{\"id\":1}]\n",
+      "stderr": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh: line 118: cmp: command not found\n",
+      "http_requests": [
+        {
+          "method": "GET",
+          "path": "/repos/o/r/items",
+          "conditional": "\"01aa8ec06990002e\"",
+          "etag": "\"01aa8ec06990002e\"",
+          "status": 304,
+          "remaining": 4000,
+          "reset": 1791541534,
+          "barrier": null
+        }
+      ]
+    }
+  ],
+  "commands": [
+    "Real five-second read: {\"label\": \"baseline-gh\", \"attempt\": 1, \"returncode\": 0, \"elapsed\": 1.37, \"stdout\": \"[{\\\"id\\\": 1}]\", \"stderr\": \"\", \"http_requests\": [{\"method\": \"GET\", \"path\": \"/repos/o/r/items\", \"conditional\": null, \"etag\": \"\\\"01aa8ec06990002e\\\"\", \"status\": 200, \"remaining\": 4000, \"reset\": 1791541534, \"barrier\": null}]}",
+    "Real five-second read: {\"label\": \"baseline-gh\", \"attempt\": 2, \"returncode\": 0, \"elapsed\": 1.0, \"stdout\": \"[{\\\"id\\\": 1}]\", \"stderr\": \"\", \"http_requests\": [{\"method\": \"GET\", \"path\": \"/repos/o/r/items\", \"conditional\": null, \"etag\": \"\\\"01aa8ec06990002e\\\"\", \"status\": 200, \"remaining\": 4000, \"reset\": 1791541534, \"barrier\": null}]}",
+    "Real five-second read: {\"label\": \"conditional-helper\", \"attempt\": 1, \"returncode\": 0, \"elapsed\": 1.48, \"stdout\": \"[{\\\"id\\\":1}]\\n\", \"stderr\": \"\", \"http_requests\": [{\"method\": \"GET\", \"path\": \"/repos/o/r/items\", \"conditional\": null, \"etag\": \"\\\"01aa8ec06990002e\\\"\", \"status\": 200, \"remaining\": 4000, \"reset\": 1791541534, \"barrier\": null}]}",
+    "Real five-second read: {\"label\": \"conditional-helper\", \"attempt\": 2, \"returncode\": 0, \"elapsed\": 1.7, \"stdout\": \"[{\\\"id\\\":1}]\\n\", \"stderr\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh: line 118: cmp: command not found\\n\", \"http_requests\": [{\"method\": \"GET\", \"path\": \"/repos/o/r/items\", \"conditional\": \"\\\"01aa8ec06990002e\\\"\", \"etag\": \"\\\"01aa8ec06990002e\\\"\", \"status\": 304, \"remaining\": 4000, \"reset\": 1791541534, \"barrier\": null}]}"
+  ],
+  "http_requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541534,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541534,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": null,
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 200,
+      "remaining": 4000,
+      "reset": 1791541534,
+      "barrier": null
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items",
+      "conditional": "\"01aa8ec06990002e\"",
+      "etag": "\"01aa8ec06990002e\"",
+      "status": 304,
+      "remaining": 4000,
+      "reset": 1791541534,
+      "barrier": null
+    }
+  ]
+}
