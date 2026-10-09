@@ -915,14 +915,11 @@ fm_busy_agy_tail_busy() {
 # signature out, so absence never proves the pane is NOT parked, only that
 # this check cannot confirm it.
 
-# fm_busy_claude_launch_prompt_tail: Claude's workspace-trust dialog
-# ("Quick safety check: Is this a project you created or one you trust?",
-# re-verified live on Claude Code 2.1.278, docs/verification/runtime-backends.md
-# "Launch-prompt backstop signatures") and its separate external-CLAUDE.md-
-# imports dialog ("Allow external CLAUDE.md file imports?", verified by
-# disassembly, .agents/skills/harness-adapters/references/harness/claude.md
-# "Hook trust" sibling section). fm-claude-trust.sh pre-registers both before
-# launch; this is the backstop for when that registration did not take effect.
+# fm_busy_claude_launch_prompt_tail: Claude's recognized startup dialogs;
+# docs/verification/runtime-backends.md "Launch-prompt backstop signatures"
+# owns the rendered evidence. This is a backstop, not consent:
+# bin/fm-claude-trust.sh owns pre-registration and consent carry-forward;
+# bin/fm-claude-memory-lib.sh owns ancestor-supervisor-memory exclusion.
 # Each dialog's own question text is paired with one of its own rendered
 # option/footer lines, both required together: the question text alone is
 # plausible self-referential prose a firstmate-repo worker could easily render

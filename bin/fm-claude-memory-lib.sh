@@ -19,8 +19,16 @@
 # Both the logical and the physical spelling of each ancestor are listed,
 # because Claude matches the path it walked, not the path we resolved.
 #
-# Sourced by bin/fm-spawn.sh, whose launch template carries the fragment in its
-# per-launch --settings JSON.
+# Sourced by bin/fm-spawn.sh for canonical templates' per-launch --settings JSON.
+# For a recognized raw Claude launch nested under a firstmate home, the spawn
+# instead runs this file as <exclusions-json> <program> [arguments...], inside
+# the TeamClaude wrapper when selected. It merges the required exclusions into
+# the last --settings <JSON-or-file> or --settings=<JSON-or-file> argument,
+# defaulting to an empty object, and replaces those settings arguments with
+# one inline --settings object before executing the original program.
+# Caller settings keys, existing exclusions, and other arguments are retained;
+# malformed settings refuse execution rather than bypassing the exclusion.
+# With no ancestor home, the spawn leaves a raw command's settings untouched.
 
 # fm_claude_md_excludes_json <pane-directory>
 # Prints the settings fragment (leading comma) or nothing when no ancestor is
@@ -46,6 +54,8 @@ fm_claude_md_excludes_json() {
     done
   done
   [ -n "$list" ] || return 0
+  # Quote replacement data so Bash 5.2's patsub_replacement cannot expand '&';
+  # keep this as an assignment for Bash 3.2 compatibility.
   list=${list//\'/"$sq"}
   printf ',"claudeMdExcludes":[%s]' "$list"
 }

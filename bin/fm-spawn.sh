@@ -435,10 +435,16 @@
 # Claude start confirmation (claude_confirm_start below):
 #   after a claude launch the spawn polls the pane for FM_CLAUDE_START_POLLS
 #   polls (default 40) FM_CLAUDE_START_POLL_INTERVAL seconds apart (default
-#   0.5) and returns once the busy record advances past the spawn seed. A
-#   trust, external-imports, bypass-permissions, or custom-API-key dialog still
-#   on screen when the window ends is reported on stderr and as a `blocked:`
-#   status event; the worker and the spawn's record are left in place.
+#   0.5). Verified semantic progress past the spawn seed takes precedence over
+#   dialog text, even when the hook already reports a completed turn. Capture
+#   uses the visible viewport where supported, otherwise the pane tail.
+#   Without progress, a trust, external-imports, bypass-permissions, or custom-
+#   API-key dialog matching at least the final two consecutive captures is
+#   reported on stderr and as a `blocked:` status event; the worker, record,
+#   and backlog transition remain in place, and the spawn still succeeds.
+#   No dialog and no progress is not a fault; three consecutive blank captures
+#   end the wait early without a verdict. Secondmates have no busy seed, so
+#   absent a positive semantic verdict or unreadable pane they use the window.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
 #     __BRIEF__    absolute path to the worker launch-brief.md or secondmate charter/brief
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode
@@ -4715,21 +4721,9 @@ agy_spawn_fail() {  # <detail>
   rovo_endpoint_cleanup
 }
 
-# A Claude worker that is stopped on one of Claude's own startup dialogs never
-# reads its brief, and firstmate's key plane cannot answer any of them (the
-# harness-adapters claude reference owns why), so the launch would otherwise
-# sit silent for as long as nobody looked at the pane. This is the claude
-# start confirmation: poll the pane for a bounded window and return as soon as
-# the harness proves it started (a busy record that advanced past the
-# fm-spawn seed, which a hook only posts once the prompt was submitted).
-# When the window ends with a recognized dialog still on screen, report it
-# loudly - on stderr and as a `blocked:` status event that wakes supervision -
-# and leave the worker alone: a person can still answer the dialog, and the
-# spawn's record and backlog transition stay valid. A pane that shows no
-# dialog and no proof is not reported, since absence of proof is not a fault
-# (a secondmate arms no busy record and always spends the full window, and a
-# pane that stays unreadable ends the wait at once).
-# FM_CLAUDE_START_POLLS / FM_CLAUDE_START_POLL_INTERVAL bound the window.
+# The header's Claude start-confirmation section owns the polling contract.
+# Never let retained dialog text override verified progress: a relaunch can
+# inherit scrollback from an earlier dialog after the new turn already began.
 claude_confirm_start() {
   local pane i=0 max=${FM_CLAUDE_START_POLLS:-40} interval=${FM_CLAUDE_START_POLL_INTERVAL:-0.5}
   local parked=0 blank=0 verdict dialog
