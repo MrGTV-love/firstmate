@@ -60,9 +60,7 @@
 #            An unacknowledged captured round blocks every retirement.
 #            Retiring stops the listener and releases its claim through the
 #            generic `retire`; it never ends the Lavish session, so the board
-#            stays readable and `arm` brings the listener back. Cost: one perl
-#            pass over every registration, plus one `fm-captain-hold.sh open`
-#            per distinct card key of an otherwise-finished board.
+#            stays readable and `arm` brings the listener back.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
 #            and prints its response verbatim, absorbing only the one exact
@@ -1051,33 +1049,32 @@ board_idle_seconds() {
   printf '%s\n' $((value * 3600))
 }
 
-# One perl pass for every registration: <source-id> TAB <artifact> lines on
-# stdin, one fact row per line out:
-#   id, artifact, file state (present, missing, or unknown), sessions (count, or
-#   "unknown"), status, queued prompts, last-activity epoch, card keys.
 # `sessions` is "unknown" when Lavish's store cannot be read, so an unreadable
 # store keeps every board instead of reading as "no session".
 sweep_facts() {  # <state-dir> <lavish-store>
+  local inbox_facts
+  inbox_facts=$(fm_procevent_inbox_facts "$1" "${@:3}") || return 1
   perl -MJSON::PP -MCwd=realpath -MErrno=ENOENT -MEncode=decode,FB_DEFAULT -MTime::Local=timegm -e '
     use strict; use warnings;
-    my ($state, $store) = @ARGV;
-    my (%by, $store_ok);
+    my ($inbox_facts, $store) = @ARGV;
+    my (%by, $store_ok, %inbox);
+    for my $row (split /\n/, $inbox_facts) {
+      my ($id, @facts) = split /\t/, $row, 4;
+      $inbox{$id} = \@facts;
+    }
     if (open my $sf, "<", $store) {
       local $/;
-      my $doc = eval { decode_json(<$sf>) };
-      if (ref($doc) eq "HASH" && ref($doc->{sessions}) eq "HASH") {
+      local $! = 0;
+      my $json = <$sf>;
+      my $read_ok = !$!;
+      my $close_ok = close $sf;
+      my $doc = eval { decode_json($json) };
+      if ($read_ok && $close_ok && ref($doc) eq "HASH" && ref($doc->{sessions}) eq "HASH") {
         $store_ok = 1;
         for my $s (values %{$doc->{sessions}}) {
           push @{$by{$s->{file}}}, $s if ref($s) eq "HASH" && defined $s->{file} && !ref($s->{file});
         }
       }
-    }
-    my $newest = sub { my $m = 0; for (@_) { my $t = (stat $_)[9]; $m = $t if defined $t && $t > $m } $m };
-    my $inbox = "$state/procevent-inbox";
-    my @inbox_files;
-    if (opendir my $dir, $inbox) {
-      @inbox_files = readdir $dir;
-      closedir $dir;
     }
     sub unescape {
       my ($v) = @_;
@@ -1099,7 +1096,8 @@ sweep_facts() {  # <state-dir> <lavish-store>
         : ($! == ENOENT ? "missing" : "unknown");
       my ($sessions, $status, $pending, @keys) = ("unknown", "", 0);
       my $keys_unknown = 0;
-      my $activity = $newest->(map { "$inbox/$_" } grep { /\A\Q$id\E\./ } @inbox_files);
+      my ($activity, $captured, $evidence) = @{$inbox{$id} // [0, 0, "inbox evidence cannot be read"]};
+      $evidence = "the board file cannot be checked" if $file_state eq "unknown";
       if ($file_state eq "present") {
         my $t = $stat[9];
         $activity = $t if $t > $activity;
@@ -1128,10 +1126,12 @@ sweep_facts() {  # <state-dir> <lavish-store>
               push @keys, $k unless $seen{$k}++;
             }
           } else {
-            $keys_unknown = 1;
+            $evidence = "the board file cannot be read";
           }
+        } elsif ($! == ENOENT) {
+          $file_state = "missing";
         } else {
-          $keys_unknown = 1;
+          $evidence = "the board file cannot be opened";
         }
       }
       if ($store_ok) {
@@ -1148,9 +1148,9 @@ sweep_facts() {  # <state-dir> <lavish-store>
           }
         }
       }
-      print join("\t", $id, $art, $file_state, $sessions, $status || "-", $pending, $activity, $keys_unknown ? "?" : (join(",", @keys) || "-")), "\n";
+      print join("\t", $id, $art, $file_state, $sessions, $status || "-", $pending, $activity, $keys_unknown ? "?" : (join(",", @keys) || "-"), $captured, $evidence), "\n";
     }
-  ' "$1" "$2"
+  ' "$inbox_facts" "$2"
 }
 
 sweep_cards_closed() {
@@ -1180,7 +1180,7 @@ sweep_cards_closed() {
 
 cmd_sweep() {
   local dry=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
-  local pending_ids facts file_state sessions status queued activity keys reason verdict out identity current_identity
+  local facts file_state sessions status queued activity keys captured evidence reason verdict out identity current_identity
   local open_cache=$'\n' retired=0 kept=0 idx
   local -a ids=() kinds=() identities=()
   case "${1-}" in
@@ -1209,9 +1209,7 @@ cmd_sweep() {
     my $dir = realpath(dirname($p));
     print defined($dir) ? "$dir/" . basename($p) : $p;
   ' "$FM_HOME" 2>/dev/null || true)
-  pending_ids=$(fm_procevent_pending "$state" | sed -n 's|.*/\([^/.]*\)\.[0-9][0-9]*\.result$|\1|p')
 
-  # Read every registration first so one perl pass can answer for all of them.
   facts=''
   for rec in "$reg"/lavish-*.source; do
     [ -f "$rec" ] && [ ! -L "$rec" ] || continue
@@ -1242,16 +1240,18 @@ cmd_sweep() {
     printf 'sweep: retired=0 kept=0\n'
     return 0
   fi
-  facts=$(printf '%s' "$facts" | sweep_facts "$state" "$store") || die "cannot read the Lavish board facts"
+  facts=$(printf '%s' "$facts" | sweep_facts "$state" "$store" "${ids[@]}") || die "cannot read the Lavish board facts"
 
-  while IFS=$'\t' read -r id artifact file_state sessions status queued activity keys; do
+  while IFS=$'\t' read -r id artifact file_state sessions status queued activity keys captured evidence; do
     [ -n "$id" ] || continue
     kind=plain; identity=''
     for idx in "${!ids[@]}"; do
       [ "${ids[$idx]}" = "$id" ] && { kind=${kinds[$idx]}; identity=${identities[$idx]}; break; }
     done
     verdict=keep
-    if [ "$standing" = '?' ]; then
+    if [ "$evidence" != - ]; then
+      reason=$evidence
+    elif [ "$standing" = '?' ]; then
       reason='the standing Bearings board path cannot be resolved'
     elif [ -n "$standing" ] && [ "$artifact" = "$standing" ]; then
       reason='the standing Bearings board'
@@ -1261,8 +1261,6 @@ cmd_sweep() {
       reason='Lavish holds queued feedback for the board'
     elif [ "$kind" = task-owned ]; then
       reason='owned by a worker task'
-    elif [ "$file_state" = unknown ]; then
-      reason='the board file cannot be checked'
     elif [ "$file_state" = missing ]; then
       verdict=retire; reason='the board file is gone'
     elif [ "$sessions" != 0 ] && [ "$status" != ended ] && [ $((now - activity)) -lt "$idle" ]; then
@@ -1279,10 +1277,8 @@ cmd_sweep() {
         verdict=retire
       fi
     fi
-    if [ "$verdict" = retire ]; then
-      case $'\n'"$pending_ids"$'\n' in
-        *$'\n'"$id"$'\n'*) verdict=keep; reason='a captured round of the board is unacknowledged' ;;
-      esac
+    if [ "$verdict" = retire ] && [ "$captured" = 1 ]; then
+      verdict=keep; reason='a captured round of the board is unacknowledged'
     fi
     if [ "$verdict" = retire ] && [ "$dry" = 0 ]; then
       if ! out=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" retire "$id" --if-identity "$identity" 2>&1 </dev/null); then

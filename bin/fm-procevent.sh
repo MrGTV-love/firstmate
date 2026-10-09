@@ -2162,6 +2162,7 @@ cmd_handled() {
 cmd_retire() {
   local id=${1-} condition=${2-} adapter='' sep='' expected_owner='' owner='' pid='' token='' identity='' stop_state owner_state
   local extension_binding_digest='' round_owner='' expected_identity='' current_identity=''
+  local inbox_facts inbox_id activity captured evidence
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   case "$condition" in
     '') [ "$#" -eq 1 ] || usage ;;
@@ -2194,7 +2195,16 @@ cmd_retire() {
       fm_procevent_source_lock_release "$id"
       die "source registration generation changed: $id"
     fi
-    if [ -n "$(source_pending "$id" | head -1)" ]; then
+    if ! inbox_facts=$(fm_procevent_inbox_facts "$STATE" "$id"); then
+      fm_procevent_source_lock_release "$id"
+      die "cannot read source $id inbox evidence"
+    fi
+    IFS=$'\t' read -r inbox_id activity captured evidence <<< "$inbox_facts"
+    if [ "$inbox_id" != "$id" ] || [ "$evidence" != - ]; then
+      fm_procevent_source_lock_release "$id"
+      die "cannot retire source $id: ${evidence:-inbox evidence cannot be read}"
+    fi
+    if [ "$captured" = 1 ]; then
       fm_procevent_source_lock_release "$id"
       die "cannot retire source $id while a captured round is unacknowledged"
     fi

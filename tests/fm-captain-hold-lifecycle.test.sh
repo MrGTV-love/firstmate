@@ -5263,6 +5263,99 @@ test_sweep_keeps_boards_with_unsearchable_parents() {
   pass "filesystem permission errors keep ended, sessionless and idle board listeners"
 }
 
+test_sweep_keeps_unknown_inbox_evidence() {
+  local home store board sid inbox session identity dry_out out locked_out rc dry_rc sweep_rc fixture_rc list
+  local role blocked healthy healthy_id
+  for session in idle ended nosession missing; do
+    home=$(make_home "board-sweep-inbox-unreadable-$session")
+    fm_test_track_procevent_home "$home" "$home/procevent-claims"
+    store="$home/lavish-state"
+    mkdir -p "$store"
+    printf '{"sessions":{}}\n' > "$store/state.json"
+    board=$(sweep_board "$home" unreadable-inbox old)
+    sid=$(sweep_register "$home" "$board")
+    case "$session" in
+      ended) sweep_session "$store" "$board" ended 0 - ;;
+      idle|missing) sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z ;;
+    esac
+    [ "$session" != missing ] || rm -f "$board"
+    identity=$(perl -e 'my @s = stat $ARGV[0]; die $! unless @s; print "$s[0]:$s[1]"' "$home/state/procevent/$sid.source")
+    inbox="$home/state/procevent-inbox"
+    mkdir -p "$inbox"
+    printf 'session:\n  status: feedback\n' > "$inbox/$sid.1.result"
+    printf 'lavish\n' > "$inbox/$sid.1.adapter"
+    touch -t 200001010000 "$inbox/$sid.1.result" "$inbox/$sid.1.adapter"
+    chmod 0300 "$inbox"
+    perl -MErrno=EACCES -e 'opendir(my $d, $ARGV[0]); exit($! == EACCES ? 0 : 1)' "$inbox"
+    fixture_rc=$?
+    dry_out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run)
+    dry_rc=$?
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep)
+    sweep_rc=$?
+    if locked_out=$(run_procevent "$home" retire "$sid" --if-identity "$identity" 2>&1); then rc=0; else rc=$?; fi
+    chmod 0700 "$inbox"
+    [ "$fixture_rc" -eq 0 ] || fail "the non-listable inbox did not produce EACCES"
+    [ "$dry_rc" -eq 0 ] && [ "$sweep_rc" -eq 0 ] || fail "the unreadable-inbox sweep failed: $dry_out $out"
+    assert_contains "$dry_out" "kept: $sid" "a dry run would retire an unreadable $session inbox: $dry_out"
+    assert_contains "$out" "kept: $sid" "an unreadable $session inbox lost its listener: $out"
+    assert_contains "$out" 'inbox cannot be opened' "the inbox read error was not logged: $out"
+    [ "$rc" -ne 0 ] || fail "locked retirement accepted an unreadable inbox"
+    assert_contains "$locked_out" 'inbox cannot be opened' "locked retirement lost the inbox error: $locked_out"
+    list=$(run_procevent "$home" list)
+    assert_contains "$list" "$sid" "an unreadable inbox lost its registration"
+    assert_present "$inbox/$sid.1.result" "the unacknowledged capture was deleted"
+    assert_absent "$inbox/$sid.1.handled" "the unreadable capture was acknowledged"
+    rm -f "$inbox/$sid.1.result" "$inbox/$sid.1.adapter"
+    rmdir "$inbox"
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the absent-inbox sweep failed: $out"
+    assert_contains "$out" "retired: $sid" "confirmed inbox absence kept a finished $session board: $out"
+    assert_absent "$home/state/procevent/$sid.source" "the absent-inbox source remains registered"
+  done
+  for role in result adapter handled; do
+    home=$(make_home "board-sweep-inbox-stat-$role")
+    fm_test_track_procevent_home "$home" "$home/procevent-claims"
+    store="$home/lavish-state"
+    board=$(sweep_board "$home" stat-error old)
+    sid=$(sweep_register "$home" "$board")
+    sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
+    healthy=$(sweep_board "$home" healthy old)
+    healthy_id=$(sweep_register "$home" "$healthy")
+    sweep_session "$store" "$healthy" open 0 2000-01-01T00:00:00.000Z
+    identity=$(perl -e 'my @s = stat $ARGV[0]; die $! unless @s; print "$s[0]:$s[1]"' "$home/state/procevent/$sid.source")
+    inbox="$home/state/procevent-inbox"
+    blocked="$home/blocked"
+    mkdir -p "$inbox" "$blocked"
+    printf 'captured\n' > "$blocked/entry"
+    [ "$role" != handled ] || printf 'session:\n  status: feedback\n' > "$inbox/$sid.1.result"
+    ln -s "$blocked/entry" "$inbox/$sid.1.$role"
+    [ "$role" != handled ] || touch -t 200001010000 "$inbox/$sid.1.result"
+    chmod 000 "$blocked"
+    perl -MErrno=EACCES -e 'stat($ARGV[0]); exit($! == EACCES ? 0 : 1)' "$inbox/$sid.1.$role"
+    fixture_rc=$?
+    dry_out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run)
+    dry_rc=$?
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep)
+    sweep_rc=$?
+    if locked_out=$(run_procevent "$home" retire "$sid" --if-identity "$identity" 2>&1); then rc=0; else rc=$?; fi
+    chmod 0700 "$blocked"
+    [ "$fixture_rc" -eq 0 ] || fail "the inbox $role fixture did not produce a stat error"
+    [ "$dry_rc" -eq 0 ] && [ "$sweep_rc" -eq 0 ] || fail "the stat-error sweep failed: $dry_out $out"
+    assert_contains "$dry_out" "kept: $sid" "a dry run ignored an inbox $role stat error: $dry_out"
+    assert_contains "$out" "kept: $sid" "an inbox $role stat error lost its listener: $out"
+    assert_contains "$out" 'cannot be checked' "the inbox stat error was not logged: $out"
+    assert_contains "$dry_out" "would-retire: $healthy_id" "one source's stat error kept an unrelated idle board: $dry_out"
+    assert_contains "$out" "retired: $healthy_id" "one source's stat error kept an unrelated idle board: $out"
+    [ "$rc" -ne 0 ] || fail "locked retirement accepted an inbox $role stat error"
+    assert_contains "$locked_out" 'cannot be checked' "locked retirement lost the inbox stat error: $locked_out"
+    assert_present "$home/state/procevent/$sid.source" "an uncertain inbox source lost its registration"
+    rm -f "$inbox/$sid.1.$role" "$inbox/$sid.1.result"
+    rmdir "$inbox"
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the recovered-inbox sweep failed: $out"
+    assert_contains "$out" "retired: $sid" "the recovered idle board was not retired: $out"
+  done
+  pass "unknown inbox evidence keeps listeners at sweep and locked retirement boundaries"
+}
+
 test_sweep_preserves_rearmed_registration_generations() (
   local mode home store board sid real_perl sweep_pid poll_pid out list rc
   real_perl=$(command -v perl)
@@ -5367,6 +5460,7 @@ test_sweep_preserves_deleted_board_keep_guards
 test_sweep_keeps_boards_with_unsearchable_parents
 test_sweep_preserves_rearmed_registration_generations
 test_sweep_keeps_recently_handled_boards_in_literal_home_paths
+test_sweep_keeps_unknown_inbox_evidence
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair
