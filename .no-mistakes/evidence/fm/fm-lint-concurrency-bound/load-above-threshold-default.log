@@ -1,0 +1,31 @@
+{
+  "name": "load-above-threshold-default",
+  "ncpu": 18,
+  "configured_cap": "default=9",
+  "load": 37,
+  "expected": 8,
+  "held_live_shellcheck": 8,
+  "gate_exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "actual_processes": [
+    "85186 84452 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh",
+    "86482 85450 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh",
+    "86550 85472 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh",
+    "86551 85403 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh",
+    "86631 85155 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh",
+    "86644 85421 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh",
+    "86844 85384 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh",
+    "86898 85446 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh"
+  ],
+  "pass": true
+}

@@ -1,0 +1,14 @@
+{
+  "path": "scan",
+  "ncpu": 18,
+  "cap": 9,
+  "load": 43,
+  "allowance": 2,
+  "held_occupants": 8,
+  "no_admission_above_allowance": true,
+  "admitted_after_occupancy_reached": 1,
+  "exit": 0,
+  "actual_process": [
+    "73980 72468 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ]
+}

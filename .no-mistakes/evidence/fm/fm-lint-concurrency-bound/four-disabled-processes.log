@@ -1,0 +1,10 @@
+Controlled contention: real ShellCheck 0.11.0 processes suspended after exec; not a substitute analyzer.
+runs=4, roots/run=6, jobs=2, cap=off, load=None, contenders=8
+75954 74606 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh
+76727 74904 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh
+77636 76770 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh
+77638 76494 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh
+77654 76874 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh
+77660 76695 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh
+78366 77902 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh
+78728 77906 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh

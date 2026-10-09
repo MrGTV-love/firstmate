@@ -1,0 +1,130 @@
+Live four-run gated contention, followed by resumed real ShellCheck analysis:
+Controlled contention: real ShellCheck 0.11.0 processes suspended after exec; not a substitute analyzer.
+runs=4, roots/run=6, jobs=2, cap=3, load=0, contenders=8
+13366  3690 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh
+13401  3679 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh
+15297  5405 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh
+
+run-0.roots.tsv
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525265147
+begin	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525267084
+end	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525265147	1791525290703	3850	0	ok	26144	1
+begin	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525290718
+end	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525290718	1791525298962	1518	0	ok	26112	1
+begin	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525298990
+end	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525298990	1791525301523	2533	0	ok	26144	1
+end	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525267084	1791525304311	4468	0	ok	26144	1
+begin	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525304327
+end	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525304327	1791525310642	6313	0	ok	26144	1
+begin	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525310656
+end	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525310656	1791525314727	4071	0	ok	26112	1
+meta	roots_begun	6
+meta	roots_completed	6
+meta	roots_unfinished	0
+meta	result_exit	0
+
+run-1.roots.tsv
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525266387
+begin	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525266796
+end	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525266796	1791525292696	4446	0	ok	26144	1
+begin	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525292713
+end	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525266387	1791525292725	4834	0	ok	26144	1
+begin	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525292747
+end	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525292747	1791525294071	1324	0	ok	26160	1
+begin	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525294082
+end	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525292713	1791525294177	1463	0	ok	26112	1
+begin	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525294191
+end	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525294191	1791525295630	1439	0	ok	26112	1
+end	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525294082	1791525295847	1765	0	ok	26160	1
+meta	roots_begun	6
+meta	roots_completed	6
+meta	roots_unfinished	0
+meta	result_exit	0
+
+run-2.roots.tsv
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525257939
+begin	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525258310
+end	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525257939	1791525287587	29364	0	ok	26128	1
+begin	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525287680
+end	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525258310	1791525288559	30249	0	ok	26144	1
+begin	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525288657
+end	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525287680	1791525290697	3017	0	ok	26144	1
+begin	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525290712
+end	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525290712	1791525296543	1538	0	ok	26128	1
+end	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525288657	1791525299076	1532	0	ok	26144	1
+begin	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525299090
+end	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525299090	1791525303221	4131	0	ok	26144	1
+meta	roots_begun	6
+meta	roots_completed	6
+meta	roots_unfinished	0
+meta	result_exit	0
+
+run-3.roots.tsv
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525262478
+begin	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525264529
+end	2	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-1.sh	1	full	1791525262478	1791525288563	26085	0	ok	26160	1
+begin	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525288586
+end	1	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh	0	full	1791525264529	1791525290372	4123	0	ok	26160	1
+begin	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525290392
+end	3	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh	0	full	1791525290392	1791525292548	2156	0	ok	26112	1
+begin	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525292561
+end	5	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-4.sh	0	full	1791525292561	1791525294071	1510	0	ok	26160	1
+end	4	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-3.sh	1	full	1791525288586	1791525299143	1734	0	ok	26112	1
+begin	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525299163
+end	6	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh	1	full	1791525299163	1791525302338	3175	0	ok	26128	1
+meta	roots_begun	6
+meta	roots_completed	6
+meta	roots_unfinished	0
+meta	result_exit	0

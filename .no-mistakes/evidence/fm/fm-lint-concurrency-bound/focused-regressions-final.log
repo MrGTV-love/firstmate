@@ -1,0 +1,7 @@
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them
+ok - host caps follow the load threshold and both acquisition paths respect total occupancy
+ok - the slot pool can be disabled, rejects bad settings, and never fails lint when unusable
+open failure queued instead of running ungated
+not ok - slot I/O fallback regression failed
+analysis ran

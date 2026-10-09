@@ -1,0 +1,18 @@
+{
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "1",
+    "--telemetry",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/queue-local/telemetry.tsv",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ],
+  "exit": 0,
+  "held_seconds": 5,
+  "root_wall_ms": 9736,
+  "analysis_ms": 3698,
+  "reason": "ok",
+  "cli": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\n",
+  "roots": "format\tfm-lint-roots-v1\nmeta\tshellcheck_version\t0.11.0\nmeta\tplatform\tDarwin arm64\nmeta\timage_os\tunknown\nmeta\timage_version\tunknown\nmeta\tmode\tfull\nmeta\tpartition\tall\nmeta\tjobs\t1\nmeta\tbounds_enforced\t0\nmeta\troot_deadline_seconds\tunbounded\nmeta\troot_kill_grace_seconds\tunbounded\nmeta\troot_memory_limit_kib\tunbounded\nmeta\ttiming_mechanism\tnone\nbegin\t1\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh\t0\tfull\t1791525862492\nend\t1\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh\t0\tfull\t1791525862492\t1791525872228\t3698\t0\tok\t26144\t1\nmeta\troots_begun\t1\nmeta\troots_completed\t1\nmeta\troots_unfinished\t0\nmeta\tresult_exit\t0\n",
+  "telemetry": "format\tfm-lint-telemetry-v1\ngit_head\tf1600a06139e0dd10bf8a79974abfc849d0050ba\ncontent_cksum\t3287029876-132\nshellcheck_version\t0.11.0\nanalysis_mode\tfull\npartition\tall\njobs\t1\nroot_bounds_enforced\t0\nroot_deadline_seconds\tunbounded\nroot_kill_grace_seconds\tunbounded\nroot_memory_limit_kib\tunbounded\nroot_timing_mechanism\tnone\nroot_count\t1\ndirect_lines\t103\ndirect_bytes\t2455\nsource_directives\t0\nsource_boundary_directives\t0\nsource_followed_directives\t0\nsource_target_count\t0\nshard_1_weight_bytes\t2455\nshard_2_weight_bytes\t0\nwall_seconds\t16\nworker_wall_sum_seconds\t10.63\nmax_worker_wall_seconds\t10.43\nuser_seconds\t0.10\nsystem_seconds\t0.16\nmax_worker_rss_kib\t26144\nworker_rss_sum_kib\t29088\nshellcheck_processes_start\t8\nshellcheck_processes_end\t10\nload_average_start\t179.16/164.68/146.00\nload_average_end\t151.83/159.35/144.52\naggregate_cpu_percent_start\t898.80\naggregate_cpu_percent_end\t667.20\nresult_exit\t0\n"
+}

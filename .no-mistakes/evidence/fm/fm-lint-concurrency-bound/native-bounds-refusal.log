@@ -1,0 +1,14 @@
+Full CLI attempt: FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_SECONDS=3 FM_LINT_HOST_SLOTS=1 FM_LINT_ROOT_MEMORY_KIB=12582912 bin/fm-lint.sh --jobs 1 --telemetry <disposable path> <clean fixture>
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: bounds required but per-root memory limit FM_LINT_ROOT_MEMORY_KIB=12582912 KiB is not enforceable on this host (ulimit -v).
+fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.
+
+Alternate route: docker info --format {{.OSType}} did not return within its 30-second command deadline. No container/VM was started and no system state changed.
+
+Attempt to impose a real GHC heap ceiling with GHCRTS=-M16m on a disposable source-following workload:
+shellcheck: Most RTS options are disabled. Link with -rtsopts to enable them.
+fm-lint.sh: ShellCheck  (pinned 0.11.0)
+fm-lint.sh: ShellCheck 0.11.0 required for CI parity, found . Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>.
+
+The installed ShellCheck binary has RTS options disabled; no credentials, system packages, global configuration, or real user data were modified.

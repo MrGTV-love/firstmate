@@ -1,0 +1,26 @@
+{
+  "command": [
+    "/usr/bin/perl",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint-cache.pl",
+    "gate",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/queue-watchdog/slots",
+    "18",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/queue-watchdog/queue-ms",
+    "--",
+    "/bin/bash",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--internal-timed",
+    "3",
+    "1",
+    "/Users/charlesabrooker/.local/bin/shellcheck",
+    "--norc",
+    "--external-sources",
+    "--",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ],
+  "held_seconds": 6,
+  "watchdog_deadline_seconds": 3,
+  "queue_ms": 6474,
+  "exit": 0,
+  "output": ""
+}

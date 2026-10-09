@@ -1,0 +1,6 @@
+concurrent admission deadline exceeded
+not ok - concurrent runs did not reach 2 held ShellCheck processes
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/tests/.fm-live-selected.sh: line 1231: [: : integer expression expected
+not ok - a lone run peaked at  live ShellCheck processes, expected its two workers

@@ -1,0 +1,39 @@
+{
+  "command": [
+    "/usr/bin/perl",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint-cache.pl",
+    "gate",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/load-probe-cadence/slots",
+    "18",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/load-probe-cadence/queue-ms",
+    "--",
+    "/Users/charlesabrooker/.local/bin/shellcheck",
+    "--norc",
+    "--external-sources",
+    "--",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ],
+  "blocked_observation_seconds": 7,
+  "real_sysctl_probes": [
+    {
+      "pid": 83537,
+      "time": 1791526266.667687,
+      "args": [
+        "-n",
+        "vm.loadavg"
+      ]
+    },
+    {
+      "pid": 90658,
+      "time": 1791526273.403472,
+      "args": [
+        "-n",
+        "vm.loadavg"
+      ]
+    }
+  ],
+  "probe_intervals_seconds": [
+    6.735785007476807
+  ],
+  "exit": 0
+}

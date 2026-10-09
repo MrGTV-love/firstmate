@@ -1,0 +1,11 @@
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them
+ok - host caps follow the load threshold and both acquisition paths respect total occupancy
+ok - the slot pool can be disabled, rejects bad settings, and never fails lint when unusable
+analysis ran
+analysis ran
+analysis ran
+ok - slot open and non-contention scan/wait lock failures warn and run ungated
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+retry=0: queued root timed out
+not ok - queued root clock regression failed

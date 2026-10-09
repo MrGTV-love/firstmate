@@ -1,0 +1,16 @@
+{
+  "gate_killed": true,
+  "watchdog": "actual fm-lint.sh --internal-timed",
+  "protected_actual_shellcheck_pid": 27105,
+  "admitted_after_cleanup": true,
+  "overlap": false,
+  "contender_exit": 0,
+  "observations": [
+    {
+      "protected_live": [],
+      "contender_admitted": true,
+      "time": 1791526595.330496
+    }
+  ],
+  "watchdog_output": ""
+}

@@ -1,0 +1,105 @@
+
+=== invalid-host-cap ===
+{
+  "name": "invalid-host-cap",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "2",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ],
+  "environment": {
+    "FM_LINT_HOST_SLOTS": "zero",
+    "FM_LINT_SLOT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/invalid-slots"
+  },
+  "exit": 2,
+  "expected_exit": 2,
+  "output": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\nfm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got zero.\n"
+}
+
+=== slot-dir-unavailable ===
+{
+  "name": "slot-dir-unavailable",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "2",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ],
+  "environment": {
+    "FM_LINT_SLOT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh/blocked"
+  },
+  "exit": 0,
+  "expected_exit": 0,
+  "output": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\nfm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n"
+}
+
+=== slot-file-unavailable ===
+{
+  "name": "slot-file-unavailable",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "2",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ],
+  "environment": {
+    "FM_LINT_SLOT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/blocked-slots",
+    "FM_LINT_HOST_SLOTS": "3"
+  },
+  "exit": 0,
+  "expected_exit": 0,
+  "output": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\nfm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n"
+}
+
+=== findings-disabled ===
+{
+  "name": "findings-disabled",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "2",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh"
+  ],
+  "environment": {
+    "FM_LINT_SLOT_DIR": "off"
+  },
+  "exit": 1,
+  "expected_exit": 1,
+  "output": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\n\nIn /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh line 2:\nprintf \"%s\\n\" $1\n              ^-- SC2086 (info): Double quote to prevent globbing and word splitting.\n\nDid you mean:\nprintf \"%s\\n\" \"$1\"\n\nFor more information:\n  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...\n"
+}
+
+=== findings-gated ===
+{
+  "name": "findings-gated",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "2",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh"
+  ],
+  "environment": {
+    "FM_LINT_SLOT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding-slots",
+    "FM_LINT_HOST_SLOTS": "3"
+  },
+  "exit": 1,
+  "expected_exit": 1,
+  "output": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\n\nIn /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh line 2:\nprintf \"%s\\n\" $1\n              ^-- SC2086 (info): Double quote to prevent globbing and word splitting.\n\nDid you mean:\nprintf \"%s\\n\" \"$1\"\n\nFor more information:\n  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...\n"
+}
+
+=== findings-unavailable ===
+{
+  "name": "findings-unavailable",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "2",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh"
+  ],
+  "environment": {
+    "FM_LINT_SLOT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh/blocked"
+  },
+  "exit": 1,
+  "expected_exit": 1,
+  "output": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\n\nIn /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh line 2:\nprintf \"%s\\n\" $1\n              ^-- SC2086 (info): Double quote to prevent globbing and word splitting.\n\nDid you mean:\nprintf \"%s\\n\" \"$1\"\n\nFor more information:\n  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...\nfm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n"
+}

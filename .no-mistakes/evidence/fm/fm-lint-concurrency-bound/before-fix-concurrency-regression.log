@@ -1,0 +1,1 @@
+not ok - six concurrent runs reached 12 live ShellCheck processes, expected at most 3 host-wide

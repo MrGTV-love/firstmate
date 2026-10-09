@@ -1,0 +1,13 @@
+{
+  "first_gate_killed": true,
+  "wrapper_killed": true,
+  "slot_locked_while_real_descendant_alive": true,
+  "contender_held_before_descendant_exit": true,
+  "contender_admitted_after_exit": true,
+  "contender_exit": 0,
+  "protected_snapshot": [
+    "67395     1 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh",
+    "67528  6001 Ss   /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint-cache.pl gate /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/slot-lifetime/slots 18 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/slot-lifetime/second/wait-ms -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh"
+  ],
+  "second_events": "{\"event\": \"started\", \"pid\": 90489, \"wrapper\": 88817, \"time\": 1791526013.258795, \"args\": [\"--norc\", \"--external-sources\", \"--\", \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-0.sh\"]}\n{\"event\": \"finished\", \"pid\": 90489, \"time\": 1791526014.906805, \"rc\": 0}\n"
+}

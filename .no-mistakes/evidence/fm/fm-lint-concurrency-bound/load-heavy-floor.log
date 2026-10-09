@@ -1,0 +1,22 @@
+{
+  "name": "load-heavy-floor",
+  "ncpu": 18,
+  "configured_cap": 6,
+  "load": 100000,
+  "expected": 2,
+  "held_live_shellcheck": 2,
+  "gate_exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "actual_processes": [
+    "11573  7596 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-2.sh",
+    "14366  9354 T    /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/root-5.sh"
+  ],
+  "pass": true
+}

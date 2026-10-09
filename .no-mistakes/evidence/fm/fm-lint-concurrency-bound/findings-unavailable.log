@@ -1,0 +1,15 @@
+{
+  "name": "findings-unavailable",
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/bin/fm-lint.sh",
+    "--jobs",
+    "2",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh"
+  ],
+  "environment": {
+    "FM_LINT_SLOT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh/blocked"
+  },
+  "exit": 1,
+  "expected_exit": 1,
+  "output": "fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\n\nIn /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FB4GY4BGX79TB64806ZHF7/.fm-live-validation/finding.sh line 2:\nprintf \"%s\\n\" $1\n              ^-- SC2086 (info): Double quote to prevent globbing and word splitting.\n\nDid you mean:\nprintf \"%s\\n\" \"$1\"\n\nFor more information:\n  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...\nfm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n"
+}

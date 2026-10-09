@@ -1,0 +1,35 @@
+TARGETED REGRESSION PROOF (not marked live; analyzer/locking fault fixtures are controlled dependencies)
+
+Base commit concurrency reproduction:
+not ok - six concurrent runs reached 12 live ShellCheck processes, expected at most 3 host-wide
+
+Current implementation concurrency/load/guard regressions:
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them
+ok - host caps follow the load threshold and both acquisition paths respect total occupancy
+ok - the slot pool can be disabled, rejects bad settings, and never fails lint when unusable
+
+I/O fallback regression after increasing its controller wait:
+analysis ran
+analysis ran
+analysis ran
+ok - slot open and non-contention scan/wait lock failures warn and run ungated
+
+Initial slot lifetime regression:
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them
+ok - host caps follow the load threshold and both acquisition paths respect total occupancy
+ok - the slot pool can be disabled, rejects bad settings, and never fails lint when unusable
+analysis ran
+analysis ran
+analysis ran
+ok - slot open and non-contention scan/wait lock failures warn and run ungated
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+
+Queued timing/retry regression after correcting controller waits:
+CAPABILITY bounded=none
+OBSERVED retry=0 rc=0 reason=ok duration=10400
+OBSERVED retry=1 rc=0 reason=memory-fallback duration=16437
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+
+Test-only changes: reset each contention-controller stage to its own 30-second wait, keep fake analyzers held for 90 seconds, and allow 30 seconds for I/O/timing fixture startup and bookkeeping. Product admission rules, deadlines, and contention assertions are unchanged.

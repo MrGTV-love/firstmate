@@ -1,0 +1,4 @@
+CAPABILITY bounded=none
+OBSERVED retry=0 rc=0 reason=ok duration=10400
+OBSERVED retry=1 rc=0 reason=memory-fallback duration=16437
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
