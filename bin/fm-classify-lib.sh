@@ -92,7 +92,8 @@ status_current_line() {  # <status-file> <kind>
   local open key verb note current=''
   open=$(status_open_decisions "$1" "$2")
   while IFS=$'\t' read -r key verb note; do
-    case "$verb" in ?*) current="$verb [key=$key]: $note" ;; esac
+    case "$verb" in ?*) ;; *) continue ;; esac
+    current="$verb [key=$key]: $note"
   done <<EOF
 $open
 EOF
@@ -292,9 +293,9 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
   local target_cursor kind fold_version boundary_rc verb
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
-  kind=$(_fm_status_kind "$f")
-  fold_version=$(_fm_open_decisions_fold_signature "$kind")
-  cf=$(_fm_open_decisions_cursor_path "$f")
+  _fm_status_kind "$f" '' kind
+  _fm_open_decisions_fold_signature "$kind" fold_version
+  _fm_open_decisions_cursor_path "$f" cf
   offset=0
   ident=''
   if _fm_open_decisions_checkpoint_parse "$cf"; then
@@ -309,10 +310,9 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   # A stat/size-read failure is a genuine I/O error, not "the file is empty" -
   # report the already-trusted persisted set unchanged rather than risking a
   # silent invalidation that would wipe it.
-  cur_ident=$(_fm_open_decisions_file_ident "$f") || { printf '%s' "$trusted_open"; return 0; }
-  [ -n "$cur_ident" ] || { printf '%s' "$trusted_open"; return 0; }
-  actual_size=$(_fm_status_file_size "$f") \
+  _fm_open_decisions_file_ident "$f" cur_ident actual_size \
     || { printf '%s' "$trusted_open"; return 0; }
+  [ -n "$cur_ident" ] || { printf '%s' "$trusted_open"; return 0; }
   actual_size=${actual_size//[[:space:]]/}
   case "$actual_size" in ''|*[!0-9]*) printf '%s' "$trusted_open"; return 0 ;; esac
   if [ -n "$captured_end" ]; then

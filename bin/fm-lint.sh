@@ -61,6 +61,21 @@
 # run holds at most JOBS concurrent ShellCheck processes. Diagnostics replay
 # in stable shard/root order. FM_LINT_JOBS=1 changes concurrency, not diagnostics
 # or exit selection.
+# That bound is per run; the host-wide pool admits each root only while total
+# slot occupancy is below the current load allowance. FM_LINT_SLOT_DIR defaults
+# to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots; "off" disables the pool.
+# Runs share a pool only when they use the same slot directory, so different
+# homes or overrides must select the same directory to share the host bound.
+# FM_LINT_HOST_SLOTS sets the cap; unset or empty uses max(2, floor(ncpu/2)).
+# A nonempty value must be a positive decimal integer without leading zeros,
+# or lint exits 2, even with the pool off. The load allowance is the cap minus
+# any 1-minute load above two times ncpu, rounded to the nearest integer and
+# clamped between min(2, cap) and cap. Thus a lone default two-worker run keeps
+# both workers unless an explicit cap of one is selected.
+# Waiting roots queue rather than fail; queue time consumes neither the root
+# deadline nor its retry budget. Slot directory, file, or locking failures
+# warn and run ungated rather than failing lint. The private gate's locking
+# and process-lifetime invariants live in bin/fm-lint-cache.pl.
 # --partition 1of2/2of2 splits the entire canonical inventory across
 # two CI runners, each with those same concurrency-limited workers.
 # Partitions are complete, disjoint, and byte-weight balanced; --list-files
@@ -85,7 +100,8 @@
 # named error, so a required-bounds run never lints uncapped. Without
 # FM_LINT_REQUIRE_BOUNDS (a local developer lint, where hosts like macOS
 # cannot apply the address-space limit at all) each root still runs in its
-# own ShellCheck process with identical diagnostics, just unbounded.
+# own ShellCheck process with identical diagnostics and no deadline or memory
+# limit; the host-wide concurrency pool remains enabled unless disabled above.
 #
 # If a source-following root exits with a memory failure, it is retried once
 # without --external-sources under the same memory limit and only the time
@@ -96,6 +112,9 @@
 # Other findings and failed retries still fail lint. The retry's diagnostics
 # replace the failed attempt's output; peak RSS is the maximum of both attempts.
 #
+# Root timestamps use Perl's high-resolution clock even on stock macOS Bash.
+# Start/end span the queue wait; recorded duration subtracts waits from both
+# the initial attempt and any retry.
 # Per-root evidence is incremental: workers append begin/end records (root,
 # mode, shard, start, end, duration, final exit status, reason, peak RSS when
 # measured, and whether the final attempt followed sources) to a roots log
@@ -157,12 +176,7 @@ fm_lint_worker_stop() {
 }
 
 fm_lint_now_ms() {
-  if [ -n "${EPOCHREALTIME:-}" ]; then
-    local seconds=${EPOCHREALTIME%.*} micros=${EPOCHREALTIME#*.}
-    printf '%s\n' "$((seconds * 1000 + 10#${micros:0:3}))"
-  else
-    printf '%s\n' "$(($(date +%s) * 1000))"
-  fi
+  "${FM_LINT_PERL_BIN:-perl}" -MTime::HiRes=time -e 'printf "%d\n", time() * 1000'
 }
 
 # Names are listed only for signal numbers that agree on Linux and macOS; any
@@ -253,8 +267,8 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
 # Run one ShellCheck invocation under the given deadline and the per-root
 # address-space limit, returning its exit status in FM_LINT_LAST_RC.
 fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds> <args...>
-  local path=$1 root_out=$2 root_err=$3 rss_file=$4 seconds=$5 invocation_rc=0
-  local -a analysis_command
+  local path=$1 root_out=$2 root_err=$3 rss_file=$4 seconds=$5 invocation_rc=0 wait_file waited
+  local -a analysis_command gate_command
   shift 5
   analysis_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" check \
     "${FM_LINT_INTERNAL_CACHE:-off}" "$ROOT" "$FM_LINT_SHELLCHECK" \
@@ -266,6 +280,15 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
       analysis_command=(/usr/bin/time -f 'max_rss_kib=%M' -o "$rss_file" "${analysis_command[@]}")
     fi
   fi
+  # The host-wide slot gate sits outside the watchdog and /usr/bin/time, so
+  # queue time counts toward neither the root deadline nor its peak RSS.
+  gate_command=()
+  wait_file="$rss_file.wait"
+  rm -f "$wait_file"
+  if [ "${FM_LINT_INTERNAL_SLOT_DIR:-off}" != off ]; then
+    gate_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
+      "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$wait_file" --)
+  fi
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
     # The watchdog runs in a process group of its own (the same setpgrp hop the
     # workers use), so the owner's TERM-then-KILL group sweep cannot kill it
@@ -274,7 +297,7 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     # check still starts the same terminate-then-kill escalation; the worker
     # names itself as that owner before the launch, so a worker that dies while
     # the watchdog is still starting is detected too.
-    ( FM_EXEC_TIMED_OWNER_PID=$$ exec "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
+    ( FM_EXEC_TIMED_OWNER_PID=$$ exec ${gate_command[@]+"${gate_command[@]}"} "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
         "${BASH:-bash}" "$SELF" --internal-timed \
         "$seconds" "$FM_LINT_INTERNAL_GRACE" \
         "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$FM_LINT_INTERNAL_MEMORY_KIB" \
@@ -283,12 +306,17 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
     FM_LINT_WORKER_RUN_PID=
   else
-    "${analysis_command[@]}" > "$root_out" 2> "$root_err" &
+    ${gate_command[@]+"${gate_command[@]}"} "${analysis_command[@]}" > "$root_out" 2> "$root_err" &
     FM_LINT_WORKER_RUN_PID=$!
     wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
     FM_LINT_WORKER_RUN_PID=
   fi
   FM_LINT_LAST_RC=$invocation_rc
+  FM_LINT_LAST_WAIT_MS=0
+  if [ -r "$wait_file" ]; then
+    waited=$(tr -d '[:space:]' < "$wait_file" 2>/dev/null)
+    case "$waited" in ''|*[!0-9]*) ;; *) FM_LINT_LAST_WAIT_MS=$waited ;; esac
+  fi
 }
 
 # Run one selected root, retry memory failures without source following, record
@@ -302,7 +330,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   local fallback_err="$output_dir/root.$shard_index.$index.fallback.err"
   local fallback_rss="$output_dir/root.$shard_index.$index.fallback.rss"
   local start_ms end_ms duration_ms invocation_rc=0 reason rss_kib initial_rc initial_reason
-  local fallback_secs
+  local fallback_secs queued_ms=0
   local final_follow_sources=${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}
   local -a fallback_args
   start_ms=$(fm_lint_now_ms)
@@ -318,13 +346,14 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   fm_lint_exec_root "$path" "$root_out" "$root_err" "$rss_file" \
     "$FM_LINT_INTERNAL_ROOT_SECS" "${FM_LINT_WORKER_ARGS[@]}"
   invocation_rc=$FM_LINT_LAST_RC
+  queued_ms=$FM_LINT_LAST_WAIT_MS
   reason=$(fm_lint_classify_root "$invocation_rc" "$root_err")
   initial_rc=$invocation_rc
   initial_reason=$reason
   # The retry spends what is left of this root's one deadline rather than a
   # fresh one, so both attempts together still fit the budget CI sized its job
   # timeout around.
-  fallback_secs=$(( (start_ms + FM_LINT_INTERNAL_ROOT_SECS * 1000 - $(fm_lint_now_ms)) / 1000 ))
+  fallback_secs=$(( (start_ms + queued_ms + FM_LINT_INTERNAL_ROOT_SECS * 1000 - $(fm_lint_now_ms)) / 1000 ))
   if [ "$reason" = memory ] \
     && [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ] \
     && [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] \
@@ -344,6 +373,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$fallback_secs" "${fallback_args[@]}"
     final_follow_sources=0
     invocation_rc=$FM_LINT_LAST_RC
+    queued_ms=$((queued_ms + FM_LINT_LAST_WAIT_MS))
     reason=$(fm_lint_classify_root "$invocation_rc" "$fallback_err")
     rss_kib=$(fm_lint_max_root_rss \
       "$(fm_lint_root_rss "$rss_file")" "$(fm_lint_root_rss "$fallback_rss")")
@@ -364,7 +394,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
   fi
   end_ms=$(fm_lint_now_ms)
-  duration_ms=$((end_ms - start_ms))
+  duration_ms=$((end_ms - start_ms - queued_ms))
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
     printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
@@ -1034,6 +1064,21 @@ if [ "${FM_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
   fi
 fi
 
+# Host-wide pool configuration; the header owns its public controls.
+SLOT_DIR=${FM_LINT_SLOT_DIR:-${XDG_CACHE_HOME:-${HOME:-${TMPDIR:-/tmp}}/.cache}/firstmate/lint-slots}
+case "${FM_LINT_HOST_SLOTS:-1}" in
+  ''|0*|*[!0-9]*)
+    printf 'fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got %s.\n' \
+      "${FM_LINT_HOST_SLOTS:-}" >&2
+    exit 2
+    ;;
+esac
+NCPU=
+if [ "$SLOT_DIR" != off ]; then
+  NCPU=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null) || NCPU=
+  case "$NCPU" in ''|0*|*[!0-9]*) NCPU=1 ;; esac
+fi
+
 PROGRESS=0
 if [ -n "$PARTITION" ]; then
   PROGRESS=1
@@ -1184,7 +1229,7 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_SHELLCHECK="$SHELLCHECK_BIN"
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
-  worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR")
+  worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
   if [ -n "$TELEMETRY" ] && [ -x /usr/bin/time ]; then
     if [ "$(uname)" = Darwin ]; then
       exec "$PERL_BIN" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \

@@ -190,23 +190,25 @@ printf '# Backlog\n' > "$CAPTAIN/data/backlog.md"
 
 ADD_LOG="$CAPTAIN/add.log"
 HOLD_OUT="$CAPTAIN/hold.out"
+HOLD_STDOUT="$CAPTAIN/hold.stdout"
 HOLD_STATUS=0
+HOLD_START=$(date +%s)
 PATH="$CAPTAIN_FAKEBIN:$BASE_PATH" FM_HOME="$CAPTAIN" \
   FM_STATE_OVERRIDE="$CAPTAIN/state" FM_DATA_OVERRIDE="$CAPTAIN/data" \
   FM_CONFIG_OVERRIDE="$CAPTAIN/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   FM_TEST_TASKS_AXI_ADD_LOG="$ADD_LOG" \
   "$ROOT/bin/fm-captain-hold.sh" hold wedged-hold --title 'Wedged hold' --reason 'backend wedged' \
-  > "$HOLD_OUT" 2>&1 || HOLD_STATUS=$?
+  > "$HOLD_STDOUT" 2> "$HOLD_OUT" || HOLD_STATUS=$?
 
 [ "$HOLD_STATUS" -ne 0 ] \
   || fail "holding a task against a wedged backend must not report success: $(cat "$HOLD_OUT")"
 [ ! -s "$ADD_LOG" ] \
   || fail "a timed-out read was spent as absence: tasks-axi add ran anyway: $(cat "$ADD_LOG")"
-case "$(cat "$HOLD_OUT")" in
-  *wedged-hold*bound*) ;;
-  *) fail "the refusal must name the item and the bound it hit, got: $(cat "$HOLD_OUT")" ;;
-esac
-pass "a bound hit stops a captain hold loudly instead of being read as a missing task"
+[ "$(elapsed_since "$HOLD_START")" -lt "$BOUND_CEILING" ] \
+  || fail "holding a task exceeded the bounded-read ceiling: $(cat "$HOLD_OUT")"
+[ ! -s "$HOLD_STDOUT" ] \
+  || fail "a timed-out hold reported a task outcome: $(cat "$HOLD_STDOUT")"
+pass "a bound hit stops a captain hold without creating a task"
 
 # The teardown gate reaches a row read through the same resolver, so the bound
 # hit has to survive the command substitution that carries the resolved id.
@@ -219,22 +221,25 @@ fm_write_meta "$CAPTAIN/state/wedged-origin.meta" \
   'decision_keys=wedged-entry'
 
 VERIFY_OUT="$CAPTAIN/verify.out"
+VERIFY_STDOUT="$CAPTAIN/verify.stdout"
+VERIFY_LOG="$CAPTAIN/verify.log"
 VERIFY_STATUS=0
+VERIFY_START=$(date +%s)
 PATH="$CAPTAIN_FAKEBIN:$BASE_PATH" FM_HOME="$CAPTAIN" \
   FM_STATE_OVERRIDE="$CAPTAIN/state" FM_DATA_OVERRIDE="$CAPTAIN/data" \
   FM_CONFIG_OVERRIDE="$CAPTAIN/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
-  "$ROOT/bin/fm-captain-hold.sh" verify wedged-origin > "$VERIFY_OUT" 2>&1 || VERIFY_STATUS=$?
+  FM_TEST_TASKS_AXI_HANG_LOG="$VERIFY_LOG" \
+  "$ROOT/bin/fm-captain-hold.sh" verify wedged-origin > "$VERIFY_STDOUT" 2> "$VERIFY_OUT" || VERIFY_STATUS=$?
 
 [ "$VERIFY_STATUS" -ne 0 ] \
   || fail "verify must not attest an inventory it could not read: $(cat "$VERIFY_OUT")"
-case "$(cat "$VERIFY_OUT")" in
-  *absent*) fail "a bound hit was reported as an absent task: $(cat "$VERIFY_OUT")" ;;
-esac
-case "$(cat "$VERIFY_OUT")" in
-  *wedged-entry*bound*) ;;
-  *) fail "verify must name the entry it could not read and the bound it hit, got: $(cat "$VERIFY_OUT")" ;;
-esac
-pass "the teardown verify gate reports a bound hit by name instead of as an absent inventory entry"
+[ "$(elapsed_since "$VERIFY_START")" -lt "$BOUND_CEILING" ] \
+  || fail "verify exceeded the bounded-read ceiling: $(cat "$VERIFY_OUT")"
+[ ! -s "$VERIFY_STDOUT" ] \
+  || fail "verify attested an unreadable inventory: $(cat "$VERIFY_STDOUT")"
+[ "$(cat "$VERIFY_LOG")" = wedged-entry ] \
+  || fail "verify continued resolving after a bound hit: $(cat "$VERIFY_LOG")"
+pass "the teardown verify gate stops at a bound hit without attesting the inventory"
 
 # The reconcile-requests intake reads each row with task_show in this shell and
 # must stop on a bound hit by name; spending the 124 as 'refused: <id>
@@ -250,24 +255,25 @@ printf 'schema=fm-decision-binding.v1\norigin=wedged-origin\n' \
   > "$REQ/state/decision-bindings/probe.origin"
 
 REQ_OUT="$REQ/req.out"
+REQ_STDOUT="$REQ/req.stdout"
 REQ_STATUS=0
+REQ_START=$(date +%s)
 printf 'wedged-req\n' \
   | PATH="$REQ_FAKEBIN:$BASE_PATH" FM_HOME="$REQ" \
     FM_STATE_OVERRIDE="$REQ/state" FM_DATA_OVERRIDE="$REQ/data" \
     FM_CONFIG_OVERRIDE="$REQ/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
     "$ROOT/bin/fm-captain-hold.sh" reconcile-requests --source-id probe --source 'test capture' \
-    > "$REQ_OUT" 2>&1 || REQ_STATUS=$?
+    > "$REQ_STDOUT" 2> "$REQ_OUT" || REQ_STATUS=$?
 
 [ "$REQ_STATUS" -ne 0 ] \
   || fail "reconcile-requests must not report success against a wedged backend: $(cat "$REQ_OUT")"
-case "$(cat "$REQ_OUT")" in
-  *absent*|*refused*) fail "the reconcile intake spent a bound hit as an absent row: $(cat "$REQ_OUT")" ;;
-esac
-case "$(cat "$REQ_OUT")" in
-  *wedged-req*bound*) ;;
-  *) fail "the reconcile intake must name the row and the bound it hit, got: $(cat "$REQ_OUT")" ;;
-esac
-pass "the reconcile-requests intake stops loudly on a bound hit instead of refusing the row as absent"
+[ "$(elapsed_since "$REQ_START")" -lt "$BOUND_CEILING" ] \
+  || fail "the reconcile intake exceeded the bounded-read ceiling: $(cat "$REQ_OUT")"
+[ ! -s "$REQ_STDOUT" ] \
+  || fail "the reconcile intake classified a timed-out row: $(cat "$REQ_STDOUT")"
+assert_absent "$REQ/state/reconcile-requests/wedged-req.request" \
+  "a timed-out row must not create a reconcile request"
+pass "the reconcile-requests intake stops at a bound hit without classifying or recording the row"
 
 # The migrated-prefix scan is the resolution path whose exact and legacy ids
 # genuinely answer NOT_FOUND: only the prefixed migrated row wedges. A dropped
@@ -283,6 +289,7 @@ set -u
 case "${1:-}" in
   --version) printf '%s\n' '0.2.6'; exit 0 ;;
   show)
+    printf '%s\n' "${2:-}" >> "$FM_TEST_TASKS_AXI_SHOW_LOG"
     [ -z "${2:-}" ] && { printf 'code: NOT_FOUND\n' >&2; exit 1; }
     # Only the prefixed migrated candidates wedge; the exact and legacy ids
     # answer NOT_FOUND promptly, the concrete path the prefix scan exists for.
@@ -338,24 +345,26 @@ fm_write_meta "$MIG/state/wedged-origin.meta" \
   'decision_keys=mig-entry'
 
 VERIFY_MIG_OUT="$MIG/verify.out"
+VERIFY_MIG_STDOUT="$MIG/verify.stdout"
+VERIFY_MIG_LOG="$MIG/verify.log"
 VERIFY_MIG_STATUS=0
+VERIFY_MIG_START=$(date +%s)
 PATH="$MIG_FAKEBIN:$BASE_PATH" FM_HOME="$MIG" \
   FM_STATE_OVERRIDE="$MIG/state" FM_DATA_OVERRIDE="$MIG/data" \
   FM_CONFIG_OVERRIDE="$MIG/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   FM_TEST_PREFIXED_GLOB='bd-*' \
-  "$ROOT/bin/fm-captain-hold.sh" verify wedged-origin > "$VERIFY_MIG_OUT" 2>&1 || VERIFY_MIG_STATUS=$?
+  FM_TEST_TASKS_AXI_SHOW_LOG="$VERIFY_MIG_LOG" \
+  "$ROOT/bin/fm-captain-hold.sh" verify wedged-origin > "$VERIFY_MIG_STDOUT" 2> "$VERIFY_MIG_OUT" || VERIFY_MIG_STATUS=$?
 
 [ "$VERIFY_MIG_STATUS" -ne 0 ] \
   || fail "verify must not attest an inventory whose migrated-prefix read wedged: $(cat "$VERIFY_MIG_OUT")"
-case "$(cat "$VERIFY_MIG_OUT")" in
-  *'no captain-held task'*|*absent*) 
-    fail "the migrated-prefix bound hit was spent as an unresolved key: $(cat "$VERIFY_MIG_OUT")" ;;
-esac
-case "$(cat "$VERIFY_MIG_OUT")" in
-  *'exceeded its read bound resolving mig-entry') ;;
-  *) fail "verify must name the entry it could not read and the bound it hit, got: $(cat "$VERIFY_MIG_OUT")" ;;
-esac
-pass "a bound hit in the migrated-prefix scan stops verify by name instead of resolving to nothing"
+[ "$(elapsed_since "$VERIFY_MIG_START")" -lt "$BOUND_CEILING" ] \
+  || fail "migrated-prefix verify exceeded the bounded-read ceiling: $(cat "$VERIFY_MIG_OUT")"
+[ ! -s "$VERIFY_MIG_STDOUT" ] \
+  || fail "verify attested an unreadable migrated inventory: $(cat "$VERIFY_MIG_STDOUT")"
+[ "$(cat "$VERIFY_MIG_LOG")" = "$(printf '%s\n' mig-entry wedged-origin-decision-mig-entry bd-mig-entry)" ] \
+  || fail "verify continued resolving after the migrated-prefix bound hit: $(cat "$VERIFY_MIG_LOG")"
+pass "a bound hit in the migrated-prefix scan stops verify without attesting the inventory"
 
 # --- half two: the digest still completes end to end ------------------------
 
