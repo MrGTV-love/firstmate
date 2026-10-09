@@ -1505,6 +1505,7 @@ spawn_abort_cleanup() {
     [ ! -e "$SPAWN_META_TMP" ] &&
     [ ! -L "$SPAWN_META_TMP" ]; then
     RELAUNCH_REPLACEMENT_PENDING=0
+    SPAWN_SLOT_CLAIMED=0
   fi
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ]; then
     RELAUNCH_REPLACEMENT_PENDING=0
@@ -1647,7 +1648,7 @@ spawn_abort_cleanup() {
   # atomic replacement rather than racing it. The release itself never removes
   # another task's claim.
   if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+    { [ "$RELAUNCH_RELOCATING" = 1 ] || { [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; }; } &&
     fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
     SPAWN_SLOT_CLAIMED=0
     if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
@@ -3493,25 +3494,25 @@ if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
     exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
   fi
 fi
-if [ "$RELAUNCH_RELOCATING" = 1 ] && fm_treehouse_pool_slot "$PROJ_ABS" "$RELAUNCH_WT"; then
-  # A relocation onto a Treehouse slot claims it for this task exactly as a
-  # fresh spawn does, under the same project lock, so a teardown that
-  # outlives the slot's next tenant can tell whose it is. The proof runs again
-  # under the lock: a claim written between the first run and now is caught.
+if [ "$RELAUNCH_RELOCATING" = 1 ]; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {
     echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
     exit 1
   }
   if ! fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
-    echo "error: another Treehouse slot allocation or return is in progress for $PROJ_ABS; refusing to race it" >&2
+    echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race relocation ownership" >&2
     exit 1
   fi
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
   fm_control_worktree_relocation "$RELAUNCH_META" "$ID" "$STATE" "$RELOCATE_TO" || exit 1
-  fm_treehouse_slot_owner_claim "$RELAUNCH_WT" "$ID" "$FM_HOME" || {
-    echo "error: could not claim Treehouse pool slot $RELAUNCH_WT for task $ID; refusing to relocate onto a slot that cannot later be proved to be its own" >&2
-    exit 1
-  }
+  WT=$RELAUNCH_WT
+  if fm_treehouse_pool_slot "$PROJ_ABS" "$RELAUNCH_WT"; then
+    fm_treehouse_slot_owner_claim "$RELAUNCH_WT" "$ID" "$FM_HOME" || {
+      echo "error: could not claim Treehouse pool slot $RELAUNCH_WT for task $ID; refusing to relocate onto a slot that cannot later be proved to be its own" >&2
+      exit 1
+    }
+    [ "$FM_TREEHOUSE_SLOT_OWNER" != absent ] || SPAWN_SLOT_CLAIMED=1
+  fi
 fi
 [ -f "$BRIEF" ] || {
   echo "error: task $ID has no brief at inaccessible data path $BRIEF" >&2
@@ -5660,6 +5661,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   fi
   RELAUNCH_REPLACEMENT_PENDING=0
+  SPAWN_SLOT_CLAIMED=0
   SPAWN_META_PUBLISH_STARTED=0
   SPAWN_META_TMP=
 fi

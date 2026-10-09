@@ -151,6 +151,11 @@ case "${1:-}" in
       printf '%s\n' "$payload" >> "$D/keys"
       case "$payload" in
         "cd -- '"*"'")
+          if [ -f "$D/hold-relocation-cd" ]; then
+            : > "$D/relocation-cd-held"
+            while [ ! -f "$D/relocation-cd-release" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do /bin/sleep 0.01; done
+            [ -f "$D/relocation-cd-release" ] || exit 1
+          fi
           if [ ! -f "$D/ignore-cd" ]; then
             cwd=${payload#"cd -- '"}
             cwd=${cwd%"'"}
@@ -3338,6 +3343,124 @@ test_relocation_claims_and_respects_pool_slot_ownership() {
   pass "relocation: a pool slot claimed by another task refuses, and an unclaimed one is claimed for the task"
 }
 
+test_concurrent_non_pool_relocations_publish_only_one_owner() {
+  local dir second id=rl111race first_pid out rc first_rc i=0 before
+  dir=$(new_case relocate-race-first "$id")
+  make_relocation_case "$dir" "$id"
+  set_case_meta_field "$dir" "$id" harness codex
+  printf codex > "$dir/fake/becomes"
+  second=$(new_case relocate-race-second "$id")
+  mkdir -p "$second/home/data/$id"
+  cp "$dir/home/data/$id/brief.md" "$second/home/data/$id/brief.md"
+  cp "$dir/home/state/$id.meta" "$second/home/state/$id.meta"
+  set_case_meta_field "$second" "$id" worktree "$second/missing"
+  printf zsh > "$second/fake/command"
+  printf codex > "$second/fake/becomes"
+  printf '%s' "$second/missing" > "$second/fake/cwd"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' \
+    "$dir/home" > "$second/home/.fm-secondmate-parent"
+  printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
+    "$second/home" > "$dir/home/data/secondmates.md"
+  before=$(cat "$second/home/state/$id.meta")
+  : > "$dir/fake/hold-relocation-cd"
+  run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest" > "$dir/first.out" 2>&1 &
+  first_pid=$!
+  while [ ! -f "$dir/fake/relocation-cd-held" ] && kill -0 "$first_pid" 2>/dev/null && [ "$i" -lt 1000 ]; do
+    sleep 0.01
+    i=$((i + 1))
+  done
+  if [ ! -f "$dir/fake/relocation-cd-held" ]; then
+    : > "$dir/fake/relocation-cd-release"
+    wait "$first_pid" || true
+    fail "the first relocation never reached cwd handoff: $(cat "$dir/first.out")"
+  fi
+  out=$(run_spawn "$second" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+  : > "$dir/fake/relocation-cd-release"
+  first_rc=0
+  wait "$first_pid" || first_rc=$?
+  expect_code 0 "$first_rc" "the lock-holding relocation failed: $(cat "$dir/first.out")"
+  expect_code 1 "$rc" "the second home published into an acquired copy: $out"
+  assert_contains "$out" "refusing to race relocation ownership" "concurrent relocation did not refuse under the shared lock"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "the first home did not publish its destination"
+  [ "$(cat "$second/home/state/$id.meta")" = "$before" ] || fail "the second home published a competing owner"
+  [ ! -s "$second/fake/literal" ] || fail "the second home launched into the first home's copy"
+  out=$(run_spawn "$second" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+  expect_code 1 "$rc" "a retry ignored the published owner: $out"
+  assert_contains "$out" "recorded by another task" "the published owner was not visible after lock release"
+  pass "concurrent non-pool relocations from two homes publish and launch exactly one owner"
+}
+
+test_unpublished_relocation_releases_only_its_new_pool_claim() {
+  local dir id variant pool marker out rc before
+  for variant in cwd wiring brief publish existing published; do
+    id="rl112$variant"
+    dir=$(new_case "relocate-claim-abort-$variant" "$id")
+    make_relocation_case "$dir" "$id"
+    cp "$dir/home/data/$id/brief.md" "$dir/brief-before"
+    pool="$dir/pool"
+    git -C "$dir/proj" worktree remove --force "$dir/dest"
+    mkdir -p "$pool/1" "$pool/2"
+    printf '{}\n' > "$pool/treehouse-state.json"
+    git -C "$dir/proj" worktree add -q "$pool/1/repo" "task-$id"
+    git -C "$dir/proj" worktree add -q -f "$pool/2/repo" "task-$id"
+    marker="$pool/1/.fm-slot-owner"
+    before=$(cat "$dir/home/state/$id.meta")
+    case "$variant" in
+      cwd|existing)
+        : > "$dir/fake/ignore-cd"
+        if [ "$variant" = existing ]; then
+          printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$marker"
+        fi
+        out=$(run_spawn "$dir" "$id" --relaunch --worktree "$pool/1/repo"); rc=$?
+        assert_contains "$out" "not its recorded worktree" "cwd failure did not reach handoff"
+        rm "$dir/fake/ignore-cd"
+        ;;
+      wiring)
+        printf 'owned by another tool\n' > "$dir/fake/foreign-wiring"
+        printf '%s\n' "$pool/1/repo/.claude/settings.local.json" > "$dir/fake/foreign-wiring-path"
+        out=$(run_spawn "$dir" "$id" --relaunch --worktree "$pool/1/repo"); rc=$?
+        assert_present "$dir/fake/foreign-wiring-created" "wiring failure never reached late admission"
+        [ "$(cat "$pool/1/repo/.claude/settings.local.json")" = 'owned by another tool' ] || fail "late refusal overwrote foreign wiring"
+        ;;
+      brief)
+        printf '# Task\n' > "$dir/home/data/$id/brief.md"
+        out=$(run_spawn "$dir" "$id" --relaunch --worktree "$pool/1/repo"); rc=$?
+        assert_contains "$out" "must contain nonempty" "brief failure refused before the intended boundary"
+        ;;
+      publish)
+        make_mv_failure_stub "$dir"
+        out=$(FM_REAL_MV=$(command -v mv) FM_FAKE_META_PUBLISH_MV_FAIL="$dir/home/state/$id.meta" \
+          run_control "$dir" "$id" relaunch --worktree "$pool/1/repo" --note "resume"); rc=$?
+        assert_contains "$out" "replacement task record" "publication failure did not reach the replacement record"
+        rm "$dir/fakebin/mv"
+        ;;
+      published)
+        out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
+          run_control "$dir" "$id" relaunch --worktree "$pool/1/repo" --note "resume"); rc=$?
+        ;;
+    esac
+    expect_code 1 "$rc" "the staged relocation abort did not fail ($variant): $out"
+    if [ "$variant" = published ]; then
+      [ "$(meta_field "$dir" "$id" worktree)" = "$pool/1/repo" ] || fail "a published relocation lost its destination"
+      [ "$(cat "$marker")" = "$(printf 'task=%s\nhome=%s' "$id" "$dir/home")" ] || fail "post-publication failure removed the owning claim"
+      continue
+    fi
+    [ "$(cat "$dir/home/state/$id.meta")" = "$before" ] || fail "an unpublished abort changed the prior record ($variant)"
+    if [ "$variant" = existing ]; then
+      [ "$(cat "$marker")" = "$(printf 'task=%s\nhome=%s' "$id" "$dir/home")" ] || fail "abort removed a pre-existing claim"
+    else
+      assert_absent "$marker" "unpublished abort leaked its new slot claim ($variant)"
+    fi
+    cp "$dir/brief-before" "$dir/home/data/$id/brief.md"
+    out=$(run_control "$dir" "$id" relaunch --worktree "$pool/2/repo" --note "retry elsewhere"); rc=$?
+    expect_code 0 "$rc" "a retry onto another copy failed ($variant): $out"
+    [ "$(meta_field "$dir" "$id" worktree)" = "$pool/2/repo" ] || fail "retry did not publish the other copy ($variant)"
+    assert_grep "home=$dir/home" "$pool/2/.fm-slot-owner" "retry did not claim the second copy"
+    [ "$variant" = existing ] || assert_absent "$marker" "retry left the first copy claimed ($variant)"
+  done
+  pass "unpublished relocation aborts release new claims; pre-existing and published claims survive"
+}
+
 test_relocation_flag_is_scoped_to_relaunch() {
   local dir out rc id=rl107
   dir=$(new_case relocate-flags "$id")
@@ -4842,6 +4965,8 @@ test_relocation_proof_survives_every_failure_journal_rewrite
 test_relocation_proof_survives_later_ordinary_launch_failure
 test_relocation_requires_a_newer_ordinary_relaunch_checkpoint
 test_relocation_claims_and_respects_pool_slot_ownership
+test_concurrent_non_pool_relocations_publish_only_one_owner
+test_unpublished_relocation_releases_only_its_new_pool_claim
 test_relocation_flag_is_scoped_to_relaunch
 test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server

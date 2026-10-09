@@ -716,6 +716,57 @@ resolve_project_lock() {  # <home> <project>
     "$ROOT/bin/fm-wake-lib.sh" "$2"
 }
 
+test_local_home_walk_refuses_an_unreadable_registry() {
+  local dir id=unreadable-registry mate sibling hidden registry out rc
+  [ "$(id -u)" != 0 ] || { echo "skip - unreadable registry needs a non-root user"; return; }
+  dir=$(make_case unreadable-local-registry)
+  mark_case_as_treehouse_pool "$dir"
+  mate="$dir/mate"
+  sibling="$dir/sibling"
+  hidden="$dir/hidden"
+  make_home "$mate"
+  make_home "$sibling"
+  make_home "$hidden"
+  printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n- sibling - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
+    "$mate" "$sibling" > "$dir/home/data/secondmates.md"
+  registry="$mate/data/secondmates.md"
+  printf -- '- hidden - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
+    "$hidden" > "$registry"
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=firstmate:fm-$id" "endpoint_task_id=$id" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  chmod 000 "$registry"
+  rc=0
+  out=$(FM_HOME="$dir/home" bash -c '
+    . "$1/bin/fm-secondmate-registry-lib.sh"
+    . "$1/bin/fm-wake-lib.sh"
+    if fm_local_firstmate_state_dirs "$2"; then exit 0; fi
+    printf "%s\n" "$FM_LOCAL_FIRSTMATE_ERROR"
+    exit 1
+  ' _ "$ROOT" "$dir/home/state") || rc=$?
+  expect_code 1 "$rc" "the walker accepted an unreadable descendant registry: $out"
+  assert_contains "$out" "local Firstmate registry cannot be read at $registry" \
+    "the walker did not name its unreadable registry"
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
+  chmod 600 "$registry"
+  expect_code 1 "$rc" "teardown ignored the unreadable registry"
+  assert_contains "$(cat "$dir/stderr")" "local Firstmate registry cannot be read at $registry" \
+    "teardown did not propagate the registry refusal"
+  assert_present "$dir/home/state/$id.meta" "registry refusal removed the task record"
+  assert_present "$dir/worktree/sentinel" "registry refusal returned the slot"
+  [ ! -s "$dir/runtime.log" ] || fail "registry refusal reached the runtime"
+  out=$(FM_HOME="$dir/home" bash -c '
+    . "$1/bin/fm-secondmate-registry-lib.sh"
+    . "$1/bin/fm-wake-lib.sh"
+    fm_local_firstmate_state_dirs "$2" || exit 1
+    printf "%s\n" "${FM_LOCAL_FIRSTMATE_STATES[@]}"
+  ' _ "$ROOT" "$dir/home/state") || fail "a readable registry refused: $out"
+  assert_contains "$out" "$hidden/state" "the restored registry lost its descendant"
+  assert_contains "$out" "$sibling/state" "an absent sibling registry should mean no mates"
+  pass "local home walking and teardown refuse unreadable registries without hiding descendants"
+}
+
 test_project_lock_anchors_at_the_local_root_across_home_layouts() {
   local dir main_home main_project local_mate remote_mate remote_child
   local main_lock mate_lock remote_lock child_lock orphan_lock rc
@@ -1539,6 +1590,7 @@ test_stale_record_on_claimed_slot_retires_then_claimant_tears_down
 test_own_and_absent_slot_claims_still_tear_down
 test_recorded_endpoint_that_changed_directory_still_tears_down
 test_project_lock_anchors_at_the_local_root_across_home_layouts
+test_local_home_walk_refuses_an_unreadable_registry
 test_remote_seeded_home_returns_its_uncontested_slot
 test_remote_seeded_home_still_refuses_a_slot_its_child_holds
 test_remote_layout_homes_serialize_on_one_project_lock

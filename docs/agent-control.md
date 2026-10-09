@@ -205,7 +205,7 @@ It accepts the relocation only when all of these hold, and it refuses every othe
   The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
   Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
 - **No other task of any local Firstmate home records it** (the root home and every registered local secondmate home, the same walk teardown uses); an unreadable home or registry refuses. Records are checked by path or alias in both `worktree` and `home`, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
-  A slot that is free is claimed for this task under the shared project lock, as a fresh spawn does.
+  Every relocation, pool or not, repeats the ownership proof under the existing shared project lock and keeps that lock through atomic task-record publication. A free pool slot is claimed for this task under that lock, as a fresh spawn does; an unpublished abort removes only the claim that attempt newly acquired, before releasing the lock. Pre-existing claims and claims paired with a published replacement record remain intact.
 - **It holds none of the harness files the launch overwrites or deletes** (the worktree-resident paths of `fm_control_harness_wiring_paths` in bin/fm-control-lib.sh).
   The control plane checks, and the launch owner checks again at the moment it would write.
   A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
