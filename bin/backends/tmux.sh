@@ -157,6 +157,47 @@ fm_backend_tmux_window_inventory() {  # <session-target>
   return 1
 }
 
+fm_backend_tmux_target_exists() {  # <target>
+  local target=$1 session window windows inventory_status panes
+  case "$target" in
+    *:*:*|'':*|*:'') ;;
+    *:*)
+      session=${target%%:*}
+      session=${session#=}
+      window=${target#*:}
+      window=${window#=}
+      if windows=$(fm_backend_tmux_window_inventory "=$session"); then
+        :
+      else
+        inventory_status=$?
+        [ "$inventory_status" -eq 2 ] && return 1
+        return 2
+      fi
+      printf '%s\n' "$windows" | grep -qxF -- "$window" && return 0
+      case "$window" in
+        @*|%*|*[!0-9]*.[0-9]*|[0-9]*)
+          panes=$(tmux list-panes -s -t "=$session" -F '#{window_name}.#{pane_index}
+#{window_index}.#{pane_index}
+#{window_id}.#{pane_index}
+#{pane_id}
+#{window_index}
+#{window_id}' 2>/dev/null) || return 2
+          printf '%s\n' "$panes" | grep -qxF -- "$window"
+          return
+          ;;
+      esac
+      return 1
+      ;;
+    @*|%*)
+      panes=$(tmux list-panes -a -F '#{window_id}
+#{pane_id}' 2>/dev/null) || return 2
+      printf '%s\n' "$panes" | grep -qxF -- "$target"
+      return
+      ;;
+  esac
+  tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
+}
+
 # fm_backend_tmux_kill: remove one explicitly named task window.
 # Empty, omitted, and malformed targets return nonzero before invoking tmux so
 # tmux can never interpret an empty target as the caller's current window.
@@ -292,7 +333,7 @@ fm_backend_tmux_agent_state() {  # <target>
   esac
   session=${target%%:*}
   window=${target#*:}
-  windows=$(fm_backend_tmux_window_inventory "$session")
+  windows=$(fm_backend_tmux_window_inventory "=${session#=}")
   inventory_status=$?
   if [ "$inventory_status" -ne 0 ]; then
     if [ "$inventory_status" -eq 2 ]; then

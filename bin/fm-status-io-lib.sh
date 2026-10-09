@@ -25,39 +25,58 @@ unset _fm_classify_nounset
 # Parameter expansion rather than dirname and basename: every presentation scan
 # asks for the cursor path of every task, and two child processes per call were
 # the largest process count in a wake drain.
-_fm_open_decisions_cursor_path() {  # <status-file>
-  local f=$1 dir base
-  case "$f" in
+_fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
+  local __fm_cursor_file=$1 __fm_cursor_dir __fm_cursor_base __fm_cursor_path
+  case "$__fm_cursor_file" in
     */*)
-      dir=${f%/*}
-      while [ "${dir%/}" != "$dir" ]; do dir=${dir%/}; done
-      [ -n "$dir" ] || dir=/
+      __fm_cursor_dir=${__fm_cursor_file%/*}
+      while [ "${__fm_cursor_dir%/}" != "$__fm_cursor_dir" ]; do __fm_cursor_dir=${__fm_cursor_dir%/}; done
+      [ -n "$__fm_cursor_dir" ] || __fm_cursor_dir=/
       ;;
-    *) dir=. ;;
+    *) __fm_cursor_dir=. ;;
   esac
-  base=${f##*/}
-  printf '%s/.%s.open-decisions-cursor' "$dir" "${base%.status}"
+  __fm_cursor_base=${__fm_cursor_file##*/}
+  __fm_cursor_path="$__fm_cursor_dir/.${__fm_cursor_base%.status}.open-decisions-cursor"
+  if [ -n "${2:-}" ]; then printf -v "$2" '%s' "$__fm_cursor_path"; else printf '%s' "$__fm_cursor_path"; fi
 }
 
 
-# Portable device:inode identity for the rotation/recreation check below.
-_fm_open_decisions_file_ident() {  # <file> -> strongest available identity
-  local f=$1 epoch birth ident
+# Portable strongest-available identity: strong:<device>:<inode>:<birth-time>
+# when birth time is available, otherwise weak:<device>:<inode>.
+# The default reader captures identity and size in one stat invocation to avoid
+# repeated per-task scheduling and to sample both from the same metadata read.
+# Optional output variables let warm fold callers avoid command substitutions;
+# without an identity output variable, the identity is printed on stdout.
+_fm_open_decisions_file_ident() {  # <file> [<identity-out-var> [<size-out-var>]]
+  local __fm_info_record __fm_info_rest __fm_info_ident __fm_info_epoch __fm_info_birth __fm_info_size
   if [ -n "${FM_STATUS_IDENTITY_READER:-}" ]; then
-    "$FM_STATUS_IDENTITY_READER" "$f"
-    return
-  fi
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-    ident=$(LC_ALL=C /usr/bin/stat -f '%d:%i' "$f" 2>/dev/null) || return 1
-    epoch=$(LC_ALL=C /usr/bin/stat -f '%B' "$f" 2>/dev/null) || epoch=0
-    if [ "$epoch" != 0 ]; then birth=$(LC_ALL=C /usr/bin/stat -f '%FB' "$f" 2>/dev/null) || birth=''; else birth=''; fi
+    __fm_info_ident=$("$FM_STATUS_IDENTITY_READER" "$1") || return 1
+    if [ -n "${3:-}" ]; then __fm_info_size=$(_fm_status_file_size "$1") || return 1; fi
   else
-    ident=$(LC_ALL=C stat -c '%d:%i' "$f" 2>/dev/null) || return 1
-    epoch=$(LC_ALL=C stat -c '%W' "$f" 2>/dev/null) || epoch=0
-    if [ "$epoch" != 0 ]; then birth=$(LC_ALL=C stat -c '%w' "$f" 2>/dev/null) || birth=''; else birth=''; fi
+    if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+      __fm_info_record=$(LC_ALL=C /usr/bin/stat -f $'%d:%i\t%B\t%FB\t%z' "$1" 2>/dev/null) || return 1
+    else
+      __fm_info_record=$(LC_ALL=C stat -c $'%d:%i\t%W\t%w\t%s' "$1" 2>/dev/null) || return 1
+    fi
+    __fm_info_ident=${__fm_info_record%%$'\t'*}
+    __fm_info_rest=${__fm_info_record#*$'\t'}
+    __fm_info_epoch=${__fm_info_rest%%$'\t'*}
+    __fm_info_rest=${__fm_info_rest#*$'\t'}
+    __fm_info_birth=${__fm_info_rest%%$'\t'*}
+    __fm_info_size=${__fm_info_rest#*$'\t'}
+    [ "$__fm_info_epoch" != 0 ] || __fm_info_birth=''
+    case "$__fm_info_ident$__fm_info_birth" in *$'\t'*|*$'\n'*|'') return 1 ;; esac
+    if [ -n "$__fm_info_birth" ]; then
+      __fm_info_ident="strong:$__fm_info_ident:$__fm_info_birth"
+    else
+      __fm_info_ident="weak:$__fm_info_ident"
+    fi
+    if [ -n "${3:-}" ] && [ -n "${FM_STATUS_SIZE_READER:-}" ]; then
+      __fm_info_size=$("$FM_STATUS_SIZE_READER" "$1") || return 1
+    fi
   fi
-  case "$ident$birth" in *$'\t'*|*$'\n'*|'') return 1 ;; esac
-  if [ -n "$birth" ]; then printf 'strong:%s:%s' "$ident" "$birth"; else printf 'weak:%s' "$ident"; fi
+  if [ -n "${3:-}" ]; then printf -v "$3" '%s' "$__fm_info_size"; fi
+  if [ -n "${2:-}" ]; then printf -v "$2" '%s' "$__fm_info_ident"; else printf '%s' "$__fm_info_ident"; fi
 }
 
 _fm_status_file_size() {  # <status-file>
@@ -226,7 +245,11 @@ status_presentation_marker_parse() {
 }
 status_presentation_marker_reported_matches() {
   local raw
-  raw=$(cat "$1" 2>/dev/null) || return 1
+  # Read the marker with the shell's own read, not a cat process: this runs for
+  # every status log on every watcher cycle. Trailing newlines are dropped, as
+  # the command substitution this replaced dropped them.
+  { IFS= read -r -d '' raw || :; } 2>/dev/null < "$1" || return 1
+  while [ "${raw%$'\n'}" != "$raw" ]; do raw=${raw%$'\n'}; done
   status_presentation_marker_parse "$raw" || return 1
   [ "$STATUS_PRESENTATION_REPORTED" = "$2" ]
 }

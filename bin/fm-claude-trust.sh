@@ -36,9 +36,9 @@
 # control that reaches an interactive pane. The same reasoning covers Claude
 # Code's separate "Allow external CLAUDE.md file imports?" dialog, which
 # `--setting-sources project,local` (firstmate PR 10's minimal worker tool
-# surface) stopped suppressing: it renders whenever a loaded CLAUDE.md chain
-# reaches outside the project tree - which every crewmate's does, through the
-# captain's own `~/.claude/CLAUDE.md` importing `~/.claude/RTK.md` - and it is
+# surface) does not suppress: it can render when a loaded CLAUDE.md chain
+# imports outside the project tree without prior consent, for example an
+# operator's `~/.claude/CLAUDE.md` importing `~/.claude/RTK.md`, and it is
 # gated the same fail-closed way as trust: cursor on "No, disable", no arrow
 # navigation from firstmate's steering plane. Only worktree mode reaches this
 # second dialog's flags: a secondmate home has no separate "project" entry to
@@ -519,10 +519,10 @@ fi
 # common case for a project claude has never asked about), the import flags
 # are left untouched on both entries: writing them to the worktree entry alone
 # would be a pure no-op (the imports check never reads it) that only obscures
-# the real state, so trust still registers normally but the import dialog is
-# left exactly as undecided as it already was - the worker wedges on it, the
-# same honest outcome as an explicit decline, rather than a spawn spending
-# consent the human was never asked for.
+# the real state, so trust still registers normally but any remaining import
+# is left undecided for interactive consent rather than spending consent the
+# human was never asked for. Ancestor-supervisor-memory exclusion is owned by
+# bin/fm-claude-memory-lib.sh and does not grant consent for other imports.
 TRUST_FLAG='hasTrustDialogAccepted'
 IMPORT_FLAGS='["hasClaudeMdExternalIncludesApproved","hasClaudeMdExternalIncludesWarningShown"]'
 if [ "$MODE" = worktree ]; then

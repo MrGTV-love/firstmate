@@ -386,13 +386,13 @@ An upgrade mid-session can therefore neither double-arm nor deadlock, and a fail
 #### Failure progression and block budget
 
 Fresh `failed` and `failed-suppressed` outcomes enter or advance the failure progression instead of acting as unconditional recovery proof.
-The auto-arm itself rechecks the healthy watcher predicate and retries a bounded number of times before reporting a genuine failure.
+The auto-arm's close classification and retries are owned by [`watcher-continuity.md`](watcher-continuity.md#claude-arm-failures) for direct arms and [`supervision-host.md`](supervision-host.md#failure-direction) for host closes.
 
 The foreground arm legitimately follows a healthy watcher until its next wake.
 The hook therefore catches HUP, TERM, and INT from host timeout or teardown and commits the ordinary durable failed outcome and failure-notice marker before exiting 2 for a recovery turn.
 Claude drops that exit 2 when it terminated the hook at the configured timeout itself, so a park that outlives the timeout ends without a rewake (`bin/fm-claude-stop-autoarm.sh` header).
 
-The first fresh exhausted-failure epoch preserves its handoff without consuming a blocked-stop count.
+The first fresh failed epoch preserves its handoff without consuming a blocked-stop count.
 Later fresh failed epochs advance the same monotonic progression instead of resetting it.
 When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3, below Claude's 8-block override).
 In Claude mode, positive watcher recovery clears the block budget, failure notice, and attended alarm together under the existing budget lock before either hook reports ordinary recovery.
@@ -412,7 +412,7 @@ Whenever both coordination locks are needed, positive auto-arm recovery and the 
 
 The one loud attended fail-open is available only when all of these hold:
 
-- The auto-arm has recorded an exhausted failure.
+- The auto-arm has recorded a failure.
 - Its one notice is already consumed.
 - The block budget is exhausted.
 - A final check finds neither a healthy watcher nor an automatic continuation.
@@ -564,7 +564,7 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - Missing-`jq` behavior.
 - All five primary registrations.
 - Tracked Claude shell and JavaScript hook execution in primary and task checkouts, including modern and legacy Grok exclusion.
-- Helper-tool exclusion and both authoritative Bash protections alongside advisory Bash/Read screening.
+- Helper-tool exclusion and both authoritative Bash protections.
 - Grok native and legacy selection.
 - Typed field precedence.
 - Malformed input.
