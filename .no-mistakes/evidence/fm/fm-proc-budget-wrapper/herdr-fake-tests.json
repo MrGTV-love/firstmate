@@ -1,0 +1,12 @@
+[
+  {
+    "label": "targeted fake-Herdr server/viewer budgets and ownership guards",
+    "command": [
+      "bash",
+      "tests/fm-herdr-lab.test.sh"
+    ],
+    "exit": 0,
+    "stdout": "ok - fm-herdr-lab: names fail closed and require the lab prefix\nok - fm-herdr-lab: provisioning, scoped calls, guarded teardown, and fleet tripwire are deterministic\nok - fm-herdr-lab: run keeps the lab session a Herdr option before any -- delimiter\nok - fm-herdr-lab: missing tripwire refuses teardown before any Herdr call\nok - fm-herdr-lab: changed default fleet state is a hard failure\nok - fm-herdr-lab: an owned stopped lab can re-provision safely\nok - fm-herdr-lab: failed deletion retains ownership until absence is confirmed\nok - fm-herdr-lab: timed-out provisioning cancels the launch before teardown\nok - fm-herdr-lab: the viewer attaches only to a session this lab owns\nok - fm-herdr-lab: timed-out viewer startup cancels its exact launcher\nok - fm-herdr-lab: startup timeout allows launcher child escalation\nok - fm-herdr-lab: viewer start requires an identity-matched owned process\nok - fm-herdr-lab: viewer stop signals only recorded processes and confirms the detach\nok - fm-herdr-lab: viewer ownership requires the recorded parent\nok - fm-herdr-lab: interrupted viewer start cancels its launcher\nok - fm-herdr-lab: teardown refuses to destroy a session an attached viewer still holds\nok - fm-herdr-lab: unreadable detach results fail closed on running sessions\nok - fm-herdr-lab: the viewer launcher refuses unsafe sessions and pidfiles\n",
+    "stderr": "tests/fm-herdr-lab.test.sh: line 335: 11333 Terminated: 15          \"$REAL_SLEEP\" 20\ntests/fm-herdr-lab.test.sh: line 335: 35486 Terminated: 15          \"$REAL_SLEEP\" 20\n"
+  }
+]

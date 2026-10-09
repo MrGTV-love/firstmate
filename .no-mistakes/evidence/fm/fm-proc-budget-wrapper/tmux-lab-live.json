@@ -1,0 +1,137 @@
+[
+  {
+    "label": "create real marked lab and launch private tmux through product lab_run",
+    "command": [
+      "bash",
+      "-c",
+      "set -eu\nREPO=$PWD\nLAB=$1\n\"$REPO/bin/fm-lab-home.sh\" create \"$LAB\"\nmkdir -p \"$LAB/tmux\"\n# Load the product's launch function without running up's trust/account workflow.\nsource \"$REPO/bin/fm-live-lab.sh\" --help >/dev/null\nROOT=$LAB\nTMUX_DIR=\"$LAB/tmux\"\nCLAUDE_DIR=\nprintf 'parent soft=%s hard=%s\\n' \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"\nlab_run tmux -L fm-lab -f /dev/null new-session -d -s budget-proof -n first -x 120 -y 40 -c \"$REPO\" \"$2\"\nprintf 'server='\nenv -u TMUX TMUX_TMPDIR=\"$TMUX_DIR\" tmux -L fm-lab display-message -p -t budget-proof '#{pid} socket=#{socket_path} grid=#{window_width}x#{window_height}'\n",
+      "_",
+      "/tmp/fm-lab-01M4FNQD-u6x17fgr",
+      "bash -c 'printf \"pane=first soft=%s hard=%s pid=%s grid=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$$\" \"$COLUMNS/$LINES\"; sleep 60'"
+    ],
+    "exit": 0,
+    "stdout": "/tmp/fm-lab-01M4FNQD-u6x17fgr\nparent soft=10666 hard=16000\nserver=56292 socket=/private/tmp/fm-lab-01M4FNQD-u6x17fgr/tmux/tmux-501/fm-lab grid=120x40\n",
+    "stderr": ""
+  },
+  {
+    "label": "launch second pane via unbudgeted client to prove server inheritance",
+    "command": [
+      "env",
+      "-u",
+      "TMUX",
+      "TMUX_TMPDIR=/tmp/fm-lab-01M4FNQD-u6x17fgr/tmux",
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-window",
+      "-d",
+      "-t",
+      "budget-proof",
+      "-n",
+      "second",
+      "-c",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P",
+      "bash -c 'ulimit -u 99999 2>/dev/null; raise_rc=$?; printf \"pane=second soft=%s hard=%s raise_exit=%s pid=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$raise_rc\" \"$$\"; sleep 60'"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "label": "observe first pane budget and nonzero grid",
+    "command": [
+      "env",
+      "-u",
+      "TMUX",
+      "TMUX_TMPDIR=/tmp/fm-lab-01M4FNQD-u6x17fgr/tmux",
+      "tmux",
+      "-L",
+      "fm-lab",
+      "capture-pane",
+      "-p",
+      "-t",
+      "budget-proof:first"
+    ],
+    "exit": 0,
+    "stdout": "pane=first soft=3058 hard=3058 pid=56351 grid=/\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "stderr": ""
+  },
+  {
+    "label": "observe inherited sealed budget in second pane",
+    "command": [
+      "env",
+      "-u",
+      "TMUX",
+      "TMUX_TMPDIR=/tmp/fm-lab-01M4FNQD-u6x17fgr/tmux",
+      "tmux",
+      "-L",
+      "fm-lab",
+      "capture-pane",
+      "-p",
+      "-t",
+      "budget-proof:second"
+    ],
+    "exit": 0,
+    "stdout": "pane=second soft=3058 hard=3058 raise_exit=1 pid=56550\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "stderr": ""
+  },
+  {
+    "label": "record actual private tmux server and pane processes",
+    "command": [
+      "ps",
+      "-p",
+      "56292,56351,56550",
+      "-o",
+      "pid=,ppid=,command="
+    ],
+    "exit": 0,
+    "stdout": "56292     1 tmux -L fm-lab -f /dev/null new-session -d -s budget-proof -n first -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P bash -c 'printf \"pane=first soft=%s hard=%s pid=%s grid=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$$\" \"$COLUMNS/$LINES\"; sleep 60'\n56351 56292 bash -c printf \"pane=first soft=%s hard=%s pid=%s grid=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$$\" \"$COLUMNS/$LINES\"; sleep 60\n56550 56292 bash -c ulimit -u 99999 2>/dev/null; raise_rc=$?; printf \"pane=second soft=%s hard=%s raise_exit=%s pid=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$raise_rc\" \"$$\"; sleep 60\n",
+    "stderr": ""
+  },
+  {
+    "label": "stop only authorized private tmux server",
+    "command": [
+      "env",
+      "-u",
+      "TMUX",
+      "TMUX_TMPDIR=/tmp/fm-lab-01M4FNQD-u6x17fgr/tmux",
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "label": "run supported lab teardown helper",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "teardown",
+      "/tmp/fm-lab-01M4FNQD-u6x17fgr"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "label": "lab removal proof",
+    "lab": "/tmp/fm-lab-01M4FNQD-u6x17fgr",
+    "lab_exists": false,
+    "private_socket_dir_exists": false
+  },
+  {
+    "label": "confirm authorized tmux server and both pane shells exited",
+    "command": [
+      "ps",
+      "-p",
+      "56292,56351,56550",
+      "-o",
+      "pid=,ppid=,stat=,command="
+    ],
+    "exit": 1,
+    "stdout": "",
+    "stderr": ""
+  }
+]

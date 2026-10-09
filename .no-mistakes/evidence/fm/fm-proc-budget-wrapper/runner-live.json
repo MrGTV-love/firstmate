@@ -1,0 +1,32 @@
+[
+  {
+    "label": "real test runner budgets script inside real CPU pass",
+    "command": [
+      "bin/fm-test-run.sh",
+      "--jobs",
+      "1",
+      "--per-script-timeout-secs",
+      "20",
+      "--json",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/runner-timing.json",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh"
+    ],
+    "exit": 0,
+    "stdout": "FM_TEST_BEGIN 2026-10-09T09:41:20Z /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh family=unclassified expected_gate_skip=none\nfixture soft=2987 hard=2987 held=1 pid=86458\nFM_TEST_END 2026-10-09T09:41:20Z /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh exit=0 duration_ms=432 gate_skip=false\nFM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=558\nFM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=432 failed=0\nFM_TEST_SLOWEST rank=1 script=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh duration_ms=432\n",
+    "stderr": "fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/runner-timing.json\n"
+  },
+  {
+    "label": "real runner fails closed when process count cannot be read",
+    "command": [
+      "bin/fm-test-run.sh",
+      "--jobs",
+      "1",
+      "--per-script-timeout-secs",
+      "20",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh"
+    ],
+    "exit": 1,
+    "stdout": "FM_TEST_BEGIN 2026-10-09T09:41:21Z /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh family=unclassified expected_gate_skip=none\nFM_TEST_END 2026-10-09T09:41:21Z /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh exit=125 duration_ms=259 gate_skip=false\nFM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=389\nFM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=259 failed=1\nFM_TEST_SLOWEST rank=1 script=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/fm-budget-live.test.sh duration_ms=259\n",
+    "stderr": "fm-proc-budget: cannot read the process count, so no budget can be set\n"
+  }
+]

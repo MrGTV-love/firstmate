@@ -1,0 +1,147 @@
+[
+  {
+    "label": "parent limits and real process baseline",
+    "command": [
+      "bash",
+      "-c",
+      "printf \"parent_soft=%s parent_hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"; ps -U \"$(id -u)\" -o pid= | wc -l"
+    ],
+    "exit": 0,
+    "stdout": "parent_soft=10666 parent_hard=16000\n    1442\n",
+    "stderr": ""
+  },
+  {
+    "label": "explicit budget, exec identity, arguments, exit status",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "300",
+      "--",
+      "bash",
+      "-c",
+      "printf \"soft=%s hard=%s pid=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$$\"; printf \"arg=<%s>\\n\" \"$1\"; exit 7",
+      "_",
+      "a b"
+    ],
+    "spawned_pid": 58851,
+    "exit": 7,
+    "stdout": "soft=1816 hard=1816 pid=58851\narg=<a b>\n",
+    "stderr": ""
+  },
+  {
+    "label": "default budget cannot be disabled by removed environment knobs",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "--",
+      "bash",
+      "-c",
+      "printf \"soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\""
+    ],
+    "exit": 0,
+    "stdout": "soft=2967 hard=2967\n",
+    "stderr": ""
+  },
+  {
+    "label": "nested wrapper retains sealed outer limits",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "300",
+      "--",
+      "bash",
+      "-c",
+      "printf \"outer=%s/%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"; exec \"$1\" -- bash -c 'ulimit -u 99999 2>/dev/null; rc=$?; printf \"inner=%s/%s raise_exit=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\" \"$rc\"'",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh"
+    ],
+    "exit": 0,
+    "stdout": "outer=1836/1836\ninner=1836/1836 raise_exit=1\n",
+    "stderr": ""
+  },
+  {
+    "label": "reject malformed extra 0",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "0",
+      "--",
+      "touch",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/must-not-run"
+    ],
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '0'\n"
+  },
+  {
+    "label": "reject malformed extra -5",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "-5",
+      "--",
+      "touch",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/must-not-run"
+    ],
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '-5'\n"
+  },
+  {
+    "label": "reject malformed extra 1.5",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "1.5",
+      "--",
+      "touch",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/must-not-run"
+    ],
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '1.5'\n"
+  },
+  {
+    "label": "reject malformed extra nope",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "nope",
+      "--",
+      "touch",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/must-not-run"
+    ],
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got 'nope'\n"
+  },
+  {
+    "label": "reject malformed extra 01",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "01",
+      "--",
+      "touch",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/must-not-run"
+    ],
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-proc-budget: extra must be a positive decimal integer, got '01'\n"
+  },
+  {
+    "label": "unreadable count refuses command with exit 125",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh",
+      "300",
+      "--",
+      "touch",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/must-not-run"
+    ],
+    "exit": 125,
+    "stdout": "",
+    "stderr": "fm-proc-budget: cannot read the process count, so no budget can be set\n"
+  },
+  {
+    "label": "targeted wrapper behavioral suite",
+    "command": [
+      "bash",
+      "tests/fm-proc-budget.test.sh"
+    ],
+    "exit": 0,
+    "stdout": "ok - default budget is the current count plus 1500\nok - explicit extra sets the budget\nok - a budget only ever tightens the limit it inherits\nok - a retained soft limit seals the inherited hard limit\nok - exit status and arguments pass through\nok - bad calls and an unreadable process count never run the command\nok - a budgeted runaway tree stops at depth 326 while an unbudgeted probe forks freely\n",
+    "stderr": ""
+  }
+]

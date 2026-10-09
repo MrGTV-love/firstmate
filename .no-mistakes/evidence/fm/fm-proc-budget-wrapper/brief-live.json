@@ -1,0 +1,244 @@
+{
+  "briefs": [
+    {
+      "variant": "normal",
+      "mode": "no-mistakes",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2990 hard=2990\n"
+    },
+    {
+      "variant": "normal",
+      "mode": "direct-PR",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2979 hard=2979\n"
+    },
+    {
+      "variant": "normal",
+      "mode": "local-only",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2979 hard=2979\n"
+    },
+    {
+      "variant": "normal",
+      "mode": "scout",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2989 hard=2989\n"
+    },
+    {
+      "variant": "quoted",
+      "mode": "no-mistakes",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2977 hard=2977\n"
+    },
+    {
+      "variant": "quoted",
+      "mode": "direct-PR",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2982 hard=2982\n"
+    },
+    {
+      "variant": "quoted",
+      "mode": "local-only",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2978 hard=2978\n"
+    },
+    {
+      "variant": "quoted",
+      "mode": "scout",
+      "rule": "8. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork.",
+      "execution": "brief-command soft=2982 hard=2982\n"
+    }
+  ],
+  "commands": [
+    {
+      "label": "generate normal no-mistakes worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-normal-no-mistakes",
+        "disposable",
+        "--mode",
+        "no-mistakes"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-normal-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted normal no-mistakes budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2990 hard=2990\n",
+      "stderr": ""
+    },
+    {
+      "label": "generate normal direct-PR worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-normal-direct-PR",
+        "disposable",
+        "--mode",
+        "direct-PR"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-normal-direct-PR/brief.md (ship, mode=direct-PR; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted normal direct-PR budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2979 hard=2979\n",
+      "stderr": ""
+    },
+    {
+      "label": "generate normal local-only worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-normal-local-only",
+        "disposable",
+        "--mode",
+        "local-only"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-normal-local-only/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted normal local-only budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2979 hard=2979\n",
+      "stderr": ""
+    },
+    {
+      "label": "generate normal scout worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-normal-scout",
+        "disposable",
+        "--scout"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-normal-scout/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted normal scout budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2989 hard=2989\n",
+      "stderr": ""
+    },
+    {
+      "label": "generate quoted no-mistakes worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-quoted-no-mistakes",
+        "disposable",
+        "--mode",
+        "no-mistakes"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-quoted-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted quoted no-mistakes budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2977 hard=2977\n",
+      "stderr": ""
+    },
+    {
+      "label": "generate quoted direct-PR worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-quoted-direct-PR",
+        "disposable",
+        "--mode",
+        "direct-PR"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-quoted-direct-PR/brief.md (ship, mode=direct-PR; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted quoted direct-PR budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2982 hard=2982\n",
+      "stderr": ""
+    },
+    {
+      "label": "generate quoted local-only worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-quoted-local-only",
+        "disposable",
+        "--mode",
+        "local-only"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-quoted-local-only/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted quoted local-only budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2978 hard=2978\n",
+      "stderr": ""
+    },
+    {
+      "label": "generate quoted scout worker brief",
+      "command": [
+        "bin/fm-brief.sh",
+        "live-budget-quoted-scout",
+        "disposable",
+        "--scout"
+      ],
+      "exit": 0,
+      "stdout": "scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/brief-home/data/live-budget-quoted-scout/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})\n",
+      "stderr": ""
+    },
+    {
+      "label": "execute emitted quoted scout budget command",
+      "command": [
+        "bash",
+        "-c",
+        "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G01FPCZHEAXED5ZRXC923P/.proc-budget-live-4y4rzrmi/budget helper'\\''s root/bin/fm-proc-budget.sh' -- bash -c 'printf \"brief-command soft=%s hard=%s\\n\" \"$(ulimit -S -u)\" \"$(ulimit -H -u)\"'"
+      ],
+      "exit": 0,
+      "stdout": "brief-command soft=2982 hard=2982\n",
+      "stderr": ""
+    }
+  ]
+}
