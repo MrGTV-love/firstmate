@@ -266,11 +266,13 @@ The Lavish adapter splits each capture between two commands:
 
 | Command | What it emits |
 | --- | --- |
-| `bin/fm-procevent-lavish.sh answers` | An exact non-reconcile selection, or a bare note when no option was selected. |
+| `bin/fm-procevent-lavish.sh answers` | A non-reconcile versioned selection (or a bare note when no option was selected), or an ordinary legacy answer, with its label and optional close mode. |
 | `reconciles` | Only task ids whose structured selection is Reconcile, carrying their notes as request provenance. |
 
-Current rows require the versioned shape and the `choice` tag.
-Unversioned rows without `schema` or `selection` accept a nonempty `answer` (or `choice`), optional notes, and bookkeeping fields.
+Versioned rows require the `fm-bearings-answer.v1` shape; both formats require the `choice` tag and a slug-shaped `question`.
+Unversioned rows have neither `schema` nor `selection` and require a nonempty `answer`, or `choice` only when `answer` is absent.
+Optional notes and bookkeeping fields are allowed.
+A nonempty legacy note is appended to the label unless already present; it never supplies the answer.
 The latest structurally valid choice per question replaces earlier choices before either output is selected, including across versioned and legacy rows.
 Legacy bare and separator-annotated reconcile values suppress earlier choices but feed neither intake, because those rows do not separate the selected option from its note.
 Every other structurally uncertain capture feeds neither intake, remains announced, and cannot forge a task id from freeform prose.
@@ -597,8 +599,8 @@ The captured-source coverage proves:
 
 - Lavish deduplicates each card before separating versioned structured selections from notes.
 - Bare and annotated Reconcile choices never reach keyed answers.
-- Genuine current and legacy choices still close normally.
-- Legacy bare and separator-annotated reconcile values feed neither intake.
+- `test_unversioned_deck_shapes_with_extra_fields_still_route` covers legacy notes, bookkeeping fields, and the `choice` alias through the shared intake.
+- `test_legacy_reconcile_replaces_previous_choices` covers both legacy answer field names and Reconcile spellings, mixed formats, and reversed row order.
 - Mixed repeated selections preserve every other card's final value.
 - The generic runner creates a request only through a verified bound source.
 - Chat reconcile text creates none.

@@ -745,13 +745,10 @@ cmd_silent() {
 # quoted fields carry JSON-style escapes, so this reads the declared field ORDER
 # rather than assuming a fixed column, and takes only rows whose `tag` field is
 # `choice`. A freeform `message` row is captain prose and is deliberately never a
-# source of decision keys. A versioned row (`schema` fm-bearings-answer.v1) must carry
-# a slug-shaped `question` and both `selection` and `note` inside its `Context data:`
-# block or it is skipped. An unversioned deck row (no `schema`, no `selection`) is accepted
-# on its slug-shaped `question` and one nonempty string `answer` (or `choice`),
-# whatever bookkeeping fields ride along, and a nonempty `note` is appended to
-# its label. Its bare or annotated reconcile values are rejected because such
-# rows do not separate the selected option from its note.
+# source of decision keys. docs/captain-hold-lifecycle.md (How a board selection
+# creates a request) owns the versioned and legacy context contract. Resolve the
+# latest valid row before filtering either output so legacy Reconcile cannot
+# revive an earlier answer or request.
 # The question cap is 128 so any task id fits, including the long legacy
 # `<origin>-decision-<key>` identities pre-collapse decks still carry; the
 # security property is the slug SHAPE, which is unchanged.
@@ -813,11 +810,8 @@ cmd_choice_rows() {
         next unless length($selected) || length($note);
         $answer = length($selected) ? $selected : $note;
         $legacy = 0;
-      # An unversioned deck: any row with no `schema` and no `selection`. Deck
-      # composers add bookkeeping fields (`note`, `task`, `owner`, `recommended`,
-      # `decision_key`) and some name the picked option `choice`, so only the
-      # question and one nonempty string answer are required. A `note` is the
-      # captain words and rides in the label; it never picks the answer.
+      # Legacy bookkeeping is not evidence of a schema version. A note enriches
+      # the label, never the selected answer.
       } elsif (!exists($data->{schema}) && !exists($data->{selection})) {
         $key = $data->{question};
         $answer = exists($data->{answer}) ? $data->{answer} : $data->{choice};
