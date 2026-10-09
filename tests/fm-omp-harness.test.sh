@@ -1403,15 +1403,17 @@ EOF
   pass ".omp watch extension: an unqueued host hand-back is delivered once ($kind)"
 }
 
-# A host close that is not an operational hand-back is a queue-read mark: a
-# park boundary with nothing queued restores the next park and sends nothing,
-# and a hand-back explanation rides with the queued row's headline.
-test_watch_extension_marks_host_closes_without_headlines() {  # <boundary|note>
+# A host close that is not an operational hand-back is a queue-read mark: its
+# headline comes only from a queued row. With nothing queued, a park boundary
+# sends nothing, while a diagnostic line is delivered with the fixed pointer.
+# An away record adds the away note to the mark.
+test_watch_extension_marks_host_closes_without_headlines() {  # <boundary|note|diagnostic|restore-boundary|restore-diagnostic>
   local kind=${1:-boundary} repo home log out status
   repo="$TMP_ROOT/watch-host-mark-$kind/repo"; home="$TMP_ROOT/watch-host-mark-$kind/home"; log="$TMP_ROOT/watch-host-mark-$kind/arm.log"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
+  case "$kind" in note|diagnostic) : > "$home/state/.afk-contract" ;; esac
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --handling-delivered ] && exit 0
@@ -1422,17 +1424,27 @@ SH
 printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
 count=$(grep -c '^host=' "$FM_ARM_LOG")
+boundary='supervision-host: cycle boundary - the park ended with nothing for main'
+diagnostic='supervision-host: the away session could not take this wake: fixture; this wake is yours'
 case "$HOST_CLOSE_KIND:$count" in
   boundary:[123])
     sleep 1
-    printf 'supervision-host: cycle boundary - the park ended with nothing for main\n'
+    printf '%s\n' "$boundary"
     exit 0
     ;;
-  note:1)
+  diagnostic:1)
+    sleep 1
+    printf 'signal: close headline\n%s\n' "$diagnostic"
+    exit 0
+    ;;
+  note:1|restore-*:1)
     sleep 1
     . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
     fm_wake_append signal queued.status 'signal: durable queued row' || exit 1
-    printf 'signal: close headline\nsupervision-host: the away session could not take this wake: fixture; this wake is yours\n'
+    case "$HOST_CLOSE_KIND" in
+      restore-boundary) printf '%s\n' "$boundary" ;;
+      *) printf 'signal: close headline\n%s\n' "$diagnostic" ;;
+    esac
     exit 0
     ;;
 esac
@@ -1443,17 +1455,24 @@ SH
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
-const boundary = process.env.HOST_CLOSE_KIND === "boundary";
-const handlers = new Map(); let tool = null; const sent = [];
-const ctx = { isIdle: () => true };
+const state = `${process.env.FM_HOME}/state`;
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+const handoff = `${state}/extensions/omp-primary-watch/session-replacement-actionable.json`;
+const kind = process.env.HOST_CLOSE_KIND;
+const restore = kind.startsWith("restore-");
+const diagnostic = "supervision-host: the away session could not take this wake: fixture; this wake is yours";
+const pointer = "FIRSTMATE WATCHER WAKE: check: wake may be due";
+const away = "not from the captain: it is not a return";
+const handlers = new Map(); let tool = null; const sent = []; let editor = "";
+const ctx = { hasUI: true, isIdle: () => true, hasPendingMessages: () => false,
+  ui: { getEditorText: () => editor, setEditorText: (value) => { editor = value; } } };
 const pi = {
   on(e, h) { handlers.set(e, h); },
   registerCommand() {},
   registerTool(t) { tool = t; },
   sendUserMessage(m, o) {
     sent.push({ m, o });
+    if (restore && sent.length === 1) return undefined;
     handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
     return undefined;
   },
@@ -1463,17 +1482,30 @@ mod.default(pi);
 await handlers.get("before_agent_start")({}, ctx);
 await tool.execute();
 const hosts = () => (existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8") : "").trim().split("\n").filter((row) => row.startsWith("host="));
-const wanted = boundary ? 4 : 2;
-for (let i = 0; i < 150 && (hosts().length < wanted || (!boundary && sent.length < 1) || existsSync(handoff)); i += 1) await new Promise((r) => setTimeout(r, 100));
-await new Promise((r) => setTimeout(r, 300));
+const wanted = kind === "boundary" ? 4 : 2;
+const expected = { boundary: 0, note: 1, diagnostic: 1, "restore-boundary": 1, "restore-diagnostic": 2 }[kind];
+const until = async (predicate) => { for (let i = 0; i < 150 && !predicate(); i += 1) await new Promise((r) => setTimeout(r, 100)); };
+if (restore) {
+  await until(() => sent.length === 1);
+  if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE WATCHER WAKE: signal: durable queued row")) throw new Error(`the queued row was not delivered first: ${JSON.stringify(sent)}`);
+  writeFileSync(`${state}/.wake-queue`, "");
+  editor = sent[0].m;
+  await until(() => editor === "");
+  if (editor !== "") throw new Error("the restored wake text was not removed");
+}
+await until(() => hosts().length >= wanted && sent.length >= expected && !existsSync(handoff));
+await new Promise((r) => setTimeout(r, 1500));
 if (hosts().length !== wanted) throw new Error(`expected ${wanted} host parks, saw ${hosts().length}: ${JSON.stringify(sent)}`);
-if (boundary) {
-  if (sent.length !== 0) throw new Error(`a park boundary with an empty queue injected text: ${JSON.stringify(sent)}`);
-} else {
-  if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE WATCHER WAKE: signal: durable queued row")) throw new Error(`the host close was not delivered as one queue-read wake: ${JSON.stringify(sent)}`);
-  if (sent[0].m.includes("signal: close headline")) throw new Error(`the close headline was injected: ${sent[0].m}`);
-  if (!sent[0].m.includes("supervision-host: the away session could not take this wake: fixture; this wake is yours")) throw new Error(`the host explanation was dropped: ${sent[0].m}`);
-  if (sent[0].o?.deliverAs !== undefined) throw new Error("a watcher wake was queued as a follow-up");
+if (sent.length !== expected) throw new Error(`expected ${expected} injected wakes for ${kind}, saw ${sent.length}: ${JSON.stringify(sent)}`);
+if (sent.some(({ m, o }) => m.includes("signal: close headline") || m.includes("FAILED") || o?.deliverAs !== undefined)) throw new Error(`a close headline, failure, or follow-up was injected: ${JSON.stringify(sent)}`);
+if (kind === "note") {
+  if (!sent[0].m.includes("FIRSTMATE WATCHER WAKE: signal: durable queued row") || !sent[0].m.includes(diagnostic)) throw new Error(`the queue-read wake lost its row or host explanation: ${sent[0].m}`);
+  if (!sent[0].m.includes(away)) throw new Error(`a host mark under an away record lost the away note: ${sent[0].m}`);
+}
+if (kind === "diagnostic" || kind === "restore-diagnostic") {
+  const last = sent[sent.length - 1].m;
+  if (!last.includes(pointer) || !last.includes(diagnostic)) throw new Error(`an empty queue dropped the host explanation: ${last}`);
+  if (kind === "diagnostic" && !last.includes(away)) throw new Error(`the empty-queue mark lost the away note: ${last}`);
 }
 if (existsSync(handoff)) throw new Error("a settled host close retained its handoff");
 await handlers.get("session_shutdown")({}, {});
@@ -1484,6 +1516,71 @@ EOF
   expect_code 0 "$status" "omp watch extension host close mark ($kind): $out"
   [ -z "$out" ] || fail "omp watch extension host close mark test printed output ($kind): $out"
   pass ".omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline ($kind)"
+}
+
+# The replacement handoff follows the same empty-queue rule: stored marks merge
+# into one, a diagnostic line is delivered with the fixed pointer, and a mark
+# with only the cycle-boundary line is cleared without a send.
+test_watch_extension_replays_host_marks_from_the_handoff() {  # <diagnostic|boundary>
+  local kind=${1:-diagnostic} repo home out status
+  repo="$TMP_ROOT/watch-host-mark-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-mark-handoff-$kind/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+exec sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(HOST_CLOSE_KIND="$kind" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+const dir = `${state}/extensions/omp-primary-watch`;
+const handoff = `${dir}/session-replacement-actionable.json`;
+mkdirSync(dir, { recursive: true });
+const boundary = "supervision-host: cycle boundary - the park ended with nothing for main";
+const diagnostic = "supervision-host: watcher downtime could not be restored for the main hand-back";
+const away = "This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.";
+const messages = process.env.HOST_CLOSE_KIND === "boundary"
+  ? [`check: wake may be due\n${boundary}`, "check: wake may be due"]
+  : [`check: wake may be due\n${boundary}`, `check: wake may be due\n${diagnostic}\n${away}`];
+writeFileSync(handoff, JSON.stringify({ version: 2, pending: messages.map((message, i) => ({
+  version: 1, token: `1-1-${i + 1}`, message, predecessorArmPid: "",
+})) }));
+const handlers = new Map(); const sent = [];
+const ctx = { isIdle: () => true };
+const pi = {
+  on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool() {},
+  sendUserMessage(m, o) {
+    sent.push({ m, o });
+    handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
+  },
+};
+(await import(pathToFileURL(process.env.EXT).href)).default(pi);
+await handlers.get("session_start")({}, ctx);
+for (let i = 0; i < 100 && existsSync(handoff); i += 1) await new Promise((r) => setTimeout(r, 50));
+await new Promise((r) => setTimeout(r, 1500));
+if (existsSync(handoff)) throw new Error(`the handoff kept a settled mark: ${JSON.stringify(sent)}`);
+if (process.env.HOST_CLOSE_KIND === "boundary") {
+  if (sent.length !== 0) throw new Error(`a boundary-only handoff mark injected text with an empty queue: ${JSON.stringify(sent)}`);
+} else {
+  if (sent.length !== 1) throw new Error(`expected one wake for the merged handoff mark: ${JSON.stringify(sent)}`);
+  for (const needle of ["FIRSTMATE WATCHER WAKE: check: wake may be due", boundary, diagnostic, away]) {
+    if (!sent[0].m.includes(needle)) throw new Error(`the handoff mark lost '${needle}': ${sent[0].m}`);
+  }
+}
+await handlers.get("session_shutdown")({}, ctx);
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp host mark handoff ($kind): $out"
+  [ -z "$out" ] || fail "omp host mark handoff test printed output ($kind): $out"
+  pass ".omp watch extension: a handoff host mark follows the empty-queue rule ($kind)"
 }
 
 test_watch_extension_migrates_legacy_handoffs() {
@@ -2484,6 +2581,11 @@ if [ "${1:-}" = --watch-queue ]; then
   test_watch_extension_delivers_host_handbacks busy
   test_watch_extension_marks_host_closes_without_headlines boundary
   test_watch_extension_marks_host_closes_without_headlines note
+  test_watch_extension_marks_host_closes_without_headlines diagnostic
+  test_watch_extension_marks_host_closes_without_headlines restore-boundary
+  test_watch_extension_marks_host_closes_without_headlines restore-diagnostic
+  test_watch_extension_replays_host_marks_from_the_handoff diagnostic
+  test_watch_extension_replays_host_marks_from_the_handoff boundary
   test_watch_extension_delivers_a_split_host_close_whole
   test_watch_extension_migrates_legacy_handoffs
   test_watch_extension_queue_read_delivery
@@ -2518,6 +2620,11 @@ test_watch_extension_delivers_host_handbacks away-return
 test_watch_extension_delivers_host_handbacks busy
 test_watch_extension_marks_host_closes_without_headlines boundary
 test_watch_extension_marks_host_closes_without_headlines note
+test_watch_extension_marks_host_closes_without_headlines diagnostic
+test_watch_extension_marks_host_closes_without_headlines restore-boundary
+test_watch_extension_marks_host_closes_without_headlines restore-diagnostic
+test_watch_extension_replays_host_marks_from_the_handoff diagnostic
+test_watch_extension_replays_host_marks_from_the_handoff boundary
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_migrates_legacy_handoffs
 test_watch_extension_queue_read_delivery

@@ -28,9 +28,9 @@
 //     bin/fm-supervision-engine-lib.sh enabled answers; config/supervision-host-off opts out) spawns
 //     bin/fm-supervision-host.sh park --restart in the arm's place, which
 //     takes away-posture wakes itself and closes only when main is needed; its
-//     header owns the output read here. Operational hand-backs preserve every
-//     "supervision-host:" line in order while wake lines keep an eight-line cap.
-//     Main-only watcher closes instead use the queue-read delivery contract in
+//     header owns the output read here. Operational hand-backs carry only the
+//     "supervision-host:" lines, deduplicated by hostNotes; no wake line from
+//     the close is injected. Every other host close is a queue-read mark under
 //     docs/watcher-continuity.md#omp-stale-wake-gating. The host
 //     prints the first cycle's status line as soon as it is verified, so
 //     readiness and the handling handoff work as they do for the arm, with a
@@ -187,6 +187,7 @@ const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 100
 const successorGraceMs = positiveInteger("FM_OMP_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
 const wakeDueMessage = "check: wake may be due";
+const awayNote = "This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.";
 const shuttingDownMessage = "watcher: not armed - omp session is shutting down";
 
 let nextGenerationId = 0;
@@ -312,7 +313,11 @@ function operationalHandback(message: string): boolean {
 }
 
 function hostNotes(message: string): string[] {
-  return [...new Set(message.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line)))];
+  return [...new Set(message.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line) || line === awayNote))];
+}
+
+function diagnosticNote(line: string): boolean {
+  return /^supervision-host: (?!cycle boundary\b)/.test(line);
 }
 
 function watcherMark(message: string): string {
@@ -328,13 +333,10 @@ function operationalMessage(message: string): string {
 // every other host close is only a hint until the queue is read.
 function hostWakeMessage(output: string): string {
   const lines = hostNotes(output);
-  if (!operationalHandback(output)) {
-    return actionableLine(output) || lines.length > 0 ? watcherMark(output) : "";
-  }
-  if (awayRecordPresent()) {
-    lines.push("This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.");
-  }
-  return `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}`;
+  const operational = operationalHandback(output);
+  if (!operational && !actionableLine(output) && lines.length === 0) return "";
+  if (awayRecordPresent()) lines.push(awayNote);
+  return operational ? `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}` : watcherMark(lines.join("\n"));
 }
 
 // The text omp carries in a user message_start: sendUserMessage wraps a string
@@ -911,13 +913,13 @@ export default function (pi: ExtensionAPI) {
       if (!generationIsLive(owner)) return false;
       owner.queueReadFailures = 0;
       if (activity !== sessionActivity || !sessionIsIdle()) return "held";
-      if (rows.length === 0) {
+      const notes = hostNotes(held.map((item) => item.pending.message).join("\n"));
+      if (rows.length === 0 && !notes.some(diagnosticNote)) {
         for (const { pending } of held) retirePending(owner, pending);
         return "dropped";
       }
       const pending = held[0].pending;
-      const headline = rows[0].split("\t").slice(4).join("\t");
-      const notes = hostNotes(held.map((item) => item.pending.message).join("\n"));
+      const headline = rows.length === 0 ? wakeDueMessage : rows[0].split("\t").slice(4).join("\t");
       const message = [`${headline}${rows.length > 1 ? `\nand ${rows.length - 1} more queued` : ""}`, ...notes].join("\n");
       const delivered = await submitWake(owner, pending.token, { content: wakeContent(message), pending });
       if (delivered === "sent") {
