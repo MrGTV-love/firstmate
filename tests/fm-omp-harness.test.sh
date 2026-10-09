@@ -360,7 +360,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   local rec id out status
   rec=$(make_spawn_case role-missing omp omp-role-missing-q5)
   read_case_record "$rec"
-  id=omp-role-missing-q5
+  id='omp-role-missing-q5'
   printf 'modelRoles:\n  advisor: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -372,7 +372,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-unlisted omp omp-role-unlisted-q6)
   read_case_record "$rec"
-  id=omp-role-unlisted-q6
+  id='omp-role-unlisted-q6'
   printf 'modelRoles:\n  default: openai-codex/gpt-gone:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -382,7 +382,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-listed omp omp-role-listed-q7)
   read_case_record "$rec"
-  id=omp-role-listed-q7
+  id='omp-role-listed-q7'
   printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -390,7 +390,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-pinned omp omp-role-pinned-q8)
   read_case_record "$rec"
-  id=omp-role-pinned-q8
+  id='omp-role-pinned-q8'
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra)
   status=$?
@@ -398,7 +398,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-bridge omp omp-role-bridge-q10)
   read_case_record "$rec"
-  id=omp-role-bridge-q10
+  id='omp-role-bridge-q10'
   printf 'modelRoles:\n  default: claude-bridge/claude-opus-4-8:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -409,7 +409,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-unreadable omp omp-role-unreadable-q9)
   read_case_record "$rec"
-  id=omp-role-unreadable-q9
+  id='omp-role-unreadable-q9'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 0 "$status" "an unreadable roles config establishes nothing and must launch: $out"
@@ -418,7 +418,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
 test_spawn_global_config_is_read_only_and_unlayered() {
   local rec id out status agent_dir
-  id=omp-role-project-q11
+  id='omp-role-project-q11'
   rec=$(make_spawn_case role-project omp "$id")
   read_case_record "$rec"
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
@@ -432,7 +432,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_absent "$HOME_DIR/state/$id.meta" "a refused project-layer spawn must publish no record"
   [ ! -s "$LAUNCH_LOG" ] || fail "a refused project-layer spawn must record no launch"
 
-  id=omp-role-malformed-q12
+  id='omp-role-malformed-q12'
   rec=$(make_spawn_case role-malformed omp "$id")
   read_case_record "$rec"
   printf 'modelRoles:\n  default: [unterminated\n' > "$GLOBAL_CONFIG"
@@ -447,7 +447,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_present "$HOME_DIR/state/$id.meta" "malformed-config pass-through must publish the task"
   assert_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
 
-  id=omp-role-agent-dir-q13
+  id='omp-role-agent-dir-q13'
   rec=$(make_spawn_case role-agent-dir omp "$id")
   read_case_record "$rec"
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
@@ -468,7 +468,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_grep "models:$agent_dir" "$CASE_DIR/omp-env.log" "catalog inspection must use the canonical launch directory"
   assert_grep "--config:$agent_dir" "$CASE_DIR/omp-env.log" "the launched omp must receive the checked directory despite pane inheritance and filtering"
 
-  id=omp-role-agent-dir-missing-q14
+  id='omp-role-agent-dir-missing-q14'
   rec=$(make_spawn_case role-agent-dir-missing omp "$id")
   read_case_record "$rec"
   printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"

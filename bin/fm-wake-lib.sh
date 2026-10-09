@@ -1343,6 +1343,7 @@ _fm_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
   # Freeze the quoted path so EXIT cleanup also works after locals unwind.
   trap - HUP TERM
   printf -v release_trap 'fm_lock_release %q' "$lockdir"
+  # shellcheck disable=SC2064 # Expand now: the EXIT trap names this exact lock.
   trap "$release_trap" EXIT
   trap 'exit 143' INT
   fm_lock_acquire_wait "$lockdir" || return 1
