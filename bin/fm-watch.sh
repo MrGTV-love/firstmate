@@ -1079,9 +1079,7 @@ EOF
     notify_key="secondmate-wake-loop-$task-$row_key"
     reason="check: secondmate wake-loop stalled: mate=$task row=$seq idle=${idle}s"
     queued=$(fm_wake_queued_keys check)
-    if printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1; then
-      fm_wake_publish_queued check "$notify_key" || return 1
-    else
+    if ! printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1; then
       fm_wake_append check "$notify_key" "$reason" || return 1
     fi
     fm_wake_secondmate_stall_receipt_write "$task" "$row_key" || return 1
@@ -1169,12 +1167,12 @@ secondmate_liveness_tick() {
     esac
     if [ -n "$reason" ]; then
       queued=$(fm_wake_queued_keys check)
-      if printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1; then
-        fm_wake_publish_queued check "$notify_key" || err="check wake row could not be published: $reason"
-      elif ! fm_wake_append check "$notify_key" "$reason"; then
+      if printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1 \
+        || fm_wake_append check "$notify_key" "$reason"; then
+        [ -n "$first_reason" ] || first_reason=$reason
+      else
         err="check wake row could not be queued: $reason"
       fi
-      [ -n "$err" ] || [ -n "$first_reason" ] || first_reason=$reason
     fi
     fm_secondmate_liveness_unlock "$id"
     if [ -n "$err" ]; then
@@ -2102,7 +2100,6 @@ procevent_surface_queued() {
   while IFS= read -r key; do
     case "$key" in procevent:*) ;; *) continue ;; esac
     [ -e "$(procevent_surfaced_marker "$key")" ] && continue
-    fm_wake_publish_queued_locked check "$key" || { fm_lock_release "$FM_WAKE_QUEUE_LOCK"; exit 1; }
     PROCEVENT_SURFACED="$PROCEVENT_SURFACED $key"
     # A stranded source or one whose launch never proved itself is the opposite
     # of a captured result: nothing is collecting for it. Headlining either as
@@ -2947,18 +2944,11 @@ while :; do
   # This is mechanical and silent unless a durable terminal-outcome obligation
   # was created, so quiet cycles never wake firstmate or consume model tokens.
   inactive_out=
-  if inactive_out=$(FM_WATCH_DELIVERY_PID="$FM_WATCH_DELIVERY_PID" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>&1); then
-    inactive_actionable=0
-    while IFS= read -r inactive_line; do
-      case "$inactive_line" in
-        'wake-row: '*) printf '%s\n' "$inactive_line" >&2 || exit 1 ;;
-        'actionable: '*) inactive_actionable=1 ;;
-      esac
-    done <<EOF
-$inactive_out
-EOF
-    [ "$inactive_actionable" -eq 0 ] || wake "check: inactive-outcome"
+  if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>/dev/null); then
+    if [ -n "$inactive_out" ]; then
+      wake "check: inactive-outcome"
+    fi
   else
     triage_log "inactive-outcome reconciliation unavailable"
   fi
@@ -3096,15 +3086,6 @@ EOF
     fi
     touch "$STATE/.last-check"
     if [ -n "$contribution_check_output" ]; then
-      while IFS= read -r contribution_check_line; do
-        case "$contribution_check_line" in
-          'check: contributions '*)
-            fm_wake_publish_queued check "contribution-${contribution_check_line##* }" || exit 1
-            ;;
-        esac
-      done <<EOF
-$contribution_check_output
-EOF
       wake "$contribution_check_output"
     fi
   fi

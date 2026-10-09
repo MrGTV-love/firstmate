@@ -1290,7 +1290,7 @@ The guard plays the lane's part by running the real drain and acknowledgement at
   With the gate on, the same closes produced no wake turn after the lane drained.
   When the lane did not drain during the long turn, exactly one wake turn followed, the lane drained inside it, and no further wake turn followed.
 
-[Watcher continuity](../watcher-continuity.md#omp-stale-wake-gating) owns the current contract: exact actor-owned queued sequence validation at initial watcher delivery, held flush, replacement replay, and restored resubmission; no recovery-marker fallback, fail-open errors, disable setting, or hold expiry. Busy or unreadable idle state holds watcher work; flush and owed-query timing are fixed at 1000ms and 10000ms. Supervision-host operational hand-backs retain their prior delivery routing and are not watcher queue rows.
+[Watcher continuity](../watcher-continuity.md#omp-stale-wake-gating) owns the current queue-read contract: watcher closes collapse into a may-be-due mark; an idle main gets one wake naming the oldest currently owed payload and the count of other rows. Initial delivery, held flush, replacement and editor recovery use one read-only query per attempted wake, with fixed 1000ms retry and 10000ms deadline. Query failures retain the mark and surface a typed notice after three consecutive failures. Supervision-host operational hand-backs retain their prior routing.
 The guard spends no model tokens, so it runs by default wherever omp is installed:
 
 ```sh
@@ -1316,6 +1316,17 @@ ok - live omp stale wake: omp (omp/18.8.1) delivered no wake turn after the lane
 ok - live omp owed wake: omp (omp/18.8.1) delivered exactly one wake turn to a lane that had not drained, and none after the drain that turn ran (owed: one wake turn, and none after the drain it triggered covered every row)
 ok - live omp control: omp (omp/18.8.1) with the fixture-only legacy injector still shows the stale wake turns the guard exists to prevent (legacy: 3 stale wake turns from the fixture-only ungated injector)
 ```
+
+On 2026-10-09, the authorized queue-read design passed the real omp 18.8.1 RPC guard on macOS arm64: zero wake turns after an in-turn drain, exactly one owed wake naming the oldest payload and two additional rows, and three legacy control turns whose drains showed no rows. The public `--queued` regressions and shared classifier tests passed. Focused extension scenarios passed partial acknowledgements within one close, external recovery, legacy handoffs, late replacement callbacks, host checks and operational hand-backs, outstanding-token release at turn end and dropped preparation, query failure notices and retries, timeout recovery, slow queries, closes during an empty query, and editor draft preservation with fresh queued payloads. The interactive restore guard received a syntax check only; it was not run in this review round.
+
+The current guard and the post-landing 5% empty-turn check share `tests/omp_wake_turns.py`. An empty wake turn requires a successful `fm-wake-drain.sh` result whose stdout contains no TSV wake rows; `WAKE_ACK_REQUIRED` alone, including recovery-only acknowledgement through zero, does not prove a row was owed. Failed or missing drain evidence is unclassified failure, not an empty turn and not a passing measurement.
+For the post-landing check, record one JSONL object per turn with `last` (the submitted prompt) and `drain` (`returncode`, `stdout`, `stderr` from that turn's drain), then run:
+
+```sh
+python3 -B tests/omp_wake_turns.py path/to/turns.jsonl --max-empty-percent 5
+```
+
+The command prints owed, empty, failed and unmeasured counts plus the empty percentage, and fails above 5% or on failed/unmeasured wake turns. The live guard uses the same classifier for its owed turn and each legacy control turn rather than labeling every injected headline stale.
 
 ### 2026-10-08 omp idle wake behind an advisor note
 

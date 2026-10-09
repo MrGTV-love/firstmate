@@ -206,14 +206,13 @@ export default function (pi: any) {
       });
       if (key === "sendUserMessage") return (content: string, options?: any) => {
         if (content.includes("FIRSTMATE WATCHER WAKE:") && existsSync(file("capture-request"))) {
-          const sequence = content.match(/^wake-seq: ([0-9]+)$/m)?.[1];
-          if (!sequence || context?.isIdle() !== true || options?.deliverAs !== undefined) {
-            publish("error", "production capture was not an idle, sequence-backed wake");
-            throw new Error("production capture was not an idle, sequence-backed wake");
+          if (context?.isIdle() !== true || options?.deliverAs !== undefined) {
+            publish("error", "production capture was not an idle wake");
+            throw new Error("production capture was not an idle wake");
           }
           unlinkSync(file("capture-request"));
           captured = content;
-          publish("captured", { content, sequence, idle: true });
+          publish("captured", { content, idle: true });
           return;
         }
         if (content === captured) {
@@ -311,11 +310,12 @@ queue_wake() {
     || { screen >&2; fail "$SUBJECT: $WAKE_TASK was not captured from an idle production send: $(cat "$PROJECT/state/.wake-followup-error" 2>/dev/null)"; }
   WAKE_SEQ=$(awk -F '\t' -v key="$WAKE_TASK.status" '$3 == "signal" && $4 == key { print $2; exit }' "$PROJECT/state/.wake-queue")
   [ -n "$WAKE_SEQ" ] || fail "$SUBJECT: the captured wake had no durable signal row for $WAKE_TASK"
-  jq -e --arg seq "$WAKE_SEQ" '(.content | split("\n") | index("wake-seq: " + $seq)) != null' \
+  WAKE_PAYLOAD=$(FM_HOME="$PROJECT" "$PROJECT/bin/fm-wake-drain.sh" --queued \
+    | awk -F '\t' -v seq="$WAKE_SEQ" '$2 == seq { print $5 }')
+  [ -n "$WAKE_PAYLOAD" ] || fail "$SUBJECT: captured wake row $WAKE_SEQ was not owed by main"
+  jq -e --arg payload "$WAKE_PAYLOAD" '.content | contains($payload)' \
     "$PROJECT/state/.wake-followup-captured" >/dev/null \
-    || fail "$SUBJECT: the production wake omitted the identity of queued row $WAKE_SEQ"
-  FM_HOME="$PROJECT" "$PROJECT/bin/fm-wake-drain.sh" --owed "$WAKE_SEQ" \
-    || fail "$SUBJECT: captured wake sequence $WAKE_SEQ was not owed by the real queue"
+    || fail "$SUBJECT: the production wake did not name its queued payload"
 }
 
 wake_is_captured() {
@@ -427,7 +427,7 @@ while :; do
     rm -f "$f"
     reason="signal: $name"
     fm_wake_append signal "$name" "$reason" || exit 1
-    awk -F '\t' -v key="$name" '$3 == "signal" && $4 == key { printf "wake-row: %s\t%s\n", $2, $5; found = 1 } END { exit !found }' "$FM_HOME/state/.wake-queue" || exit 1
+    printf '%s\n' "$reason"
     exit 0
   done
   sleep 0.5
@@ -522,9 +522,9 @@ wait_for 20 model_saw 'FIRSTMATE WATCHER WAKE: signal: idle-trigger-advisor-tail
   || { idle_screen >&2; fail "$SUBJECT: a wake reaching an idle lane behind an advisor note did not start a turn"; }
 IDLE_SEQ=$(awk -F '\t' '$3 == "signal" && $4 == "idle-trigger-advisor-tail" { print $2 }' "$IDLE/home/state/.wake-queue")
 [ -n "$IDLE_SEQ" ] || fail "$SUBJECT: the idle arm did not append its durable wake row"
-FM_HOME="$IDLE/home" "$IDLE/home/bin/fm-wake-drain.sh" --owed "$IDLE_SEQ" \
-  || fail "$SUBJECT: the idle wake sequence $IDLE_SEQ was not consumable by the real owed query"
-model_saw "wake-seq: $IDLE_SEQ" || fail "$SUBJECT: the idle wake omitted its durable row sequence"
+FM_HOME="$IDLE/home" "$IDLE/home/bin/fm-wake-drain.sh" --queued \
+  | awk -F '\t' -v seq="$IDLE_SEQ" '$2 == seq { found = 1 } END { exit !found }' \
+  || fail "$SUBJECT: the idle wake row was not consumable by main"
 sleep 3
 model_saw 'operator draft kept' && fail "$SUBJECT: the operator draft was submitted with the idle wake"
 idle_screen | grep -F 'operator draft kept' >/dev/null \

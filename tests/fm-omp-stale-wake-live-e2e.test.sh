@@ -70,6 +70,8 @@ import json, os, subprocess, sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 lab, root, omp, mode = sys.argv[1:5]
+sys.path.insert(0, os.path.join(root, "tests"))
+from omp_wake_turns import classify_turn, summarize
 home = os.path.join(lab, mode, "home")
 agent = os.path.join(lab, mode, "agent")
 for d in (agent, os.path.join(home, ".omp", "extensions"), os.path.join(home, ".pi", "extensions", "lib"), os.path.join(home, "state")):
@@ -97,7 +99,6 @@ while :; do
     rm -f "$f"
     reason="signal: $name"
     fm_wake_append signal "$name" "$reason" || exit 1
-    fm_wake_actor_rows main | awk -F '\\t' '{ printf "wake-row: %s\\t%s\\n", $2, $5 }'
     printf '%s\\n' "$reason"
     exit 0
   done
@@ -149,14 +150,17 @@ def lane_drains():
     for name in ("FM_STATE_OVERRIDE", "FM_ROOT_OVERRIDE", "FM_CONFIG_OVERRIDE", "FM_DATA_OVERRIDE", "FM_SUPERVISION_ACTOR"):
         drain_env.pop(name, None)
     drained = subprocess.run([drain], env=drain_env, capture_output=True, text=True)
+    record = {"returncode": drained.returncode, "stdout": drained.stdout, "stderr": drained.stderr}
+    if drained.returncode != 0:
+        raise RuntimeError(f"lane drain failed: {record}")
     command = [line for line in drained.stderr.splitlines() if line.startswith("WAKE_ACK_REQUIRED:")]
     if not command:
-        return False
+        return record
     words = command[0].split()
     seq = words[words.index("--ack-through") + 1]
     generation = words[words.index("--recovery-generation") + 1]
     subprocess.run([drain, "--ack-through", seq, "--recovery-generation", generation], env=drain_env, capture_output=True, text=True, check=True)
-    return True
+    return record
 
 def text(message):
     content = message.get("content")
@@ -170,12 +174,11 @@ class Model(BaseHTTPRequestHandler):
         request = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
         users = [text(m) for m in request.get("messages", []) if m.get("role") == "user"]
         last = users[-1] if users else ""
+        entry = {"t": time.time(), "last": last}
+        if "FIRSTMATE WATCHER WAKE" in last:
+            entry["drain"] = lane_drains()
         with log_lock:
-            log.append({"t": time.time(), "last": last})
-        # In the owed scenario the lane drains inside its wake turn, as a real
-        # lane does before it answers.
-        if mode == "owed" and "FIRSTMATE WATCHER WAKE" in last:
-            lane_drains()
+            log.append(entry)
         if "LONGTURN" in last:
             if not longturn_release.wait(120):
                 raise TimeoutError("the driver never released the long turn")
@@ -256,7 +259,7 @@ for name in ("trigger-1", "trigger-2", "trigger-3"):
     fire(name)
 if mode in ("stale", "legacy"):
     time.sleep(0.5)
-    if not lane_drains():
+    if classify_turn({"last": "FIRSTMATE WATCHER WAKE", "drain": lane_drains()}) != "owed":
         print("the lane's drain had nothing to present: the closes left no durable row", file=sys.stderr)
         shutdown(1)
 longturn_release.set()
@@ -264,27 +267,34 @@ wait_for(lambda: any(e.get("type") == "agent_end" for t, e in events if t > long
 settle = float(os.environ.get("SETTLE_SECONDS", "8"))
 time.sleep(settle)
 turns = wake_turns()
+report = summarize(turns)
+if report["failed"] or report["unmeasured"]:
+    print(f"wake turns lacked successful drain evidence: {report}", file=sys.stderr)
+    shutdown(1)
+with open(os.path.join(lab, mode, "turns.jsonl"), "w") as handle:
+    for turn in turns:
+        handle.write(json.dumps(turn) + "\n")
 if mode == "owed":
-    if len(turns) != 1 or "signal: trigger-1" not in turns[0]["last"]:
+    if len(turns) != 1 or report["empty"] != 0 or "signal: trigger-1" not in turns[0]["last"] or "and 2 more queued" not in turns[0]["last"]:
         print(f"expected exactly one wake turn naming trigger-1, saw {len(turns)}: {[t['last'][:160] for t in turns]}", file=sys.stderr)
         shutdown(1)
     print("owed: one wake turn, and none after the drain it triggered covered every row")
 elif mode == "stale":
-    if turns:
+    if report["empty"] or turns:
         print(f"{len(turns)} stale wake turn(s) reached a lane that had drained every row: {[t['last'][:160] for t in turns]}", file=sys.stderr)
         shutdown(1)
     print("stale: no wake turn after the lane drained and acknowledged every row")
 else:
-    if len(turns) < 2:
-        print(f"the fixture-only legacy injector produced only {len(turns)} stale wake turn(s): the scenario cannot see the defect", file=sys.stderr)
+    if report["empty"] != 3 or len(turns) != 3:
+        print(f"legacy control expected three drain-proven empty turns: {report}", file=sys.stderr)
         shutdown(1)
-    print(f"legacy: {len(turns)} stale wake turns from the fixture-only ungated injector")
+    print(f"legacy: {report['empty']} stale wake turns from the fixture-only ungated injector")
 shutdown(0)
 PY
 
 for mode in stale owed legacy; do
   mkdir -p "$LAB/$mode"
-  out=$(python3 -I "$LAB/driver.py" "$LAB" "$ROOT" "$REAL_OMP" "$mode" 2>"$LAB/$mode/driver.stderr") \
+  out=$(python3 -I -B "$LAB/driver.py" "$LAB" "$ROOT" "$REAL_OMP" "$mode" 2>"$LAB/$mode/driver.stderr") \
     || { cat "$LAB/$mode/driver.stderr" >&2; [ ! -s "$LAB/$mode/omp.stderr" ] || cat "$LAB/$mode/omp.stderr" >&2; fail "$SUBJECT: stale-wake scenario $mode failed"; }
   reap_lab
   case "$mode" in
