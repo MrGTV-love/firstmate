@@ -35,7 +35,14 @@ fm_procevent_claim_root() {
   printf '%s\n' "${FM_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}"
 }
 
-fm_procevent_registry_dir() { printf '%s\n' "$1/procevent"; }
+# Functions only: a runner started with exported functions does not inherit
+# shell variables, so a path built from a library variable would come out empty.
+fm_procevent_registry_dir_to() { printf -v "$1" '%s/procevent' "$2"; }
+fm_procevent_registry_dir() {
+  local _fm_pe_dir
+  fm_procevent_registry_dir_to _fm_pe_dir "$1"
+  printf '%s\n' "$_fm_pe_dir"
+}
 fm_procevent_inbox_dir()    { printf '%s\n' "$1/procevent-inbox"; }
 fm_procevent_capture_reservation_dir() { printf '%s\n' "$1/procevent-capture-reservations"; }
 
@@ -120,8 +127,16 @@ fm_procevent_any_registered() {
 # is untouched: that home refreshes its own lease. Nothing here keys on a script
 # name, a command line, or a process name, all of which are shared across homes.
 
+fm_procevent_owner_lease_path_to() {  # <out-var> <state-root>
+  local _fm_pe_reg
+  fm_procevent_registry_dir_to _fm_pe_reg "$2"
+  printf -v "$1" '%s/.owner-lease' "$_fm_pe_reg"
+}
+
 fm_procevent_owner_lease_path() {  # <state-root>
-  printf '%s/.owner-lease\n' "$(fm_procevent_registry_dir "$1")"
+  local _fm_pe_lease
+  fm_procevent_owner_lease_path_to _fm_pe_lease "$1"
+  printf '%s\n' "$_fm_pe_lease"
 }
 
 # Record owner-presence activity in this home's process-event state. Best
@@ -144,7 +159,7 @@ fm_procevent_owner_lease_touch() {  # <state-root>
 # which is what a removed home looks like from inside a surviving runner.
 fm_procevent_owner_lease_age() {  # <state-root>
   local lease value
-  lease=$(fm_procevent_owner_lease_path "$1")
+  fm_procevent_owner_lease_path_to lease "$1"
   [ -f "$lease" ] && [ ! -L "$lease" ] || return 1
   IFS= read -r value < "$lease" || return 1
   perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e '
@@ -613,13 +628,14 @@ fm_procevent_claim_state_root_field_valid() {  # <canonical-state-root>
 }
 
 fm_procevent_claim_state_root_identity() {  # <state-root>
-  local state=$1 canonical device inode owner mode
+  local state=$1 canonical facts device inode owner mode
   canonical=$(fm_procevent_state_root_resolve "$state") || return 1
   fm_procevent_claim_state_root_field_valid "$canonical" || return 1
-  device=$(fm_pr_file_device "$canonical") || return 1
-  inode=$(fm_pr_file_inode "$canonical") || return 1
-  owner=$(id -u) || return 1
-  mode=$(fm_pr_file_mode "$canonical") || return 1
+  facts=$(fm_pr_file_facts "$canonical") || return 1
+  # The caller's IFS is unknown (a runner may set one), so name the separator.
+  IFS=' ' read -r device inode mode _ <<< "$facts"
+  [ -n "$device" ] && [ -n "$inode" ] && [ -n "$mode" ] || return 1
+  owner=$EUID
   printf '%s\t%s\t%s\t%s\t%s\n' "$canonical" "$device" "$inode" "$owner" "$mode"
 }
 
@@ -991,17 +1007,19 @@ fm_procevent_path_normalize() {
       *) normalized+=("$part") ;;
     esac
   done
-  printf '/%s\n' "$(IFS=/; printf '%s' "${normalized[*]}")"
+  # Join with a local IFS instead of a command substitution: no process started.
+  local IFS=/
+  printf '/%s\n' "${normalized[*]}"
 }
 
 fm_procevent_directory_owned_by_current_user() {
   local owner
-  if [ "$(uname)" = Darwin ]; then
+  if _fm_pr_is_darwin; then
     owner=$(/usr/bin/stat -f %u "$1" 2>/dev/null)
   else
     owner=$(stat -c %u "$1" 2>/dev/null)
   fi
-  [ "$owner" = "$(id -u)" ]
+  [ "$owner" = "$EUID" ]
 }
 
 # fm_procevent_state_root_resolve <state-root>
@@ -1020,10 +1038,11 @@ fm_procevent_state_root_resolve() {  # <state-root>
 }
 
 fm_procevent_private_directory_valid() {
-  local directory=$1 exact_mode=$2 canonical normalized mode
+  local directory=$1 exact_mode=$2 canonical normalized mode facts owner
   [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
-  fm_procevent_directory_owned_by_current_user "$directory" || return 1
-  mode=$(fm_pr_file_mode "$directory") || return 1
+  facts=$(fm_pr_file_facts "$directory") || return 1
+  IFS=' ' read -r _ _ mode owner <<< "$facts"
+  [ "$owner" = "$EUID" ] || return 1
   case "$mode" in ''|*[!0-7]*) return 1 ;; esac
   if [ "$exact_mode" = 1 ]; then
     [ "$mode" = 700 ] || return 1

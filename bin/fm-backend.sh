@@ -333,33 +333,61 @@ fm_backend_required_tool_available() {  # <backend> <tool>
 # errors) if the file or key is absent. Mirrors the ad hoc `grep '^key=' |
 # tail -1 | cut -d= -f2-` snippet every fm-*.sh script used to repeat inline.
 fm_meta_get() {  # <meta-file> <key>
-  local meta=$1 key=$2 line value=''
-  [ -f "$meta" ] || return 0
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      "$key="*) value=${line#*=} ;;
-    esac
-  done < "$meta" 2>/dev/null || true
-  printf '%s' "$value"
+  local _fm_mg_out
+  fm_meta_get_to _fm_mg_out "$1" "$2"
+  printf '%s' "$_fm_mg_out"
+}
+
+# The same read assigned to <out-var>: a per-task loop that reads several keys
+# pays for the file read alone, not also for a command substitution (one
+# process) around each key. The result is empty when the file or key is absent.
+fm_meta_get_to() {  # <out-var> <meta-file> <key>
+  local _fm_mg_line _fm_mg_value=''
+  if [ -f "$2" ]; then
+    while IFS= read -r _fm_mg_line || [ -n "$_fm_mg_line" ]; do
+      case "$_fm_mg_line" in
+        "$3="*) _fm_mg_value=${_fm_mg_line#*=} ;;
+      esac
+    done < "$2" 2>/dev/null || true
+  fi
+  printf -v "$1" '%s' "$_fm_mg_value"
 }
 
 # fm_backend_of_meta: the backend recorded in <meta-file>, defaulting to
 # `tmux` when the field is absent - the P1 compatibility contract.
+fm_backend_of_meta_to() {  # <out-var> <meta-file>
+  local _fm_bo_v
+  fm_meta_get_to _fm_bo_v "$2" backend
+  printf -v "$1" '%s' "${_fm_bo_v:-tmux}"
+}
+
 fm_backend_of_meta() {  # <meta-file>
-  local v
-  v=$(fm_meta_get "$1" backend)
-  printf '%s' "${v:-tmux}"
+  local _fm_bo_out
+  fm_backend_of_meta_to _fm_bo_out "$1"
+  printf '%s' "$_fm_bo_out"
+}
+
+# Assigns the target and returns 0, or assigns nothing and returns 1 when the
+# record names no target, exactly as the printing form prints or does not print.
+fm_backend_target_of_meta_to() {  # <out-var> <meta-file>
+  local _fm_bt_meta=$2 _fm_bt_backend _fm_bt_terminal _fm_bt_window
+  fm_backend_of_meta_to _fm_bt_backend "$_fm_bt_meta"
+  if [ "$_fm_bt_backend" = orca ]; then
+    fm_meta_get_to _fm_bt_terminal "$_fm_bt_meta" terminal
+    if [ -n "$_fm_bt_terminal" ]; then
+      printf -v "$1" '%s' "$_fm_bt_terminal"
+      return 0
+    fi
+  fi
+  fm_meta_get_to _fm_bt_window "$_fm_bt_meta" window
+  [ -n "$_fm_bt_window" ] || return 1
+  printf -v "$1" '%s' "$_fm_bt_window"
 }
 
 fm_backend_target_of_meta() {  # <meta-file>
-  local meta=$1 backend terminal window
-  backend=$(fm_backend_of_meta "$meta")
-  if [ "$backend" = orca ]; then
-    terminal=$(fm_meta_get "$meta" terminal)
-    [ -n "$terminal" ] && { printf '%s' "$terminal"; return 0; }
-  fi
-  window=$(fm_meta_get "$meta" window)
-  [ -n "$window" ] && printf '%s' "$window"
+  local _fm_bt_out
+  fm_backend_target_of_meta_to _fm_bt_out "$1" || return 1
+  printf '%s' "$_fm_bt_out"
 }
 
 # fm_backend_validate_task_endpoint: validate a task cleanup record entirely
@@ -622,34 +650,35 @@ fm_backend_source_readable() {  # <path>
 }
 
 fm_backend_source() {  # <name>
-  local name=$1 adapter rel path siblings
+  local name=$1 adapter rel sibling
   fm_backend_validate "$name" || return 1
   adapter="$FM_BACKEND_LIB_DIR/backends/$name.sh"
+  # The sibling list rides in the positional parameters: zsh does not
+  # word-split an unquoted expansion, so a space-separated string is one path.
   case "$name" in
     tmux)
-      siblings="fm-tmux-lib.sh fm-composer-lib.sh fm-cursor-lib.sh fm-session-lock-lib.sh fm-agent-process-lib.sh fm-gemini-lib.sh"
+      set -- fm-tmux-lib.sh fm-composer-lib.sh fm-cursor-lib.sh fm-session-lock-lib.sh fm-agent-process-lib.sh fm-gemini-lib.sh
       ;;
     herdr)
-      siblings="fm-composer-lib.sh fm-transition-lib.sh fm-agent-process-lib.sh fm-session-lock-lib.sh fm-gemini-lib.sh"
+      set -- fm-composer-lib.sh fm-transition-lib.sh fm-agent-process-lib.sh fm-session-lock-lib.sh fm-gemini-lib.sh
       ;;
     zellij)
-      siblings="fm-backend-hometag-lib.sh fm-composer-lib.sh"
+      set -- fm-backend-hometag-lib.sh fm-composer-lib.sh
       ;;
     orca)
-      siblings="fm-composer-lib.sh"
+      set -- fm-composer-lib.sh
       ;;
     cmux)
-      siblings="fm-backend-hometag-lib.sh fm-composer-lib.sh"
+      set -- fm-backend-hometag-lib.sh fm-composer-lib.sh
       ;;
     *)
       return 1
       ;;
   esac
   fm_backend_source_readable "$adapter" || return 1
-  # shellcheck disable=SC2086 # sibling names are a fixed space-separated list
-  for rel in $siblings; do
-    path="$FM_BACKEND_LIB_DIR/$rel"
-    fm_backend_source_readable "$path" || return 1
+  for rel in "$@"; do
+    sibling="$FM_BACKEND_LIB_DIR/$rel"
+    fm_backend_source_readable "$sibling" || return 1
   done
   case "$name" in
     tmux)
@@ -810,18 +839,43 @@ fm_backend_send_key() {  # <backend> <target> <key> [expected-label]
 # fm_backend_send_text_submit: type text once, then submit and verify,
 # retrying only the submission (never retyping). Echoes the backend's
 # proof-carrying verdict; callers require exact empty for confirmed delivery.
+# A pane that already shows the recognised dialog is refused before any
+# adapter types, so that submit neither types the text nor sends Enter.
 fm_backend_send_text_submit() {  # <backend> <target> <text> <retries> <enter-sleep> <settle> [expected-label]
-  local backend=$1
+  local backend=$1 rc=0 target label dialog
   shift
+  target=$1
+  label=${6:-}
   fm_backend_source "$backend" || return 1
+  # Every Enter loop below reads the dialog sink, so it must exist before
+  # any adapter types: a sink that fails here leaves the composer untouched.
+  fm_composer_dialog_sink_prepare || {
+    echo "error: the dialog check for a $backend submit could not be recorded" >&2
+    return 1
+  }
+  # One composer read after the sink exists and before the adapter types.
+  # The classify writes the sink; a named dialog means the next Enter would
+  # answer it.
+  if [ -n "$label" ]; then
+    fm_backend_composer_state "$backend" "$target" "$label" >/dev/null || true
+  else
+    fm_backend_composer_state "$backend" "$target" >/dev/null || true
+  fi
+  if dialog=$(fm_composer_blocking_dialog_noted); then
+    fm_composer_dialog_sink_release
+    echo "error: blocked on a prompt: $dialog" >&2
+    return 1
+  fi
   case "$backend" in
-    tmux) fm_backend_tmux_send_text_submit "$@" ;;
-    herdr) fm_backend_herdr_send_text_submit "$@" ;;
-    zellij) fm_backend_zellij_send_text_submit "$@" ;;
-    orca) fm_backend_orca_send_text_submit "$@" ;;
-    cmux) fm_backend_cmux_send_text_submit "$@" ;;
-    *) echo "error: no send-text implementation for backend '$backend'" >&2; return 1 ;;
+    tmux) fm_backend_tmux_send_text_submit "$@" || rc=$? ;;
+    herdr) fm_backend_herdr_send_text_submit "$@" || rc=$? ;;
+    zellij) fm_backend_zellij_send_text_submit "$@" || rc=$? ;;
+    orca) fm_backend_orca_send_text_submit "$@" || rc=$? ;;
+    cmux) fm_backend_cmux_send_text_submit "$@" || rc=$? ;;
+    *) echo "error: no send-text implementation for backend '$backend'" >&2; rc=1 ;;
   esac
+  fm_composer_dialog_sink_release
+  return "$rc"
 }
 
 # fm_backend_kill: remove the task's session endpoint. An already-gone target
@@ -909,18 +963,15 @@ fm_backend_composer_state() {  # <backend> <target> [expected-label] -> empty|pe
 # session: for herdr this deliberately queries the pane directly instead of
 # going through fm_backend_herdr_target_ready (which auto-starts the herdr
 # server as a side effect via fm_backend_herdr_server_ensure - fine for an
-# operation that is about to use the pane, wrong for a passive liveness
-# probe). A gone tmux window or an unqueryable herdr pane (server down, pane
-# closed), missing zellij pane, or unreadable Orca terminal simply fails, which
-# IS "does not exist" for this purpose.
-# Mirrors fm-crew-state.sh's pane_readable check; exists here as one shared
-# primitive so callers that only need a fast alive/dead read (recovery
-# digests, the session-start fleet digest) do not re-derive it inline.
+# operation that is about to use the pane, wrong for a passive liveness probe).
+# Backs fm-crew-state.sh's pane_readable check for tmux; exists here as one
+# shared primitive for recovery digests and the session-start fleet digest.
 fm_backend_target_exists() {  # <backend> <target> [expected-label]
   local backend=$1 target=$2 expected_label=${3:-} session pane
   case "$backend" in
     tmux)
-      tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
+      fm_backend_source tmux || return 2
+      fm_backend_tmux_target_exists "$target"
       ;;
     herdr)
       fm_backend_source herdr || return 1
@@ -967,8 +1018,9 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # Only `dead` and `missing` license recovery. Every `alive` is proven at
 # process level through the shared classifier in bin/fm-agent-process-lib.sh,
 # never from a registration or a rendered title alone. The tmux adapter
-# requires a successful session inventory and returns `missing` only when it
-# omits the exact window; the Herdr adapter reuses its strict husk classifier -
+# requires exact recorded session and window membership, with inventory-read
+# classification owned by fm_backend_tmux_window_inventory; the Herdr adapter
+# reuses its strict husk classifier -
 # which verifies a registered agent against `pane process-info` and the real
 # process table, so a registration Herdr kept over a shell-only pane reads
 # `dead` here (issue #4115) - then maps a positively stopped session server to

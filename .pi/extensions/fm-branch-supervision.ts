@@ -89,16 +89,18 @@ import {
   DefaultResourceLoader,
   DynamicBorder,
   getAgentDir,
+  keyHint,
   ModelRuntime,
   type ModelRegistry,
   SessionManager,
   ToolExecutionComponent,
+  VERSION,
   type AgentSession,
   type ExtensionAPI,
   type ExtensionCommandContext,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Container, fuzzyFilter, Input, SelectList, Text } from "@earendil-works/pi-tui";
+import { Box, Container, fuzzyFilter, Input, SelectList, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { registerFirstmateTool } from "./lib/fm-native-contract.ts";
 import { runCommandAsync } from "./lib/fm-async-exec.ts";
@@ -651,10 +653,16 @@ export default function (pi: ExtensionAPI) {
   // queued for the captain's next prompt. The durable truth is the store's
   // processed marker; this only paces re-presentation and resets with the
   // session generation.
-  type ProcessingState = { sequences: string; through: number; triggered: number; pending: boolean; nextTurnQueued: boolean };
+  type ProcessingState = { sequences: string; through: number; triggered: number; pending: boolean; nextTurnQueued: boolean; visibleFinals: Set<string> };
   let processing: ProcessingState | null = null;
   let queuedProcessingContent: string | null = null;
   let processingOpenedThisRun = false;
+  // Compare only replies to the same consumed sequence set. A retry can be
+  // the first real handling, so only an empty or exact-repeat final is hidden.
+  // Buffer retry streaming until message_end can make that decision; tool
+  // messages always keep their prose, and a user message ends this scope.
+  let activeProcessing: { request: ProcessingState; retry: boolean } | null = null;
+  let userMessageThisTurn = false;
   let processedInitializedGeneration = -1;
   // One revision for BOTH selections: a model or effort change invalidates an
   // in-flight branch build exactly the same way.
@@ -1093,7 +1101,7 @@ export default function (pi: ExtensionAPI) {
     }
     if (processing?.pending) return true;
     if (!processing || processing.sequences !== sequences) {
-      processing = { sequences, through, triggered: 0, pending: false, nextTurnQueued: false };
+      processing = { sequences, through, triggered: 0, pending: false, nextTurnQueued: false, visibleFinals: new Set() };
     }
     // A presentation already sent is consumed by the run it joins or opens;
     // until that run settles, sending a widened or identical copy would hand
@@ -1675,7 +1683,6 @@ ${context.command}
     // duplicate suppression. Operational extension injections are not dialog.
     const prompt = event.prompt;
     processingOpenedThisRun = queuedProcessingContent !== null && prompt === queuedProcessingContent;
-    if (processingOpenedThisRun) queuedProcessingContent = null;
     const trimmed = prompt.trim();
     if (!trimmed || isOperationalUserText(trimmed)) return;
     const file = currentMainSession.getSessionFile() ?? "";
@@ -1689,6 +1696,48 @@ ${context.command}
     // Pi delivers a queued nextTurn copy with the prompt that starts this run,
     // so a fresh copy may be queued again once this run settles unacknowledged.
     if (processing) processing.nextTurnQueued = false;
+  });
+  pi.on?.("turn_start", () => {
+    userMessageThisTurn = false;
+  });
+  pi.on?.("message_start", (event) => {
+    if (event.message.role === "user") {
+      userMessageThisTurn = true;
+      activeProcessing = null;
+    } else if (
+      event.message.role === "custom" &&
+      isProcessingCustomMessage(event.message) &&
+      queuedProcessingContent !== null &&
+      event.message.content === queuedProcessingContent
+    ) {
+      // message_start covers both an idle custom prompt and a follow-up
+      // consumed inside an existing run; neither needs before_agent_start.
+      activeProcessing = !userMessageThisTurn && processing ? { request: processing, retry: processing.triggered > 1 } : null;
+      queuedProcessingContent = null;
+    }
+  });
+  pi.registerMarkdownTransformer?.((markdown, context) =>
+    activeProcessing?.retry && context.isStreaming && context.messageType !== "user" ? "" : markdown,
+  );
+  pi.on?.("message_end", (event) => {
+    if (!activeProcessing || event.message.role !== "assistant") return;
+    // message_end runs before tool execution. Keep the whole message when
+    // it carries a call, including prose alongside fm_branch_processed.
+    if (event.message.content.some((part) => part.type === "toolCall")) return;
+    const text = event.message.content.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim();
+    const { request, retry } = activeProcessing;
+    if (!retry || (text && !request.visibleFinals.has(text))) {
+      if (text) request.visibleFinals.add(text);
+      return;
+    }
+    // Pi applies the replacement before persistence and transcript rendering.
+    // Preserve the message envelope, including provider usage accounting.
+    return {
+      message: {
+        ...event.message,
+        content: [],
+      },
+    };
   });
   pi.on?.("context", (event, ctx) => {
     if (!afkPostureRecordPresent(state)) return;
@@ -1712,6 +1761,7 @@ ${context.command}
     mainStreaming = false;
     queuedProcessingContent = null;
     processingOpenedThisRun = false;
+    activeProcessing = null;
     if (processing) processing.pending = false;
     const settledGeneration = generation;
     await enqueueDelivery(async () => {
@@ -1771,6 +1821,8 @@ ${context.command}
     consecutiveProviderErrors = 0;
     providerRecovery = null;
     generation += 1;
+    activeProcessing = null;
+    userMessageThisTurn = false;
     mirrorCollection.collectAnchor = null;
     mirrorCollection.pendingCursor = null;
     mirrorCollection.stagedCaptain = null;
@@ -1819,6 +1871,9 @@ ${context.command}
     shuttingDown = true;
     generation += 1;
     processing = null;
+    queuedProcessingContent = null;
+    activeProcessing = null;
+    userMessageThisTurn = false;
     pendingMirror.length = 0;
     currentMainSession = null;
     mirrorCollection.collectAnchor = null;
@@ -2092,10 +2147,174 @@ ${context.command}
     !calmPresentation.stockExportRendering &&
     !calmTranscriptClassIsVisible(itemClass);
 
+  const outcomesToolAnsiPattern = new RegExp(
+    "(?:\\u001B\\][\\s\\S]*?(?:\\u0007|\\u001B\\u005C|\\u009C))|[\\u001B\\u009B][[\\]\\()#;?]*(?:\\d{1,4}(?:[;:]\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]",
+    "g",
+  );
+  const normalizeOutcomesToolOutput = (value: string): string => {
+    const withoutAnsi = value.includes("\u001B") || value.includes("\u009B")
+      ? value.replace(outcomesToolAnsiPattern, "")
+      : value;
+    return Array.from(withoutAnsi)
+      .filter((char) => {
+        const code = char.codePointAt(0);
+        if (code === undefined) return false;
+        if (code === 0x09 || code === 0x0a || code === 0x0d) return true;
+        if (code <= 0x1f) return false;
+        return code < 0xfff9 || code > 0xfffb;
+      })
+      .join("")
+      .replace(/\r/g, "");
+  };
+
+  let stockOutcomesPreviewLines: number | null | undefined;
+  const getStockOutcomesPreviewLines = (): number | undefined => {
+    if (stockOutcomesPreviewLines !== undefined) return stockOutcomesPreviewLines ?? undefined;
+    const probeTokens = Array.from(
+      { length: 64 },
+      (_, index) => `FM_OUTCOMES_PREVIEW_PROBE_${String(index).padStart(2, "0")}`,
+    );
+    try {
+      const probeDefinition: ToolDefinition = {
+        name: "fm_outcomes_preview_probe",
+        label: "Preview probe",
+        description: "Preview probe",
+        parameters: Type.Object({}),
+        execute: async () => ({ content: [], details: undefined }),
+      };
+      const probe = new ToolExecutionComponent(
+        probeDefinition.name,
+        "fm-outcomes-preview-probe",
+        {},
+        { showImages: false },
+        probeDefinition,
+        { requestRender() {} } as ConstructorParameters<typeof ToolExecutionComponent>[5],
+        root,
+      );
+      probe.updateResult({
+        content: [{ type: "text", text: probeTokens.join("\n") }],
+        isError: false,
+      });
+      const rendered = probe.render(4096).join("\n");
+      const visibleLines = probeTokens.filter((token) => rendered.includes(token)).length;
+      stockOutcomesPreviewLines = visibleLines > 0 && visibleLines < probeTokens.length ? visibleLines : null;
+    } catch {
+      stockOutcomesPreviewLines = null;
+    }
+    return stockOutcomesPreviewLines ?? undefined;
+  };
+
+  type OutcomesToolShellState = {
+    shell?: Box;
+    call?: Text;
+    result?: Text | Container;
+  };
+  const refreshOutcomesToolShell = (
+    shellState: OutcomesToolShellState,
+    theme: Parameters<NonNullable<ToolDefinition["renderCall"]>>[1],
+    context: Parameters<NonNullable<ToolDefinition["renderCall"]>>[2],
+  ): Box => {
+    const background = context.isPartial
+      ? (text: string) => theme.bg("toolPendingBg", text)
+      : context.isError
+        ? (text: string) => theme.bg("toolErrorBg", text)
+        : (text: string) => theme.bg("toolSuccessBg", text);
+    const shell = shellState.shell ?? new Box(1, 1, background);
+    shellState.shell = shell;
+    shell.setBgFn(background);
+    shell.clear();
+    if (shellState.call) shell.addChild(shellState.call);
+    if (shellState.result) shell.addChild(shellState.result);
+    return shell;
+  };
+
+  // Pi's stock call header (formatToolCallWithArgs) is not a public export.
+  // Before Pi 0.99 it is the bold title alone. Since Pi 0.99 a collapsed call
+  // is `title key=json` on the title line, cut at 100 characters, and an
+  // expanded call puts one muted `key: value` line under the title. Calm-off
+  // rendering has to match the installed Pi or the stock comparison fails.
+  // Keep this in step with that function.
+  const [stockMajor = 0, stockMinor = 0] = VERSION.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const stockCallHeaderShowsArgs = stockMajor > 0 || stockMinor >= 99;
+  const stockCollapsedArgsChars = 100;
+  const stockToolCallHeader = (
+    title: string,
+    args: unknown,
+    theme: Parameters<NonNullable<ToolDefinition["renderCall"]>>[1],
+    expanded: boolean,
+  ): string => {
+    const header = theme.fg("toolTitle", theme.bold(title));
+    if (!stockCallHeaderShowsArgs || args == null) return header;
+    const entries = typeof args === "object" && !Array.isArray(args)
+      ? Object.entries(args)
+      : [["args", args] as [string, unknown]];
+    if (entries.length === 0) return header;
+    if (expanded) {
+      const lines = entries.map(([key, value]) => {
+        const text = typeof value === "string" ? value : (JSON.stringify(value, null, 2) ?? String(value));
+        return `  ${key}: ${text.replace(/\t/g, "   ").replace(/\r/g, "").split("\n").join("\n    ")}`;
+      });
+      return `${header}\n${theme.fg("muted", lines.join("\n"))}`;
+    }
+    const pairs = entries.map(([key, value]) => `${key}=${JSON.stringify(value) ?? String(value)}`).join(" ");
+    const preview = pairs.length > stockCollapsedArgsChars
+      ? `${pairs.slice(0, stockCollapsedArgsChars - 3)}...`
+      : pairs;
+    return `${header} ${theme.fg("muted", preview)}`;
+  };
+
+
+  // Hosts whose ToolExecutionComponent lacks the incremental update API (Pi before
+  // the delegation surface, and stand-in hosts) cannot be driven as a stock row,
+  // so the supervision tools reconstruct Pi's boxed fallback shell and call
+  // header for the loaded version instead.
+  const legacyStockRenderers = (definition: ToolDefinition): Pick<ToolDefinition, "renderShell" | "renderCall" | "renderResult"> => {
+    const withPreview = definition.name === "fm_branch_outcomes";
+    return {
+      renderShell: "self",
+      renderCall: (args, theme, context) => {
+        if (calmPresentation.stockExportRendering) throw new Error("Use Pi stock export rendering");
+        if (calmHides("assistant-tool-call")) return new Container();
+        const shellState = context.state as OutcomesToolShellState;
+        shellState.call = new Text(stockToolCallHeader(definition.name, args, theme, context.expanded), 0, 0);
+        return refreshOutcomesToolShell(shellState, theme, context);
+      },
+      renderResult: (result, options, theme, context) => {
+        if (calmPresentation.stockExportRendering) throw new Error("Use Pi stock export rendering");
+        if (calmHides("tool-result")) return new Container();
+        const output = result.content
+          .filter((item) => item.type === "text")
+          .map((item) => normalizeOutcomesToolOutput(item.text))
+          .join("\n");
+        const shellState = context.state as OutcomesToolShellState;
+        if (!withPreview) {
+          shellState.result = output ? new Text(theme.fg("toolOutput", output), 0, 0) : new Container();
+          refreshOutcomesToolShell(shellState, theme, context);
+          return new Container();
+        }
+        // Keep each line's ANSI scope independent, matching Pi's stock fallback.
+        // Pi 0.84.4 no longer supplies an implicit reset at multiline boundaries.
+        const lines = output.split("\n");
+        const previewLines = getStockOutcomesPreviewLines();
+        const displayLines = options.expanded || previewLines === undefined ? lines : lines.slice(0, previewLines);
+        const remaining = lines.length - displayLines.length;
+        let renderedOutput = displayLines.map((line) => theme.fg("toolOutput", line)).join("\n");
+        if (remaining > 0) {
+          renderedOutput += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`;
+        }
+        shellState.result = output ? new Text(renderedOutput, 0, 0) : new Container();
+        refreshOutcomesToolShell(shellState, theme, context);
+        return new Container();
+      },
+    };
+  };
+  const canDelegateToStockRow = typeof (ToolExecutionComponent as { prototype?: { updateArgs?: unknown } } | undefined)?.prototype?.updateArgs === "function";
+
   // Let Pi own its fallback rendering, including argument previews and expansion.
   // The outer self shell supplies the leading spacer, so the delegated stock row
   // yields only its content. No stock ANSI, truncation, or header rules are copied.
   const stockToolRenderers = (definition: ToolDefinition): Pick<ToolDefinition, "renderShell" | "renderCall" | "renderResult"> => {
+    if (!canDelegateToStockRow) return legacyStockRenderers(definition);
     type StockState = { row?: ToolExecutionComponent };
     const getRow = (context: Parameters<NonNullable<ToolDefinition["renderCall"]>>[2]): ToolExecutionComponent => {
       const state = context.state as StockState;
@@ -2211,6 +2430,9 @@ ${context.command}
           };
         }
         const remaining = await readUnprocessedOutcomes(acknowledgedGeneration);
+        if (acknowledgedGeneration === generation && activeProcessing && through >= activeProcessing.request.through) {
+          activeProcessing = null;
+        }
         if (remaining !== null && remaining.length === 0) processing = null;
         const open = remaining === null
           ? "the remaining outcomes could not be read"

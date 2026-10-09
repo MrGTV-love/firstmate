@@ -1,17 +1,131 @@
 #!/usr/bin/env perl
-# fm-lint-cache.pl - private dependency selection and successful-result cache for fm-lint.sh.
+# fm-lint-cache.pl - private dependency selection, success cache, and host-slot gate for fm-lint.sh.
 # Usage: perl fm-lint-cache.pl select <root> <NUL-separated changes on stdin>
 #        perl fm-lint-cache.pl check <cache-dir|off> <root> <shellcheck> <args> -- <file>
 # ShellCheck retains source-aware extended analysis; only identical successful checks
-# are reused. flock serializes identical misses across worktrees, not unrelated roots.
+# are reused. Cache-key flock serializes identical misses, independently of host slots.
 #
 use Cwd qw(abs_path);
 use strict;
 use warnings;
 use Digest::SHA qw(sha256_hex);
-use Fcntl qw(:flock);
+use Fcntl qw(:flock F_SETFD);
 use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
+
+# Private gate protocol; bin/fm-lint.sh's header owns the public pool controls.
+# Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <wait-file> -- <command...>
+# Commands inherit the flock descriptor across exec, so killing the gate cannot
+# release capacity while a protected descendant still holds it; the kernel
+# releases the slot when the last inherited descriptor closes.
+# After any lock wakeup, rescan total occupancy before admitting a command.
+# Waiting gates probe load no more than once every two seconds, including after
+# wakeups, to avoid spawning frequent sysctl readers on an overloaded macOS host.
+# The high-resolution wait is written in milliseconds to <wait-file> before
+# launch so the caller can account for queue time separately.
+if (($ARGV[0] // '') eq 'gate') {
+    require POSIX;
+    require Time::HiRes;
+    my (undef, $slot_dir, $ncpu, $wait_file, $dashes, @command) = @ARGV;
+    die "fm-lint-gate: invalid private invocation\n"
+        unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/;
+    my ($child, $caught);
+    my %signal_number = (HUP => 1, INT => 2, TERM => 15);
+    for my $name (keys %signal_number) {
+        $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; };
+    }
+    my $floor = 2;
+    my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
+        : ($ncpu >> 1) > $floor ? ($ncpu >> 1) : $floor;
+    $floor = $cap if $cap < $floor;
+    my $slot_load = sub {
+        return $ENV{FM_LINT_SLOT_LOAD} + 0
+            if ($ENV{FM_TEST_SEAM} // '') eq '1' && ($ENV{FM_LINT_SLOT_LOAD} // '') =~ /\A[0-9]+(?:\.[0-9]+)?\z/;
+        if (open(my $fh, '<', '/proc/loadavg')) {
+            my $line = <$fh>;
+            return $1 + 0 if defined $line && $line =~ /\A([0-9]+(?:\.[0-9]+)?)/;
+        }
+        if (open(my $pipe, '-|', 'sysctl', '-n', 'vm.loadavg')) {
+            my $line = <$pipe>;
+            close $pipe;
+            return $1 + 0 if defined $line && $line =~ /([0-9]+(?:\.[0-9]+)?)/;
+        }
+        return 0;
+    };
+    my ($slot, $waited_from, $recheck_at);
+    my $available = eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ };
+    if ($available) {
+        $waited_from = Time::HiRes::time();
+        ACQUIRE: while (!$slot) {
+            exit 128 + $signal_number{$caught} if $caught;
+            my $delay = ($recheck_at // 0) - Time::HiRes::time();
+            Time::HiRes::sleep($delay) if $delay > 0;
+            exit 128 + $signal_number{$caught} if $caught;
+            my (@free, $occupied);
+            $occupied = 0;
+            for my $index (0 .. $cap - 1) {
+                open(my $fh, '>>', "$slot_dir/slot.$index")
+                    or do { $available = 0; last ACQUIRE; };
+                if (flock($fh, LOCK_EX | LOCK_NB)) { push @free, $fh; next; }
+                my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
+                close $fh;
+                unless ($busy) { $available = 0; last ACQUIRE; }
+                $occupied++;
+            }
+            my $allowed = int($cap + 2 * $ncpu - $slot_load->() + 0.5);
+            $recheck_at = Time::HiRes::time() + 2;
+            $allowed = $floor if $allowed < $floor;
+            $allowed = $cap if $allowed > $cap;
+            $slot = shift @free if @free && $occupied < $allowed;
+            my $has_free = @free;
+            close $_ for @free;
+            next if $slot || $caught;
+            next if $has_free;
+            if (open(my $fh, '>>', "$slot_dir/slot.@{[ int(rand($cap)) ]}")) {
+                eval {
+                    local $SIG{ALRM} = sub { die "gate-recheck\n" };
+                    alarm 2;
+                    my $got = flock($fh, LOCK_EX);
+                    my $interrupted = $!{EINTR};
+                    alarm 0;
+                    die "gate-lock: $!\n" unless $got || $interrupted;
+                };
+                alarm 0;
+                my $error = $@;
+                close $fh;
+                if ($error && $error ne "gate-recheck\n") { $available = 0; last ACQUIRE; }
+            } else {
+                $available = 0;
+                last ACQUIRE;
+            }
+        }
+    }
+    if ($slot && !defined fcntl($slot, F_SETFD, 0)) {
+        close $slot;
+        undef $slot;
+        $available = 0;
+    }
+    unless ($available) {
+        warn "fm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n";
+    }
+    if (open(my $fh, '>', $wait_file)) {
+        printf {$fh} "%d\n", $waited_from ? (Time::HiRes::time() - $waited_from) * 1000 : 0;
+        close $fh;
+    }
+    exit 128 + $signal_number{$caught} if $caught;
+    $child = fork();
+    die "fm-lint-gate: fork: $!\n" unless defined $child;
+    if (!$child) {
+        exec {$command[0]} @command;
+        warn "fm-lint-gate: exec $command[0]: $!\n";
+        POSIX::_exit(127);
+    }
+    kill 'TERM', $child if $caught;
+    my $reaped;
+    while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
+    my $status = $reaped == $child ? $? : 127 << 8;
+    exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
+}
 
 my ($mode, $root, @args) = @ARGV;
 my $cache;

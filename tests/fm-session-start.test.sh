@@ -72,7 +72,7 @@ new_world() {
 make_fake_toolchain() {
   local fakebin=$1
   fm_fake_exit0 "$fakebin" tmux node chrome-devtools-axi
-  fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.77
+  fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -295,23 +295,40 @@ SH
   chmod +x "$fakebin/ps"
 }
 
-# make_fake_tmux <fakebin> <live-target>: display-message succeeds only for
-# the given "session:window" target - the exact primitive
-# fm_backend_target_exists uses for a tmux endpoint liveness read.
+# make_fake_tmux <fakebin> <live-target>: a tmux server holding exactly one
+# "session:window" target. It models what real tmux does (verified on 3.5a),
+# not what a naive probe would like: `display-message -t` answers success for
+# ANY target while a server runs, falling back to some other pane when the
+# named window or session is absent. Only the window inventory is truthful, and
+# a session the server does not hold answers "can't find session" on it.
 make_fake_tmux() {
   local fakebin=$1 live=$2
   cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
 set -u
+case "\$*" in
+  *'=remote'*|*'remote:'*)
+    [ -z "\${FM_FAKE_REMOTE_LOCAL_PROBE_LOG:-}" ] || printf '%s\n' "\$*" >> "\$FM_FAKE_REMOTE_LOCAL_PROBE_LOG"
+    ;;
+esac
 case "\${1:-}" in
   display-message)
+    printf '%%1\n'
+    exit 0
+    ;;
+  list-windows)
     target=""
     prev=""
     for a in "\$@"; do
       [ "\$prev" = "-t" ] && target="\$a"
       prev="\$a"
     done
-    [ "\$target" = "$live" ] && { printf '%%1\n'; exit 0; }
+    session=\${target#=}
+    if [ "\$session" = "${live%%:*}" ]; then
+      printf '%s\n' "${live#*:}"
+      exit 0
+    fi
+    printf "can't find session: %s\n" "\$session" >&2
     exit 1
     ;;
 esac
@@ -1378,8 +1395,8 @@ EOF
     "SECONDMATE_LIVENESS: secondmate $SESSION_START_SECOND_MATE_ID: skipped: endpoint probe unreadable (backend=tmux)" \
     "session start did not distinguish transient unreadability from absence"
   [ ! -s "$log" ] || fail "session start touched a transiently unreadable target: $(cat "$log")"
-  assert_contains "$out" "endpoint: dead (backend=tmux window=firstmate:fm-$SESSION_START_SECOND_MATE_ID)" \
-    "the later cheap presence read should preserve the visible offline symptom"
+  assert_contains "$out" "endpoint: unknown (backend=tmux window=firstmate:fm-$SESSION_START_SECOND_MATE_ID - endpoint inventory unreadable)" \
+    "the fleet digest must not report an unreadable endpoint as dead"
   pass "session start: transient tmux unreadability never licenses a relaunch"
 }
 
@@ -1434,12 +1451,58 @@ EOF
 
   printf 'window=fm-sess:live-window\nkind=ship\n' > "$home/state/task-live.meta"
   printf 'window=fm-sess:dead-window\nkind=ship\n' > "$home/state/task-dead.meta"
+  printf 'window=fm-gone:live-window\nkind=ship\n' > "$home/state/task-nosession.meta"
 
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   assert_contains "$out" "endpoint: alive (backend=tmux window=fm-sess:live-window)" "live tmux endpoint not reported alive"
-  assert_contains "$out" "endpoint: dead (backend=tmux window=fm-sess:dead-window)" "dead tmux endpoint not reported dead"
+  assert_contains "$out" "endpoint: dead (backend=tmux window=fm-sess:dead-window)" \
+    "a closed window in a session tmux still holds was reported alive: the probe answered through tmux's active-window fallback"
+  assert_contains "$out" "endpoint: dead (backend=tmux window=fm-gone:live-window)" \
+    "a window in a session tmux no longer holds was reported alive"
 
-  pass "tmux endpoint liveness is reported per task: alive for a live window, dead for a gone one"
+  pass "tmux endpoint liveness is reported per task: alive for a live window, dead for a closed window or a gone session"
+}
+
+test_endpoint_liveness_remote() {
+  local rec root home fakebin out
+  rec=$(new_world liveness-remote)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  make_fake_tmux "$fakebin" "fm-sess:live-window"
+  printf 'window=remote:mate\nkind=secondmate\nremote_host=fixture-host\nremote_target=work:fm-mate\n' \
+    > "$home/state/mate.meta"
+  printf 'window=remote:legacy\nkind=secondmate\nbackend=herdr\n' \
+    > "$home/state/legacy.meta"
+  printf 'window=work:pane\nkind=secondmate\nbackend=herdr\nremote_host=fixture-host\nremote_target=work:pane\n' \
+    > "$home/state/host-only.meta"
+  printf 'working: retained remote activity\n' > "$home/state/mate.status"
+  cat > "$fakebin/herdr" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *'pane get '*|*'pane read '*)
+    printf '%s\n' "\$*" >> "$home/local-herdr.log"
+    ;;
+esac
+exit 1
+SH
+  chmod +x "$fakebin/herdr"
+  out=$(FM_FAKE_REMOTE_LOCAL_PROBE_LOG="$home/local-tmux.log" \
+    run_named_harness_session_start claude "$home" "$root" "$fakebin:$BASE_PATH" --reemit)
+  assert_contains "$out" "endpoint: unknown (window=remote:mate - remote endpoint on fixture-host; not probed locally)" \
+    "a remote record without backend metadata was classified through the local tmux server"
+  assert_contains "$out" "endpoint: unknown (window=remote:legacy - remote endpoint on unknown; not probed locally)" \
+    "a remote-prefix record was classified through local Herdr"
+  assert_contains "$out" "endpoint: unknown (window=work:pane - remote endpoint on fixture-host; not probed locally)" \
+    "a remote-host record was classified through local Herdr"
+  assert_not_contains "$out" "endpoint: dead" "remote liveness without authoritative evidence must stay unknown"
+  assert_not_contains "$out" "endpoint: alive" "local evidence cannot establish remote liveness"
+  [ ! -s "$home/local-herdr.log" ] || fail "a remote endpoint was probed on local Herdr: $(cat "$home/local-herdr.log")"
+  [ ! -s "$home/local-tmux.log" ] || fail "a remote endpoint was probed on local tmux: $(cat "$home/local-tmux.log")"
+  assert_contains "$out" "working: retained remote activity" "the remote status record was not retained in the digest"
+  pass "remote fleet endpoints remain unknown and bypass local backend probes"
 }
 
 test_endpoint_liveness_herdr() {
@@ -1521,7 +1584,11 @@ EOF
   printf 'window=sess:p-slow\nkind=ship\nbackend=herdr\n' > "$home/state/task-a-slow.meta"
   printf 'window=sess:p-live\nkind=ship\nbackend=herdr\n' > "$home/state/task-z-live.meta"
 
-  out=$(FM_SESSION_START_ENDPOINT_TIMEOUT=2 run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
+  # The same fake hangs the side-band home summary before the endpoint section.
+  # Bound that unrelated refresh at 5s instead of paying its production 60s;
+  # the endpoint's own 2s bound and descendant-cleanup assertions stay real.
+  out=$(FM_HOME_SUMMARY_TIMEOUT=5 FM_SESSION_START_ENDPOINT_TIMEOUT=2 \
+    run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "a hung endpoint read must not fail the digest"
   assert_contains "$out" \
@@ -1556,7 +1623,10 @@ EOF
   printf 'window=sess:p-slow\nkind=ship\nbackend=herdr\n' > "$home/state/task-a-slow.meta"
   printf 'window=sess:p-live\nkind=ship\nbackend=herdr\n' > "$home/state/task-z-live.meta"
 
-  out=$(FM_SESSION_START_ENDPOINT_TIMEOUT=00 run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
+  # Only the unrelated summary gets a shorter fixture budget. The invalid
+  # endpoint value must still fall back to the real 10s production bound.
+  out=$(FM_HOME_SUMMARY_TIMEOUT=5 FM_SESSION_START_ENDPOINT_TIMEOUT=00 \
+    run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "a padded-zero per-read bound must not fail the digest"
   assert_contains "$out" \
@@ -1749,6 +1819,9 @@ $rec
 EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_claude "$fakebin"
+  # A Claude home runs the supervision host by default and then presents its
+  # outcomes; this case pins a home that does not run it.
+  : > "$home/config/supervision-host-off"
 
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append \
     --task task-b --verdict captain --summary 'unread Pi branch outcome' >/dev/null \
@@ -3164,6 +3237,7 @@ test_status_tail_line_cap
 test_orphan_status_logs_are_printed
 test_endpoint_liveness_tmux
 test_endpoint_liveness_herdr
+test_endpoint_liveness_remote
 test_endpoint_read_death_is_isolated_and_reported
 test_endpoint_read_hang_is_bounded_and_reported
 test_endpoint_bound_rejects_padded_zero

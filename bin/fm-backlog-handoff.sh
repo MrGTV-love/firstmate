@@ -849,14 +849,14 @@ with_remote_route_locks() { # <secondmate-id> <function> <args...>
     ;;
   esac
   ACTIVE_REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
-  fm_lock_acquire_wait "$ACTIVE_REGISTRY_LOCK"
+  fm_lock_acquire_wait "$ACTIVE_REGISTRY_LOCK" || { ACTIVE_REGISTRY_LOCK=; return 1; }
   if [ "$(secondmate_registry_field "$REG" "$id" remote 2>/dev/null || true)" != 1 ]; then
     echo "error: pending outbox has no matching remote secondmate route: $id" >&2
     release_remote_locks
     return 1
   fi
   ACTIVE_HANDOFF_LOCK="$STATE/.backlog-handoff-$id.lock"
-  fm_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK"
+  fm_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK" || { ACTIVE_HANDOFF_LOCK=; release_remote_locks; return 1; }
   if "$operation" "$@"; then rc=0; else rc=$?; fi
   release_remote_locks
   return "$rc"
@@ -926,17 +926,17 @@ if [ "$RESUME_PENDING" -eq 1 ]; then
 fi
 
 ACTIVE_REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
-fm_lock_acquire_wait "$ACTIVE_REGISTRY_LOCK"
+fm_lock_acquire_wait "$ACTIVE_REGISTRY_LOCK" || { ACTIVE_REGISTRY_LOCK=; exit 1; }
 REMOTE=$(secondmate_registry_field "$REG" "$ID" remote 2>/dev/null || true)
 if [ "$REMOTE" = 1 ]; then
   ACTIVE_HANDOFF_LOCK="$STATE/.backlog-handoff-$ID.lock"
-  fm_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK"
+  fm_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK" || { ACTIVE_HANDOFF_LOCK=; exit 1; }
   if remote_handoff "$ID" "$@"; then rc=0; else rc=$?; fi
   release_remote_locks
   exit "$rc"
 fi
 ACTIVE_HANDOFF_LOCK="$STATE/.backlog-handoff-$ID.lock"
-fm_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK"
+fm_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK" || { ACTIVE_HANDOFF_LOCK=; exit 1; }
 fm_lock_release "$ACTIVE_REGISTRY_LOCK"
 ACTIVE_REGISTRY_LOCK=
 

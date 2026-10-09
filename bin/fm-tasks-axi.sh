@@ -14,6 +14,10 @@
 # stores it verbatim as a link, which lifecycle transitions record relative to
 # that same root.
 #
+# `show` (including `view`) and `list` decode stored captain-hold reasons
+# through bin/fm-hold-reason-lib.sh, which owns the field-only decoding contract.
+# Decoded reasons use quoted strings so embedded line breaks remain intact.
+#
 # Supported completion grammar: an optional `task` noun, `done` or `close`,
 # exactly one ID, and --pr, --report, --note, --drop-file, --keep, --no-prune,
 # --json, or --help. Valued options accept split or = forms; --keep requires a
@@ -66,7 +70,8 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
-# Otherwise the exit status is tasks-axi's own.
+# Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
+# in that case the decoder's nonzero status is returned.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -77,6 +82,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+# shellcheck source=bin/fm-hold-reason-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-hold-reason-lib.sh"
 
 usage() {
   awk '
@@ -297,9 +304,9 @@ if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
   case "$STATE" in /*) task_state=$STATE ;; *) task_state="$CALLER_DIR/$STATE" ;; esac
   TASK_CONTROL_LOCK="$task_state/.control-$TASK_ID.lock"
   TASK_META_LOCK=$(fm_meta_lock_path "$task_state/$TASK_ID.meta") || fail "cannot resolve the task record lock for $TASK_ID"
-  fm_lock_acquire_wait "$TASK_CONTROL_LOCK"
+  fm_lock_acquire_wait "$TASK_CONTROL_LOCK" || exit 1
   TASK_CONTROL_LOCK_HELD=1
-  fm_lock_acquire_wait "$TASK_META_LOCK"
+  fm_lock_acquire_wait "$TASK_META_LOCK" || exit 1
   TASK_META_LOCK_HELD=1
 fi
 guard_completion
@@ -316,6 +323,13 @@ if [ "$GUARD_STRIP_DROP" = 1 ]; then
 fi
 
 cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI_ROOT"
+case "${1:-}" in
+  show|view|list)
+    set -o pipefail
+    tasks-axi ${ARGS[@]+"${ARGS[@]}"} | fm_hold_reason_decode_stream
+    exit $?
+    ;;
+esac
 case "$TASK_COMMAND" in
   reopen|start)
     if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then

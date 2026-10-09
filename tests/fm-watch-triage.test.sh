@@ -603,6 +603,72 @@ test_status_is_paused_classifier() {
   pass "status_is_paused: only the leading paused verb matches, paused is not captain-relevant, and the two declared-wait verbs stay separable"
 }
 
+# status_declared_wait_identity: a restated keyed wait keeps one identity, while a
+# replacement, a different key, or a key re-declared after its resolution does not.
+test_status_declared_wait_identity() {
+  local dir f one two
+  dir=$(make_case wait-identity); f="$dir/t.status"
+  ident() { status_declared_wait_identity "$f" || printf 'NONE'; }
+  printf 'paused [key=k] [at=1]: a\n' > "$f"; one=$(ident)
+  printf 'More prose.\n\npaused [key=k] [at=2]: b\nresolved [key=other] [at=3]: x\npaused [key=k] [at=4]: c\n' >> "$f"; two=$(ident)
+  [ "$one" = "$two" ] || fail "restating a keyed wait changed its identity: $one vs $two"
+  printf 'paused [key=j] [at=5]: d\n' >> "$f"; two=$(ident)
+  [ "$one" != "$two" ] || fail "a different key kept the previous wait's identity"
+  printf 'resolved [key=j] [at=6]: x\npaused [key=j] [at=7]: e\n' >> "$f"; one=$(ident)
+  [ "$one" != "$two" ] || fail "a key re-declared after its resolution kept the earlier episode's identity"
+  printf 'working [at=8]: resumed\npaused [key=j] [at=9]: f\n' >> "$f"; two=$(ident)
+  [ "$one" != "$two" ] || fail "a pause re-declared after the worker resumed kept the earlier identity"
+  printf 'paused [at=10]: keyless one\n' > "$f"; one=$(ident)
+  printf 'paused [at=11]: keyless two\n' >> "$f"; two=$(ident)
+  [ "$one" != "$two" ] || fail "new keyless text was treated as a restatement"
+  printf 'paused [key=k] [at=12]: g\nresolved [key=k] [at=13]: done\n' > "$f"
+  [ "$(ident)" = NONE ] || fail "a resolved wait still reported an identity"
+  # The episode reaches back past the bounded read window, so the whole file decides.
+  printf 'paused [key=k] [at=1]: a\n' > "$f"; one=$(FM_CLASSIFY_EVENT_WINDOW_LINES=3 ident)
+  printf 'paused [key=k] [at=2]: b\npaused [key=k] [at=3]: c\npaused [key=k] [at=4]: d\npaused [key=k] [at=5]: e\n' >> "$f"
+  two=$(FM_CLASSIFY_EVENT_WINDOW_LINES=3 ident)
+  [ "$one" = "$two" ] \
+    || fail "an episode longer than the read window lost its first line: $one vs $two"
+  printf 'paused [key=k] [at=1]: a\n' > "$f"; one=$(ident)
+  for two in $(seq 1 200); do printf 'Continuation prose.\n\n' >> "$f"; done
+  [ "$(status_declared_wait_line "$f")" = 'paused [key=k] [at=1]: a' ] \
+    || fail "continuation prose hid the declared wait"
+  two=$(ident)
+  [ "$one" = "$two" ] || fail "a tail without an opener lost the wait identity: $one vs $two"
+  printf 'Further continuation prose.\n' >> "$f"
+  [ "$(ident)" = "$one" ] || fail "continuation appends changed the widened wait identity"
+  unset -f ident
+  pass "status_declared_wait_identity: restatements share an identity; new keys, re-declared keys, and keyless text do not"
+}
+
+test_wait_identity_concurrent_append_uses_one_snapshot() {
+  local dir f one two countfile i
+  dir=$(make_case wait-identity-concurrent); f="$dir/t.status"; countfile="$dir/tail-count"
+  for i in $(seq 1 298); do printf 'Continuation prose.\n'; done > "$f"
+  printf 'working: resumed\npaused [key=k]: original wait\n' >> "$f"
+  one=$(status_declared_wait_identity "$f")
+  [ "${one##*:}" = 300 ] || fail "initial wait identity had the wrong line position: $one"
+  printf '0\n' > "$countfile"
+  # shellcheck disable=SC2329 # Invoked indirectly by status_declared_wait_identity.
+  tail() {
+    local calls
+    calls=$(cat "$countfile")
+    printf '%s\n' "$((calls + 1))" > "$countfile"
+    if [ "$calls" -eq 1 ]; then
+      printf 'paused [key=k]: restated during the read\n' >> "$f"
+    fi
+    command tail "$@"
+  }
+  two=$(status_declared_wait_identity "$f")
+  unset -f tail
+  [ "$(command tail -n 1 "$f")" = 'paused [key=k]: restated during the read' ] \
+    || fail "the concurrent append fixture did not append during the read"
+  [ "$one" = "$two" ] || fail "a concurrent restatement changed the episode position: $one vs $two"
+  [ "$(status_declared_wait_identity "$f")" = "$one" ] \
+    || fail "the next consistent read changed the episode identity again"
+  pass "a concurrent status append cannot mix declaration and episode positions"
+}
+
 # crew_absorb_class: the single fm-crew-state.sh read that returns BOTH absorb
 # reasons - working (active run/busy pane), paused (declared external wait), or none
 # (surface it) - so the watcher's stale path gets both for one bounded call.
@@ -2966,6 +3032,223 @@ test_live_declared_wait_churn_honors_the_resurface_throttle() {
     [ "$bare" -eq 1 ] || fail "[$name] elapsed re-surface changed the wake identity: $(cat "$state/.wake-queue")"
   done
   pass "a parked live worker surfaces once, absorbs pane churn for the whole re-surface window, then re-surfaces when it elapses"
+}
+
+# --- a progress line under the SAME keyed wait is not a new wait --------------
+# The 2026-10-08 d2 lane: one keyed wait (`paused [key=main913-native-approve-wait]`)
+# restated with fresh progress text every ~8 minutes, and a stale alarm for the
+# parked live worker about a minute after EACH restatement. The throttle was bound
+# to the whole status-log signature, so any append - even the same wait's own
+# progress note - read as a replacement wait and re-opened the first-sight alarm.
+# The contract pinned here: the declared wait's identity is its phase key within
+# one contiguous episode, so a restatement stays inside the window its first sight
+# opened, while a different key, or the same key re-declared after it was resolved,
+# is a new wait whose first sight still surfaces.
+test_live_keyed_wait_restatement_is_not_a_new_wait() {
+  local dir state fakebin out capture_file statusf window key sig wakes throttle
+  dir=$(make_case keyed-wait-restatement); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/parked.status"
+  window="test:fm-parked"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  throttle="$state/.paused-resurfaced-$key"
+  printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/parked.meta"
+  printf 'paused [key=run-wait] [at=1]: waiting on the validation run (check 1)\n' > "$statusf"
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-parked_status"
+  printf 'parked, elapsed 1s' > "$capture_file"
+  printf '%s' "$(hash_text "$(cat "$capture_file")")" > "$state/.hash-$key"
+  printf '1\n' > "$state/.count-$key"
+
+  parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" exit \
+    || fail "first sight of a keyed wait on a parked live worker did not surface"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the keyed wait's first surface"
+  [ -e "$throttle" ] || fail "the keyed wait's first surface recorded no re-surface throttle"
+
+  # The same wait restated twice with new progress text, the pane churning each time.
+  for sig in 2 3; do
+    printf 'paused [key=run-wait] [at=%s]: waiting on the validation run (check %s)\n' "$sig" "$sig" >> "$statusf"
+    printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+    printf 'parked, restated %ss' "$sig" > "$capture_file"
+    parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" absorb \
+      || fail "watcher exited on restatement $sig of a keyed wait instead of absorbing it"
+    wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' \
+      "$state/.wake-queue" 2>/dev/null || echo 0)
+    [ "$wakes" -eq 0 ] || fail "restating the same keyed wait (check $sig) re-alarmed $wakes time(s)"
+    [ -e "$throttle" ] || fail "restating the same keyed wait (check $sig) cleared the re-surface throttle"
+  done
+
+  # A different key is a different wait: its first sight surfaces.
+  printf 'paused [key=release-wait] [at=4]: waiting on the release\n' >> "$statusf"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+  printf 'parked, other wait' > "$capture_file"
+  parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" exit \
+    || fail "a different keyed wait did not surface on its first sight"
+  wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' \
+    "$state/.wake-queue" 2>/dev/null || echo 0)
+  [ "$wakes" -eq 1 ] || fail "a different keyed wait produced $wakes first wakes instead of one"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the second keyed wait's first surface"
+
+  # The same key re-declared after it was resolved is a new episode, even when
+  # both lines land between two polls and the watcher never sees the gap.
+  printf 'resolved [key=release-wait] [at=5]: the release shipped\npaused [key=release-wait] [at=6]: waiting on the next release\n' >> "$statusf"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+  printf 'parked, same key again' > "$capture_file"
+  parked_watch_round "$state" "$fakebin" "$out" "$capture_file" "$window" exit \
+    || fail "a key re-declared after its resolution inherited the earlier episode's throttle"
+  wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' \
+    "$state/.wake-queue" 2>/dev/null || echo 0)
+  [ "$wakes" -eq 1 ] || fail "a re-declared keyed wait produced $wakes first wakes instead of one"
+  pass "restating a keyed wait stays inside its window, while a new key or a re-declared resolved key still surfaces"
+}
+
+test_restated_wait_recheck_uses_last_surface_time() {
+  local mode phase dir state fakebin out capture statusf window key throttle before pid wakes
+  local kind harness command verdict line future
+  future=$(iso_utc_at "$(( $(date +%s) + 31536000 ))")
+  for mode in live live-changing live-until live-changing-until stopped stopped-until \
+    secondmate secondmate-until secondmate-held busy busy-changing busy-until busy-changing-until; do
+    dir=$(make_case "restated-cadence-$mode"); state="$dir/state"; fakebin="$dir/fakebin"
+    out="$dir/watch.out"; capture="$dir/pane.txt"; statusf="$state/parked.status"
+    window=test:fm-parked; key=$(printf '%s' "$window" | tr ':/.' '___')
+    throttle="$state/.paused-resurfaced-$key"
+    kind=ship; harness=grok; command=grok
+    verdict='state: paused · source: status-log · parked'
+    line='paused [key=k]: waiting on validation'
+    case "$mode" in
+      stopped*) command=zsh; verdict='state: stopped · source: pane · bare shell' ;;
+      secondmate*) kind=secondmate ;;
+      busy*) harness=pi; command=pi; verdict='state: working · source: pane · harness busy (pi-ext)' ;;
+    esac
+    case "$mode" in
+      *-until) line="paused [key=k]: waiting until $future" ;;
+      secondmate-held) line='captain-held [key=k]: awaiting the captain' ;;
+    esac
+    printf 'window=%s\nkind=%s\nharness=%s\nbackend=tmux\n' "$window" "$kind" "$harness" > "$state/parked.meta"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$state/parked.meta"
+    case "$mode" in busy*) record_pi_busy "$state" parked ;; esac
+    printf '%s\n' "$line" > "$statusf"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$statusf"
+    printf 'parked on validation\n' > "$capture"
+    printf '%s' "$(hash_text "$(cat "$capture")")" > "$state/.hash-$key"
+    printf '1\n' > "$state/.count-$key"
+
+    for phase in initial restated due; do
+      case "$phase" in
+        restated|due)
+          printf '%s (fresh progress)\n' "$line" >> "$statusf"
+          if [ "$phase" = restated ]; then
+            set_mtime "$(( $(date +%s) - 480 ))" "$throttle"
+          else
+            set_mtime "$(( $(date +%s) - 20000 ))" "$throttle"
+          fi
+          before=$(file_mtime "$throttle")
+          ;;
+      esac
+      case "$mode" in *-changing*) printf 'Parked... %s\n' "$phase" > "$capture" ;; esac
+      printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+      PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture" \
+        FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_CREW_STATE="$verdict" \
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+        FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+        FM_PAUSE_RESURFACE_SECS=14400 FM_BUSY_TURN_MAX_SECS=1 \
+        FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+        "$WATCH" >> "$out" &
+      pid=$!
+      if [ "$phase" = restated ]; then
+        wait_poll_cycle "$state" "$pid" \
+          || { reap "$pid"; fail "[$mode] a restatement re-alarmed inside the four-hour cadence"; }
+        wakes=$(wedge_stale_wakes "$state" "$window")
+        [ "$wakes" -eq 0 ] || { reap "$pid"; fail "[$mode] a restatement queued $wakes stale wakes"; }
+        [ "$(file_mtime "$throttle")" = "$before" ] \
+          || { reap "$pid"; fail "[$mode] absorbing a restatement advanced the surface timestamp"; }
+        reap "$pid"
+      else
+        wait_for_exit "$pid" 100 \
+          || { reap "$pid"; fail "[$mode] $phase did not surface on the four-hour cadence"; }
+        wakes=$(wedge_stale_wakes "$state" "$window")
+        [ "$wakes" -eq 1 ] || fail "[$mode] $phase queued $wakes stale wakes instead of one"
+        [ -e "$throttle" ] || fail "[$mode] $phase did not record its actual surface"
+        if [ "$phase" = due ]; then
+          [ "$(file_mtime "$throttle")" -gt "$before" ] || fail "[$mode] the recheck did not reset its cadence"
+        fi
+      fi
+      ack_stopped_cycle "$state" || fail "[$mode] could not acknowledge $phase"
+    done
+  done
+  pass "restated waits recheck four hours after their last surface on every absorbed path"
+}
+
+test_restated_wait_preserves_fired_deadline_phase() {
+  local mode phase dir state fakebin out capture statusf window key throttle before pid wakes past
+  local kind harness command verdict
+  past=$(iso_utc_at "$(( $(date +%s) - 120 ))")
+  for mode in live live-changing stopped secondmate busy busy-changing; do
+    dir=$(make_case "restated-deadline-$mode"); state="$dir/state"; fakebin="$dir/fakebin"
+    out="$dir/watch.out"; capture="$dir/pane.txt"; statusf="$state/parked.status"
+    window=test:fm-parked; key=$(printf '%s' "$window" | tr ':/.' '___')
+    throttle="$state/.paused-resurfaced-$key"
+    kind=ship; harness=grok; command=grok
+    verdict='state: paused · source: status-log · parked'
+    case "$mode" in
+      stopped) command=zsh; verdict='state: stopped · source: pane · bare shell' ;;
+      secondmate) kind=secondmate ;;
+      busy*) harness=pi; command=pi; verdict='state: working · source: pane · harness busy (pi-ext)' ;;
+    esac
+    printf 'window=%s\nkind=%s\nharness=%s\nbackend=tmux\n' "$window" "$kind" "$harness" > "$state/parked.meta"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$state/parked.meta"
+    case "$mode" in busy*) record_pi_busy "$state" parked ;; esac
+    printf 'paused [key=k]: waiting on validation\n' > "$statusf"
+    set_mtime "$(( $(date +%s) - 20000 ))" "$statusf"
+    printf 'parked on validation\n' > "$capture"
+    printf '%s' "$(hash_text "$(cat "$capture")")" > "$state/.hash-$key"
+    printf '1\n' > "$state/.count-$key"
+
+    for phase in initial deadline restated recheck deadline-restated; do
+      case "$phase" in
+        deadline|deadline-restated)
+          printf 'paused [key=k]: still waiting until %s\n' "$past" >> "$statusf"
+          set_mtime "$(( $(date +%s) - 480 ))" "$throttle"
+          ;;
+        restated|recheck)
+          printf 'paused [key=k]: still waiting on validation\n' >> "$statusf"
+          if [ "$phase" = restated ]; then
+            set_mtime "$(( $(date +%s) - 480 ))" "$throttle"
+          else
+            set_mtime "$(( $(date +%s) - 20000 ))" "$throttle"
+          fi
+          ;;
+      esac
+      [ "$phase" = initial ] || before=$(file_mtime "$throttle")
+      case "$mode" in *-changing) printf 'Parked... %s\n' "$phase" > "$capture" ;; esac
+      printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-parked_status"
+      PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture" \
+        FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_CREW_STATE="$verdict" \
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+        FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+        FM_PAUSE_RESURFACE_SECS=14400 FM_BUSY_TURN_MAX_SECS=1 \
+        FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+        "$WATCH" >> "$out" &
+      pid=$!
+      case "$phase" in
+        restated|deadline-restated)
+          wait_poll_cycle "$state" "$pid" \
+            || { reap "$pid"; fail "[$mode] $phase reopened a fired deadline inside the four-hour cadence"; }
+          wakes=$(wedge_stale_wakes "$state" "$window")
+          [ "$wakes" -eq 0 ] || { reap "$pid"; fail "[$mode] $phase queued $wakes stale wakes"; }
+          [ "$(file_mtime "$throttle")" = "$before" ] \
+            || { reap "$pid"; fail "[$mode] $phase advanced the last actual surface time"; }
+          reap "$pid"
+          ;;
+        *)
+          wait_for_exit "$pid" 300 \
+            || { reap "$pid"; fail "[$mode] $phase did not surface when required: $(cat "$out"); $(cat "$state/.watch-triage.log" 2>/dev/null)"; }
+          wakes=$(wedge_stale_wakes "$state" "$window")
+          [ "$wakes" -eq 1 ] || fail "[$mode] $phase queued $wakes stale wakes instead of one"
+          ;;
+      esac
+      ack_stopped_cycle "$state" || fail "[$mode] could not acknowledge $phase"
+    done
+  done
+  pass "deadline rechecks expedite once and survive undated restatements and periodic rechecks"
 }
 
 test_live_paused_until_controls_recheck_time() {
@@ -6453,6 +6736,66 @@ test_captain_held_never_rechecked_while_away_record_exists() {
   pass "a captain-held item is never rechecked while the away-posture record exists, and the recheck returns once the record is archived"
 }
 
+# Quiet mode's record is a present captain (bin/fm-afk-contract.sh AWAY OR
+# QUIET), so it silences nothing: the same hold is rechecked with that record
+# live, both on the watcher's own cadence and through the one-shot handoff a
+# running quiet daemon owns.
+write_quiet_record() {  # <state>
+  if ! FM_HOME="$(dirname "$1")" FM_STATE_OVERRIDE="$1" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1; then
+    fail "could not write quiet mode's record in $1"
+  fi
+}
+
+test_captain_held_rechecked_under_a_quiet_record() {
+  local dir state fakebin out capture_file statusf window key back pid
+  dir=$(make_case quiet-record-held); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-hold.status"
+  window="test:fm-secondmate-hold"
+  printf 'idle awaiting the captain\n' > "$capture_file"
+  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-hold.meta"
+  printf 'captain-held [key=route]: tracked by task-decision-route\n' > "$statusf"
+  back=$(( $(date +%s) - 500 ))
+  if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
+  else touch -m -d "@$back" "$statusf"; fi
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-secondmate-hold_status"
+  key=$(printf '%s' "$window" | tr '.:/' '___')
+  printf '%s' "$(hash_text "idle awaiting the captain")" > "$state/.hash-$key"
+  printf '1\n' > "$state/.count-$key"
+  write_quiet_record "$state"
+  export FM_FAKE_CREW_STATE='state: unknown · source: none · no current-state source available'
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "a captain-held item was not rechecked beside quiet mode's record"; }
+  unset FM_FAKE_CREW_STATE
+  grep -F "awaiting the captain" "$out" >/dev/null || fail "the recheck beside a quiet record did not name the captain: $(cat "$out")"
+  ! grep -F 'never rechecked while the away-posture record exists' "$state/.watch-triage.log" >/dev/null 2>&1 \
+    || fail "quiet mode's record silenced a captain-held item as if the captain were away: $(cat "$state/.watch-triage.log")"
+  [ -f "$state/.afk-contract" ] || fail "fixture: quiet mode's record is gone"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the captain-held recheck"
+
+  dir=$(make_case quiet-daemon-held-oneshot); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/held-afk.status"
+  window="test:fm-held-afk"
+  printf 'idle awaiting the captain\n' > "$capture_file"
+  printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/held-afk.meta"
+  printf 'captain-held [key=route]: tracked by task-decision-route\n' > "$statusf"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-held-afk_status"
+  key=$(printf '%s' "$window" | tr '.:/' '___')
+  printf 'quiet\n' > "$state/.afk"
+  write_quiet_record "$state"
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_FAKE_TMUX_CURRENT_COMMAND=zsh \
+    FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "the quiet daemon's one-shot never handed off a captain-held pane"; }
+  grep -F "stale: $window" "$state/.wake-queue" >/dev/null \
+    || fail "the quiet daemon's one-shot did not queue the captain-held pane for the daemon: $(cat "$state/.wake-queue" 2>/dev/null)"
+  pass "quiet mode's record silences no captain-held recheck, on the watcher's cadence or through a quiet daemon's one-shot"
+}
+
 test_live_captain_held_first_sight_silenced_by_away_record() {
   local dir state fakebin out capture_file statusf window key sig pid
   dir=$(make_case away-record-held-live); state="$dir/state"; fakebin="$dir/fakebin"
@@ -6626,6 +6969,8 @@ test_classifier_primitives
 test_unrecognized_status_prefix_is_visible
 test_crew_is_provably_working_classifier
 test_status_is_paused_classifier
+test_status_declared_wait_identity
+test_wait_identity_concurrent_append_uses_one_snapshot
 test_crew_absorb_class_classifier
 test_crew_worktree_written_since_classifier
 test_empty_write_prune_widens_the_probe
@@ -6709,6 +7054,9 @@ test_exited_declared_pause_is_bounded_but_live_gate_surfaces
 test_own_work_wait_keeps_first_alert_then_long_cadence
 test_absorbed_replacement_wait_does_not_inherit_the_old_throttle
 test_live_declared_wait_churn_honors_the_resurface_throttle
+test_live_keyed_wait_restatement_is_not_a_new_wait
+test_restated_wait_recheck_uses_last_surface_time
+test_restated_wait_preserves_fired_deadline_phase
 test_live_paused_until_controls_recheck_time
 test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
 test_wedge_threshold_keeps_a_wait_past_a_default_key_answer
@@ -6754,6 +7102,7 @@ test_captain_held_never_rechecked_while_away_record_exists
 test_live_captain_held_first_sight_silenced_by_away_record
 test_backlog_hold_never_rechecked_while_away_record_exists
 test_afk_one_shot_never_hands_off_captain_held_under_away_record
+test_captain_held_rechecked_under_a_quiet_record
 test_paused_until_near_future_is_quiet_before_the_cadence
 test_paused_until_wrong_year_is_bounded_by_the_cadence
 test_paused_until_that_passed_is_rechecked_before_the_cadence

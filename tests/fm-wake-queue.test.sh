@@ -994,6 +994,90 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   pass "a proven-idle leftover row is rung so the child home can drain without a parent alarm"
 }
 
+# The idle proof that gates a drain ring reads the mate's pane. A TERM that
+# lands while that read is blocked must still stop the watcher at once and run
+# its cleanup, as it does for every other pane read.
+test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture() {
+  local dir state sub fakebin fifo out pid holder i rc orphan
+  dir=$(make_case secondmate-ring-blocked-capture)
+  state="$dir/state"
+  sub="$dir/secondmate"
+  fakebin="$dir/fakebin"
+  fifo="$dir/pane.fifo"
+  out="$dir/watch-blocked.out"
+  mkdir -p "$sub/state"
+  printf 'mate\n' > "$sub/.fm-secondmate-home"
+  printf 'window=firstmate:fm-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+    "$sub" > "$state/mate.meta"
+  printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
+  install_secondmate_alive_tmux "$fakebin"
+  install_secondmate_stall_date "$fakebin"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
+    || fail "could not arm the mate's busy contract"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
+    --source claude-hook --event stop >/dev/null \
+    || fail "could not mark the mate idle"
+
+  printf '1000\n' > "$dir/now"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+
+  # The active-turn read returns, then the idle-proof read blocks on a FIFO
+  # whose write end the holder keeps open without writing.
+  mv "$fakebin/tmux" "$fakebin/tmux-alive"
+  cat > "$fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = capture-pane ]; then
+  n=$(( $(cat "$FM_FAKE_CAPTURE_COUNT" 2>/dev/null || echo 0) + 1 ))
+  printf '%s\n' "$n" > "$FM_FAKE_CAPTURE_COUNT"
+  [ "$n" -ge 2 ] || exit 0
+  exec cat "$FM_FAKE_TMUX_CAPTURE"
+fi
+exec "$(dirname "$0")/tmux-alive" "$@"
+SH
+  chmod +x "$fakebin/tmux"
+  mkfifo "$fifo"
+  ( exec 3> "$fifo"; : > "$dir/capture-blocked"; exec sleep 30 ) &
+  holder=$!
+
+  printf '1002\n' > "$dir/now"
+  touch "$state/.secondmate-liveness-tick"
+  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
+    FM_FAKE_TMUX_CAPTURE="$fifo" FM_FAKE_CAPTURE_COUNT="$dir/captures" \
+    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    "$WATCH" > "$out" 2>&1 &
+  pid=$!
+  i=0
+  while [ ! -e "$dir/capture-blocked" ] && [ "$i" -lt 300 ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if [ ! -e "$dir/capture-blocked" ] || ! is_live_non_zombie "$pid"; then
+    kill "$holder" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true
+    fail "the watcher never blocked inside the drain-ring idle capture: $(cat "$out")"
+  fi
+  kill "$pid" 2>/dev/null || true
+  wait_for_exit "$pid" 100
+  rc=$?
+  orphan=$(pgrep -f "cat $fifo" || true)
+  [ -z "$orphan" ] || pkill -f "cat $fifo" 2>/dev/null || true
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  [ "$rc" -ne 124 ] || fail "TERM did not stop a watcher blocked in the drain-ring idle capture"
+  [ -z "$orphan" ] || fail "a watcher stopped in the drain-ring idle capture left that capture running"
+  [ "$(cat "$dir/captures")" = 2 ] \
+    || fail "the watcher did not block in the drain-ring idle capture: $(cat "$dir/captures") pane reads"
+  [ ! -e "$state/.watch.lock" ] \
+    || fail "a watcher stopped in the drain-ring idle capture kept its singleton lock"
+  [ ! -s "$dir/sent" ] || fail "a watcher stopped before its idle proof still rang the mate"
+  pass "TERM stops a watcher blocked in the drain-ring idle capture and runs its cleanup"
+}
+
 # Busy and unknown panes are never typed into. Busy still defers inside the
 # active-turn bound. Unknown keeps the parent alarm. Empty inbox is not idle
 # proof, so the unknown fixture starts with no instruction records.
@@ -2060,6 +2144,57 @@ test_legacy_generationless_wake_is_adopted() {
 
 # Pin the recovery acknowledgement contract from docs/watcher-continuity.md at
 # the queue-library boundary.
+# A handover (bin/fm-watch-arm.sh --take-over) undoes only the downtime its own
+# watcher stop published over an acknowledged episode. A wake appended between
+# the snapshot and the stop, or an episode that was still open, is left for the
+# next watcher's arm check to surface.
+handover_case() {  # <state> <acked|handling> <append-between 0|1>
+  FM_STATE_OVERRIDE="$1" bash -c '
+    # shellcheck disable=SC1090,SC1091
+    . "$1/bin/fm-wake-lib.sh"
+    marker="$STATE/.watcher-down"
+    fm_recovery_marker_publish "$marker" downtime || exit 1
+    fm_recovery_marker_read "$marker" || exit 1
+    case "$2" in
+      acked) fm_recovery_marker_ack "$marker" "${FM_RECOVERY_MARKER_TOKEN##*:}" || exit 1 ;;
+      handling) fm_recovery_marker_begin_handling "$marker" || exit 1 ;;
+    esac
+    fm_recovery_marker_read "$marker" || exit 1
+    printf "before=%s\n" "$FM_RECOVERY_MARKER_TOKEN"
+    fm_recovery_marker_handover_snapshot "$marker" || exit 1
+    [ "$3" = 0 ] || fm_wake_append signal handover "signal: appended during the handover" || exit 1
+    # The stopped watcher closes and publishes downtime, as its EXIT cleanup does.
+    fm_recovery_marker_publish "$marker" downtime || exit 1
+    fm_recovery_marker_handover_restore "$marker" "$FM_RECOVERY_HANDOVER_TOKEN" "$FM_RECOVERY_HANDOVER_SEQ" || exit 1
+    fm_recovery_marker_read "$marker" || exit 1
+    printf "after=%s\n" "$FM_RECOVERY_MARKER_TOKEN"
+  ' _ "$ROOT" "$2" "$3"
+}
+
+test_handover_restore_undoes_only_its_own_stop() {
+  local out before after
+  out=$(handover_case "$(make_case handover-acked)/state" acked 0) || fail "acked handover case failed: $out"
+  before=$(printf '%s\n' "$out" | sed -n 's/^before=//p')
+  after=$(printf '%s\n' "$out" | sed -n 's/^after=//p')
+  case "$before" in acked:downtime:*) ;; *) fail "fixture: the episode was not acknowledged: $out" ;; esac
+  [ "$after" = "$before" ] || fail "a handover with nothing queued left a downtime episode: $out"
+
+  out=$(handover_case "$(make_case handover-appended)/state" acked 1) || fail "appended handover case failed: $out"
+  before=$(printf '%s\n' "$out" | sed -n 's/^before=//p')
+  after=$(printf '%s\n' "$out" | sed -n 's/^after=//p')
+  case "$after" in
+    pending:downtime:*) [ "${after##*:}" != "${before##*:}" ] || fail "fixture: no fresh episode opened: $out" ;;
+    *) fail "a handover hid a wake appended during it: $out" ;;
+  esac
+
+  out=$(handover_case "$(make_case handover-handling)/state" handling 0) || fail "handling handover case failed: $out"
+  before=$(printf '%s\n' "$out" | sed -n 's/^before=//p')
+  after=$(printf '%s\n' "$out" | sed -n 's/^after=//p')
+  case "$before" in pending:handling:*) ;; *) fail "fixture: the episode was not being handled: $out" ;; esac
+  [ "$after" = "pending:downtime:${before##*:}" ] || fail "a handover rewrote an episode main had not acknowledged: $out"
+  pass "a handover undoes only the downtime its own stop published over an acknowledged episode"
+}
+
 test_stale_recovery_generation_cannot_touch_a_newer_episode() {
   local dir state first_err replay_err sequence generation handling_marker
   local newer_marker newer_sequence newer_generation rc
@@ -2350,7 +2485,16 @@ test_interruption_before_and_after_raw_commit() {
 # announced (no wake), while ANY unannounced byte - a pending foreign line, a
 # missing cursor, a later different note - reads as wake-worthy.
 test_self_announced_append_guards() {
-  local dir state status folded rc=0
+  local dir state status folded annotations candidate utf8_locale='' LC_ALL rc=0
+  # Exercise locale-preserving checkpoint reuse even when the suite starts in C.
+  for candidate in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+    if locale -a 2>/dev/null | grep -qx "$candidate"; then utf8_locale=$candidate; break; fi
+  done
+  if [ -n "$utf8_locale" ]; then
+    LC_ALL=$utf8_locale; export LC_ALL
+  else
+    printf 'SKIP: UTF-8 self-announced append locale: no UTF-8 locale is installed\n'
+  fi
   dir=$(make_case self-announced-append)
   state="$dir/state"
   status="$state/t.status"
@@ -2422,10 +2566,17 @@ test_self_announced_append_guards() {
   ' _ "$ROOT/bin/fm-classify-lib.sh" "$folded" \
     || fail "could not fold the open decision"
   run_wake_lib fm_wake_status_append_self_announced "$state" "$folded" \
-    'resolved [key=k3]: answered: folded close' \
+    "$(printf 'resolved [key=k3]: answered: caf\xc3\xa9 rentr\xc3\xa9e')" \
     || fail "a close after an OPEN DECISIONS fold was not self-announced (rc=$?)"
   run_wake_lib fm_wake_signal_seen_current "$state" "$folded" \
     || fail "the folded close left unannounced bytes behind"
+  annotations=$(FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"; . "$2"
+    fm_wake_print_annotations "$(printf "0\t1\tsignal\tfolded.status\tfixture")"
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$ROOT/bin/fm-wake-lib.sh") \
+    || fail "could not annotate the folded close"
+  assert_not_contains "$annotations" 'needs-decision' "annotation replayed the already-folded opening"
+  assert_contains "$annotations" "$(printf 'caf\xc3\xa9 rentr\xc3\xa9e')" "annotation hid the unread bookkeeping close"
   printf 'blocked: worker still needs help\n' >> "$folded"
   run_wake_lib fm_wake_signal_seen_current "$state" "$folded" \
     && fail "a later worker line after a folded close was swallowed"
@@ -2605,6 +2756,86 @@ test_self_held_lock_reclaims_instead_of_deadlocking() {
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$state" || rc=$?
   [ "$rc" -eq 0 ] || fail "a subshell reclaimed its parent's live hold (rc=$rc)"
   pass "an abandoned same-process lock hold is reclaimed; a parent's live hold is not"
+}
+
+# A waiter whose lock directory's parent vanished (a deleted test fixture, a
+# discarded scratch copy, a returned worktree slot) can never acquire: it used to
+# spin forever at ten sleeps a second, which is how fm-wake-grant.sh and watcher
+# orphans burned CPU for hours. The wait now reports failure once the parent has
+# been missing for the grace, but a parent that comes back inside the grace is
+# still waited for.
+lock_wait_pid_is_live() {  # <pid>: running, not a zombie awaiting its parent
+  local stat
+  stat=$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ') || return 1
+  [ -n "$stat" ] || return 1
+  case "$stat" in Z*) return 1 ;; esac
+}
+
+test_lock_wait_ends_when_the_lock_directory_is_gone() {
+  local dir state lock waiter_pid i rc
+  dir=$(make_case lock-wait-parent-gone)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2" || exit 10
+    : > "$3"
+    stub_ticks=0
+    while [ ! -e "$4" ] && [ "$stub_ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      stub_ticks=$((stub_ticks + 1))
+    done
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/holder.ready" "$dir/release-holder" &
+  holder_pid=$!
+  for i in $(seq 1 100); do
+    [ -e "$dir/holder.ready" ] && break
+    sleep 0.05
+  done
+  [ -e "$dir/holder.ready" ] || { kill "$holder_pid" 2>/dev/null || true; fail "lock holder did not acquire"; }
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    : > "$4"
+    fm_lock_acquire_wait "$2"
+    printf "%s\n" "$?" > "$3"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/waiter.rc" "$dir/waiter.ready" &
+  waiter_pid=$!
+  for i in $(seq 1 100); do
+    [ -e "$dir/waiter.ready" ] && break
+    sleep 0.05
+  done
+  [ -e "$dir/waiter.ready" ] \
+    || { kill "$waiter_pid" "$holder_pid" 2>/dev/null || true; fail "waiter did not initialize"; }
+  lock_wait_pid_is_live "$waiter_pid" \
+    || { kill "$holder_pid" 2>/dev/null || true; fail "waiter did not block behind the live holder"; }
+  mv "$state" "$dir/state.gone" || fail "could not move the lock directory away"
+  kill -KILL "$holder_pid" 2>/dev/null || true
+  wait "$holder_pid" 2>/dev/null || true
+  for i in $(seq 1 200); do
+    lock_wait_pid_is_live "$waiter_pid" || break
+    sleep 0.05
+  done
+  if lock_wait_pid_is_live "$waiter_pid"; then
+    kill -KILL "$waiter_pid" 2>/dev/null || true
+    wait "$waiter_pid" 2>/dev/null || true
+    fail "a lock waiter kept spinning after its lock directory was deleted"
+  fi
+  wait "$waiter_pid" 2>/dev/null || true
+  rc=$(cat "$dir/waiter.rc" 2>/dev/null || true)
+  [ "$rc" = 1 ] || fail "the abandoned lock wait did not report failure (rc=${rc:-none})"
+
+  # A parent that returns inside the grace is an ordinary wait, not an abandonment.
+  mkdir -p "$state"
+  rm -f "$dir/waiter.rc"
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    rm -rf "$2"
+    ( sleep 1; mkdir -p "$2" ) &
+    fm_lock_acquire_wait "$3"
+    printf "%s\n" "$?" > "$4"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$lock" "$dir/returned.rc"
+  [ "$(cat "$dir/returned.rc" 2>/dev/null || true)" = 0 ] \
+    || fail "a lock directory that returned inside the grace was not waited for"
+  pass "a lock wait ends when its lock directory is gone and survives a brief absence"
 }
 
 test_subshell_lock_ownership_without_bashpid() {
@@ -3562,6 +3793,7 @@ SH
 
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
+test_lock_wait_ends_when_the_lock_directory_is_gone
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
 test_live_presentation_holder_is_deadlined_without_weakening_ack
@@ -3572,6 +3804,7 @@ test_secondmate_reprovisioned_queue_starts_a_fresh_interval
 test_secondmate_active_turn_defers_stall_until_the_turn_ends
 test_secondmate_long_lived_mate_mid_turn_is_not_a_stall
 test_secondmate_proven_idle_ring_lets_the_child_drain
+test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture
 test_secondmate_busy_and_unknown_panes_are_not_rung
 test_secondmate_genuine_stall_after_idle_ring_still_alarms
 test_secondmate_idle_omp_alarms_without_input
@@ -3609,6 +3842,7 @@ test_branch_actor_without_eligible_snapshot_refuses
 test_wake_publish_requires_atomic_recovery_evidence
 test_recovery_mint_and_delivery_log_avoid_sibling_subst
 test_legacy_generationless_wake_is_adopted
+test_handover_restore_undoes_only_its_own_stop
 test_stale_recovery_generation_cannot_touch_a_newer_episode
 test_stale_ack_that_consumes_nothing_names_the_current_wake
 test_branch_stale_ack_that_consumes_nothing_names_its_granted_wake

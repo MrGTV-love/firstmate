@@ -206,7 +206,7 @@ The detailed reconciliation and task chronology stay in the private audit report
 ### Per-task endpoint reads cannot truncate the digest
 
 A per-task backend endpoint liveness read that dies mid-read inside the digest process takes every later stage with it, and a parent wrapper that banners only the runtime-bound exit stays silent about the missing sections.
-The digest now runs each per-task endpoint read in its own bounded child (`FM_SESSION_START_ENDPOINT_TIMEOUT`, default 10s) whose death, hang, or nonzero surprise becomes that task's own `endpoint: error` line, and the parent wrapper banners ANY nonzero child exit, naming the stage and the abnormal exit status.
+The digest now runs each per-task endpoint read in its own bounded child (`FM_SESSION_START_ENDPOINT_TIMEOUT`, default 10s) whose timeout or signal death becomes that task's own `endpoint: error` line, and the parent wrapper banners ANY nonzero digest-child exit, naming the stage and the abnormal exit status.
 Verified on 2026-09-27 with the deterministic process-tree tests that reproduce both failure shapes with real processes and no harness:
 
 ```sh
@@ -602,7 +602,7 @@ tests/fm-turnend-guard.test.sh
 
 ## Supervision host
 
-This supports [supervision-host.md](../supervision-host.md): the Claude engine, the away-wake path, its failure direction, and the unchanged behavior of homes without `config/supervision-host`.
+This pre-flip evidence supports [supervision-host.md](../supervision-host.md)'s Claude engine, away-wake path, and failure direction; its no-file baseline describes the earlier opt-in release, not the current Claude default.
 It was measured on 2026-09-23 on macOS 26.6.2 arm64 with Claude Code 2.1.281 as both primary and engine (model `sonnet`), Pi 0.87.0 workers on `openai-codex/gpt-5.6-sol`, and Herdr 0.9.0, in disposable lab homes on private tmux sockets and named Herdr lab sessions.
 
 The opt-in live guard refreshes the engine evidence:
@@ -630,7 +630,7 @@ Claude's `--output-format json` reports `total_cost_usd` as the resumed conversa
 Five consecutive turns of one conversation, a host restart between the second and third, reported totals of 0.2093, 0.3441, 0.4234, 0.4870, and 0.5408 with per-turn `cache_read_input_tokens` of 423687, 359255, 245302, 174613, and 185598.
 Each handled away wake cost between $0.05 and $0.21 on `sonnet`.
 
-Without `config/supervision-host`, the same live sessions and guards ran on the tree before the host (`ac2ed3b2`) and with it, with identical results:
+Before the Claude default-on flip, without `config/supervision-host`, the same live sessions and guards ran on the tree before the host (`ac2ed3b2`) and with it, with identical results:
 
 | Check | Before | After |
 | --- | --- | --- |
@@ -648,11 +648,15 @@ Deterministic entry points:
 
 ```sh
 tests/fm-supervision-host.test.sh
+tests/fm-supervision-host-hook.test.sh
 tests/fm-claude-stop-autoarm.test.sh
 tests/fm-afk-launch.test.sh
 tests/fm-supervision-instructions.test.sh
 tests/fm-watch-arm.test.sh
 ```
+
+Split-fixture smoke on 2026-10-08 (Darwin arm64): all 13 host+hook cases passed through the executable test runner in 362262 ms after registered-home process cleanup was moved to each case boundary. These cases run the real Firstmate host, hooks, watcher, and wake paths with fixture harnesses and an engine stub, not a live model.
+The host group passed its first 44 cases before a latch handoff assertion stopped the full run; a fresh-process smoke of the remaining 16 passed 10 and failed six watcher-freshness, successor-verification, or engine-timing assertions. No full-host pass or healthy new-head duration was established. Local `uptime` reported load averages of 58.20/90.01/99.79 during verification; load is a plausible cause, not a proved diagnosis. Production waits and CI job timeouts were not widened.
 
 
 ### Non-Pi primaries
@@ -701,6 +705,7 @@ Deterministic entry points:
 
 ```sh
 tests/fm-supervision-host.test.sh
+tests/fm-supervision-host-hook.test.sh
 tests/fm-wake-queue.test.sh
 tests/fm-cursor-primary.test.sh
 tests/fm-pi-watch-extension.test.sh
@@ -763,6 +768,7 @@ Deterministic entry points:
 
 ```sh
 tests/fm-supervision-host.test.sh
+tests/fm-supervision-host-hook.test.sh
 tests/fm-afk-return.test.sh
 tests/fm-branch-supervision.test.sh
 ```

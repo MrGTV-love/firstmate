@@ -5,13 +5,25 @@
 // /fork, reload) as well as terminal quit. This extension binds one generation per
 // session activation. Only the active live generation may start, stop, rearm, or
 // clear the arm child. Replacement shutdown publishes a generation-bound handoff
-// phase but retains its established child until the next owning session_start (or
-// fresh factory bind) publishes a distinct active generation and commits the
-// tracked replacement arm without a model turn. A replacement handoff carries
+// phase but retains its established child until a live successor runtime's
+// session_start or arm call publishes a distinct active generation and commits
+// the tracked replacement arm without a model turn. A replacement handoff carries
 // actionable closes that were still pending delivery; its durable state lives at
 // state/extensions/pi-primary-watch/session-replacement-actionable.json.
 // Terminal quit leaves the final generation stopped so late callbacks cannot rearm.
 // Stale callbacks from a prior generation are no-ops against the active replacement.
+// Duplicate factories in one Pi loader runtime are
+// ignored before registration, preserving one tool and one watcher. A reload
+// removes the loader-owned discovery subscription and binds a new instance;
+// the latest bound instance owns the home, and earlier instances refuse arms.
+// Replacement invalidates the outgoing delivery API: command and tool repair
+// on that stopped instance must refuse, not publish false active ownership.
+// If session_start is missing after FM_PI_SUCCESSOR_GRACE_MS (configuration
+// reference owns the default), log successor-missing and one bound-expired
+// record without calling the retired API. A live successor runtime is required
+// to recover; terminal quit schedules no successor wait.
+// .pi/extensions/lib/fm-watch-lifecycle.ts owns the best-effort lifecycle record
+// at state/extensions/pi-primary-watch/lifecycle.log.
 //
 // Delivery versus consumption (stated once here):
 // A main follow-up is delivered once Pi accepts it (sendUserMessage resolves).
@@ -54,6 +66,7 @@ import {
   FIRSTMATE_CALM_PRESENTATION_EVENT,
 } from "./lib/fm-calm-visibility.ts";
 import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.ts";
+import { bindWatchInstance, createLifecycleLog, setLifecycleDeadline } from "./lib/fm-watch-lifecycle.ts";
 
 type ArmResult = {
   ok: boolean;
@@ -149,6 +162,9 @@ const armScript = `${fmRoot}/bin/fm-watch-arm.sh`;
 const marker = `${state}/.pi-watch-extension-loaded`;
 const handoffDir = `${state}/extensions/pi-primary-watch`;
 const actionableHandoff = `${handoffDir}/session-replacement-actionable.json`;
+const extensionLog = `${state}/.watch-extension.log`;
+const extensionLogMaxLines = extensionLogKeepLines();
+const lifecycleLogPath = `${handoffDir}/lifecycle.log`;
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
@@ -161,6 +177,7 @@ const armReadyTimeoutMs = positiveInteger(
   process.platform === "win32" ? 35000 : 12000,
 );
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const successorGraceMs = positiveInteger("FM_PI_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - Pi session is shutting down";
 
@@ -213,6 +230,18 @@ function positiveInteger(name: string, fallback: number): number {
   return Math.floor(value);
 }
 
+// Opt-in bound for the extension diagnostic log: only a positive
+// FM_WATCH_EXTENSION_LOG_KEEP_LINES enables logging, so the default run
+// writes nothing. Unset, empty, non-numeric, zero, and negative values
+// disable the log entirely instead of falling back to a silent default.
+function extensionLogKeepLines(): number {
+  const raw = process.env.FM_WATCH_EXTENSION_LOG_KEEP_LINES;
+  if (raw === undefined || raw.trim() === "") return 0;
+  const value = Math.floor(Number(raw));
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return value;
+}
+
 function parentPid(pid: string): string {
   const result = spawnSync("ps", ["-o", "ppid=", "-p", pid], { encoding: "utf8" });
   if (result.status !== 0) return "";
@@ -226,6 +255,21 @@ function pidAlive(pid: string): boolean {
   } catch {
     return false;
   }
+}
+
+// An arm child whose process is gone but whose close event has not fired yet
+// (stdio pipes still held) must not keep the single-flight slot: neither a
+// repair call nor a scheduled retry would start anything until that close
+// finally fires. Callers that gate on slot occupancy use this instead of
+// owner.child so both paths can always recover.
+
+function liveArmChild(owner: SessionGeneration): ChildProcess | null {
+  const child = owner.child;
+  if (!child) return null;
+  if (child.exitCode !== null || child.signalCode !== null) return null;
+  const pid = child.pid;
+  if (pid === undefined || !pidAlive(String(pid))) return null;
+  return child;
 }
 
 function lockOwnership(): LockOwnership {
@@ -312,6 +356,35 @@ function nodeErrorCode(error: unknown): string {
   return typeof error === "object" && error !== null && "code" in error
     ? String((error as { code?: unknown }).code ?? "")
     : "";
+}
+
+// Bounded diagnostic record for restore attempts, readiness timeouts, and
+// handling-confirmation targets and results. Opt-in through
+// FM_WATCH_EXTENSION_LOG_KEEP_LINES and off by default: a disabled log
+// returns before touching the filesystem, so it never creates its file.
+// Purely observational: a logging failure never changes supervision
+// behavior. docs/watcher-continuity.md owns what the arm layer already
+// records; this file is the extension side.
+function appendExtensionLog(detail: string): void {
+  if (extensionLogMaxLines <= 0) return;
+  try {
+    mkdirSync(state, { recursive: true });
+    const cleaned = detail.replace(/[\r\n\t]+/g, " ").slice(0, 512);
+    const line = `${new Date().toISOString()} pid=${process.pid} ${cleaned}`;
+    let previous = "";
+    try {
+      previous = readFileSync(extensionLog, "utf8");
+    } catch (error) {
+      if (nodeErrorCode(error) !== "ENOENT") return;
+    }
+    const joined = `${previous}${previous === "" || previous.endsWith("\n") ? "" : "\n"}${line}\n`;
+    const kept = joined.split("\n").slice(-(extensionLogMaxLines + 1)).join("\n");
+    const temporary = `${extensionLog}.tmp-${process.pid}`;
+    writeFileSync(temporary, kept, { mode: 0o600 });
+    renameSync(temporary, extensionLog);
+  } catch {
+    // Diagnostic only: never fail supervision for observability.
+  }
 }
 
 function createPendingActionable(message: string, predecessorArmPid: string): PendingActionableClose {
@@ -496,25 +569,51 @@ function stopGeneration(generation: SessionGeneration): ChildProcess | null {
   return child;
 }
 
-async function waitForGenerationChildClose(armChild: ChildProcess | null): Promise<void> {
+async function waitForGenerationChildClose(
+  armChild: ChildProcess | null,
+  lifecycle: ReturnType<typeof createLifecycleLog>,
+): Promise<void> {
   if (!armChild) return;
   const closed = armClose.get(armChild);
   if (!closed) return;
   await new Promise<void>((resolveWait) => {
-    const timer = setTimeout(resolveWait, armRetireTimeoutMs);
+    const timer = setLifecycleDeadline(() => {
+      lifecycle("bound-expired", {
+        waiter: "pi-watch-extension",
+        "waited-on": "shutdown-arm-close",
+        bound: `${armRetireTimeoutMs}ms`,
+        actual: `${timer.elapsedMs()}ms`,
+      });
+      resolveWait();
+    }, armRetireTimeoutMs);
     void closed.then(() => {
-      clearTimeout(timer);
+      timer.cancel();
       resolveWait();
     });
   });
 }
 
-async function stopSessionGeneration(generation: SessionGeneration, replacement: boolean): Promise<void> {
+async function stopSessionGeneration(
+  generation: SessionGeneration,
+  replacement: boolean,
+  lifecycle: ReturnType<typeof createLifecycleLog>,
+): Promise<void> {
   generation.replacement = replacement;
-  retireGenerationOwner(generation, replacement);
+  try {
+    retireGenerationOwner(generation, replacement);
+  } catch (error) {
+    // Marker publication is evidence, not retirement: failing it must not
+    // poison the promise a live successor needs before it can activate.
+    lifecycle("generation-owner-retire-failed", {
+      generation: generation.id,
+      replacement,
+      code: nodeErrorCode(error),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
   if (!replacement) {
     const child = stopGeneration(generation);
-    await waitForGenerationChildClose(child);
+    await waitForGenerationChildClose(child, lifecycle);
     return;
   }
 
@@ -548,9 +647,95 @@ const cleanupOnProcessExit = () => {
 };
 process.once("exit", cleanupOnProcessExit);
 
+type PiWatchInstanceApi = {
+  retire: () => { recovery: boolean; stopped: Promise<void> };
+};
+
 export default function (pi: ExtensionAPI) {
+  // Pi rejects duplicate tools before session_start. Discover an existing
+  // factory through the loader-owned bus before claiming its process slot or
+  // registering anything. Pi removes this subscription on reload, so a fresh
+  // runtime still binds and registers its own successor normally.
+  let alreadyLoaded = false;
+  const discovery = { home: state, claim: () => { alreadyLoaded = true; } };
+  pi.events?.emit?.("firstmate:pi-primary-watch-instance", discovery);
+  if (alreadyLoaded) return;
+  const instance = bindWatchInstance<PiWatchInstanceApi>("__firstmatePiWatchInstances", state);
+  const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
+  pi.events?.on?.("firstmate:pi-primary-watch-instance", (request: unknown) => {
+    const candidate = request as typeof discovery | undefined;
+    if (instance.isCurrent() && candidate?.home === state && typeof candidate.claim === "function") {
+      candidate.claim();
+      lifecycle("duplicate-load-ignored");
+    }
+  });
   let generation = createGeneration();
+  lifecycle("generation-create", { generation: generation.id, cause: "factory-bind" });
   activateGeneration(generation);
+  lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
+  let generationStopped: Promise<void> = Promise.resolve();
+  let successorTimer: ReturnType<typeof setLifecycleDeadline> | null = null;
+  let recoveryPending = false;
+  lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
+  if (instance.previous?.api) {
+    const predecessor = instance.previous.api.retire();
+    generationStopped = predecessor.stopped;
+    recoveryPending = predecessor.recovery;
+    if (!recoveryPending) generation.stopping = true;
+    if (recoveryPending) scheduleSuccessorExpiry(generation);
+    void generationStopped.catch(() => {});
+  }
+  instance.previous = null;
+
+  function clearSuccessorTimer(): void {
+    successorTimer?.cancel();
+    successorTimer = null;
+  }
+
+  function scheduleSuccessorExpiry(stopped: SessionGeneration): void {
+    if (!instance.isCurrent() || generation !== stopped || !recoveryPending) return;
+    clearSuccessorTimer();
+    const retirement = generationStopped;
+    const timer = setLifecycleDeadline(async () => {
+      if (successorTimer === timer) successorTimer = null;
+      try {
+        await retirement;
+        if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement || !recoveryPending) return;
+        lifecycle("bound-expired", {
+          waiter: "pi-watch-extension",
+          "waited-on": "session_start",
+          bound: `${successorGraceMs}ms`,
+          actual: `${timer.elapsedMs()}ms`,
+          outcome: "successor-missing",
+        });
+        lifecycle("successor-missing", {
+          generation: generation.id,
+          message: "watcher: not armed - Pi replacement runtime did not start; reload the extension in a live session",
+        });
+      } catch (error) {
+        if (!instance.isCurrent()) return;
+        const detail = error instanceof Error ? error.message : String(error);
+        lifecycle("successor-wait-failed", { generation: generation.id, error: detail });
+      }
+    }, successorGraceMs);
+    timer.unref();
+    successorTimer = timer;
+  }
+
+  async function armFromSession(): Promise<ArmResult> {
+    if (!instance.isCurrent()) {
+      lifecycle("arm-refused", { reason: "superseded-instance", current: instance.current()?.id });
+      return { ok: false, message: shuttingDownMessage };
+    }
+    const stopped = generation;
+    const retirement = generationStopped;
+    await retirement;
+    if (!instance.isCurrent()) return { ok: false, message: shuttingDownMessage };
+    if (generation !== stopped || generationStopped !== retirement) {
+      return armFromSession();
+    }
+    return activateOwnedWatch(generation);
+  }
 
   let calmPresentation: CalmPresentationState = {
     active: false,
@@ -611,6 +796,7 @@ export default function (pi: ExtensionAPI) {
   function confirmHandlingDelivery(recovery: { generation: string; watcherPid: string }): {
     ok: boolean;
     detail: string;
+    superseded?: boolean;
   } {
     try {
       const result = spawnSync(
@@ -623,6 +809,11 @@ export default function (pi: ExtensionAPI) {
         },
       );
       if (result.status === 0) return { ok: true, detail: "" };
+      if (result.status === 3) {
+        // The marker advanced past this restoration's generation mid-restore,
+        // so a newer pipeline owns the episode now: superseded, not rejected.
+        return { ok: false, detail: "", superseded: true };
+      }
       const stderr = (result.stderr || "").trim();
       return {
         ok: false,
@@ -638,16 +829,15 @@ export default function (pi: ExtensionAPI) {
   }
 
   function confirmHandlingDeliveryWithRetry(
-    owner: SessionGeneration,
     recovery: { generation: string; watcherPid: string },
-  ): { ok: boolean; detail: string } {
-    const snapshot = (): { generation: string; watcherPid: string } => {
-      const current = owner.child ? armRecovery.get(owner.child) : undefined;
-      return current ?? recovery;
-    };
-    const first = confirmHandlingDelivery(snapshot());
-    if (first.ok) return first;
-    return confirmHandlingDelivery(snapshot());
+  ): { ok: boolean; detail: string; superseded?: boolean } {
+    // Confirm the restoration's own recovery token, never a fresh snapshot of
+    // the current arm child: a successor replaced during the restore window
+    // must not turn this delivery into a false rejection, and a retry must
+    // not retire a newer healthy watcher.
+    const first = confirmHandlingDelivery(recovery);
+    if (first.ok || first.superseded) return first;
+    return confirmHandlingDelivery(recovery);
   }
 
   function offerWakeToBranch(message: string): Promise<void> | null {
@@ -668,11 +858,25 @@ export default function (pi: ExtensionAPI) {
   ): Promise<boolean> {
     if (!generationIsLive(owner)) return false;
     if (recovery) {
-      const confirmed = confirmHandlingDeliveryWithRetry(owner, recovery);
-      if (!confirmed.ok) {
-        const watcherPid = recovery.watcherPid;
-        if (!pidAlive(watcherPid)) {
-          await retireArm(owner.child);
+      const confirmed = confirmHandlingDeliveryWithRetry(recovery);
+      appendExtensionLog(
+        `confirm generation=${recovery.generation} watcherPid=${recovery.watcherPid} result=${confirmed.ok ? "confirmed" : confirmed.superseded ? "superseded" : "rejected"}`,
+      );
+      // A superseded result means a newer pipeline owns this episode now: it
+      // routes like a confirmed delivery below, with no failure appended, and
+      // retires nothing.
+      if (!confirmed.ok && !confirmed.superseded) {
+        const failedPid = recovery.watcherPid;
+        const current = owner.child;
+        const currentRecovery = current ? armRecovery.get(current) : undefined;
+        if (
+          current &&
+          currentRecovery?.watcherPid === failedPid &&
+          currentRecovery?.generation === recovery.generation &&
+          !pidAlive(failedPid)
+        ) {
+          appendExtensionLog(`retire pid=${failedPid} reason=confirm-failure`);
+          await retireArm(current);
         }
         return await sendWake(owner, `${message}\n\n${confirmed.detail}`, pending);
       }
@@ -850,7 +1054,7 @@ export default function (pi: ExtensionAPI) {
         // been idle.
         const deferred = owner.deferredClose;
         owner.deferredClose = null;
-        if (deferred && !owner.child && !owner.retryTimer) {
+        if (deferred && !liveArmChild(owner) && !owner.retryTimer) {
           scheduleRetry(owner, deferred.message, deferred.predecessorArmPid);
         }
       }
@@ -878,10 +1082,18 @@ export default function (pi: ExtensionAPI) {
     const readiness = armReadiness.get(armChild);
     if (!readiness) return Promise.resolve(false);
     return new Promise((resolveReady) => {
-      const timer = setTimeout(() => resolveReady(false), armReadyTimeoutMs);
+      const timer = setLifecycleDeadline(() => {
+        lifecycle("bound-expired", {
+          waiter: "pi-watch-extension",
+          "waited-on": "arm-readiness",
+          bound: `${armReadyTimeoutMs}ms`,
+          actual: `${timer.elapsedMs()}ms`,
+        });
+        resolveReady(false);
+      }, armReadyTimeoutMs);
       timer.unref();
       void readiness.then((ready) => {
-        clearTimeout(timer);
+        timer.cancel();
         resolveReady(ready);
       });
     });
@@ -894,10 +1106,18 @@ export default function (pi: ExtensionAPI) {
     const closed = armClose.get(armChild);
     if (!closed) return false;
     return new Promise((resolveRetired) => {
-      const timer = setTimeout(() => resolveRetired(false), armRetireTimeoutMs);
+      const timer = setLifecycleDeadline(() => {
+        lifecycle("bound-expired", {
+          waiter: "pi-watch-extension",
+          "waited-on": "unready-arm-close",
+          bound: `${armRetireTimeoutMs}ms`,
+          actual: `${timer.elapsedMs()}ms`,
+        });
+        resolveRetired(false);
+      }, armRetireTimeoutMs);
       timer.unref();
       void closed.then(() => {
-        clearTimeout(timer);
+        timer.cancel();
         resolveRetired(true);
       });
     });
@@ -912,10 +1132,14 @@ export default function (pi: ExtensionAPI) {
       if (!generationIsLive(owner)) return { failure: "" };
       const replacement = startArm(owner, predecessorArmPid);
       const successorChild = owner.child;
+      appendExtensionLog(
+        `restore attempt=${attempt} predecessor=${predecessorArmPid || "none"} start=${replacement.ok ? `ok pid=${successorChild?.pid ?? "none"}` : "failed"}`,
+      );
       if (replacement.ok && successorChild && await waitForReadiness(successorChild)) {
         return { failure: "", recovery: armRecovery.get(successorChild) };
       }
       if (replacement.ok) {
+        appendExtensionLog(`restore attempt=${attempt} readiness=timeout pid=${successorChild?.pid ?? "none"}`);
         failure = "watcher: FAILED - Pi extension could not verify a ready successor watcher";
         if (!(await retireArm(successorChild))) {
           return {
@@ -931,11 +1155,12 @@ export default function (pi: ExtensionAPI) {
       if (attempt === retryLimit) break;
       await waitForRetry(attempt + 1);
     }
+    appendExtensionLog(`restore exhausted attempts=${retryLimit + 1} outcome=hand-to-main`);
     return { failure: `${failure}\nwatcher: FAILED - Pi extension could not restore watcher continuity after ${retryLimit} retries` };
   }
 
   function scheduleRetry(owner: SessionGeneration, message: string, predecessorArmPid: string): void {
-    if (!generationIsLive(owner) || owner.child || owner.retryTimer) return;
+    if (!generationIsLive(owner) || liveArmChild(owner) || owner.retryTimer) return;
     const ownership = lockOwnership();
     if (ownership !== "owned") {
       surfaceFailure(owner, `watcher: FAILED - Pi extension cannot restore continuity because this session no longer owns the lock\n${message}`);
@@ -969,7 +1194,7 @@ export default function (pi: ExtensionAPI) {
       };
     }
     publishGenerationOwner(owner, "active");
-    if (owner.child) {
+    if (liveArmChild(owner)) {
       return {
         ok: true,
         message: `watcher: unchanged - Pi extension already owns an arm child; no manual re-arm needed; ${repairOnlyHint}`,
@@ -1106,6 +1331,7 @@ export default function (pi: ExtensionAPI) {
     if (owner.pendingActionables.length > 0) {
       if (loadFailure) surfaceFailure(owner, loadFailure);
       const armResult = startArm(owner, owner.pendingActionables[0].predecessorArmPid);
+      if (armResult.ok) recoveryPending = false;
       if (!armResult.ok) {
         surfaceFailure(owner, `watcher: FAILED - Pi extension could not arm before replacement wake delivery\n${armResult.message}`);
       }
@@ -1113,34 +1339,63 @@ export default function (pi: ExtensionAPI) {
       return armResult;
     }
     const result = startArm(owner);
+    if (result.ok) recoveryPending = false;
     if (loadFailure) surfaceFailure(owner, `${loadFailure}\n${result.message}`);
     return result;
   }
 
   pi.on?.("before_agent_start", (event) => {
+    if (!instance.isCurrent()) return;
     consumeWake(generation, event.prompt);
   });
   pi.on?.("message_start", (event) => {
+    if (!instance.isCurrent()) return;
     if (event.message.role !== "user") return;
     consumeWake(generation, userMessageText(event.message.content));
   });
 
   pi.on?.("session_start", async () => {
-    if (generation.stopping) generation = createGeneration();
+    if (!instance.isCurrent()) {
+      lifecycle("session_start-ignored", { reason: "superseded-instance" });
+      return;
+    }
+    lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
+    await generationStopped;
+    if (!instance.isCurrent()) return;
+    clearSuccessorTimer();
+    if (generation.stopping) {
+      generation = createGeneration();
+      lifecycle("generation-create", { generation: generation.id, cause: "session_start" });
+    }
     activateGeneration(generation);
+    lifecycle("generation-activate", { generation: generation.id, cause: "session_start" });
     if (lockOwnership() !== "owned") return;
     activateOwnedWatch(generation);
   });
   pi.on?.("session_shutdown", async (event) => {
+    if (!instance.isCurrent()) {
+      lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
+      return;
+    }
     const replacement = event.reason === "reload" || event.reason === "new" || event.reason === "resume" || event.reason === "fork";
+    lifecycle("session_shutdown", { generation: generation.id, reason: String(event.reason ?? "") });
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
-    await stopSessionGeneration(generation, replacement);
+    clearSuccessorTimer();
+    const stopped = generation;
+    recoveryPending = replacement;
+    generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, replacement, lifecycle)]).then(() => {});
+    try {
+      await generationStopped;
+    } finally {
+      lifecycle("generation-stop", { generation: stopped.id, replacement });
+      if (replacement) scheduleSuccessorExpiry(stopped);
+    }
   });
 
   pi.registerCommand?.("fm-watch-arm-pi", {
     description: "Arm firstmate watcher supervision through the Pi extension instead of foreground bash.",
     handler: async (_args, ctx) => {
-      const result = activateOwnedWatch(generation);
+      const result = await armFromSession();
       ctx.ui.notify(result.message, result.ok ? "info" : "warning");
     },
   });
@@ -1181,7 +1436,7 @@ export default function (pi: ExtensionAPI) {
       return new Container();
     },
     execute: async () => {
-      const result = activateOwnedWatch(generation);
+      const result = await armFromSession();
       return {
         content: [{ type: "text", text: result.message }],
         details: result,
@@ -1189,9 +1444,26 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  instance.publish({
+    retire: () => {
+      clearSuccessorTimer();
+      lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
+      if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
+      const stopped = generation;
+      if (!stopped.stopping) {
+        recoveryPending = true;
+        generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true, lifecycle)]).then(() => {});
+      }
+      const retirement = generationStopped.finally(() => {
+        lifecycle("generation-stop", { generation: stopped.id, cause: "factory-retire" });
+      });
+      return { recovery: recoveryPending, stopped: retirement };
+    },
+  });
+
   // Pi loads project extensions before the first model turn can run the locked
   // session-start command. Publish this generation while the lock is absent so
   // that command can distinguish a loaded extension from a missing one; a
   // foreign live lock still suppresses publication.
-  publishGenerationOwner(generation, "active");
+  if (!generation.stopping) publishGenerationOwner(generation, "active");
 }

@@ -13,7 +13,7 @@ set -u
 RUNNER="$ROOT/bin/fm-test-run.sh"
 
 POOL_TMP=$(fm_test_tmproot fm-test-run-pool)
-REAL_PYTHON=$(command -v python3)
+REAL_PYTHON=$(python3 -c 'import sys; print(sys.executable)')
 mkdir -p "$POOL_TMP/bin"
 printf '#!%s\n' "$REAL_PYTHON" >"$POOL_TMP/bin/python3"
 cat >>"$POOL_TMP/bin/python3" <<'PY'
@@ -355,6 +355,42 @@ test_changed_spawn_selects_picker_without_broadening_siblings() {
   pass "spawn changes select picker coverage without broadening sibling commands"
 }
 
+test_supervision_groups_share_coverage_and_changed_selection() {
+  local tmp repo listed script owner
+  tmp=$(fm_test_tmproot fm-test-run-supervision-selection)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for script in fm-supervision-host.test.sh fm-supervision-host-hook.test.sh; do
+    printf '#!/usr/bin/env bash\n# fm-supervision-host-helpers.sh\n' >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  printf '# wake-helpers.sh\n' >"$repo/tests/fm-supervision-host-helpers.sh"
+  : >"$repo/tests/wake-helpers.sh"
+  : >"$repo/.pi/extensions/lib/fm-branch-dispatch.ts"
+  git -C "$repo" add tests .pi
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm supervision-selection-fixture
+
+  for owner in tests/fm-supervision-host-helpers.sh tests/wake-helpers.sh .pi/extensions/lib/fm-branch-dispatch.ts; do
+    printf '\n' >>"$repo/$owner"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$owner failed supervision selection"
+    for script in fm-supervision-host.test.sh fm-supervision-host-hook.test.sh; do
+      assert_contains "$listed" "tests/$script" "$owner selects $script"
+    done
+    assert_not_contains "$listed" "tests/fm-pr-merge.test.sh" "$owner must not widen to unrelated suites"
+    git -C "$repo" add "$owner"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm supervision-owner-change
+  done
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --family afk)
+  for script in fm-supervision-host.test.sh fm-supervision-host-hook.test.sh; do
+    assert_contains "$listed" "tests/$script" "AFK family includes $script"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list "tests/$script")
+    [ "$listed" = "tests/$script" ] || fail "$script must be independently selectable: $listed"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --family afk)
+  done
+  pass "both supervision groups retain family coverage and direct/transitive changed selection"
+}
+
 test_changed_dependency_selection_and_unmapped_failure() {
   local tmp repo listed rc
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-changed.XXXXXX")
@@ -451,6 +487,35 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" add .agents/skills/hyper-jev
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-skill-change
 
+  mkdir -p "$repo/bin/ten-levels/extensions" "$repo/tests/assets"
+  : >"$repo/bin/ten-levels/extensions/report.ts"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-jev-guard.test.sh"
+  chmod +x "$repo/tests/fm-jev-guard.test.sh"
+  : >"$repo/tests/assets/retired-asset.mjs"
+  git -C "$repo" add tests/fm-jev-guard.test.sh tests/assets/retired-asset.mjs
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm guard-fixture
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
+  assert_contains "$listed" "tests/fm-jev-guard.test.sh" "vendored jev-guard files select the jev-guard suite"
+  git -C "$repo" add bin/ten-levels
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-guard-change
+  git -C "$repo" rm -q tests/assets/retired-asset.mjs
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a retired test asset was refused as an unmapped changed source"
+  [ -z "$listed" ] || fail "an unreferenced retired test asset must select no suite: $listed"
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm retired-asset-change
+
+  mkdir -p "$repo/tests/assets"
+  : >"$repo/tests/assets/board-render-harness.mjs"
+  printf '#!/usr/bin/env bash\nnode tests/assets/board-render-harness.mjs\n' >"$repo/tests/fm-bearings-board-render.test.sh"
+  chmod +x "$repo/tests/fm-bearings-board-render.test.sh"
+  git -C "$repo" add tests/assets/board-render-harness.mjs tests/fm-bearings-board-render.test.sh
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm board-render-fixture
+  git -C "$repo" rm -q tests/assets/board-render-harness.mjs
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a referenced deleted test asset must select its consumer"
+  assert_contains "$listed" "tests/fm-bearings-board-render.test.sh" "a deleted board-render harness selects its surviving consumer"
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm referenced-asset-deletion
+
   printf '\n' >>"$repo/bin/fm-procevent-quota.sh"
   printf '\n' >>"$repo/bin/fm-quota-choose.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
@@ -537,6 +602,42 @@ test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer() {
   done
   rm -rf "$tmp"
   pass "fleet snapshot selects its exact ledger consumer without widening snapshot siblings"
+}
+
+test_changed_watch_helpers_select_runnable_consumers() {
+  local tmp repo listed expected path out status
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-watch-helpers.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cp -R "$ROOT/bin/." "$repo/bin/"
+  cp "$ROOT/tests/fm-pi-watch-loader-live.test.sh" "$repo/tests/"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-omp-harness.test.sh"
+  : >"$repo/tests/fm-pi-watch-loader-live.test.mjs"
+  : >"$repo/tests/watch-lifecycle-expiry.mjs"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm watch-fixture
+  for path in fm-pi-watch-loader-live.test.mjs watch-lifecycle-expiry.mjs; do
+    printf '\n' >>"$repo/tests/$path"
+    listed=$("$repo/bin/fm-test-run.sh" --list --changed --base HEAD) \
+      || fail "$path failed changed-test selection"
+    case "$path" in
+      fm-pi-watch-loader-live.test.mjs) expected=tests/fm-pi-watch-loader-live.test.sh ;;
+      watch-lifecycle-expiry.mjs) expected=$(printf '%s\n' tests/fm-omp-harness.test.sh tests/fm-pi-watch-extension.test.sh) ;;
+    esac
+    [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] || fail "$path selected incorrect consumers: $listed"
+    git -C "$repo" add "tests/$path"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm helper-change
+  done
+  listed=$("$repo/bin/fm-test-run.sh" --list --family live-harness-optin)
+  assert_contains "$listed" tests/fm-pi-watch-loader-live.test.sh "loader regression must belong to the opt-in family"
+  cp "$ROOT/tests/lib.sh" "$repo/tests/"
+  out=$(FM_LIVE=0 FM_PI_WATCH_LOADER_LIVE_E2E=0 "$repo/bin/fm-test-run.sh" --jobs 1 tests/fm-pi-watch-loader-live.test.sh 2>&1) && status=0 || status=$?
+  expect_code 0 "$status" "disabled Pi loader regression: $out"
+  assert_contains "$out" "skip: live: disabled by FM_PI_WATCH_LOADER_LIVE_E2E=0" "loader must skip before requiring the SDK"
+  assert_contains "$out" "expected_gate_skip=live-capability" "loader skip must use the live capability class"
+  assert_contains "$out" "skipped_gate=1" "runner must record the disabled loader regression"
+  rm -rf "$tmp"
+  pass "watch JavaScript helpers select runnable consumers and the loader regression is gated"
 }
 
 test_changed_status_owners_select_all_consuming_tests() {
@@ -1351,11 +1452,11 @@ test_list_scheduled_non_lane_selections_use_serial_weights() {
     printf '\n' >>"$repo/$script"
   done
   printf '%s\n' \
+    tests/fm-kimi-harness.test.sh \
     tests/fm-muse-harness.test.sh \
     tests/fm-brief.test.sh \
     tests/fm-captain-hold-lifecycle.test.sh \
     tests/fm-lint.test.sh \
-    tests/fm-kimi-harness.test.sh \
     tests/fm-operational-input.test.sh >"$tmp/expected"
   for selection in family all changed scripts; do
     case "$selection" in
@@ -1480,7 +1581,7 @@ test_portable_serial_shards_partition_the_serial_lane() {
 }
 
 test_portable_serial_hint_coverage_is_reported_and_bounded() {
-  local out serial unhinted
+  local out serial unhinted max budget
   # Shards are packed from measured duration hints, so an unmeasured script is
   # placed on a guess. Enough of them and the partition still looks balanced by
   # script count while one shard carries far more real work than another and
@@ -1501,7 +1602,39 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   # this trips (docs/fm-test-portable-shards.md).
   [ "$((unhinted * 100))" -le "$((serial * 15))" ] \
     || fail "$unhinted of $serial portable serial scripts lack a measured hint; refresh them"
-  pass "coverage guard reports and bounds the unmeasured portable serial share"
+  # A complete partition can still overflow a CI job. Assert the runner's
+  # modeled packing target through its executable interface, not source hints.
+  max=$(printf '%s\n' "$out" | sed -n 's/.*serial_max_ms=\([0-9][0-9]*\).*/\1/p')
+  budget=$(printf '%s\n' "$out" | sed -n 's/.*serial_budget_ms=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$max" ] && [ -n "$budget" ] \
+    || fail "coverage summary must carry serial packing and budget: $out"
+  [ "$budget" -eq 1200000 ] || fail "packing must leave ten minutes of the normal CI tier"
+  [ "$max" -gt 0 ] && [ "$max" -le "$budget" ] \
+    || fail "largest serial shard packs ${max}ms above the ${budget}ms target"
+  pass "coverage guard bounds the unmeasured share and serial packing within twenty minutes"
+}
+
+test_portable_serial_packing_budget_boundary() {
+  local tmp repo weight out rc
+  tmp=$(fm_test_tmproot fm-test-run-packing-boundary)
+  repo="$tmp/repo"
+
+  for weight in 1200000 1200001; do
+    shard_fixture_init "$repo" "$weight"
+    out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
+    if [ "$weight" -eq 1200000 ]; then
+      expect_code 0 "$rc" "packing exactly at the budget must be accepted"
+      assert_contains "$out" "FM_TEST_COVERAGE ok" "boundary coverage did not pass"
+      assert_contains "$out" "serial_max_ms=1200000" "fixture did not pack exactly at the budget"
+      assert_contains "$out" "serial_budget_ms=1200000" "fixture changed the packing budget"
+    else
+      expect_code 1 "$rc" "packing one millisecond above the budget must be refused"
+      assert_contains "$out" "largest portable serial shard packs 1200001ms above the 1200000ms target" \
+        "over-budget refusal did not explain the modeled excess"
+      assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
+    fi
+  done
+  pass "serial packing accepts the exact budget and refuses one millisecond above it"
 }
 
 # The serial shard lists are computed again for every shard and for the whole
@@ -1517,9 +1650,26 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
 # harness adds are enough to hide it, and a regression test that cannot fail on
 # the old code proves nothing.
 shard_fixture_init() {
-  local dir=$1 name
+  local dir=$1 name weight=${2:-1}
   mkdir -p "$dir/bin" "$dir/tests"
   cp "$RUNNER" "$dir/bin/fm-test-run.sh"
+  # Keep coverage fixtures independent of production duration growth. The
+  # optional boundary weight changes only the script tested at that boundary.
+  python3 - "$dir/bin/fm-test-run.sh" "$weight" <<'PY' \
+    || fail "could not seed the fixture's measured timing input"
+from pathlib import Path
+import re, sys
+runner = Path(sys.argv[1])
+text = runner.read_text()
+start = text.index("portable_serial_weight_hints() {")
+end = text.index("\nEOF", start)
+text = text[:start] + re.sub(
+    r"(?m)^(tests/[^ ]+\.test\.sh) [0-9]+$",
+    lambda match: f"{match[1]} {sys.argv[2] if match[1] == 'tests/fm-watch-triage.test.sh' else 1}",
+    text[start:end],
+) + text[end:]
+runner.write_text(text)
+PY
   chmod +x "$dir/bin/fm-test-run.sh"
   for name in "$ROOT"/tests/*.test.sh; do
     : >"$dir/tests/${name##*/}"
@@ -1592,11 +1742,12 @@ test_serial_shard_guard_holds_at_every_lane_size() {
 }
 
 test_serial_shard_generation_failure_is_not_a_partial_success() {
-  local tmp dir real_sort rc
+  local tmp dir real_sort rc shard_lane
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-shard-failure.XXXXXX")
   dir="$tmp/fixture"
   shard_fixture_init "$dir"
   shard_fixture_grow "$dir" 5
+  shard_lane=$("$dir/bin/fm-test-run.sh" --list-lanes | grep -m1 '^portable-serial-[0-9]*of[0-9]*$')
   real_sort=$(command -v sort)
   mkdir -p "$tmp/fakebin"
   cat >"$tmp/fakebin/sort" <<'SH'
@@ -1613,7 +1764,7 @@ SH
   set +e
   env -i PATH="$tmp/fakebin:$PATH" REAL_SORT="$real_sort" \
     HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
-    "$dir/bin/fm-test-run.sh" --list --lane portable-serial-1of9 \
+    "$dir/bin/fm-test-run.sh" --list --lane "$shard_lane" \
     >"$tmp/out" 2>"$tmp/err"
   rc=$?
   set -e
@@ -1953,6 +2104,129 @@ SH
   pass "--per-script-timeout-secs turns a hung script into a bounded failure"
 }
 
+# A script killed outright (the per-script bound's KILL, an outer timeout) never
+# runs its cleanup trap, so a stub it started outlives it. The runner sweeps the
+# leftovers its fixture marker proves are the dead run's after each script.
+test_runner_reaps_stubs_a_killed_script_left_behind() {
+  local tmp repo runner leak stub_pid_file stub rc waited
+  tmp=$(mktemp -d)
+  repo="$tmp/repo"
+  leak=tests/fm-leak-fixture.test.sh
+  mkdir -p "$repo/tests"
+  cp -R "$ROOT/bin" "$repo/bin"
+  cp "$ROOT/tests/lib.sh" "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  cp "$repo/bin/fm-test-reap-orphans.sh" "$repo/bin/fm-test-reap-fixture.sh"
+  cat > "$repo/bin/fm-test-reap-orphans.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "$#" -eq 0 ]; then set -- --tmpdir "${TMPDIR:?}"; fi
+exec "$(dirname "${BASH_SOURCE[0]}")/fm-test-reap-fixture.sh" "$@"
+SH
+  chmod +x "$repo/bin/fm-test-reap-orphans.sh"
+  runner="$repo/bin/fm-test-run.sh"
+  stub_pid_file="$tmp/stub.pid"
+  cat >"$repo/$leak" <<'SH'
+#!/usr/bin/env bash
+set -u
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+root=$(fm_test_tmproot fm-leak-fixture)
+cat >"$root/stub.sh" <<'STUB'
+#!/usr/bin/env bash
+n=0
+while [ ! -e "$1" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+  sleep 0.05
+  n=$((n + 1))
+done
+STUB
+(
+  bash "$root/stub.sh" "$root/release" >/dev/null 2>&1 &
+  fm_test_record_process "$FM_LEAK_PIDFILE" "$!" || exit 1
+) || exit 1
+kill -KILL "$$"
+SH
+  chmod +x "$runner" "$repo/$leak"
+
+  set +e
+  (cd "$repo" && FM_TEST_SKIP_ORPHAN_REAP=1 FM_LEAK_PIDFILE="$stub_pid_file" \
+    TMPDIR="$tmp" "$runner" "$leak" >"$tmp/out" 2>"$tmp/err")
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "a script killed outright must fail the run: $(cat "$tmp/out")"
+  [ -s "$stub_pid_file" ] || fail "the killed script never started its stub: $(cat "$tmp/out" "$tmp/err")"
+  IFS=$'\t' read -r stub _ < "$stub_pid_file"
+  waited=0
+  while fm_test_process_alive "$stub_pid_file" /stub.sh && [ "$waited" -lt 100 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  if fm_test_process_alive "$stub_pid_file" /stub.sh; then
+    fm_test_process_alive "$stub_pid_file" /stub.sh && kill -KILL "$FM_TEST_PROCESS_PID" 2>/dev/null || true
+    fail "the runner left the killed script's stub $stub running"
+  fi
+  grep -Fq "reaped after $leak:" "$tmp/err" \
+    || fail "the runner did not say what it reaped: $(cat "$tmp/err")"
+  rm -rf "$tmp"
+  pass "the runner reaps the stub a killed script left behind"
+}
+
+# A script that forks without bound must stop at its own limit instead of
+# filling the user's process table for every other lane (the 2026-10-08
+# fork-EAGAIN incident), so the runner starts each script under the per-tree
+# process budget of bin/fm-proc-budget.sh. The fixture reports the limit it
+# runs under; the runner's own limit is the comparison.
+test_each_script_runs_under_a_process_budget() {
+  local tmp repo fixture inherited seen expected count
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-budget.XXXXXX")
+  repo="$tmp/repo"
+  fixture=tests/fm-budget-fixture.test.sh
+  mkdir -p "$repo/bin" "$repo/tests" "$tmp/failing-ps" "$tmp/budget-ps"
+  cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-proc-budget.sh" "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  cat >"$repo/$fixture" <<'SH'
+#!/usr/bin/env bash
+echo "ok - fixture runs under limit $(ulimit -u)"
+SH
+  printf '#!/bin/sh\nexit 1\n' >"$tmp/failing-ps/ps"
+  case "$(uname -s)" in
+    Linux) count=$(set -o pipefail; ps -L -U "$(id -u)" -o lwp= | wc -l) || fail "cannot read the baseline task count" ;;
+    *) count=$(set -o pipefail; ps -U "$(id -u)" -o pid= | wc -l) || fail "cannot read the baseline process count" ;;
+  esac
+  cat >"$tmp/budget-ps/ps" <<SH
+#!/bin/sh
+i=0
+while [ "\$i" -lt "$count" ]; do
+  echo "\$i"
+  i=\$((i + 1))
+done
+SH
+  chmod +x "$repo/bin/fm-test-run.sh" "$repo/$fixture" "$tmp/failing-ps/ps" "$tmp/budget-ps/ps"
+  inherited=$(ulimit -S -u)
+  expected=$((count + 1500))
+  case "$inherited" in
+    ''|*[!0-9]*) ;;
+    *) [ "$expected" -lt "$inherited" ] || expected=$inherited ;;
+  esac
+
+  PATH="$tmp/budget-ps:$PATH" "$repo/bin/fm-test-run.sh" "$fixture" >"$tmp/out" 2>"$tmp/err" \
+    || fail "the budgeted run failed: $(cat "$tmp/out" "$tmp/err")"
+  seen=$(sed -n 's/.*fixture runs under limit //p' "$tmp/out")
+  case "$seen" in
+    ''|*[!0-9]*) fail "the fixture did not report a numeric limit (got '$seen'): $(cat "$tmp/out")" ;;
+  esac
+  assert_equals "$expected" "$seen" "the script budget must be capped by its inherited limit"
+
+  if PATH="$tmp/failing-ps:$PATH" "$repo/bin/fm-test-run.sh" "$fixture" >"$tmp/out4" 2>"$tmp/err4"; then
+    fail "a runner with an unreadable process count must fail"
+  fi
+  assert_not_contains "$(cat "$tmp/out4" "$tmp/err4")" "fixture runs under limit" \
+    "a failed budget must prevent fixture execution"
+  assert_contains "$(cat "$tmp/out4" "$tmp/err4")" "cannot read the process count" \
+    "a failed budget must report the wrapper's refusal"
+
+  rm -rf "$tmp"
+  pass "each script runs under a per-tree process budget"
+}
+
 # The duration regression this guard exists for: a suite whose scripts are all
 # green but whose wall clock outgrew its caller's invocation budget. The caller
 # gets killed mid-run and retries invisibly, so an over-budget run has to be a
@@ -2277,7 +2551,9 @@ test_task_marker_refuses_the_primary_checkout
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
+test_supervision_groups_share_coverage_and_changed_selection
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
+test_changed_watch_helpers_select_runnable_consumers
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
@@ -2301,6 +2577,7 @@ test_portable_shard_union_and_coverage_guard
 test_portable_parallel_lanes_stay_duration_balanced
 test_portable_serial_shards_partition_the_serial_lane
 test_portable_serial_hint_coverage_is_reported_and_bounded
+test_portable_serial_packing_budget_boundary
 test_serial_shard_guard_holds_at_every_lane_size
 test_serial_shard_generation_failure_is_not_a_partial_success
 test_coverage_guard_passes_with_extra_scripts
@@ -2312,6 +2589,8 @@ test_unmapped_new_test_never_inherits_family_concurrency
 test_changed_shared_fixture_selects_its_readers
 test_concurrent_runs_are_ordered_longest_first
 test_per_script_timeout_bounds_a_hang
+test_runner_reaps_stubs_a_killed_script_left_behind
+test_each_script_runs_under_a_process_budget
 test_changed_bound_gives_slow_watcher_suites_headroom
 test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation

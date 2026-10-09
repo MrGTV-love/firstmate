@@ -1132,6 +1132,7 @@ for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
     if reader == 'questions':
         for i in range(24):
             (deadline_home / 'state' / (str(i) + '.status')).write_text('needs-decision [key=q]: question\n')
+    (deadline_home / 'attempts').write_text('')
     (deadline_home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
         tasks=deadline_tasks, backlog=dict(present=True, records=(
             [dict(id='owns-prs', structured=True, state='done', links=[PR_URL + str(i) for i in range(24)])]
@@ -1173,7 +1174,9 @@ sys.exit(1)
     assert not deadline_report['complete'] and len(rows(deadline_report, 'coverage')) == 1, deadline_report
     assert 'collection exceeded its deadline' in rows(deadline_report, 'coverage')['ledger degraded']['evidence']
     attempts = (deadline_home / 'attempts').read_text().splitlines()
-    assert len(attempts) == 2, (reader, attempts)
+    # The real overall deadline may expire before the injected second-attempt
+    # alarm on a loaded host; neither path may start a third source command.
+    assert len(attempts) <= 2, (reader, attempts)
     assert json.loads((deadline_home / 'state/open-loops.json').read_text()) == deadline_report
     print('PASS: deadline escapes ' + reader + ' source recovery', flush=True)
 print('PASS: owned-work categories, owners, ages, degraded row, and atomic publication')

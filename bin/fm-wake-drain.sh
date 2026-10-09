@@ -33,6 +33,8 @@ SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 # shellcheck source=bin/fm-supervision-engine-lib.sh
 . "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
+# shellcheck source=bin/fm-afk-contract.sh
+. "$SCRIPT_DIR/fm-afk-contract.sh"
 
 DRAIN_TMP=
 DRAIN_VIEW_TMP=
@@ -581,8 +583,9 @@ EOF
 # main last drained (docs/supervision-host.md "Captain outcomes"). Off Pi this
 # presentation is what the Pi branch's transcript entries are. It runs only for
 # main, only where fm_supervision_host_outcomes_drained holds (the Pi branch
-# extension owns this path on Pi), and never while the away-posture record
-# exists, because those outcomes wait for the return. Bounded, and silent when
+# extension owns this path on Pi), and never while an away record exists,
+# because those outcomes wait for the return; quiet mode's record is a present
+# captain (bin/fm-afk-contract.sh AWAY OR QUIET). Bounded, and silent when
 # nothing is new or unprocessed.
 #   - Captain outcomes come first and never wait behind routine ones. Every
 #     unprocessed captain row is presented on every drain until main
@@ -625,7 +628,7 @@ print_branch_outcomes_section() {
   config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
   fm_supervision_host_outcomes_drained "$config" || return 0
   [ -s "$STATE/branch-outcomes.jsonl" ] || return 0
-  [ ! -f "$STATE/.afk-contract" ] || return 0
+  ! fm_afk_contract_away_present "$STATE" || return 0
   if ! command -v jq >/dev/null 2>&1; then
     printf 'BRANCH OUTCOMES SKIPPED: jq is not installed, so the outcome store cannot be presented; nothing was marked read, and these outcomes are presented once jq is back.\n' >&2
     return 1
@@ -830,7 +833,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 if [ -n "$ACK_THROUGH" ]; then
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
 elif fm_lock_acquire_wait_bounded "$FM_WAKE_QUEUE_LOCK" "$PRESENTATION_LOCK_TIMEOUT"; then
   :
 else
@@ -910,7 +913,7 @@ if [ -n "$ACK_THROUGH" ]; then
     echo "wake drain: inactive outcome receipt could not be recorded safely" >&2
     exit 1
   fi
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
   DRAIN_LOCK_HELD=true
   DRAIN_TMP=$(mktemp "$STATE/.wake-queue.ack.XXXXXX") || exit 1
   chmod 0600 "$DRAIN_TMP" || exit 1

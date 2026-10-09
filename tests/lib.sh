@@ -108,12 +108,45 @@ pass() {
 # that file is armed once, here, at source time - which always runs in the
 # real caller, never a subshell.
 
+# fm_test_tmpdir: directory used for registries and fixture roots.
+# Resolves absolute or relative TMPDIR to an existing physical directory,
+# falling back to /tmp if resolution fails or the directory contains .git.
+# Keep registries out of git worktree roots so concurrent git add -A cannot
+# accidentally stage live test state.
+fm_test_tmpdir() {
+  local base=${TMPDIR:-/tmp} physical
+  base=${base%/}
+  [ -n "$base" ] || base=/tmp
+  case "$base" in
+    /*) ;;
+    *)
+      if physical=$(CDPATH='' cd -- "$base" 2>/dev/null && pwd -P); then
+        base=$physical
+      else
+        base=/tmp
+      fi
+      ;;
+  esac
+  if physical=$(CDPATH='' cd -- "$base" 2>/dev/null && pwd -P); then
+    base=$physical
+  else
+    base=/tmp
+  fi
+  if [ -e "$base/.git" ]; then
+    printf '%s\n' /tmp
+    return 0
+  fi
+  printf '%s\n' "$base"
+}
+
+FM_TEST_TMPDIR=$(fm_test_tmpdir) || return 1
+
 FM_TEST_CLEANUP_DIRS=()
-FM_TEST_CLEANUP_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-cleanup.$$.XXXXXX") || return 1
+FM_TEST_CLEANUP_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-cleanup.$$.XXXXXX") || return 1
 
 fm_test_pid_identity() {
   local pid=$1
-  FM_STATE_OVERRIDE="${TMPDIR:-/tmp}" bash -c \
+  FM_STATE_OVERRIDE="$FM_TEST_TMPDIR" bash -c \
     '. "$1"; fm_pid_identity "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$pid"
 }
 
@@ -136,7 +169,7 @@ FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || {
 # private one). It never matches on a script or process name, which would reach
 # into another home's live runners.
 
-FM_TEST_PROCEVENT_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-procevent.$$.XXXXXX") || return 1
+FM_TEST_PROCEVENT_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-procevent.$$.XXXXXX") || return 1
 
 fm_test_track_procevent_home() {  # <home> [claim-root]
   [ -n "${1:-}" ] || return 1
@@ -175,7 +208,7 @@ fm_test_reap_procevent_homes() {
 # deleted has no lock and is skipped; that watcher exits on its own home-gone
 # check within one poll.
 
-FM_TEST_WATCHER_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-watcher.$$.XXXXXX") || return 1
+FM_TEST_WATCHER_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-watcher.$$.XXXXXX") || return 1
 
 fm_test_track_watcher_state() {  # <state-dir>
   [ -n "${1:-}" ] || return 1
@@ -309,6 +342,23 @@ fm_test_reap_jobs() {
   done
 }
 
+# --- fixture-root process reaping ------------------------------------------
+#
+# Subshell-started or disowned stubs escape fm_test_reap_jobs' job table;
+# bin/fm-test-reap-orphans.sh's header owns their process-ownership proof.
+# Sweep BEFORE removing roots, because deleting a marker discards that proof.
+
+fm_test_reap_fixture_processes() {
+  local d
+  local -a args=()
+  [ -f "$FM_TEST_CLEANUP_REGISTRY" ] || return 0
+  while IFS= read -r d; do
+    [ -n "$d" ] && [ -d "$d" ] && args+=(--root "$d")
+  done < "$FM_TEST_CLEANUP_REGISTRY"
+  [ "${#args[@]}" -gt 0 ] || return 0
+  "$ROOT/bin/fm-test-reap-orphans.sh" --owner-pid "$$" "${args[@]}" >/dev/null 2>&1 || true
+}
+
 fm_test_cleanup() {
   local d
   # Stop watchers gracefully before forced job reaping: watcher_cleanup owns
@@ -317,6 +367,7 @@ fm_test_cleanup() {
   fm_test_reap_jobs
   fm_test_reap_processes
   fm_test_reap_procevent_homes
+  fm_test_reap_fixture_processes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
     [ -n "$d" ] && fm_test_remove_tree "$d"
   done
@@ -330,7 +381,7 @@ fm_test_cleanup() {
 
 fm_test_tmproot() {
   local prefix=${1:-fm-test} root tmp_base
-  tmp_base=${TMPDIR:-/tmp}
+  tmp_base=$(fm_test_tmpdir)
   tmp_base=${tmp_base%/}
   root=$(mktemp -d "$tmp_base/${prefix}.XXXXXX") || return 1
   root=$(cd -P -- "$root" && pwd -P) || return 1
@@ -373,8 +424,10 @@ FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 
 fm_test_reap_orphans() {
   local marker dir mtime now owner_pid owner_identity current_identity
+  # Stop what a dead owner left running before any root (and so its proof) goes.
+  "$ROOT/bin/fm-test-reap-orphans.sh" --tmpdir "$FM_TEST_TMPDIR" >/dev/null 2>&1 || true
   now=$(date +%s)
-  for marker in "${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture; do
+  for marker in "$FM_TEST_TMPDIR"/fm-*/.fm-test-fixture; do
     [ -e "$marker" ] || continue
     owner_pid=$(sed -n '1p' "$marker" 2>/dev/null) || owner_pid=
     owner_identity=$(sed -n '2,$p' "$marker" 2>/dev/null) || owner_identity=

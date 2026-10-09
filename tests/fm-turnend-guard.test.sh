@@ -190,6 +190,7 @@ install_guard_scripts() {
   cp "$ROOT/bin/fm-harness.sh" "$dir/bin/fm-harness.sh"
   cp "$ROOT/bin/fm-primary-scope-lib.sh" "$dir/bin/fm-primary-scope-lib.sh"
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
   cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
@@ -914,7 +915,6 @@ const contracts = {
   'fm-sessionstart-run.sh': ['SessionStart'],
   'fm-arm-pretool-check.sh': ['PreToolUse'],
   'fm-cd-pretool-check.sh': ['PreToolUse'],
-  'fm-jev-guardrail.mjs': ['PreToolUse'],
   'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
   'fm-turnend-guard.sh': ['Stop'],
   'fm-claude-stop-autoarm.sh': ['Stop'],
@@ -1002,7 +1002,7 @@ function payloadFor(registration, tool = 'Bash', ordinary = false) {
 }
 if (mode === 'contexts') {
   for (const registration of registrations) {
-    const tools = registration.target === 'fm-jev-guardrail.mjs' ? ['Bash', 'Read'] : ['Bash'];
+    const tools = ['Bash'];
     for (const tool of tools) {
       if (registration.event === 'PreToolUse') assert.ok(registration.matcher.test(tool), `${registration.target} lost ${tool}`);
       for (const home of [primary, task]) {
@@ -1028,16 +1028,6 @@ if (mode === 'contexts') {
               case 'fm-cd-pretool-check.sh':
                 deny(result, label);
                 break;
-              case 'fm-jev-guardrail.mjs': {
-                silent(result, label);
-                const records = rows(home, 'jev-guardrail.jsonl');
-                assert.equal(records.length, 1, `${label}: duplicate or missing screening result`);
-                assert.equal(records[0].event, 'result');
-                assert.equal(records[0].status, 'excluded');
-                assert.equal(records[0].host, 'claude');
-                assert.equal(records[0].selected, false);
-                break;
-              }
               case 'fm-host-mirror.sh':
                 silent(result, label);
                 assert.deepEqual(rows(home, '.host-mirror.jsonl').map(row => [row.tag, row.text]),
@@ -1067,13 +1057,6 @@ if (mode === 'contexts') {
       silent(invoke(registration, primary, 'native', payloadFor(registration, 'Bash', true)), `${registration.target}/ordinary`);
       assert.deepEqual(snapshot(primary), before, `${registration.target}: ordinary hook changed state`);
     }
-    if (registration.target === 'fm-jev-guardrail.mjs') {
-      for (const tool of tools) {
-        reset(primary, registration.target);
-        silent(invoke(registration, primary, 'task-marker', payloadFor(registration, tool)), `Jev/${tool}/task-marker`);
-        assert.deepEqual(snapshot(primary), [], `Jev/${tool}: task marker did not exclude tracked screening`);
-      }
-    }
   }
 } else if (mode === 'tools') {
   assert.deepEqual(settings.permissions?.deny ?? [], [], 'tracked permissions deny helper/session tools');
@@ -1082,8 +1065,7 @@ if (mode === 'contexts') {
   const tools = ['Bash', 'Read', ...helpers, 'Edit', 'Write', 'Glob', 'Grep', 'WebFetch', 'WebSearch',
     'Skill', 'NotebookEdit', 'MultiEdit', 'ExitPlanMode', 'EnterPlanMode', 'Task', 'TaskOutput', 'TaskStop'];
   for (const registration of pretool) {
-    const expected = registration.target === 'fm-jev-guardrail.mjs' ? ['Bash', 'Read'] : ['Bash'];
-    assert.deepEqual(tools.filter(tool => registration.matcher.test(tool)), expected,
+    assert.deepEqual(tools.filter(tool => registration.matcher.test(tool)), ['Bash'],
       `${registration.target}: matcher intercepts a tool outside its exact surface`);
   }
   for (const tool of helpers) assert.ok(!pretool.some(r => r.matcher.test(tool)), `${tool} intercepted`);
@@ -1105,12 +1087,6 @@ if (mode === 'contexts') {
     assert.deepEqual(deniers, command === null || command === 'cat README.md' ? []
       : [command === 'cd projects/example' ? 'fm-cd-pretool-check.sh' : 'fm-arm-pretool-check.sh'],
       `${tool}/${command}: missing, duplicated, or crossed Bash authorization`);
-    const records = rows(primary, 'jev-guardrail.jsonl');
-    assert.ok(records.every(row => row.event === 'result'), 'credential-free screening attempted transport');
-    if (command === null || command === 'cat README.md') {
-      assert.deepEqual(records.map(row => [row.host, row.status]), [['claude', 'excluded']],
-        `${tool}: ordinary tool must produce one advisory excluded result`);
-    }
   }
 } else assert.fail(`unknown config consumer mode: ${mode}`);
 JS
@@ -1407,8 +1383,13 @@ install_integrated_autoarm() {
   cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
   cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
   cp "$ROOT/bin/fm-lock.sh" "$dir/bin/fm-lock.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-lock.sh"
   ln -s /bin/bash "$dir/fake-claude"
+  # These cases drive the watcher arm, so the home opts out of the supervision
+  # host a Claude home otherwise runs by default.
+  mkdir -p "$dir/config"
+  : > "$dir/config/supervision-host-off"
 }
 
 run_integrated_autoarm() {

@@ -3,10 +3,9 @@
 #
 # bin/fm-lint.sh is the single owner invoked by CI
 # (.github/workflows/ci.yml) and by the pre-push gate (.no-mistakes.yaml
-# commands.lint). CI runs its two full-rigor canonical partitions; the local
-# gate uses its context-selected default. Their selection differs deliberately,
-# while this owner keeps analysis flags, configuration, and tool versions from
-# drifting.
+# commands.lint). CI and the local gate deliberately select different roots;
+# bin/fm-lint.sh owns their analysis modes, memory fallback, configuration,
+# and tool versions.
 # Regression origin: with no commands.lint configured, the local no-mistakes
 # lint step never ran the deterministic shell lint, so PRs passed local
 # validation yet failed CI on info/warning findings such as SC2015, SC1007, and
@@ -23,6 +22,8 @@ INSTALLER="$ROOT/bin/fm-install-shellcheck.sh"
 REQUIRED=$("$LINT" --required-version)
 # Ordinary regressions must not read or populate the operator's shared cache.
 export FM_LINT_CACHE_DIR=off
+# Nor may they queue on the operator's shared host-wide ShellCheck slots.
+export FM_LINT_SLOT_DIR=off
 
 # Official GitHub release asset sha256 values for shellcheck v0.11.0 .tar.xz
 # archives (https://github.com/koalaman/shellcheck/releases/tag/v0.11.0). Tests
@@ -1089,6 +1090,587 @@ SH
   pass "jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry"
 }
 
+# Counted design comparison (architectural requirements, not timing estimates):
+# Design                              Host bound  Lone workers  New daemons  Stale-slot cleanup
+# A per-run only                           0           2             0                0
+# B FM_LINT_JOBS=1 default                  0           1             0                0
+# C bash mkdir slot dirs                   1           2             0                1
+# D central lint daemon                    1           2             1                0
+# E flock slot pool in the Perl helper     1           2             0                0 (chosen)
+# E supplies a host bound without a daemon or stale-lock reclamation protocol.
+# Supplied paired reproduction: identical workloads of six roots per run,
+# --jobs 2, gate disabled with FM_LINT_SLOT_DIR=off versus enabled with cap 3.
+# Concurrent runs:                    1     4     8    16
+# Peak live ShellCheck, disabled:     2     8    16    32 (2 x runs)
+# Peak live ShellCheck, enabled:      2     3     3     3 (min(2 x runs, cap))
+# A lone run still peaks at two; fleet-day measurements remain out of scope.
+#
+fm_lint_stub_counting_shellcheck() {
+  local fakebin=$1 activity=$2 peak=$3 real_perl
+  real_perl=$(command -v perl)
+  mkdir -p "$activity"
+  : > "$peak"
+  cat > "$fakebin/shellcheck" <<PL
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Fcntl qw(:flock);
+use Time::HiRes qw(time sleep);
+if ((\$ARGV[0] // '') eq '--version') {
+    print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
+    exit 0;
+}
+open(my \$lock, '>>', "$peak.lock") or die "\$!";
+flock(\$lock, LOCK_EX) or die "\$!";
+open(my \$active, '>', "$activity/\$\$") or die "\$!";
+close \$active;
+my @active = glob "$activity/*";
+open(my \$peak, '>>', "$peak") or die "\$!";
+print {\$peak} scalar(@active), "\n";
+close \$peak;
+close \$lock;
+my \$deadline = time() + 90;
+while (\$ENV{FM_LINT_COUNT_HOLD} && !-e "$peak.release") {
+    if (time() > \$deadline) { unlink "$activity/\$\$"; exit 1; }
+    sleep 0.01;
+}
+unlink "$activity/\$\$";
+exit 0;
+PL
+  chmod +x "$fakebin/shellcheck"
+  cat > "$fakebin/perl" <<PL
+#!$real_perl
+use strict;
+use warnings;
+use Time::HiRes qw(time sleep);
+if (\$ENV{FM_LINT_COUNT_HOLD} && (\$ARGV[0] // '') =~ m{/fm-lint-cache[.]pl\\z}
+    && ((\$ARGV[1] // '') eq 'gate'
+        || ((\$ARGV[1] // '') eq 'check' && (\$ENV{FM_LINT_INTERNAL_SLOT_DIR} // 'off') eq 'off'))) {
+    my \$dir = \$ENV{FM_LINT_COUNT_READY_DIR};
+    open(my \$ready, '>', "\$dir/ready.\$\$") or die "\$!";
+    close \$ready;
+    my \$deadline = time() + 30;
+    until (-e "\$dir/start") {
+        die "contender start deadline exceeded\\n" if time() > \$deadline;
+        sleep 0.01;
+    }
+    open(my \$attempt, '>', "\$dir/attempt.\$\$") or die "\$!";
+    close \$attempt;
+}
+exec "$real_perl", @ARGV or die "exec perl: \$!";
+PL
+  chmod +x "$fakebin/perl"
+}
+
+fm_lint_concurrent_runs() {
+  local runs=$1 tmp=$2 fakebin=$3 expected=$4 run pid rc=0 ready_rc=0
+  local -a pids roots
+  roots=("$tmp/a.sh" "$tmp/b.sh" "$tmp/c.sh" "$tmp/d.sh")
+  rm -f "$tmp/peak.release"
+  rm -rf "$tmp/contenders"
+  mkdir -p "$tmp/contenders"
+  for run in $(seq 1 "$runs"); do
+    FM_LINT_COUNT_HOLD=1 FM_LINT_COUNT_READY_DIR="$tmp/contenders" \
+      PATH="$fakebin:$PATH" "$LINT" --jobs 2 "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
+    pids+=("$!")
+  done
+  perl - "$tmp/peak" "$expected" "$tmp/contenders" "$((2 * runs))" <<'PL' || ready_rc=$?
+use Time::HiRes qw(time sleep);
+my ($peak, $expected, $dir, $contenders) = @ARGV;
+my $deadline = time() + 30;
+while (1) {
+    my @ready = glob "$dir/ready.*";
+    last if @ready >= $contenders;
+    die "contender readiness deadline exceeded\n" if time() > $deadline;
+    sleep 0.01;
+}
+open(my $start, '>', "$dir/start") or die "$!";
+close $start;
+$deadline = time() + 30;
+while (1) {
+    my @attempts = glob "$dir/attempt.*";
+    last if @attempts >= $contenders;
+    die "contender admission attempt deadline exceeded\n" if time() > $deadline;
+    sleep 0.01;
+}
+$deadline = time() + 30;
+while (1) {
+    open(my $fh, '<', $peak) or die "$!";
+    my @counts = <$fh>;
+    close $fh;
+    last if grep { /\A[0-9]+\n\z/ && $_ >= $expected } @counts;
+    die "concurrent admission deadline exceeded\n" if time() > $deadline;
+    sleep 0.01;
+}
+sleep 3;
+PL
+  touch "$tmp/contenders/start" "$tmp/peak.release"
+  for pid in "${pids[@]}"; do
+    wait "$pid" || rc=$?
+  done
+  [ "$ready_rc" -eq 0 ] || fail "concurrent runs did not reach $expected held ShellCheck processes"$'\n'"$(cat "$tmp"/run.*.out)"
+  [ "$rc" -eq 0 ] || fail "a concurrent fm-lint.sh run failed (rc=$rc)"$'\n'"$(cat "$tmp"/run.*.out)"
+  sort -n "$tmp/peak" | tail -1
+}
+
+fm_lint_slot_fixture() {  # <name> -> prints the tmp dir
+  local tmp root
+  tmp=$(fm_test_tmproot "$1")
+  mkdir -p "$tmp/bin"
+  for root in a b c d; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"
+  done
+  fm_lint_stub_counting_shellcheck "$tmp/bin" "$tmp/active" "$tmp/peak"
+  printf '%s\n' "$tmp"
+}
+
+test_host_slots_bound_concurrent_runs() {
+  local tmp peak lone baseline
+  tmp=$(fm_lint_slot_fixture fm-lint-slots)
+  # One run keeps its two workers: the host-wide bound never throttles a lone run.
+  lone=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
+    fm_lint_concurrent_runs 1 "$tmp" "$tmp/bin" 2)
+  [ "$lone" -eq 2 ] || fail "a lone run peaked at $lone live ShellCheck processes, expected its two workers"
+  : > "$tmp/peak"
+  baseline=$(FM_LINT_SLOT_DIR=off fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin" 12)
+  [ "$baseline" -eq 12 ] || fail "six ungated runs peaked at $baseline live ShellCheck processes, expected 12"
+  : > "$tmp/peak"
+  # Six runs would start twelve ShellCheck processes if each bounded only itself.
+  peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
+    fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin" 3)
+  [ "$peak" -le 3 ] || fail "six concurrent runs reached $peak live ShellCheck processes, expected at most 3 host-wide"
+  [ "$peak" -ge 3 ] || fail "six concurrent runs peaked at $peak, so the slots were not used in parallel"
+  pass "six concurrent runs peak at $baseline ShellCheck processes ungated and $peak with a three-slot pool"
+}
+
+test_host_load_shrinks_slots_to_the_floor() {
+  local tmp peak
+  tmp=$(fm_lint_slot_fixture fm-lint-slots-load)
+  # Load far past two times the cores leaves only the two-slot floor, so the
+  # runs queue instead of failing or timing out.
+  peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=6 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=100000 \
+    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin" 2)
+  [ "$peak" -le 2 ] || fail "under heavy load four runs reached $peak live ShellCheck processes, expected at most 2"
+  : > "$tmp/peak"
+  peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=6 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
+    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin" 6)
+  [ "$peak" -gt 2 ] || fail "with an idle host four runs peaked at $peak, so the load never widened the slots"
+  pass "host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them"
+}
+
+test_host_load_preserves_the_cap_until_the_threshold() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-slots-threshold)
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "host load boundary regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use Fcntl qw(:flock);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+my $command = q{
+    use Time::HiRes qw(time sleep);
+    my ($started, $release) = @ARGV;
+    open(my $fh, '>', $started) or die "$!";
+    close $fh;
+    my $deadline = time() + 15;
+    until (-e $release) { exit 1 if time() > $deadline; sleep 0.01; }
+};
+for my $cap ('', 6) {
+    local $ENV{FM_LINT_HOST_SLOTS} = $cap;
+    for my $load (30, 36, 37) {
+        local $ENV{FM_TEST_SEAM} = 1;
+        local $ENV{FM_LINT_SLOT_LOAD} = $load;
+        my $full = $cap || 9;
+        my $expected = $load == 37 ? $full - 1 : $full;
+        my $dir = "$tmp/$full.$load";
+        make_path($dir);
+        my @pids;
+        for my $index (0 .. $full) {
+            my $pid = fork();
+            die "fork: $!" unless defined $pid;
+            if (!$pid) {
+                exec $^X, $gate, 'gate', "$dir/slots", 18, "$dir/wait.$index",
+                    '--', $^X, '-e', $command, "$dir/started.$index", "$dir/release";
+                die "exec: $!";
+            }
+            push @pids, $pid;
+        }
+        my $error;
+        eval {
+            my $deadline = time() + 10;
+            while (1) {
+                my @started = glob "$dir/started.*";
+                last if @started >= $expected;
+                die "admission deadline exceeded\n" if time() > $deadline;
+                sleep 0.01;
+            }
+            sleep 0.25;
+            my @started = glob "$dir/started.*";
+            die "admitted @started; expected $expected commands\n" unless @started == $expected;
+        };
+        $error = $@;
+        open(my $release, '>', "$dir/release") or die "release: $!";
+        close $release;
+        for my $pid (@pids) {
+            waitpid($pid, 0);
+            $error ||= "gated command exited with status $?\n" if $?;
+        }
+        die "cap $full, load $load: $error" if $error;
+    }
+}
+for my $path (qw(scan wake)) {
+    my $dir = "$tmp/occupancy.$path";
+    make_path("$dir/slots");
+    my @holders;
+    for my $index ($path eq 'wake' ? (0 .. 8) : (1 .. 8)) {
+        open($holders[$index], '>>', "$dir/slots/slot.$index") or die "$!";
+        flock($holders[$index], LOCK_EX) or die "$!";
+    }
+    local $ENV{FM_LINT_HOST_SLOTS} = 9;
+    local $ENV{FM_TEST_SEAM} = 1;
+    local $ENV{FM_LINT_SLOT_LOAD} = 43;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        close $_ for grep { defined } @holders;
+        exec $^X, $gate, 'gate', "$dir/slots", 18, "$dir/wait",
+            '--', $^X, '-e', 'open(my $fh, ">", $ARGV[0]) or die "$!"', "$dir/started";
+        die "exec: $!";
+    }
+    my $error;
+    eval {
+        sleep 0.25;
+        close $holders[0] if $path eq 'wake';
+        sleep 2;
+        die "admitted with eight occupied slots and an allowance of two\n" if -e "$dir/started";
+        close $holders[$_] for 1 .. 7;
+        my $deadline = time() + 5;
+        until (-e "$dir/started") {
+            die "did not admit below the occupancy allowance\n" if time() > $deadline;
+            sleep 0.01;
+        }
+    };
+    $error = $@;
+    close $holders[8];
+    if ($error) { kill 'KILL', $pid; }
+    waitpid($pid, 0);
+    $error ||= "gated command failed: $?\n" if $?;
+    die "$path: $error" if $error;
+}
+PL
+  pass "host caps follow the load threshold and both acquisition paths respect total occupancy"
+}
+
+test_slot_pool_can_be_disabled_or_misconfigured() {
+  local tmp rc out
+  tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
+  rc=0
+  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR=off "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a run with the slot pool off failed"$'\n'"$out"
+  rc=0
+  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=zero "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "a non-numeric FM_LINT_HOST_SLOTS exited $rc, expected 2"
+  assert_contains "$out" "FM_LINT_HOST_SLOTS" "the refusal did not name the setting"
+  [ ! -d "$tmp/slots" ] || fail "a refused run still created the slot directory"
+  rc=0
+  out=$(PATH="$tmp/bin:$PATH" FM_LINT_SLOT_DIR="$tmp/a.sh/blocked" "$LINT" "$tmp/a.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "an unusable slot directory must not fail lint"$'\n'"$out"
+  assert_contains "$out" "running without the host-wide ShellCheck bound" "an unusable slot directory was not reported"
+  pass "the slot pool can be disabled, rejects bad settings, and never fails lint when unusable"
+}
+
+test_slot_file_failures_run_ungated() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-slot-errors)
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slot I/O fallback regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+open(my $module, '>', "$tmp/FailLock.pm") or die "$!";
+print {$module} <<'MODULE';
+package FailLock;
+use Errno qw(EIO EWOULDBLOCK);
+use Fcntl qw(LOCK_NB);
+BEGIN {
+    *CORE::GLOBAL::flock = sub {
+        $! = $ENV{FAIL_LOCK} eq 'wait' && ($_[1] & LOCK_NB) ? EWOULDBLOCK : EIO;
+        return 0;
+    };
+}
+1;
+MODULE
+close $module;
+for my $failure (qw(open scan wait)) {
+    my $dir = "$tmp/$failure";
+    make_path("$dir/slots");
+    make_path("$dir/slots/slot.0") if $failure eq 'open';
+    local $ENV{FM_LINT_HOST_SLOTS} = 1;
+    local $ENV{FM_TEST_SEAM} = 1;
+    local $ENV{FM_LINT_SLOT_LOAD} = 0;
+    local $ENV{FAIL_LOCK} = $failure;
+    my @inject = $failure eq 'open' ? () : ("-I$tmp", '-MFailLock');
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        open STDERR, '>', "$dir/err" or die "$!";
+        exec $^X, @inject, $gate, 'gate', "$dir/slots", 18, "$dir/wait",
+            '--', $^X, '-e', 'print "analysis ran\n"; exit 23';
+        die "exec: $!";
+    }
+    my $deadline = time() + 30;
+    while (waitpid($pid, WNOHANG) == 0) {
+        if (time() > $deadline) {
+            kill 'KILL', $pid;
+            waitpid($pid, 0);
+            die "$failure failure queued instead of running ungated\n";
+        }
+        sleep 0.01;
+    }
+    die "$failure fallback lost the command exit status: $?\n" unless $? == (23 << 8);
+    open(my $err, '<', "$dir/err") or die "$!";
+    local $/;
+    my $warning = <$err>;
+    die "$failure fallback omitted the warning\n"
+        unless $warning =~ /running without the host-wide ShellCheck bound/;
+}
+PL
+  pass "slot open and non-contention scan/wait lock failures warn and run ungated"
+}
+
+test_slot_survives_gate_death() {
+  local tmp bounded=none
+  if fm_lint_bounds_supported; then bounded=perl; fi
+  tmp=$(fm_test_tmproot fm-lint-slot-inheritance)
+  perl - "$LINT" "$ROOT/bin/fm-lint-cache.pl" "$tmp" "$bounded" <<'PL' || fail "slot lifetime regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($lint, $gate_script, $tmp, $bound_mechanism) = @ARGV;
+open(my $stub, '>', "$tmp/shellcheck") or die "$!";
+print {$stub} "#!/usr/bin/env perl\n", <<'STUB';
+use Time::HiRes qw(time sleep);
+$SIG{TERM} = $SIG{HUP} = $SIG{INT} = 'IGNORE';
+my $child = fork();
+die "fork: $!" unless defined $child;
+if (!$child) {
+    my $deadline = time() + 15;
+    until (-e "$ENV{CASE_DIR}/release") { last if time() > $deadline; sleep 0.01; }
+    exit 0;
+}
+open(my $fh, '>', "$ENV{CASE_DIR}/started") or die "$!";
+print {$fh} "$$ $child\n";
+close $fh;
+waitpid($child, 0);
+STUB
+close $stub;
+chmod 0755, "$tmp/shellcheck";
+for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
+    my $dir = "$tmp/$bounded";
+    make_path("$dir/out");
+    open(my $root, '>', "$dir/root.sh") or die "$!";
+    print {$root} "#!/bin/bash\nexit 0\n";
+    close $root;
+    open(my $manifest, '>', "$dir/manifest") or die "$!";
+    print {$manifest} "0\t$dir/root.sh\n";
+    close $manifest;
+    local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
+        FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
+        FM_LINT_HOST_SLOTS => 1, FM_TEST_SEAM => 1, FM_LINT_SLOT_LOAD => 0,
+        FM_LINT_INTERNAL_BOUNDED => $bounded, FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
+        FM_LINT_INTERNAL_ROOT_SECS => 10, FM_LINT_INTERNAL_GRACE => 1,
+        FM_LINT_SHELLCHECK => "$tmp/shellcheck", CASE_DIR => $dir);
+    my $worker = fork();
+    die "fork: $!" unless defined $worker;
+    if (!$worker) {
+        open STDOUT, '>', "$dir/output" or die "$!";
+        open STDERR, '>&', \*STDOUT or die "$!";
+        exec '/bin/bash', $lint, '--internal-worker', "$dir/manifest", "$dir/out", 0;
+        die "exec: $!";
+    }
+    my ($command, $descendant, $gate, $queued, $error);
+    eval {
+        my $deadline = time() + 5;
+        until (-s "$dir/started") { die "command never started\n" if time() > $deadline; sleep 0.01; }
+        open(my $started, '<', "$dir/started") or die "$!";
+        ($command, $descendant) = split / /, <$started>;
+        open(my $ps, '-|', 'ps', '-axo', 'pid=,ppid=,args=') or die "$!";
+        my (%parent, %args);
+        while (<$ps>) {
+            next unless /^\s*(\d+)\s+(\d+)\s+(.*)$/;
+            $parent{$1} = $2; $args{$1} = $3;
+        }
+        close $ps;
+        my $ancestor = $command;
+        while ($ancestor && $ancestor != $worker) {
+            if (($args{$ancestor} // '') =~ /\Q$dir\/slots\E/) { $gate = $ancestor; last; }
+            $ancestor = $parent{$ancestor};
+        }
+        die "gate not found in command ancestry\n" unless $gate;
+        $queued = fork();
+        die "fork: $!" unless defined $queued;
+        if (!$queued) {
+            exec $^X, $gate_script, 'gate', "$dir/slots", 18, "$dir/queued.wait",
+                '--', $^X, '-e', q{
+                    my ($admitted, $bounded, @protected) = @ARGV;
+                    if ($bounded ne 'none') {
+                        open(my $ps, '-|', 'ps', '-o', 'stat=', '-p', join(',', @protected)) or die "$!";
+                        my @live = grep { !/^\s*Z/ } <$ps>;
+                        close $ps;
+                        die "admission overlapped a live protected tree\n" if @live;
+                    }
+                    open(my $fh, '>', $admitted) or die "$!";
+                }, "$dir/admitted", $bounded, $command, $descendant;
+            die "exec: $!";
+        }
+        kill 'KILL', $gate;
+        if ($bounded eq 'none') {
+            sleep 0.2;
+            die "queued command started while protected tree survived\n" if -e "$dir/admitted";
+            kill 'KILL', $command;
+            sleep 0.2;
+            die "queued command started while protected descendant survived\n" if -e "$dir/admitted";
+            die "protected descendant exited before release\n" unless kill 0, $descendant;
+        } else {
+            my $deadline = time() + 5;
+            until (-e "$dir/admitted") {
+                die "watchdog cleanup did not release the slot\n" if time() > $deadline;
+                sleep 0.01;
+            }
+        }
+    };
+    $error = $@;
+    open(my $release, '>', "$dir/release") or die "$!";
+    close $release;
+    my $deadline = time() + 5;
+    if ($queued) {
+        while (waitpid($queued, WNOHANG) == 0) {
+            if (time() > $deadline) { kill 'KILL', $queued; waitpid($queued, 0); $error ||= "slot never released\n"; last; }
+            sleep 0.01;
+        }
+        $error ||= "queued command failed: $?\n" if $?;
+        $error ||= "queued command never admitted\n" unless -e "$dir/admitted";
+    }
+    kill 'KILL', $command if $command;
+    kill 'KILL', $descendant if $descendant;
+    kill 'TERM', $worker;
+    waitpid($worker, 0);
+    if ($error) {
+        open(my $output, '<', "$dir/output") or die "$!";
+        open(my $analysis, '<', "$dir/out/shard.0.out") or die "$!";
+        local $/;
+        die "$bounded: $error", <$output>, <$analysis>;
+    }
+}
+PL
+  pass "inherited slots prevent overlap after gate death and allow admission after watchdog cleanup"
+}
+
+test_queued_roots_use_high_resolution_timings() {
+  local tmp bounded=none
+  if fm_lint_bounds_supported; then bounded=perl; fi
+  tmp=$(fm_test_tmproot fm-lint-slot-clock)
+  perl - "$LINT" "$tmp" "$bounded" <<'PL' || fail "queued root clock regression failed"
+use strict;
+use warnings;
+use Fcntl qw(:flock);
+use File::Path qw(make_path);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($lint, $tmp, $bounded) = @ARGV;
+open(my $env, '>', "$tmp/bash-env") or die "$!";
+print {$env} "unset EPOCHREALTIME\n";
+close $env;
+open(my $stub, '>', "$tmp/shellcheck") or die "$!";
+print {$stub} "#!/usr/bin/env perl\n", <<'STUB';
+use Time::HiRes qw(sleep);
+sleep 0.08;
+if ($ENV{RETRY} && grep { $_ eq '--external-sources' } @ARGV) {
+    print STDERR "shellcheck: Heap exhausted;\n";
+    exit 251;
+}
+exit 0;
+STUB
+close $stub;
+chmod 0755, "$tmp/shellcheck";
+for my $retry (0, 1) {
+    my $dir = "$tmp/$retry";
+    make_path("$dir/out", "$dir/slots");
+    open(my $slot, '>>', "$dir/slots/slot.0") or die "$!";
+    flock($slot, LOCK_EX) or die "$!";
+    open(my $manifest, '>', "$dir/manifest") or die "$!";
+    print {$manifest} "0\t$dir/root.sh\n";
+    close $manifest;
+    open(my $root, '>', "$dir/root.sh") or die "$!";
+    print {$root} "#!/bin/bash\nexit 0\n";
+    close $root;
+    local %ENV = (%ENV, BASH_ENV => "$tmp/bash-env", RETRY => $retry,
+        FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
+        FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
+        FM_LINT_HOST_SLOTS => 1, FM_TEST_SEAM => 1, FM_LINT_SLOT_LOAD => 0,
+        FM_LINT_INTERNAL_BOUNDED => $bounded, FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
+        FM_LINT_INTERNAL_ROOT_SECS => 3, FM_LINT_INTERNAL_GRACE => 1,
+        FM_LINT_INTERNAL_ROOTS_LOG => "$dir/roots.tsv", FM_LINT_SHELLCHECK => "$tmp/shellcheck");
+    my $launched = time();
+    my $worker = fork();
+    die "fork: $!" unless defined $worker;
+    if (!$worker) {
+        close $slot;
+        open STDOUT, '>', "$dir/output" or die "$!";
+        open STDERR, '>&', \*STDOUT or die "$!";
+        exec '/bin/bash', $lint, '--internal-worker', "$dir/manifest", "$dir/out", 0;
+        die "exec: $!";
+    }
+    my $error;
+    eval {
+        # Controller waits cover host scheduling and worker bookkeeping; the
+        # protected root still has its independently enforced three-second bound.
+        my $deadline = time() + 30;
+        until (-s "$dir/roots.tsv") { die "root never began\n" if time() > $deadline; sleep 0.01; }
+        my $began = time();
+        sleep 1.5;
+        close $slot;
+        $deadline = time() + 30;
+        while (waitpid($worker, WNOHANG) == 0) {
+            die "queued root timed out\n" if time() > $deadline;
+            sleep 0.01;
+        }
+        die "queued root failed: $?\n" if $?;
+        my $finished = time();
+        my $queued_ms = 0;
+        for my $file (glob "$dir/out/*.rss.wait") {
+            open(my $wait, '<', $file) or die "$!";
+            $queued_ms += <$wait>;
+        }
+        my $elapsed = ($finished - $launched) * 1000 - $queued_ms;
+        open(my $log, '<', "$dir/roots.tsv") or die "$!";
+        my @end;
+        while (<$log>) { @end = split /\t/ if /^end\t/; }
+        die "missing root result\n" unless @end;
+        my $expected = $retry ? 'memory-fallback' : 'ok';
+        die "wrong root outcome: $end[9]\n" unless $end[9] eq $expected;
+        die "root timestamps fall outside the observed lifecycle\n"
+            unless $end[5] >= $launched * 1000 - 1 && $end[5] <= $began * 1000 + 1
+                && $end[6] >= ($began + 1.5) * 1000 - 1 && $end[6] <= $finished * 1000 + 1;
+        die "duration $end[7]ms exceeds $elapsed ms available for analysis\n"
+            unless $end[7] >= 70 && $end[7] <= $elapsed + 2;
+        die "root wall time omitted the queue\n" unless $end[6] - $end[5] >= 1500;
+    };
+    $error = $@;
+    close $slot if defined fileno($slot);
+    kill 'KILL', $worker;
+    waitpid($worker, 0);
+    die "retry=$retry: $error" if $error;
+}
+PL
+  pass "queued roots and memory retries record precise analysis durations without EPOCHREALTIME"
+}
+
 test_worker_trees_stop_on_signal() {
   local tmp fakebin fixture jobs telemetry lint_tmp pid_file out_file telemetry_file
   local parent_pid shellcheck_pid i parent_rc survivor
@@ -1274,6 +1856,177 @@ test_root_memory_limit_reports_a_named_death() {
   awk -F '\t' '$1 == "end" && $3 ~ /ok\.sh$/ && $10 == "ok" { found=1 } END { exit !found }' \
     "$roots_log" || fail "the sidecar lost the clean root's record"
   pass "a root refused by its enforced memory limit fails by name with a memory reason"
+}
+
+test_memory_failure_retries_without_external_sources() {
+  local tmp fakebin fixture out rc log rss_kib require_bounds=0 mode
+  local -a modes=(0)
+  if fm_lint_bounds_supported; then
+    require_bounds=1
+    modes=(1 0)
+  fi
+  tmp=$(fm_test_tmproot fm-lint-memory-fallback)
+  fakebin=$(fm_fakebin "$tmp")
+  fixture="$tmp/teardown.sh"
+  log="$tmp/flags.log"
+  printf '#!/usr/bin/env bash\n# shellcheck source=lib.sh\nexit 0\n' > "$fixture"
+  cat > "$fakebin/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+follow=no
+exclude=none
+while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
+  case "$1" in
+    --external-sources) follow=yes ;;
+    --exclude=*) exclude=${1#--exclude=} ;;
+  esac
+  shift
+done
+shift
+printf '%s\t%s\n' "$follow" "$exclude" >> "$FM_TEST_FALLBACK_LOG"
+if [ "$follow" = yes ]; then
+  printf 'shellcheck: Heap exhausted;\n' >&2
+  exit 251
+fi
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+
+  for mode in "${modes[@]}"; do
+    : > "$log"
+    rc=0
+    out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS="$mode" \
+      FM_TEST_FALLBACK_LOG="$log" "$LINT" --telemetry "$tmp/pass.$mode.tsv" "$fixture" 2>&1) || rc=$?
+    [ "$rc" -eq 0 ] || fail "a clean no-source fallback did not pass (bounded=$mode)"$'\n'"$out"
+    assert_grep $'source_directives\t1' "$tmp/pass.$mode.tsv" "telemetry lost the root's source directive"
+    assert_grep $'source_followed_directives\t0' "$tmp/pass.$mode.tsv" \
+      "telemetry counted a source directive that the passing fallback did not follow"
+    [ "$(cat "$log")" = "$(printf 'yes\tnone\nno\tSC1091,SC2034,SC2153,SC2329')" ] \
+      || fail "the memory failure did not retry without external sources and exclude only cross-file codes"$'\n'"$(cat "$log")"
+    assert_contains "$out" "hit the memory ceiling with --external-sources (reason=memory rc=251)" \
+      "the fallback was not identified in the output"
+    assert_contains "$out" "fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)" \
+      "the narrower fallback result was not disclosed"
+    awk -F '\t' '$1 == "end" && $3 ~ /teardown\.sh$/ && $9 == 0 && $10 == "memory-fallback" { found=1 } END { exit !found }' \
+      "$tmp/pass.$mode.roots.tsv" || fail "the clean fallback was not recorded distinctly"
+    rss_kib=$(awk -F '\t' '$1 == "end" && $3 ~ /teardown\.sh$/ { print $11 }' "$tmp/pass.$mode.roots.tsv")
+    if [ "$mode" -eq 1 ]; then
+      assert_grep $'meta\tbounds_enforced\t1' "$tmp/pass.$mode.roots.tsv" \
+        "the bounded fallback did not enforce bounds"
+      case "$rss_kib" in ''|*[!0-9]*) fail "the fallback attempts lost per-root RSS reporting: $rss_kib" ;; esac
+    else
+      assert_grep $'meta\tbounds_enforced\t0' "$tmp/pass.$mode.roots.tsv" \
+        "the unbounded fallback unexpectedly enforced bounds"
+      # Unbounded roots read RSS from /usr/bin/time when the host has it, so the
+      # figure is either that reading or the explicit unavailable marker.
+      case "$rss_kib" in
+        unavailable) ;;
+        ''|*[!0-9]*) fail "the unbounded fallback reported a malformed RSS: $rss_kib" ;;
+      esac
+    fi
+  done
+
+  if ! pinned_ready; then
+    pass "SKIP (ShellCheck $REQUIRED not resolved): real fallback finding check"
+    return
+  fi
+  local real_shellcheck
+  real_shellcheck=$(command -v shellcheck)
+  cat > "$fakebin/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  exec "$FM_REAL_SHELLCHECK" "$@"
+fi
+for arg in "$@"; do
+  if [ "$arg" = --external-sources ]; then
+    printf 'shellcheck: Heap exhausted;\n' >&2
+    exit 251
+  fi
+done
+exec "$FM_REAL_SHELLCHECK" "$@"
+SH
+  chmod +x "$fakebin/shellcheck"
+  # shellcheck disable=SC2016 # The fixture intentionally contains an unexpanded parameter.
+  printf '#!/usr/bin/env bash\nx=$1\nprintf "%%s\\n" $x\n' > "$fixture"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_REAL_SHELLCHECK="$real_shellcheck" \
+    FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS="$require_bounds" \
+    "$LINT" --telemetry "$tmp/finding.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "a real ShellCheck finding in the fallback did not fail lint (exit $rc)"$'\n'"$out"
+  assert_contains "$out" "fallback reason=findings rc=1" \
+    "the fallback finding was not identified"
+  assert_contains "$out" "SC2086" "the real fallback finding was not reported"
+  awk -F '\t' '$1 == "end" && $3 ~ /teardown\.sh$/ && $9 == 1 && $10 == "findings" { found=1 } END { exit !found }' \
+    "$tmp/finding.roots.tsv" || fail "the fallback finding was not recorded as a failure"
+  pass "memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding"
+}
+
+test_memory_fallback_spends_only_the_remaining_root_deadline() {
+  if ! fm_lint_bounds_supported; then
+    pass "SKIP (host cannot enforce the bounded envelope): fallback deadline check"
+    return
+  fi
+  local tmp fakebin fixture log out rc duration_ms
+  tmp=$(fm_test_tmproot fm-lint-fallback-deadline)
+  fakebin=$(fm_fakebin "$tmp")
+  fixture="$tmp/teardown.sh"
+  log="$tmp/attempts.log"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
+  cat > "$fakebin/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+for arg in "$@"; do
+  if [ "$arg" = --external-sources ]; then
+    printf 'follow\n' >> "$FM_TEST_ATTEMPT_LOG"
+    sleep "$FM_TEST_FIRST_SECS"
+    printf 'shellcheck: Heap exhausted;\n' >&2
+    exit 251
+  fi
+done
+printf 'fallback\n' >> "$FM_TEST_ATTEMPT_LOG"
+sleep 60
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+
+  # A 3s first attempt leaves about 3s of the 6s deadline, so the retry is
+  # killed there; a fresh deadline would let the root run for about 9s.
+  : > "$log"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=1 \
+    FM_LINT_ROOT_SECONDS=6 FM_LINT_ROOT_GRACE=1 \
+    FM_TEST_ATTEMPT_LOG="$log" FM_TEST_FIRST_SECS=3 \
+    "$LINT" --telemetry "$tmp/partial.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a fallback cut off by the root deadline unexpectedly passed"
+  [ "$(cat "$log")" = "$(printf 'follow\nfallback')" ] \
+    || fail "the root did not retry once with its remaining time"$'\n'"$(cat "$log")"
+  assert_contains "$out" "fallback reason=timeout" \
+    "the fallback was not stopped by the root's remaining deadline"$'\n'"$out"
+  duration_ms=$(awk -F '\t' '$1 == "end" && $3 ~ /teardown\.sh$/ { print $8 }' "$tmp/partial.roots.tsv")
+  [ "$duration_ms" -lt 7000 ] \
+    || fail "the first attempt and fallback together exceeded the root deadline plus grace: ${duration_ms}ms"
+
+  # With under a second of the deadline left, no retry starts.
+  : > "$log"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=1 \
+    FM_LINT_ROOT_SECONDS=6 FM_LINT_ROOT_GRACE=1 \
+    FM_TEST_ATTEMPT_LOG="$log" FM_TEST_FIRST_SECS=5.2 \
+    "$LINT" --telemetry "$tmp/spent.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a memory failure with no deadline left unexpectedly passed"
+  [ "$(cat "$log")" = follow ] \
+    || fail "a fallback started with no time left in the root deadline"$'\n'"$(cat "$log")"
+  assert_contains "$out" "no time left in its 6s deadline to retry without it" \
+    "the skipped fallback was not explained"$'\n'"$out"
+  awk -F '\t' '$1 == "end" && $3 ~ /teardown\.sh$/ && $10 == "memory" && $12 == 1 { found=1 } END { exit !found }' \
+    "$tmp/spent.roots.tsv" || fail "the unretried memory failure was not recorded as a source-following memory failure"
+  pass "a memory fallback runs only within the time left in its root's original deadline"
 }
 
 test_memory_evidence_outranks_findings_and_signal_reasons() {
@@ -1546,13 +2299,8 @@ test_seeded_joint_source_parity() {
     pass "SKIP (ShellCheck $REQUIRED not resolved): seeded joint-source parity check"
     return
   fi
-  local tmp rel adapter dispatcher dep owner test_root out rc
-  tmp=$(mktemp -d "$ROOT/.fm-lint-parity.XXXXXX")
-  if [ "${#FM_TEST_CLEANUP_DIRS[@]}" -eq 0 ]; then
-    trap fm_test_cleanup EXIT
-  fi
-  FM_TEST_CLEANUP_DIRS+=("$tmp")
-  rel=${tmp#"$ROOT/"}
+  local tmp adapter dispatcher dep owner test_root out rc
+  tmp=$(fm_test_tmproot fm-lint-parity)
   adapter="$tmp/adapter.sh"
   dispatcher="$tmp/dispatcher.sh"
   dep="$tmp/owner-dep.sh"
@@ -1567,7 +2315,7 @@ adapter_bad() {
 SH
   cat > "$dispatcher" <<SH
 #!/usr/bin/env bash
-# shellcheck source=$rel/adapter.sh
+# shellcheck source=$adapter
 . "$adapter"
 dispatcher_bad() {
   local a= b=
@@ -1580,7 +2328,7 @@ owner_dependency_value=ok
 SH
   cat > "$owner" <<SH
 #!/usr/bin/env bash
-# shellcheck source=$rel/owner-dep.sh
+# shellcheck source=$dep
 . "$dep"
 owner_bad() {
   printf '%s\n' "\$owner_dependency_value"
@@ -1589,7 +2337,7 @@ owner_bad() {
 SH
   cat > "$test_root" <<SH
 #!/usr/bin/env bash
-# shellcheck source=$rel/owner.sh
+# shellcheck source=$owner
 . "$owner"
 test_local_bad() {
   local output=\$(printf ok)
@@ -2620,9 +3368,18 @@ test_rejects_direct_beads_cli_in_explicit_core_path
 test_ignores_ambient_shellcheck_opts
 test_clean_fixture_passes
 test_jobs_are_deterministic_and_complete
+test_host_slots_bound_concurrent_runs
+test_host_load_shrinks_slots_to_the_floor
+test_host_load_preserves_the_cap_until_the_threshold
+test_slot_pool_can_be_disabled_or_misconfigured
+test_slot_file_failures_run_ungated
+test_slot_survives_gate_death
+test_queued_roots_use_high_resolution_timings
 test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree
 test_root_memory_limit_reports_a_named_death
+test_memory_failure_retries_without_external_sources
+test_memory_fallback_spends_only_the_remaining_root_deadline
 test_memory_evidence_outranks_findings_and_signal_reasons
 test_source_excerpt_with_oom_text_stays_findings
 test_require_bounds_refuses_when_enforcement_is_missing

@@ -35,9 +35,11 @@
 # A pushed branch is recoverable work, not a delivered result.
 # A ship has landed only when its PR is merged and
 # GitHub reports a PR head that contains the current local work, or its content is
-# already present in the up-to-date default branch.
-# This recognizes the common squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
-# on a remote yet the change is fully in main.
+# already present in the up-to-date default branch. This recognizes the common
+# squash-merge-then-delete-branch flow, where the branch's own commits live nowhere
+# on a remote yet the change is fully in main. A task whose meta records
+# base_branch= (bin/fm-spawn.sh) runs that content check against origin's copy of
+# its base branch instead of the default branch.
 # Squash merges collapse the branch's commits, so per-commit patch ids against main
 # no longer match, and a pipeline rebase can leave the local worktree diverged from
 # the PR head. A diverged copy is not treated as landed: path-set coverage, git
@@ -53,7 +55,8 @@
 # by itself causes a false refusal of landed work.
 # A gh lookup error falls back to the content check; if that is also inconclusive,
 # teardown refuses rather than risk discarding unlanded work.
-# Uncommitted changes are never landed.
+# Uncommitted changes are never landed; dirty refusals distinguish untracked-only
+# leftovers from tracked edits and list at most ten non-exempt untracked paths.
 # local-only projects additionally accept a clean existing copy whose HEAD is
 # contained in refs/heads/<default>, regardless of remote reachability.
 # An absent recorded copy or one that is not a Git worktree completes only
@@ -88,7 +91,10 @@
 # cleanup step, teardown verifies record exclusivity: no OTHER task record in
 # this home or any locally registered Firstmate home may name the same live path
 # in its worktree= or home=. One live path with two task records is the reuse
-# collision itself, whichever record is stale.
+# collision itself, whichever record is stale. The one exception is a slot whose
+# owner claim (below) names another task: this teardown is then records-only and
+# touches nothing under the slot, so the scan is skipped rather than stranding
+# the stale record and, with it, the claimant's own teardown.
 # That scan alone cannot prove THIS record is the current owner, because the task
 # that took the slot next may leave no record it can reach - its own worker may
 # have exited and its record been cleaned up, or it may live in a home this
@@ -266,10 +272,11 @@
 #     never signalled, because no record proves which task owns that lane.
 #     Teardown refuses instead, even with --force, naming the pid, its birth
 #     identity, the matched path, and the lane. A lane is either a worktree
-#     the project or a git-backed root's repository still registers there,
-#     even when its directory or .git is missing or prunable, or a linked
-#     worktree git discovers from the cwd; outer-worktree discovery never
-#     proves custody. Only a cwd exactly equal to a live recorded scan root is
+#     the project, a git-backed scan root, or an available local task project's
+#     repository still registers there, even when its directory or .git is
+#     missing or prunable, or a linked worktree git discovers from the cwd;
+#     outer-worktree discovery never proves custody.
+#     Only a cwd exactly equal to a live recorded scan root is
 #     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
@@ -284,6 +291,39 @@
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
 #     vanished; a live matching target or uncertain result refuses, as do authorization
 #     and write failures. Idempotent: nothing left to find is a silent no-op.
+#   Fix 3 - retire task-private no-mistakes launch agents (runs after Fix 1 and
+#     BEFORE Fix 2, because Fix 2 can neither prove custody of nor durably stop
+#     what an agent owns). A private no-mistakes home can install a KeepAlive
+#     launchd agent, com.kunchenguid.no-mistakes.daemon.<hash>, that survives
+#     reboots and relaunches its daemon after a kill; killing the process alone
+#     cannot release the copy durably.
+#     retire_task_private_nm_launch_agents reads every such plist in
+#     $FM_LAUNCH_AGENTS_DIR (default ~/Library/LaunchAgents) and acts only on
+#     one whose Label matches its file name and whose absolute `--root` is the
+#     task copy or inside it after resolving symlinks and normalizing path
+#     segments and separators; lookalike prefixes such as <copy>-x never match.
+#     The Fix 2 nested-lane boundary also applies: a root belonging to a nested
+#     lane is skipped, and unreadable registry or lane classification refuses.
+#     Registries are checked even when the task copy is already gone, so
+#     admitted missing-copy recovery still excludes registered nested lanes.
+#     For a loaded service it runs `launchctl bootout gui/<uid>/<label>`, then
+#     requires `launchctl print` to report the service gone (exit 113) before
+#     moving the plist to data/<id>/launchagent-backup/.
+#     An already-unloaded agent's plist is archived without bootout.
+#     The shared daemon's agent (root ~/.no-mistakes), another task's agent,
+#     symlinked plists, and plists whose root cannot be proven are left as found;
+#     teardown never runs `no-mistakes daemon stop`, which targets the shared
+#     daemon. Missing launchctl, a service that stays loaded, an unreadable load
+#     state, or a failed archive refuses even with --force, preserving the
+#     unarchived plist and any remaining copy.
+#     tests/fm-teardown.test.sh's private, foreign, nested, and absent-copy
+#     launch-agent cases exercise this boundary with a fake launchctl.
+# After Fix 1, Fix 3, and Fix 2, when config/pipeline-spend opts this home in, a ship
+# task whose local copy this teardown owns has its no-mistakes pipeline spend
+# recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
+# ledger. It runs before the task branch it attributes runs by is deleted and
+# before state/<id>.meta is removed, and is best effort: a failure warns and
+# never blocks cleanup.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1176,6 +1216,7 @@ elif [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ]; then
 fi
 MODE=$(grep '^mode=' "$META" | cut -d= -f2- || true)
 [ -n "$MODE" ] || MODE=no-mistakes
+BASE_BRANCH=$(grep '^base_branch=' "$META" | cut -d= -f2- || true)
 
 # A record accepted as a legacy incarnation (no spawn_gen, and either
 # --legacy-record given or the record is windowless) may be torn down only
@@ -1593,9 +1634,9 @@ pr_is_merged() {
 # "added". Returns non-zero when inconclusive (no default ref, or a merge conflict),
 # so the caller refuses rather than guesses.
 content_in_default() {
-  local name ref default_tree merged_tree
+  local name=${BASE_BRANCH:-} ref default_tree merged_tree
   [ -d "$WT" ] || return 1
-  name=$(default_branch) || return 1
+  [ -n "$name" ] || name=$(default_branch) || return 1
   if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
     git -C "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
     ref="refs/remotes/origin/$name"
@@ -1895,6 +1936,23 @@ teardown_treehouse_return() {
   return 1
 }
 
+report_worktree_dirt() {
+  # Use the same porcelain snapshot and exemptions as the refusal predicate.
+  printf '%s\n' "$1" | awk '
+    /^\?\? / { if (++untracked <= 10) paths = paths "  " substr($0, 4) "\n"; next }
+    NF { tracked = 1 }
+    END {
+      if (tracked) print "uncommitted changes present (includes tracked edits)"
+      else print "uncommitted changes present (untracked-only leftovers)"
+      if (untracked) {
+        print "untracked paths (up to 10):"
+        printf "%s", paths
+        if (untracked > 10) print "  ... additional untracked paths omitted"
+      }
+    }
+  ' >&2
+}
+
 validate_worktree_teardown_safety() {
   local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state
   [ "$FORCE" != "--force" ] || return 0
@@ -1921,7 +1979,7 @@ validate_worktree_teardown_safety() {
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
-  dirty=$(printf '%s\n' "$dirty_raw" | grep -vE '^\?\? (\.claude/|\.fm-(grok|kimi)-turnend$)' | head -1 || true)
+  dirty=$(printf '%s\n' "$dirty_raw" | grep -vE '^\?\? (\.claude/|\.fm-(grok|kimi)-turnend$)' || true)
 
   if ! unpushed_raw=$(git -C "$WT" log --oneline HEAD --not --remotes -- 2>/dev/null); then
     if worktree_safety_blocked_by_lock "commits not on a remote"; then
@@ -1935,7 +1993,7 @@ validate_worktree_teardown_safety() {
 
   if [ -n "$dirty" ]; then
     echo "REFUSED: worktree $WT has uncommitted changes." >&2
-    echo "uncommitted changes present" >&2
+    report_worktree_dirt "$dirty"
     echo "Commit them (or get the captain's explicit OK to discard, then --force)." >&2
     return 1
   else
@@ -2152,8 +2210,10 @@ task_canonical_path() {  # <path>
 
 # Prints a discovered nested worktree lane beneath <root> that holds <path>.
 # A lane in TASK_REGISTERED_LANES wins even when its directory or .git is gone;
-# otherwise git classifies the nearest existing directory. Empty output is
-# not proof of custody. Fails when git cannot classify <path> under a git <root>.
+# otherwise git classifies the nearest existing directory within <root>.
+# A missing root returns empty after the registry check, supporting absent-copy
+# recovery. Empty output is not proof of process custody.
+# Fails when git cannot classify <path> under a git <root>.
 task_nested_lane_for_path() {  # <root> <path>
   local root=$1 path=$2 dir lane top git_dir common_dir
   [ -e "$path" ] || path=${path% (deleted)}
@@ -2162,7 +2222,7 @@ task_nested_lane_for_path() {  # <root> <path>
   done
   dir=$path
   while [ ! -d "$dir" ]; do
-    case "$dir" in "$root"/*) dir=${dir%/*} ;; *) return 1 ;; esac
+    case "$dir" in "$root"/*) dir=${dir%/*} ;; "$root") return 0 ;; *) return 1 ;; esac
   done
   while :; do
     if ! top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null); then
@@ -2185,18 +2245,27 @@ task_nested_lane_for_path() {  # <root> <path>
 }
 
 # Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
-# entries, that the project or a git-backed scan root's repository registers
-# strictly beneath a scan root. No git-backed root means no registry is read.
+# entries, registered strictly beneath a scan root by the recorded project,
+# git-backed scan roots, or available task projects in reachable local Firstmate
+# states. Project registries remain sources when the scan root is missing.
 task_registered_lanes_under_roots() {  # <canonical-root>...
-  local root src registry line lane
+  local root src registry line lane state_dir meta project
   local -a sources
   TASK_REGISTERED_LANES=()
   sources=()
   for root in "$@"; do
     git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
   done
-  [ "${#sources[@]}" -gt 0 ] || return 0
   [ -z "$PROJ" ] || sources+=("$PROJ")
+  collect_local_firstmate_states "$STATE" || return 1
+  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+    for meta in "$state_dir"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      project=$(fm_meta_get "$meta" project)
+      [ -n "$project" ] || continue
+      git -C "$project" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$project")
+    done
+  done
   for src in "${sources[@]}"; do
     if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
       TASK_PIDS_FAILED_DIR=$src
@@ -2420,6 +2489,116 @@ EOF
 }
 
 
+# Fix 3 (see script header): "label<TAB>root" for a no-mistakes daemon launch
+# agent plist, from its Label and the `--root` of its `daemon run` arguments.
+# Fails for anything that is not that exact, parsable shape.
+nm_launch_agent_fields() {  # <plist>
+  perl -e '
+    local $/;
+    my $x = <STDIN>;
+    my ($label) = $x =~ m{<key>Label</key>\s*<string>([^<]*)</string>} or exit 1;
+    $x =~ m{<key>ProgramArguments</key>\s*<array>(.*?)</array>}s or exit 1;
+    my @a = $1 =~ m{<string>([^<]*)</string>}g;
+    my $root;
+    for my $i (0 .. $#a - 3) {
+      next unless $a[$i] eq "daemon" && $a[$i + 1] eq "run" && $a[$i + 2] eq "--root";
+      $root = $a[$i + 3];
+      last;
+    }
+    defined $root && length $root or exit 1;
+    my %e = (amp => "&", lt => "<", gt => ">", quot => "\"", apos => "\x27");
+    for ($label, $root) { s/&(amp|lt|gt|quot|apos);/$e{$1}/g }
+    exit 1 if $label =~ /[^A-Za-z0-9._-]/ || $root =~ /[\t\n\r]/;
+    print "$label\t$root\n";
+  ' < "$1"
+}
+
+# Fix 3: apply the script header's private-agent ownership and retirement
+# contract before process reaping.
+retire_task_private_nm_launch_agents() {  # <worktree>
+  local wt=$1 dir plist label root canon_wt canon_root fields uid backup dest rc attempt lane
+  dir=${FM_LAUNCH_AGENTS_DIR:-${HOME:-}/Library/LaunchAgents}
+  [ -d "$dir" ] || return 0
+  canon_wt=$(task_canonical_path "$wt") || return 0
+  if ! task_registered_lanes_under_roots "$canon_wt"; then
+    echo "REFUSED: cannot establish nested worktree ownership under $canon_wt; preserving the launch agents and task $ID." >&2
+    return 1
+  fi
+  uid=$(id -u)
+  backup="$DATA/$ID/launchagent-backup"
+  for plist in "$dir"/com.kunchenguid.no-mistakes.daemon.*.plist; do
+    [ -f "$plist" ] || continue
+    if [ -L "$plist" ] || ! fields=$(nm_launch_agent_fields "$plist"); then
+      echo "teardown: leaving unreadable no-mistakes launch agent $plist as found; its root cannot be proven to be $ID's" >&2
+      continue
+    fi
+    label=${fields%%$'\t'*}
+    root=${fields#*$'\t'}
+    [ "$plist" = "$dir/$label.plist" ] || continue
+    case "$root" in /*) ;; *) continue ;; esac
+    canon_root=$(perl -MCwd=abs_path -e '
+      my $path = "/";
+      for my $part (split m{/+}, $ARGV[0]) {
+        next if $part eq "" || $part eq ".";
+        if ($part eq "..") {
+          $path =~ s{/[^/]+$}{};
+          $path = "/" if $path eq "";
+          next;
+        }
+        my $next = ($path eq "/" ? "" : $path) . "/$part";
+        if (-d $next) {
+          $path = abs_path($next);
+          defined $path or exit 1;
+        } else {
+          exit 1 if -e $next || -l $next;
+          $path = $next;
+        }
+      }
+      print "$path\n";
+    ' "$root") || continue
+    case "$canon_root" in "$canon_wt"|"$canon_wt"/*) ;; *) continue ;; esac
+    if ! lane=$(task_nested_lane_for_path "$canon_wt" "$canon_root"); then
+      echo "REFUSED: cannot classify the worktree holding no-mistakes launch agent $label's root $canon_root; preserving the launch agent and task $ID." >&2
+      return 1
+    fi
+    [ -z "$lane" ] || continue
+    if ! command -v launchctl >/dev/null 2>&1; then
+      echo "REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable, so it cannot be unloaded; preserving the worktree and $plist." >&2
+      return 1
+    fi
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      rc=0
+      launchctl print "gui/$uid/$label" >/dev/null 2>&1 || rc=$?
+      case "$rc" in
+        113) break ;;
+        0) ;;
+        *)
+          echo "REFUSED: cannot tell whether no-mistakes launch agent $label (rooted in $ID's copy) is loaded (launchctl print exited $rc); preserving the worktree and $plist." >&2
+          return 1
+          ;;
+      esac
+      if [ "$attempt" = 1 ]; then
+        launchctl bootout "gui/$uid/$label" >/dev/null 2>&1 || true
+      else
+        sleep 0.25
+      fi
+      rc=0
+    done
+    if [ "$rc" != 113 ]; then
+      echo "REFUSED: no-mistakes launch agent $label (rooted in $ID's copy) is still loaded after launchctl bootout; preserving the worktree and $plist." >&2
+      return 1
+    fi
+    dest="$backup/$label.plist"
+    [ ! -e "$dest" ] || dest="$dest.$(date +%s)"
+    if ! mkdir -p "$backup" || ! mv -- "$plist" "$dest"; then
+      echo "REFUSED: could not archive no-mistakes launch agent plist $plist to $dest; preserving the worktree." >&2
+      return 1
+    fi
+    echo "teardown: retired task-private no-mistakes launch agent $label (root $root); plist archived to $dest" >&2
+  done
+}
+
+
 # The task's own live slot, canonicalized, or empty when this record has no slot
 # to release (a secondmate home, a record with no worktree=, or a path that is
 # already gone). Every slot-ownership check below is scoped to that value, so a
@@ -2430,56 +2609,27 @@ teardown_live_slot_path() {
   canonical_existing_dir "$WT"
 }
 
+# Every local Firstmate state directory whose records can name a pool slot this
+# task's slot might also be; bin/fm-wake-lib.sh's fm_local_firstmate_state_dirs
+# owns the walk and what it refuses.
 collect_local_firstmate_states() {
-  local record_state=$1 root home reg line child known existing i=0
-  local -a homes
-  TREEHOUSE_OWNER_STATES=("$record_state")
-  root=$(fm_firstmate_root_home "$FM_HOME") || {
-    echo "REFUSED: cannot resolve the root Firstmate home; nothing was changed" >&2
+  fm_local_firstmate_state_dirs "$1" || {
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
     return 1
   }
-  homes=("$root")
-  while [ "$i" -lt "${#homes[@]}" ]; do
-    home=${homes[$i]}
-    i=$((i + 1))
-    known=0
-    for existing in "${TREEHOUSE_OWNER_STATES[@]}"; do
-      [ "$existing" != "$home/state" ] || known=1
-    done
-    [ "$known" = 1 ] || TREEHOUSE_OWNER_STATES+=("$home/state")
-    reg="$home/data/secondmates.md"
-    [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
-    [ -f "$reg" ] && [ ! -L "$reg" ] || {
-      echo "REFUSED: local Firstmate registry is unsafe at $reg; nothing was changed" >&2
-      return 1
-    }
-    while IFS= read -r line || [ -n "$line" ]; do
-      case "$line" in
-        "- "*)
-          secondmate_registry_parse_line "$line" || {
-            echo "REFUSED: malformed local Firstmate registry entry in $reg; nothing was changed" >&2
-            return 1
-          }
-          [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
-          child=$(canonical_existing_dir "$SECONDMATE_REGISTRY_HOME") || {
-            echo "REFUSED: registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME; nothing was changed" >&2
-            return 1
-          }
-          known=0
-          for existing in "${homes[@]}"; do
-            [ "$existing" != "$child" ] || known=1
-          done
-          [ "$known" = 1 ] || homes+=("$child")
-          ;;
-      esac
-    done < "$reg"
-  done
+  TREEHOUSE_OWNER_STATES=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
 }
 
 require_exclusive_worktree_slot_record() {
   local record_meta=$1 record_id=$2 record_state=$3 worktree=$4
   local slot state_dir other other_id field other_path other_slot
   slot=$(canonical_existing_dir "$worktree") || return 0
+  # A slot whose owner claim names another task was reassigned, so this record's
+  # teardown is records-only and touches nothing under it; another record naming
+  # the slot is then no hazard, and refusing would strand this stale record and
+  # block the claimant's own teardown behind it.
+  fm_treehouse_slot_owner_state "$slot" "$record_id"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" != other ] || return 0
   collect_local_firstmate_states "$record_state" || return 1
   for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
     for other in "$state_dir"/*.meta; do
@@ -2513,11 +2663,11 @@ require_exclusive_task_worktree_slot() {
 # Positive slot ownership, read from the claim the task that took the slot wrote
 # into the slot itself (bin/fm-wake-lib.sh owns the claim and its states).
 #
-# The record scan above proves that no OTHER task record names this slot. It
-# cannot prove that THIS record is not the stale one, because the task that took
-# the slot next may leave no record this scan can reach: its own worker may have
-# exited and its record been cleaned up, or it may belong to a home this machine
-# does not register. The claim closes that gap from the other side - it names the
+# For a slot this task still claims, or one with no claim, the record scan above
+# proves that no OTHER task record names it. It cannot prove that THIS record is
+# not the stale one, because the task that took the slot next may leave no record
+# this scan can reach: its own worker may have exited and its record been cleaned
+# up, or it may belong to a home this machine does not register. The claim closes that gap from the other side - it names the
 # task that actually took the slot, and it is written under the same project lock
 # that allocates it - so a claim naming another task is proof the slot was
 # reassigned after this record was written.
@@ -3696,17 +3846,23 @@ if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
 fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
-# them). Fix 1 and Fix 2 (see script header) run here, unconditionally on
-# --force, and before ANY destructive step below - a still-parked run or a
-# leaked process can own live work in this exact worktree. Not for
+# them). Fix 1, Fix 3, and Fix 2 (see script header) run here, unconditionally on
+# --force, and before ANY destructive step below - a still-parked run, loaded
+# private agent, or leaked process can own live work in this exact worktree. Not for
 # kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   conclude_task_no_mistakes_run "$WT"
+  retire_task_private_nm_launch_agents "$WT" || exit 1
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"
+fi
+if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend" ]; then
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$SCRIPT_DIR/fm-pipeline-spend.sh" record "$ID" >/dev/null \
+    || echo "warning: could not record $ID's no-mistakes pipeline spend; cleanup continues" >&2
 fi
 
 if [ "$BACKEND" = herdr ]; then

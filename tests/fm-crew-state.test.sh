@@ -199,9 +199,11 @@ SH
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-# FM_FAKE_TMUX_MISSING: the window is authoritatively gone - every addressed
-# call fails, but the session inventory still answers successfully and simply
-# omits the window, which is what proves absence.
+# FM_FAKE_TMUX_MISSING: the crew's window has closed while its session lives.
+# Real tmux (verified on 3.5a) answers every addressed call for an absent
+# window with success - display-message and capture-pane fall back to the
+# session's active pane - so only the window inventory is truthful, and it
+# simply omits the window, which is what proves absence.
 # FM_FAKE_TMUX_UNREADABLE: tmux itself cannot answer - it fails to execute (a
 # trimmed PATH) or errors non-definitively - so even the inventory fails, with
 # a message that is NOT one of the definitive no-session/no-server/no-socket
@@ -209,15 +211,20 @@ set -u
 [ "${FM_FAKE_TMUX_UNREADABLE:-0}" = 1 ] && { printf 'no current client\n' >&2; exit 1; }
 case "${1:-}" in
   list-windows)
-    # A successful but empty inventory: it omits the crew's window, so absence
-    # is proved by the answer rather than by an addressed call failing. Only
-    # reached once display-message has already failed.
+    if [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ]; then
+      printf 'main\n'
+    else
+      # A live server holds every window the case's tasks recorded.
+      for meta in "${FM_STATE_OVERRIDE:-/nonexistent}"/*.meta; do
+        [ -f "$meta" ] || continue
+        window=$(sed -n 's/^window=//p' "$meta" | head -1)
+        printf '%s\n' "${window#*:}"
+      done
+    fi
     ;;
   display-message)
-    [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 1
     printf '%%1\n' ;;
   capture-pane)
-    [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 1
     if [ "${FM_FAKE_BUSY:-0}" = 1 ]; then printf 'work in progress\n%s\n' "${FM_FAKE_BUSY_TEXT:-esc to interrupt}"
     else printf 'all quiet\n> \n'; fi ;;
 esac

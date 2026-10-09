@@ -185,8 +185,18 @@ fm_busy_codex_semantic_source() {
   fm_busy_codex_appserver_observable || fm_busy_codex_hooks_verified
 }
 
+# The path helpers have assigning forms so the per-task cycle scans can build a
+# path without a command substitution (one process) around a printf.
+fm_busy_record_path_to() {  # <out-var> <state-dir> <id>
+  printf -v "$1" '%s/%s.busy-state' "$2" "$3"
+}
+
 fm_busy_record_path() {  # <state-dir> <id>
   printf '%s/%s.busy-state' "$1" "$2"
+}
+
+fm_busy_gen_path_to() {  # <out-var> <state-dir> <id>
+  printf -v "$1" '%s/%s.busy-gen' "$2" "$3"
 }
 
 fm_busy_gen_path() {  # <state-dir> <id>
@@ -204,13 +214,19 @@ fm_busy_token_valid() {  # <value>
 
 # fm_busy_current_gen: the task's armed gen token, or failure when the busy
 # contract has never been armed for this task.
+fm_busy_current_gen_to() {  # <out-var> <state-dir> <id>
+  local _fm_bg_file _fm_bg_gen
+  fm_busy_gen_path_to _fm_bg_file "$2" "$3"
+  [ -f "$_fm_bg_file" ] || return 1
+  IFS= read -r _fm_bg_gen < "$_fm_bg_file" 2>/dev/null || _fm_bg_gen=
+  fm_busy_token_valid "$_fm_bg_gen" || return 1
+  printf -v "$1" '%s' "$_fm_bg_gen"
+}
+
 fm_busy_current_gen() {  # <state-dir> <id>
-  local gen_file gen
-  gen_file=$(fm_busy_gen_path "$1" "$2")
-  [ -f "$gen_file" ] || return 1
-  IFS= read -r gen < "$gen_file" 2>/dev/null || gen=
-  fm_busy_token_valid "$gen" || return 1
-  printf '%s' "$gen"
+  local _fm_bg_out
+  fm_busy_current_gen_to _fm_bg_out "$1" "$2" || return 1
+  printf '%s' "$_fm_bg_out"
 }
 
 # fm_busy_sources_for_harness: the semantic sources trusted to classify a
@@ -262,12 +278,12 @@ fm_busy_source_trusted() {  # <harness> <source>
 fm_busy_record_read() {  # <state-dir> <id>
   local state=$1 id=$2 rec gen line extra ver f
   local r_gen='' r_seq='' r_state='' r_source='' r_event='' r_ts=''
-  rec=$(fm_busy_record_path "$state" "$id")
+  fm_busy_record_path_to rec "$state" "$id"
   if [ ! -f "$rec" ]; then
     printf 'missing'
     return 1
   fi
-  if ! gen=$(fm_busy_current_gen "$state" "$id"); then
+  if ! fm_busy_current_gen_to gen "$state" "$id"; then
     # A record without an armed gen has no incarnation to bind to.
     printf 'malformed'
     return 1
@@ -915,14 +931,11 @@ fm_busy_agy_tail_busy() {
 # signature out, so absence never proves the pane is NOT parked, only that
 # this check cannot confirm it.
 
-# fm_busy_claude_launch_prompt_tail: Claude's workspace-trust dialog
-# ("Quick safety check: Is this a project you created or one you trust?",
-# re-verified live on Claude Code 2.1.278, docs/verification/runtime-backends.md
-# "Launch-prompt backstop signatures") and its separate external-CLAUDE.md-
-# imports dialog ("Allow external CLAUDE.md file imports?", verified by
-# disassembly, .agents/skills/harness-adapters/references/harness/claude.md
-# "Hook trust" sibling section). fm-claude-trust.sh pre-registers both before
-# launch; this is the backstop for when that registration did not take effect.
+# fm_busy_claude_launch_prompt_tail: Claude's recognized startup dialogs;
+# docs/verification/runtime-backends.md "Launch-prompt backstop signatures"
+# owns the rendered evidence. This is a backstop, not consent:
+# bin/fm-claude-trust.sh owns pre-registration and consent carry-forward;
+# bin/fm-claude-memory-lib.sh owns ancestor-supervisor-memory exclusion.
 # Each dialog's own question text is paired with one of its own rendered
 # option/footer lines, both required together: the question text alone is
 # plausible self-referential prose a firstmate-repo worker could easily render
@@ -935,8 +948,36 @@ fm_busy_claude_launch_prompt_tail() {
     && printf '%s' "$buf" | grep -qiE 'No, exit|Enter to confirm'; then
     return 0
   fi
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
-    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'
+  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'; then
+    return 0
+  fi
+  # The machine-level bypass-permissions confirmation and the custom-API-key
+  # choice, live-verified on Claude Code 2.1.294 in a scratch config. Each
+  # is paired with its own rendered option, for the same self-reference reason.
+  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_BYPASS_PROMPT_REGEX:-WARNING: Claude Code running in Bypass Permissions mode}" \
+    && printf '%s' "$buf" | grep -qiE 'Yes, I accept'; then
+    return 0
+  fi
+  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_APIKEY_PROMPT_REGEX:-Do you want to use this API key\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No \(recommended\)'
+}
+
+# fm_busy_claude_launch_prompt_name: names which of the dialogs above the
+# captured pane on stdin shows, for a report a person can act on. Prints
+# nothing when none matches.
+fm_busy_claude_launch_prompt_name() {
+  local buf
+  buf=$(cat)
+  if printf '%s' "$buf" | grep -qiE 'Allow external CLAUDE\.md file imports\?'; then
+    printf '%s' 'Allow external CLAUDE.md file imports?'
+  elif printf '%s' "$buf" | grep -qiE 'Quick safety check: Is this a project you created or one you trust\?'; then
+    printf '%s' 'workspace trust (Quick safety check)'
+  elif printf '%s' "$buf" | grep -qiE 'WARNING: Claude Code running in Bypass Permissions mode'; then
+    printf '%s' 'bypass-permissions confirmation'
+  elif printf '%s' "$buf" | grep -qiE 'Do you want to use this API key\?'; then
+    printf '%s' 'custom API key choice'
+  fi
 }
 
 # fm_busy_pi_launch_prompt_tail: Pi's project-trust dialog. Live-verified on
@@ -1173,12 +1214,17 @@ fm_busy_classify() {  # <backend> <target> <harness> <id> <state-dir> [tail40]
 # override - a gone endpoint is dead, never busy. Requires fm-backend.sh to
 # be sourced for fm_backend_target_exists.
 fm_busy_classify_live() {  # <backend> <target> <harness> <id> <state-dir> [expected-label]
-  local backend=$1 target=$2 harness=$3 id=$4 state=$5 label=${6-}
+  local backend=$1 target=$2 harness=$3 id=$4 state=$5 label=${6-} endpoint_rc=0
   if [ -z "$target" ]; then
     printf 'unknown no-target'
     return 0
   fi
-  if ! fm_backend_target_exists "$backend" "$target" "$label" 2>/dev/null; then
+  fm_backend_target_exists "$backend" "$target" "$label" 2>/dev/null || endpoint_rc=$?
+  if [ "$backend" = tmux ] && [ "$endpoint_rc" -eq 2 ]; then
+    printf 'unknown endpoint-unreadable'
+    return 0
+  fi
+  if [ "$endpoint_rc" -ne 0 ]; then
     printf 'dead endpoint-gone'
     return 0
   fi

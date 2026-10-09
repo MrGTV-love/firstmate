@@ -250,6 +250,9 @@ SH
   # plain text with no run id and no quoting - see the ledger fixtures below),
   # and `runs` appends its own invocation to FM_FAKE_NM_RUNS_LOG when set, so
   # a test can prove whether the ledger fallback ever engaged.
+  # The bare `axi` overview answers FM_FAKE_AXI_OVERVIEW verbatim (empty by
+  # default, so no repository resolves and the pipeline-spend record is
+  # written as unavailable).
   # This keeps every case hermetic - without it, `command -v no-mistakes`
   # would fall through to whatever real binary happens to be on the test
   # runner's own PATH. Tests exercising the run-abort path override
@@ -261,6 +264,8 @@ case "${1:-}" in
   axi)
     shift
     case "${1:-}" in
+      '')
+        printf '%s\n' "${FM_FAKE_AXI_OVERVIEW:-}" ;;
       status)
         shift
         run_id=""
@@ -287,6 +292,11 @@ case "${1:-}" in
         [ -z "${FM_FAKE_NM_ABORT_LOG:-}" ] || printf 'abort %s\n' "$*" >> "$FM_FAKE_NM_ABORT_LOG"
         exit 0 ;;
     esac
+    ;;
+  daemon)
+    if [ "${2:-}" = stop ] && [ -n "${FM_FAKE_NM_SHARED_DAEMON_STATE:-}" ]; then
+      printf '%s\n' stopped > "$FM_FAKE_NM_SHARED_DAEMON_STATE"
+    fi
     ;;
   runs)
     [ -z "${FM_FAKE_NM_RUNS_LOG:-}" ] || printf 'runs %s\n' "$*" >> "$FM_FAKE_NM_RUNS_LOG"
@@ -899,6 +909,51 @@ test_teardown_closes_the_backlog_item_itself() {
   pass "teardown closes its own backlog item before reporting success"
 }
 
+test_teardown_closes_a_gerrit_task_with_its_change_url_as_a_note() {
+  local case_dir out real_tasks_axi gerrit_url=https://gerrit.example.com/c/project/+/12345
+  case_dir=$(make_case tasks-axi-close-gerrit)
+  write_meta "$case_dir" no-mistakes ship
+  printf 'pr=%s\n' "$gerrit_url" >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  # Pin the refusal tasks-axi applies to a --pr link that is not a canonical
+  # GitHub pull request, so this case keeps reproducing whatever the installed
+  # release accepts.
+  real_tasks_axi=$(command -v tasks-axi)
+  cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+previous=
+for arg in "\$@"; do
+  if [ "\$previous" = --pr ] && ! [[ "\$arg" =~ ^https://github\.com/[^/]+/[^/]+/pull/[0-9]+\$ ]]; then
+    echo "error: \"Task pr link must be a canonical pull request URL\""
+    exit 1
+  fi
+  previous=\$arg
+done
+exec "$real_tasks_axi" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/tasks-axi"
+
+  out=$(run_teardown "$case_dir" 2>&1) || fail "teardown of a landed Gerrit task failed: $out"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "teardown left a landed Gerrit task's backlog item at $(backlog_row_state "$case_dir"): $out"
+  tasks-axi show task-x1 --file "$case_dir/data/backlog.md" --full \
+    | grep -F "body: \"Gerrit change $gerrit_url\"" >/dev/null \
+    || fail "closed Gerrit backlog item did not record its change URL as a note"
+  assert_absent "$case_dir/state/task-x1.backlog-close" \
+    "a landed Gerrit close left its pending-close record behind"
+
+  case_dir=$(make_case tasks-axi-close-github-under-refusal)
+  write_meta "$case_dir" no-mistakes ship
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  cp "$TMP_ROOT/tasks-axi-close-gerrit/fakebin/tasks-axi" "$case_dir/fakebin/tasks-axi"
+  out=$(run_teardown "$case_dir" 2>&1) || fail "teardown of a landed GitHub task failed: $out"
+  tasks-axi show task-x1 --file "$case_dir/data/backlog.md" \
+    | grep -F 'links: "pr:https://github.com/example/repo/pull/7"' >/dev/null \
+    || fail "a GitHub pull request no longer closed as the item's pr link"
+  pass "teardown closes a landed Gerrit task with its change URL as a note and a GitHub task with --pr"
+}
+
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator() {
   local case_dir out backlog_path
   case_dir=$(make_case tasks-axi-manual-optout)
@@ -1384,6 +1439,52 @@ SH
   pass "worktree whose content already landed in the default branch is torn down (content fallback)"
 }
 
+# A task recording base_branch= landed when its content reached that branch, not
+# the default branch: a squash merge into the base branch is the landing.
+test_content_fallback_uses_recorded_base_branch() {
+  local case_dir rc landed tmp
+  for landed in base default; do
+    case_dir=$(make_case "content-base-$landed")
+    write_meta "$case_dir" direct-PR ship
+    printf 'base_branch=feature/hub\n' >> "$case_dir/state/task-x1.meta"
+    tmp="$case_dir/_hub"
+    git clone -q "$case_dir/origin.git" "$tmp"
+    git -C "$tmp" push -q origin HEAD:refs/heads/feature/hub
+    rm -rf "$tmp"
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    if [ "$landed" = base ]; then
+      tmp="$case_dir/_land"
+      git clone -q "$case_dir/origin.git" "$tmp"
+      git -C "$tmp" checkout -q feature/hub
+      printf 'hello\n' > "$tmp/feature.txt"
+      git -C "$tmp" add feature.txt
+      git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "squash feature.txt"
+      git -C "$tmp" push -q origin HEAD:feature/hub
+      rm -rf "$tmp"
+    else
+      land_on_origin_main "$case_dir" feature.txt hello
+    fi
+    cat > "$case_dir/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse"
+
+    set +e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+    rc=$?
+    set -e
+    if [ "$landed" = base ]; then
+      expect_code 0 "$rc" "content-base: content squashed into the recorded base branch should count as landed"
+      assert_absent "$case_dir/state/task-x1.meta" "content-base: teardown kept the record of landed work"
+    else
+      [ "$rc" -ne 0 ] || fail "content-base: content only on the default branch passed for a task based on feature/hub"
+      assert_present "$case_dir/state/task-x1.meta" "content-base: a refused teardown removed the task record"
+    fi
+  done
+  pass "the content-landed fallback checks a task's recorded base branch, not the default branch"
+}
+
 test_content_fallback_refreshes_stale_origin_ref() {
   local case_dir rc
   case_dir=$(make_case content-stale-ref)
@@ -1426,6 +1527,76 @@ test_dirty_worktree_refuses() {
   grep -q REFUSED "$case_dir/stderr" || fail "dirty-wt: no REFUSED line in stderr"
   grep -q "uncommitted changes" "$case_dir/stderr" || fail "dirty-wt: refusal did not cite uncommitted changes"
   pass "dirty worktree is refused even when its committed work has landed (dirty always wins)"
+}
+
+assert_dirty_diagnostic() {
+  local kind=$1 mode=$2 case_dir rc before n
+  case_dir=$(make_case "dirty-$kind-$mode")
+  write_meta "$case_dir" "$mode" ship
+  wt_commit_file "$case_dir" feature.txt hello
+  # Exercise both dirty refusal sites: remote-reachable work and local-only
+  # work merged into local main but absent from every remote.
+  if [ "$mode" = local-only ]; then
+    git -C "$case_dir/project" merge -q --ff-only fm/task-x1
+  else
+    git -C "$case_dir/wt" push -q origin fm/task-x1
+  fi
+  if [ "$kind" != untracked ]; then
+    printf '%s\n' 'uncommitted edit' > "$case_dir/wt/feature.txt"
+    # Cover index edits as well as unstaged edits.
+    [ "$mode" != local-only ] || git -C "$case_dir/wt" add feature.txt
+  fi
+  if [ "$kind" != tracked ]; then
+    mkdir "$case_dir/wt/00 proof scratch"
+    printf '%s\n' 'manual server log' > "$case_dir/wt/00 proof scratch/server.log"
+    for n in 01 02 03 04 05 06 07 08 09 10 11; do
+      touch "$case_dir/wt/$n-scratch.txt"
+    done
+    # Preserve the existing exemptions without counting them as leftovers.
+    mkdir "$case_dir/wt/.claude"
+    touch "$case_dir/wt/.claude/settings.local.json" "$case_dir/wt/.fm-grok-turnend"
+  fi
+  before=$(git -C "$case_dir/wt" status --porcelain)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "$kind/$mode: dirty teardown must still refuse"
+  grep -q REFUSED "$case_dir/stderr" || fail "$kind/$mode: no refusal"
+  if [ "$kind" = untracked ]; then
+    grep -Fq 'uncommitted changes present (untracked-only leftovers)' "$case_dir/stderr" \
+      || fail "$kind/$mode: missing untracked-only classification"
+    ! grep -q 'includes tracked edits' "$case_dir/stderr" || fail "$kind/$mode: misclassified as tracked"
+  else
+    grep -Fq 'uncommitted changes present (includes tracked edits)' "$case_dir/stderr" \
+      || fail "$kind/$mode: missing tracked-edit classification"
+    ! grep -q 'untracked-only' "$case_dir/stderr" || fail "$kind/$mode: misclassified as untracked-only"
+  fi
+  if [ "$kind" != tracked ]; then
+    grep -Fq '00 proof scratch/' "$case_dir/stderr" || fail "$kind/$mode: scratch folder not named"
+    grep -Fxq '  09-scratch.txt' "$case_dir/stderr" || fail "$kind/$mode: tenth path missing"
+    ! grep -q '10-scratch.txt\|11-scratch.txt\|\.claude/\|\.fm-grok-turnend' "$case_dir/stderr" \
+      || fail "$kind/$mode: path list exceeded its bound or included exempt files"
+    grep -Fq 'additional untracked paths omitted' "$case_dir/stderr" || fail "$kind/$mode: no truncation notice"
+  else
+    ! grep -q 'untracked paths' "$case_dir/stderr" || fail "$kind/$mode: invented untracked paths"
+  fi
+  [ -f "$case_dir/state/task-x1.meta" ] || fail "$kind/$mode: task metadata removed"
+  [ "$before" = "$(git -C "$case_dir/wt" status --porcelain)" ] || fail "$kind/$mode: worktree changed"
+  pass "$kind/$mode: dirty refusal classifies leftovers and preserves work"
+}
+
+test_untracked_only_refusal_diagnostic() {
+  assert_dirty_diagnostic untracked no-mistakes
+  assert_dirty_diagnostic untracked local-only
+}
+
+test_tracked_edit_refusal_diagnostic() {
+  assert_dirty_diagnostic tracked no-mistakes
+  assert_dirty_diagnostic tracked local-only
+}
+
+test_mixed_refusal_diagnostic() {
+  assert_dirty_diagnostic mixed no-mistakes
+  assert_dirty_diagnostic mixed local-only
 }
 
 test_gh_error_and_content_absent_refuses() {
@@ -2769,6 +2940,146 @@ test_herdr_flat_teardown_preflight_refuses_before_changes() {
   pass "herdr flat teardown preflight refuses before every destructive change"
 }
 
+# The Herdr presentation-lock namespace is named per OS account. These cases
+# act as a fixture account uid (via an `id -u` shim) so they never touch the
+# real account's namespace or the old shared /tmp/firstmate-herdr-presentation,
+# and every directory the fixture account resolves is really owned by the
+# running account, i.e. by another uid from the fixture account's view.
+# FM_FAKE_NS_STAT names one path whose owner and mode the `stat` shim reports
+# instead; the adapter reads ownership through a PATH `stat` only on its non-
+# Darwin branch, so the arms that need it run only there.
+herdr_lock_ns_fake_uid() {
+  printf '%s' "$((3000000000 + $$ % 1000000))"
+}
+
+configure_herdr_lock_ns_shims() {  # <case-dir>
+  local case_dir=$1 real_id real_stat
+  real_id=$(command -v id); real_stat=$(command -v stat)
+  cat > "$case_dir/fakebin/id" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -u ] && [ "\$#" -eq 1 ] && [ -n "\${FM_FAKE_ACCOUNT_UID:-}" ]; then
+  printf '%s\n' "\$FM_FAKE_ACCOUNT_UID"
+  exit 0
+fi
+exec "$real_id" "\$@"
+SH
+  cat > "$case_dir/fakebin/stat" <<SH
+#!/usr/bin/env bash
+if [ "\$#" -eq 3 ] && [ "\$1" = -c ] && [ -n "\${FM_FAKE_NS_STAT:-}" ] \\
+  && [ "\$3" = "\${FM_FAKE_NS_STAT%%:*}" ]; then
+  rest=\${FM_FAKE_NS_STAT#*:}
+  case "\$2" in
+    %u) printf '%s\n' "\${rest%%:*}"; exit 0 ;;
+    %a) printf '%s\n' "\${rest#*:}"; exit 0 ;;
+  esac
+fi
+exec "$real_stat" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/id" "$case_dir/fakebin/stat"
+}
+
+herdr_lock_ns_path_state() {  # <path>
+  if [ -e "$1" ] || [ -L "$1" ]; then
+    # A fixed, known path: ls is the portable way to read mode and numeric owner.
+    # shellcheck disable=SC2012
+    ls -ldn "$1" 2>/dev/null | awk '{print $1, $3, $4}'
+  else
+    printf 'absent'
+  fi
+}
+
+run_herdr_lock_ns_teardown() {  # <case-dir> <fake-uid> [stat-spec]
+  local case_dir=$1 fake_uid=$2 stat_spec=${3:-} rc=0
+  FM_FAKE_ACCOUNT_UID="$fake_uid" FM_FAKE_NS_STAT="$stat_spec" \
+    FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
+    FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  return "$rc"
+}
+
+new_herdr_lock_ns_case() {  # <name>
+  local case_dir
+  case_dir=$(make_case "$1")
+  write_meta "$case_dir" local-only ship
+  configure_flat_herdr_teardown_case "$case_dir"
+  configure_herdr_lock_ns_shims "$case_dir"
+  : > "$case_dir/herdr.log"
+  : > "$case_dir/state/task-x1.status"
+  printf '%s' "$case_dir"
+}
+
+assert_herdr_lock_ns_refused() {  # <case-dir> <label>
+  local case_dir=$1 label=$2
+  assert_grep "presentation lock could not be resolved" "$case_dir/stderr" \
+    "$label: the namespace refusal was not explained visibly"
+  [ -e "$case_dir/state/task-x1.meta" ] || fail "$label: refusal erased the durable endpoint metadata"
+  [ -d "$case_dir/wt" ] || fail "$label: refusal removed the isolated copy"
+  [ ! -e "$case_dir/closed" ] || fail "$label: refusal attempted a pane close without the lock"
+}
+
+test_herdr_teardown_presentation_lock_namespace_is_per_account() {
+  local fake_uid own_ns legacy legacy_before legacy_after own_before case_dir rc lock linux_arms=0
+  fake_uid=$(herdr_lock_ns_fake_uid)
+  [ "$fake_uid" != "$(id -u)" ] || fail "herdr-lock-ns: fixture account uid collides with the running account"
+  own_ns="/tmp/firstmate-herdr-presentation-$fake_uid"
+  legacy=/tmp/firstmate-herdr-presentation
+  [ ! -e "$own_ns" ] && [ ! -L "$own_ns" ] \
+    || fail "herdr-lock-ns: fixture namespace $own_ns already exists; refusing to reuse it"
+  printf '%s\n' "$own_ns" >> "$FM_TEST_CLEANUP_REGISTRY"
+  mkdir -m 700 "$own_ns" || fail "herdr-lock-ns: could not stage $own_ns"
+  legacy_before=$(herdr_lock_ns_path_state "$legacy")
+
+  # This account's own name, really owned by another uid, is still refused and
+  # is left exactly as it was.
+  own_before=$(herdr_lock_ns_path_state "$own_ns")
+  case_dir=$(new_herdr_lock_ns_case herdr-lock-ns-foreign-owner)
+  rc=0; run_herdr_lock_ns_teardown "$case_dir" "$fake_uid" || rc=$?
+  [ "$rc" -ne 0 ] || fail "herdr-lock-ns-foreign-owner: teardown adopted a namespace another uid owns"
+  assert_herdr_lock_ns_refused "$case_dir" herdr-lock-ns-foreign-owner
+  [ "$(herdr_lock_ns_path_state "$own_ns")" = "$own_before" ] \
+    || fail "herdr-lock-ns-foreign-owner: refusal changed the foreign-owned namespace: $(herdr_lock_ns_path_state "$own_ns")"
+
+  if [ "$(uname -s)" != Darwin ]; then
+    linux_arms=1
+    # The old shared name is owned by another uid whenever it exists here, as
+    # on a host where a second account created it first; this account's
+    # teardown no longer consults it and completes in its own namespace.
+    case_dir=$(new_herdr_lock_ns_case herdr-lock-ns-other-account)
+    run_herdr_lock_ns_teardown "$case_dir" "$fake_uid" "$own_ns:$fake_uid:700" \
+      || fail "herdr-lock-ns-other-account: teardown was blocked: $(cat "$case_dir/stderr")"
+    [ -e "$case_dir/closed" ] || fail "herdr-lock-ns-other-account: the pane was not closed under the lock"
+    [ ! -e "$case_dir/state/task-x1.meta" ] || fail "herdr-lock-ns-other-account: teardown left the metadata behind"
+    grep -q "teardown task-x1 complete" "$case_dir/stdout" \
+      || fail "herdr-lock-ns-other-account: teardown did not report completion"
+    lock=$(FM_FAKE_ACCOUNT_UID="$fake_uid" FM_FAKE_NS_STAT="$own_ns:$fake_uid:700" \
+      FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
+      PATH="$case_dir/fakebin:$PATH" \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_presentation_session_lock_path default' "$ROOT") \
+      || fail "herdr-lock-ns-other-account: could not resolve the fixture account's lock path"
+    case "$lock" in
+      "$own_ns"/order-*.lock) ;;
+      *) fail "herdr-lock-ns-other-account: the lock is not in this account's namespace: $lock" ;;
+    esac
+
+    # This account's own name with the right owner but the wrong mode is refused.
+    case_dir=$(new_herdr_lock_ns_case herdr-lock-ns-wrong-mode)
+    rc=0; run_herdr_lock_ns_teardown "$case_dir" "$fake_uid" "$own_ns:$fake_uid:755" || rc=$?
+    [ "$rc" -ne 0 ] || fail "herdr-lock-ns-wrong-mode: teardown adopted a namespace that is not mode 700"
+    assert_herdr_lock_ns_refused "$case_dir" herdr-lock-ns-wrong-mode
+    [ -d "$own_ns" ] || fail "herdr-lock-ns-wrong-mode: refusal removed the namespace"
+  fi
+
+  legacy_after=$(herdr_lock_ns_path_state "$legacy")
+  [ "$legacy_after" = "$legacy_before" ] \
+    || fail "herdr-lock-ns: teardown changed the old shared namespace: $legacy_before -> $legacy_after"
+  rm -rf "$own_ns"
+  if [ "$linux_arms" = 1 ]; then
+    pass "herdr teardown takes its lock in a per-account namespace another account cannot block, and still refuses a foreign-owned or wrong-mode one"
+  else
+    pass "herdr teardown refuses a foreign-owned per-account namespace (owner-shim arms need the non-Darwin stat branch; skipped on Darwin)"
+  fi
+}
+
 configure_secondmate_with_herdr_child() {  # <case-dir>
   local case_dir=$1 home="$1/secondmate-home"
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
@@ -3443,6 +3754,95 @@ land_shippable_commit() {
   wt_commit "$case_dir" "shippable work"
   git -C "$case_dir/wt" push -q origin fm/task-x1
   git -C "$case_dir/project" fetch -q origin
+}
+
+# Cleanup keeps the task's no-mistakes pipeline spend in this home's records
+# (bin/fm-pipeline-spend.sh) while the task branch that attributes its runs and
+# the task record still exist, then removes both as before.
+test_teardown_records_the_task_pipeline_spend() {
+  local case_dir rc=0 ledger
+  case_dir=$(make_case pipeline-spend)
+  write_meta "$case_dir" no-mistakes ship
+  : > "$case_dir/config/pipeline-spend"
+  land_shippable_commit "$case_dir"
+  mkdir -p "$case_dir/nm"
+  python3 - "$case_dir/nm/state.sqlite" "$case_dir/project" "$(date +%s)" <<'PY'
+import sqlite3
+import sys
+
+database, project, created = sys.argv[1], sys.argv[2], int(sys.argv[3])
+db = sqlite3.connect(database)
+db.executescript("""
+    CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL UNIQUE);
+    CREATE TABLE runs (id TEXT PRIMARY KEY, repo_id TEXT NOT NULL, branch TEXT NOT NULL,
+                       status TEXT NOT NULL, created_at INTEGER NOT NULL);
+    CREATE TABLE agent_invocations (id TEXT, run_id TEXT, purpose TEXT, session_mode TEXT,
+        started_at INTEGER, exit_status TEXT, duration_ms INTEGER, input_tokens INTEGER,
+        output_tokens INTEGER, cache_read_tokens INTEGER, cache_creation_tokens INTEGER,
+        delta_input_tokens INTEGER, delta_output_tokens INTEGER, delta_cache_read_tokens INTEGER);
+""")
+db.execute("INSERT INTO repos VALUES ('r1', ?)", (project,))
+db.execute("INSERT INTO runs VALUES ('01RUN', 'r1', 'fm/task-x1', 'completed', ?)", (created,))
+db.execute("INSERT INTO agent_invocations VALUES ('i1', '01RUN', 'review', 'cold', ?, 'ok', 100, 7, 8, 9, 10, 7, 8, 9)",
+           (created,))
+db.execute("INSERT INTO agent_invocations VALUES ('i2', '01RUN', 'review', 'cold', ?, 'cancelled', 50, "
+           "NULL, NULL, NULL, NULL, NULL, NULL, NULL)", (created + 1,))
+db.commit()
+PY
+  (
+    export NM_HOME="$case_dir/nm" FM_FAKE_AXI_OVERVIEW="repo: $case_dir/project"
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  ) || rc=$?
+
+  expect_code 0 "$rc" "pipeline-spend: teardown should succeed"
+  ledger=$case_dir/data/pipeline-spend.jsonl
+  assert_present "$ledger" "pipeline-spend: teardown left no pipeline spend record"
+  jq -e '
+    .task == "task-x1" and .spawn_gen == "teardown-test-task-x1"
+    and .source == "no-mistakes-state" and .branch == "fm/task-x1"
+    and [.runs[].id] == ["01RUN"]
+    and .total.invocations == 2 and .total.exit == {"ok": 1, "cancelled": 1}
+    and .total.input_tokens == {"total": 7, "unknown": 1}
+  ' "$ledger" >/dev/null || fail "pipeline-spend: the recorded spend is wrong: $(cat "$ledger")"
+  assert_absent "$case_dir/state/task-x1.meta" "pipeline-spend: teardown kept the task record"
+  ! git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1 \
+    || fail "pipeline-spend: teardown kept the task branch"
+  pass "teardown records the task's pipeline spend before removing its branch and record"
+}
+
+test_teardown_skips_pipeline_spend_when_disabled() {
+  local case_dir rc=0
+  case_dir=$(make_case pipeline-spend-disabled)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "pipeline-spend-disabled: teardown should succeed"
+  assert_absent "$case_dir/data/pipeline-spend.jsonl" \
+    "pipeline-spend-disabled: teardown created a spend ledger without opt-in"
+  assert_absent "$case_dir/state/task-x1.meta" \
+    "pipeline-spend-disabled: teardown kept the task record"
+  pass 'teardown skips all pipeline-spend recording when the home has not opted in'
+}
+
+# An owned ship task whose local copy is already gone and recorded PR is merged
+# still leaves an unavailable-source account before its record goes.
+test_teardown_records_unavailable_spend_for_a_gone_worktree() {
+  local case_dir rc=0 ledger
+  case_dir=$(make_case pipeline-spend-gone)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  : > "$case_dir/config/pipeline-spend"
+  seed_backlog_in_flight "$case_dir"
+  append_pr_meta_url "$case_dir"
+  add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "pipeline-spend-gone: teardown should succeed"
+  ledger=$case_dir/data/pipeline-spend.jsonl
+  assert_present "$ledger" "pipeline-spend-gone: teardown left no pipeline spend record"
+  jq -e '.task == "task-x1" and .source == "unavailable" and .total == null
+    and (.reason | contains("is gone"))' "$ledger" >/dev/null \
+    || fail "pipeline-spend-gone: the recorded spend is wrong: $(cat "$ledger")"
+  assert_absent "$case_dir/state/task-x1.meta" "pipeline-spend-gone: teardown kept the task record"
+  pass "teardown records unavailable pipeline spend for an owned ship task whose copy is gone"
 }
 
 test_parked_own_run_is_aborted_before_teardown() {
@@ -5151,6 +5551,383 @@ EOF
   pass "the run abort and the leaked-process reap both complete before the destructive worktree return"
 }
 
+# No-mistakes auto-installs a KeepAlive launchd agent for a daemon whose home is
+# private to one task. These cases drive teardown against a fake launchctl and a
+# fixture LaunchAgents directory (FM_LAUNCH_AGENTS_DIR), never the real ones.
+NM_AGENT_PREFIX=com.kunchenguid.no-mistakes.daemon
+
+# Fixture launchctl: `print` succeeds only while a label is loaded; `bootout`
+# unloads it and, like launchd, ends the process the agent owns. Every call is
+# logged. FAKE_LAUNCHCTL_BOOTOUT_FAILS=1 keeps the agent loaded, as a failed
+# unload does.
+add_fake_launchctl() {  # <case-dir>
+  local case_dir=$1 fake="$1/fakebin/launchctl"
+  mkdir -p "$case_dir/launchctl-loaded"
+  : > "$case_dir/launchctl-calls"
+  cat > "$fake" <<SH
+#!/usr/bin/env bash
+loaded="$case_dir/launchctl-loaded"
+printf '%s\n' "\$*" >> "$case_dir/launchctl-calls"
+label=\${2##*/}
+case "\$1" in
+  print) [ -e "\$loaded/\$label" ] || exit 113 ;;
+  bootout)
+    [ -e "\$loaded/\$label" ] || exit 113
+    [ "\${FAKE_LAUNCHCTL_BOOTOUT_FAILS:-0}" != 1 ] || exit 5
+    pid=\$(cat "\$loaded/\$label")
+    [ -z "\$pid" ] || kill -KILL "\$pid" 2>/dev/null || true
+    rm -f "\$loaded/\$label"
+    ;;
+  *) exit 64 ;;
+esac
+SH
+  chmod +x "$fake"
+}
+
+# Write the plist shape no-mistakes installs. Args: case_dir hash root [pid]
+# A pid marks the agent as loaded and owning that process.
+add_nm_launch_agent() {
+  local case_dir=$1 hash=$2 root=$3 pid=${4:-} label
+  label="$NM_AGENT_PREFIX.$hash"
+  mkdir -p "$case_dir/launchagents"
+  cat > "$case_dir/launchagents/$label.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/no-mistakes</string>
+    <string>daemon</string>
+    <string>run</string>
+    <string>--root</string>
+    <string>$root</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$root</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>
+PLIST
+  if [ -n "$pid" ]; then
+    printf '%s\n' "$pid" > "$case_dir/launchctl-loaded/$label"
+  fi
+}
+
+# The incident: a worker's private no-mistakes home ran as a launchd agent whose
+# daemon held a directory inside the task copy. Without a retire step, teardown
+# found a process it could not prove custody of and refused (and a plain kill is
+# undone by launchd KeepAlive).
+test_private_nm_launch_agent_is_retired_before_teardown() {
+  local case_dir rc pid label shared_state
+  case_dir=$(make_case private-nm-agent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  add_fake_launchctl "$case_dir"
+  shared_state="$case_dir/shared-daemon-state"
+  printf '%s\n' running > "$shared_state"
+  FM_FAKE_NM_SHARED_DAEMON_STATE="$shared_state" "$case_dir/fakebin/no-mistakes" daemon stop
+  [ "$(cat "$shared_state")" = stopped ] || fail "private-nm-agent: fake daemon stop did not stop the shared daemon"
+  printf '%s\n' running > "$shared_state"
+  mkdir -p "$case_dir/wt/.no-mistakes/h"
+  teardown_fixture_start "$case_dir/wt/.no-mistakes/h" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  kill -0 "$pid" 2>/dev/null || fail "private-nm-agent: setup daemon did not start"
+  label="$NM_AGENT_PREFIX.3baa54c9"
+  add_nm_launch_agent "$case_dir" 3baa54c9 "$(cd "$case_dir/wt" && pwd -P)/.no-mistakes/h" "$pid"
+
+  rc=0
+  FM_FAKE_NM_SHARED_DAEMON_STATE="$shared_state" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if kill -0 "$pid" 2>/dev/null; then
+    teardown_fixture_stop "$pid"
+    fail "private-nm-agent: the private daemon survived teardown"
+  fi
+  expect_code 0 "$rc" "private-nm-agent: teardown must finish once the agent is retired"
+  assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" \
+    "private-nm-agent: teardown did not boot the agent out of the user domain"
+  assert_absent "$case_dir/launchagents/$label.plist" \
+    "private-nm-agent: the plist is still installed, so the agent returns at next login"
+  assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
+    "private-nm-agent: the plist was not archived under the task's data"
+  assert_grep "retired task-private no-mistakes launch agent $label" "$case_dir/stderr" \
+    "private-nm-agent: teardown did not report the retired agent"
+  [ "$(cat "$shared_state")" = running ] || fail "private-nm-agent: teardown stopped the shared daemon"
+  pass "a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes"
+}
+
+test_private_nm_launch_agent_equivalent_roots_are_retired() {
+  local spelling case_dir wt root pid label rc
+  for spelling in dot separators parent symlink; do
+    case_dir=$(make_case "private-nm-agent-$spelling")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    add_fake_launchctl "$case_dir"
+    wt=$(cd "$case_dir/wt" && pwd -P)
+    mkdir -p "$wt/.no-mistakes/h" "$wt/.no-mistakes/staging"
+    ln -s "$wt/.no-mistakes/h" "$case_dir/private-home"
+    case "$spelling" in
+      dot) root="$wt/./.no-mistakes/h" ;;
+      separators) root="$wt//.no-mistakes//h/" ;;
+      parent) root="$wt/.no-mistakes/staging/../h" ;;
+      symlink) root="$case_dir/private-home" ;;
+    esac
+    teardown_fixture_start "$wt/.no-mistakes/h" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    label="$NM_AGENT_PREFIX.3baa54c9"
+    add_nm_launch_agent "$case_dir" 3baa54c9 "$root" "$pid"
+
+    rc=0
+    FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if kill -0 "$pid" 2>/dev/null; then
+      teardown_fixture_stop "$pid"
+      fail "private-nm-agent-$spelling: the private daemon survived teardown"
+    fi
+    expect_code 0 "$rc" "private-nm-agent-$spelling: teardown must finish"
+    assert_absent "$case_dir/launchctl-loaded/$label" \
+      "private-nm-agent-$spelling: the agent is still loaded"
+    assert_absent "$case_dir/launchagents/$label.plist" \
+      "private-nm-agent-$spelling: the plist is still installed"
+    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
+      "private-nm-agent-$spelling: the plist was not archived"
+    assert_absent "$case_dir/state/task-x1.meta" \
+      "private-nm-agent-$spelling: the task record survived teardown"
+  done
+  pass "equivalent private roots unload their agents and allow teardown to finish"
+}
+
+test_nested_nm_launch_agents_are_left_alone() {
+  local registrar damage case_dir registry nested lane pid label rc hash
+  for registrar in project sibling; do
+    for damage in none no-git deleted; do
+      case_dir=$(make_case "nested-nm-agent-$registrar-$damage")
+      write_meta "$case_dir" no-mistakes ship
+      land_shippable_commit "$case_dir"
+      add_fake_launchctl "$case_dir"
+      registry="$case_dir/project"
+      if [ "$registrar" = sibling ]; then
+        registry="$case_dir/sibling-clone"
+        git clone -q "$case_dir/origin.git" "$registry"
+      fi
+      nested="$case_dir/wt/other-lane"
+      git -C "$registry" worktree add -q --detach "$nested" main
+      git -C "$registry" worktree lock "$nested"
+      lane=$(cd "$nested" && pwd -P)
+      fm_write_meta "$case_dir/state/other-lane.meta" "worktree=$lane" "project=$registry" "kind=ship"
+      mkdir -p "$lane/.no-mistakes/h"
+      ln -s "$lane/.no-mistakes/h" "$case_dir/lane-home"
+      teardown_fixture_start "$lane/.no-mistakes/h" KILL sleep 300
+      pid=$TEARDOWN_FIXTURE_PID
+      add_nm_launch_agent "$case_dir" 00000001 "$lane/./.no-mistakes//h" "$pid"
+      add_nm_launch_agent "$case_dir" 00000002 "$lane/.no-mistakes/missing/../h"
+      add_nm_launch_agent "$case_dir" 00000003 "$case_dir/lane-home"
+      case "$damage" in
+        no-git) rm -f "$nested/.git" ;;
+        deleted) rm -rf "$nested" ;;
+      esac
+
+      rc=0
+      FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+        run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      if ! kill -0 "$pid" 2>/dev/null; then
+        fail "nested-nm-agent-$registrar-$damage: another lane's daemon was killed"
+      fi
+      teardown_fixture_stop "$pid"
+      expect_code 1 "$rc" "nested-nm-agent-$registrar-$damage: teardown must refuse the foreign process"
+      [ ! -s "$case_dir/launchctl-calls" ] \
+        || fail "nested-nm-agent-$registrar-$damage: teardown addressed another lane's agent"
+      for hash in 00000001 00000002 00000003; do
+        label="$NM_AGENT_PREFIX.$hash"
+        assert_present "$case_dir/launchagents/$label.plist" "nested-nm-agent: foreign plist was removed"
+      done
+      assert_present "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.00000001" "nested-nm-agent: foreign agent was unloaded"
+      assert_absent "$case_dir/data/task-x1/launchagent-backup" "nested-nm-agent: foreign plist was archived"
+      assert_present "$case_dir/state/task-x1.meta" "nested-nm-agent: task record was removed"
+    done
+  done
+  pass "nested-lane agents remain loaded and installed across registry, path, and lane-damage variants"
+}
+
+test_absent_copy_nm_launch_agents_preserve_nested_ownership() {
+  local recovery registrar case_dir wt registry nested home hash label root rc head
+  local -a flags
+  for recovery in merged forced; do
+    for registrar in project sibling; do
+      case_dir=$(make_case "absent-nm-agent-$recovery-$registrar")
+      write_meta "$case_dir" no-mistakes ship
+      add_fake_launchctl "$case_dir"
+      wt=$(cd "$case_dir/wt" && pwd -P)
+      registry="$case_dir/project"
+      home="$case_dir/primary-home"
+      if [ "$registrar" = sibling ]; then
+        registry="$case_dir/sibling-clone"
+        git clone -q "$case_dir/origin.git" "$registry"
+        home="$case_dir/mate-home"
+        mkdir -p "$case_dir/primary-home/data"
+        printf -- '- mate-x - fixture scope (home: %s; scope: fixture; projects: alpha; added 2026-07-14)\n' \
+          "$home" > "$case_dir/primary-home/data/secondmates.md"
+      fi
+      mkdir -p "$home/state"
+      nested="$wt/other-lane"
+      git -C "$registry" worktree add -q --detach "$nested" main
+      git -C "$registry" worktree lock "$nested"
+      fm_write_meta "$home/state/other-lane.meta" "worktree=$nested" "project=$registry" "kind=ship"
+      flags=()
+      if [ "$recovery" = merged ]; then
+        append_pr_meta_url "$case_dir"
+        head=$(git -C "$wt" rev-parse HEAD)
+        add_gh_pr_merged_for_head "$case_dir" "$head"
+      else
+        flags=(--force --drop-file "$(fm_test_drop_file)")
+      fi
+      hash=0
+      for root in "$wt" "$wt/.no-mistakes/h" "$wt" "$wt/.no-mistakes/h"; do
+        hash=$((hash + 1))
+        add_nm_launch_agent "$case_dir" "$hash" "$root"
+        [ "$hash" -gt 2 ] || : > "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.$hash"
+      done
+      add_nm_launch_agent "$case_dir" nested "$nested/.no-mistakes/h"
+      : > "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.nested"
+      rm -rf "$wt"
+
+      rc=0
+      FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+        run_teardown "$case_dir" "${flags[@]+"${flags[@]}"}" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "absent-nm-agent-$recovery-$registrar: recovery refused: $(cat "$case_dir/stderr")"
+      for hash in 1 2 3 4; do
+        label="$NM_AGENT_PREFIX.$hash"
+        assert_absent "$case_dir/launchctl-loaded/$label" "absent-nm-agent: private agent remains loaded"
+        assert_absent "$case_dir/launchagents/$label.plist" "absent-nm-agent: private plist remains installed"
+        assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" "absent-nm-agent: private plist not archived"
+        if [ "$hash" -le 2 ]; then
+          assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" "absent-nm-agent: loaded private agent not booted out"
+        fi
+      done
+      label="$NM_AGENT_PREFIX.nested"
+      assert_present "$case_dir/launchctl-loaded/$label" "absent-nm-agent: nested agent was unloaded"
+      assert_present "$case_dir/launchagents/$label.plist" "absent-nm-agent: nested plist was removed"
+      assert_no_grep "$label" "$case_dir/launchctl-calls" "absent-nm-agent: nested agent was addressed"
+      assert_absent "$case_dir/data/task-x1/launchagent-backup/$label.plist" "absent-nm-agent: nested plist was archived"
+      assert_present "$home/state/other-lane.meta" "absent-nm-agent: nested task record was removed"
+      assert_absent "$case_dir/state/task-x1.meta" "absent-nm-agent: recovered task record remains"
+    done
+  done
+  pass "absent-copy recovery retires private agents but preserves nested agents registered by local task projects"
+}
+
+# Every agent whose root is not inside THIS task's copy stays loaded and
+# installed: the shared ~/.no-mistakes agent, another task's agent, a sibling
+# directory that only shares a name prefix, and a root that climbs out with `..`.
+test_foreign_nm_launch_agents_are_left_alone() {
+  local case_dir rc wt calls hash
+  case_dir=$(make_case foreign-nm-agents)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  add_fake_launchctl "$case_dir"
+  wt=$(cd "$case_dir/wt" && pwd -P)
+  printf '%s\n' '.no-mistakes/' >> "$(git -C "$wt" rev-parse --git-path info/exclude)"
+  add_nm_launch_agent "$case_dir" 00000001 "$case_dir/home/.no-mistakes" 999991
+  add_nm_launch_agent "$case_dir" 00000002 "$case_dir/other-wt/.no-mistakes/h" 999992
+  add_nm_launch_agent "$case_dir" 00000003 "$wt-sibling/.no-mistakes/h" 999993
+  add_nm_launch_agent "$case_dir" 00000004 "$wt/../escape/.no-mistakes/h" 999994
+  mkdir -p "$case_dir/escape/h" "$wt/.no-mistakes"
+  ln -s "$case_dir/escape" "$wt/.no-mistakes/outside"
+  add_nm_launch_agent "$case_dir" 00000006 "$wt/missing/../../escape/.no-mistakes/h"
+  add_nm_launch_agent "$case_dir" 00000007 "$wt/.no-mistakes/outside/h"
+  add_nm_launch_agent "$case_dir" 00000008 "$wt/.no-mistakes/outside/../.no-mistakes/h"
+  add_nm_launch_agent "$case_dir" 00000009 "$wt/missing/../.no-mistakes/outside/h"
+  for hash in 00000006 00000007 00000008 00000009; do
+    : > "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.$hash"
+  done
+  mkdir -p "$case_dir/launchagents"
+  printf '%s\n' 'not a plist' > "$case_dir/launchagents/com.kunchenguid.no-mistakes.daemon.00000005.plist"
+  printf '%s\n' unrelated > "$case_dir/launchagents/com.example.other.plist"
+
+  rc=0
+  FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "foreign-nm-agents: teardown should be unaffected by other agents: $(cat "$case_dir/stderr")"
+  calls=$(cat "$case_dir/launchctl-calls")
+  assert_not_contains "$calls" "bootout" "foreign-nm-agents: teardown unloaded an agent that is not this task's"
+  [ "$(find "$case_dir/launchagents" -name '*.plist' | wc -l | tr -d ' ')" = 10 ] \
+    || fail "foreign-nm-agents: an installed plist was moved or removed"
+  for hash in 00000001 00000002 00000003 00000004 00000006 00000007 00000008 00000009; do
+    assert_present "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.$hash" \
+      "foreign-nm-agents: an outside-root agent was unloaded"
+  done
+  assert_absent "$case_dir/data/task-x1/launchagent-backup" \
+    "foreign-nm-agents: something was archived for a task that owned no agent"
+  assert_grep "leaving unreadable no-mistakes launch agent $case_dir/launchagents/$NM_AGENT_PREFIX.00000005.plist as found" "$case_dir/stderr" \
+    "foreign-nm-agents: an unparsable plist was skipped silently"
+  pass "agents rooted outside the task's copy, and unparsable plists, are never unloaded or moved"
+}
+
+# An agent that will not unload still owns its process and respawns it, so
+# teardown must stop with the plist and the task record intact.
+test_private_nm_launch_agent_bootout_failure_refuses() {
+  local case_dir rc pid label
+  case_dir=$(make_case private-nm-agent-stuck)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  add_fake_launchctl "$case_dir"
+  mkdir -p "$case_dir/wt/.no-mistakes/h"
+  teardown_fixture_start "$case_dir/wt/.no-mistakes/h" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  label="$NM_AGENT_PREFIX.3baa54c9"
+  add_nm_launch_agent "$case_dir" 3baa54c9 "$(cd "$case_dir/wt" && pwd -P)/.no-mistakes/h" "$pid"
+
+  rc=0
+  FAKE_LAUNCHCTL_BOOTOUT_FAILS=1 FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -0 "$pid" 2>/dev/null || { teardown_fixture_stop "$pid"; fail "private-nm-agent-stuck: process was signalled around a loaded agent"; }
+  teardown_fixture_stop "$pid"
+  expect_code 1 "$rc" "private-nm-agent-stuck: teardown must refuse when the agent stays loaded"
+  assert_present "$case_dir/launchagents/$label.plist" "private-nm-agent-stuck: plist removed although the agent is still loaded"
+  assert_present "$case_dir/state/task-x1.meta" "private-nm-agent-stuck: task record removed"
+  assert_present "$case_dir/wt" "private-nm-agent-stuck: task copy removed"
+  assert_grep "REFUSED: no-mistakes launch agent $label (rooted in task-x1's copy) is still loaded" "$case_dir/stderr" \
+    "private-nm-agent-stuck: refusal does not name the agent"
+  pass "an agent that stays loaded after bootout stops teardown with its plist and the task copy intact"
+}
+
+# A plist left behind by a reboot or a manual bootout has no loaded service; it
+# still brings the daemon back at next login, so it is archived too.
+test_private_nm_launch_agent_not_loaded_is_archived() {
+  local case_dir rc label wt root hash=0
+  case_dir=$(make_case private-nm-agent-unloaded)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  add_fake_launchctl "$case_dir"
+  wt=$(cd "$case_dir/wt" && pwd -P)
+  for root in "$wt/.no-mistakes/h" "$wt/./.no-mistakes/h" "$wt//.no-mistakes//h/" \
+    "$wt/missing/../.no-mistakes/h" "$wt/missing/./h" "$wt/missing/h/.." "$wt/."; do
+    hash=$((hash + 1))
+    add_nm_launch_agent "$case_dir" "$hash" "$root"
+  done
+
+  rc=0
+  FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "private-nm-agent-unloaded: teardown should finish"
+  for hash in 1 2 3 4 5 6 7; do
+    label="$NM_AGENT_PREFIX.$hash"
+    assert_absent "$case_dir/launchagents/$label.plist" "private-nm-agent-unloaded: plist still installed"
+    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
+      "private-nm-agent-unloaded: plist not archived"
+  done
+  pass "a private no-mistakes plist with no loaded service is still archived"
+}
+
 # Copy the public teardown script tree, then drop or blank one required file.
 # Symlinks keep the copy cheap; an unreadable case replaces one link with a
 # real mode-000 file so the probe is of the file itself.
@@ -5406,6 +6183,7 @@ test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
 test_teardown_closes_the_backlog_item_itself
+test_teardown_closes_a_gerrit_task_with_its_change_url_as_a_note
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator
 test_local_only_truly_unpushed_refuses
 test_local_only_merged_to_local_main_allows
@@ -5422,6 +6200,7 @@ test_herdr_teardown_clears_escalation_marker
 test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes
 test_herdr_flat_teardown_refuses_records_on_unparseable_presence
 test_herdr_flat_teardown_preflight_refuses_before_changes
+test_herdr_teardown_presentation_lock_namespace_is_per_account
 test_forced_secondmate_herdr_child_preflight_refuses_before_changes
 test_forced_secondmate_teardown_holds_descendant_lifecycle_locks
 test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed
@@ -5446,8 +6225,12 @@ test_squash_merged_stale_local_refuses_when_forge_unreachable
 test_pr_check_does_not_refresh_stale_pr_head
 test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows
+test_content_fallback_uses_recorded_base_branch
 test_content_fallback_refreshes_stale_origin_ref
 test_dirty_worktree_refuses
+test_untracked_only_refusal_diagnostic
+test_tracked_edit_refusal_diagnostic
+test_mixed_refusal_diagnostic
 test_gh_error_and_content_absent_refuses
 test_legacy_record_without_the_flag_refuses
 test_windowless_legacy_record_with_gone_worktree_refuses
@@ -5474,6 +6257,9 @@ test_transient_index_lock_clears_after_first_attempt_and_retry_succeeds
 test_persistent_index_lock_exhausts_retries_and_refuses_loudly
 test_empty_retry_wait_uses_default_without_aborting
 test_fractional_legacy_retry_wait_refuses_without_arithmetic_error
+test_teardown_records_the_task_pipeline_spend
+test_teardown_skips_pipeline_spend_when_disabled
+test_teardown_records_unavailable_spend_for_a_gone_worktree
 test_parked_own_run_is_aborted_before_teardown
 test_parked_own_run_concludes_on_passed_with_override_after_abort
 test_parked_own_run_concludes_on_passed_with_skips_after_abort
@@ -5517,6 +6303,13 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
+test_private_nm_launch_agent_is_retired_before_teardown
+test_private_nm_launch_agent_equivalent_roots_are_retired
+test_foreign_nm_launch_agents_are_left_alone
+test_nested_nm_launch_agents_are_left_alone
+test_absent_copy_nm_launch_agents_preserve_nested_ownership
+test_private_nm_launch_agent_bootout_failure_refuses
+test_private_nm_launch_agent_not_loaded_is_archived
 )
 
 # Validate the complete selection before running any behavioral case.

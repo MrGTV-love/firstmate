@@ -41,8 +41,9 @@
 # part of the "lab" back onto the real fleet. The threat model stays a CONFUSED
 # agent: a hostile agent that would hand-forge the marker file is the
 # adversarial case no-mistakes' neutral-execution-context and the
-# HEAD-continuity guard already own, so the check is a plain token file, not a
-# bound record. This is an allowance on the CAPABILITY side only:
+# HEAD-continuity guard already own, so authorization checks only the first-line
+# token, not the reaping provenance owned by bin/fm-test-reap-orphans.sh.
+# This is an allowance on the CAPABILITY side only:
 # fm_is_gate_agent still reports the gate context, so the sessionstart
 # stand-downs that read it directly are unaffected by the marker.
 #
@@ -77,8 +78,8 @@
 # test as "the gate refusal fired" rather than an ordinary usage error.
 FM_GATE_REFUSE_EXIT=3
 
-# The disposable-lab-home marker file and the token line it must carry. The
-# format is owned here; bin/fm-lab-home.sh is the supported writer.
+# The disposable-lab-home marker file and first-line gate token are owned here;
+# bin/fm-lab-home.sh is the supported writer.
 FM_GATE_LAB_MARKER='.fm-lab-home'
 FM_GATE_LAB_TOKEN='fm-lab-home v1'
 

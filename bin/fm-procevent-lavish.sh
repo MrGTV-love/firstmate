@@ -12,6 +12,7 @@
 #   fm-procevent-lavish.sh source-id <artifact.html>
 #   fm-procevent-lavish.sh retire <artifact.html>
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
+#   fm-procevent-lavish.sh deliver-reply poll <artifact.html> --agent-reply-file <path>
 #   fm-procevent-lavish.sh check <artifact.html>
 #
 # classify   Print the lifecycle state a handler should act on: feedback, ended,
@@ -21,8 +22,10 @@
 #            It is read-only over the capture: it does not arm, poll, or change
 #            what Lavish delivered. The freeform message (tag=message) is its
 #            own labeled field, printed first and distinct from per-element
-#            annotations; it is labeled SESSION-ENDING MESSAGE only when the
-#            session ended. Declared and presented item counts,
+#            annotations; it is labeled SESSION-ENDING MESSAGE, and counted as
+#            session_ending_message_count, only when the session ended, and is
+#            otherwise CAPTAIN MESSAGE and captain_message_count. Declared and
+#            presented item counts,
 #            plus a completeness verdict, follow before all annotations so a
 #            partial read is obvious. Each annotation retains its element uid,
 #            selector, tag, and text. A non-choice freeform comment (`prompt`)
@@ -35,12 +38,17 @@
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
 #            and prints its response verbatim, absorbing only the one exact
-#            transient interruption described below. A task-owned arm consumes
-#            its staged reply file once - reading and removing it before the
-#            poll - and hands the contents to the published `--agent-reply`
-#            argument; later retries poll without that reply. That post is best
-#            effort: a crash while consuming drops that one round's reply
-#            instead of posting it twice. See the note at the consume site.
+#            transient interruption described below. A staged reply still
+#            present when it starts is posted before the long-poll: through
+#            `lavish-axi reply` when supported, otherwise through the legacy
+#            best-effort `poll --agent-reply` path.
+# deliver-reply
+#            Run by `fm-procevent.sh register-task` under the source lock, only
+#            after the task is eligible to own the board, with the listener argv
+#            it is about to publish. Exit 0 once Lavish accepts the staged reply,
+#            3 when the installed Lavish is a confirmed older release without
+#            synchronous reply so the listener keeps the legacy path, and any
+#            other status when the reply failed or the version is unknown.
 # check      Compile, without running, inline event handlers and inline classic
 #            scripts; exit 1 naming each parse failure and its source line.
 #            Skip external, module, JSON and other non-classic scripts, and
@@ -121,12 +129,10 @@
 # `read` is the presentation command summarized above; keyed intake remains
 # the separate `answers` contract described here.
 #
-# It wraps ONLY the currently published interface, verified against 0.1.45:
-#   Usage: lavish-axi poll <html-file> [--agent-reply "..."]
-# and that command "long-polls indefinitely" server-side. The adapter therefore
-# runs the plain blocking form with no timeout flag, so results arrive as real
-# server-side events. It adds no periodic discovery, no timer fallback, and no
-# dependency on any unreleased capability.
+# It wraps the published `lavish-axi poll` and `lavish-axi reply` interfaces,
+# verified against 0.1.80. `poll` long-polls indefinitely; `reply` exits only
+# after the server confirms acceptance. Older compatible versions retain the
+# legacy poll-with-reply path, without the synchronous handoff guarantee.
 #
 # BOUNDED QUIET RETRY, owned here and nowhere else. A live listener can be cut
 # short by the server with exactly this two-line response while the session's
@@ -199,6 +205,23 @@ apply_session_host() {  # <artifact>
   LAVISH_AXI_HOST=${endpoint%$'\n'*}
   LAVISH_AXI_PORT=${endpoint##*$'\n'}
   export LAVISH_AXI_HOST LAVISH_AXI_PORT
+}
+
+lavish_reply_compatible() {
+  local status=0
+  "$FM_ROOT/bin/fm-bootstrap.sh" lavish-reply-compatible >/dev/null 2>&1 || status=$?
+  case "$status" in
+    0|1) return "$status" ;;
+  esac
+  die "cannot confirm a supported lavish-axi version, so the staged reply was not posted; retry once \`lavish-axi --version\` reports a supported release"
+}
+
+post_lavish_reply() {  # <artifact> <reply-file>
+  local output
+  if ! output=$(lavish-axi reply "$1" --agent-reply-file "$2" 2>&1); then
+    [ -n "$output" ] || output="lavish-axi reply exited nonzero"
+    die "Lavish did not accept the staged reply: $output"
+  fi
 }
 
 # Canonical identity is physical, not the path string: Lavish itself keys a
@@ -430,6 +453,13 @@ cmd_arm() {
   [ -z "$task" ] || printf 'owner-task: %s\n' "$task"
 }
 
+cmd_deliver_reply() {
+  [ "$#" -eq 4 ] && [ "$1" = poll ] && [ "$3" = --agent-reply-file ] || usage
+  lavish_reply_compatible || exit 3
+  apply_session_host "$2"
+  post_lavish_reply "$2" "$4"
+}
+
 cmd_retire() {
   local artifact=${1-} id
   [ -n "$artifact" ] || usage
@@ -557,19 +587,20 @@ cmd_poll() {
     [ -f "$artifact" ] && [ ! -L "$artifact" ] && [ -r "$artifact" ] \
       || die "artifact is no longer a readable file: $artifact"
     apply_session_host "$artifact"
-    # Posting a round's reply is BEST EFFORT and deliberately carries no delivery
-    # machinery. The staged file is the only record that a reply is owed, so it is
-    # consumed HERE - after every non-posting step that could abort this poll has
-    # already succeeded - leaving one narrow window: a crash between consuming the
-    # file and the call below drops this one round's reply rather than posting it
-    # twice. A listener that starts with no staged file simply polls without one.
-    # Robust delivery waits on lavish-axi's own exclusive listener; do not add a
-    # receipt, retry, or idempotency marker here.
+    # Newer Lavish builds expose a one-shot reply command whose success is the
+    # server's acceptance receipt. Consume the staged file only after that
+    # confirmation; older compatible builds retain the published poll reply
+    # behavior and its best-effort delivery boundary.
     if [ -f "$reply_file" ] && [ ! -L "$reply_file" ]; then
-      reply_text=$(cat -- "$reply_file") \
-        || die "cannot read agent reply file: $reply_file"
-      rm -f -- "$reply_file" || die "cannot consume agent reply file: $reply_file"
-      reply_pending=1
+      if lavish_reply_compatible; then
+        post_lavish_reply "$artifact" "$reply_file"
+        rm -f -- "$reply_file" || die "cannot consume agent reply file: $reply_file"
+      else
+        reply_text=$(cat -- "$reply_file") \
+          || die "cannot read agent reply file: $reply_file"
+        rm -f -- "$reply_file" || die "cannot consume agent reply file: $reply_file"
+        reply_pending=1
+      fi
     fi
     if [ "$reply_pending" -eq 1 ]; then
       lavish-axi poll "$artifact" --agent-reply "$reply_text" | poll_response_filter "$response"
@@ -714,11 +745,10 @@ cmd_silent() {
 # quoted fields carry JSON-style escapes, so this reads the declared field ORDER
 # rather than assuming a fixed column, and takes only rows whose `tag` field is
 # `choice`. A freeform `message` row is captain prose and is deliberately never a
-# source of decision keys. A row that does not carry both a slug-shaped `question`
-# and the versioned `selection` and `note` fields inside its `Context data:` block
-# is skipped. A time-limited rollout branch accepts the old question/answer
-# shape only for ordinary answers and rejects its bare or annotated reconcile
-# values because old rows do not separate the selected option from its note.
+# source of decision keys. docs/captain-hold-lifecycle.md (How a board selection
+# creates a request) owns the versioned and legacy context contract. Resolve the
+# latest valid row before filtering either output so legacy Reconcile cannot
+# revive an earlier answer or request.
 # The question cap is 128 so any task id fits, including the long legacy
 # `<origin>-decision-<key>` identities pre-collapse decks still carry; the
 # security property is the slug SHAPE, which is unchanged.
@@ -780,17 +810,15 @@ cmd_choice_rows() {
         next unless length($selected) || length($note);
         $answer = length($selected) ? $selected : $note;
         $legacy = 0;
-      # Time-limited compatibility for captures from pre-change boards; remove
-      # once no board carrying the old question/answer context can remain armed.
-      } elsif (!exists($data->{schema}) && !exists($data->{selection})
-          && !exists($data->{note})) {
+      # Legacy bookkeeping is not evidence of a schema version. A note enriches
+      # the label, never the selected answer.
+      } elsif (!exists($data->{schema}) && !exists($data->{selection})) {
         $key = $data->{question};
-        $answer = $data->{answer};
-        next if !defined($key) || ref($key) || !defined($answer) || ref($answer);
+        $answer = exists($data->{answer}) ? $data->{answer} : $data->{choice};
+        $note = defined($data->{note}) ? $data->{note} : "";
+        next if !defined($key) || ref($key) || !defined($answer) || ref($answer) || ref($note);
         next unless length($answer) && length($answer) <= 512;
-        next if $answer eq "reconcile" || index($answer, "reconcile - ") == 0;
         $selected = "";
-        $note = "";
         $legacy = 1;
       } else {
         next;
@@ -804,6 +832,9 @@ cmd_choice_rows() {
       }
       my $label = defined $f{text} ? $f{text} : "";
       s/[\x00-\x1f\x7f]/ /g for ($answer, $note, $label);
+      if ($legacy && length $note && index($label, $note) < 0) {
+        $label = length($label) ? "$label - $note" : $note;
+      }
       $label = substr($label, 0, 512);
       if (defined $seen{$key}) { $choices[$seen{$key}] = undef }
       $seen{$key} = scalar @choices;
@@ -813,6 +844,8 @@ cmd_choice_rows() {
       };
     }
     for my $choice (grep { defined } @choices) {
+      next if $choice->{legacy} && ($choice->{answer} eq "reconcile"
+        || index($choice->{answer}, "reconcile - ") == 0);
       if ($selection eq "reconciles") {
         next if $choice->{legacy};
         if ($choice->{selection} eq "reconcile") {
@@ -919,9 +952,9 @@ cmd_read() {
       return if !@lines || (@lines == 1 && $lines[0] eq "");
       print "| $_\n" for @lines;
     }
+    my $ended = $session_ended =~ /^(?:true|True|TRUE)$/;
     if (@messages) {
-      my $message_label = $session_ended =~ /^(?:true|True|TRUE)$/
-        ? "SESSION-ENDING MESSAGE" : "CAPTAIN MESSAGE";
+      my $message_label = $ended ? "SESSION-ENDING MESSAGE" : "CAPTAIN MESSAGE";
       print "$message_label\n";
       for my $i (0 .. $#messages) {
         print "$message_label PART ", ($i + 1), " of ", scalar(@messages), "\n" if @messages > 1;
@@ -942,7 +975,8 @@ cmd_read() {
     print "lifecycle: $lifecycle\n";
     print "session_ended: ", (length $session_ended ? $session_ended : "(unset)"), "\n";
     print "annotation_count: ", scalar(@annotations), "\n";
-    print "session_ending_message_count: ", scalar(@messages), "\n";
+    my $message_count_key = $ended ? "session_ending_message_count" : "captain_message_count";
+    print "$message_count_key: ", scalar(@messages), "\n";
     print "\n";
     if (@annotations) {
       print "ANNOTATIONS\n";
@@ -978,6 +1012,7 @@ case "${1-}" in
   arm)       shift; cmd_arm "$@" ;;
   retire)    shift; cmd_retire "$@" ;;
   poll)      shift; cmd_poll "$@" ;;
+  deliver-reply) shift; cmd_deliver_reply "$@" ;;
   check)     shift; cmd_check "$@" ;;
   source-id) shift; cmd_source_id "$@" ;;
   classify)  shift; cmd_classify "$@" ;;

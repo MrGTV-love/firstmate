@@ -55,25 +55,72 @@ fm_nm_run() {  # <dir> <timeout_secs> <args...>
   fm_nm_run_checked "$@" || true
 }
 
+# The _to forms below assign to the caller's variable instead of printing, so a
+# hot loop or a chain of reads pays no command substitution (one process each)
+# for a trim or a field read. The printing forms stay for callers that capture
+# them and print byte-for-byte what they always printed.
+fm_nm_trim_to() {  # <output-variable> <value>
+  local _fm_nm_t=${2:-}
+  _fm_nm_t="${_fm_nm_t#"${_fm_nm_t%%[![:space:]]*}"}"
+  _fm_nm_t="${_fm_nm_t%"${_fm_nm_t##*[![:space:]]}"}"
+  printf -v "$1" '%s' "$_fm_nm_t"
+}
+
 fm_nm_trim() {
-  local s=${1:-}
-  s="${s#"${s%%[![:space:]]*}"}"
-  s="${s%"${s##*[![:space:]]}"}"
-  printf '%s' "$s"
+  local _fm_nm_out
+  fm_nm_trim_to _fm_nm_out "${1:-}"
+  printf '%s' "$_fm_nm_out"
+}
+
+fm_nm_strip_quotes_to() {  # <output-variable> <value>
+  local _fm_nm_q
+  fm_nm_trim_to _fm_nm_q "${2:-}"
+  case "$_fm_nm_q" in
+    \"*\") _fm_nm_q=${_fm_nm_q#\"}; _fm_nm_q=${_fm_nm_q%\"} ;;
+  esac
+  fm_nm_trim_to "$1" "$_fm_nm_q"
 }
 
 fm_nm_strip_quotes() {
-  local s
-  s=$(fm_nm_trim "${1:-}")
-  case "$s" in
-    \"*\") s=${s#\"}; s=${s%\"} ;;
+  local _fm_nm_out
+  fm_nm_strip_quotes_to _fm_nm_out "${1:-}"
+  printf '%s' "$_fm_nm_out"
+}
+
+# Path of no-mistakes' local state database as the CLI would see it from
+# worktree $1: <NM_HOME>/state.sqlite, with NM_HOME defaulting to
+# ~/.no-mistakes and a relative NM_HOME resolving from that worktree. Readers
+# open it with SQLite's mode=ro, so a missing database is never created.
+fm_nm_state_db() {  # <worktree>
+  local root=${NM_HOME:-}
+  [ -n "$root" ] || root=~/.no-mistakes
+  case "$root" in
+    /*) ;;
+    *) root="$1/$root" ;;
   esac
-  fm_nm_trim "$s"
+  printf '%s/state.sqlite\n' "$root"
+}
+
+# Scalar value of a TOON key in captured `axi status` output $2: the text after
+# the key on the FIRST line that starts with it, indentation allowed. Returns 1
+# and assigns nothing when no line carries the key, so the printing form can
+# tell an absent key (no output) from an empty value (one empty line).
+fm_nm_field_to() {  # <output-variable> <toon-output> <key>
+  local _fm_nm_line _fm_nm_re="^[[:space:]]*$3:[[:space:]]*(.*)\$"
+  while IFS= read -r _fm_nm_line || [ -n "$_fm_nm_line" ]; do
+    if [[ $_fm_nm_line =~ $_fm_nm_re ]]; then
+      printf -v "$1" '%s' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done <<< "$2"
+  return 1
 }
 
 # Scalar value of a TOON key in captured `axi status` output $1.
 fm_nm_field() {  # <toon-output> <key>
-  printf '%s\n' "$1" | sed -n "s/^[[:space:]]*$2:[[:space:]]*\(.*\)/\1/p" | head -1
+  local _fm_nm_out
+  fm_nm_field_to _fm_nm_out "$1" "$2" || return 0
+  printf '%s\n' "$_fm_nm_out"
 }
 
 # Full commit sha for sha-ish $2 as seen from worktree $1's own object store;
@@ -132,8 +179,8 @@ fm_nm_run_status_class() {  # <status_word>
 
 # Select from a complete `no-mistakes axi` overview with the existing awk
 # toolchain. A capped overview requires an optional Python 3 sqlite3 reader
-# for a read-only same-branch query of NM_HOME/state.sqlite (default:
-# ~/.no-mistakes/state.sqlite; relative NM_HOME resolves from the worktree).
+# for a read-only same-branch query of the state database fm_nm_state_db
+# locates for the worktree.
 # Repo identity is the overview's own top-level `repo:` line, which every axi
 # release emits: it is the `working_path` the CLI itself resolved for the
 # queried worktree. That is NOT the task worktree path in general - a linked
@@ -241,7 +288,7 @@ fm_nm_select_run() {  # <branch> <axi-overview> <worktree> [timeout_secs]
     incomplete\|*) available_ids=${selection#*|} ;;
     *) printf '%s\n' "$selection"; return ;;
   esac
-  if ! inventory=$(fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$3" "$available_ids" 2>/dev/null <<'PY'
+  if ! inventory=$(fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$available_ids" "$(fm_nm_state_db "$3")" 2>/dev/null <<'PY'
 import json
 import os
 import re
@@ -250,7 +297,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-branch, overview, worktree, available_ids = sys.argv[1:]
+branch, overview, available_ids, database = sys.argv[1:]
 ids = available_ids.split(", ") if available_ids else []
 try:
     repos = [line[6:].strip() for line in overview.splitlines() if line.startswith("repo: ")]
@@ -259,10 +306,7 @@ try:
     repo_path = json.loads(repos[0]) if repos[0].startswith('"') else repos[0]
     if not isinstance(repo_path, str) or not os.path.isabs(repo_path):
         raise ValueError
-    root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
-    if not root.is_absolute():
-        root = Path(worktree) / root
-    with closing(sqlite3.connect((root / "state.sqlite").as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
+    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
         db.execute("BEGIN")
         repo = db.execute("SELECT id FROM repos WHERE working_path = ?", (repo_path,)).fetchall()
         if len(repo) != 1:
@@ -303,17 +347,34 @@ PY
   esac
 }
 
-# branch_sync.state from captured `axi status` TOON $1: the scalar directly
+# branch_sync.state from captured `axi status` TOON $2: the scalar directly
 # under the top-level `branch_sync:` block. The first `state:` inside the
 # block is the direct child (the nested local/pipeline/target/remote
 # sub-blocks carry no `state:` key). Empty when the block is absent: no run
 # on the current branch, another branch's run, or a CLI without branch sync.
+fm_nm_branch_sync_state_to() {  # <output-variable> <toon-output>
+  local _fm_nm_line _fm_nm_in=0 _fm_nm_s=''
+  local _fm_nm_start='^[[:space:]]*branch_sync:[[:space:]]*$'
+  local _fm_nm_end='^[^[:space:]][^:]*:'
+  local _fm_nm_state='^[[:space:]]{1,}state:[[:space:]]*(.*)$'
+  while IFS= read -r _fm_nm_line || [ -n "$_fm_nm_line" ]; do
+    if [ "$_fm_nm_in" -eq 0 ]; then
+      if [[ $_fm_nm_line =~ $_fm_nm_start ]]; then _fm_nm_in=1; fi
+      continue
+    fi
+    if [[ $_fm_nm_line =~ $_fm_nm_state ]]; then
+      _fm_nm_s=${BASH_REMATCH[1]}
+      break
+    fi
+    if [[ $_fm_nm_line =~ $_fm_nm_end ]]; then _fm_nm_in=0; fi
+  done <<< "$2"
+  fm_nm_strip_quotes_to "$1" "$_fm_nm_s"
+}
+
 fm_nm_branch_sync_state() {  # <toon-output>
-  local s
-  s=$(printf '%s\n' "$1" \
-    | sed -n '/^[[:space:]]*branch_sync:[[:space:]]*$/,/^[^[:space:]][^:]*:/s/^[[:space:]]\{1,\}state:[[:space:]]*\(.*\)/\1/p' \
-    | head -1)
-  fm_nm_strip_quotes "$s"
+  local _fm_nm_out
+  fm_nm_branch_sync_state_to _fm_nm_out "$1"
+  printf '%s' "$_fm_nm_out"
 }
 
 # One scalar from a nested block of the top-level `branch_sync:` block in
@@ -344,11 +405,13 @@ fm_nm_branch_sync_nested() {  # <toon-output> <sub-block> <key>
 # 0 if the run in captured `axi status` TOON $1 is still in flight: no
 # terminal outcome and no terminal status.
 fm_nm_run_is_active() {  # <toon-output>
-  local status outcome
-  status=$(fm_nm_strip_quotes "$(fm_nm_field "$1" status)")
-  outcome=$(fm_nm_strip_quotes "$(fm_nm_field "$1" outcome)")
-  [ -z "$outcome" ] || return 1
-  case "$status" in completed|failed|cancelled) return 1 ;; esac
+  local _fm_nm_status='' _fm_nm_outcome=''
+  fm_nm_field_to _fm_nm_status "$1" status || :
+  fm_nm_strip_quotes_to _fm_nm_status "$_fm_nm_status"
+  fm_nm_field_to _fm_nm_outcome "$1" outcome || :
+  fm_nm_strip_quotes_to _fm_nm_outcome "$_fm_nm_outcome"
+  [ -z "$_fm_nm_outcome" ] || return 1
+  case "$_fm_nm_status" in completed|failed|cancelled) return 1 ;; esac
 }
 
 # The custody exemption to the head rule above: while the pipeline OWNS the
@@ -361,7 +424,9 @@ fm_nm_run_is_active() {  # <toon-output>
 # released the branch, and binding one by branch name alone is the historical
 # reused-branch misattribution the head rule exists to prevent.
 fm_nm_run_is_pipeline_owned_active() {  # <toon-output>
-  [ "$(fm_nm_branch_sync_state "$1")" = pipeline_owned ] || return 1
+  local _fm_nm_sync=''
+  fm_nm_branch_sync_state_to _fm_nm_sync "$1"
+  [ "$_fm_nm_sync" = pipeline_owned ] || return 1
   fm_nm_run_is_active "$1"
 }
 
@@ -381,8 +446,16 @@ FM_NM_GATE_ROW_RE='^[[:space:]]*[^,]+,[[:space:]]*"?(awaiting_approval|fix_revie
 # leaves it at `running` while a run waits at a gate, so the word and the gate
 # markers routinely disagree.
 fm_nm_run_is_parked() {  # <toon-output>
-  printf '%s\n' "$1" | grep -Eq \
-    "$FM_NM_GATE_LINE_RE|$FM_NM_AWAITING_AGENT_RE|$FM_NM_GATE_SCALAR_RE|$FM_NM_GATE_ROW_RE"
+  local _fm_nm_line
+  while IFS= read -r _fm_nm_line || [ -n "$_fm_nm_line" ]; do
+    if [[ $_fm_nm_line =~ $FM_NM_GATE_LINE_RE ]] \
+      || [[ $_fm_nm_line =~ $FM_NM_AWAITING_AGENT_RE ]] \
+      || [[ $_fm_nm_line =~ $FM_NM_GATE_SCALAR_RE ]] \
+      || [[ $_fm_nm_line =~ $FM_NM_GATE_ROW_RE ]]; then
+      return 0
+    fi
+  done <<< "$1"
+  return 1
 }
 
 # 0 if the run in captured `axi status` TOON $1 is EXECUTING: in flight and
@@ -408,9 +481,12 @@ fm_nm_run_is_parked() {  # <toon-output>
 # Dropping them would report a fix round or a ci wait as idle, which is the
 # misreport this predicate exists to prevent.
 fm_nm_run_is_executing() {  # <toon-output>
+  local _fm_nm_status=''
   fm_nm_run_is_active "$1" || return 1
   fm_nm_run_is_parked "$1" && return 1
-  case "$(fm_nm_strip_quotes "$(fm_nm_field "$1" status)")" in
+  fm_nm_field_to _fm_nm_status "$1" status || :
+  fm_nm_strip_quotes_to _fm_nm_status "$_fm_nm_status"
+  case "$_fm_nm_status" in
     pending|running|fixing|ci) return 0 ;;
   esac
   return 1
@@ -454,7 +530,7 @@ fm_nm_runs_status_for_worktree() {  # <worktree> <branch> <runs-list-output> [ex
   local_full=$(git -C "$wt" rev-parse HEAD 2>/dev/null) || return 0
   [ -n "$list" ] || return 0
   while IFS= read -r row; do
-    row=$(fm_nm_trim "$row")
+    fm_nm_trim_to row "$row"
     [ -n "$row" ] || continue
     IFS=$' \t' read -r st br sha day clock pr extra <<< "$row"
     [ -n "$st" ] && [ -n "$br" ] && [ -n "$sha" ] && [ -n "$day" ] && [ -n "$clock" ] || break
