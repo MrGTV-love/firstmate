@@ -16,7 +16,7 @@ mkdir -p "$STATE"
 
 # Everything this suite starts runs through a symlink under $LAB, so one pattern
 # names exactly this suite's processes and nothing else.
-ln -s "$(command -v bash)" "$LAB/nestbash"
+ln -s "$(command -v bash)" "$LAB/bash"
 ln -s "$(command -v sleep)" "$LAB/nestsleep"
 ln -s "$(command -v sleep)" "$LAB/burstsleep"
 cat > "$LAB/nest.sh" <<'SH'
@@ -40,7 +40,7 @@ while [ "$i" -lt "$1" ]; do
 done
 SH
 
-stop_lab_processes() { pkill -f "$LAB/(nestbash|nestsleep|burstsleep)" >/dev/null 2>&1; return 0; }
+stop_lab_processes() { pkill -f "$LAB/(bash|nestsleep|burstsleep)" >/dev/null 2>&1; return 0; }
 cleanup() { stop_lab_processes; fm_test_cleanup; }
 trap cleanup EXIT INT TERM
 
@@ -86,17 +86,15 @@ pass "check reads the user's process count and reports its limit or UNKNOWN"
 [ "$("$GUARD" check --json --limit 1 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["status"])')" = CRITICAL ] \
   || fail "a limit below the count was not CRITICAL"
 if "$GUARD" check --check --limit 1 >/dev/null; then fail "--check exited zero on a CRITICAL verdict"; fi
-[ "$("$GUARD" check --json --limit 1 --crit-pct 100 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["status"])')" = CRITICAL ] \
-  || fail "a count above 100% of the limit was not CRITICAL"
 pass "check classifies the count against the limit and --check exits on WARNING or CRITICAL"
 
 for command in check census watch; do
-  for bad in "--warn-pct 60" "--clear-pct 50"; do
+  for bad in "--warn-pct 60" "--clear-pct 50" "--crit-pct 90" "--keep 20"; do
     # shellcheck disable=SC2086
     if "$GUARD" "$command" $bad >/dev/null 2>&1; then fail "$command accepted $bad"; fi
   done
 done
-for bad in "--crit-pct 0" "--crit-pct 101" "--limit x"; do
+for bad in "--limit x"; do
   # shellcheck disable=SC2086
   if "$GUARD" check $bad >/dev/null 2>&1; then fail "check accepted $bad"; fi
 done
@@ -104,12 +102,12 @@ for bad in "--hold 0" "--interval 0"; do
   # shellcheck disable=SC2086
   if "$GUARD" watch --state-dir "$STATE" $bad >/dev/null 2>&1; then fail "watch accepted $bad"; fi
 done
-pass "warning and clear customization are refused, as are invalid remaining options"
+pass "threshold and retention customization are refused, as are invalid remaining options"
 
 # --- census of a real self-recursive tree -----------------------------------
 
 export NESTSLEEP="$LAB/nestsleep" BURSTSLEEP="$LAB/burstsleep"
-"$LAB/nestbash" "$LAB/nest.sh" 60 --user alice:secret >/dev/null 2>&1 &
+"$LAB/bash" "$LAB/nest.sh" 60 --user alice:secret >/dev/null 2>&1 &
 ROOT_PID=$!
 fm_test_wait_until 20 pgrep -f "$LAB/nestsleep 120" || fail "the recursive tree never reached its leaf"
 
@@ -152,9 +150,6 @@ pgrep -f "$LAB/nestsleep 120" >/dev/null || fail "census killed a measured proce
 stop_lab_processes
 pass "census only reads: every measured process is still alive"
 
-for _ in 1 2 3 4; do "$GUARD" census --state-dir "$STATE/prune" --limit 1000000 --keep 2 >/dev/null; sleep 1; done
-[ "$(census_count "$STATE/prune")" = 2 ] || fail "census kept $(census_count "$STATE/prune") files, not 2"
-pass "census keeps only the newest files"
 
 # --- watch: threshold, hold, one census per episode --------------------------
 
@@ -229,17 +224,19 @@ if [ "$room" = 1 ]; then
   # burst, and dropping the burst returns well below it, however busy the host is.
   limit=$(python3 -I -c 'import sys; print(int((int(sys.argv[1]) + int(sys.argv[2]) // 2) / 0.6) + 1)' "$base" "$burst")
   D="$STATE/dip"
+  "$LAB/bash" "$LAB/burst.sh" "$burst"
+  fm_test_wait_until 60 burst_ready || fail "the first burst never started"
+  first=$(now)
   "$GUARD" watch --state-dir "$D" --limit "$limit" --hold 4 --interval 0.2 --source-id t-dip > "$LAB/dip.out" &
   WATCH_PID=$!
-  sleep 1
-  "$LAB/nestbash" "$LAB/burst.sh" "$burst"
-  fm_test_wait_until 60 burst_ready || fail "the first burst never started"
   sleep 0.5
   stop_lab_processes
+  observed=$(since "$first")
+  if num_ge "$observed" 4; then fail "the host could not bound the first observed burst below the hold ($observed s)"; fi
   sleep 1.5
   kill -0 "$WATCH_PID" 2>/dev/null || fail "a burst shorter than the hold ended the watch: $(cat "$LAB/dip.out")"
   second=$(now)
-  "$LAB/nestbash" "$LAB/burst.sh" "$burst"
+  "$LAB/bash" "$LAB/burst.sh" "$burst"
   wait "$WATCH_PID" || fail "watch exited nonzero after the second burst"
   waited=$(since "$second")
   stop_lab_processes
@@ -252,7 +249,7 @@ fi
 
 # --- never kills -------------------------------------------------------------
 
-"$LAB/nestbash" "$LAB/nest.sh" 5 >/dev/null 2>&1 &
+"$LAB/bash" "$LAB/nest.sh" 5 >/dev/null 2>&1 &
 fm_test_wait_until 20 pgrep -f "$LAB/nestsleep 120" || fail "the survivor tree never reached its leaf"
 "$GUARD" watch --state-dir "$STATE/survivors" --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "watch exited nonzero over the survivor tree"
 pgrep -f "$LAB/nestsleep 120" >/dev/null || fail "watch killed a process of the tree it reported"

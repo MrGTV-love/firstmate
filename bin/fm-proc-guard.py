@@ -20,7 +20,7 @@ Commands (run --help on each for flags):
 
 Thresholds (named here so a reader can audit every verdict):
   warning     60   percent of the limit above which the count is a pile-up (fixed)
-  --crit-pct  90   check only: percent at which forks are about to fail for everyone
+  critical    90   check only: percent at which forks are about to fail for everyone (fixed)
   clear       50   percent at or below which an open episode closes (fixed)
   --hold       5   seconds the count must stay above warning (more than, not equal)
 
@@ -71,6 +71,7 @@ NAME = "fm-proc-guard"
 CENSUS_PREFIX = "proc-census."
 EPISODE_FILE = "proc-guard.episode"
 WARN_PERCENT = 60
+CRITICAL_PERCENT = 90
 CLEAR_PERCENT = 50
 CENSUS_TOP = 5
 CENSUS_KEEP = 20
@@ -436,7 +437,7 @@ def build_census(source, count, limit, limit_source, threshold, trigger):
     }
 
 
-def write_census(state_dir, census, keep=CENSUS_KEEP):
+def write_census(state_dir, census):
     os.makedirs(state_dir, exist_ok=True)
     final = os.path.join(
         state_dir, "%s%d.%d.json" % (CENSUS_PREFIX, census["epoch"], os.getpid()))
@@ -457,7 +458,7 @@ def write_census(state_dir, census, keep=CENSUS_KEEP):
         (name for name in os.listdir(state_dir)
          if name.startswith(CENSUS_PREFIX) and name.endswith(".json")),
         key=lambda name: (os.path.getmtime(os.path.join(state_dir, name)), name))
-    for stale in kept[: max(0, len(kept) - keep)]:
+    for stale in kept[: max(0, len(kept) - CENSUS_KEEP)]:
         try:
             os.unlink(os.path.join(state_dir, stale))
         except OSError:
@@ -499,7 +500,7 @@ def cmd_check(args):
         else:
             pct = round(100.0 * count / limit, 1)
             report["percent_of_limit"] = pct
-            if count > limit * args.crit_pct / 100.0:
+            if count > limit * CRITICAL_PERCENT / 100.0:
                 report.update(status="CRITICAL", recommendation=(
                     "The user process count is near the cap; forks fail for every process "
                     "of this user, which can explain worker silence while it holds."))
@@ -535,7 +536,7 @@ def cmd_census(args):
         sys.exit(1)
     threshold = limit * WARN_PERCENT / 100.0 if limit else None
     census = build_census(source, count, limit, limit_source, threshold, {"reason": "requested"})
-    print(write_census(args.state_dir or default_state_dir(), census, args.keep))
+    print(write_census(args.state_dir or default_state_dir(), census))
 
 
 def read_episode(path):
@@ -591,6 +592,7 @@ def cmd_watch(args):
             sampling_cpu += time.process_time() - cpu_before
             samples, skipped = samples + 1, 0
         except (ReadError, OSError) as error:
+            over_since = quiet_since = None
             skipped += 1
             if skipped >= MAX_SKIPPED_SAMPLES:
                 sys.stdout.write(result_document(args.source_id, "error", [
@@ -620,7 +622,7 @@ def cmd_watch(args):
                     try:
                         census = build_census(source, count, limit, limit_source, threshold, trigger)
                         summary = census["summary"]
-                        path = write_census(state_dir, census, args.keep)
+                        path = write_census(state_dir, census)
                     except Exception as error:  # noqa: BLE001 - report, never crash the detector
                         problem = "%s: %s" % (type(error).__name__, error)
                     try:
@@ -654,13 +656,6 @@ def positive(text):
     return value
 
 
-def percent(text):
-    value = float(text)
-    if not 0 < value <= 100:
-        raise argparse.ArgumentTypeError("must be above 0 and at most 100")
-    return value
-
-
 def main():
     sys.stdout.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -672,8 +667,6 @@ def main():
 
     check = commands.add_parser("check", help="one reading and verdict")
     common(check)
-    check.add_argument("--crit-pct", type=percent, default=90.0,
-                       help="percent of the limit at which the verdict is CRITICAL (default: %(default)s)")
     check.add_argument("--json", action="store_true", help="print one JSON object")
     check.add_argument("--check", action="store_true",
                        help="exit 1 for WARNING or CRITICAL, 0 otherwise (UNKNOWN fails open)")
@@ -682,8 +675,6 @@ def main():
     census = commands.add_parser("census", help="write one census now and print its path")
     common(census)
     census.add_argument("--state-dir", help="where the census goes (default: the home's state/)")
-    census.add_argument("--keep", type=int, default=CENSUS_KEEP,
-                        help="census files to keep, newest first (default: %(default)s)")
     census.set_defaults(run=cmd_census)
 
     watch = commands.add_parser("watch", help="sample until a pile-up, write one census, exit")
@@ -695,8 +686,6 @@ def main():
                        help="seconds between samples (default: %(default)s)")
     watch.add_argument("--hold", type=positive, default=5.0,
                        help="seconds the count must stay above the threshold, strictly more than (default: %(default)s)")
-    watch.add_argument("--keep", type=int, default=CENSUS_KEEP,
-                       help="census files to keep, newest first (default: %(default)s)")
     watch.add_argument("--duration", type=float, default=0.0,
                        help="stop with status: idle after this many seconds; 0 runs until a pile-up (default: %(default)s)")
     watch.add_argument("--source-id", default="proc-guard",

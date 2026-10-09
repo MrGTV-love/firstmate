@@ -58,6 +58,8 @@ class Source:
 
     def count(self):
         self.last = next(self.counts, self.last)
+        if isinstance(self.last, Exception):
+            raise self.last
         return self.last
 
     def pids(self):
@@ -302,6 +304,35 @@ class GuardBehavior(unittest.TestCase):
             self.assertFalse(episode.exists())
             self.assertFalse((root / "equal").exists())
 
+    def test_unreadable_sample_breaks_high_hold(self):
+        with tempfile.TemporaryDirectory() as state:
+            result = self.watch(state, [61, guard.ReadError("unreadable"), 61, 61, 61])
+            self.assertIn("status: pileup\n", result)
+            self.assertIn("sampler_samples: 4\n", result)
+
+    def test_unreadable_sample_breaks_quiet_hold(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            episode = root / "shared.episode"
+            episode.write_text('{"opened": 1}')
+            result = self.watch(root / "state", [50, OSError("unreadable"), 50, 50], episode, duration=4)
+            self.assertIn("status: idle\n", result)
+            self.assertIn("armed: no\n", result)
+            self.assertTrue(episode.exists())
+            result = self.watch(root / "state", [50], episode, duration=4)
+            self.assertIn("armed: yes\n", result)
+            self.assertFalse(episode.exists())
+
+    def test_census_retention_keeps_the_newest_twenty(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary)
+            for index in range(22):
+                census = {"epoch": index}
+                path = Path(guard.write_census(state, census))
+                os.utime(path, (index, index))
+            retained = [json.loads(path.read_text())["epoch"] for path in state.glob("proc-census.*.json")]
+            self.assertEqual(sorted(retained), list(range(2, 22)))
+
     def test_episode_override_is_shared_across_census_directories(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -344,13 +375,6 @@ class GuardBehavior(unittest.TestCase):
                 self.assertIn("armed: no\n", result)
                 self.assertFalse((root / "second").exists())
 
-    def test_obsolete_threshold_options_are_rejected_by_every_command(self):
-        for command in ("check", "census", "watch"):
-            for option, value in (("--warn-pct", "60"), ("--clear-pct", "50")):
-                with self.subTest(command=command, option=option), patch.object(sys, "stderr", io.StringIO()):
-                    with self.assertRaises(SystemExit) as error:
-                        invoke(Source([1]), command, option, value)
-                    self.assertEqual(error.exception.code, 2)
 
 
 if __name__ == "__main__":

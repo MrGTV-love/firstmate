@@ -28,7 +28,8 @@
 #
 # Arming establishes a detached listener. The registration authorizes its
 # standing lifetime, and the runner keeps its canonical claim across captures.
-# The canonical episode record keeps one pile-up to one census across homes.
+# The canonical episode record suppresses repeat captures across homes.
+# An owner handoff mid-capture can produce at most one extra census.
 # bin/fm-proc-guard.py owns the thresholds, the count semantics, and the census
 # document.
 set -u

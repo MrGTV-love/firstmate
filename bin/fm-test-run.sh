@@ -1601,7 +1601,7 @@ families_for_changed_path() {
     bin/fm-procevent-quota.sh)
       printf '%s\n' "__script__:fm-procevent-quota.test.sh"
       ;;
-    bin/fm-proc-guard.*|bin/fm-procevent-proc.sh)
+    bin/fm-proc-guard.*|bin/fm-procevent-proc.sh|tests/fm-proc-guard.behavior.test.py)
       printf '%s\n' "__script__:fm-proc-guard.test.sh"
       printf '%s\n' "__script__:fm-procevent-proc.test.sh"
       ;;

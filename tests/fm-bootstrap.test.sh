@@ -1409,6 +1409,22 @@ SH
 # The per-user process pile-up detector is host-wide, so only a primary home that
 # is not read-only arms it, and a refusal to arm on an unmeasurable host stays silent.
 test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
+  bootstrap_with_limit() {
+    local limit=$1
+    shift
+    python3 -I -c '
+import os, resource, sys
+if sys.platform == "linux":
+    _, hard = resource.getrlimit(resource.RLIMIT_NPROC)
+    soft = resource.RLIM_INFINITY if sys.argv[1] == "unlimited" else 1000000
+    if soft == resource.RLIM_INFINITY and hard != resource.RLIM_INFINITY:
+        sys.exit(77)
+    if hard != resource.RLIM_INFINITY:
+        soft = min(soft, hard)
+    resource.setrlimit(resource.RLIMIT_NPROC, (soft, hard))
+os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
+' "$limit" "$@"
+  }
   local case_dir fakebin home sm lab out
   case_dir="$TMP_ROOT/pileup-detector-arm"
   local FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60
@@ -1440,19 +1456,31 @@ test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
   assert_not_contains "$out" "pile-up detector" "a lab bootstrap reported on the detector"
   assert_absent "$lab/state/procevent/proc-guard.source" "a disposable lab home armed the host-wide detector"
 
-  out=$(env -u FM_HOME -u FM_STATE_OVERRIDE PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_ROOT_OVERRIDE="$home" \
+  out=$(bootstrap_with_limit finite env -u FM_HOME -u FM_STATE_OVERRIDE PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_ROOT_OVERRIDE="$home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
   assert_not_contains "$out" "pile-up detector" "arming the detector was not silent"
   assert_present "$home/state/procevent/proc-guard.source" "the primary home did not arm the detector"
   fm_test_wait_until 300 test -s "$home/state/procevent/proc-guard.runner" || fail "bootstrap registered without listening"
   kill -0 "$(cat "$home/state/procevent/proc-guard.runner")" 2>/dev/null || fail "bootstrap listener is not live"
-  PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+  bootstrap_with_limit finite env PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" >/dev/null \
     || fail "a second bootstrap failed over the armed detector"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-procevent-proc.sh" retire >/dev/null \
     || fail "bootstrap detector retirement failed"
 
   rm -rf "$home/state/procevent"
+  if [ "$(uname -s)" = Linux ]; then
+    local rc=0
+    out=$(bootstrap_with_limit unlimited env PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" 2>&1) || rc=$?
+    if [ "$rc" -eq 77 ]; then
+      pass "unlimited bootstrap case skipped: inherited hard limit is finite"
+    else
+      expect_code 0 "$rc" "an unlimited process limit must not fail bootstrap"
+      assert_not_contains "$out" "pile-up detector" "an unlimited process limit was reported instead of staying silent"
+      assert_absent "$home/state/procevent/proc-guard.source" "an unlimited process limit still armed the detector"
+    fi
+  fi
   mkdir -p "$case_dir/no-python"
   for tool in bash dirname env cat awk sed grep tr date mkdir rm mv chmod ln touch cksum wc sort uname git jq; do
     command -v "$tool" >/dev/null 2>&1 && ln -sf "$(command -v "$tool")" "$case_dir/no-python/$tool"

@@ -529,7 +529,7 @@ cmd_register() {
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe and at most 64 characters: $id"
   [ "$sep" = -- ] || usage
   [ "$#" -ge 1 ] || die "register needs at least one argv element after --"
-  local arg
+  local arg owner pid token identity stop_state
   for arg in "$@"; do
     case "$arg" in *$'\n'*) die "argv elements cannot contain newlines" ;; esac
   done
@@ -544,6 +544,37 @@ cmd_register() {
   if ! extension_registration_replacement_safe_locked "$id"; then
     fm_procevent_source_lock_release "$id"
     die "cannot replace extension registration while its prior runner remains active: $id"
+  fi
+  if adapter_is_standing "$adapter"; then
+    if fm_procevent_registration_matches_locked "$STATE" "$adapter" "$id" "$@"; then
+      fm_procevent_source_lock_release "$id"
+      owner_lease_refresh
+      printf 'registered: %s (%s)\n' "$id" "$adapter"
+      return 0
+    fi
+    if [ -e "$(fm_procevent_claim_path "$id")" ]; then
+      if ! fm_procevent_claim_load_locked "$id"; then
+        fm_procevent_source_lock_release "$id"
+        die "cannot safely read source ownership: $id"
+      fi
+      if fm_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
+        owner=$FM_PROCEVENT_CLAIM_HOME
+        pid=$FM_PROCEVENT_CLAIM_PID
+        token=$FM_PROCEVENT_CLAIM_TOKEN
+        identity=$FM_PROCEVENT_CLAIM_IDENTITY
+        stop_runner_pid "$pid" "$identity"
+        stop_state=$?
+        if [ "$stop_state" -eq 2 ]; then
+          fm_procevent_source_lock_release "$id"
+          die "cannot confirm runner identity; source remains registered: $id"
+        fi
+        if ! fm_procevent_claim_reclaim_locked "$id" "$owner" "$pid" "$token"; then
+          fm_procevent_source_lock_release "$id"
+          die "cannot release source ownership: $id"
+        fi
+        rm -f -- "$(staging_file "$id" "$token")" "$(runner_file "$id")"
+      fi
+    fi
   fi
   if ! fm_procevent_registration_publish_locked "$STATE" "$adapter" "$id" "$@"; then
     fm_procevent_source_lock_release "$id"

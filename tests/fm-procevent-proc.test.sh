@@ -46,12 +46,29 @@ registration="$HOME_A/state/procevent/proc-guard.source"
 for expected in poll --hold 1.5 --interval 0.25 --limit 1000000000; do
   grep -qxF -- "$expected" "$registration" || fail "registration lost the argument $expected"
 done
+registration_inode=$(python3 -I -c 'import os, sys; print(os.stat(sys.argv[1]).st_ino)' "$registration")
+prior_runner=$(cat "$HOME_A/state/procevent/proc-guard.runner")
 in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >/dev/null \
   || fail "arming twice with the same flags failed"
+[ "$(python3 -I -c 'import os, sys; print(os.stat(sys.argv[1]).st_ino)' "$registration")" = "$registration_inode" ] \
+  || fail "an identical arm replaced the registration generation"
+[ "$(cat "$HOME_A/state/procevent/proc-guard.runner")" = "$prior_runner" ] \
+  || fail "an identical arm replaced the listener"
 fm_test_wait_until 300 test -s "$HOME_A/state/procevent/proc-guard.runner" || fail "arm left no listener"
 sleep 3
 [ -s "$HOME_A/state/procevent/proc-guard.runner" ] || fail "arm left no listener"
 kill -0 "$(cat "$HOME_A/state/procevent/proc-guard.runner")" 2>/dev/null || fail "idle lease expired the standing listener"
+in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1 >/dev/null \
+  || fail "rearming with a changed limit failed"
+fm_test_wait_until 300 test -e "$HOME_A/state/procevent-inbox/proc-guard.1.result" \
+  || fail "the changed limit never reached the sampler"
+changed_result="$HOME_A/state/procevent-inbox/proc-guard.1.result"
+grep -qx 'limit: 1' "$changed_result" || fail "the replacement sampler retained the old limit"
+kill -0 "$prior_runner" 2>/dev/null && fail "changed rearm left the obsolete listener alive"
+in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >/dev/null \
+  || fail "restoring the quiet sampler failed"
+fm_test_wait_until 100 bash -c 'test ! -e "$1/proc-guard.episode"' _ "$FM_PROCEVENT_CLAIM_ROOT" \
+  || fail "the quiet replacement never cleared the episode"
 in_home "$HOME_A" "$ADAPTER" retire >/dev/null || fail "quiet retire failed"
 pass "arm starts an idempotent standing listener without a watcher or fresh owner lease"
 
@@ -109,8 +126,9 @@ fm_test_wait_until 300 awk -F '\t' '$3 == "check" && $4 == "procevent:proc-guard
 pass "a pile-up becomes one census and one durable wake, and the detector stays registered"
 
 HOME_F=$(new_home competitor)
-in_home "$HOME_F" "$ADAPTER" arm --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "competing arm failed"
+in_home "$HOME_F" "$ADAPTER" arm --limit 1000000000 --hold 1 --interval 0.2 >/dev/null || fail "competing arm failed"
 sleep 4
+in_home "$HOME_F" "$ADAPTER" arm --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "competing rearm failed"
 [ "$(awk -F '\t' '$3 == "check"' "$STATE_E/.wake-queue" | grep -c .)" = 1 ] || fail "a second wake appeared while the count stayed high"
 [ ! -e "$STATE_E/procevent-inbox/proc-guard.2.result" ] || fail "a second result was captured while the count stayed high"
 [ "$(census_n "$STATE_E")" = 1 ] || fail "a second census was written while the count stayed high"
