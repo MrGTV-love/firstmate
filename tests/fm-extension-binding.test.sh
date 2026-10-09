@@ -47,6 +47,7 @@ signal_retire_pid=
 signal_worker_pid=
 active_runner_pid=
 active_runner_release=
+proc_shadow_release=
 remote_active_release=
 unrelated_daemon_pid=
 unrelated_launcher_pid=
@@ -84,6 +85,7 @@ extension_test_cleanup() {
   [ -z "$signal_retire_pid" ] || kill -TERM "$signal_retire_pid" 2>/dev/null || true
   [ -z "$active_runner_release" ] || touch "$active_runner_release" 2>/dev/null || true
   [ -z "$active_runner_pid" ] || kill -TERM "$active_runner_pid" 2>/dev/null || true
+  [ -z "$proc_shadow_release" ] || touch "$proc_shadow_release" 2>/dev/null || true
   [ -z "$remote_active_release" ] || touch "$remote_active_release" 2>/dev/null || true
   [ -z "$unrelated_daemon_pid" ] || kill -KILL "$unrelated_daemon_pid" 2>/dev/null || true
   [ -z "$unrelated_launcher_pid" ] || kill -KILL "$unrelated_launcher_pid" 2>/dev/null || true
@@ -1385,6 +1387,49 @@ active_replacement=$(FM_HOME="$H_ACTIVE_RUNNER" "$PROCEVENT" register-extension 
 active_replacement_owner=$(printf '%s\n' "$active_replacement" | sed -n 's/^owner-token: //p')
 FM_HOME="$H_ACTIVE_RUNNER" "$PROCEVENT" retire active-source --if-owner "$active_replacement_owner" >/dev/null
 pass "all registration owner transitions wait for the prior extension runner"
+
+# An extension bound under the proc adapter name before the built-in detector
+# existed keeps the ordinary home-lease lifetime and still counts toward
+# supervision, even registered under the detector's source id.
+PRE_PROC_ROOT="$TMP_ROOT/pre-proc-root"
+mkdir -p "$PRE_PROC_ROOT/bin"
+for pre_proc_file in \
+  fm-extension.mjs fm-extension-launch-barrier.mjs fm-extension.sh fm-procevent.sh fm-procevent-lib.sh \
+  fm-procevent-extension-capture.pl fm-procevent-lavish.sh fm-pr-lib.sh fm-wake-lib.sh fm-path-lib.sh; do
+  cp "$ROOT/bin/$pre_proc_file" "$PRE_PROC_ROOT/bin/$pre_proc_file"
+done
+chmod +x "$PRE_PROC_ROOT/bin"/fm-*.sh "$PRE_PROC_ROOT/bin/fm-extension.mjs" "$PRE_PROC_ROOT/bin/fm-extension-launch-barrier.mjs"
+P_PROC_SHADOW="$PACKAGES/proc-shadow"
+make_package "$P_PROC_SHADOW" org.example.proc-shadow proc
+H_PROC_SHADOW="$HOMES/proc-shadow"; new_home "$H_PROC_SHADOW"
+fm_test_track_procevent_home "$H_PROC_SHADOW" "$FM_PROCEVENT_CLAIM_ROOT"
+FM_HOME="$H_PROC_SHADOW" "$PRE_PROC_ROOT/bin/fm-extension.mjs" bind "$P_PROC_SHADOW" --adapter proc \
+  --trust-same-user-code >/dev/null || fail "a pre-upgrade host could not bind the proc adapter name"
+proc_shadow_marker="$TMP_ROOT/proc-shadow.marker"
+proc_shadow_release="$TMP_ROOT/proc-shadow.release"
+proc_shadow_registration=$(FM_HOME="$H_PROC_SHADOW" "$PROCEVENT" register-extension proc proc-guard \
+  --config-ref "active-block|$proc_shadow_marker|$proc_shadow_release") \
+  || fail "an extension could not register under the detector's source id"
+proc_shadow_owner=$(printf '%s\n' "$proc_shadow_registration" | sed -n 's/^owner-token: //p')
+(
+  # shellcheck source=bin/fm-supervision-lib.sh
+  . "$ROOT/bin/fm-supervision-lib.sh"
+  fm_supervision_status "$H_PROC_SHADOW/state" 300
+  [ "$FM_SUP_SOURCES" -eq 1 ]
+) || fail "an extension registered as proc-guard was exempted from supervision"
+FM_HOME="$H_PROC_SHADOW" FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+  "$PROCEVENT" start --detach proc-guard >/dev/null || fail "the shadow extension runner did not launch"
+wait_for_file "$proc_shadow_marker" || fail "the shadow extension runner never entered its poll"
+fm_test_wait_until 30 test -s "$H_PROC_SHADOW/state/procevent/proc-guard.runner" \
+  || fail "the shadow extension runner recorded no listener"
+proc_shadow_runner=$(cat "$H_PROC_SHADOW/state/procevent/proc-guard.runner")
+# shellcheck disable=SC2016 # $1 expands in the child shell.
+fm_test_wait_until 30 bash -c '! kill -0 "$1" 2>/dev/null' _ "$proc_shadow_runner" \
+  || fail "a stale home lease left an extension named proc listening"
+touch "$proc_shadow_release"
+proc_shadow_release=
+FM_HOME="$H_PROC_SHADOW" "$PROCEVENT" retire proc-guard --if-owner "$proc_shadow_owner" >/dev/null 2>&1 || true
+pass "an extension named proc keeps lease-bound lifetime and counts toward supervision"
 fi
 
 # --- owner tokens, overridden state, sweep, and legacy compatibility --------

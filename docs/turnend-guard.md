@@ -75,7 +75,7 @@ It also requires `AGENTS.md`, `bin/`, and the effective state directory.
 For an in-scope primary, the guard counts in-flight work from `state/*.meta`.
 These sources also count toward supervision need:
 
-- Registered `state/procevent/*.source` records require supervision even though they have no task metadata, except `proc-guard.source`: the standing process pile-up detector does not by itself require a watcher.
+- Registered `state/procevent/*.source` records require supervision even though they have no task metadata, except the built-in `proc` registration: the standing process pile-up detector does not by itself require a watcher, while an extension bound under the `proc` adapter name or another adapter registered as `proc-guard` still does.
 - Every mode treats `state/x-watch.check.sh` as supervision need, so Relay polling remains guarded without an in-flight task.
 - A custom check registered with `bin/fm-check-register.sh` counts the same way, so an operator's home-level poll keeps running after the last task is torn down.
 

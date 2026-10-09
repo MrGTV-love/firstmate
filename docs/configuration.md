@@ -2723,9 +2723,10 @@ Detaching a runner into its own process group is what lets a persistent source o
 - Those two reads are spaced half a check interval apart, so the pair the debounce requires completes inside one check interval instead of costing two of them.
 
 The built-in `proc` adapter opts into `standing` lifetime: its guard requires the recorded physical state root and its registration, rather than recent home activity.
+An extension bound under the `proc` adapter name is not the built-in registration and keeps the home lease.
 An identical standing registration is preserved; changing its command stops and releases only this home's identity-proved runner before publishing the replacement, leaving another home's canonical owner untouched.
 Bootstrap's `arm` requests a detached canonical listener without waiting for startup, and returns immediately when a live runner already owns the claim; consumers that need readiness use `fm-procevent.sh ensure-listening <source-id>`.
-If cleanup leaves the arming process holding an unremovable source lock, reacquisition refuses it rather than waiting indefinitely on itself.
+If cleanup leaves the arming process holding an unremovable source lock or its reclamation mutex, reacquisition refuses it rather than waiting indefinitely on itself.
 `relisten` continues after an unhandled pile-up capture while preserving that claim.
 Retirement and physical state-root disappearance still stop the detector through the same identity-gated runner cleanup.
 Other adapters retain the home-lease and handled-capture requirements.

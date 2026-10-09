@@ -1537,11 +1537,6 @@ SH
   pass "bootstrap arms the process pile-up detector in a primary home only, silently, and not when read-only, a secondmate, a lab, or unmeasurable"
 }
 
-if [ "${1-}" = proc-detector ]; then
-  test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only
-  exit 0
-fi
-
 test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap
 test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only

@@ -1231,6 +1231,7 @@ fm_lock_try_acquire() {
   steal="$lockdir.steal"
   if ! fm_lock_try_acquire_steal_mutex "$steal"; then
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
+    [ "$(cat "$steal/pid" 2>/dev/null || true)" != "$current" ] || FM_LOCK_HELD_PID=$current
     FM_LOCK_OWNER_DIR=
     return 1
   fi
@@ -1288,6 +1289,8 @@ fm_lock_try_acquire() {
     FM_LOCK_OWNER_DIR=
   fi
   fm_lock_release "$steal"
+  [ "$rc" -eq 0 ] || [ "$(cat "$steal/pid" 2>/dev/null || true)" != "$current" ] \
+    || FM_LOCK_HELD_PID=$current
   return "$rc"
 }
 
@@ -1302,7 +1305,7 @@ fm_lock_try_acquire() {
 # already-held sibling locks. tests/fm-wake-queue.test.sh covers the grace, and
 # tests/fm-orphan-safety.test.sh covers failure propagation with returning state.
 fm_lock_acquire_wait() {
-  local lockdir=$1 parent gone_since= current=''
+  local lockdir=$1 parent gone_since='' current=''
   parent=${lockdir%/*}
   [ "$parent" != "$lockdir" ] || parent=.
   [ -n "$parent" ] || parent=/

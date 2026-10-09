@@ -407,6 +407,11 @@ fm_test_drop_file >/dev/null
 
 export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
 
+# Process-event source claims are machine-wide by default, so every suite gets a
+# private claim root; a suite that needs a specific one exports it after sourcing.
+FM_PROCEVENT_CLAIM_ROOT=$(fm_test_tmproot fm-procevent-claims)/claims || return 1
+export FM_PROCEVENT_CLAIM_ROOT
+
 trap fm_test_cleanup EXIT
 trap 'fm_test_cleanup; exit 130' INT
 trap 'fm_test_cleanup; exit 143' TERM

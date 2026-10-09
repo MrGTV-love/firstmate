@@ -1068,10 +1068,21 @@ test_bootstrap_opt_out_cleanup() {
 test_bootstrap_opt_out_reports_cleanup_failure() {
   local home fakebin out bootstrap_pid
   home="$TMP_ROOT/boot-optout-fail"; mkdir -p "$home"
+  fm_test_track_procevent_home "$home"
   printf 'FMX_PAIRING_TOKEN=tok-out\n' > "$home/.env"
   FM_HOME="$home" "$ROOT/bin/fm-bootstrap.sh" >/dev/null 2>&1
   assert_present "$home/state/x-watch.check.sh" "opt-in must create the shim before cleanup failure"
   assert_present "$home/config/x-mode.env" "opt-in must create the cadence config before cleanup failure"
+  # A source lock whose owner died must not strand bootstrap when cleanup
+  # cannot remove it.
+  if [ -f "$home/state/procevent/proc-guard.source" ]; then
+    fm_test_wait_until 60 test -s "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim" \
+      || fail "the detector armed by the first bootstrap was never claimed"
+    # shellcheck disable=SC2016 # The child shell owns these expansions.
+    FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_lock_acquire_wait "$2"' \
+      _ "$ROOT/bin/fm-wake-lib.sh" "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.lock" \
+      || fail "could not leave a dead-owner source lock"
+  fi
   fakebin=$(fm_fakebin "$home")
   cat > "$fakebin/rm" <<'SH'
 #!/usr/bin/env bash

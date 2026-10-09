@@ -404,6 +404,9 @@ adapter_is_standing() {
 }
 
 source_file()  { printf '%s/%s.source\n' "$REG" "$1"; }
+source_is_builtin() {  # <source-id>
+  [ "$(sed -n '2p' "$(source_file "$1")" 2>/dev/null)" != owner=extension ]
+}
 source_field() {  # <source-id> <field>
   sed -n "s/^$2=//p" "$(source_file "$1")" | head -1
 }
@@ -1606,10 +1609,10 @@ cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file
   half=$((tick / 2))
   [ $((tick % 2)) -eq 0 ] || half="$half.5"
   adapter=$(read_adapter "$id") || die "source adapter is unreadable"
-  ! adapter_is_standing "$adapter" || standing=1
+  ! source_is_builtin "$id" || ! adapter_is_standing "$adapter" || standing=1
   watchdog_owner_alive() {
     if [ "$standing" -eq 1 ]; then
-      [ "$(read_adapter "$id" 2>/dev/null)" = "$adapter" ]
+      [ "$(read_adapter "$id" 2>/dev/null)" = "$adapter" ] && source_is_builtin "$id"
     else
       fm_procevent_owner_alive "$STATE" "$lease"
     fi

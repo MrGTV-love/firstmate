@@ -18,7 +18,7 @@ The process family is `fm-proc-guard`; its engine header owns the count semantic
 Only its `check` command follows the one-shot verdict contract below.
 Its `census` command writes a diagnostic artifact, while `watch` is the long-running, fork-free sampling mode.
 The [adapter header](../bin/fm-procevent-proc.sh) owns bootstrap arming, shared episode placement, and the interrupted-capture handoff caveat; [process-event configuration](configuration.md#process-to-event-sources-stateprocevent) owns standing-source lifetime.
-Behavioral coverage in `tests/fm-proc-guard.behavior.test.py`, `tests/fm-procevent-proc.test.sh`, and the bootstrap `proc-detector` case exercises real-UID accounting, privacy, fixed threshold boundaries, watcher-free lifetime, durable capture/wake delivery, cross-home episode suppression, and override-only home routing.
+Behavioral coverage in `tests/fm-proc-guard.behavior.test.py`, `tests/fm-procevent-proc.test.sh`, and the bootstrap arming case in `tests/fm-bootstrap.test.sh` exercise real-UID accounting, privacy, fixed threshold boundaries, watcher-free lifetime, durable capture/wake delivery, cross-home episode suppression, and override-only home routing.
 
 ## Engine contract
 

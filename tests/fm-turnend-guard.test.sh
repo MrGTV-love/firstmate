@@ -108,16 +108,24 @@ test_predicate_source_needs_supervision() {
 }
 
 test_predicate_standing_detector_alone_needs_no_supervision() {
-  local state="$TMP_ROOT/pred-detector/state"
-  mkdir -p "$state/procevent"
-  : > "$state/procevent/proc-guard.source"
+  local home="$TMP_ROOT/pred-detector" state
+  state="$home/state"
+  mkdir -p "$state"
+  register_source() {  # <adapter> <source-id>
+    FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-procevent.sh" register "$1" "$2" -- /bin/true >/dev/null \
+      || fail "could not register $2 with the $1 adapter"
+  }
+  register_source proc proc-guard
   fm_supervision_needed "$state" 300 && fail "the standing process pile-up detector alone must not need supervision"
   [ "$FM_SUP_SOURCES" -eq 0 ] || fail "the standing detector must not count as a registered source"
   fm_supervision_unhealthy "$state" 300 && fail "an idle home with only the standing detector must not be unhealthy"
-  : > "$state/procevent/other.source"
+  register_source lavish other
   fm_supervision_unhealthy "$state" 300 || fail "a real source beside the detector must still need supervision"
   [ "$FM_SUP_SOURCES" -eq 1 ] || fail "expected exactly the real source to count, got $FM_SUP_SOURCES"
-  pass "fm_supervision_needed: the standing process pile-up detector alone needs no supervision"
+  register_source lavish proc-guard
+  fm_supervision_status "$state" 300
+  [ "$FM_SUP_SOURCES" -eq 2 ] || fail "another adapter registered under the detector's id must count, got $FM_SUP_SOURCES"
+  pass "fm_supervision_needed: only the built-in standing process pile-up detector needs no supervision"
 }
 
 # Register a custom check the way an operator does, through the real

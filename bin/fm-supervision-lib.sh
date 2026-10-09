@@ -46,7 +46,7 @@ fm_sup_stat_mtime() {
 # grace-seconds defaults to $FM_GUARD_GRACE, then 300, matching fm-guard.sh.
 # Always returns 0; callers read the vars, or use fm_supervision_unhealthy below.
 fm_supervision_status() {
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} meta source check id beat m age
+  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} meta source check id beat m age adapter owner
   FM_SUP_IN_FLIGHT=0
   FM_SUP_NEEDED=false
   FM_SUP_WATCHER_FRESH=false
@@ -63,7 +63,9 @@ fm_supervision_status() {
     # The standing process pile-up detector (bin/fm-procevent-proc.sh) restarts
     # itself and waits on nothing a session must be present for, so it alone
     # never makes an otherwise idle home need a watcher.
-    [ "${source##*/}" != proc-guard.source ] || continue
+    adapter='' owner=''
+    { IFS= read -r adapter; IFS= read -r owner; } 2>/dev/null < "$source" || :
+    [ "$adapter" != adapter=proc ] || [ "$owner" = owner=extension ] || continue
     FM_SUP_SOURCES=$((FM_SUP_SOURCES + 1))
   done
   FM_SUP_CHECKS=0
