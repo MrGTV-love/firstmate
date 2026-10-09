@@ -972,7 +972,8 @@ Its `remove` action excises only the marker-delimited Firstmate region and remov
 For Pi and pi-signed secondmate launches, `fm-spawn.sh` starts the selected executable with `-e` pointed at the secondmate home's own tracked `.pi/extensions/fm-primary-pi-watch.ts` and `.pi/extensions/fm-primary-turnend-guard.ts`, both already present from the secondmate home's git worktree.
 Pi-family secondmates can start unattended in Firstmate-seeded homes without accepting project trust manually; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the capability requirement, session-only approval scope, and older-version fallback, with [regression evidence](verification/runtime-backends.md#pi-seeded-secondmate-project-trust).
 
-For omp session posture, worker-only memory scope, and safe secondmate extension loading, see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
+For omp session posture, worker-only memory scope, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
+The [portable omp regression suite](../tests/fm-omp-harness.test.sh) covers default-role admission and raw-command model selection without an omp installation; its model-flag expectations preserve literal shell quoting across Bash versions.
 
 ## Claude permission mode (config/claude-permission-mode)
 
