@@ -1,0 +1,318 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.g21muhv5"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.g21muhv5\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "register",
+        "lavish",
+        "lab-owned-a",
+        "--",
+        "/bin/sleep",
+        "120"
+      ],
+      "returncode": 0,
+      "stdout": "registered: lab-owned-a (lavish)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "ensure-listening",
+        "lab-owned-a"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-a                  lavish       live       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8sxdd7qh"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8sxdd7qh\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "register",
+        "lavish",
+        "lab-owned-b",
+        "--",
+        "/bin/sleep",
+        "120"
+      ],
+      "returncode": 0,
+      "stdout": "registered: lab-owned-b (lavish)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "ensure-listening",
+        "lab-owned-b"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-b                  lavish       live       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-a                  lavish       none       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-b                  lavish       live       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "retire",
+        "lab-owned-a"
+      ],
+      "returncode": 0,
+      "stdout": "retired: lab-owned-a\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "retire",
+        "lab-owned-b"
+      ],
+      "returncode": 0,
+      "stdout": "retired: lab-owned-b\n",
+      "stderr": ""
+    }
+  ],
+  "results": [
+    {
+      "name": "fresh-home-lease-keeps-real-runners-live",
+      "pids": [
+        19157,
+        30498
+      ],
+      "result": "pass"
+    },
+    {
+      "name": "transient-owner-evidence-loss-does-not-kill",
+      "result": "pass",
+      "missing_seconds": 0.2
+    },
+    {
+      "name": "replaced-state-root-stops-only-its-runner",
+      "result": "pass",
+      "elapsed_seconds": 1.87,
+      "stopped_pid": 19157,
+      "unaffected_pid": 30498
+    }
+  ]
+}

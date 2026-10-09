@@ -1,0 +1,1563 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "name",
+        "fork-budget"
+      ],
+      "returncode": 0,
+      "stdout": "fm-lab-fork-budget-54303-16323\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "prepare",
+        "fm-lab-fork-budget-54303-16323"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "provision",
+        "fm-lab-fork-budget-54303-16323"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "fm-herdr-lab: tripwire already exists for 'fm-lab-fork-budget-54303-16323'; refusing ambiguous ownership\n"
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "teardown",
+        "fm-lab-fork-budget-54303-16323"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "name",
+        "fork-budget"
+      ],
+      "returncode": 0,
+      "stdout": "fm-lab-fork-budget-74915-28401\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "provision",
+        "fm-lab-fork-budget-74915-28401"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-fork-budget-74915-28401",
+        "status",
+        "--json"
+      ],
+      "returncode": 0,
+      "stdout": "{\"client\":{\"version\":\"0.9.1\",\"channel\":\"stable\",\"protocol\":22,\"endpoint_protocol_generation\":1,\"endpoint_capabilities\":[\"surface_interest\",\"presentation_effects_fence\",\"health_check\"],\"remote_host_bridge\":true,\"remote_bridge_idle_timeout\":true,\"binary\":\"/Users/charlesabrooker/.local/bin/herdr\",\"session\":\"fm-lab-fork-budget-74915-28401\"},\"server\":{\"status\":\"running\",\"running\":true,\"version\":\"0.9.1\",\"protocol\":22,\"capabilities\":{\"live_handoff\":true,\"detached_server_daemon\":false,\"endpoint_protocol_generation\":1,\"surface_interest\":true,\"health_check\":true},\"compatible\":true,\"endpoint_compatible\":true,\"socket\":\"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-fork-budget-74915-28401/herdr.sock\",\"session\":\"fm-lab-fork-budget-74915-28401\",\"restart_needed\":false,\"server_binary_stale\":false},\"update\":{\"restart_needed\":false,\"server_binary_stale\":false}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-fork-budget-74915-28401",
+        "workspace",
+        "create",
+        "--help"
+      ],
+      "returncode": 0,
+      "stdout": "Create a workspace\n\nUsage: herdr workspace create [OPTIONS]\n\nOptions:\n      --cwd <PATH>\n          \n\n      --label <TEXT>\n          \n\n      --env <KEY=VALUE>\n          Set an environment variable for the launched process\n\n      --focus\n          \n\n      --no-focus\n\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-fork-budget-74915-28401",
+        "tab",
+        "create",
+        "--help"
+      ],
+      "returncode": 0,
+      "stdout": "Create a tab\n\nUsage: herdr tab create [OPTIONS]\n\nOptions:\n      --workspace <WORKSPACE_ID>\n          \n\n      --cwd <PATH>\n          \n\n      --label <TEXT>\n          \n\n      --env <KEY=VALUE>\n          Set an environment variable for the launched process\n\n      --focus\n          \n\n      --no-focus\n\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-fork-budget-74915-28401",
+        "pane",
+        "capture",
+        "--help"
+      ],
+      "returncode": 2,
+      "stdout": "",
+      "stderr": "herdr pane commands:\n  herdr pane list [--workspace <workspace_id>]\n  herdr pane current [--pane ID|--current]\n  herdr pane get <pane_id>\n  herdr pane layout [--pane ID|--current]\n  herdr pane process-info [--pane ID|--current]\n  herdr pane neighbor --direction left|right|up|down [--pane ID|--current]\n  herdr pane edges [--pane ID|--current]\n  herdr pane focus --direction left|right|up|down [--pane ID|--current]\n  herdr pane resize --direction left|right|up|down [--amount FLOAT] [--pane ID|--current]\n  herdr pane zoom [<pane_id>|--pane ID|--current] [--toggle|--on|--off]\n  herdr pane rename <pane_id> <label>|--clear\n  herdr pane read <pane_id> [--source visible|recent|recent-unwrapped] [--lines N] [--format text|ansi] [--ansi]\n  herdr pane input [<pane_id>|--pane ID|--current] --right-click herdr|pane\n  herdr pane split [<pane_id>|--pane ID|--current] --direction right|down [--ratio FLOAT] [--cwd PATH] [--env KEY=VALUE] [--right-click herdr|pane] [--focus] [--no-focus]\n  herdr pane swap --direction left|right|up|down [--pane ID|--current]\n  herdr pane swap --source-pane ID --target-pane ID\n  herdr pane move <pane_id> --tab <tab_id> --split right|down [--target-pane ID] [--ratio FLOAT] [--focus|--no-focus]\n  herdr pane move <pane_id> --new-tab [--workspace ID] [--label TEXT] [--focus|--no-focus]\n  herdr pane move <pane_id> --new-workspace [--label TEXT] [--tab-label TEXT] [--focus|--no-focus]\n  herdr pane close <pane_id>\n  herdr pane send-text <pane_id> <text>\n  herdr pane send-keys <pane_id> <key> [key ...]\n  herdr pane wait-output <pane_id> (--match TEXT | --regex PATTERN) [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]\n  herdr pane report-agent <pane_id> --source ID --agent LABEL --state idle|working|blocked|unknown [--message TEXT] [--seq N] [--agent-session-id ID] [--agent-session-path PATH]\n  herdr pane report-agent-session <pane_id> --source ID --agent LABEL [--seq N] [--agent-session-id ID] [--agent-session-path PATH]\n  herdr pane release-agent <pane_id> --source ID --agent LABEL [--seq N]\n  herdr pane report-metadata <pane_id> --source ID [--agent LABEL] [--applies-to-source ID] [--title TEXT|--clear-title] [--display-agent TEXT|--clear-display-agent] [--state-label STATUS=TEXT] [--clear-state-labels] [--token NAME=VALUE] [--clear-token NAME] [--seq N] [--ttl-ms N]\n  herdr pane run <pane_id> <command>\n"
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "teardown",
+        "fm-lab-fork-budget-74915-28401"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.33l4hgjx"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.33l4hgjx\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; for f in \"$2/state/\"*.status; do fm_wake_status_mark_current \"$2/state\" \"$f\" || exit; done",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.33l4hgjx"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-home-summary-refresh.sh"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh",
+        "refresh"
+      ],
+      "returncode": 2,
+      "stdout": "error: \"unrecognized arguments: refresh\"\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "quiet-12-log-poll",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.33l4hgjx",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 47647
+    },
+    {
+      "label": "append-actionable-status",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.33l4hgjx/state/task-3.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "restart-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.33l4hgjx",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 86305
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8egfc1j1"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8egfc1j1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; for f in \"$2/state/\"*.status; do fm_wake_status_mark_current \"$2/state\" \"$f\" || exit; done",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8egfc1j1"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-home-summary-refresh.sh"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh",
+        "refresh"
+      ],
+      "returncode": 2,
+      "stdout": "error: \"unrecognized arguments: refresh\"\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.gf7efnut"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.gf7efnut\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; for f in \"$2/state/\"*.status; do fm_wake_status_mark_current \"$2/state\" \"$f\" || exit; done",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.gf7efnut"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-home-summary-refresh.sh"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh",
+        "--heartbeat"
+      ],
+      "returncode": 0,
+      "stdout": "bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh\ndescription: Reconcile assigned work against live delivery evidence\ncomplete: false\ngenerated_epoch: 1791550025\nrows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:\n  \"coverage\",\"ledger degraded\",\"firstmate\",\"restore the unreadable sources and rerun the reconciler\",null,true,\"fleet snapshot: backlog is unavailable\"\nhelp: Run bin/fm-open-loops.sh --json for age limits and structured rows\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "quiet-12-log-poll",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.gf7efnut",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 67916
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.xhpgjh0i"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.xhpgjh0i\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; for f in \"$2/state/\"*.status; do fm_wake_status_mark_current \"$2/state\" \"$f\" || exit; done",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.xhpgjh0i"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-home-summary-refresh.sh"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh",
+        "--heartbeat"
+      ],
+      "returncode": 0,
+      "stdout": "bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh\ndescription: Reconcile assigned work against live delivery evidence\ncomplete: true\ngenerated_epoch: 1791550065\nrows: []\nhelp: Run bin/fm-open-loops.sh --json for age limits and structured rows\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "quiet-12-log-poll",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.xhpgjh0i",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 87050
+    },
+    {
+      "label": "append-actionable-status",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.xhpgjh0i/state/task-3.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "restart-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.xhpgjh0i",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 25142
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; for f in \"$2/state/\"*.status; do fm_wake_status_mark_current \"$2/state\" \"$f\" || exit; done",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-home-summary-refresh.sh"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh",
+        "--heartbeat"
+      ],
+      "returncode": 0,
+      "stdout": "bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh\ndescription: Reconcile assigned work against live delivery evidence\ncomplete: true\ngenerated_epoch: 1791550130\nrows: []\nhelp: Run bin/fm-open-loops.sh --json for age limits and structured rows\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "quiet-12-log-poll",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 70047
+    },
+    {
+      "label": "append-actionable-status",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; fm_recovery_marker_snapshot \"$2/state/.watcher-down\"; printf \"%s\" \"${FM_RECOVERY_MARKER_TOKEN##*:}\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "70047.1791550136.ylD5UK",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-wake-drain.sh",
+        "--ack-through",
+        "2",
+        "--recovery-generation",
+        "70047.1791550136.ylD5UK"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "restart-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 11741
+    },
+    {
+      "label": "same-size-inode-replacement",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; fm_recovery_marker_snapshot \"$2/state/.watcher-down\"; printf \"%s\" \"${FM_RECOVERY_MARKER_TOKEN##*:}\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "11741.1791550155.TKg6Je",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-wake-drain.sh",
+        "--ack-through",
+        "4",
+        "--recovery-generation",
+        "11741.1791550155.TKg6Je"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "replacement-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 54988
+    },
+    {
+      "label": "unicode-control-symlink-status",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-4.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; fm_recovery_marker_snapshot \"$2/state/.watcher-down\"; printf \"%s\" \"${FM_RECOVERY_MARKER_TOKEN##*:}\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "54988.1791550165.Wzfb5y",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-wake-drain.sh",
+        "--ack-through",
+        "6",
+        "--recovery-generation",
+        "54988.1791550165.Wzfb5y"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "symlink-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 78272
+    },
+    {
+      "label": "stop-isolated-watcher",
+      "stdout": "",
+      "stderr": "",
+      "returncode": -15
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.g21muhv5"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.g21muhv5\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "register",
+        "lavish",
+        "lab-owned-a",
+        "--",
+        "/bin/sleep",
+        "120"
+      ],
+      "returncode": 0,
+      "stdout": "registered: lab-owned-a (lavish)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "ensure-listening",
+        "lab-owned-a"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-a                  lavish       live       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8sxdd7qh"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8sxdd7qh\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "register",
+        "lavish",
+        "lab-owned-b",
+        "--",
+        "/bin/sleep",
+        "120"
+      ],
+      "returncode": 0,
+      "stdout": "registered: lab-owned-b (lavish)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "ensure-listening",
+        "lab-owned-b"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-b                  lavish       live       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-a                  lavish       none       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-owned-b                  lavish       live       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "retire",
+        "lab-owned-a"
+      ],
+      "returncode": 0,
+      "stdout": "retired: lab-owned-a\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "retire",
+        "lab-owned-b"
+      ],
+      "returncode": 0,
+      "stdout": "retired: lab-owned-b\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "name",
+        "state-parity"
+      ],
+      "returncode": 0,
+      "stdout": "fm-lab-state-parity-67348-20025\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.l1p8wdut"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.l1p8wdut\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "provision",
+        "fm-lab-state-parity-67348-20025"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-67348-20025",
+        "workspace",
+        "create",
+        "--label",
+        "fork-budget-state",
+        "--cwd",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "--no-focus"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:workspace:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d67cfc6bf1c1\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"1\",\"number\":1,\"pane_count\":1,\"tab_id\":\"w1:t1\",\"workspace_id\":\"w1\"},\"type\":\"workspace_created\",\"workspace\":{\"active_tab_id\":\"w1:t1\",\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"fork-budget-state\",\"number\":1,\"pane_count\":1,\"tab_count\":1,\"workspace_id\":\"w1\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "teardown",
+        "fm-lab-state-parity-67348-20025"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "name",
+        "state-parity"
+      ],
+      "returncode": 0,
+      "stdout": "fm-lab-state-parity-26157-12648\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "provision",
+        "fm-lab-state-parity-26157-12648"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "workspace",
+        "create",
+        "--label",
+        "fork-budget-state",
+        "--cwd",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "--no-focus"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:workspace:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"pane_id\":\"w1:p1\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d67d14817cb1\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"1\",\"number\":1,\"pane_count\":1,\"tab_id\":\"w1:t1\",\"workspace_id\":\"w1\"},\"type\":\"workspace_created\",\"workspace\":{\"active_tab_id\":\"w1:t1\",\"agent_status\":\"unknown\",\"focused\":true,\"label\":\"fork-budget-state\",\"number\":1,\"pane_count\":1,\"tab_count\":1,\"workspace_id\":\"w1\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "tab",
+        "create",
+        "--workspace",
+        "w1",
+        "--label",
+        "fm-live-working",
+        "--cwd",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "--no-focus"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:tab:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"pane_id\":\"w1:p2\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t2\",\"terminal_id\":\"term_65d67d148cea72\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":false,\"label\":\"fm-live-working\",\"number\":2,\"pane_count\":1,\"tab_id\":\"w1:t2\",\"workspace_id\":\"w1\"},\"type\":\"tab_created\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "pane",
+        "rename",
+        "w1:p2",
+        "fm-live-working"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:pane:rename\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"label\":\"fm-live-working\",\"pane_id\":\"w1:p2\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t2\",\"terminal_id\":\"term_65d67d148cea72\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state",
+        "live-working",
+        "--state",
+        "busy",
+        "--source",
+        "fm-recovery",
+        "--event",
+        "recovered"
+      ],
+      "returncode": 0,
+      "stdout": "g1791550334.29093.3004\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-crew-state.sh",
+        "live-working"
+      ],
+      "returncode": 0,
+      "stdout": "state: working \u00b7 source: pane \u00b7 harness busy (fm-recovery)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-crew-state.sh",
+        "live-working"
+      ],
+      "returncode": 0,
+      "stdout": "state: working \u00b7 source: pane \u00b7 harness busy (fm-recovery)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "tab",
+        "create",
+        "--workspace",
+        "w1",
+        "--label",
+        "fm-live-paused",
+        "--cwd",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "--no-focus"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:tab:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"pane_id\":\"w1:p3\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t3\",\"terminal_id\":\"term_65d67d15a148a3\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":false,\"label\":\"fm-live-paused\",\"number\":3,\"pane_count\":1,\"tab_id\":\"w1:t3\",\"workspace_id\":\"w1\"},\"type\":\"tab_created\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "pane",
+        "rename",
+        "w1:p3",
+        "fm-live-paused"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:pane:rename\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"label\":\"fm-live-paused\",\"pane_id\":\"w1:p3\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t3\",\"terminal_id\":\"term_65d67d15a148a3\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state",
+        "live-paused",
+        "--state",
+        "idle",
+        "--source",
+        "fm-recovery",
+        "--event",
+        "recovered"
+      ],
+      "returncode": 0,
+      "stdout": "g1791550335.33213.23808\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-crew-state.sh",
+        "live-paused"
+      ],
+      "returncode": 0,
+      "stdout": "state: paused \u00b7 source: status-log \u00b7 laboratory paused\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-crew-state.sh",
+        "live-paused"
+      ],
+      "returncode": 0,
+      "stdout": "state: paused \u00b7 source: status-log \u00b7 laboratory paused\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "tab",
+        "create",
+        "--workspace",
+        "w1",
+        "--label",
+        "fm-live-failed",
+        "--cwd",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "--no-focus"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:tab:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"pane_id\":\"w1:p4\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t4\",\"terminal_id\":\"term_65d67d16a473e4\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":false,\"label\":\"fm-live-failed\",\"number\":4,\"pane_count\":1,\"tab_id\":\"w1:t4\",\"workspace_id\":\"w1\"},\"type\":\"tab_created\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "pane",
+        "rename",
+        "w1:p4",
+        "fm-live-failed"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:pane:rename\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"label\":\"fm-live-failed\",\"pane_id\":\"w1:p4\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t4\",\"terminal_id\":\"term_65d67d16a473e4\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state",
+        "live-failed",
+        "--state",
+        "idle",
+        "--source",
+        "fm-recovery",
+        "--event",
+        "recovered"
+      ],
+      "returncode": 0,
+      "stdout": "g1791550336.36772.2739\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-crew-state.sh",
+        "live-failed"
+      ],
+      "returncode": 0,
+      "stdout": "state: failed \u00b7 source: status-log \u00b7 laboratory failed\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-crew-state.sh",
+        "live-failed"
+      ],
+      "returncode": 0,
+      "stdout": "state: failed \u00b7 source: status-log \u00b7 laboratory failed\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "tab",
+        "create",
+        "--workspace",
+        "w1",
+        "--label",
+        "fm-live-done",
+        "--cwd",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "--no-focus"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:tab:create\",\"result\":{\"root_pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"pane_id\":\"w1:p5\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t5\",\"terminal_id\":\"term_65d67d17aa04d5\",\"workspace_id\":\"w1\"},\"tab\":{\"agent_status\":\"unknown\",\"focused\":false,\"label\":\"fm-live-done\",\"number\":5,\"pane_count\":1,\"tab_id\":\"w1:t5\",\"workspace_id\":\"w1\"},\"type\":\"tab_created\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "run",
+        "fm-lab-state-parity-26157-12648",
+        "pane",
+        "rename",
+        "w1:p5",
+        "fm-live-done"
+      ],
+      "returncode": 0,
+      "stdout": "{\"id\":\"cli:pane:rename\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"focused\":false,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\"label\":\"fm-live-done\",\"pane_id\":\"w1:p5\",\"revision\":0,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t5\",\"terminal_id\":\"term_65d67d17aa04d5\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-busy-event.sh",
+        "arm",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state",
+        "live-done",
+        "--state",
+        "idle",
+        "--source",
+        "fm-recovery",
+        "--event",
+        "recovered"
+      ],
+      "returncode": 0,
+      "stdout": "g1791550337.40093.4616\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-crew-state.sh",
+        "live-done"
+      ],
+      "returncode": 0,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 laboratory done\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-crew-state.sh",
+        "live-done"
+      ],
+      "returncode": 0,
+      "stdout": "state: done \u00b7 source: status-log \u00b7 laboratory done\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-crew-state.sh",
+        "missing-record"
+      ],
+      "returncode": 0,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 no metadata for missing-record\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-crew-state.sh",
+        "missing-record"
+      ],
+      "returncode": 0,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 no metadata for missing-record\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-crew-state.sh",
+        "duplicate-gone"
+      ],
+      "returncode": 0,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-crew-state.sh",
+        "duplicate-gone"
+      ],
+      "returncode": 0,
+      "stdout": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-fleet-snapshot.sh",
+        "--json"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"schema\": \"fm-fleet-snapshot.v1\",\n  \"generated\": \"2026-10-09T12:51:48Z\",\n  \"fm_home\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w\",\n  \"roots\": {\n    \"fm_root\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\n    \"state\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state\",\n    \"data\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data\",\n    \"config\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/config\",\n    \"projects\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/projects\"\n  },\n  \"backlog\": {\n    \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/backlog.md\",\n    \"records\": [],\n    \"present\": true\n  },\n  \"tasks\": [\n    {\n      \"id\": \"duplicate-gone\",\n      \"kind\": \"scout\",\n      \"harness\": \"\",\n      \"mode\": \"\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"\",\n      \"spawn_gen\": null,\n      \"backend\": \"tmux\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/duplicate-gone.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/duplicate-gone.status\",\n          \"present\": false,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"\",\n            \"note\": \"\",\n            \"raw\": \"\",\n            \"age_seconds\": null\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/absent\",\n          \"present\": false\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/duplicate-gone/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"unknown\",\n        \"source\": \"none\",\n        \"detail\": \"worktree gone (torn down?)\",\n        \"raw\": \"state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": null,\n        \"exists\": null,\n        \"agent_alive\": \"not_checked\",\n        \"status\": \"unknown\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-duplicate-gone\",\n        \"steer\": \"bin/fm-send.sh fm-duplicate-gone '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-done\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-done.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-done.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"done\",\n            \"note\": \"laboratory done\",\n            \"raw\": \"done [at=1791550308]: laboratory done\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-done\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-done/report.md\",\n          \"present\": true\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"done\",\n        \"source\": \"status-log\",\n        \"detail\": \"laboratory done\",\n        \"raw\": \"state: done \u00b7 source: status-log \u00b7 laboratory done\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p5\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": true,\n        \"last_event_text\": \"done [at=1791550308]: laboratory done\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-done\",\n        \"steer\": \"bin/fm-send.sh fm-live-done '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-failed\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-failed.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-failed.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"failed\",\n            \"note\": \"laboratory failed\",\n            \"raw\": \"failed [at=1791550308]: laboratory failed\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-failed\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-failed/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"failed\",\n        \"source\": \"status-log\",\n        \"detail\": \"laboratory failed\",\n        \"raw\": \"state: failed \u00b7 source: status-log \u00b7 laboratory failed\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p4\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"failed [at=1791550308]: laboratory failed\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-failed\",\n        \"steer\": \"bin/fm-send.sh fm-live-failed '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-paused\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-paused.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-paused.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"paused\",\n            \"note\": \"laboratory paused\",\n            \"raw\": \"paused [at=1791550308]: laboratory paused\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-paused\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-paused/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"paused\",\n        \"source\": \"status-log\",\n        \"detail\": \"laboratory paused\",\n        \"raw\": \"state: paused \u00b7 source: status-log \u00b7 laboratory paused\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p3\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"paused [at=1791550308]: laboratory paused\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-paused\",\n        \"steer\": \"bin/fm-send.sh fm-live-paused '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-working\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-working.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-working.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"working\",\n            \"note\": \"laboratory working\",\n            \"raw\": \"working [at=1791550308]: laboratory working\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-working\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-working/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"working\",\n        \"source\": \"pane\",\n        \"detail\": \"harness busy (fm-recovery)\",\n        \"raw\": \"state: working \u00b7 source: pane \u00b7 harness busy (fm-recovery)\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p2\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"working [at=1791550308]: laboratory working\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-working\",\n        \"steer\": \"bin/fm-send.sh fm-live-working '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    }\n  ],\n  \"main_inventory\": {\n    \"valid\": true,\n    \"reason\": null,\n    \"orphan_in_flight\": [],\n    \"unstructured_current_count\": 0\n  },\n  \"contributions\": {\n    \"known\": 0,\n    \"checked\": 0,\n    \"counts\": {\n      \"captain\": 0,\n      \"fleet\": 0,\n      \"maintainer\": 0,\n      \"nobody\": 0\n    },\n    \"unmeasured\": 0,\n    \"complete\": true,\n    \"proven_clear\": true,\n    \"stale_verdicts\": 0,\n    \"missing_verdicts\": 0,\n    \"unreadable_records\": 0,\n    \"valid_until\": 900,\n    \"captain\": [],\n    \"captain_omitted\": 0\n  },\n  \"scout_reports\": [\n    {\n      \"id\": \"live-done\",\n      \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-done/report.md\",\n      \"kind\": \"scout\"\n    }\n  ],\n  \"secondmate_current\": {\n    \"registry\": {\n      \"present\": false,\n      \"available\": true,\n      \"complete\": true,\n      \"reason\": null,\n      \"provenance\": \"registered-table\",\n      \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/secondmates.md\",\n      \"freshness\": {\n        \"status\": \"fresh\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\"\n      },\n      \"records\": [],\n      \"input_truncated\": false,\n      \"records_truncated\": false,\n      \"reasons\": [],\n      \"lines_in_window\": 0,\n      \"records_in_window\": 0\n    },\n    \"records\": [],\n    \"total_registered\": 0,\n    \"total\": 0,\n    \"shown\": 0,\n    \"truncated\": 0\n  },\n  \"secondmate_landed\": {\n    \"records\": [],\n    \"truncated\": [],\n    \"unreadable\": [],\n    \"partial\": []\n  },\n  \"secondmate_guidance\": {\n    \"note\": \"For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority.\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-fleet-snapshot.sh",
+        "--json"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"schema\": \"fm-fleet-snapshot.v1\",\n  \"generated\": \"2026-10-09T12:51:48Z\",\n  \"fm_home\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w\",\n  \"roots\": {\n    \"fm_root\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5\",\n    \"state\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state\",\n    \"data\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data\",\n    \"config\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/config\",\n    \"projects\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/projects\"\n  },\n  \"backlog\": {\n    \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/backlog.md\",\n    \"records\": [],\n    \"present\": true\n  },\n  \"tasks\": [\n    {\n      \"id\": \"duplicate-gone\",\n      \"kind\": \"scout\",\n      \"harness\": \"\",\n      \"mode\": \"\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"\",\n      \"spawn_gen\": null,\n      \"backend\": \"tmux\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/duplicate-gone.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/duplicate-gone.status\",\n          \"present\": false,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"\",\n            \"note\": \"\",\n            \"raw\": \"\",\n            \"age_seconds\": null\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/absent\",\n          \"present\": false\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/duplicate-gone/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"unknown\",\n        \"source\": \"none\",\n        \"detail\": \"worktree gone (torn down?)\",\n        \"raw\": \"state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": null,\n        \"exists\": null,\n        \"agent_alive\": \"not_checked\",\n        \"status\": \"unknown\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-duplicate-gone\",\n        \"steer\": \"bin/fm-send.sh fm-duplicate-gone '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-done\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-done.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-done.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"done\",\n            \"note\": \"laboratory done\",\n            \"raw\": \"done [at=1791550308]: laboratory done\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-done\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-done/report.md\",\n          \"present\": true\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"done\",\n        \"source\": \"status-log\",\n        \"detail\": \"laboratory done\",\n        \"raw\": \"state: done \u00b7 source: status-log \u00b7 laboratory done\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p5\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": true,\n        \"last_event_text\": \"done [at=1791550308]: laboratory done\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-done\",\n        \"steer\": \"bin/fm-send.sh fm-live-done '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-failed\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-failed.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-failed.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"failed\",\n            \"note\": \"laboratory failed\",\n            \"raw\": \"failed [at=1791550308]: laboratory failed\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-failed\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-failed/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"failed\",\n        \"source\": \"status-log\",\n        \"detail\": \"laboratory failed\",\n        \"raw\": \"state: failed \u00b7 source: status-log \u00b7 laboratory failed\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p4\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"failed [at=1791550308]: laboratory failed\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-failed\",\n        \"steer\": \"bin/fm-send.sh fm-live-failed '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-paused\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-paused.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-paused.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"paused\",\n            \"note\": \"laboratory paused\",\n            \"raw\": \"paused [at=1791550308]: laboratory paused\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-paused\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-paused/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"paused\",\n        \"source\": \"status-log\",\n        \"detail\": \"laboratory paused\",\n        \"raw\": \"state: paused \u00b7 source: status-log \u00b7 laboratory paused\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p3\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"paused [at=1791550308]: laboratory paused\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-paused\",\n        \"steer\": \"bin/fm-send.sh fm-live-paused '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    },\n    {\n      \"id\": \"live-working\",\n      \"kind\": \"scout\",\n      \"harness\": \"claude\",\n      \"mode\": \"local-only\",\n      \"yolo\": \"\",\n      \"branch\": null,\n      \"project\": \"lab\",\n      \"spawn_gen\": null,\n      \"backend\": \"herdr\",\n      \"remote\": null,\n      \"paths\": {\n        \"meta\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-working.meta\",\n          \"present\": true\n        },\n        \"status_log\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-working.status\",\n          \"present\": true,\n          \"kind\": \"event_history\",\n          \"last_event\": {\n            \"state\": \"working\",\n            \"note\": \"laboratory working\",\n            \"raw\": \"working [at=1791550308]: laboratory working\",\n            \"age_seconds\": 0\n          }\n        },\n        \"worktree\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-working\",\n          \"present\": true\n        },\n        \"home\": {\n          \"path\": null,\n          \"present\": false\n        },\n        \"report\": {\n          \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-working/report.md\",\n          \"present\": false\n        }\n      },\n      \"secondmate_projects\": [],\n      \"current_state\": {\n        \"state\": \"working\",\n        \"source\": \"pane\",\n        \"detail\": \"harness busy (fm-recovery)\",\n        \"raw\": \"state: working \u00b7 source: pane \u00b7 harness busy (fm-recovery)\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p2\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      },\n      \"pr\": {\n        \"url\": null,\n        \"source\": \"absent\",\n        \"head\": null\n      },\n      \"hints\": {\n        \"pending_decision\": false,\n        \"blocked_event\": false,\n        \"open_decisions\": [],\n        \"scout_report_present\": false,\n        \"last_event_text\": \"working [at=1791550308]: laboratory working\"\n      },\n      \"actions\": {\n        \"watch\": \"bin/fm-peek.sh fm-live-working\",\n        \"steer\": \"bin/fm-send.sh fm-live-working '<instruction>'\",\n        \"return_channel_note\": null\n      },\n      \"backlog\": null\n    }\n  ],\n  \"main_inventory\": {\n    \"valid\": true,\n    \"reason\": null,\n    \"orphan_in_flight\": [],\n    \"unstructured_current_count\": 0\n  },\n  \"contributions\": {\n    \"known\": 0,\n    \"checked\": 0,\n    \"counts\": {\n      \"captain\": 0,\n      \"fleet\": 0,\n      \"maintainer\": 0,\n      \"nobody\": 0\n    },\n    \"unmeasured\": 0,\n    \"complete\": true,\n    \"proven_clear\": true,\n    \"stale_verdicts\": 0,\n    \"missing_verdicts\": 0,\n    \"unreadable_records\": 0,\n    \"valid_until\": 900,\n    \"captain\": [],\n    \"captain_omitted\": 0\n  },\n  \"scout_reports\": [\n    {\n      \"id\": \"live-done\",\n      \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-done/report.md\",\n      \"kind\": \"scout\"\n    }\n  ],\n  \"secondmate_current\": {\n    \"registry\": {\n      \"present\": false,\n      \"available\": true,\n      \"complete\": true,\n      \"reason\": null,\n      \"provenance\": \"registered-table\",\n      \"path\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/secondmates.md\",\n      \"freshness\": {\n        \"status\": \"fresh\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\"\n      },\n      \"records\": [],\n      \"input_truncated\": false,\n      \"records_truncated\": false,\n      \"reasons\": [],\n      \"lines_in_window\": 0,\n      \"records_in_window\": 0\n    },\n    \"records\": [],\n    \"total_registered\": 0,\n    \"total\": 0,\n    \"shown\": 0,\n    \"truncated\": 0\n  },\n  \"secondmate_landed\": {\n    \"records\": [],\n    \"truncated\": [],\n    \"unreadable\": [],\n    \"partial\": []\n  },\n  \"secondmate_guidance\": {\n    \"note\": \"For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority.\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/bin/fm-fleet-snapshot.sh",
+        "--secondmate-home-summary"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"schema\": \"fm-secondmate-home-summary.v1\",\n  \"hold_classifier_schema\": \"fm-captain-hold-buckets.v1\",\n  \"contributions\": {\n    \"known\": 0,\n    \"checked\": 0,\n    \"counts\": {\n      \"captain\": 0,\n      \"fleet\": 0,\n      \"maintainer\": 0,\n      \"nobody\": 0\n    },\n    \"unmeasured\": 0,\n    \"complete\": true,\n    \"proven_clear\": true,\n    \"stale_verdicts\": 0,\n    \"missing_verdicts\": 0,\n    \"unreadable_records\": 0,\n    \"valid_until\": 900,\n    \"captain\": [],\n    \"captain_omitted\": 0\n  },\n  \"generated\": \"2026-10-09T12:51:48Z\",\n  \"generated_epoch\": 1791550308,\n  \"home\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w\",\n  \"valid\": false,\n  \"reason\": \"live child state has no in-flight backlog item: duplicate-gone=unknown, live-done=done, live-failed=failed, live-paused=paused, live-working=working\",\n  \"invalidity\": {\n    \"kind\": \"unowned_current\",\n    \"ids\": [\n      \"duplicate-gone\",\n      \"live-done\",\n      \"live-failed\",\n      \"live-paused\",\n      \"live-working\"\n    ]\n  },\n  \"state\": \"unknown\",\n  \"active_children\": [],\n  \"decisions_open\": [],\n  \"holds\": [],\n  \"queued\": [],\n  \"landed\": [],\n  \"endpoints\": [\n    {\n      \"id\": \"duplicate-gone\",\n      \"state\": \"unknown\",\n      \"source\": \"none\",\n      \"endpoint\": {\n        \"target\": null,\n        \"exists\": null,\n        \"agent_alive\": \"not_checked\",\n        \"status\": \"unknown\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-done\",\n      \"state\": \"done\",\n      \"source\": \"status-log\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p5\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-failed\",\n      \"state\": \"failed\",\n      \"source\": \"status-log\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p4\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-paused\",\n      \"state\": \"paused\",\n      \"source\": \"status-log\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p3\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-working\",\n      \"state\": \"working\",\n      \"source\": \"pane\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p2\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    }\n  ],\n  \"counts\": {\n    \"active_children\": 0,\n    \"decisions_open\": 0,\n    \"holds\": 0,\n    \"queued\": 0,\n    \"landed\": 0,\n    \"endpoints\": 5\n  },\n  \"omitted\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-fleet-snapshot.sh",
+        "--secondmate-home-summary"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"schema\": \"fm-secondmate-home-summary.v1\",\n  \"hold_classifier_schema\": \"fm-captain-hold-buckets.v1\",\n  \"contributions\": {\n    \"known\": 0,\n    \"checked\": 0,\n    \"counts\": {\n      \"captain\": 0,\n      \"fleet\": 0,\n      \"maintainer\": 0,\n      \"nobody\": 0\n    },\n    \"unmeasured\": 0,\n    \"complete\": true,\n    \"proven_clear\": true,\n    \"stale_verdicts\": 0,\n    \"missing_verdicts\": 0,\n    \"unreadable_records\": 0,\n    \"valid_until\": 900,\n    \"captain\": [],\n    \"captain_omitted\": 0\n  },\n  \"generated\": \"2026-10-09T12:51:48Z\",\n  \"generated_epoch\": 1791550308,\n  \"home\": \"/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w\",\n  \"valid\": false,\n  \"reason\": \"live child state has no in-flight backlog item: duplicate-gone=unknown, live-done=done, live-failed=failed, live-paused=paused, live-working=working\",\n  \"invalidity\": {\n    \"kind\": \"unowned_current\",\n    \"ids\": [\n      \"duplicate-gone\",\n      \"live-done\",\n      \"live-failed\",\n      \"live-paused\",\n      \"live-working\"\n    ]\n  },\n  \"state\": \"unknown\",\n  \"active_children\": [],\n  \"decisions_open\": [],\n  \"holds\": [],\n  \"queued\": [],\n  \"landed\": [],\n  \"endpoints\": [\n    {\n      \"id\": \"duplicate-gone\",\n      \"state\": \"unknown\",\n      \"source\": \"none\",\n      \"endpoint\": {\n        \"target\": null,\n        \"exists\": null,\n        \"agent_alive\": \"not_checked\",\n        \"status\": \"unknown\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-done\",\n      \"state\": \"done\",\n      \"source\": \"status-log\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p5\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-failed\",\n      \"state\": \"failed\",\n      \"source\": \"status-log\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p4\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-paused\",\n      \"state\": \"paused\",\n      \"source\": \"status-log\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p3\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    },\n    {\n      \"id\": \"live-working\",\n      \"state\": \"working\",\n      \"source\": \"pane\",\n      \"endpoint\": {\n        \"target\": \"fm-lab-state-parity-26157-12648:w1:p2\",\n        \"exists\": true,\n        \"agent_alive\": \"dead\",\n        \"status\": \"dead\",\n        \"observed_at\": \"2026-10-09T12:51:48Z\",\n        \"freshness\": \"fresh\"\n      }\n    }\n  ],\n  \"counts\": {\n    \"active_children\": 0,\n    \"decisions_open\": 0,\n    \"holds\": 0,\n    \"queued\": 0,\n    \"landed\": 0,\n    \"endpoints\": 5\n  },\n  \"omitted\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-home-summary-refresh.sh"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+        "teardown",
+        "fm-lab-state-parity-26157-12648"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.b9bcw22k"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.b9bcw22k\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "register",
+        "lavish",
+        "lab-permission-guard",
+        "--",
+        "/bin/sleep",
+        "120"
+      ],
+      "returncode": 0,
+      "stdout": "registered: lab-permission-guard (lavish)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "ensure-listening",
+        "lab-permission-guard"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "error: process-event state root is not a private directory\n"
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-permission-guard         lavish       none       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "retire",
+        "lab-permission-guard"
+      ],
+      "returncode": 0,
+      "stdout": "retired: lab-permission-guard\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/tests/fm-supervision-fork-budget.test.sh"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "not ok - reading a 201-row run ledger entered 205 subshells; the bound is 20 (one per row is the old cost)\n"
+    },
+    {
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/tests/fm-supervision-fork-budget.test.sh"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "not ok - a quiet scan of 12 status logs entered 233 subshells; the bound is 40 (the old cost was 233)\n"
+    },
+    {
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/tests/fm-supervision-fork-budget.test.sh"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "not ok - listing 20 task windows entered 80 subshells; the bound is 4 (the old cost was 80)\n"
+    },
+    {
+      "argv": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.test-phase-scratch/baseline/tests/fm-supervision-fork-budget.test.sh"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "not ok - five owner-watchdog ticks entered 115 subshells; the bound is 80 (the old cost was 115)\n"
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "19157",
+        "-o",
+        "pid=",
+        "-o",
+        "stat=",
+        "-o",
+        "command="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "30498",
+        "-o",
+        "pid=",
+        "-o",
+        "stat=",
+        "-o",
+        "command="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "pid=",
+        "-o",
+        "stat=",
+        "-o",
+        "command="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "cleanup_process_checks": [
+    {
+      "pid": 19157,
+      "returncode": 1,
+      "output": ""
+    },
+    {
+      "pid": 30498,
+      "returncode": 1,
+      "output": ""
+    },
+    {
+      "pid": 34070,
+      "returncode": 1,
+      "output": ""
+    }
+  ],
+  "setup_corrections": [
+    "Provision on a fresh Herdr lab invokes prepare itself; explicit prepare followed by provision was refused and the lab tripwire was torn down.",
+    "The watcher fixture needed a present empty backlog, current event timestamps, the supported open-loops --heartbeat command, and generation-bound wake acknowledgement before rearming. All final watcher scenarios passed after those fixture corrections."
+  ],
+  "measurement_scope": "New helper counts are subshell-depth transitions only. The user-supplied all-fork/spawn and paired host-rate measurements recorded in the test header were not independently remeasured in this run."
+}

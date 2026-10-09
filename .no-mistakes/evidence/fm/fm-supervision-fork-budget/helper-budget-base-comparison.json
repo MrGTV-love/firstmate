@@ -1,0 +1,32 @@
+{
+  "counter_contract": "Subshell-depth transitions, not total process starts. Helper-level regression evidence only.",
+  "baseline": "b062a76a97fe371231bb35cc6d6631c7eaeef00c",
+  "base_checks": [
+    {
+      "selector": "test_run_ledger_scan_starts_no_subshell_per_row",
+      "base_exit": 1,
+      "base_output": "not ok - reading a 201-row run ledger entered 205 subshells; the bound is 20 (one per row is the old cost)\n"
+    },
+    {
+      "selector": "test_quiet_signal_scan_costs_one_stat_per_log",
+      "base_exit": 1,
+      "base_output": "not ok - a quiet scan of 12 status logs entered 233 subshells; the bound is 40 (the old cost was 233)\n"
+    },
+    {
+      "selector": "test_recorded_windows_reads_each_task_without_a_subshell",
+      "base_exit": 1,
+      "base_output": "not ok - listing 20 task windows entered 80 subshells; the bound is 4 (the old cost was 80)\n"
+    },
+    {
+      "selector": "test_owner_watchdog_tick_subshell_budget",
+      "base_exit": 1,
+      "base_output": "not ok - five owner-watchdog ticks entered 115 subshells; the bound is 80 (the old cost was 115)\n"
+    }
+  ],
+  "target_output_observed": [
+    "201-row ledger: 4 (bound 20)",
+    "quiet scan of 12 logs: 17 (bound 40)",
+    "20 recorded windows: 0 (bound 4)",
+    "five watchdog ticks: 50 (bound 80)"
+  ]
+}

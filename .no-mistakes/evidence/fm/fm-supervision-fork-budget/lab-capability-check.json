@@ -1,0 +1,123 @@
+[
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "name",
+      "fork-budget"
+    ],
+    "returncode": 0,
+    "stdout": "fm-lab-fork-budget-54303-16323\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "prepare",
+      "fm-lab-fork-budget-54303-16323"
+    ],
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "provision",
+      "fm-lab-fork-budget-54303-16323"
+    ],
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "fm-herdr-lab: tripwire already exists for 'fm-lab-fork-budget-54303-16323'; refusing ambiguous ownership\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "teardown",
+      "fm-lab-fork-budget-54303-16323"
+    ],
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "name",
+      "fork-budget"
+    ],
+    "returncode": 0,
+    "stdout": "fm-lab-fork-budget-74915-28401\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "provision",
+      "fm-lab-fork-budget-74915-28401"
+    ],
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "run",
+      "fm-lab-fork-budget-74915-28401",
+      "status",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "{\"client\":{\"version\":\"0.9.1\",\"channel\":\"stable\",\"protocol\":22,\"endpoint_protocol_generation\":1,\"endpoint_capabilities\":[\"surface_interest\",\"presentation_effects_fence\",\"health_check\"],\"remote_host_bridge\":true,\"remote_bridge_idle_timeout\":true,\"binary\":\"/Users/charlesabrooker/.local/bin/herdr\",\"session\":\"fm-lab-fork-budget-74915-28401\"},\"server\":{\"status\":\"running\",\"running\":true,\"version\":\"0.9.1\",\"protocol\":22,\"capabilities\":{\"live_handoff\":true,\"detached_server_daemon\":false,\"endpoint_protocol_generation\":1,\"surface_interest\":true,\"health_check\":true},\"compatible\":true,\"endpoint_compatible\":true,\"socket\":\"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-fork-budget-74915-28401/herdr.sock\",\"session\":\"fm-lab-fork-budget-74915-28401\",\"restart_needed\":false,\"server_binary_stale\":false},\"update\":{\"restart_needed\":false,\"server_binary_stale\":false}}\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "run",
+      "fm-lab-fork-budget-74915-28401",
+      "workspace",
+      "create",
+      "--help"
+    ],
+    "returncode": 0,
+    "stdout": "Create a workspace\n\nUsage: herdr workspace create [OPTIONS]\n\nOptions:\n      --cwd <PATH>\n          \n\n      --label <TEXT>\n          \n\n      --env <KEY=VALUE>\n          Set an environment variable for the launched process\n\n      --focus\n          \n\n      --no-focus\n\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "run",
+      "fm-lab-fork-budget-74915-28401",
+      "tab",
+      "create",
+      "--help"
+    ],
+    "returncode": 0,
+    "stdout": "Create a tab\n\nUsage: herdr tab create [OPTIONS]\n\nOptions:\n      --workspace <WORKSPACE_ID>\n          \n\n      --cwd <PATH>\n          \n\n      --label <TEXT>\n          \n\n      --env <KEY=VALUE>\n          Set an environment variable for the launched process\n\n      --focus\n          \n\n      --no-focus\n\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "run",
+      "fm-lab-fork-budget-74915-28401",
+      "pane",
+      "capture",
+      "--help"
+    ],
+    "returncode": 2,
+    "stdout": "",
+    "stderr": "herdr pane commands:\n  herdr pane list [--workspace <workspace_id>]\n  herdr pane current [--pane ID|--current]\n  herdr pane get <pane_id>\n  herdr pane layout [--pane ID|--current]\n  herdr pane process-info [--pane ID|--current]\n  herdr pane neighbor --direction left|right|up|down [--pane ID|--current]\n  herdr pane edges [--pane ID|--current]\n  herdr pane focus --direction left|right|up|down [--pane ID|--current]\n  herdr pane resize --direction left|right|up|down [--amount FLOAT] [--pane ID|--current]\n  herdr pane zoom [<pane_id>|--pane ID|--current] [--toggle|--on|--off]\n  herdr pane rename <pane_id> <label>|--clear\n  herdr pane read <pane_id> [--source visible|recent|recent-unwrapped] [--lines N] [--format text|ansi] [--ansi]\n  herdr pane input [<pane_id>|--pane ID|--current] --right-click herdr|pane\n  herdr pane split [<pane_id>|--pane ID|--current] --direction right|down [--ratio FLOAT] [--cwd PATH] [--env KEY=VALUE] [--right-click herdr|pane] [--focus] [--no-focus]\n  herdr pane swap --direction left|right|up|down [--pane ID|--current]\n  herdr pane swap --source-pane ID --target-pane ID\n  herdr pane move <pane_id> --tab <tab_id> --split right|down [--target-pane ID] [--ratio FLOAT] [--focus|--no-focus]\n  herdr pane move <pane_id> --new-tab [--workspace ID] [--label TEXT] [--focus|--no-focus]\n  herdr pane move <pane_id> --new-workspace [--label TEXT] [--tab-label TEXT] [--focus|--no-focus]\n  herdr pane close <pane_id>\n  herdr pane send-text <pane_id> <text>\n  herdr pane send-keys <pane_id> <key> [key ...]\n  herdr pane wait-output <pane_id> (--match TEXT | --regex PATTERN) [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]\n  herdr pane report-agent <pane_id> --source ID --agent LABEL --state idle|working|blocked|unknown [--message TEXT] [--seq N] [--agent-session-id ID] [--agent-session-path PATH]\n  herdr pane report-agent-session <pane_id> --source ID --agent LABEL [--seq N] [--agent-session-id ID] [--agent-session-path PATH]\n  herdr pane release-agent <pane_id> --source ID --agent LABEL [--seq N]\n  herdr pane report-metadata <pane_id> --source ID [--agent LABEL] [--applies-to-source ID] [--title TEXT|--clear-title] [--display-agent TEXT|--clear-display-agent] [--state-label STATUS=TEXT] [--clear-state-labels] [--token NAME=VALUE] [--clear-token NAME] [--seq N] [--ttl-ms N]\n  herdr pane run <pane_id> <command>\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-herdr-lab.sh",
+      "teardown",
+      "fm-lab-fork-budget-74915-28401"
+    ],
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

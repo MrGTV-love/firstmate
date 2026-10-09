@@ -1,0 +1,122 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.b9bcw22k"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.b9bcw22k\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "register",
+        "lavish",
+        "lab-permission-guard",
+        "--",
+        "/bin/sleep",
+        "120"
+      ],
+      "returncode": 0,
+      "stdout": "registered: lab-permission-guard (lavish)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "ensure-listening",
+        "lab-permission-guard"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "error: process-event state root is not a private directory\n"
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 0,
+      "stdout": "S   \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "34070",
+        "-o",
+        "stat="
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "list"
+      ],
+      "returncode": 0,
+      "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlab-permission-guard         lavish       none       0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-procevent.sh",
+        "retire",
+        "lab-permission-guard"
+      ],
+      "returncode": 0,
+      "stdout": "retired: lab-permission-guard\n",
+      "stderr": ""
+    }
+  ],
+  "results": [
+    {
+      "name": "writable-state-root-refuses-cli-and-stops-owned-runner",
+      "result": "pass",
+      "refusal": "error: process-event state root is not a private directory\n",
+      "elapsed_seconds": 0.36
+    }
+  ]
+}

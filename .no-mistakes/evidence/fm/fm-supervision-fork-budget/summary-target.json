@@ -1,0 +1,120 @@
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-09T12:51:48Z",
+  "generated_epoch": 1791550308,
+  "home": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w",
+  "valid": false,
+  "reason": "live child state has no in-flight backlog item: duplicate-gone=unknown, live-done=done, live-failed=failed, live-paused=paused, live-working=working",
+  "invalidity": {
+    "kind": "unowned_current",
+    "ids": [
+      "duplicate-gone",
+      "live-done",
+      "live-failed",
+      "live-paused",
+      "live-working"
+    ]
+  },
+  "state": "unknown",
+  "active_children": [],
+  "decisions_open": [],
+  "holds": [],
+  "queued": [],
+  "landed": [],
+  "endpoints": [
+    {
+      "id": "duplicate-gone",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "live-done",
+      "state": "done",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p5",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "live-failed",
+      "state": "failed",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p4",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "live-paused",
+      "state": "paused",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p3",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "live-working",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p2",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      }
+    }
+  ],
+  "counts": {
+    "active_children": 0,
+    "decisions_open": 0,
+    "holds": 0,
+    "queued": 0,
+    "landed": 0,
+    "endpoints": 5
+  },
+  "omitted": []
+}

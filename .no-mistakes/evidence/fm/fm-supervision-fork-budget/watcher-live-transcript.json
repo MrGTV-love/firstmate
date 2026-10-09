@@ -1,0 +1,237 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; for f in \"$2/state/\"*.status; do fm_wake_status_mark_current \"$2/state\" \"$f\" || exit; done",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-home-summary-refresh.sh"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh",
+        "--heartbeat"
+      ],
+      "returncode": 0,
+      "stdout": "bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-open-loops.sh\ndescription: Reconcile assigned work against live delivery evidence\ncomplete: true\ngenerated_epoch: 1791550130\nrows: []\nhelp: Run bin/fm-open-loops.sh --json for age limits and structured rows\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "quiet-12-log-poll",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 70047
+    },
+    {
+      "label": "append-actionable-status",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; fm_recovery_marker_snapshot \"$2/state/.watcher-down\"; printf \"%s\" \"${FM_RECOVERY_MARKER_TOKEN##*:}\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "70047.1791550136.ylD5UK",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-wake-drain.sh",
+        "--ack-through",
+        "2",
+        "--recovery-generation",
+        "70047.1791550136.ylD5UK"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "restart-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 11741
+    },
+    {
+      "label": "same-size-inode-replacement",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; fm_recovery_marker_snapshot \"$2/state/.watcher-down\"; printf \"%s\" \"${FM_RECOVERY_MARKER_TOKEN##*:}\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "11741.1791550155.TKg6Je",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-wake-drain.sh",
+        "--ack-through",
+        "4",
+        "--recovery-generation",
+        "11741.1791550155.TKg6Je"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "replacement-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 54988
+    },
+    {
+      "label": "unicode-control-symlink-status",
+      "stdout": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-4.status\n",
+      "stderr": "",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        ". \"$1/bin/fm-wake-lib.sh\"; fm_recovery_marker_snapshot \"$2/state/.watcher-down\"; printf \"%s\" \"${FM_RECOVERY_MARKER_TOKEN##*:}\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+        "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer"
+      ],
+      "returncode": 0,
+      "stdout": "54988.1791550165.Wzfb5y",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/bin/fm-wake-drain.sh",
+        "--ack-through",
+        "6",
+        "--recovery-generation",
+        "54988.1791550165.Wzfb5y"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "bin/fm-watch.sh"
+      ],
+      "label": "symlink-dedup",
+      "env": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer",
+        "FM_POLL": "1",
+        "FM_SIGNAL_GRACE": "0",
+        "FM_HEARTBEAT": "3600",
+        "FM_HEARTBEAT_MAX": "3600",
+        "FM_HOME_SUMMARY_INTERVAL": "3600",
+        "FM_OPEN_LOOPS_INTERVAL": "3600",
+        "FM_CHECK_INTERVAL": "3600"
+      },
+      "pid": 78272
+    },
+    {
+      "label": "stop-isolated-watcher",
+      "stdout": "",
+      "stderr": "",
+      "returncode": -15
+    }
+  ],
+  "results": [
+    {
+      "name": "append-actionable-status",
+      "output": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "queue": "1791550136\t1\tsignal\ttask-3.status\tsignal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n1791550137\t2\tsignal\ttask-3.status\tsignal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "result": "pass"
+    },
+    {
+      "name": "same-size-inode-replacement",
+      "output": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "queue": "1791550154\t3\tsignal\ttask-3.status\tsignal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n1791550155\t4\tsignal\ttask-3.status\tsignal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-3.status\n",
+      "result": "pass"
+    },
+    {
+      "name": "unicode-control-symlink-status",
+      "output": "signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-4.status\n",
+      "queue": "1791550165\t5\tsignal\ttask-4.status\tsignal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-4.status\n1791550166\t6\tsignal\ttask-4.status\tsignal: /Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.rzw_5oer/state/task-4.status\n",
+      "result": "pass"
+    },
+    {
+      "name": "quiet-and-restart-dedup",
+      "result": "pass",
+      "quiet_logs": 12,
+      "no_duplicate_wakes": true
+    }
+  ]
+}

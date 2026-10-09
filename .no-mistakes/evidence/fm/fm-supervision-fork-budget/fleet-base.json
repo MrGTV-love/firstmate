@@ -1,0 +1,465 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-09T12:51:48Z",
+  "fm_home": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+    "state": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state",
+    "data": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data",
+    "config": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/config",
+    "projects": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/projects"
+  },
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/backlog.md",
+    "records": [],
+    "present": true
+  },
+  "tasks": [
+    {
+      "id": "duplicate-gone",
+      "kind": "scout",
+      "harness": "",
+      "mode": "",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/duplicate-gone.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/duplicate-gone.status",
+          "present": false,
+          "kind": "event_history",
+          "last_event": {
+            "state": "",
+            "note": "",
+            "raw": "",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/absent",
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/duplicate-gone/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown · source: none · worktree gone (torn down?)",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": ""
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-duplicate-gone",
+        "steer": "bin/fm-send.sh fm-duplicate-gone '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "live-done",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": null,
+      "project": "lab",
+      "spawn_gen": null,
+      "backend": "herdr",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-done.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-done.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "laboratory done",
+            "raw": "done [at=1791550308]: laboratory done",
+            "age_seconds": 0
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-done",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-done/report.md",
+          "present": true
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "done",
+        "source": "status-log",
+        "detail": "laboratory done",
+        "raw": "state: done · source: status-log · laboratory done",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p5",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": true,
+        "last_event_text": "done [at=1791550308]: laboratory done"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-live-done",
+        "steer": "bin/fm-send.sh fm-live-done '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "live-failed",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": null,
+      "project": "lab",
+      "spawn_gen": null,
+      "backend": "herdr",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-failed.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-failed.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "failed",
+            "note": "laboratory failed",
+            "raw": "failed [at=1791550308]: laboratory failed",
+            "age_seconds": 0
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-failed",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-failed/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "failed",
+        "source": "status-log",
+        "detail": "laboratory failed",
+        "raw": "state: failed · source: status-log · laboratory failed",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p4",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "failed [at=1791550308]: laboratory failed"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-live-failed",
+        "steer": "bin/fm-send.sh fm-live-failed '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "live-paused",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": null,
+      "project": "lab",
+      "spawn_gen": null,
+      "backend": "herdr",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-paused.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-paused.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "paused",
+            "note": "laboratory paused",
+            "raw": "paused [at=1791550308]: laboratory paused",
+            "age_seconds": 0
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-paused",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-paused/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "paused",
+        "source": "status-log",
+        "detail": "laboratory paused",
+        "raw": "state: paused · source: status-log · laboratory paused",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p3",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "paused [at=1791550308]: laboratory paused"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-live-paused",
+        "steer": "bin/fm-send.sh fm-live-paused '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "live-working",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "local-only",
+      "yolo": "",
+      "branch": null,
+      "project": "lab",
+      "spawn_gen": null,
+      "backend": "herdr",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-working.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/state/live-working.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "laboratory working",
+            "raw": "working [at=1791550308]: laboratory working",
+            "age_seconds": 0
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/worktree=live-working",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-working/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "working",
+        "source": "pane",
+        "detail": "harness busy (fm-recovery)",
+        "raw": "state: working · source: pane · harness busy (fm-recovery)",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-state-parity-26157-12648:w1:p2",
+        "exists": true,
+        "agent_alive": "dead",
+        "status": "dead",
+        "observed_at": "2026-10-09T12:51:48Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791550308]: laboratory working"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-live-working",
+        "steer": "bin/fm-send.sh fm-live-working '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [
+    {
+      "id": "live-done",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/live-done/report.md",
+      "kind": "scout"
+    }
+  ],
+  "secondmate_current": {
+    "registry": {
+      "present": false,
+      "available": true,
+      "complete": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F956C4Y2YNXZ7JMB6MP9M5/fm-lab.8vnnya9w/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-10-09T12:51:48Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [],
+    "total_registered": 0,
+    "total": 0,
+    "shown": 0,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}
