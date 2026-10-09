@@ -36,23 +36,25 @@ Object.assign(process.env, {
   FM_OMP_SUCCESSOR_GRACE_MS: "400",
 });
 writeFileSync(`${state}/.lock`, `${process.pid}\n`);
-const childScript = `${root}/expiry-child.mjs`;
-writeFileSync(childScript, `
-import { appendFileSync, existsSync } from "node:fs";
-const first = !existsSync(process.env.FM_ARM_LOG);
-process.on("SIGTERM", () => {});
-appendFileSync(process.env.FM_ARM_LOG, process.pid + "\\n");
-if (first) {
-  console.log("watcher: started pid=" + process.pid + " (beacon fresh)");
-  if (process.env.FM_EXPIRY_SCENARIO !== "shutdown") {
-    console.log("signal: expiry regression wake");
-    process.exit(0);
-  }
-}
-setInterval(() => {}, 1000);
+const childScript = `${root}/expiry-child.sh`;
+writeFileSync(childScript, `#!/bin/bash
+# Ignore retirement before publishing readiness: expiry tests must exercise an
+# unretirable child, not race Node startup against the retirement deadline.
+trap '' TERM
+first=0
+[ -f "$FM_ARM_LOG" ] || first=1
+printf '%s\\n' "$$" >> "$FM_ARM_LOG"
+if [ "$first" = 1 ]; then
+  printf 'watcher: started pid=%s (beacon fresh)\\n' "$$"
+  if [ "$FM_EXPIRY_SCENARIO" != shutdown ]; then
+    printf 'signal: expiry regression wake\\n'
+    exit 0
+  fi
+fi
+while :; do sleep 1; done
 `);
 for (const name of ["fm-watch-arm.sh", "fm-supervision-host.sh"]) {
-  writeFileSync(`${root}/bin/${name}`, `#!/usr/bin/env bash\n[ "\${1:-}" = --handling-delivered ] && exit 0\nexec '${process.execPath}' '${childScript}'\n`, { mode: 0o755 });
+  writeFileSync(`${root}/bin/${name}`, `#!/bin/bash\n[ "\${1:-}" = --handling-delivered ] && exit 0\nexec /bin/bash '${childScript}'\n`, { mode: 0o755 });
 }
 const rows = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n") : [];
 process.once("exit", () => {

@@ -294,16 +294,20 @@ _fm_is_pending_reply_escalation() {  # <key> <note>
   esac
 }
 
-_fm_status_kind() {
-  local meta=${1%.status}.meta kind=${2:-} line
-  if [ -z "$kind" ]; then
-    [ -f "$meta" ] && [ -r "$meta" ] && [ ! -L "$meta" ] || { printf unknown; return 0; }
-    while IFS= read -r line || [ -n "$line" ]; do
-      case "$line" in kind=*) kind=${line#kind=} ;; esac
-    done < "$meta"
-    kind=${kind:-ship}
+_fm_status_kind() {  # <status-file> [<kind>] [<out-var>]
+  local __fm_kind_meta=${1%.status}.meta __fm_kind=${2:-} __fm_kind_line
+  if [ -z "$__fm_kind" ]; then
+    if [ -f "$__fm_kind_meta" ] && [ -r "$__fm_kind_meta" ] && [ ! -L "$__fm_kind_meta" ]; then
+      while IFS= read -r __fm_kind_line || [ -n "$__fm_kind_line" ]; do
+        case "$__fm_kind_line" in kind=*) __fm_kind=${__fm_kind_line#kind=} ;; esac
+      done < "$__fm_kind_meta"
+      __fm_kind=${__fm_kind:-ship}
+    else
+      __fm_kind=unknown
+    fi
   fi
-  case "$kind" in ship|scout|secondmate) printf '%s' "$kind" ;; *) printf unknown ;; esac
+  case "$__fm_kind" in ship|scout|secondmate) ;; *) __fm_kind=unknown ;; esac
+  if [ -n "${3:-}" ]; then printf -v "$3" '%s' "$__fm_kind"; else printf '%s' "$__fm_kind"; fi
 }
 
 _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb> <kind>
@@ -389,7 +393,7 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 status_open_decisions() {  # <status-file> [<kind>]
   local f=$1 kind=${2:-} line resolve held open='' verb offset=0 span seeded=0
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
-  kind=$(_fm_status_kind "$f" "$kind")
+  _fm_status_kind "$f" "$kind" kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   if _fm_open_decisions_checkpoint_seed "$f" "$kind"; then
@@ -477,16 +481,16 @@ EOF
 # The signature a fold checkpoint must carry to be reused for <kind>: the fold
 # version, task kind, effective parsing locales, and every fold-affecting
 # override, so readers never reuse a checkpoint under a different interpretation.
-_fm_open_decisions_fold_signature() {  # <kind>
-  local sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
-  sig="$sig:ctype=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}:collate=${LC_ALL:-${LC_COLLATE:-${LANG:-C}}}"
+_fm_open_decisions_fold_signature() {  # <kind> [<out-var>]
+  local __fm_sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
+  __fm_sig="$__fm_sig:ctype=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}:collate=${LC_ALL:-${LC_COLLATE:-${LANG:-C}}}"
   if [ -n "${FM_CLASSIFY_RESOLVE_VERB:-}" ] || [ -n "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-}" ] \
     || [ -n "${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-}" ]; then
-    sig="$sig:${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"
-    sig="$sig:${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}"
-    sig="$sig:${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}"
+    __fm_sig="$__fm_sig:${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"
+    __fm_sig="$__fm_sig:${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}"
+    __fm_sig="$__fm_sig:${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}"
   fi
-  printf '%s' "$sig"
+  if [ -n "${2:-}" ]; then printf -v "$2" '%s' "$__fm_sig"; else printf '%s' "$__fm_sig"; fi
 }
 
 # Parse one checkpoint file: `version=`, `offset=`, `ident=` header lines, then
@@ -499,7 +503,7 @@ _fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
   local cf=$1 data first rest line
   _FM_ODC_VERSION='' _FM_ODC_OFFSET=0 _FM_ODC_IDENT='' _FM_ODC_OPEN=''
   [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ] || return 1
-  data=$(LC_ALL=C command cat "$cf" 2>/dev/null) || return 1
+  data=$(< "$cf") || return 1
   first=${data%%$'\n'*}
   case "$first" in version=?*) _FM_ODC_VERSION=${first#version=} ;; *) return 1 ;; esac
   case "$data" in *$'\n'*) rest=${data#*$'\n'} ;; *) return 1 ;; esac
@@ -528,13 +532,14 @@ _fm_open_decisions_checkpoint_boundary() {  # <status-file> <offset>
 # _FM_ODC_OPEN / _FM_ODC_OFFSET and the current file size in _FM_ODC_SIZE.
 # Read-only; status_open_decisions above owns every rejection reason.
 _fm_open_decisions_checkpoint_seed() {  # <status-file> <kind>
-  local f=$1 kind=$2 cur_ident
+  local f=$1 kind=$2 cur_ident cf fold_version
   _FM_ODC_SIZE=0
-  _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$f")" || return 1
-  [ "$_FM_ODC_VERSION" = "$(_fm_open_decisions_fold_signature "$kind")" ] || return 1
-  cur_ident=$(_fm_open_decisions_file_ident "$f" 2>/dev/null) || return 1
+  _fm_open_decisions_cursor_path "$f" cf
+  _fm_open_decisions_fold_signature "$kind" fold_version
+  _fm_open_decisions_checkpoint_parse "$cf" || return 1
+  [ "$_FM_ODC_VERSION" = "$fold_version" ] || return 1
+  _fm_open_decisions_file_ident "$f" cur_ident _FM_ODC_SIZE 2>/dev/null || return 1
   [ -n "$cur_ident" ] && [ "$cur_ident" = "$_FM_ODC_IDENT" ] || return 1
-  _FM_ODC_SIZE=$(_fm_status_file_size "$f" 2>/dev/null) || return 1
   _FM_ODC_SIZE=${_FM_ODC_SIZE//[[:space:]]/}
   case "$_FM_ODC_SIZE" in ''|*[!0-9]*) return 1 ;; esac
   [ "$_FM_ODC_OFFSET" -le "$_FM_ODC_SIZE" ] || return 1
