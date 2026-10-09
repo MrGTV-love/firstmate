@@ -1632,7 +1632,15 @@ snapshot_collection_cleanup() {
 }
 CONTRIBUTIONS_PID=
 snapshot_cleanup() {
-  [ -z "$CONTRIBUTIONS_PID" ] || kill "$CONTRIBUTIONS_PID" 2>/dev/null || true
+  local pid
+  if [ -n "$CONTRIBUTIONS_PID" ]; then
+    while IFS= read -r pid; do
+      if [ "$pid" = "$CONTRIBUTIONS_PID" ]; then
+        kill "$pid" 2>/dev/null || true
+        break
+      fi
+    done < <(jobs -pr)
+  fi
   snapshot_task_cleanup
   snapshot_collection_cleanup
   cleanup_json_files
@@ -2193,8 +2201,13 @@ SECONDMATE_LANDED_JSON_FILE="$JSON_TRANSPORT_DIR/secondmate-landed.json"
 printf '%s\n' "$TASKS_JSON" > "$TASKS_JSON_FILE" \
   || { echo "fm-fleet-snapshot: temporary task file write failed" >&2; exit 1; }
 
-wait "$CONTRIBUTIONS_PID" \
-  || { echo "fm-fleet-snapshot: contribution coverage unavailable" >&2; exit 1; }
+if wait "$CONTRIBUTIONS_PID"; then
+  CONTRIBUTIONS_PID=
+else
+  CONTRIBUTIONS_PID=
+  echo "fm-fleet-snapshot: contribution coverage unavailable" >&2
+  exit 1
+fi
 
 if [ "$OUTPUT_MODE" = secondmate-home-summary ]; then
   secondmate_home_summary_json "$BACKLOG_JSON_FILE" "$TASKS_JSON_FILE" \
