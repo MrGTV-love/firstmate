@@ -200,18 +200,17 @@ It accepts the relocation only when all of these hold, and it refuses every othe
   An unmounted volume looks like a deleted copy, so do not relocate while one is offline.
 - **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
 - **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
-- **Its HEAD contains the recorded head.**
-  The strongest evidence that exists is used, in this order: the record's own `worktree_head`, the last head in git's own reflog for the vanished copy (it survives only until the stale registration is pruned), this task's prior control journal for that same path, the record's `pr_head`, and finally the branch tip in the shared repository.
-  The journal names the evidence used as `relocation_head_source`.
-  A `branch-tip` source is the weakest: a copy on the branch contains the tip by construction, so it proves the copy is on the branch's current line and nothing earlier.
-  Recreating the copy with a reset (`checkout -B`) moves the branch behind the task's commits, and every stronger source catches that.
-- **No other task of this home records it**, by path or by alias, and a Treehouse pool slot is not claimed by another task.
+- **Its HEAD contains every surviving recorded head:** the record's own `worktree_head`, the last head in git's reflog for the vanished copy, this task's prior control journal for that path, and the record's `pr_head`.
+  Relocation refuses when none survives, or when history was rewritten between two recorded heads and the copy cannot contain both.
+  The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
+  Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
+- **No other task of this home records it**, by path or by alias, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
   A slot that is free is claimed for this task under the shared project lock, as a fresh spawn does.
 - **It holds none of the harness files the launch overwrites or deletes** (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`).
   The control plane checks, and the launch owner checks again at the moment it would write.
   A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
 
-The journal keeps `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, the failure phases included, and the identical command is judged against that proof when it is run again after a failure.
+The journal keeps `relocation_from`, `relocation_to`, `relocation_head`, and `relocation_head_source` through every rewrite, including failure phases and later ordinary relaunches, and a repeated relocation is judged against that proof.
 Only the record's `worktree=` moves, and only at the launch owner's single atomic publication.
 The task id, endpoint, brief, status log, and armed poll are untouched, and the `--note` requirement still applies.
 Uncommitted changes in the vanished copy are not recoverable, and the progress note says so.

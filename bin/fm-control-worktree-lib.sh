@@ -35,29 +35,21 @@
 #     over and deletes (fm_control_worktree_wiring_free), so nothing a project
 #     or another tool owns is ever overwritten or deleted.
 #
-# The recorded head is the strongest of these that exists, in this order, and
-# the name of the one used is journaled so a weak proof is visible as weak:
-#   meta-worktree_head   the head the record itself carries
-#   registered-worktree  the last head in git's reflog for the vanished copy
-#   journal              this task's prior control journal for that same path
-#   meta-pr_head         the head last pushed for the task's PR
-#   branch-tip           the branch tip in the shared repository - always
-#                        present, and the weakest: a destination on the branch
-#                        contains it by construction, so it proves the copy is
-#                        on the branch's current line and nothing earlier.
 
-# The per-task harness files the launch owner overwrites (arming) or deletes
-# (retiring the previous incarnation) INSIDE a worktree.
-# bin/fm-control-lib.sh's fm_control_harness_wiring_paths owns the same list per
-# harness; a destination must hold none of them whatever the harness.
-fm_control_worktree_wiring_free() {  # <worktree>
-  local wt=$1 rel
-  for rel in .claude/settings.local.json .opencode/plugins/fm-busy-state.js .fm-grok-turnend .fm-kimi-turnend; do
-    if [ -e "$wt/$rel" ] || [ -L "$wt/$rel" ]; then
-      echo "error: the fresh copy $wt already holds the harness file $rel, which the launch would overwrite or delete; relocation never touches a file it did not create. Use a copy without it (a copy returned to the pool carries none)" >&2
-      return 1
-    fi
-  done
+fm_control_worktree_wiring_free() {
+  local wt=$1 state=$2 id=$3 h path rel
+  while read -r h; do
+    while read -r path; do
+      case "$path" in
+        "$wt/"*) rel=${path#"$wt/"} ;;
+        *) continue ;;
+      esac
+      if [ -e "$path" ] || [ -L "$path" ]; then
+        echo "error: the fresh copy $wt already holds the harness file $rel, which the launch would overwrite or delete; relocation never touches a file it did not create. Use a copy without it (a copy returned to the pool carries none)" >&2
+        return 1
+      fi
+    done < <(fm_control_harness_wiring_paths "$h" "$wt" "$state" "$id")
+  done < <(fm_control_harnesses)
 }
 
 # The last head git's own reflog holds for a vanished worktree, read from the
@@ -80,7 +72,8 @@ fm_control_worktree_registered_head() {  # <git-common-dir> <path>
 fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   local meta=$1 id=$2 state=$3 dest=$4
   local kind old probe parent real top project common project_common git_dir branch checked
-  local head='' evidence='' journal other owned status
+  local head='' evidence='' journal other owned status source i owner_home this_home
+  local -a heads=() sources=()
 
   kind=$(fm_meta_get "$meta" kind)
   [ -n "$kind" ] || kind=ship
@@ -181,47 +174,49 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
     return 1
   }
 
-  # The recorded head, strongest evidence first.
   head=$(fm_meta_get "$meta" worktree_head)
-  if [ -n "$head" ]; then evidence="meta-worktree_head"; fi
-  if [ -z "$head" ]; then
-    head=$(fm_control_worktree_registered_head "$common" "$old")
-    if [ -n "$head" ]; then evidence="registered-worktree"; fi
-  fi
+  if [ -n "$head" ]; then heads+=("$head"); sources+=("meta-worktree_head"); fi
+  head=$(fm_control_worktree_registered_head "$common" "$old")
+  if [ -n "$head" ]; then heads+=("$head"); sources+=("registered-worktree"); fi
+  head=
   journal="$state/$id.control-relaunch"
-  if [ -z "$head" ] && [ -f "$journal" ] && [ ! -L "$journal" ] \
+  if [ -f "$journal" ] && [ ! -L "$journal" ] \
      && [ "$(fm_meta_get "$journal" task)" = "$id" ]; then
-    if [ "$(fm_meta_get "$journal" relocation_from)" = "$old" ]; then
+    if [ "$(fm_meta_get "$journal" relocation_from)" = "$old" ] \
+       || [ "$(fm_meta_get "$journal" relocation_to)" = "$old" ]; then
       head=$(fm_meta_get "$journal" relocation_head)
     elif [ "$(fm_meta_get "$journal" worktree)" = "$old" ]; then
       head=$(fm_meta_get "$journal" worktree_head)
     fi
-    if [ -n "$head" ]; then evidence="journal"; fi
+    if [ -n "$head" ]; then heads+=("$head"); sources+=("journal"); fi
   fi
-  if [ -z "$head" ]; then
-    head=$(fm_meta_get "$meta" pr_head)
-    if [ -n "$head" ]; then evidence="meta-pr_head"; fi
-  fi
-  if [ -z "$head" ]; then
-    head=$(git -C "$real" rev-parse --verify --quiet "refs/heads/$branch^{commit}" 2>/dev/null || true)
-    if [ -n "$head" ]; then evidence="branch-tip"; fi
-  fi
-  case "$head" in
-    '') echo "error: no recorded head exists for branch '$branch', so the fresh copy cannot be shown to contain the task's work" >&2; return 1 ;;
-    *[!0-9a-fA-F]*) echo "error: the recorded head '$head' is not a full commit id" >&2; return 1 ;;
-  esac
-  [ "${#head}" = 40 ] || [ "${#head}" = 64 ] || {
-    echo "error: the recorded head '$head' is not a full commit id" >&2
+  head=$(fm_meta_get "$meta" pr_head)
+  if [ -n "$head" ]; then heads+=("$head"); sources+=("meta-pr_head"); fi
+  [ -n "${heads[*]-}" ] || {
+    echo "error: no recorded head exists for branch '$branch', so the fresh copy cannot be shown to contain the task's work" >&2
     return 1
   }
-  git -C "$real" cat-file -e "$head^{commit}" 2>/dev/null || {
-    echo "error: the recorded head $head ($evidence) is not in the repository, so the fresh copy cannot be shown to contain it" >&2
-    return 1
-  }
-  git -C "$real" merge-base --is-ancestor "$head" HEAD 2>/dev/null || {
-    echo "error: the fresh copy's HEAD does not contain the recorded head $head ($evidence); the branch was moved behind the task's work, so relocating would drop commits" >&2
-    return 1
-  }
+  for i in "${!heads[@]}"; do
+    head=${heads[$i]}
+    source=${sources[$i]}
+    case "$head" in
+      *[!0-9a-fA-F]*) echo "error: the recorded head '$head' is not a full commit id" >&2; return 1 ;;
+    esac
+    [ "${#head}" = 40 ] || [ "${#head}" = 64 ] || {
+      echo "error: the recorded head '$head' is not a full commit id" >&2
+      return 1
+    }
+    git -C "$real" cat-file -e "$head^{commit}" 2>/dev/null || {
+      echo "error: the recorded head $head ($source) is not in the repository, so the fresh copy cannot be shown to contain it" >&2
+      return 1
+    }
+    git -C "$real" merge-base --is-ancestor "$head" HEAD 2>/dev/null || {
+      echo "error: the fresh copy's HEAD does not contain the recorded head $head ($source); the branch was moved behind the task's work, so relocating would drop commits" >&2
+      return 1
+    }
+    evidence="${evidence:+$evidence,}$source"
+  done
+  head=$(git -C "$real" rev-parse --verify HEAD) || return 1
 
   # No other task of this home may record the destination, by path or alias.
   for other in "$state"/*.meta; do
@@ -242,7 +237,15 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   if declare -F fm_treehouse_pool_slot >/dev/null 2>&1 && fm_treehouse_pool_slot "$project" "$real"; then
     fm_treehouse_slot_owner_state "$real" "$id"
     case "$FM_TREEHOUSE_SLOT_OWNER" in
-      mine|absent) ;;
+      absent) ;;
+      mine)
+        owner_home=$(cd "$FM_TREEHOUSE_SLOT_OWNER_HOME" 2>/dev/null && pwd -P) || owner_home=
+        this_home=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || this_home=
+        if [ -z "$FM_TREEHOUSE_SLOT_OWNER_HOME" ] || [ -z "$this_home" ] || [ "$owner_home" != "$this_home" ]; then
+          echo "error: the pool slot $dest is claimed by task $id of home $FM_TREEHOUSE_SLOT_OWNER_HOME, not this home" >&2
+          return 1
+        fi
+        ;;
       other)
         echo "error: the pool slot $dest is claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID${FM_TREEHOUSE_SLOT_OWNER_HOME:+ (home $FM_TREEHOUSE_SLOT_OWNER_HOME)}, not by $id" >&2
         return 1
@@ -254,7 +257,7 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
     esac
   fi
 
-  fm_control_worktree_wiring_free "$real" || return 1
+  fm_control_worktree_wiring_free "$real" "$state" "$id" || return 1
 
   # These result variables are consumed by the sourcing caller.
   # shellcheck disable=SC2034

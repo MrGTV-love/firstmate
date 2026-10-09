@@ -4757,6 +4757,7 @@ agy_spawn_fail() {  # <detail>
 if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$RELAUNCH" -eq 1 ]; then
+  [ "$RELAUNCH_RELOCATING" = 0 ] || spawn_enter_recorded_worktree
   # No worktree is acquired: the recorded one is reused as-is. What must be
   # proven instead is that the adopted endpoint's shell is actually sitting in
   # that worktree, so the replacement agent starts where the work is rather
@@ -5018,7 +5019,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # them is somebody else's runs here, at the mutation, not only when the proof
   # first ran.
   if [ "$RELAUNCH_RELOCATING" = 1 ]; then
-    fm_control_worktree_wiring_free "$WT" || exit 1
+    fm_control_worktree_wiring_free "$WT" "$STATE_REAL" "$ID" || exit 1
   fi
   # Retire the previous incarnation's per-task harness wiring before arming the
   # new one. Without this, a harness switch would leave the old adapter's hook

@@ -30,11 +30,7 @@
 # the caller already prepared, checked out on the recorded branch at a head that
 # contains the recorded head. It never creates, moves or removes a copy, never
 # touches one that exists, and never overwrites or deletes a harness file the
-# fresh copy already holds. bin/fm-control-worktree-lib.sh owns the proof and the
-# evidence order; docs/agent-control.md "Relocating a task whose worktree is
-# gone" owns the procedure. The journal keeps relocation_from, relocation_to,
-# relocation_head and relocation_head_source through every rewrite, failures
-# included.
+# fresh copy already holds.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
@@ -898,6 +894,17 @@ RELOCATE_FROM=
 RELOCATE_DEST=
 RELOCATE_HEAD=
 RELOCATE_HEAD_SOURCE=
+PRIOR_RELOCATE_FROM=
+PRIOR_RELOCATE_TO=
+PRIOR_RELOCATE_HEAD=
+PRIOR_RELOCATE_HEAD_SOURCE=
+if [ -f "$JOURNAL" ] && [ ! -L "$JOURNAL" ] \
+   && [ "$(fm_meta_get "$JOURNAL" task)" = "$ID" ]; then
+  PRIOR_RELOCATE_FROM=$(fm_meta_get "$JOURNAL" relocation_from)
+  PRIOR_RELOCATE_TO=$(fm_meta_get "$JOURNAL" relocation_to)
+  PRIOR_RELOCATE_HEAD=$(fm_meta_get "$JOURNAL" relocation_head)
+  PRIOR_RELOCATE_HEAD_SOURCE=$(fm_meta_get "$JOURNAL" relocation_head_source)
+fi
 RELAUNCH_TX=
 RELAUNCH_BRIEF=
 PRIOR_HARNESS=$HARNESS
@@ -938,6 +945,11 @@ journal_write() {  # <phase> [extra-line]...
       echo "relocation_to=$RELOCATE_DEST"
       echo "relocation_head=$RELOCATE_HEAD"
       echo "relocation_head_source=$RELOCATE_HEAD_SOURCE"
+    else
+      [ -z "$PRIOR_RELOCATE_FROM" ] || echo "relocation_from=$PRIOR_RELOCATE_FROM"
+      [ -z "$PRIOR_RELOCATE_TO" ] || echo "relocation_to=$PRIOR_RELOCATE_TO"
+      [ -z "$PRIOR_RELOCATE_HEAD" ] || echo "relocation_head=$PRIOR_RELOCATE_HEAD"
+      [ -z "$PRIOR_RELOCATE_HEAD_SOURCE" ] || echo "relocation_head_source=$PRIOR_RELOCATE_HEAD_SOURCE"
     fi
     local line
     for line in "$@"; do
@@ -1241,7 +1253,7 @@ record_note() {
         elif [ "$RELOCATING" = 1 ]; then
           echo "This task was relaunched in $RELOCATE_DEST because its recorded local copy"
           echo "($RELOCATE_FROM) was proven absent. The new copy is a fresh checkout of the same branch"
-          echo "and contains every commit the task had ($RELOCATE_HEAD_SOURCE: $RELOCATE_HEAD)."
+          echo "and contains every surviving recorded head ($RELOCATE_HEAD_SOURCE), proven at $RELOCATE_HEAD."
           echo "Uncommitted changes in the vanished copy are not recoverable; check the branch"
           echo "and the status log for what is missing before continuing."
         else
@@ -1380,8 +1392,10 @@ do_relaunch() {
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi
   else
-    [ "$(fm_meta_get "$META" control_relaunch_tx)" != "$RELAUNCH_TX" ] \
-      || RELAUNCH_META_PUBLISHED=1
+    if [ "$(fm_meta_get "$META" control_relaunch_tx)" = "$RELAUNCH_TX" ]; then
+      RELAUNCH_META_PUBLISHED=1
+      WT=$(fm_meta_get "$META" worktree)
+    fi
     die "the replacement agent for $ID could not be launched on $TARGET_HARNESS"
   fi
 
