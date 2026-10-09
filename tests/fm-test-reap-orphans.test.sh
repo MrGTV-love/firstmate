@@ -447,6 +447,33 @@ env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REA
 wait_gone "$KILLED_STUB" 10 || fail "sourcing the test library did not reap the stub of a killed test"
 pass "sourcing the test library reaps the stub a killed test left behind"
 
+NESTED_RUN=$(mktemp -d "$CHILD_TMP/fm-test-run.XXXXXX") || fail "could not make a parallel run container"
+NESTED_WORKER_TMP="$NESTED_RUN/w1/tmp"
+mkdir -p "$NESTED_WORKER_TMP"
+NESTED_LIVE_ROOT=$(TMPDIR="$NESTED_WORKER_TMP" fm_test_tmproot fm-test-reap-live)
+write_stub "$NESTED_LIVE_ROOT/poll-publish-holder.sh"
+orphan "$TMP_ROOT/nested-live.pid" bash "$NESTED_LIVE_ROOT/poll-publish-holder.sh" "$NESTED_LIVE_ROOT/release"
+NESTED_LIVE_STUB=$(cat "$TMP_ROOT/nested-live.pid")
+NESTED_UNMARKED_ROOT="$NESTED_LIVE_ROOT-unmarked"
+mkdir -p "$NESTED_UNMARKED_ROOT"
+write_stub "$NESTED_UNMARKED_ROOT/poll-publish-holder.sh"
+orphan "$TMP_ROOT/nested-unmarked.pid" bash "$NESTED_UNMARKED_ROOT/poll-publish-holder.sh" "$NESTED_UNMARKED_ROOT/release"
+NESTED_UNMARKED_STUB=$(cat "$TMP_ROOT/nested-unmarked.pid")
+env TMPDIR="$NESTED_WORKER_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_MODE=killed \
+  FM_TEST_PIDFILE="$TMP_ROOT/nested-killed.pid" FM_TEST_SKIP_ORPHAN_REAP=1 bash "$TMP_ROOT/child.sh" >/dev/null 2>&1
+wait_file "$TMP_ROOT/nested-killed.pid" 5 || fail "the killed parallel test did not start its stub"
+NESTED_KILLED_STUB=$(cat "$TMP_ROOT/nested-killed.pid")
+track "$NESTED_KILLED_STUB" "$(cat "$TMP_ROOT/nested-killed.pid.identity")"
+alive "$NESTED_KILLED_STUB" || fail "the parallel test's stub did not outlive its owner"
+env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REAP=0 bash -c '. "$FM_TEST_LIB"' >/dev/null 2>&1
+wait_gone "$NESTED_KILLED_STUB" 10 || fail "startup recovery left the killed parallel test's nested stub running"
+alive "$NESTED_LIVE_STUB" || fail "startup recovery stopped a live test's nested stub"
+alive "$NESTED_UNMARKED_STUB" || fail "startup recovery stopped an unmarked nested stub"
+touch "$NESTED_LIVE_ROOT/release" "$NESTED_UNMARKED_ROOT/release"
+wait_gone "$NESTED_LIVE_STUB" 5 || fail "the live test's nested stub did not accept its release"
+wait_gone "$NESTED_UNMARKED_STUB" 5 || fail "the unmarked nested stub did not accept its release"
+pass "startup recovery reaps killed parallel tests' nested stubs without crossing ownership boundaries"
+
 NESTED_LAB_ROOT="$SCAN/fm-lab-nested/home"
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 NESTED_LAB_OWNER=$!

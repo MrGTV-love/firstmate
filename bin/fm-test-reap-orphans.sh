@@ -224,10 +224,10 @@ else
       case "$marker" in */.fm-test-fixture) ;; *) lab_inactive "$root" || continue ;; esac
       add_root "$root"
     done < <(
-      printf '%s\0' "$dir"/fm-*/.fm-test-fixture "$dir"/fmlab.*/.fm-live-lab
+      printf '%s\0' "$dir"/fmlab.*/.fm-live-lab
       for container in "$dir"/fm-* "$dir"/fmlab.*; do
         [ -d "$container" ] && [ ! -L "$container" ] || continue
-        find "$container" -type f -name .fm-lab-home -print0 2>/dev/null
+        find "$container" -type f \( -name .fm-lab-home -o -name .fm-test-fixture \) -print0 2>/dev/null
       done
     )
   done
