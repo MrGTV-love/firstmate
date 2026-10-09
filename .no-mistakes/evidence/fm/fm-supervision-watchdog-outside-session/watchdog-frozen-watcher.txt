@@ -1,0 +1,107 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o
+/tmp/fml.7yjWhv
+
+exit=0
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o claude
+
+exit=0
+
+$ tmux -L fm-lab set-option -g remain-on-exit on
+
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary #{pane_pid}
+49913
+
+exit=0
+
+$ ps -p 49913 -o pid=,comm=,args=
+49913 claude claude
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-check-register.sh continuous
+registered: state/continuous.check.sh
+
+exit=0
+
+$ tmux -L fm-lab new-window -d -t primary -n watcher -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ exec env FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o FM_HEARTBEAT=999999 FM_CHECK_INTERVAL=999999 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watch-arm.sh
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: healthy
+
+exit=0
+
+Gate adapter only clears path overrides before exec of the real fm-watch-arm.sh; no lifecycle bypass or fake stop is used.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: stale-watcher - recovery failed (attempt 1)
+
+exit=1
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: stale-watcher - recovery failed (attempt 2)
+
+exit=1
+
+Actual configured failure notification:
+firstmate supervision is down (stale-watcher) and 2 automatic recoveries failed - see /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o/state/.watchdog.log
+
+
+Watchdog product log:
+[2026-10-09T01:24:09-0500] verdict stale-watcher; recovery attempt 1
+[2026-10-09T01:24:09-0500] stopping the stale watcher pid=65331 through real-arm-gate-adapter.sh --stop
+watcher: FAILED - pid=65331 did not stop
+[2026-10-09T01:24:27-0500] watcher stop reported a failure
+[2026-10-09T01:24:27-0500] running config/watchdog-resume for stale-watcher
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 registered custom check(s), but no watcher has a fresh beacon (last beat: 1028s ago, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o/config/operator-resume.py", line 8, in <module>
+    assert receipt, 'The real wake-drain did not provide a recovery receipt'
+           ^^^^^^^
+AssertionError: The real wake-drain did not provide a recovery receipt
+[2026-10-09T01:24:36-0500] config/watchdog-resume exited non-zero
+[2026-10-09T01:25:07-0500] recovery attempt 1 failed; verdict now stale-watcher
+[2026-10-09T01:25:11-0500] verdict stale-watcher; recovery attempt 2
+[2026-10-09T01:25:11-0500] stopping the stale watcher pid=65331 through real-arm-gate-adapter.sh --stop
+watcher: FAILED - pid=65331 did not stop
+[2026-10-09T01:25:31-0500] watcher stop reported a failure
+[2026-10-09T01:25:32-0500] running config/watchdog-resume for stale-watcher
+WARNING: watcher still down (same stale episode; last beat: 1100s ago, grace 300s) - full banner already printed this episode.
+
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o/config/operator-resume.py", line 8, in <module>
+    assert receipt, 'The real wake-drain did not provide a recovery receipt'
+           ^^^^^^^
+AssertionError: The real wake-drain did not provide a recovery receipt
+[2026-10-09T01:25:46-0500] config/watchdog-resume exited non-zero
+[2026-10-09T01:26:16-0500] recovery attempt 2 failed; verdict now stale-watcher
+
+
+$ bash -c . "$1"; fm_pid_identity "$2" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-wake-lib.sh 65331
+Fri Oct  9 01:23:49 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watch.sh
+
+exit=0
+
+$ tmux -L fm-lab kill-server
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.yrvnul7o
+
+exit=0

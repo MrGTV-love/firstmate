@@ -1,0 +1,339 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7
+/tmp/fml.gvXc4O
+
+exit=0
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7 claude
+
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary #{pane_pid}
+88985
+
+exit=0
+
+$ ps -p 88985 -o pid=,comm=,args=
+88985 claude claude
+
+exit=0
+
+Live Claude CLI pid used in disposable session-lock records=88985
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: idle
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: idle - no state directory at /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/absent/state
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - recovery failed (attempt 1)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog-episode:
+attempts=1 last_attempt=1791525470 last_alarm=0
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog.log:
+[2026-10-09T00:57:50-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T00:57:50-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:57:51-0500] recovery attempt 1 failed; verdict now session-missing
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - waiting out the retry interval
+
+exit=0
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog-episode:
+attempts=1 last_attempt=1791525470 last_alarm=0
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog.log:
+[2026-10-09T00:57:50-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T00:57:50-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:57:51-0500] recovery attempt 1 failed; verdict now session-missing
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - recovery failed (attempt 2)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog-episode:
+attempts=2 last_attempt=1791525504 last_alarm=1791525504
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog.log:
+[2026-10-09T00:57:50-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T00:57:50-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:57:51-0500] recovery attempt 1 failed; verdict now session-missing
+[2026-10-09T00:58:24-0500] verdict session-missing; recovery attempt 2
+[2026-10-09T00:58:24-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:58:25-0500] recovery attempt 2 failed; verdict now session-missing
+
+
+Actual configured command-channel notification:
+firstmate supervision is down (session-missing) and 2 automatic recoveries failed - see /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog.log
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - recovery failed (attempt 3)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog-episode:
+attempts=3 last_attempt=1791525521 last_alarm=1791525504
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog.log:
+[2026-10-09T00:57:50-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T00:57:50-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:57:51-0500] recovery attempt 1 failed; verdict now session-missing
+[2026-10-09T00:58:24-0500] verdict session-missing; recovery attempt 2
+[2026-10-09T00:58:24-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:58:25-0500] recovery attempt 2 failed; verdict now session-missing
+[2026-10-09T00:58:42-0500] verdict session-missing; recovery attempt 3
+[2026-10-09T00:58:42-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:58:43-0500] recovery attempt 3 failed; verdict now session-missing
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - recovery failed (attempt 4)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog-episode:
+attempts=4 last_attempt=1791525548 last_alarm=1791525548
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/alarm-only/state/.watchdog.log:
+[2026-10-09T00:57:50-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T00:57:50-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:57:51-0500] recovery attempt 1 failed; verdict now session-missing
+[2026-10-09T00:58:24-0500] verdict session-missing; recovery attempt 2
+[2026-10-09T00:58:24-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:58:25-0500] recovery attempt 2 failed; verdict now session-missing
+[2026-10-09T00:58:42-0500] verdict session-missing; recovery attempt 3
+[2026-10-09T00:58:42-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:58:43-0500] recovery attempt 3 failed; verdict now session-missing
+[2026-10-09T00:59:08-0500] verdict session-missing; recovery attempt 4
+[2026-10-09T00:59:08-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T00:59:09-0500] recovery attempt 4 failed; verdict now session-missing
+
+
+Actual singleton owner:
+39221
+Fri Oct  9 00:59:20 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: another check is running
+
+exit=0
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/singleton/state/.watchdog.log:
+[2026-10-09T00:59:23-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T00:59:23-0500] running config/watchdog-resume for session-missing
+
+
+Original watchdog exit=1
+watchdog: session-missing - recovery failed (attempt 1)
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - recovery failed (attempt 1)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/singleton/state/.watchdog-episode:
+attempts=1 last_attempt=1791525615 last_alarm=0
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/singleton/state/.watchdog.log:
+[2026-10-09T00:59:23-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T00:59:23-0500] running config/watchdog-resume for session-missing
+[2026-10-09T00:59:31-0500] recovery attempt 1 failed; verdict now session-missing
+[2026-10-09T01:00:15-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T01:00:16-0500] running config/watchdog-resume for session-missing
+[2026-10-09T01:00:23-0500] recovery attempt 1 failed; verdict now session-missing
+
+
+SCENARIO FAILURE: Live watchdog identity excludes a contender; reused-PID directory and symlink locks are reclaimed without signalling the unrelated process: Command '['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh']' timed out after 40 seconds
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: healthy
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: stale-watcher - recovery failed (attempt 1)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/bound-turn/state/.watchdog-episode:
+attempts=1 last_attempt=1791525702 last_alarm=0
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/bound-turn/state/.watchdog.log:
+[2026-10-09T01:01:43-0500] verdict stale-watcher; recovery attempt 1
+[2026-10-09T01:01:44-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T01:01:55-0500] recovery attempt 1 failed; verdict now stale-watcher
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: stale-watcher - recovery failed (attempt 2)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/bound-turn/state/.watchdog-episode:
+attempts=2 last_attempt=1791525728 last_alarm=1791525728
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/bound-turn/state/.watchdog.log:
+[2026-10-09T01:01:43-0500] verdict stale-watcher; recovery attempt 1
+[2026-10-09T01:01:44-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T01:01:55-0500] recovery attempt 1 failed; verdict now stale-watcher
+[2026-10-09T01:02:08-0500] verdict stale-watcher; recovery attempt 2
+[2026-10-09T01:02:08-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T01:02:12-0500] recovery attempt 2 failed; verdict now stale-watcher
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: healthy
+
+exit=0
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/bound-turn/state/.watchdog.log:
+[2026-10-09T01:01:43-0500] verdict stale-watcher; recovery attempt 1
+[2026-10-09T01:01:44-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T01:01:55-0500] recovery attempt 1 failed; verdict now stale-watcher
+[2026-10-09T01:02:08-0500] verdict stale-watcher; recovery attempt 2
+[2026-10-09T01:02:08-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T01:02:12-0500] recovery attempt 2 failed; verdict now stale-watcher
+[2026-10-09T01:02:24-0500] verdict healthy; episode cleared
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: dead-arm-owner - recovery failed (attempt 1)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/dead-arm/state/.watchdog-episode:
+attempts=1 last_attempt=1791525747 last_alarm=0
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/dead-arm/state/.watchdog.log:
+[2026-10-09T01:02:27-0500] verdict dead-arm-owner; recovery attempt 1
+[2026-10-09T01:02:27-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-09T01:02:29-0500] recovery attempt 1 failed; verdict now dead-arm-owner
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-install.sh install --print
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent template for bin/fm-watchdog-check.sh (docs/watchdog.md).
+  bin/fm-watchdog-install.sh fills the tokens between at signs and writes the result to
+  ~/Library/LaunchAgents; do not load this file directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.firstmate.watchdog.3256705357</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/./bin/fm-watchdog-check.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FM_HOME</key>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;</string>
+    <key>PATH</key>
+    <string>/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>120</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;/state/.watchdog.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;/state/.watchdog.launchd.log</string>
+</dict>
+</plist>
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-install.sh install --print
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent template for bin/fm-watchdog-check.sh (docs/watchdog.md).
+  bin/fm-watchdog-install.sh fills the tokens between at signs and writes the result to
+  ~/Library/LaunchAgents; do not load this file directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.firstmate.watchdog.3256705357</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/./bin/fm-watchdog-check.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FM_HOME</key>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;</string>
+    <key>PATH</key>
+    <string>/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>120</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;/state/.watchdog.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;/state/.watchdog.launchd.log</string>
+</dict>
+</plist>
+
+exit=0
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/./bin/fm-watchdog-check.sh
+watchdog: idle
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-install.sh install --print --interval 5
+error: interval must be at least 30 seconds
+
+exit=1
+
+$ tmux -L fm-lab kill-server
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7
+
+exit=0

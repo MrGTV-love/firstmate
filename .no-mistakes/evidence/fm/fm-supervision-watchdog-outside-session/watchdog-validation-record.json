@@ -1,0 +1,78 @@
+{
+  "baseline": "bash tests/fm-watchdog-check.test.sh completed successfully",
+  "scope": "Real watchdog CLI, genuine Claude CLI processes named by disposable lock records, and actual watcher/arm processes in marked lab homes on a private 120x40 tmux socket. Beacon ages and ledger records were fault-injection data. Real command-channel notifications were persisted locally. The gate-only arm adapter clears inherited path overrides before exec of the real arm; it does not bypass lifecycle authorization or fake the stop.",
+  "setup_repairs": "Used the supported short socket directory, allowed slower host command completion, waited for full watcher identity publication, and supplied an operator resume command that consumes the real wake-drain acknowledgement before re-arming. Frozen watchers were tested as failed-recovery containment, not successful recovery.",
+  "scenarios": [
+    {
+      "name": "Closed home with no supervision stays idle",
+      "result": "pass",
+      "live": true,
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+    },
+    {
+      "name": "Removed home is not recreated by the watchdog",
+      "result": "pass",
+      "live": true,
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+    },
+    {
+      "name": "Missing session without a resume command alarms only after repeated failure and rate-limits alerts",
+      "result": "pass",
+      "live": true,
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+    },
+    {
+      "name": "A running Claude CLI with bound session-lock evidence is healthy at 1000 seconds and stale at 3700 seconds even with threshold 7200",
+      "result": "pass",
+      "live": true,
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+    },
+    {
+      "name": "A live Claude CLI named by the session lock exposes a dead Stop-arm owner past the ordinary 900-second threshold",
+      "result": "pass",
+      "live": true,
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+    },
+    {
+      "name": "Relative homes and code roots render a typed launchd contract that executes correctly from the generated working directory",
+      "result": "pass",
+      "live": true,
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+    },
+    {
+      "name": "Live watchdog identity excludes a contender; reused-PID directory and symlink locks are reclaimed without signalling the unrelated process",
+      "result": "pass",
+      "live": true,
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-singleton-transcript.txt"
+    },
+    {
+      "name": "A stale real watcher is stopped home-locally and restored by an operator resume command without an alarm",
+      "live": true,
+      "result": "pass",
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-real-recovery.txt"
+    },
+    {
+      "name": "An unresponsive real watcher fails recovery and raises the configured alarm only after repeated attempts",
+      "live": true,
+      "result": "pass",
+      "reason": "",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-frozen-watcher.txt"
+    },
+    {
+      "name": "Rendering and checking an isolated home do not implicitly install a login agent",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-not-installed.txt",
+      "reason": "The real launchctl consumer reports that the generated disposable label is not registered."
+    }
+  ],
+  "limit": "No LaunchAgent installation/bootstrap, login restart, or reboot was performed; those require explicit authority to change system state outside the worktree."
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Live watchdog identity excludes a contender; reused-PID directory and symlink locks are reclaimed without signalling the unrelated process",
+    "result": "pass",
+    "live": true,
+    "reason": "",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-singleton-transcript.txt"
+  }
+]

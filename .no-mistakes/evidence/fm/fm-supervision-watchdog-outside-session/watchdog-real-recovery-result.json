@@ -1,0 +1,7 @@
+{
+  "name": "A stale real watcher is stopped home-locally and restored by an operator resume command without an alarm",
+  "live": true,
+  "result": "pass",
+  "reason": "",
+  "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-real-recovery.txt"
+}

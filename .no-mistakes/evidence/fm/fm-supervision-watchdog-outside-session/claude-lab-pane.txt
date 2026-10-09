@@ -1,0 +1,3 @@
+42515 claude claude
+
+Only the private lab CLI process is used; session-lock and ledger records are disposable fault-injection data.

@@ -1,0 +1,91 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc
+/tmp/fml.2Qz4B9
+
+exit=0
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc claude
+
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary #{pane_pid}
+42515
+
+exit=0
+
+$ ps -p 42515 -o pid=,comm=,args=
+42515 claude claude
+
+exit=0
+
+Live Claude CLI pid used in disposable session-lock records=42515
+
+Actual singleton owner:
+52749
+Fri Oct  9 01:04:35 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: another check is running
+
+exit=0
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc/singleton/state/.watchdog.log:
+[2026-10-09T01:04:41-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T01:04:42-0500] running config/watchdog-resume for session-missing
+
+
+Original watchdog exit=1
+watchdog: session-missing - recovery failed (attempt 1)
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - recovery failed (attempt 1)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc/singleton/state/.watchdog-episode:
+attempts=1 last_attempt=1791525903 last_alarm=0
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc/singleton/state/.watchdog.log:
+[2026-10-09T01:04:41-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T01:04:42-0500] running config/watchdog-resume for session-missing
+[2026-10-09T01:04:49-0500] recovery attempt 1 failed; verdict now session-missing
+[2026-10-09T01:05:03-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T01:05:04-0500] running config/watchdog-resume for session-missing
+[2026-10-09T01:05:11-0500] recovery attempt 1 failed; verdict now session-missing
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: session-missing - recovery failed (attempt 1)
+
+exit=1
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc/singleton/state/.watchdog-episode:
+attempts=1 last_attempt=1791525933 last_alarm=0
+
+
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc/singleton/state/.watchdog.log:
+[2026-10-09T01:04:41-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T01:04:42-0500] running config/watchdog-resume for session-missing
+[2026-10-09T01:04:49-0500] recovery attempt 1 failed; verdict now session-missing
+[2026-10-09T01:05:03-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T01:05:04-0500] running config/watchdog-resume for session-missing
+[2026-10-09T01:05:11-0500] recovery attempt 1 failed; verdict now session-missing
+[2026-10-09T01:05:33-0500] verdict session-missing; recovery attempt 1
+[2026-10-09T01:05:34-0500] running config/watchdog-resume for session-missing
+[2026-10-09T01:05:38-0500] recovery attempt 1 failed; verdict now session-missing
+
+
+$ tmux -L fm-lab kill-server
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.4g4mcehc
+
+exit=0

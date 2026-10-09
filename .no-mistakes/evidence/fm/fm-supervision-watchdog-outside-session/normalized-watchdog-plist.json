@@ -1,0 +1,17 @@
+{
+  "Label": "com.firstmate.watchdog.3256705357",
+  "ProgramArguments": [
+    "/bin/bash",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/./bin/fm-watchdog-check.sh"
+  ],
+  "EnvironmentVariables": {
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home & <main>",
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  "WorkingDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home & <main>",
+  "RunAtLoad": true,
+  "StartInterval": 120,
+  "ProcessType": "Background",
+  "StandardOutPath": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home & <main>/state/.watchdog.launchd.log",
+  "StandardErrorPath": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home & <main>/state/.watchdog.launchd.log"
+}

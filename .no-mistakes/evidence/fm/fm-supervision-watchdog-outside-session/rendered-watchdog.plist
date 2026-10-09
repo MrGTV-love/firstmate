@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent template for bin/fm-watchdog-check.sh (docs/watchdog.md).
+  bin/fm-watchdog-install.sh fills the tokens between at signs and writes the result to
+  ~/Library/LaunchAgents; do not load this file directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.firstmate.watchdog.3256705357</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/./bin/fm-watchdog-check.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FM_HOME</key>
+    <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;</string>
+    <key>PATH</key>
+    <string>/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>120</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;/state/.watchdog.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/../../../evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.nmlsyrd7/relative-home &amp; &lt;main&gt;/state/.watchdog.launchd.log</string>
+</dict>
+</plist>

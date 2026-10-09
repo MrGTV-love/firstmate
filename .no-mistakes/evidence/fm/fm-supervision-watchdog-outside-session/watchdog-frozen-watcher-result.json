@@ -1,0 +1,7 @@
+{
+  "name": "An unresponsive real watcher fails recovery and raises the configured alarm only after repeated attempts",
+  "live": true,
+  "result": "pass",
+  "reason": "",
+  "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-frozen-watcher.txt"
+}

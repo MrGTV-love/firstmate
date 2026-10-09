@@ -1,0 +1,3 @@
+$ ps -p 24524,52178,65331 -o pid=,lstart=,command=
+
+exit=1

@@ -1,0 +1,177 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.t_7bmr7u
+/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.t_7bmr7u
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.t_7bmr7u
+/tmp/fml.Y5ZkcY
+
+exit=0
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.t_7bmr7u claude
+
+exit=0
+
+$ tmux -L fm-lab set-option -g remain-on-exit on
+
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary #{pane_pid}
+49348
+
+exit=0
+
+$ ps -p 49348 -o pid=,comm=,args=
+49348 claude claude
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-check-register.sh continuous
+registered: state/continuous.check.sh
+
+exit=0
+
+$ tmux -L fm-lab new-window -d -t primary -n watcher -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ exec env FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.t_7bmr7u FM_HEARTBEAT=999999 FM_CHECK_INTERVAL=999999 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watch-arm.sh
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: healthy
+
+exit=0
+
+Gate adapter only clears path overrides before exec of the real fm-watch-arm.sh; no lifecycle bypass or fake stop is used.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: recovered from stale-watcher
+
+exit=0
+
+Before watcher PID=24524; recovered watcher PID=52178
+
+$ tmux -L fm-lab capture-pane -p -t primary:recovered-watcher
+watcher: started pid=52178 (beacon fresh)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+Recovered watcher pane:
+watcher: started pid=52178 (beacon fresh)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh
+watchdog: healthy
+
+exit=0
+
+Watchdog product log:
+[2026-10-09T01:21:20-0500] verdict stale-watcher; recovery attempt 1
+[2026-10-09T01:21:20-0500] stopping the stale watcher pid=24524 through real-arm-gate-adapter.sh --stop
+watcher: stopped pid=24524
+[2026-10-09T01:21:23-0500] running config/watchdog-resume for stale-watcher
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 24524.1791526882.AqmBcb
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 registered custom check(s), but no watcher has a fresh beacon (last beat: 1067s ago, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+[2026-10-09T01:23:07-0500] recovered from stale-watcher
+
+
+$ bash -c . "$1"; fm_pid_identity "$2" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-wake-lib.sh 24524
+
+exit=1
+
+$ bash -c . "$1"; fm_pid_identity "$2" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-wake-lib.sh 52178
+Fri Oct  9 01:22:51 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watch.sh
+
+exit=0
+
+$ tmux -L fm-lab kill-server
+
+exit=0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/fm-lab.t_7bmr7u
+
+exit=0

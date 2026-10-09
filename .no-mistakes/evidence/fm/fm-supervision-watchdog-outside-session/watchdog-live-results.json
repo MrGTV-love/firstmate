@@ -1,0 +1,51 @@
+[
+  {
+    "name": "Closed home with no supervision stays idle",
+    "result": "pass",
+    "live": true,
+    "reason": "",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+  },
+  {
+    "name": "Removed home is not recreated by the watchdog",
+    "result": "pass",
+    "live": true,
+    "reason": "",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+  },
+  {
+    "name": "Missing session without a resume command alarms only after repeated failure and rate-limits alerts",
+    "result": "pass",
+    "live": true,
+    "reason": "",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+  },
+  {
+    "name": "Live watchdog identity excludes a contender; reused-PID directory and symlink locks are reclaimed without signalling the unrelated process",
+    "result": "fail",
+    "live": true,
+    "reason": "Command '['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ/bin/fm-watchdog-check.sh']' timed out after 40 seconds",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+  },
+  {
+    "name": "A running Claude CLI with bound session-lock evidence is healthy at 1000 seconds and stale at 3700 seconds even with threshold 7200",
+    "result": "pass",
+    "live": true,
+    "reason": "",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+  },
+  {
+    "name": "A live Claude CLI named by the session lock exposes a dead Stop-arm owner past the ordinary 900-second threshold",
+    "result": "pass",
+    "live": true,
+    "reason": "",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+  },
+  {
+    "name": "Relative homes and code roots render a typed launchd contract that executes correctly from the generated working directory",
+    "result": "pass",
+    "live": true,
+    "reason": "",
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EY67GK5YXQS7CVZEW2QSJQ/watchdog-live-transcript.txt"
+  }
+]

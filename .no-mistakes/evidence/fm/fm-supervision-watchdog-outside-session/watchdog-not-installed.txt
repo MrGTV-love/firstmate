@@ -1,0 +1,5 @@
+$ launchctl print gui/501/com.firstmate.watchdog.3256705357
+Bad request.
+Could not find service "com.firstmate.watchdog.3256705357" in domain for user gui: 501
+
+exit=113
