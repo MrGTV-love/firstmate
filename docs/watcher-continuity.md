@@ -95,17 +95,49 @@ Both suites use `tests/watch-lifecycle-expiry.mjs` for shutdown child-close, suc
 omp restores queued user follow-ups to the composer when a run is interrupted with Escape or a message is dequeued with Alt+Up, so accepting a wake as a follow-up does not prove a turn consumed it.
 Before recording or sending a wake, `.omp/extensions/fm-primary-omp-watch.ts` normalizes CRLF and CR to LF, expands each tab to three spaces, and strips other C0 controls to match omp's editor restoration.
 Consumption still matches the emitted text exactly.
-Only an accepted user `message_start` carrying the exact emitted text consumes one pending token. `before_agent_start` records context and the loaded build but does not consume a wake: preparation can still be cancelled by Escape. A second identical wake therefore remains recoverable and eligible for replacement handoff, and shutdown during cancelled preparation retains the pending record until the replacement accepts its user message.
-While a wake remains unconsumed, `agent_end` schedules one editor check after two seconds; this is not continuous polling.
-The check requires the current generation to be live, a UI editor, positive idle state, and no pending messages.
+Only an accepted user `message_start` carrying the exact emitted text consumes one pending token.
+`before_agent_start` records context and the loaded build but does not consume a wake: preparation can still be cancelled by Escape.
+A second identical wake therefore remains recoverable and eligible for replacement handoff, and shutdown during cancelled preparation retains the pending record until the replacement accepts its user message.
+While a wake remains unconsumed, `agent_end` schedules one editor check after two seconds, replacing a check already pending so the editor is read two full seconds after the run ended.
+Omp accepting the wake as a follow-up schedules one too, unless a check is already pending.
+The check requires the current generation to be live, a UI editor, and positive idle state.
+While omp still reports queued messages the check waits for them to drain into a run, in up to fifteen further two-second rounds, rather than skipping for good.
+The wait count and once-per-episode warning belong to the session generation.
+A replacement starts with both cleared; accepted user `message_start` and `agent_end` clear both even when a whole turn runs between timer checks.
+Checks that observe a running turn or an empty queue also clear both for the next episode, including when no wakes remain tracked.
 Recovery accepts only a complete unchanged emitted wake segment bounded by editor edges or omp's blank-line joins, with only its leading invisible transport mark allowed to be present or absent.
-Direct prefix, suffix, or internal edits are left untouched and not submitted.
+Direct prefix, suffix, or internal edits are left untouched; edited composer text is not submitted.
 The extension removes only the wake and one transport blank-line separator, preserves operator draft bytes including invisible marks and leading/trailing newlines, and resends the wake alone through omp's prompt-starting message API.
-Recovery is bounded to three resubmission attempts per wake; another `agent_end` is needed to schedule another check.
-A wake restored by Alt+Up while idle without `agent_end` is not resubmitted, and rare credential loss during recovery can reject resubmission after the editable copy is removed; the durable queue and shutdown handoff retain the wake, the existing parent stalled-loop alarm reports either stall for endpoint-recorded local secondmates, and consumption-confirmed removal remains follow-up `fm-omp-wake-recovery-rollback`.
+Recovery is bounded to three resubmission attempts per tracked wake; recovering an editor segment relies on a later `agent_end` for the next check, while stuck-queue resubmissions schedule their own follow-up checks.
+A queue that is still full once omp has stayed idle through that wait is stuck, because omp's follow-up gate refused to start a turn for it.
+A wake sitting in the composer is then recovered as above.
+If no eligible unchanged tracked wake can be recovered from the composer, the check resubmits the oldest unconsumed wake with attempts remaining through the same prompt-starting API without altering the editor.
+That prompt starts a turn and flushes the queue behind it, so the wake can reach main twice and the idempotent drain absorbs the repeat.
+Delivery is proven by the accepted user `message_start` carrying the wake; if three resubmissions of every unconsumed wake do not produce it, the extension reports the wait once through omp's own notification and leaves the durable queue and shutdown handoff to the parent's stalled-loop alarm.
+Alt+Up does not itself schedule a recovery check; a tracked wake dequeued after the existing check has finished can remain until a later `agent_end`.
+Rare credential loss during recovery can reject resubmission after the editable copy is removed; the durable queue and shutdown handoff retain the wake, the existing parent stalled-loop alarm reports either stall for endpoint-recorded local secondmates, and consumption-confirmed removal remains follow-up `fm-omp-wake-recovery-rollback`.
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
 `tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, pending-wake retention across cancelled preparation without `agent_end`, later completed draft turns, and replacement handoff until accepted user `message_start`, plus identical wakes across preparation plus accepted-message callbacks, streaming delivery, and session replacement.
+It also covers the wait on queued messages: a queue that drains, a restored wake behind a queue that never drains, a wake stuck in the queue itself, and resubmissions that start no turn.
+Deterministic lifecycle checks prove that episodes after session replacement, queue drainage observed by recovery checks or polling while exhausted wakes remain tracked, or a running-turn observation each wait all fifteen checks before retrying and warn once after exhausting their attempts.
+Separate cases isolate accepted wake messages, ordinary user messages, and turn completion between checks.
+Recovery delays and wait limits are fixed in production; the fixture controls timer scheduling in its Node host to accelerate bounded waits and isolate polling scenarios.
 The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
+
+### omp stranded wake text
+
+An idle omp raises no event when text lands in its composer, so wake text that older wiring typed there and never submitted stayed pending until someone pressed Enter, and a restart that needs an empty composer was refused.
+Once the extension owns the watch for the lock-holding session, at session start or through `fm_watch_arm_omp`, `.omp/extensions/fm-primary-omp-watch.ts` polls the editor every three seconds.
+A poll acts only when omp is idle and the editor holds a complete Firstmate watcher wake: the watcher envelope header from `bin/fm-operational-input.sh`, the wake body, and its fixed closing sentence, bounded by editor edges or omp's blank-line joins, with the leading transport mark present or absent.
+The full editor text, including any draft, must match on two consecutive eligible idle polls before a wake is sent.
+The extension sends the wake alone through omp's prompt-starting message API, restores the transport mark, and then removes only that wake and one blank-line separator from the editor.
+Any other text is left exactly as found: operator drafts, a structurally edited or truncated wake, and a wake this extension still tracks, which the bounded restored-wake recovery above owns.
+Before template-based recovery, every tracked wake must be accounted for by its own exact composer segment, allowing only omission of the leading transport mark. If any tracked copy is missing or edited, polling waits for exact restored recovery or accepted-message consumption to resolve ownership rather than treating an exact-match refusal as permission to submit a template match.
+Accepted residual: with older-wiring wakes A and B in the composer, the poll sends A and removes its segment; if Escape cancels A's preparation before the user `message_start`, A stays tracked but absent, so the poll does not send B until an owner round removes the stall. Edited-copy and duplicate protections remain in force. The cure is assigned to the wake-replay option D round.
+Once the tracked-copy ownership gate is satisfied, the scan skips unchanged tracked wakes and stranded text that has exhausted its attempts, so neither can block a later eligible wake; recovering that later wake preserves the skipped text and operator drafts.
+Delivery is bounded to three attempts per distinct wake text, and a wake sent this way is tracked until an accepted user `message_start` consumes it.
+`tests/fm-omp-harness.test.sh` covers delivery with and without the transport mark, operator drafts on both sides, several wakes, text that is not a whole wake, a running turn, text still changing, the attempt bound, edited tracked copies with polling active, duplicate ownership, and later eligible wakes behind exhausted tracked or stranded text.
+The live guard's stranded-wake step and its evidence are recorded in [omp stranded wake text and the queue panel](verification/runtime-backends.md#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 
 ### Cursor stop hook
 
