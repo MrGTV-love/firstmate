@@ -1,0 +1,247 @@
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+would-retire: lavish-0b104fed789e2fe4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/no-session.html - Lavish holds no session for the board
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+would-retire: lavish-315c2a39672d3b5b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html - the Lavish session has ended
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+would-retire: lavish-5cac8767bb8cc759 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html - the board file is gone
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 48 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 48 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - Lavish holds queued feedback for the board
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+would-retire: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: would-retire=4 kept=11
+[exit=0]
+
+Dry-run proof: all registrations and the exact real idle poll PIDs remain.
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+retired: lavish-0b104fed789e2fe4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/no-session.html - Lavish holds no session for the board
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+retired: lavish-315c2a39672d3b5b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html - the Lavish session has ended
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+retired: lavish-5cac8767bb8cc759 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html - the board file is gone
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 48 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 48 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - Lavish holds queued feedback for the board
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+retired: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: retired=4 kept=11
+[exit=0]
+
+Retirement proof: real idle poll PIDs stopped; registrations removed; Lavish store SHA256 unchanged: 82a39eacb30af99db95ee7468debe07d91a929988dbb3210d70e173c573ed042
+
+Revival proof: arm restored real resident poll {"62679": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html", "63192": "node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html", "63196": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html"}
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 1 hours
+would-retire: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - idle for 6 hours with no open captain call
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 1 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+would-retire: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: would-retire=2 kept=10
+[exit=0]
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+error: FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to 8760
+[exit=1]
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+error: FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to 8760
+[exit=1]
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+error: FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to 8760
+[exit=1]
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 1 hours
+would-retire: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - idle for 6 hours with no open captain call
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 1 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+would-retire: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: would-retire=2 kept=10
+[exit=0]
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - active within the last 8760 hours
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - active within the last 8760 hours
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 8760 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 8760 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - active within the last 8760 hours
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - active within the last 8760 hours
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 8760 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - active within the last 8760 hours
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - active within the last 8760 hours
+kept: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - active within the last 8760 hours
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - active within the last 8760 hours
+sweep: would-retire=0 kept=12
+[exit=0]
+
+PASS: retirement eligibility, dry run, live process stop/reconcile no-regrowth/arm revival, open and legacy cards, dynamic discovery, queued/captured feedback, worker ownership, activity and idle-window limits.
+
+$ <worktree>/bin/fm-bearings-board.sh build <worktree>/.sweep-validation/fm home [literal]/payload.json
+board: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html"
+  url: "http://127.0.0.1:53341/session/7f9e9d801e2dab17"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --reopen`."
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html"
+  url: "http://127.0.0.1:53341/session/7f9e9d801e2dab17"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --reopen`."
+fm-bearings-board: the board Lavish session is not live after reopening it (lavish-axi 0.1.79 reported status opened); refusing to arm a poll on an ended session
+[exit=1]
+
+$ <worktree>/bin/fm-bearings-board.sh build <worktree>/.sweep-validation/build-home/payload.json
+board: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html
+  url: "http://127.0.0.1:53341/session/692faba0dd70f4d6"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html --reopen`."
+session: live
+served: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html
+bound: lavish-692faba0dd70f4d6
+armed: lavish-692faba0dd70f4d6
+[exit=0]
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+kept: lavish-692faba0dd70f4d6 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html - the standing Bearings board
+sweep: retired=0 kept=1
+[exit=0]
+
+PASS: successful real Bearings build automatically stopped its old real listener; aged standing Bearings board retained.
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+kept: lavish-10b19d7bd45208a1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html - card open-card is an open captain call or cannot be checked
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+retired: lavish-4c3d377add632554 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html - idle for 72 hours with no open captain call
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 48 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 48 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-a1b1268c4078ce25 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-no-session.html - card open-card is an open captain call or cannot be checked
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 48 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+retired: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: retired=2 kept=13
+[exit=0]
+
+PASS: open captain calls protect idle, ended and sessionless registrations.
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-115323d2033922e3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html - Lavish session evidence cannot be read unambiguously
+kept: lavish-75f96879cec5f6d4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html - Lavish session evidence cannot be read unambiguously
+sweep: retired=0 kept=15
+
+Verified real EACCES listing inbox mode 0300.
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-115323d2033922e3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html - inbox cannot be opened: Permission denied
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - inbox cannot be opened: Permission denied
+sweep: retired=0 kept=15
+
+$ <worktree>/bin/fm-procevent.sh retire lavish-115323d2033922e3 --if-identity 16777232:170330871
+error: cannot retire source lavish-115323d2033922e3: inbox cannot be opened: Permission denied
+[exit=1]
+
+Verified real EACCES stat on one inbox file.
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-115323d2033922e3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html - inbox entry cannot be checked: Permission denied
+retired: lavish-b7cd5135eabaa41d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html - idle for 72 hours with no open captain call
+sweep: retired=2 kept=14
+
+$ <worktree>/bin/fm-procevent.sh retire lavish-115323d2033922e3 --if-identity 16777232:170330871
+error: cannot retire source lavish-115323d2033922e3: inbox entry cannot be checked: Permission denied
+[exit=1]
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-f0ceacce4d76eb2c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html - the board file cannot be opened
+sweep: retired=1 kept=14
+
+Verified real EACCES looking up decision binding.
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-f7f3228d10a52499 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html - card closed-card is an open captain call or cannot be checked
+sweep: retired=0 kept=15
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+retired: lavish-f7f3228d10a52499 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html - idle for 72 hours with no open captain call
+sweep: retired=2 kept=13
+
+PASS: real store, inbox, board and binding uncertainty keep; locked retirement refuses; unrelated healthy and ordinary unbound listeners retire.
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - active within the last 48 hours
+sweep: retired=0 kept=13
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+retired: lavish-8c06e04b0e8297cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html - idle for 234685 hours with no open captain call
+sweep: retired=1 kept=0
+[exit=0]
+
+PASS: recent handled capture is active in a literal home path; confirmed missing inbox allows old resolved board retirement.
+
+$ <worktree>/bin/fm-procevent.sh retire lavish-f9d10ab03e356480 --if-identity 16777232:170236580
+error: source registration generation changed: lavish-f9d10ab03e356480
+[exit=1]
+
+PASS: stale identity retirement refused; replacement real poll remains registered and resident: {"2798": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html", "6511": "node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html", "6547": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html"}
+
+$ <worktree>/bin/fm-procevent.sh retire lavish-74b654497ddc617e --if-identity 16777232:170267275
+error: cannot retire source lavish-74b654497ddc617e while a captured round is unacknowledged
+[exit=1]
+
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+retired: lavish-10b19d7bd45208a1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html - the Lavish session has ended
+retired: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - idle for 72 hours with no open captain call
+retired: lavish-a1b1268c4078ce25 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-no-session.html - Lavish holds no session for the board
+retired: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - idle for 72 hours with no open captain call
+sweep: retired=4 kept=9
+
+PASS: exact and legacy cards keep while held, then allow retirement after recorded answers.
+
+UNTESTED migration resolution: bd was missing on PATH, so downloaded and SHA256-verified bd 1.3.1 into the worktree, initialized a real embedded-Dolt graph, and created raw/derived migration-note rows. Installed tasks-axi 0.2.6 rejects backend beads for list and hold (UNSUPPORTED). npm registry and upstream main both report 0.2.6; a Beads-capable real tasks-axi build is required for full live migrated-key routing. Markdown bound-key and binding EACCES paths were driven live instead.
+
+Live-lab teardown complete: no registrations or resident polls in owned lab homes; isolated Lavish server and private tmux socket stopped. Targeted test fixture cleanup remains until its command completes.
+
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+kept: lavish-ff37d5d5d6e1846e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/migration-home/boards/migrated.html - card third-choice is an open captain call or cannot be checked
+sweep: retired=0 kept=1
+[exit=0]
+
+PASS: unsupported real Beads consumer is uncertainty and keeps its listener; successful migrated-key resolution remains untested live.
+
+Final cleanup: downloaded Beads runtime/archive, private graph, test fixtures, temporary homes and socket all removed from the worktree. Source and test files were not changed.

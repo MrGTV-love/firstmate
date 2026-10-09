@@ -1,0 +1,964 @@
+Isolated real Lavish server: {"ok": true, "app": "lavish-axi", "version": "0.1.79", "state_id": "074509f7b7e81dbe", "state_dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/lavish-state", "hosts": ["127.0.0.1"], "requested_hosts": ["127.0.0.1"], "listeners": []}
+$ tmux -L fm-lab new-session -d -s validation -x 120 -y 40 -c <worktree> sleep 3600
+error connecting to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/tmux/tmux-501/fm-lab (File name too long)
+[exit=1]
+$ tmux -S .sweep-validation/s new-session -d -s validation -x 120 -y 40 -c <worktree> sleep 3600
+[exit=0]
+$ tasks-axi add closed-card Closed ordinary work item
+ok: added closed-card -> Queued
+task:
+  id: closed-card
+  title: Closed ordinary work item
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-10-09
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start closed-card` to move it to in flight
+  - Run `tasks-axi block closed-card --by <other>` to record a dependency
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh hold open-card --title Unanswered captain card --reason Choose a route --repo sample
+open-card
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh hold legacy-origin-decision-third-choice --title Legacy captain card --reason Legacy decision pending --repo sample --origin legacy-origin
+legacy-origin-decision-third-choice
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/idle.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html"
+  url: "http://127.0.0.1:53341/session/e93884a4a83f6df8"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/idle.html
+registered: lavish-e93884a4a83f6df8 (lavish)
+armed: lavish-e93884a4a83f6df8
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/open.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html"
+  url: "http://127.0.0.1:53341/session/f9d10ab03e356480"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/open.html
+registered: lavish-f9d10ab03e356480 (lavish)
+armed: lavish-f9d10ab03e356480
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/legacy.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html"
+  url: "http://127.0.0.1:53341/session/252ede3f6d62a0a0"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/legacy.html
+registered: lavish-252ede3f6d62a0a0 (lavish)
+armed: lavish-252ede3f6d62a0a0
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh bind lavish-252ede3f6d62a0a0 legacy-origin
+bound: lavish-252ede3f6d62a0a0 -> legacy-origin
+[exit=0]
+Idle listener resident PIDs: {"41632": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html", "42045": "node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html", "42050": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html"}
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/gone.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html"
+  url: "http://127.0.0.1:53341/session/5cac8767bb8cc759"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-5cac8767bb8cc759 -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/fm home [literal]/boards/gone.html
+registered: lavish-5cac8767bb8cc759 (lavish)
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/ended.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html"
+  url: "http://127.0.0.1:53341/session/315c2a39672d3b5b"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-315c2a39672d3b5b -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/fm home [literal]/boards/ended.html
+registered: lavish-315c2a39672d3b5b (lavish)
+[exit=0]
+$ lavish-axi end <worktree>/.sweep-validation/fm home [literal]/boards/ended.html
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html"
+  status: ended
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-0b104fed789e2fe4 -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/fm home [literal]/boards/no-session.html
+registered: lavish-0b104fed789e2fe4 (lavish)
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/fresh.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html"
+  url: "http://127.0.0.1:53341/session/61f4d95b83a4e273"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/fresh.html
+registered: lavish-61f4d95b83a4e273 (lavish)
+armed: lavish-61f4d95b83a4e273
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/window-six.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html"
+  url: "http://127.0.0.1:53341/session/6ed2b6ef8e93888a"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/window-six.html
+registered: lavish-6ed2b6ef8e93888a (lavish)
+armed: lavish-6ed2b6ef8e93888a
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/dynamic.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html"
+  url: "http://127.0.0.1:53341/session/e60db1894600a55b"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/dynamic.html
+registered: lavish-e60db1894600a55b (lavish)
+armed: lavish-e60db1894600a55b
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/empty.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html"
+  url: "http://127.0.0.1:53341/session/d1e142d8e833c247"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/empty.html
+registered: lavish-d1e142d8e833c247 (lavish)
+armed: lavish-d1e142d8e833c247
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/unsupported.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html"
+  url: "http://127.0.0.1:53341/session/88edec2828daec33"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/unsupported.html
+warning: this board has inline form handlers but no data-fm-lavish-form-guard script; a form that fails to cancel its own submit would lose the answer silently. Add .agents/skills/bearings/assets/lavish-form-guard.html: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html
+registered: lavish-88edec2828daec33 (lavish)
+armed: lavish-88edec2828daec33
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/unresolved.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html"
+  url: "http://127.0.0.1:53341/session/42a31163843d3d49"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/unresolved.html
+registered: lavish-42a31163843d3d49 (lavish)
+armed: lavish-42a31163843d3d49
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html
+[exit=0]
+$ tmux -S .sweep-validation/s new-window -d -t validation -n fm-worker sleep 3600
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/worker.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html"
+  url: "http://127.0.0.1:53341/session/74a0dd5488136fc3"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/worker.html --for worker
+registered: lavish-74a0dd5488136fc3 (lavish, task=worker)
+armed: lavish-74a0dd5488136fc3
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html
+owner-task: worker
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/queued.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html"
+  url: "http://127.0.0.1:53341/session/c026ad3401cc910a"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-c026ad3401cc910a -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/fm home [literal]/boards/queued.html
+registered: lavish-c026ad3401cc910a (lavish)
+[exit=0]
+Queued feedback persisted by real API: {"key": "c026ad3401cc910a", "file": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html", "url": "http://127.0.0.1:53341/session/c026ad3401cc910a", "status": "feedback", "pending_prompts": 1, "prompts": [{"uid": "", "prompt": "", "selector": "", "tag": "message", "text": "Do not lose my queued feedback"}], "layout_warnings": [], "artifact_revision": 0, "artifact_load": null, "artifact_failures": [], "delivered_attachments": [], "dom_snapshot": "", "chat": [], "chat_revision": 0, "chat_ack_ids": [], "updated_at": "2026-10-09T13:45:11.286Z"}
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/captured.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html"
+  url: "http://127.0.0.1:53341/session/74b654497ddc617e"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/captured.html
+registered: lavish-74b654497ddc617e (lavish)
+armed: lavish-74b654497ddc617e
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html
+[exit=0]
+POST /api/74b654497ddc617e/prompts
+{"status": "queued", "pending_prompts": 1, "chat": [], "ack_ids": [], "chat_revision": 0}
+Durable real listener capture:
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html"
+  status: feedback
+prompts[1]{uid,prompt,selector,tag,text}:
+  "","","",message,Durable unacknowledged answer
+next_step: "Apply the requested changes to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html --agent-reply \"<message for the user>\"` without --timeout-ms unless the user ended the session. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. The poll waits silently until the user sends more feedback, ends the session, or leaves every review window disconnected past the reconnect grace period - never kill it. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited."
+dom_snapshot: ""
+
+$ <worktree>/bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-0b104fed789e2fe4      lavish       none       0
+lavish-252ede3f6d62a0a0      lavish       live       0
+lavish-315c2a39672d3b5b      lavish       none       0
+lavish-42a31163843d3d49      lavish       live       0
+lavish-5cac8767bb8cc759      lavish       none       0
+lavish-61f4d95b83a4e273      lavish       live       0
+lavish-6ed2b6ef8e93888a      lavish       live       0
+lavish-74a0dd5488136fc3      lavish       task:worker/listening 0
+lavish-74b654497ddc617e      lavish       none       1
+lavish-88edec2828daec33      lavish       live       0
+lavish-c026ad3401cc910a      lavish       none       0
+lavish-d1e142d8e833c247      lavish       live       0
+lavish-e60db1894600a55b      lavish       live       0
+lavish-e93884a4a83f6df8      lavish       live       0
+lavish-f9d10ab03e356480      lavish       live       0
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+would-retire: lavish-0b104fed789e2fe4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/no-session.html - Lavish holds no session for the board
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+would-retire: lavish-315c2a39672d3b5b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html - the Lavish session has ended
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+would-retire: lavish-5cac8767bb8cc759 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html - the board file is gone
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 48 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 48 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - Lavish holds queued feedback for the board
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+would-retire: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: would-retire=4 kept=11
+[exit=0]
+Dry-run proof: all registrations and the exact real idle poll PIDs remain.
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+retired: lavish-0b104fed789e2fe4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/no-session.html - Lavish holds no session for the board
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+retired: lavish-315c2a39672d3b5b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/ended.html - the Lavish session has ended
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+retired: lavish-5cac8767bb8cc759 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html - the board file is gone
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 48 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 48 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - Lavish holds queued feedback for the board
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+retired: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: retired=4 kept=11
+[exit=0]
+Retirement proof: real idle poll PIDs stopped; registrations removed; Lavish store SHA256 unchanged: 82a39eacb30af99db95ee7468debe07d91a929988dbb3210d70e173c573ed042
+$ <worktree>/bin/fm-procevent.sh reconcile
+reconciled: published=1 started=2 stopped=0 uncertain=0 failed=0
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/idle.html
+registered: lavish-e93884a4a83f6df8 (lavish)
+armed: lavish-e93884a4a83f6df8
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html
+[exit=0]
+Revival proof: arm restored real resident poll {"62679": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html", "63192": "node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html", "63196": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html"}
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 1 hours
+would-retire: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - idle for 6 hours with no open captain call
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 1 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+would-retire: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: would-retire=2 kept=10
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+error: FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to 8760
+[exit=1]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+error: FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to 8760
+[exit=1]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+error: FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to 8760
+[exit=1]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 1 hours
+would-retire: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - idle for 6 hours with no open captain call
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 1 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+would-retire: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: would-retire=2 kept=10
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep --dry-run
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - active within the last 8760 hours
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - active within the last 8760 hours
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 8760 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 8760 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - active within the last 8760 hours
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - active within the last 8760 hours
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 8760 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - active within the last 8760 hours
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - active within the last 8760 hours
+kept: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - active within the last 8760 hours
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - active within the last 8760 hours
+sweep: would-retire=0 kept=12
+[exit=0]
+PASS: retirement eligibility, dry run, live process stop/reconcile no-regrowth/arm revival, open and legacy cards, dynamic discovery, queued/captured feedback, worker ownership, activity and idle-window limits.
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/build-retire.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html"
+  url: "http://127.0.0.1:53341/session/4c3d377add632554"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/build-retire.html
+registered: lavish-4c3d377add632554 (lavish)
+armed: lavish-4c3d377add632554
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html
+[exit=0]
+$ <worktree>/bin/fm-bearings-board.sh build <worktree>/.sweep-validation/fm home [literal]/payload.json
+board: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html"
+  url: "http://127.0.0.1:53341/session/7f9e9d801e2dab17"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --reopen`."
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html"
+  url: "http://127.0.0.1:53341/session/7f9e9d801e2dab17"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html --reopen`."
+fm-bearings-board: the board Lavish session is not live after reopening it (lavish-axi 0.1.79 reported status opened); refusing to arm a poll on an ended session
+[exit=1]
+$ lavish-axi
+bin: ~/.local/bin/lavish-axi
+description: "Lavish Editor helps agents turn rich HTML artifacts into collaborative human review surfaces. Whenever you are about to give user a complex response that will be easier to understand via a rich / interactive page, consider using Lavish Editor. First generate an interactive HTML artifact according to user request, then run `lavish-axi <html-file>` so the user can visually review it, annotate elements or selected text, queue prompts, and send feedback back through `lavish-axi poll`."
+sessions[15]{file,status,url,pending_prompts,listener}:
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/.lavish/bearings-board.html",open,"http://127.0.0.1:53341/session/7f9e9d801e2dab17",0,none
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html",open,"http://127.0.0.1:53341/session/4c3d377add632554",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html",open,"http://127.0.0.1:53341/session/74b654497ddc617e",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html",open,"http://127.0.0.1:53341/session/e60db1894600a55b",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html",open,"http://127.0.0.1:53341/session/d1e142d8e833c247",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html",open,"http://127.0.0.1:53341/session/61f4d95b83a4e273",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/gone.html",open,"http://127.0.0.1:53341/session/5cac8767bb8cc759",0,none
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html",open,"http://127.0.0.1:53341/session/e93884a4a83f6df8",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html",open,"http://127.0.0.1:53341/session/252ede3f6d62a0a0",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html",open,"http://127.0.0.1:53341/session/f9d10ab03e356480",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html",open,"http://127.0.0.1:53341/session/c026ad3401cc910a",0,none
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html",open,"http://127.0.0.1:53341/session/42a31163843d3d49",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html",open,"http://127.0.0.1:53341/session/88edec2828daec33",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html",open,"http://127.0.0.1:53341/session/6ed2b6ef8e93888a",0,agent-listener
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html",open,"http://127.0.0.1:53341/session/74a0dd5488136fc3",0,agent-listener
+visual_guidance[5]: "Use visual hierarchy to make the most important decisions, risks, tradeoffs, and next actions obvious at a glance","Show, don't tell: explain concepts, flows, relationships, and comparisons with labeled illustrations - hand-authored inline SVG, per the diagram playbook - and show existing UI or state with screenshots of the real pages (run the app read-only if needed); reserve prose for what cannot be shown, such as rationale, trade-offs, and open questions","Structure the prose that remains with sections, cards, tables, annotated snippets, and side-by-side comparisons instead of long paragraphs","Choose typography, spacing, color, and layout deliberately so the artifact has a clear point of view","Prevent horizontal overflow at every nesting level: nested grid/flex children also need minmax(0, 1fr) tracks and min-width: 0, especially when badges, labels, or status text use wide pixel or monospace fonts; wrap, truncate, or contain long unbreakable text deliberately"
+playbooks[8]{id,use_when}:
+  diagram,"Explain relationships, flows, state, architecture, and concepts with illustrations"
+  table,Turn dense records into scan-friendly review surfaces
+  comparison,"Show options, tradeoffs, and current vs target behavior"
+  plan,Explain a product or technical plan before implementation
+  code,"Render source code, code files, patches, PR diffs, and before/after code inside Lavish artifacts"
+  input,"Must be used when the agent needs to collect user input on decisions, choices, preferences, triage, scope, or other structured feedback from within the artifact"
+  explanation,"Explain an existing system, PR, incident, or decision to a reader who was not there - when the goal is understanding what is and why, not choosing a direction or inspecting a plan before implementation"
+  slides,Create a deliberate presentation when slides are requested
+help[12]: "Run `lavish-axi <html-file>` to open or resume a Lavish Editor session. If the user explicitly ended the session from the browser, this refuses to reopen it and explains why instead of reopening uninvited - pass `--reopen` only when the user asks for further review or something important needs their visual attention","Unless the user specifies another location, create HTML artifacts in the current working directory under `.lavish/`","Lavish serves the html file through a local express.js server. If your html needs to reference other filesystem assets such as images, CSS, fonts, and local scripts, copy them into the same directory as the HTML file, then reference them with relative paths from that directory. Never prepend `/` to those asset paths - root paths won't work","Run `lavish-axi poll <html-file>` to wait for user feedback. It long-polls and stays silent until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, so leave it running - never kill it. Detected layout issues never return this poll: the browser files them in the user's Layout issues inbox in the Lavish top bar, and they arrive as an ordinary tag \"layout-warnings\" prompt only when the user selects them and queues the fixes. Never edit the artifact to chase a layout issue the user has not queued. The only exception is a fatal artifact_failures response, which means the review surface itself could not be used. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. `Send & End` ends the session. Its final feedback is still delivered once. After that response, polling stops, and the agent must not reopen the session uninvited.","Mermaid is the whiteboard opt-in, not the diagram default: only when the user asks for an editable whiteboard, author that diagram as Mermaid in a `.mermaid` container. Rendered Mermaid diagrams there become embedded, editable Excalidraw whiteboards in the browser (click a diagram to unlock editing; a Fullscreen action opens it over the whole viewport) - flowchart, sequence, class, ER, and state diagrams convert to editable shapes; other types embed as an image to draw on. Scenes autosave locally; an unmodified autosave silently re-converts when a reload changes the Mermaid source. If the reviewer edited the scene, they choose to re-convert and discard saved edits or keep editing the saved scene. Standalone and exported copies still render plain Mermaid. Queue feedback adds a prompt to the Conversation panel; when the user sends it, poll returns a tag \"whiteboard\" prompt carrying a bounded edit summary plus local scenePath (.excalidraw JSON) and previewPath (PNG) files - read the summary first, open the files only when needed, then apply the edits by updating the Mermaid source in the artifact (never try to write the scene back)","Run `lavish-axi end <html-file>` to end a session as the agent - ending it this way still allows a plain reopen later. When the user ends it from the browser instead, a later `lavish-axi <html-file>` refuses to reopen it without `--reopen`","Run `lavish-axi export <html-file> [--out <path>]` to write a portable copy of the artifact - one HTML file with its LOCAL assets inlined - so it opens with no Lavish server and no sibling files. Remote CDN/font references are left as links, so it needs network to render those. Users can also export from the browser chrome's overflow menu","Run `lavish-axi share <html-file> [--private | --password <pw>]` to publish the artifact on ht-ml.app (https://ht-ml.app), a third-party hosting service not part of Lavish, and get back a visitable URL. Shares are PUBLIC by default, so anyone with the link can open them. Pass --private to publish a PRIVATE page behind a password Lavish generates and returns - hand the user that password with the URL and say it is a shared secret anyone they give it to can use; --password <pw> uses one you were already given instead. Local assets are inlined; remote refs load over the network. It also returns a secret update_key that can republish or lock the same URL later - run `lavish-axi share --help` before using it. Users can also publish from the browser chrome's overflow menu",Run `lavish-axi stop` to shut down the background server (it also self-stops when idle or after the last session ends with nothing connected),"Run `lavish-axi playbook <playbook_id>` for focused artifact guidance. One artifact often combines several playbooks (for example a plan that includes a comparison and a diagram), so MUST open each matching playbook before writing HTML.","Lavish does not auto-inject any design system - artifacts stay portable so they render identically when opened directly without lavish-axi running. Before writing any HTML: Decide the design direction in this strict priority order, and only move to the next step when the current one truly yields nothing: (1) if the user asked for a specific look or named design system, use that; (2) otherwise you must first inspect the project the artifact is about - the subject or product whose content or UI it represents, which may differ from your current working directory - and match that project's design system: Tailwind or theme config, shared CSS variables or design tokens, component library, brand assets, or existing styled pages. If the artifact previews, proposes, or mocks a specific app's UI, render it in that app's own design system so it faithfully shows the product, even when you are running in a different repo; (3) only when both steps come up empty, use the Lavish-recommended Tailwind CSS browser runtime v4 + DaisyUI v5, available via CDN, and prefer that CDN snippet over hand-writing styles unless explicitly instructed otherwise by the user. Run `lavish-axi design` for a content-to-playbook router, a copy-pasteable CDN snippet, the whiteboard (Mermaid) opt-in snippet, and the DaisyUI component reference. When you deliver the artifact, state which of the three design sources you used and why.","Use lavish-axi when the user asks for a visual artifact, HTML explainer, interactive prototype, review surface, product or technical plan, comparison, report, or browser-based feedback loop"
+[exit=0]
+$ tasks-axi add closed-card Finished build fixture
+ok: added closed-card -> Queued
+task:
+  id: closed-card
+  title: Finished build fixture
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-10-09
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start closed-card` to move it to in flight
+  - Run `tasks-axi block closed-card --by <other>` to record a dependency
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/build-home/boards/build-retire.html --no-open
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/boards/build-retire.html
+  url: "http://127.0.0.1:53341/session/92f4749a4891a83d"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/boards/build-retire.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/boards/build-retire.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/boards/build-retire.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/boards/build-retire.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/boards/build-retire.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/build-home/boards/build-retire.html
+registered: lavish-92f4749a4891a83d (lavish)
+armed: lavish-92f4749a4891a83d
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/boards/build-retire.html
+[exit=0]
+$ <worktree>/bin/fm-bearings-board.sh build <worktree>/.sweep-validation/build-home/payload.json
+board: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html
+  url: "http://127.0.0.1:53341/session/692faba0dd70f4d6"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html --reopen`."
+session: live
+served: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html
+bound: lavish-692faba0dd70f4d6
+armed: lavish-692faba0dd70f4d6
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+kept: lavish-692faba0dd70f4d6 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/build-home/.lavish/bearings-board.html - the standing Bearings board
+sweep: retired=0 kept=1
+[exit=0]
+PASS: successful real Bearings build automatically stopped its old real listener; aged standing Bearings board retained.
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/open-ended.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html"
+  url: "http://127.0.0.1:53341/session/10b19d7bd45208a1"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-10b19d7bd45208a1 -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/fm home [literal]/boards/open-ended.html
+registered: lavish-10b19d7bd45208a1 (lavish)
+[exit=0]
+$ lavish-axi end <worktree>/.sweep-validation/fm home [literal]/boards/open-ended.html
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html"
+  status: ended
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-a1b1268c4078ce25 -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/fm home [literal]/boards/open-no-session.html
+registered: lavish-a1b1268c4078ce25 (lavish)
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+kept: lavish-10b19d7bd45208a1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html - card open-card is an open captain call or cannot be checked
+kept: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - card third-choice is an open captain call or cannot be checked
+kept: lavish-42a31163843d3d49 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unresolved.html - card missing-card is an open captain call or cannot be checked
+retired: lavish-4c3d377add632554 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/build-retire.html - idle for 72 hours with no open captain call
+kept: lavish-61f4d95b83a4e273 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/fresh.html - active within the last 48 hours
+kept: lavish-6ed2b6ef8e93888a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/window-six.html - active within the last 48 hours
+kept: lavish-74a0dd5488136fc3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/worker.html - owned by a worker task
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - a captured round of the board is unacknowledged
+kept: lavish-88edec2828daec33 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/unsupported.html - the board's complete card-key set cannot be established
+kept: lavish-a1b1268c4078ce25 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-no-session.html - card open-card is an open captain call or cannot be checked
+kept: lavish-c026ad3401cc910a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/queued.html - active within the last 48 hours
+kept: lavish-d1e142d8e833c247 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/empty.html - the board's complete card-key set cannot be established
+kept: lavish-e60db1894600a55b /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/dynamic.html - the board's complete card-key set cannot be established
+retired: lavish-e93884a4a83f6df8 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/idle.html - idle for 72 hours with no open captain call
+kept: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - card open-card is an open captain call or cannot be checked
+sweep: retired=2 kept=13
+[exit=0]
+PASS: open captain calls protect idle, ended and sessionless registrations.
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/evidence-old.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html"
+  url: "http://127.0.0.1:53341/session/115323d2033922e3"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/evidence-old.html
+registered: lavish-115323d2033922e3 (lavish)
+armed: lavish-115323d2033922e3
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/store-gone.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html"
+  url: "http://127.0.0.1:53341/session/75f96879cec5f6d4"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-75f96879cec5f6d4 -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/fm home [literal]/boards/store-gone.html
+registered: lavish-75f96879cec5f6d4 (lavish)
+[exit=0]
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-115323d2033922e3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html - Lavish session evidence cannot be read unambiguously
+kept: lavish-75f96879cec5f6d4 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/store-gone.html - Lavish session evidence cannot be read unambiguously
+sweep: retired=0 kept=15
+Verified real EACCES listing inbox mode 0300.
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-115323d2033922e3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html - inbox cannot be opened: Permission denied
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - inbox cannot be opened: Permission denied
+sweep: retired=0 kept=15
+$ <worktree>/bin/fm-procevent.sh retire lavish-115323d2033922e3 --if-identity 16777232:170330871
+error: cannot retire source lavish-115323d2033922e3: inbox cannot be opened: Permission denied
+[exit=1]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/healthy-idle.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html"
+  url: "http://127.0.0.1:53341/session/b7cd5135eabaa41d"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/healthy-idle.html
+registered: lavish-b7cd5135eabaa41d (lavish)
+armed: lavish-b7cd5135eabaa41d
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html
+[exit=0]
+Verified real EACCES stat on one inbox file.
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-115323d2033922e3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/evidence-old.html - inbox entry cannot be checked: Permission denied
+retired: lavish-b7cd5135eabaa41d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/healthy-idle.html - idle for 72 hours with no open captain call
+sweep: retired=2 kept=14
+$ <worktree>/bin/fm-procevent.sh retire lavish-115323d2033922e3 --if-identity 16777232:170330871
+error: cannot retire source lavish-115323d2033922e3: inbox entry cannot be checked: Permission denied
+[exit=1]
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/board-read-error.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html"
+  url: "http://127.0.0.1:53341/session/f0ceacce4d76eb2c"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/board-read-error.html
+registered: lavish-f0ceacce4d76eb2c (lavish)
+error: listener is not running: lavish-f0ceacce4d76eb2c
+[exit=1]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/board-read-error.html
+registered: lavish-f0ceacce4d76eb2c (lavish)
+still-listening: lavish-f0ceacce4d76eb2c
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html
+note: an earlier listener is still live and serving this board; this registration takes effect only after the source is retired and armed again
+[exit=0]
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-f0ceacce4d76eb2c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/board-read-error.html - the board file cannot be opened
+sweep: retired=1 kept=14
+$ lavish-axi <worktree>/.sweep-validation/fm home [literal]/boards/binding-error.html --no-open
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html"
+  url: "http://127.0.0.1:53341/session/f7f3228d10a52499"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/binding-error.html
+registered: lavish-f7f3228d10a52499 (lavish)
+armed: lavish-f7f3228d10a52499
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh bind lavish-f7f3228d10a52499 legacy-origin
+bound: lavish-f7f3228d10a52499 -> legacy-origin
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh open-bound lavish-f7f3228d10a52499 closed-card
+[exit=1]
+Verified real EACCES looking up decision binding.
+$ <worktree>/bin/fm-captain-hold.sh open-bound lavish-f7f3228d10a52499 closed-card
+fm-captain-hold: decision binding cannot be checked: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/state/decision-bindings/lavish-f7f3228d10a52499.origin: Permission denied
+[exit=2]
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-f7f3228d10a52499 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html - card closed-card is an open captain call or cannot be checked
+sweep: retired=0 kept=15
+$ <worktree>/bin/fm-captain-hold.sh open-bound lavish-f7f3228d10a52499 closed-card
+[exit=1]
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+retired: lavish-f7f3228d10a52499 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/binding-error.html - idle for 72 hours with no open captain call
+sweep: retired=2 kept=13
+PASS: real store, inbox, board and binding uncertainty keep; locked retirement refuses; unrelated healthy and ordinary unbound listeners retire.
+$ git init -q <worktree>/.sweep-validation/beads-graph
+[exit=0]
+$ <worktree>/.sweep-validation/beads-bin/bd init --prefix fm --skip-agents --skip-hooks --non-interactive
+Thanks for using bd! Quick heads-up: bd shares anonymous usage metrics —
+   just which commands get run (plus the bd version and OS platform), never your
+   issues, paths, remotes, identity, or anything you type. Seeing how people use
+   bd is how we decide what to improve next, so it genuinely makes bd better for
+   everyone.
+      Curious what's sent?   bd metrics example
+      Prefer to opt out?     bd metrics off    (one command, no restart needed)
+
+  Repository ID: 47130feb
+  Clone ID: bcfe2290f0f674c4
+  ✓ Committed beads files to git
+
+⚠ No Dolt remote configured
+  Issues are stored in local Dolt. .beads/issues.jsonl is an export,
+  not cross-machine sync or the source of truth.
+  To enable durable sync, add a git origin and then run:
+    bd dolt push
+
+✓ bd initialized successfully!
+
+  Backend: dolt
+  Mode: embedded
+  Database: fm
+  Issue prefix: fm
+  Issues will be named: fm-<hash> (e.g., fm-a3f2dd)
+
+Run bd quickstart to get started.
+
+[exit=0]
+$ <worktree>/.sweep-validation/beads-bin/bd create --help
+Create a new issue (or batch from markdown/graph JSON)
+
+Usage:
+  bd create [title] [flags]
+
+Aliases:
+  create, new
+
+Flags:
+      --acceptance string         Acceptance criteria
+      --allow-empty-description   Allow empty description input from stdin or file
+      --append-notes string       Append to existing notes (with newline separator)
+  -a, --assignee string           Assignee
+      --body-file string          Read description from file (use - for stdin)
+      --context string            Additional context for the issue
+      --defer string              Defer until date (issue hidden from bd ready until then). Same formats as --due
+      --deps strings              Dependencies as 'type:id' or bare 'id'. Bare 'id', 'depends-on:id', and 'blocked-by:id' all make THIS issue depend on id; 'blocks:id' reverses direction (id depends on this issue). E.g. 'blocked-by:bd-20,discovered-from:bd-15'
+  -d, --description string        Issue description
+      --design string             Design notes
+      --design-file string        Read design from file (use - for stdin)
+      --dry-run                   Preview what would be created without actually creating
+      --due string                Due date/time. Formats: +6h, +1d, +2w, tomorrow, next monday, 2025-01-15
+      --ephemeral                 Create as ephemeral (short-lived, subject to TTL compaction)
+  -e, --estimate int              Time estimate in minutes (e.g., 60 for 1 hour)
+      --event-actor string        Entity URI who caused this event (requires --type=event)
+      --event-category string     Event category (e.g., patrol.muted, agent.started) (requires --type=event)
+      --event-payload string      Event-specific JSON data (requires --type=event)
+      --event-target string       Entity URI or bead ID affected (requires --type=event)
+      --external-ref string       External reference (e.g., 'gh-9', 'jira-ABC', Linear URL)
+  -f, --file string               Create one issue per ## heading (### fields attach to that issue); for title plus description-from-file, use --body-file
+      --force                     Force creation even if prefix doesn't match database prefix
+      --graph string              Create a graph of issues with dependencies from JSON plan file
+  -h, --help                      help for create
+      --id string                 Explicit issue ID (e.g., 'bd-42' for partitioning)
+  -l, --labels strings            Labels (comma-separated)
+      --metadata string           Set custom metadata (JSON string or @file.json to read from file)
+      --mol-type string           Molecule type: swarm (multi-agent), patrol (recurring ops), work (default)
+      --no-history                Skip Dolt commit history without making GC-eligible (for permanent agent beads)
+      --no-inherit-labels         Don't inherit labels from parent issue
+      --notes string              Additional notes
+      --parent string             Parent issue ID for hierarchical child (e.g., 'bd-a3f8e9')
+  -p, --priority string           Priority (0-4 or P0-P4, 0=highest) (default "2")
+      --repo string               Target repository for issue (overrides auto-routing)
+      --silent                    Output only the issue ID (for scripting)
+      --skills string             Required skills for this issue
+      --spec-id string            Link to specification document
+  -s, --status string             Initial status
+      --stdin                     Read description from stdin (alias for --body-file -)
+      --storage-class string      Storage class: versioned, unversioned, or ephemeral (default: storage-class.<type> config, else versioned)
+      --title string              Issue title (alternative to positional argument)
+  -t, --type string               Issue type (bug|feature|task|epic|chore|decision|spike|story|milestone); custom types require types.custom config; aliases: enhancement/feat→feature, dec/adr→decision (default "task")
+      --validate                  Validate description contains required sections for issue type
+      --waits-for string          Spawner issue ID to wait for (creates waits-for dependency for fanout gate)
+      --waits-for-gate string     Gate type: all-children (wait for all) or any-children (wait for first) (default "all-children")
+      --wisp-type string          Wisp type for TTL-based compaction: heartbeat, ping, patrol, gc_report, recovery, error, escalation
+
+Global Flags:
+      --actor string              Actor name for audit trail (default: $BEADS_ACTOR, git user.name, $USER)
+      --cpu-profile               Generate CPU profile for performance analysis
+      --database string           Run against a different server database for this invocation, without changing the project's configured database (proxied-server mode only)
+      --db string                 Database path (default: auto-discover .beads/*.db). In proxied-server mode, a value that isn't an existing path is treated as a database name override (see --database)
+  -C, --directory string          Change to this directory before running the command (like git -C)
+      --dolt-auto-commit string   Dolt auto-commit policy (off|on|batch). 'on': commit after each write. 'batch': defer commits to bd dolt commit; uncommitted changes persist in the working set until then (a live batch-mode bd process also flushes on SIGTERM/SIGHUP, except in proxied-server mode, where bd dolt commit is the only flush point). In proxied-server mode the deferral covers the writes the CLI makes on that route, including config and version metadata; explicit commit points (bd batch, bd mol bond/pour/squash, bd mol wisp create, and the wisp half of bd mol burn) still commit, and a bd serve process on the same database is unaffected. Default: on. Override via config key dolt.auto-commit
+      --global                    Use the global shared-server database (beads_global)
+      --ignore-schema-skew        Proceed despite forward schema drift (some queries may fail)
+      --json                      Output in JSON format
+      --mem-profile string        Write heap profile to FILE on exit (also respects BEADS_MEM_PROFILE)
+      --no-color                  Disable color output (also: NO_COLOR=1 or CLICOLOR=0)
+  -q, --quiet                     Suppress non-essential output (errors only)
+      --readonly                  Read-only mode: block write operations (for worker sandboxes)
+      --sandbox                   Sandbox mode: disables Dolt auto-push
+  -v, --verbose                   Enable verbose/debug output
+[exit=0]
+$ <worktree>/.sweep-validation/beads-bin/bd update --help
+Update one or more issues.
+
+If no issue ID is provided, updates the last touched issue (from most recent
+create, update, show, or close operation). This fallback only applies in
+interactive sessions (stdin is a terminal); in scripts and agent sessions a
+missing ID is an error, so a command built from an empty variable cannot
+silently mutate an unrelated issue. Set BD_LAST_TOUCHED_FALLBACK=1 to allow
+the fallback anywhere, or =0 to disable it entirely.
+
+Updates are applied per issue ID, not atomically across IDs: when some IDs
+fail, the remaining issues are still updated, every failed ID is reported on
+stderr, and the command exits nonzero.
+
+Exit codes: 1 for general failures; 13 when every failure is a stale
+--if-assignee/--if-status guard (the precondition no longer held, nothing was
+written — another actor won the race, so retrying the same guard is
+pointless).
+
+Usage:
+  bd update [id...] [flags]
+
+Flags:
+      --acceptance string            Acceptance criteria
+      --add-label strings            Add labels (repeatable)
+      --allow-empty-description      Allow empty description replacement when reading from stdin or file
+      --append-notes string          Append to existing notes (with newline separator)
+  -a, --assignee string              Assignee
+      --await-id string              Set gate await_id (e.g., GitHub run ID for gh:run gates)
+      --body-file string             Read description from file (use - for stdin)
+      --claim                        Atomically claim the issue (sets assignee to you, status to in_progress; idempotent if already claimed by you; issues assigned to a pool alias listed in the claim.pools config are claimable too)
+      --defer string                 Defer until date (empty to clear). Issue hidden from bd ready until then, then auto-wakes to open
+  -d, --description string           Issue description
+      --design string                Design notes
+      --design-file string           Read design from file (use - for stdin)
+      --due string                   Due date/time (empty to clear). Formats: +6h, +1d, +2w, tomorrow, next monday, 2025-01-15
+      --ephemeral                    Mark issue as ephemeral (wisp) - not exported to JSONL
+  -e, --estimate int                 Time estimate in minutes (e.g., 60 for 1 hour)
+      --external-ref string          External reference (e.g., 'gh-9', 'jira-ABC', Linear URL)
+      --force                        Override two refusals: let -a/--assignee overwrite another actor's live in_progress claim (use only for abandoned claims — crashed agent, expired lease; prefer bd reclaim), and let -s/--status move the issue into closed (or a configured done status) despite open children or a live blocker (same as bd close --force)
+  -h, --help                         help for update
+      --history                      Clear no-history flag (re-enable Dolt commit history)
+      --if-assignee string           Apply the update only if the current assignee equals this value (--if-assignee '' requires unassigned); a mismatch writes nothing and exits 13 (vs 1 for other failures). Requires a field update; cannot combine with --claim
+      --if-status string             Apply the update only if the current status equals this value; a mismatch writes nothing and exits 13 (vs 1 for other failures). Requires a field update; cannot combine with --claim
+      --metadata string              Set custom metadata (JSON string or @file.json to read from file)
+      --no-history                   Mark issue as no-history (skip Dolt commits, not GC-eligible)
+      --notes string                 Additional notes (replaces existing notes; use --append-notes to append)
+      --parent string                New parent issue ID (reparents the issue, use empty string to remove parent)
+      --persistent                   Mark issue as persistent (promote wisp to regular issue)
+  -p, --priority string              Priority (0-4 or P0-P4, 0=highest)
+      --remove-label strings         Remove labels (repeatable)
+      --session string               Claude Code session ID for status=closed (or set CLAUDE_SESSION_ID env var)
+      --set-labels strings           Set labels, replacing all existing (repeatable)
+      --set-metadata stringArray     Set metadata key=value (repeatable, e.g., --set-metadata team=platform)
+      --spec-id string               Link to specification document
+  -s, --status string                New status
+      --stdin                        Read description from stdin (alias for --body-file -)
+      --title string                 New title
+  -t, --type string                  New type (bug|feature|task|epic|chore|decision|spike|story|milestone); custom types require types.custom config; aliases: enhancement/feat→feature, dec/adr→decision
+      --unset-metadata stringArray   Remove metadata key (repeatable, e.g., --unset-metadata team)
+
+Global Flags:
+      --actor string              Actor name for audit trail (default: $BEADS_ACTOR, git user.name, $USER)
+      --cpu-profile               Generate CPU profile for performance analysis
+      --database string           Run against a different server database for this invocation, without changing the project's configured database (proxied-server mode only)
+      --db string                 Database path (default: auto-discover .beads/*.db). In proxied-server mode, a value that isn't an existing path is treated as a database name override (see --database)
+  -C, --directory string          Change to this directory before running the command (like git -C)
+      --dolt-auto-commit string   Dolt auto-commit policy (off|on|batch). 'on': commit after each write. 'batch': defer commits to bd dolt commit; uncommitted changes persist in the working set until then (a live batch-mode bd process also flushes on SIGTERM/SIGHUP, except in proxied-server mode, where bd dolt commit is the only flush point). In proxied-server mode the deferral covers the writes the CLI makes on that route, including config and version metadata; explicit commit points (bd batch, bd mol bond/pour/squash, bd mol wisp create, and the wisp half of bd mol burn) still commit, and a bd serve process on the same database is unaffected. Default: on. Override via config key dolt.auto-commit
+      --global                    Use the global shared-server database (beads_global)
+      --ignore-schema-skew        Proceed despite forward schema drift (some queries may fail)
+      --json                      Output in JSON format
+      --mem-profile string        Write heap profile to FILE on exit (also respects BEADS_MEM_PROFILE)
+      --no-color                  Disable color output (also: NO_COLOR=1 or CLICOLOR=0)
+  -q, --quiet                     Suppress non-essential output (errors only)
+      --readonly                  Read-only mode: block write operations (for worker sandboxes)
+      --sandbox                   Sandbox mode: disables Dolt auto-push
+  -v, --verbose                   Enable verbose/debug output
+[exit=0]
+$ tasks-axi list
+error: "Unsupported backend \"beads\" — P1 ships the markdown backend only"
+code: UNSUPPORTED
+help[1]: "Set `backend = \"markdown\"` in .tasks.toml, or omit --backend"
+[exit=1]
+$ <worktree>/.sweep-validation/beads-bin/bd create Closed migrated raw key --id fm-raw-closed --notes migrated from data/backlog.md id third-choice --silent
+fm-raw-closed
+[exit=0]
+$ <worktree>/.sweep-validation/beads-bin/bd close fm-raw-closed
+✓ Closed fm-raw-closed — Closed migrated raw key: Closed
+[exit=0]
+$ <worktree>/.sweep-validation/beads-bin/bd create Open migrated derived key --id fm-derived-open --notes migrated from data/backlog.md id origin-decision-third-choice --silent
+fm-derived-open
+[exit=0]
+$ tasks-axi hold fm-derived-open --kind captain --reason Do not retire my board
+error: "Unsupported backend \"beads\" — P1 ships the markdown backend only"
+code: UNSUPPORTED
+help[1]: "Set `backend = \"markdown\"` in .tasks.toml, or omit --backend"
+[exit=1]
+$ <worktree>/bin/fm-procevent.sh handled lavish-74b654497ddc617e 1
+handled: lavish-74b654497ddc617e 1
+[exit=0]
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+kept: lavish-74b654497ddc617e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html - active within the last 48 hours
+sweep: retired=0 kept=13
+$ tasks-axi add closed-card Finished without inbox
+ok: added closed-card -> Queued
+task:
+  id: closed-card
+  title: Finished without inbox
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-10-09
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start closed-card` to move it to in flight
+  - Run `tasks-axi block closed-card --by <other>` to record a dependency
+[exit=0]
+$ lavish-axi <worktree>/.sweep-validation/absent-home/boards/idle.html --no-open
+session:
+  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html
+  url: "http://127.0.0.1:53341/session/8c06e04b0e8297cd"
+  status: opened
+self_paint_warning: "This artifact never paints its own page surface: no background on html/body/:root, no bg-* class or data-theme on html/body, and no stylesheet that could set one. Lavish injects no design system, so text that assumes a dark or light host surface can render invisible. Set an explicit background and readable text."
+next_step: "First fix the unpainted page surface flagged in self_paint_warning and save - Lavish live-reloads the artifact automatically, so you do not need to re-run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html`. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \"layout-warnings\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html --agent-reply \"<message for the user>\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html --reopen`."
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-8c06e04b0e8297cd -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/absent-home/boards/idle.html
+registered: lavish-8c06e04b0e8297cd (lavish)
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+retired: lavish-8c06e04b0e8297cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/absent-home/boards/idle.html - idle for 234685 hours with no open captain call
+sweep: retired=1 kept=0
+[exit=0]
+PASS: recent handled capture is active in a literal home path; confirmed missing inbox allows old resolved board retirement.
+$ <worktree>/bin/fm-procevent.sh retire lavish-f9d10ab03e356480
+retired: lavish-f9d10ab03e356480
+[exit=0]
+$ <worktree>/bin/fm-procevent-lavish.sh arm <worktree>/.sweep-validation/fm home [literal]/boards/open.html
+registered: lavish-f9d10ab03e356480 (lavish)
+armed: lavish-f9d10ab03e356480
+artifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-f9d10ab03e356480 --if-identity 16777232:170236580
+error: source registration generation changed: lavish-f9d10ab03e356480
+[exit=1]
+PASS: stale identity retirement refused; replacement real poll remains registered and resident: {"2798": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html", "6511": "node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html", "6547": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html"}
+POST /api/74b654497ddc617e/prompts
+{"status": "queued", "pending_prompts": 1, "chat": [], "ack_ids": [], "chat_revision": 0}
+$ <worktree>/bin/fm-procevent.sh retire lavish-74b654497ddc617e --if-identity 16777232:170267275
+error: cannot retire source lavish-74b654497ddc617e while a captured round is unacknowledged
+[exit=1]
+New real capture preserved:
+session:
+  file: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html"
+  status: feedback
+prompts[1]{uid,prompt,selector,tag,text}:
+  "","","",message,Second unacknowledged capture; never lose this
+next_step: "Apply the requested changes to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html. Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/captured.html --agent-reply \"<message for the user>\"` without --timeout-ms unless the user ended the session. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. The poll waits silently until the user sends more feedback, ends the session, or leaves every review window disconnected past the reconnect grace period - never kill it. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited."
+dom_snapshot: ""
+
+$ <worktree>/bin/fm-captain-hold.sh answer open-card --decision-file <worktree>/.sweep-validation/fm home [literal]/answer.txt
+answered: open-card
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh answer legacy-origin-decision-third-choice --decision-file <worktree>/.sweep-validation/fm home [literal]/answer.txt
+answered: legacy-origin-decision-third-choice
+[exit=0]
+$ bin/fm-procevent-lavish.sh sweep (relevant rows)
+retired: lavish-10b19d7bd45208a1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-ended.html - the Lavish session has ended
+retired: lavish-252ede3f6d62a0a0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/legacy.html - idle for 72 hours with no open captain call
+retired: lavish-a1b1268c4078ce25 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open-no-session.html - Lavish holds no session for the board
+retired: lavish-f9d10ab03e356480 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/fm home [literal]/boards/open.html - idle for 72 hours with no open captain call
+sweep: retired=4 kept=9
+PASS: exact and legacy cards keep while held, then allow retirement after recorded answers.
+UNTESTED migration resolution: bd was missing on PATH, so downloaded and SHA256-verified bd 1.3.1 into the worktree, initialized a real embedded-Dolt graph, and created raw/derived migration-note rows. Installed tasks-axi 0.2.6 rejects backend beads for list and hold (UNSUPPORTED). npm registry and upstream main both report 0.2.6; a Beads-capable real tasks-axi build is required for full live migrated-key routing. Markdown bound-key and binding EACCES paths were driven live instead.
+$ <worktree>/bin/fm-procevent.sh retire lavish-74a0dd5488136fc3
+retired: lavish-74a0dd5488136fc3
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-6ed2b6ef8e93888a
+retired: lavish-6ed2b6ef8e93888a
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-42a31163843d3d49
+retired: lavish-42a31163843d3d49
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-61f4d95b83a4e273
+retired: lavish-61f4d95b83a4e273
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-88edec2828daec33
+retired: lavish-88edec2828daec33
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-e60db1894600a55b
+retired: lavish-e60db1894600a55b
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-c026ad3401cc910a
+retired: lavish-c026ad3401cc910a
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-74b654497ddc617e
+retired: lavish-74b654497ddc617e
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-d1e142d8e833c247
+retired: lavish-d1e142d8e833c247
+[exit=0]
+$ <worktree>/bin/fm-procevent.sh retire lavish-692faba0dd70f4d6
+retired: lavish-692faba0dd70f4d6
+[exit=0]
+$ lavish-axi stop --port 53341
+server:
+  status: stopped
+  port: 53341
+[exit=0]
+$ tmux -S .sweep-validation/s kill-server
+[exit=0]
+Live-lab teardown complete: no registrations or resident polls in owned lab homes; isolated Lavish server and private tmux socket stopped. Targeted test fixture cleanup remains until its command completes.
+$ <worktree>/bin/fm-procevent.sh register lavish lavish-ff37d5d5d6e1846e -- <worktree>/bin/fm-procevent-lavish.sh poll <worktree>/.sweep-validation/migration-home/boards/migrated.html
+registered: lavish-ff37d5d5d6e1846e (lavish)
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh bind lavish-ff37d5d5d6e1846e origin
+bound: lavish-ff37d5d5d6e1846e -> origin
+[exit=0]
+$ <worktree>/bin/fm-captain-hold.sh open-bound lavish-ff37d5d5d6e1846e third-choice
+fm-captain-hold: error: "Unsupported backend \"beads\" — P1 ships the markdown backend only"
+[exit=2]
+$ <worktree>/bin/fm-procevent-lavish.sh sweep
+kept: lavish-ff37d5d5d6e1846e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4G9E6HVJ3S8MS9V1BGPX94E/.sweep-validation/migration-home/boards/migrated.html - card third-choice is an open captain call or cannot be checked
+sweep: retired=0 kept=1
+[exit=0]
+PASS: unsupported real Beads consumer is uncertainty and keeps its listener; successful migrated-key resolution remains untested live.
+$ <worktree>/bin/fm-procevent.sh retire lavish-ff37d5d5d6e1846e
+retired: lavish-ff37d5d5d6e1846e
+[exit=0]
+Final cleanup: downloaded Beads runtime/archive, private graph, test fixtures, temporary homes and socket all removed from the worktree. Source and test files were not changed.

@@ -1,0 +1,15 @@
+Initial focused command (600-second command bound):
+`bash tests/fm-captain-hold-lifecycle.test.sh test_sweep_retires_only_finished_board_listeners test_sweep_keeps_recently_handled_boards_in_literal_home_paths test_sweep_keeps_unknown_inbox_evidence test_sweep_keeps_unknown_card_discovery test_sweep_resolves_bound_captain_keys test_sweep_resolves_migrated_captain_keys test_sweep_stops_a_live_listener_of_a_finished_board test_sweep_preserves_rearmed_registration_generations`
+ok - the sweep retires finished boards and keeps every board that could still carry an answer
+ok - recent acknowledgements keep only their own listeners in literal home paths
+ok - unknown inbox evidence keeps listeners at sweep and locked retirement boundaries
+ok - unknown and dynamic card discovery keeps ended, sessionless and idle listeners
+Command timed out after 600 seconds. Remaining selectors were submitted separately with a longer command bound; the complete repository suite was not run.
+
+Remaining focused command (1800-second command bound):
+`bash tests/fm-captain-hold-lifecycle.test.sh test_sweep_resolves_bound_captain_keys test_sweep_resolves_migrated_captain_keys test_sweep_stops_a_live_listener_of_a_finished_board test_sweep_preserves_rearmed_registration_generations`
+ok - bound sweep keys share exact and legacy answer precedence without cross-source cache leakage
+ok - sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities
+ok - the sweep stops the resident poll of a finished board's live listener
+ok - stale sweeps preserve replacement generations and newly captured rounds
+Completed successfully in 545.38 seconds.
