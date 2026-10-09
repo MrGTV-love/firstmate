@@ -147,7 +147,7 @@ The family's clock is two long scripts that do not contend: `fm-pr-check-securit
 Admitting them inside their own family is a different question and this proof answers it: the six members present on that date are safe with each other at four workers.
 
 `tests/fm-pr-state.test.sh` and `tests/fm-pr-reviewers.test.sh` joined this family after the date above, so that result does not cover them.
-`script_allows_concurrency` in `bin/fm-test-run.sh` grants concurrency by family membership alone, so the family was re-proved at its full eight-member membership.
+`script_allows_concurrency` in `bin/fm-test-run.sh` grants concurrency by family membership alone, so the family was re-proved at its then-current eight-member membership.
 
 - Date: 2026-09-12
 - Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4`
@@ -164,6 +164,9 @@ That its duration landed within 3% of the two clean runs is evidence the elevate
 
 These durations are not comparable with the six-member run above: that measurement was taken on a different machine state, and the gap is far larger than two short scripts can account for, so it is not evidence about the two new members.
 For the same reason the 1.72x four-worker figure recorded above is left as a statement about that measurement rather than restated as current.
+
+The recorded family proofs predate `tests/fm-gh-rest.test.sh` and the shared REST-reader changes; they do not establish concurrent isolation for those changes.
+Refresh this evidence with the family proof command above before treating the current admission as verified.
 
 ### secondmate: admitted
 

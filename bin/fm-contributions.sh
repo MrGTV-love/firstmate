@@ -64,9 +64,9 @@
 # attempted at most once per poll and its observation applied to every owner.
 # A final observation applies
 # to every owner without another forge read. When the budget refuses a read
-# mid-observation, that URL's records stay untouched and the poll moves to the
-# next URL that still has a full observation reserve; only a genuine forge
-# failure or head change records an error.
+# mid-observation, that URL's records stay untouched unless quota protection applies, and the poll moves
+# to the next URL that still has a full observation reserve; a genuine forge failure or head change
+# records an error. docs/configuration.md "GitHub REST reads and the quota floor" owns quota degradation.
 # API failure leaves error evidence; an expired or absent observation is not
 # silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # A URL whose last good observation is merged or closed is final: it is
@@ -74,15 +74,8 @@
 # observation, with a stale error beside it cleared.
 # A genuine failure prints its unavailable line only when it starts an episode
 # (no prior owner has an error); a successful read ends the episode.
-# Every REST GET goes through fm-gh-rest.sh, which sends If-None-Match from a
-# per-URL ETag cache under state/ and serves the cached body on a 304 (a 304
-# is not counted against GitHub's rate limit); an absent or corrupt cache entry
-# is a normal GET. The same helper records X-RateLimit-* from each response.
-# When the recorded core quota is below the floor (FM_GH_RATE_FLOOR_PERCENT,
-# default 15) and its window is open, the helper refuses the first read of a
-# URL before any network call: poll keeps that row's last observation, marks
-# it stale with the window's reset time as the row's reason, and prints that
-# once per episode. The next successful read clears the mark.
+# REST reads use fm-gh-rest.sh; its header owns the helper interface and
+# docs/configuration.md "GitHub REST reads and the quota floor" owns the shared read behavior.
 # FM_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
 # FM_CONTRIBUTIONS_READY_LABEL selects the equivalent triage label, default
 # ready-for-pr. Labels are matched case-insensitively and exactly.
@@ -244,7 +237,7 @@ forge() {
         gh "$@" 2> "$forge_err" || rc=$?
     fi
   fi
-  if [ "$rc" -eq 75 ]; then # the quota floor refused the read; no forge call was made
+  if [ "$rc" -eq 75 ]; then # quota refusal can follow completed pages; no partial response is consumed
     head -1 "$forge_err" > "$TMP/quota-low"
     return "$rc"
   fi

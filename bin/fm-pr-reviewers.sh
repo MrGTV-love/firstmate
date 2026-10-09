@@ -7,9 +7,8 @@
 # use GitHub's own commit author.login mapping; names and email addresses are
 # never converted or guessed. The pull-request author and Bot accounts are
 # excluded. One API read is issued per changed path, so a wide pull request
-# costs proportionally more reads and time. Every read is a conditional REST GET
-# through fm-gh-rest.sh, so a repeated run over unchanged data is answered from
-# the per-URL ETag cache under state/ without counting against the rate limit.
+# costs proportionally more reads and time. Shared REST-read behavior is owned by
+# docs/configuration.md "GitHub REST reads and the quota floor".
 #
 # Usage: fm-pr-reviewers.sh <pr-url>
 #   Prints candidates in descending unique-commit count as:

@@ -18,10 +18,8 @@
 # A closed or merged pull request reports that terminal state and nothing else.
 # Unresolved review-thread state is out of this command's scope.
 #
-# The one REST read (the review list) is a conditional GET through
-# fm-gh-rest.sh: unchanged data is answered from its per-URL ETag cache under
-# state/ without counting against the rate limit. The pr view and pr checks
-# reads are GraphQL and stay unconditional.
+# The review-list read uses fm-gh-rest.sh; shared read behavior is owned by
+# docs/configuration.md "GitHub REST reads and the quota floor".
 #
 # Usage: fm-pr-state.sh <pr-url>
 #   Prints one line per blocker it can see and nothing when it sees none.
