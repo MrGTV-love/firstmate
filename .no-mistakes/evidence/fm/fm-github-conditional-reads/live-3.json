@@ -1,0 +1,298 @@
+{
+  "name": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+  "result": "pass",
+  "live": true,
+  "reason": "",
+  "details": {
+    "http_error": "gh: isolated service failure (HTTP 502)\n",
+    "quota_refusal": "GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n",
+    "recovered_quota": {
+      "resource": "core",
+      "limit": 5000,
+      "remaining": 4000,
+      "reset": 1791557266,
+      "observed": 1791550089
+    }
+  },
+  "commands": [
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/error"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "gh: isolated service failure (HTTP 502)\n"
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "guard"
+      ],
+      "exit": 75,
+      "stdout": "GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--floor"
+      ],
+      "exit": 75,
+      "stdout": "",
+      "stderr": "GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n"
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "guard"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "guard"
+      ],
+      "exit": 75,
+      "stdout": "GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":1}],[{\"id\":2}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--floor",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 75,
+      "stdout": "",
+      "stderr": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:47:46Z\n"
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":1}],[{\"id\":2}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--floor",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 75,
+      "stdout": "",
+      "stderr": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:47:46Z\n"
+    },
+    {
+      "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--floor"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":1}]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/error",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 600,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 502,
+      "etag": null,
+      "link": null,
+      "response_body": {
+        "message": "isolated service failure"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791557266,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"01aa8ec06990002e\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"65bf30e84fe08f8a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791557266,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"01aa8ec06990002e\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791557266,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"01aa8ec06990002e\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"65bf30e84fe08f8a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"01aa8ec06990002e\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791557266,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"01aa8ec06990002e\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"01aa8ec06990002e\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791557266,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"01aa8ec06990002e\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 1
+        }
+      ]
+    }
+  ]
+}

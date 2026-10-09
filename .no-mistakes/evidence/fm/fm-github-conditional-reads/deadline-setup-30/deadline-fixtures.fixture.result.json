@@ -1,0 +1,19 @@
+{
+  "kind": "supplemental fixture only; not live",
+  "command": [
+    "python3",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/deadline-fixtures.py",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world",
+    "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/deadline-setup-30"
+  ],
+  "returncode": 0,
+  "seconds": 13.221,
+  "environment": {
+    "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/empty-home",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/tmp",
+    "LANG": "en_US.UTF-8"
+  },
+  "adjustment": "Fresh world; throwaway-only command_timeout_seconds=30; explicitly remove all five FM path overrides before invocation; original assertions unchanged; pr-checks only"
+}

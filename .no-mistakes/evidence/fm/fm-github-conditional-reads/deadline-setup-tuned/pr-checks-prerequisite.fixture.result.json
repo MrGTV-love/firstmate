@@ -1,0 +1,23 @@
+{
+  "command": [
+    "bash",
+    "-x",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/fm-gh-rest.sh",
+    "get",
+    "/repos/test/project/pulls?state=open&per_page=100",
+    "--floor",
+    "--paginate",
+    "--slurp"
+  ],
+  "returncode": 0,
+  "seconds": 0.584,
+  "environment": {
+    "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/fakebin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/empty-home",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp",
+    "LANG": "en_US.UTF-8",
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home",
+    "DEADLINE_READER": "pr-checks"
+  },
+  "kind": "fixture prerequisite diagnostic, not live"
+}

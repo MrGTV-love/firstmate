@@ -1,0 +1,14 @@
+ok - a 304 serves the cached body without a new counted call
+ok - changed data is fetched once and the refreshed entry is reused
+ok - a missing, corrupt, or unparsable cache falls back to a normal GET
+ok - pagination follows Link and every page rides the cache
+ok - 304 pagination metadata adds and removes pages, and survives omitted headers
+ok - a concurrent 304 serves its ETag generation without rewriting the replacement body or links
+ok - query fields are URL-encoded and keyed separately
+ok - a failed read exits nonzero, names the error, and caches nothing
+ok - the floor comes from response headers, is overridable, and ends at the reset
+ok - concurrent responses retain the lowest remaining quota
+ok - older windows cannot replace newer quota, and new windows replenish it
+ok - a 304 response still updates the recorded quota
+ok - get --floor refuses below the floor before any network call, and a plain get still reads
+ok - fresh and cached pages stop pagination at the quota floor without partial output

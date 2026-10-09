@@ -1,0 +1,458 @@
+{
+  "name": "Read unchanged and changed paginated resources with safe cache fallback",
+  "result": "pass",
+  "live": true,
+  "reason": "",
+  "details": {
+    "cold_and_warm": [
+      [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    ],
+    "expanded": [
+      [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ],
+      [
+        {
+          "id": 3
+        }
+      ]
+    ],
+    "final_cache": {
+      "etag": "\"79a8870b371b7f4d\"",
+      "body": "[{\"id\": 9}]\n",
+      "next": null
+    },
+    "encoded_query": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100"
+  },
+  "commands": [
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":1},{\"id\":2}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":1},{\"id\":2}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":1},{\"id\":2}],[{\"id\":3}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":1},{\"id\":2}],[{\"id\":3}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":1},{\"id\":2}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":9}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":9}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":9}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":9}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":9}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/commits",
+        "-f",
+        "sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "-f",
+        "path=dir/a b.ts",
+        "-f",
+        "per_page=100"
+      ],
+      "exit": 0,
+      "stdout": "[{\"sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"author\":{\"login\":\"carol\"}}]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"de6a5226a697486b\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": "\"de6a5226a697486b\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"de6a5226a697486b\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"ebbba0e3c8e1580a\"",
+      "link": "<https://api.github.com/repos/o/r/items?page=1>; rel=\"prev\"",
+      "response_body": [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"ebbba0e3c8e1580a\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"79a8870b371b7f4d\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"79a8870b371b7f4d\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"79a8870b371b7f4d\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"79a8870b371b7f4d\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"79a8870b371b7f4d\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"79a8870b371b7f4d\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"12a1e492b4bfd4bf\"",
+      "link": null,
+      "response_body": [
+        {
+          "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "author": {
+            "login": "carol"
+          }
+        }
+      ]
+    }
+  ]
+}

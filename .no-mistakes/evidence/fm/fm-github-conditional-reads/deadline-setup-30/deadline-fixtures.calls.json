@@ -1,0 +1,24 @@
+[
+  {
+    "reader": "pr-checks",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world/deadline-pr-checks/code/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550301, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world/deadline-pr-checks/home\", \"complete\": false, \"rows\": [{\"id\": \"a88889019e0167917e29b354\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"reconciler: collection exceeded its deadline; PR test/project#0: source command failure\"}]}\n",
+    "stderr": "",
+    "seconds": 11.246,
+    "environment": {
+      "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world/deadline-pr-checks/fakebin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world/empty-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world/tmp",
+      "LANG": "en_US.UTF-8",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world/deadline-pr-checks/home",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "DEADLINE_READER": "pr-checks"
+    }
+  }
+]

@@ -1,0 +1,48 @@
+{
+  "classification": "Supplemental fixtures only, not live",
+  "shell_statuses": {
+    "fm-gh-rest": 0,
+    "fm-pr-reviewers": 0
+  },
+  "proven_deadline_readers": {
+    "origins": "original timeout1 setup",
+    "pr-state": "authorized timeout5 setup",
+    "questions": "authorized timeout5 setup with cat injected only here",
+    "pr-checks": "authorized fresh timeout30 setup, two identical expected check-runs requests and matching second-request SIGALRM trigger; exact assertions passed"
+  },
+  "latest_pr_checks_result": {
+    "kind": "supplemental fixture only; not live",
+    "command": [
+      "python3",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/deadline-fixtures.py",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/world",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/deadline-setup-30"
+    ],
+    "returncode": 0,
+    "seconds": 13.221,
+    "environment": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/empty-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8/tmp",
+      "LANG": "en_US.UTF-8"
+    },
+    "adjustment": "Fresh world; throwaway-only command_timeout_seconds=30; explicitly remove all five FM path overrides before invocation; original assertions unchanged; pr-checks only"
+  },
+  "earlier_setup_failures": "Preserved unchanged at root and deadline-setup-tuned; latest result supersedes earlier incomplete proof, not evidence deletion",
+  "cause": "Earlier setups expired before named check-runs reader: original natural10s collection deadline and tuned5s prerequisite timeout. Fresh30s setup reaches named reader and passes in13.221s. All runner envs were clean dictionaries, so FM path overrides were already absent; latest runner also explicitly removes them before invocation. Precise source of prerequisite latency not established.",
+  "evidence": {
+    "origins": "deadline-origins.fixture.evidence.json",
+    "pr-state": "deadline-setup-tuned/deadline-pr-state.fixture.evidence.json",
+    "questions": "deadline-setup-tuned/deadline-questions.fixture.evidence.json",
+    "pr-checks": "deadline-setup-30/deadline-pr-checks.fixture.evidence.json",
+    "latest_commands_statuses_env_timing": "deadline-setup-30/deadline-fixtures.fixture.result.json",
+    "latest_case_env": "deadline-setup-30/deadline-fixtures.calls.json"
+  },
+  "cleanup": {
+    "removed": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-final-dp37dpk8",
+    "completed": true,
+    "preexisting_live_lavish_validation": "untouched"
+  },
+  "tracked_files_modified": false
+}

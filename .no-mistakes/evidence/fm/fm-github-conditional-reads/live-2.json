@@ -1,0 +1,434 @@
+{
+  "name": "Concurrent 304 serves its validated generation without rewriting another generation",
+  "result": "pass",
+  "live": true,
+  "reason": "",
+  "details": [
+    {
+      "links": "supplied",
+      "validated_response": [
+        [
+          {
+            "id": 3
+          }
+        ],
+        [
+          {
+            "id": 4
+          }
+        ]
+      ],
+      "replacement_cache": {
+        "etag": "\"65bf30e84fe08f8a\"",
+        "body": "[{\"id\": 2}]\n",
+        "next": null
+      }
+    },
+    {
+      "links": "omitted",
+      "validated_response": [
+        [
+          {
+            "id": 3
+          }
+        ],
+        [
+          {
+            "id": 4
+          }
+        ]
+      ],
+      "replacement_cache": {
+        "etag": "\"65bf30e84fe08f8a\"",
+        "body": "[{\"id\": 2}]\n",
+        "next": null
+      }
+    }
+  ],
+  "commands": [
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":1}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":3}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":2}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":3}],[{\"id\":4}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":2}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":1}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":3}],[{\"id\":4}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2"
+      ],
+      "exit": 0,
+      "stdout": "[{\"id\":2}]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":3}],[{\"id\":4}]]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/items?per_page=2",
+        "--paginate",
+        "--slurp"
+      ],
+      "exit": 0,
+      "stdout": "[[{\"id\":2}]]\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"01aa8ec06990002e\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"01aa8ec06990002e\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"65bf30e84fe08f8a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"01aa8ec06990002e\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"de6a5226a697486b\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"de6a5226a697486b\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"de6a5226a697486b\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"428dbb9459a2c2b5\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"65bf30e84fe08f8a\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"65bf30e84fe08f8a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"01aa8ec06990002e\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"01aa8ec06990002e\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"65bf30e84fe08f8a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"01aa8ec06990002e\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"de6a5226a697486b\"",
+      "link": "<https://api.github.com/repos/o/r/items?per_page=2&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"428dbb9459a2c2b5\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"de6a5226a697486b\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"de6a5226a697486b\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2&page=2",
+      "conditional": "\"428dbb9459a2c2b5\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"428dbb9459a2c2b5\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/items?per_page=2",
+      "conditional": "\"65bf30e84fe08f8a\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"65bf30e84fe08f8a\"",
+      "link": null,
+      "response_body": [
+        {
+          "id": 2
+        }
+      ]
+    }
+  ]
+}

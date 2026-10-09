@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-fixtures.py", line 30, in <module>
+    exec(compile(block, str(root / 'tests/fm-open-loops.test.sh') + ':1115-1189', 'exec'))
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/tests/fm-open-loops.test.sh:1115-1189", line 72, in <module>
+AssertionError: ('pr-checks', [])

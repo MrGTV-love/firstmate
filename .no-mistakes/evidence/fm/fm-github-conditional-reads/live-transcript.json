@@ -1,0 +1,872 @@
+[
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":1},{\"id\":2}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":1},{\"id\":2}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":1},{\"id\":2}],[{\"id\":3}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":1},{\"id\":2}],[{\"id\":3}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":1},{\"id\":2}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":9}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":9}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":9}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":9}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":9}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Read unchanged and changed paginated resources with safe cache fallback",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/commits",
+      "-f",
+      "sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "-f",
+      "path=dir/a b.ts",
+      "-f",
+      "per_page=100"
+    ],
+    "exit": 0,
+    "stdout": "[{\"sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"author\":{\"login\":\"carol\"}}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":1}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":3}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":2}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":3}],[{\"id\":4}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":2}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":1}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":3}],[{\"id\":4}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":2}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":3}],[{\"id\":4}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent 304 serves its validated generation without rewriting another generation",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":2}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/error"
+    ],
+    "exit": 1,
+    "stdout": "",
+    "stderr": "gh: isolated service failure (HTTP 502)\n"
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "guard"
+    ],
+    "exit": 75,
+    "stdout": "GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--floor"
+    ],
+    "exit": 75,
+    "stdout": "",
+    "stderr": "GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n"
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "guard"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "guard"
+    ],
+    "exit": 75,
+    "stdout": "GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":1}],[{\"id\":2}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--floor",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 75,
+    "stdout": "",
+    "stderr": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:47:46Z\n"
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 0,
+    "stdout": "[[{\"id\":1}],[{\"id\":2}]]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--floor",
+      "--paginate",
+      "--slurp"
+    ],
+    "exit": 75,
+    "stdout": "",
+    "stderr": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:47:46Z\n"
+  },
+  {
+    "scenario": "HTTP failure and fresh or cached pagination refuse safely below the quota floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/items?per_page=2",
+      "--floor"
+    ],
+    "exit": 0,
+    "stdout": "[{\"id\":1}]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/quota-seed"
+    ],
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/quota-low"
+    ],
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/quota-high"
+    ],
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/old-window"
+    ],
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "guard"
+    ],
+    "exit": 75,
+    "stdout": "GitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r/new-window"
+    ],
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "guard"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "Poll unchanged PRs conditionally and discover a new maintainer signal on an appended page",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "Poll unchanged PRs conditionally and discover a new maintainer signal on an appended page",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "Poll unchanged PRs conditionally and discover a new maintainer signal on an appended page",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "contribution-wake: check: contributions delivery 81d47dbd8d0ea5c0f95bf28be43c302f585568a08cccefb238a4ea8d7153353a\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Poll unchanged PRs conditionally and discover a new maintainer signal on an appended page",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh",
+      "--contribution-input"
+    ],
+    "exit": 0,
+    "stdout": "{\n  \"backlog\": {\n    \"present\": true,\n    \"records\": [\n      {\n        \"captain_drop\": false,\n        \"completion\": {\n          \"date\": null,\n          \"verb\": null\n        },\n        \"hold_set\": null,\n        \"body_excerpt\": null,\n        \"merged\": null,\n        \"title\": \"Lab contribution\",\n        \"local_note\": null,\n        \"priority\": null,\n        \"structured\": true,\n        \"reported\": null,\n        \"kind\": \"ship\",\n        \"captain_actionable\": false,\n        \"requires_child_metadata\": false,\n        \"state\": \"queued\",\n        \"unresolved_blocker_ids\": [],\n        \"hold_age_days\": null,\n        \"since\": null,\n        \"order\": 1,\n        \"done\": null,\n        \"body_lines\": [],\n        \"repo\": \"sample\",\n        \"blocked_reason\": null,\n        \"current_role\": \"queued\",\n        \"report_path\": null,\n        \"checked\": false,\n        \"pr_url\": \"https://github.com/o/r/pull/8\",\n        \"hold_until\": null,\n        \"id\": \"delivery\",\n        \"hold_kind\": null,\n        \"raw\": \"- [ ] delivery - Lab contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\",\n        \"blocked_by\": null,\n        \"links\": [\n          \"https://github.com/o/r/pull/8\"\n        ],\n        \"hold_reason\": null,\n        \"hold_bucket\": null,\n        \"blocked_by_ids\": []\n      }\n    ],\n    \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-repeat/data/backlog.md\"\n  },\n  \"tasks\": []\n}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Poll unchanged PRs conditionally and discover a new maintainer signal on an appended page",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "snapshot",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-repeat/input.json",
+      "--all"
+    ],
+    "exit": 0,
+    "stdout": "{\n  \"known\": 1,\n  \"checked\": 1,\n  \"counts\": {\n    \"captain\": 0,\n    \"fleet\": 1,\n    \"maintainer\": 0,\n    \"nobody\": 0\n  },\n  \"unmeasured\": 0,\n  \"complete\": true,\n  \"proven_clear\": true,\n  \"stale_verdicts\": 0,\n  \"missing_verdicts\": 0,\n  \"unreadable_records\": 0,\n  \"valid_until\": 1791551087,\n  \"captain\": [],\n  \"captain_omitted\": 0,\n  \"rows\": [\n    {\n      \"task\": \"delivery\",\n      \"url\": \"https://github.com/o/r/pull/8\",\n      \"kind\": \"pr\",\n      \"checked_at\": \"2026-10-09T12:49:47Z\",\n      \"checked\": true,\n      \"final\": false,\n      \"head\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 1,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [\n        {\n          \"token\": \"comment:12:2026-10-09T12:49:39Z:\",\n          \"type\": \"comment\",\n          \"source\": \"https://github.com/o/r/pull/8#issuecomment-12\",\n          \"head\": null,\n          \"author\": \"maintainer\",\n          \"body\": \"Please clarify the contract\"\n        }\n      ],\n      \"actor\": \"fleet\",\n      \"reason\": \"incoming maintainer signal needs triage\",\n      \"tasks\": [\n        \"delivery\"\n      ]\n    }\n  ]\n}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r"
+    ],
+    "exit": 0,
+    "stdout": "{\"permissions\":{\"push\":false}}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:49:39Z; last observations kept, marked stale\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r"
+    ],
+    "exit": 0,
+    "stdout": "{\"permissions\":{\"push\":false}}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh",
+      "--contribution-input"
+    ],
+    "exit": 0,
+    "stdout": "{\n  \"backlog\": {\n    \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-quota/data/backlog.md\",\n    \"present\": true,\n    \"records\": [\n      {\n        \"local_note\": null,\n        \"hold_bucket\": null,\n        \"id\": \"delivery\",\n        \"repo\": \"sample\",\n        \"done\": null,\n        \"blocked_reason\": null,\n        \"captain_drop\": false,\n        \"completion\": {\n          \"verb\": null,\n          \"date\": null\n        },\n        \"priority\": null,\n        \"order\": 1,\n        \"unresolved_blocker_ids\": [],\n        \"pr_url\": \"https://github.com/o/r/pull/8\",\n        \"hold_until\": null,\n        \"checked\": false,\n        \"body_excerpt\": null,\n        \"current_role\": \"queued\",\n        \"raw\": \"- [ ] delivery - Lab contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\",\n        \"hold_kind\": null,\n        \"state\": \"queued\",\n        \"requires_child_metadata\": false,\n        \"hold_age_days\": null,\n        \"since\": null,\n        \"links\": [\n          \"https://github.com/o/r/pull/8\"\n        ],\n        \"blocked_by_ids\": [],\n        \"kind\": \"ship\",\n        \"reported\": null,\n        \"hold_reason\": null,\n        \"structured\": true,\n        \"body_lines\": [],\n        \"report_path\": null,\n        \"merged\": null,\n        \"title\": \"Lab contribution\",\n        \"blocked_by\": null,\n        \"captain_actionable\": false,\n        \"hold_set\": null\n      },\n      {\n        \"kind\": \"ship\",\n        \"links\": [\n          \"https://github.com/o/r/pull/8\"\n        ],\n        \"blocked_by_ids\": [],\n        \"state\": \"queued\",\n        \"requires_child_metadata\": false,\n        \"since\": null,\n        \"hold_age_days\": null,\n        \"hold_kind\": null,\n        \"blocked_by\": null,\n        \"captain_actionable\": false,\n        \"hold_set\": null,\n        \"merged\": null,\n        \"title\": \"Lab contribution\",\n        \"structured\": true,\n        \"body_lines\": [],\n        \"report_path\": null,\n        \"reported\": null,\n        \"hold_reason\": null,\n        \"completion\": {\n          \"date\": null,\n          \"verb\": null\n        },\n        \"order\": 2,\n        \"priority\": null,\n        \"captain_drop\": false,\n        \"done\": null,\n        \"blocked_reason\": null,\n        \"hold_bucket\": null,\n        \"local_note\": null,\n        \"id\": \"aaa\",\n        \"repo\": \"sample\",\n        \"raw\": \"- [ ] aaa - Lab contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\",\n        \"checked\": false,\n        \"body_excerpt\": null,\n        \"current_role\": \"queued\",\n        \"hold_until\": null,\n        \"pr_url\": \"https://github.com/o/r/pull/8\",\n        \"unresolved_blocker_ids\": []\n      },\n      {\n        \"hold_kind\": null,\n        \"state\": \"queued\",\n        \"since\": null,\n        \"hold_age_days\": null,\n        \"requires_child_metadata\": false,\n        \"blocked_by_ids\": [],\n        \"links\": [\n          \"https://github.com/o/r/pull/9\"\n        ],\n        \"kind\": \"ship\",\n        \"reported\": null,\n        \"hold_reason\": null,\n        \"structured\": true,\n        \"report_path\": null,\n        \"body_lines\": [],\n        \"title\": \"Lab contribution\",\n        \"merged\": null,\n        \"captain_actionable\": false,\n        \"blocked_by\": null,\n        \"hold_set\": null,\n        \"local_note\": null,\n        \"hold_bucket\": null,\n        \"repo\": \"sample\",\n        \"id\": \"tail\",\n        \"blocked_reason\": null,\n        \"done\": null,\n        \"captain_drop\": false,\n        \"order\": 3,\n        \"priority\": null,\n        \"completion\": {\n          \"verb\": null,\n          \"date\": null\n        },\n        \"unresolved_blocker_ids\": [],\n        \"pr_url\": \"https://github.com/o/r/pull/9\",\n        \"hold_until\": null,\n        \"checked\": false,\n        \"current_role\": \"queued\",\n        \"body_excerpt\": null,\n        \"raw\": \"- [ ] tail - Lab contribution https://github.com/o/r/pull/9 (repo: sample) (kind: ship)\"\n      }\n    ]\n  },\n  \"tasks\": []\n}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "snapshot",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-quota/input.json",
+      "--all"
+    ],
+    "exit": 0,
+    "stdout": "{\n  \"known\": 2,\n  \"checked\": 0,\n  \"counts\": {\n    \"captain\": 0,\n    \"fleet\": 2,\n    \"maintainer\": 0,\n    \"nobody\": 0\n  },\n  \"unmeasured\": 0,\n  \"complete\": false,\n  \"proven_clear\": false,\n  \"stale_verdicts\": 0,\n  \"missing_verdicts\": 0,\n  \"unreadable_records\": 0,\n  \"valid_until\": 900,\n  \"captain\": [],\n  \"captain_omitted\": 0,\n  \"rows\": [\n    {\n      \"task\": \"aaa\",\n      \"url\": \"https://github.com/o/r/pull/8\",\n      \"kind\": \"pr\",\n      \"checked_at\": null,\n      \"checked\": false,\n      \"final\": false,\n      \"head\": null,\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 0,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [],\n      \"actor\": \"fleet\",\n      \"reason\": \"GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:49:39Z\",\n      \"tasks\": [\n        \"aaa\",\n        \"delivery\"\n      ]\n    },\n    {\n      \"task\": \"tail\",\n      \"url\": \"https://github.com/o/r/pull/9\",\n      \"kind\": \"pr\",\n      \"checked_at\": null,\n      \"checked\": false,\n      \"final\": false,\n      \"head\": null,\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 0,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [],\n      \"actor\": \"fleet\",\n      \"reason\": \"GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:49:39Z\",\n      \"tasks\": [\n        \"tail\"\n      ]\n    }\n  ]\n}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r"
+    ],
+    "exit": 0,
+    "stdout": "{\"permissions\":{\"push\":false}}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "contributions: GitHub core quota low (300 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:49:39Z; last observations kept, marked stale\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "A successful low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "A successful low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:49:39Z; last observations kept, marked stale\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "A completed low-quota issue remains measured while budget-skipped tail owners become stale",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "A successful low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "A completed low-quota issue remains measured while budget-skipped tail owners become stale",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "A completed low-quota issue remains measured while budget-skipped tail owners become stale",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:51:36Z; last observations kept, marked stale\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "A completed low-quota issue remains measured while budget-skipped tail owners become stale",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-fleet-snapshot.sh",
+      "--contribution-input"
+    ],
+    "exit": 0,
+    "stdout": "{\n  \"backlog\": {\n    \"path\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-wave-corrected-issue/data/backlog.md\",\n    \"records\": [\n      {\n        \"structured\": true,\n        \"body_excerpt\": null,\n        \"requires_child_metadata\": false,\n        \"links\": [\n          \"https://github.com/o/r/issues/9\"\n        ],\n        \"blocked_reason\": null,\n        \"raw\": \"- [ ] filed - Lab contribution https://github.com/o/r/issues/9 (repo: sample) (kind: ship)\",\n        \"merged\": null,\n        \"hold_bucket\": null,\n        \"priority\": null,\n        \"state\": \"queued\",\n        \"hold_age_days\": null,\n        \"completion\": {\n          \"verb\": null,\n          \"date\": null\n        },\n        \"checked\": false,\n        \"pr_url\": null,\n        \"title\": \"Lab contribution\",\n        \"id\": \"filed\",\n        \"hold_kind\": null,\n        \"hold_set\": null,\n        \"report_path\": null,\n        \"done\": null,\n        \"hold_until\": null,\n        \"reported\": null,\n        \"since\": null,\n        \"local_note\": null,\n        \"kind\": \"ship\",\n        \"hold_reason\": null,\n        \"blocked_by_ids\": [],\n        \"current_role\": \"queued\",\n        \"body_lines\": [],\n        \"unresolved_blocker_ids\": [],\n        \"blocked_by\": null,\n        \"repo\": \"sample\",\n        \"captain_actionable\": false,\n        \"order\": 1,\n        \"captain_drop\": false\n      },\n      {\n        \"current_role\": \"queued\",\n        \"blocked_by_ids\": [],\n        \"hold_reason\": null,\n        \"kind\": \"ship\",\n        \"local_note\": null,\n        \"since\": null,\n        \"captain_drop\": false,\n        \"captain_actionable\": false,\n        \"order\": 2,\n        \"repo\": \"sample\",\n        \"blocked_by\": null,\n        \"unresolved_blocker_ids\": [],\n        \"body_lines\": [],\n        \"pr_url\": \"https://github.com/o/r/pull/10\",\n        \"completion\": {\n          \"verb\": null,\n          \"date\": null\n        },\n        \"checked\": false,\n        \"hold_age_days\": null,\n        \"state\": \"queued\",\n        \"priority\": null,\n        \"hold_bucket\": null,\n        \"merged\": null,\n        \"raw\": \"- [ ] tail - Lab contribution https://github.com/o/r/pull/10 (repo: sample) (kind: ship)\",\n        \"blocked_reason\": null,\n        \"links\": [\n          \"https://github.com/o/r/pull/10\"\n        ],\n        \"requires_child_metadata\": false,\n        \"body_excerpt\": null,\n        \"structured\": true,\n        \"reported\": null,\n        \"hold_until\": null,\n        \"done\": null,\n        \"report_path\": null,\n        \"hold_set\": null,\n        \"hold_kind\": null,\n        \"id\": \"tail\",\n        \"title\": \"Lab contribution\"\n      }\n    ],\n    \"present\": true\n  },\n  \"tasks\": []\n}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "A completed low-quota issue remains measured while budget-skipped tail owners become stale",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "snapshot",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-wave-corrected-issue/input.json",
+      "--all"
+    ],
+    "exit": 0,
+    "stdout": "{\n  \"known\": 2,\n  \"checked\": 0,\n  \"counts\": {\n    \"captain\": 0,\n    \"fleet\": 2,\n    \"maintainer\": 0,\n    \"nobody\": 0\n  },\n  \"unmeasured\": 0,\n  \"complete\": false,\n  \"proven_clear\": false,\n  \"stale_verdicts\": 0,\n  \"missing_verdicts\": 0,\n  \"unreadable_records\": 0,\n  \"valid_until\": 1791504900,\n  \"captain\": [],\n  \"captain_omitted\": 0,\n  \"rows\": [\n    {\n      \"task\": \"filed\",\n      \"url\": \"https://github.com/o/r/issues/9\",\n      \"kind\": \"issue\",\n      \"checked_at\": \"2026-10-09T00:01:00Z\",\n      \"checked\": false,\n      \"final\": false,\n      \"head\": null,\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 0,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [],\n      \"actor\": \"fleet\",\n      \"reason\": \"contribution not recently checked\",\n      \"tasks\": [\n        \"filed\"\n      ]\n    },\n    {\n      \"task\": \"tail\",\n      \"url\": \"https://github.com/o/r/pull/10\",\n      \"kind\": \"pr\",\n      \"checked_at\": \"2026-10-09T00:00:00Z\",\n      \"checked\": false,\n      \"final\": false,\n      \"head\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"verdict\": null,\n      \"reviews\": [],\n      \"distinct_checks\": 1,\n      \"missing_verdicts\": 0,\n      \"pending_checks\": 0,\n      \"failed_checks\": 0,\n      \"stale_verdicts\": 0,\n      \"signals\": [],\n      \"actor\": \"fleet\",\n      \"reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:51:36Z\",\n      \"tasks\": [\n        \"tail\"\n      ]\n    }\n  ]\n}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "A low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+      "poll"
+    ],
+    "exit": 0,
+    "stdout": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:52:56Z; last observations kept, marked stale\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550443, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": true, \"rows\": [{\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 0, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\"}]}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550445, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": true, \"rows\": [{\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 2, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\"}]}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r"
+    ],
+    "exit": 0,
+    "stdout": "{\"permissions\":{\"push\":false}}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550445, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": false, \"rows\": [{\"id\": \"81efc51801d899bfb6a622b7\", \"category\": \"coverage\", \"subject\": \"ledger stale\", \"owner\": \"firstmate\", \"next_action\": \"wait for the GitHub quota window to reset; the next run refreshes every row\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": false, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"informational\": true}, {\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true, \"stale\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 2, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\", \"stale\": true}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"stale_until_epoch\": 1791554043}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "get",
+      "/repos/o/r"
+    ],
+    "exit": 0,
+    "stdout": "{\"permissions\":{\"push\":false}}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550448, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-no-prior\", \"complete\": false, \"rows\": [{\"id\": \"d7b6078e39ab8b786a537a1f\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\"}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"stale_until_epoch\": 1791554043}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550448, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": true, \"rows\": [{\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 5, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\"}]}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550448, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": false, \"rows\": [{\"id\": \"81efc51801d899bfb6a622b7\", \"category\": \"coverage\", \"subject\": \"ledger stale\", \"owner\": \"firstmate\", \"next_action\": \"wait for the GitHub quota window to reset; the next run refreshes every row\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": false, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"informational\": true}, {\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true, \"stale\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 5, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\", \"stale\": true}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"stale_until_epoch\": 1791554043}\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh",
+      "https://github.com/o/r/pull/8"
+    ],
+    "exit": 2,
+    "stdout": "",
+    "stderr": "struct field for \"repository\" doesn't exist in any of 1 places to unmarshal\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\n"
+  },
+  {
+    "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh",
+      "https://github.com/o/r/pull/8"
+    ],
+    "exit": 2,
+    "stdout": "",
+    "stderr": "struct field for \"repository\" doesn't exist in any of 1 places to unmarshal\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\n"
+  },
+  {
+    "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh",
+      "https://github.com/o/r/pull/8"
+    ],
+    "exit": 0,
+    "stdout": "CHECKS: none reported yet\nREVIEW DECISION: CHANGES_REQUESTED\nREVIEW: maintainer CHANGES_REQUESTED\nSTALE BLOCKING REVIEW: oldreviewer CHANGES_REQUESTED at bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh",
+      "https://github.com/o/r/pull/8"
+    ],
+    "exit": 0,
+    "stdout": "CHECKS: none reported yet\nREVIEW DECISION: CHANGES_REQUESTED\nREVIEW: maintainer CHANGES_REQUESTED\nSTALE BLOCKING REVIEW: oldreviewer CHANGES_REQUESTED at bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh",
+      "https://github.com/o/r/pull/8"
+    ],
+    "exit": 0,
+    "stdout": "carol\t2 recent commits\nbob\t1 recent commit\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-reviewers.sh",
+      "https://github.com/o/r/pull/8"
+    ],
+    "exit": 0,
+    "stdout": "carol\t2 recent commits\nbob\t1 recent commit\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+      "guard"
+    ],
+    "exit": 75,
+    "stdout": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:55:29Z\n",
+    "stderr": ""
+  }
+]

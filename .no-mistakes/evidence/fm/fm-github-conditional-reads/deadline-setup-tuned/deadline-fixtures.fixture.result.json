@@ -1,0 +1,20 @@
+{
+  "kind": "supplemental fixture regressions (not live)",
+  "source": "tests/fm-open-loops.test.sh:1115-1189",
+  "command": [
+    "python3",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-fixtures.py",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world",
+    "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/deadline-setup-tuned"
+  ],
+  "returncode": 1,
+  "seconds": 34.046,
+  "environment": {
+    "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/empty-home",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp",
+    "LANG": "en_US.UTF-8"
+  },
+  "setup_adjustment": "Only throwaway runner: command_timeout_seconds=5 instead of 1; exact existing assertions unchanged; origins already passed initial run and was not rerun"
+}

@@ -1,0 +1,93 @@
+{
+  "kind": "supplemental fixtures only; not live",
+  "shell_regressions": [
+    {
+      "kind": "supplemental fixture regression (not live)",
+      "command": [
+        "bash",
+        "tests/fm-gh-rest.test.sh"
+      ],
+      "returncode": 0,
+      "seconds": 62.032,
+      "environment": {
+        "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/empty-home",
+        "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp",
+        "LANG": "en_US.UTF-8"
+      },
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/fm-gh-rest.fixture.stdout.log",
+      "stderr": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/fm-gh-rest.fixture.stderr.log"
+    },
+    {
+      "kind": "supplemental fixture regression (not live)",
+      "command": [
+        "bash",
+        "tests/fm-pr-reviewers.test.sh"
+      ],
+      "returncode": 0,
+      "seconds": 8.001,
+      "environment": {
+        "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/empty-home",
+        "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp",
+        "LANG": "en_US.UTF-8"
+      },
+      "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/fm-pr-reviewers.fixture.stdout.log",
+      "stderr": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/fm-pr-reviewers.fixture.stderr.log"
+    }
+  ],
+  "initial_deadline_run": {
+    "kind": "supplemental fixture regressions (not live)",
+    "source": "tests/fm-open-loops.test.sh:1115-1189",
+    "command": [
+      "python3",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-fixtures.py",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN"
+    ],
+    "returncode": 1,
+    "seconds": 16.865,
+    "environment": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/empty-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp",
+      "LANG": "en_US.UTF-8"
+    }
+  },
+  "tuned_deadline_run": {
+    "kind": "supplemental fixture regressions (not live)",
+    "source": "tests/fm-open-loops.test.sh:1115-1189",
+    "command": [
+      "python3",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-fixtures.py",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/deadline-setup-tuned"
+    ],
+    "returncode": 1,
+    "seconds": 34.046,
+    "environment": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/empty-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp",
+      "LANG": "en_US.UTF-8"
+    },
+    "setup_adjustment": "Only throwaway runner: command_timeout_seconds=5 instead of 1; exact existing assertions unchanged; origins already passed initial run and was not rerun"
+  },
+  "proved_readers": [
+    "origins",
+    "pr-state",
+    "questions"
+  ],
+  "objective_failures": [
+    {
+      "reader": "pr-checks",
+      "initial": "request identity/count assertion failed with attempts=[]; natural overall deadline fired before injected SIGALRM trigger; collector alarm is command timeout multiplied by 10",
+      "tuned": "deadline-phrase assertion failed; attempts=[]; open PR list prerequisite timed out before named check-runs requests",
+      "diagnostic": "Standalone fixture-only prerequisite returned status0 in0.584s and recovered stale quota lock; specific cause of collector-bound latency is not established"
+    }
+  ],
+  "source_changes": false,
+  "unrelated_open_loops_cases_run": false
+}

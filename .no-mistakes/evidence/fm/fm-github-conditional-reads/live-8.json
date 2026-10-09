@@ -1,0 +1,509 @@
+{
+  "name": "A low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+  "result": "pass",
+  "live": true,
+  "reason": "",
+  "details": {
+    "duration_seconds": 10.823380499961786,
+    "announcement": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:52:56Z; last observations kept, marked stale\n",
+    "unchanged_rows_except_error": {
+      "delivery": {
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "can_merge": false,
+          "review_decision": "CHANGES_REQUESTED",
+          "reviews": [],
+          "checks": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:49:39Z"
+            }
+          ],
+          "events": [],
+          "absent_checks": []
+        },
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:52:56Z"
+      },
+      "duplicate": {
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "can_merge": false,
+          "review_decision": "CHANGES_REQUESTED",
+          "reviews": [],
+          "checks": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:49:39Z"
+            }
+          ],
+          "events": [],
+          "absent_checks": []
+        },
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:52:56Z"
+      },
+      "tail": {
+        "url": "https://github.com/o/r/pull/9",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "can_merge": false,
+          "review_decision": "CHANGES_REQUESTED",
+          "reviews": [],
+          "checks": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:49:39Z"
+            }
+          ],
+          "events": [],
+          "absent_checks": []
+        },
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:52:56Z"
+      }
+    },
+    "before": {
+      "delivery": {
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "can_merge": false,
+          "review_decision": "CHANGES_REQUESTED",
+          "reviews": [],
+          "checks": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:49:39Z"
+            }
+          ],
+          "events": [],
+          "absent_checks": []
+        },
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": null
+      },
+      "duplicate": {
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "can_merge": false,
+          "review_decision": "CHANGES_REQUESTED",
+          "reviews": [],
+          "checks": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:49:39Z"
+            }
+          ],
+          "events": [],
+          "absent_checks": []
+        },
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": null
+      },
+      "tail": {
+        "url": "https://github.com/o/r/pull/9",
+        "kind": "pr",
+        "checked_at": "2026-10-09T00:00:00Z",
+        "observation": {
+          "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "open",
+          "draft": false,
+          "mergeable": "mergeable",
+          "can_merge": false,
+          "review_decision": "CHANGES_REQUESTED",
+          "reviews": [],
+          "checks": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:49:39Z"
+            }
+          ],
+          "events": [],
+          "absent_checks": []
+        },
+        "verdict": null,
+        "seen": [],
+        "pending": [],
+        "notified": [],
+        "error": null
+      }
+    },
+    "quota": {
+      "resource": "core",
+      "limit": 5000,
+      "remaining": 500,
+      "reset": 1791553976,
+      "observed": 1791550386
+    },
+    "requests_after_crossing": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553976,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"2ef82dda2f10d590\"",
+        "link": null,
+        "response_body": {
+          "number": 8,
+          "html_url": "https://github.com/o/r/pull/8",
+          "state": "open",
+          "user": {
+            "login": "author"
+          },
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "fm/lab"
+          },
+          "base": {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "draft": false,
+          "mergeable": true,
+          "merged_at": null,
+          "updated_at": "2026-10-09T12:52:56Z",
+          "requested_reviewers": [],
+          "requested_teams": []
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 500,
+          "reset": 1791553976,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/8/comments?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 500,
+          "reset": 1791553976,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 500,
+          "reset": 1791553976,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 500,
+          "reset": 1791553976,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"100b6fcf835a0218\"",
+        "link": null,
+        "response_body": {
+          "check_runs": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:52:56Z"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 500,
+          "reset": 1791553976,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"00a9f31979dc5909\"",
+        "link": null,
+        "response_body": {
+          "permissions": {
+            "push": false
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/comments?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 500,
+          "reset": 1791553976,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      }
+    ]
+  },
+  "commands": [
+    {
+      "scenario": "A low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+        "poll"
+      ],
+      "exit": 0,
+      "stdout": "contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:52:56Z; last observations kept, marked stale\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791553976,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"2ef82dda2f10d590\"",
+      "link": null,
+      "response_body": {
+        "number": 8,
+        "html_url": "https://github.com/o/r/pull/8",
+        "state": "open",
+        "user": {
+          "login": "author"
+        },
+        "head": {
+          "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "fm/lab"
+        },
+        "base": {
+          "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "draft": false,
+        "mergeable": true,
+        "merged_at": null,
+        "updated_at": "2026-10-09T12:52:56Z",
+        "requested_reviewers": [],
+        "requested_teams": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791553976,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/issues/8/comments?per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791553976,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791553976,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791553976,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"100b6fcf835a0218\"",
+      "link": null,
+      "response_body": {
+        "check_runs": [
+          {
+            "name": "build",
+            "id": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-10-09T12:52:56Z"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791553976,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"00a9f31979dc5909\"",
+      "link": null,
+      "response_body": {
+        "permissions": {
+          "push": false
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls/8/comments?per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791553976,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    }
+  ]
+}

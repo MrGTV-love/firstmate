@@ -1,0 +1,450 @@
+[
+  {
+    "name": "A successful low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+    "result": "fail",
+    "live": true,
+    "reason": "[Errno 2] No such file or directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-wave-corrected-pr/data/delivery/contributions.json'",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/drive.py\", line 61, in scenario\n    details=fn()\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/consumers.py\", line 127, in <lambda>\n    scenario('A successful low-quota PR wave blocks GraphQL and marks every unmeasured tail owner',lambda:wave_tail('pr'))\n                                                                                                          ~~~~~~~~~^^^^^^\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/consumers.py\", line 89, in wave_tail\n    before={t:saved(p,t)['records'][0] for t in (('tail','delivery') if kind=='pr' else ('tail','filed'))}\n              ~~~~~^^^^^\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/drive.py\", line 48, in saved\n    def saved(p,task): return json.loads((p/'data'/task/'contributions.json').read_text())\n                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py\", line 792, in read_text\n    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:\n         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py\", line 776, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-wave-corrected-pr/data/delivery/contributions.json'\n",
+    "commands": [
+      {
+        "scenario": "A successful low-quota PR wave blocks GraphQL and marks every unmeasured tail owner",
+        "command": [
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-contributions.sh",
+          "poll"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"560b6e0faf0c5ead\"",
+        "link": null,
+        "response_body": {
+          "number": 8,
+          "html_url": "https://github.com/o/r/pull/8",
+          "state": "open",
+          "user": {
+            "login": "author"
+          },
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "fm/lab"
+          },
+          "base": {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "draft": false,
+          "mergeable": true,
+          "merged_at": null,
+          "updated_at": "2026-10-09T12:51:36Z",
+          "requested_reviewers": [],
+          "requested_teams": []
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"00a9f31979dc5909\"",
+        "link": null,
+        "response_body": {
+          "permissions": {
+            "push": false
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/reviews?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"cd73d2b38f7e8267\"",
+        "link": null,
+        "response_body": {
+          "check_runs": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:51:36Z"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/8/comments?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/8/comments?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/9",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"25f809fba9796d06\"",
+        "link": null,
+        "response_body": {
+          "number": 9,
+          "html_url": "https://github.com/o/r/pull/9",
+          "state": "open",
+          "user": {
+            "login": "author"
+          },
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "fm/lab"
+          },
+          "base": {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "draft": false,
+          "mergeable": true,
+          "merged_at": null,
+          "updated_at": "2026-10-09T12:51:36Z",
+          "requested_reviewers": [],
+          "requested_teams": []
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/9/comments?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"00a9f31979dc5909\"",
+        "link": null,
+        "response_body": {
+          "permissions": {
+            "push": false
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/pulls/9/reviews?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"cd73d2b38f7e8267\"",
+        "link": null,
+        "response_body": {
+          "check_runs": [
+            {
+              "name": "build",
+              "id": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-09T12:51:36Z"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/issues/9/comments?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "GET",
+        "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+        "conditional": null,
+        "request_body": null,
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": "\"4f53cda18c2baa0c\"",
+        "link": null,
+        "response_body": []
+      },
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "conditional": null,
+        "request_body": "{\"query\":\"\\n\\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\\n\\t\\trepository(owner: $owner, name: $repo) {\\n\\t\\t\\tpullRequest(number: $pr_number) {headRefOid,reviewDecision,id,number}\\n\\t\\t}\\n\\t}\",\"variables\":{\"owner\":\"o\",\"pr_number\":9,\"repo\":\"r\"}}",
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791553896,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": null,
+        "link": null,
+        "response_body": {
+          "data": {
+            "repository": {
+              "pullRequest": {
+                "id": "PR_lab",
+                "number": 8,
+                "url": "https://github.com/o/r/pull/8",
+                "state": "OPEN",
+                "mergedAt": null,
+                "isDraft": false,
+                "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "headRefName": "fm/lab",
+                "baseRefName": "main",
+                "author": {
+                  "login": "author",
+                  "__typename": "User"
+                },
+                "mergeable": "MERGEABLE",
+                "reviewDecision": "CHANGES_REQUESTED",
+                "statusCheckRollup": {
+                  "contexts": {
+                    "nodes": [],
+                    "pageInfo": {
+                      "hasNextPage": false,
+                      "endCursor": null
+                    }
+                  }
+                },
+                "headRef": {
+                  "name": "fm/lab",
+                  "target": {
+                    "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                  }
+                },
+                "baseRef": {
+                  "name": "main"
+                },
+                "baseRepository": {
+                  "name": "r",
+                  "owner": {
+                    "login": "o"
+                  },
+                  "defaultBranchRef": {
+                    "name": "main"
+                  }
+                },
+                "headRepository": {
+                  "name": "r",
+                  "owner": {
+                    "login": "o"
+                  }
+                }
+              },
+              "name": "r",
+              "owner": {
+                "login": "o"
+              },
+              "defaultBranchRef": {
+                "name": "main"
+              },
+              "branchProtectionRules": {
+                "nodes": []
+              }
+            },
+            "viewer": {
+              "login": "lab"
+            },
+            "node": {
+              "id": "PR_lab",
+              "number": 8,
+              "url": "https://github.com/o/r/pull/8",
+              "state": "OPEN",
+              "mergedAt": null,
+              "isDraft": false,
+              "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "headRefName": "fm/lab",
+              "baseRefName": "main",
+              "author": {
+                "login": "author",
+                "__typename": "User"
+              },
+              "mergeable": "MERGEABLE",
+              "reviewDecision": "CHANGES_REQUESTED",
+              "statusCheckRollup": {
+                "contexts": {
+                  "nodes": [],
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  }
+                }
+              },
+              "headRef": {
+                "name": "fm/lab",
+                "target": {
+                  "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                }
+              },
+              "baseRef": {
+                "name": "main"
+              },
+              "baseRepository": {
+                "name": "r",
+                "owner": {
+                  "login": "o"
+                },
+                "defaultBranchRef": {
+                  "name": "main"
+                }
+              },
+              "headRepository": {
+                "name": "r",
+                "owner": {
+                  "login": "o"
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/live-7.json"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "reader": "pr-checks",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550144, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home\", \"complete\": false, \"rows\": [{\"id\": \"f5706171eea3582191f4d701\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"open PRs test/project: Command '['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-che\"}]}\n",
+    "stderr": "",
+    "seconds": 18.057
+  },
+  {
+    "reader": "pr-state",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-state/code/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550161, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-state/home\", \"complete\": false, \"rows\": [{\"id\": \"8efdb31b4e572da089b8f471\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"reconciler: collection exceeded its deadline; PR state https://github.com/test/project/pull/0: source command failure\"}, {\"id\": \"cc9f46b2ae861917142da9db\", \"category\": \"failed_task\", \"subject\": \"failed-0\", \"owner\": \"firstmate\", \"next_action\": \"recover the failed work or record why it ends\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": true, \"evidence\": \"\"}]}\n",
+    "stderr": "",
+    "seconds": 7.916
+  },
+  {
+    "reader": "questions",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-questions/code/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550169, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-questions/home\", \"complete\": false, \"rows\": [{\"id\": \"7ee81cf42aeeda10cf64e63e\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"reconciler: collection exceeded its deadline; questions 0.status: source command failure\"}]}\n",
+    "stderr": "",
+    "seconds": 1.548
+  }
+]

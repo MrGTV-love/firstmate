@@ -1,0 +1,182 @@
+{
+  "name": "Concurrent quota responses retain the minimum and reject older windows",
+  "result": "pass",
+  "live": true,
+  "reason": "",
+  "details": {
+    "lowest_concurrent": {
+      "resource": "core",
+      "limit": 5000,
+      "remaining": 749,
+      "reset": 1791553666,
+      "observed": 1791550090
+    },
+    "new_window": {
+      "resource": "core",
+      "limit": 5000,
+      "remaining": 4000,
+      "reset": 1791557266,
+      "observed": 1791550091
+    }
+  },
+  "commands": [
+    {
+      "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/quota-seed"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/quota-low"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/quota-high"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/old-window"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "guard"
+      ],
+      "exit": 75,
+      "stdout": "GitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r/new-window"
+      ],
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Concurrent quota responses retain the minimum and reject older windows",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "guard"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/quota-seed",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 800,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/quota-low",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 749,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/quota-high",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 750,
+        "reset": 1791553666,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/old-window",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4900,
+        "reset": 1791553566,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/new-window",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791557266,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    }
+  ],
+  "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/live-scenario-04.json"
+}

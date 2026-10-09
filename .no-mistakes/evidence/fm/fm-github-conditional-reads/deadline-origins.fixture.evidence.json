@@ -1,0 +1,49 @@
+{
+  "kind": "supplemental fixture deadline regression (not live)",
+  "reader": "origins",
+  "attempts": [
+    [
+      "git",
+      "-C",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/home/projects/0",
+      "config",
+      "--get",
+      "remote.origin.url"
+    ],
+    [
+      "git",
+      "-C",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/home/projects/1",
+      "config",
+      "--get",
+      "remote.origin.url"
+    ]
+  ],
+  "trigger": [
+    "git",
+    "-C",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/home/projects/1",
+    "config",
+    "--get",
+    "remote.origin.url"
+  ],
+  "degraded_report": {
+    "schema": "fm-open-loops.v1",
+    "generated_epoch": 1791550065,
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/home",
+    "complete": false,
+    "rows": [
+      {
+        "id": "7952a89365f16088973a2b13",
+        "category": "coverage",
+        "subject": "ledger degraded",
+        "owner": "firstmate",
+        "next_action": "restore the unreadable sources and rerun the reconciler",
+        "age_seconds": null,
+        "limit_seconds": 0,
+        "overdue": true,
+        "evidence": "reconciler: collection exceeded its deadline; project origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/home/projects/0: source command failure"
+      }
+    ]
+  }
+}

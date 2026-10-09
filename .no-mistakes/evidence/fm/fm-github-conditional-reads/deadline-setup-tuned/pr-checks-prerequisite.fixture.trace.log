@@ -1,0 +1,530 @@
++ set -u
++++ dirname /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/fm-gh-rest.sh
+++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin
+++ pwd
++ SCRIPT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin
++ STATE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
++ CACHE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-rest-cache
++ EX_TEMPFAIL=75
++ work=
++ case "${1:-}" in
++ command -v jq
++ case "${1:-}" in
++ shift
++ cmd_get '/repos/test/project/pulls?state=open&per_page=100' --floor --paginate --slurp
++ local endpoint= paginate=0 slurp=0 floor=0 query= key value reason i=0
++ '[' 4 -gt 0 ']'
++ case "$1" in
++ '[' -z '' ']'
++ endpoint='/repos/test/project/pulls?state=open&per_page=100'
++ shift
++ '[' 3 -gt 0 ']'
++ case "$1" in
++ floor=1
++ shift
++ '[' 2 -gt 0 ']'
++ case "$1" in
++ paginate=1
++ shift
++ '[' 1 -gt 0 ']'
++ case "$1" in
++ slurp=1
++ shift
++ '[' 0 -gt 0 ']'
++ '[' -n '/repos/test/project/pulls?state=open&per_page=100' ']'
++ command -v gh
++ '[' -n '' ']'
++ endpoint='repos/test/project/pulls?state=open&per_page=100'
++ pages=()
++ local pages next
+++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.XXXXXX
++ work=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo
++ trap '[ -z "$work" ] || rm -rf -- "$work"' EXIT
++ '[' -n 'repos/test/project/pulls?state=open&per_page=100' ']'
++ '[' 1 -eq 1 ']'
+++ quota_low core
+++ local file
++++ ratelimit_file core
+++++ tr -c A-Za-z0-9_- _
+++++ printf %s core
++++ printf '%s/gh-ratelimit.%s.json\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state core
+++ file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json
+++ '[' -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json ']'
+++ return 1
++ reason=
++ i=1
+++ fetch_page 'repos/test/project/pulls?state=open&per_page=100' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/page.1
+++ local 'endpoint=repos/test/project/pulls?state=open&per_page=100' body_out=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/page.1 entry snapshot etag= raw hdr err status next staged=
++++ cache_path 'repos/test/project/pulls?state=open&per_page=100'
++++ local key
++++ command -v shasum
+++++ printf '%s\n%s' github.com 'repos/test/project/pulls?state=open&per_page=100'
+++++ shasum -a 256
++++ key='8d44680f1500c5327517a5e5d3cf2689d5f30194de005a8503ec4e5ce3843991  -'
++++ key=8d44680f1500c5327517a5e5d3cf2689d5f30194de005a8503ec4e5ce3843991
++++ printf '%s/%s.json\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-rest-cache 8d44680f1500c5327517a5e5d3cf2689d5f30194de005a8503ec4e5ce3843991
+++ entry=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-rest-cache/8d44680f1500c5327517a5e5d3cf2689d5f30194de005a8503ec4e5ce3843991.json
+++ raw=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409
+++ hdr=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr
+++ err=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.err
+++ snapshot=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.cache
+++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-rest-cache/8d44680f1500c5327517a5e5d3cf2689d5f30194de005a8503ec4e5ce3843991.json
+++ conditional=()
+++ local -a conditional
+++ '[' -z '' ']'
+++ env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 gh api -i 'repos/test/project/pulls?state=open&per_page=100'
+++ local rc=0
+++ tr -d '\r'
+++ awk -v hdr=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr -v body=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/page.1 'BEGIN { inhead = 1; printf "" > hdr; printf "" > body }
+    inhead { if ($0 == "") { inhead = 0 } else { print > hdr } ; next }
+    { print > body }'
++++ awk 'NR == 1 { print $2 }' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr
+++ status=200
+++ local name value response_etag= link= has_link=0
+++ IFS==
+++ read -r name value
++++ header_pairs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr
++++ awk '-F: *' 'BEGIN { split("x-ratelimit-limit x-ratelimit-remaining x-ratelimit-reset x-ratelimit-resource etag link", w, " ")
+      for (i in w) want[w[i]] = 1 }
+    NR == 1 { next }
+    { name = tolower($1); if (name in want) { v = $0; sub(/^[^:]*: */, "", v); print name "=" v } }' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr
++++ printf %s ''
++++ tr , '\n'
++++ sed -n 's/^[[:space:]]*<\([^>]*\)>[[:space:]]*;[[:space:]]*rel="next".*/\1/p'
++++ head -1
++++ sed -E 's#^https?://[^/]+/##'
+++ next=
+++ '[' 200 = 304 ']'
+++ case "$status" in
+++ '[' 0 -eq 0 ']'
+++ jq -e . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/page.1
+++ etag=
+++ '[' -n '' ']'
+++ record_response /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr '' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-rest-cache/8d44680f1500c5327517a5e5d3cf2689d5f30194de005a8503ec4e5ce3843991.json
+++ local headers=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr staged= entry=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-rest-cache/8d44680f1500c5327517a5e5d3cf2689d5f30194de005a8503ec4e5ce3843991.json snapshot=
+++ local lock=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ local limit= remaining= reset= resource=core name value
+++ IFS==
+++ read -r name value
++++ header_pairs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr
++++ awk '-F: *' 'BEGIN { split("x-ratelimit-limit x-ratelimit-remaining x-ratelimit-reset x-ratelimit-resource etag link", w, " ")
+      for (i in w) want[w[i]] = 1 }
+    NR == 1 { next }
+    { name = tolower($1); if (name in want) { v = $0; sub(/^[^:]*: */, "", v); print name "=" v } }' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr
+++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/fm-wake-lib.sh
+++++ d=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin
+++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/fm-wake-lib.sh ']'
+++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin
+++++ pwd
++++ FM_WAKE_LIB_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin
+++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/..
+++++ pwd
++++ FM_WAKE_DEFAULT_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code
++++ FM_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code
++++ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home
++++ STATE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
++++ FM_WAKE_QUEUE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/.wake-queue
++++ FM_WAKE_QUEUE_LOCK=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/.wake-queue.lock
++++ FM_LOCK_STALE_AFTER=2
++++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/fm-path-lib.sh
++++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/code/bin/fm-secondmate-parent-lib.sh
+++++ uname
++++ _FM_UNAME=Darwin
++++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
++++ '[' 3 -gt 4 ']'
++++ '[' 3 -eq 4 ']'
++++ FM_WATCHER_MATCHED_IDENTITY=
++++ FM_WATCHER_HEALTHY_PID=
++++ FM_WATCHER_HEALTHY_IDENTITY=
++++ FM_WATCHER_VERDICT_OK=false
++++ FM_WATCHER_VERDICT_REASON=stale-beacon
++++ FM_RECOVERY_MARKER_TOKEN=
++++ FM_RECOVERY_MARKER_ACTION=none
++++ FM_RECOVERY_MARKER_WRITTEN_TOKEN=
++++ FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
++++ FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
++++ FM_RECOVERY_HANDOVER_TOKEN=
++++ FM_RECOVERY_HANDOVER_SEQ=
++++ FM_WAKE_STATUS_KEY=
++++ FM_WAKE_STATUS_HISTORICAL=false
++++ FM_WAKE_EVENT_LINE=
++++ FM_WAKE_UNREAD_LINES=
+++ fm_lock_acquire_wait /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ fm_lock_try_acquire /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock pid steal cur rc steal_owner primary_owner current
+++ FM_LOCK_HELD_PID=
+++ FM_LOCK_OWNER_DIR=
+++ FM_LOCK_RECOVERED_PID=
+++ fm_lock_try_create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock allowed_steal_owner= ownerdir
+++ FM_LOCK_OWNER_DIR=
++++ fm_lock_owner_dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock lock_abs
+++++ fm_lock_abs_path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ local path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock dir base
+++++ fm_dirname_to dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state ']'
+++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state ']'
+++++ printf -v dir %s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ fm_basename_to base /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ fm_path=gh-ratelimit.core.json.lock
+++++ '[' gh-ratelimit.core.json.lock '!=' gh-ratelimit.core.json.lock ']'
+++++ printf -v base %s gh-ratelimit.core.json.lock
++++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
++++++ pwd -P
+++++ dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ printf '%s/%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state gh-ratelimit.core.json.lock
++++ lock_abs=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.XXXXXX
+++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy
+++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ']'
+++ fm_lock_discard_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy
+++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy ']'
+++ fm_lock_clean_known_files /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy
+++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy/pid /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy/fm-home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy/pid-identity /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy/role /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy/watcher-path
+++ rmdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.rDBphy
+++ return 1
+++ fm_current_pid current
+++ local fm_pid
++++ exec sh -c 'printf "%s\n" "$PPID"'
+++ fm_pid=77381
+++ case "$fm_pid" in
+++ '[' 1 -gt 0 ']'
+++ printf -v current %s 77381
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock/pid
+++ pid=17156
+++ '[' -n 17156 ']'
+++ '[' 17156 = 77381 ']'
+++ fm_pid_alive 17156
+++ local pid=17156
+++ case "$pid" in
+++ kill -0 17156
+++ fm_lock_mid_acquire_is_fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock 17156
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock pid=17156 mid_acquire_stale
+++ case "$pid" in
+++ return 1
+++ steal=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ fm_lock_try_acquire_steal_mutex /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal current
+++ FM_LOCK_OWNER_DIR=
+++ fm_lock_try_create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal allowed_steal_owner= ownerdir
+++ FM_LOCK_OWNER_DIR=
++++ fm_lock_owner_dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
++++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal lock_abs
+++++ fm_lock_abs_path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++++ local path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal dir base
+++++ fm_dirname_to dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state ']'
+++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state ']'
+++++ printf -v dir %s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ fm_basename_to base /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++++ fm_path=gh-ratelimit.core.json.lock.steal
+++++ '[' gh-ratelimit.core.json.lock.steal '!=' gh-ratelimit.core.json.lock.steal ']'
+++++ printf -v base %s gh-ratelimit.core.json.lock.steal
++++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
++++++ pwd -P
+++++ dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ printf '%s/%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state gh-ratelimit.core.json.lock.steal
++++ lock_abs=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
++++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.XXXXXX
+++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ']'
+++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ']'
+++ fm_lock_prepare_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ mypid back
+++ fm_current_pid mypid
+++ local fm_pid
++++ exec sh -c 'printf "%s\n" "$PPID"'
+++ fm_pid=77381
+++ case "$fm_pid" in
+++ '[' 1 -gt 0 ']'
+++ printf -v mypid %s 77381
+++ printf '%s\n' 77381
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/pid
+++ back=77381
+++ '[' 77381 = 77381 ']'
+++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
+++ fm_lock_claim /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ''
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ allowed_steal_owner= mypid back
+++ fm_current_pid mypid
+++ local fm_pid
++++ exec sh -c 'printf "%s\n" "$PPID"'
+++ fm_pid=77381
+++ case "$fm_pid" in
+++ '[' 1 -gt 0 ']'
+++ printf -v mypid %s 77381
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/pid
+++ back=77381
+++ '[' 77381 '!=' 77381 ']'
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
+++ fm_lock_claim_blocked_by_steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ''
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal allowed_steal_owner= steal
+++ steal=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.steal
+++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.steal ']'
+++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.steal ']'
+++ return 1
+++ return 0
+++ FM_LOCK_OWNER_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ return 0
+++ return 0
+++ steal_owner=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock/pid
+++ cur=17156
+++ fm_pid_alive 17156
+++ local pid=17156
+++ case "$pid" in
+++ kill -0 17156
+++ fm_lock_mid_acquire_is_fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock 17156
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock pid=17156 mid_acquire_stale
+++ case "$pid" in
+++ return 1
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
+++ primary_owner=
+++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ']'
++++ fm_lock_link_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ primary_owner=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock/pid
+++ cur=17156
+++ fm_lock_recheck_stale_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT 17156
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock expected_owner=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT expected_pid=17156 actual_pid
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT ']'
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT ']'
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock/pid
+++ actual_pid=17156
+++ '[' 17156 = 17156 ']'
+++ fm_pid_alive 17156
+++ local pid=17156
+++ case "$pid" in
+++ kill -0 17156
+++ fm_lock_mid_acquire_is_fresh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock 17156
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock pid=17156 mid_acquire_stale
+++ case "$pid" in
+++ return 1
+++ return 0
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/.watch.lock ']'
+++ fm_lock_remove_path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ownerdir
+++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ']'
++++ fm_lock_link_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT ']'
+++ fm_lock_discard_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT ']'
+++ fm_lock_clean_known_files /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT/pid /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT/fm-home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT/pid-identity /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT/role /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT/watcher-path
+++ rmdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.63hENT
+++ return 0
+++ rc=1
+++ fm_lock_try_create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock allowed_steal_owner=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ownerdir
+++ FM_LOCK_OWNER_DIR=
++++ fm_lock_owner_dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock lock_abs
+++++ fm_lock_abs_path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ local path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock dir base
+++++ fm_dirname_to dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state ']'
+++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state '!=' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state ']'
+++++ printf -v dir %s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ fm_basename_to base /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ local fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ case "$fm_path" in
+++++ fm_path=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++++ fm_path=gh-ratelimit.core.json.lock
+++++ '[' gh-ratelimit.core.json.lock '!=' gh-ratelimit.core.json.lock ']'
+++++ printf -v base %s gh-ratelimit.core.json.lock
++++++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
++++++ pwd -P
+++++ dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state
+++++ printf '%s/%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state gh-ratelimit.core.json.lock
++++ lock_abs=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.XXXXXX
+++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
+++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ']'
+++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ']'
+++ fm_lock_prepare_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
+++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx mypid back
+++ fm_current_pid mypid
+++ local fm_pid
++++ exec sh -c 'printf "%s\n" "$PPID"'
+++ fm_pid=77381
+++ case "$fm_pid" in
+++ '[' 1 -gt 0 ']'
+++ printf -v mypid %s 77381
+++ printf '%s\n' 77381
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/pid
+++ back=77381
+++ '[' 77381 = 77381 ']'
+++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx ']'
+++ fm_lock_claim /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx allowed_steal_owner=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ mypid back
+++ fm_current_pid mypid
+++ local fm_pid
++++ exec sh -c 'printf "%s\n" "$PPID"'
+++ fm_pid=77381
+++ case "$fm_pid" in
+++ '[' 1 -gt 0 ']'
+++ printf -v mypid %s 77381
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/pid
+++ back=77381
+++ '[' 77381 '!=' 77381 ']'
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx ']'
+++ fm_lock_claim_blocked_by_steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock allowed_steal_owner=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ steal
+++ steal=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ '[' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ']'
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
+++ return 1
+++ return 0
+++ FM_LOCK_OWNER_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
+++ return 0
+++ rc=0
+++ FM_LOCK_RECOVERED_PID=17156
+++ '[' 0 -ne 0 ']'
+++ fm_lock_release /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal pid current ownerdir
+++ fm_current_pid current
+++ local fm_pid
++++ exec sh -c 'printf "%s\n" "$PPID"'
+++ fm_pid=77381
+++ case "$fm_pid" in
+++ '[' 1 -gt 0 ']'
+++ printf -v current %s 77381
+++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ']'
++++ fm_lock_link_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/pid
+++ pid=77381
+++ '[' 77381 = 77381 ']'
+++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ actual
++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
+++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal
+++ fm_lock_discard_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ ']'
+++ fm_lock_clean_known_files /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/pid /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/fm-home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/pid-identity /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/role /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ/watcher-path
+++ rmdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.steal.owner.SdfvfQ
+++ return 0
+++ return 0
+++ trap 'fm_lock_release "$lock"' EXIT
+++ record_rate '' '' '' core
+++ local limit= remaining= reset= resource=core file previous prev_reset prev_remaining
+++ case "$limit$remaining$reset" in
+++ return 0
+++ '[' -n '' ']'
+++ return 0
++++ fm_lock_release /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock pid current ownerdir
++++ fm_current_pid current
++++ local fm_pid
+++++ exec sh -c 'printf "%s\n" "$PPID"'
++++ fm_pid=77381
++++ case "$fm_pid" in
++++ '[' 1 -gt 0 ']'
++++ printf -v current %s 77381
++++ '[' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ']'
+++++ fm_lock_link_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx ']'
+++++ cat /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/pid
++++ pid=77381
++++ '[' 77381 = 77381 ']'
++++ fm_lock_points_to_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx actual
+++++ readlink /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ actual=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ '[' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx ']'
++++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock
++++ fm_lock_discard_owner /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ local ownerdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx ']'
++++ fm_lock_clean_known_files /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ local lockdir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/pid /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/fm-home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/pid-identity /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/role /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx/watcher-path
++++ rmdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-ratelimit.core.json.lock.owner.qaTNhx
++++ return 0
+++ '[' -z '' ']'
+++ rm -f -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.hdr /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/raw.1816230409.err
+++ printf %s ''
+++ return 0
++ next=
++ pages+=("$work/page.$i")
++ '[' 1 -eq 1 ']'
++ endpoint=
++ '[' -n '' ']'
++ '[' 1 -eq 1 ']'
++ jq -sc . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo/page.1
++ prune_cache
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-tuned-world/deadline-pr-checks/home/state/gh-rest-cache ']'
++ return 0
++ '[' -z /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo ']'
++ rm -rf -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp/fm-gh-rest.2En5Xo

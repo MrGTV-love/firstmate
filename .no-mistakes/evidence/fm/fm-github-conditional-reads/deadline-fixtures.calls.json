@@ -1,0 +1,24 @@
+[
+  {
+    "reader": "origins",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/code/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550065, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/home\", \"complete\": false, \"rows\": [{\"id\": \"7952a89365f16088973a2b13\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"reconciler: collection exceeded its deadline; project origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-origins/home/projects/0: source command failure\"}]}\n",
+    "stderr": ""
+  },
+  {
+    "reader": "pr-checks",
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-pr-checks/code/bin/fm-open-loops.sh",
+      "--heartbeat",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550067, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/deadline-world/deadline-pr-checks/home\", \"complete\": false, \"rows\": [{\"id\": \"79a27e53fa1891ed805ea40b\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"reconciler: collection exceeded its deadline\"}]}\n",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,11 @@
+[req]
+distinguished_name = dn
+x509_extensions = extensions
+prompt = no
+[dn]
+CN = api.github.com
+[extensions]
+subjectAltName = DNS:api.github.com,DNS:github.com,DNS:localhost,IP:127.0.0.1
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,digitalSignature,keyEncipherment,keyCertSign
+extendedKeyUsage = serverAuth

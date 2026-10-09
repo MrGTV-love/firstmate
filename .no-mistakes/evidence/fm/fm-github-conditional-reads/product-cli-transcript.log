@@ -1,0 +1,716 @@
+LIVE PRODUCT VALIDATION
+Real tracked firstmate commands and installed gh; disposable loopback HTTPS API and isolated fleet homes.
+No public GitHub requests, production data, fleet sessions, credentials, linters, or broad repository suite were used.
+Earlier setup attempts are preserved separately; final scenarios below reflect corrected disposable setups.
+
+SCENARIO 1: Read unchanged and changed paginated resources with safe cache fallback
+Observed result: pass
+API responses: GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2&page=2=200 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2&page=2=304 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100=200
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":1},{"id":2}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":1},{"id":2}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":1},{"id":2}],[{"id":3}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":1},{"id":2}],[{"id":3}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":1},{"id":2}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":9}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":9}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":9}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":9}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":9}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/commits -f sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb -f path=dir/a b.ts -f per_page=100
+[{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":{"login":"carol"}}]
+exit=0
+
+SCENARIO 2: Concurrent 304 serves its validated generation without rewriting another generation
+Observed result: pass
+API responses: GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2&page=2=200 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2&page=2=200 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2&page=2=304 GET /repos/o/r/items?per_page=2=304
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":1}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":3}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":2}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":3}],[{"id":4}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":2}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":1}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":3}],[{"id":4}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2
+[{"id":2}]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":3}],[{"id":4}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":2}]]
+exit=0
+
+SCENARIO 3: HTTP failure and fresh or cached pagination refuse safely below the quota floor
+Observed result: pass
+API responses: GET /repos/o/r/error=502 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2&page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2=200 GET /repos/o/r/items?per_page=2&page=2=200 GET /repos/o/r/items?per_page=2=304 GET /repos/o/r/items?per_page=2=304
+$ bin/fm-gh-rest.sh get /repos/o/r/error
+stderr: gh: isolated service failure (HTTP 502)
+exit=1
+$ bin/fm-gh-rest.sh guard
+GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z
+exit=75
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --floor
+stderr: GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z
+exit=75
+$ bin/fm-gh-rest.sh guard
+exit=0
+$ bin/fm-gh-rest.sh guard
+GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z
+exit=75
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":1}],[{"id":2}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --floor --paginate --slurp
+stderr: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:47:46Z
+exit=75
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --paginate --slurp
+[[{"id":1}],[{"id":2}]]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --floor --paginate --slurp
+stderr: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:47:46Z
+exit=75
+$ bin/fm-gh-rest.sh get /repos/o/r/items?per_page=2 --floor
+[{"id":1}]
+exit=0
+
+SCENARIO 4: Concurrent quota responses retain the minimum and reject older windows
+Observed result: pass
+API responses: GET /repos/o/r/quota-seed=200 GET /repos/o/r/quota-low=200 GET /repos/o/r/quota-high=200 GET /repos/o/r/old-window=200 GET /repos/o/r/new-window=200
+$ bin/fm-gh-rest.sh get /repos/o/r/quota-seed
+[]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/quota-low
+[]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/quota-high
+[]
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r/old-window
+[]
+exit=0
+$ bin/fm-gh-rest.sh guard
+GitHub core quota low (749 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:47:46Z
+exit=75
+$ bin/fm-gh-rest.sh get /repos/o/r/new-window
+[]
+exit=0
+$ bin/fm-gh-rest.sh guard
+exit=0
+
+SCENARIO 5: Poll unchanged PRs conditionally and discover a new maintainer signal on an appended page
+Observed result: pass
+API responses: GET /repos/o/r/pulls/8=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=200 GET /repos/o/r/pulls/8/comments?per_page=100=200 GET /repos/o/r/issues/8/comments?per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=200 GET /repos/o/r=200 GET /repos/o/r/pulls/8/reviews?per_page=100=200 POST /graphql=200 GET /repos/o/r/pulls/8=304 GET /repos/o/r/pulls/8/reviews?per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=304 GET /repos/o/r=304 GET /repos/o/r/pulls/8/comments?per_page=100=304 GET /repos/o/r/issues/8/comments?per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=304 POST /graphql=200 GET /repos/o/r/pulls/8=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=304 GET /repos/o/r/pulls/8/reviews?per_page=100=304 GET /repos/o/r=304 GET /repos/o/r/pulls/8/comments?per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=304 GET /repos/o/r/issues/8/comments?per_page=100=304 GET /repos/o/r/issues/8/comments?per_page=100&page=2=200 POST /graphql=200
+$ bin/fm-contributions.sh poll
+exit=0
+$ bin/fm-contributions.sh poll
+exit=0
+$ bin/fm-contributions.sh poll
+contribution-wake: check: contributions delivery 81d47dbd8d0ea5c0f95bf28be43c302f585568a08cccefb238a4ea8d7153353a
+exit=0
+$ bin/fm-fleet-snapshot.sh --contribution-input
+{
+  "backlog": {
+    "present": true,
+    "records": [
+      {
+        "captain_drop": false,
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "hold_set": null,
+        "body_excerpt": null,
+        "merged": null,
+        "title": "Lab contribution",
+        "local_note": null,
+        "priority": null,
+        "structured": true,
+        "reported": null,
+        "kind": "ship",
+        "captain_actionable": false,
+        "requires_child_metadata": false,
+        "state": "queued",
+        "unresolved_blocker_ids": [],
+        "hold_age_days": null,
+        "since": null,
+        "order": 1,
+        "done": null,
+        "body_lines": [],
+        "repo": "sample",
+        "blocked_reason": null,
+        "current_role": "queued",
+        "report_path": null,
+        "checked": false,
+        "pr_url": "https://github.com/o/r/pull/8",
+        "hold_until": null,
+        "id": "delivery",
+        "hold_kind": null,
+        "raw": "- [ ] delivery - Lab contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "blocked_by": null,
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "hold_reason": null,
+        "hold_bucket": null,
+        "blocked_by_ids": []
+      }
+    ],
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-repeat/data/backlog.md"
+  },
+  "tasks": []
+}
+exit=0
+$ bin/fm-contributions.sh snapshot .conditional-live-validation/poll-repeat/input.json --all
+{
+  "known": 1,
+  "checked": 1,
+  "counts": {
+    "captain": 0,
+    "fleet": 1,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": true,
+  "proven_clear": true,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 1791551087,
+  "captain": [],
+  "captain_omitted": 0,
+  "rows": [
+    {
+      "task": "delivery",
+      "url": "https://github.com/o/r/pull/8",
+      "kind": "pr",
+      "checked_at": "2026-10-09T12:49:47Z",
+      "checked": true,
+      "final": false,
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 1,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [
+        {
+          "token": "comment:12:2026-10-09T12:49:39Z:",
+          "type": "comment",
+          "source": "https://github.com/o/r/pull/8#issuecomment-12",
+          "head": null,
+          "author": "maintainer",
+          "body": "Please clarify the contract"
+        }
+      ],
+      "actor": "fleet",
+      "reason": "incoming maintainer signal needs triage",
+      "tasks": [
+        "delivery"
+      ]
+    }
+  ]
+}
+exit=0
+
+SCENARIO 6: Quota-stale polling keeps observations, suppresses late-owner repeats, and recovers after reset
+Observed result: pass
+API responses: GET /repos/o/r/pulls/8=200 GET /repos/o/r/issues/8/comments?per_page=100=200 GET /repos/o/r=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=200 GET /repos/o/r/pulls/8/comments?per_page=100=200 GET /repos/o/r/pulls/8/reviews?per_page=100=200 POST /graphql=200 GET /repos/o/r=304 GET /repos/o/r=304 GET /repos/o/r=304 GET /repos/o/r/pulls/8=304 GET /repos/o/r/issues/8/comments?per_page=100=304 GET /repos/o/r/pulls/8/reviews?per_page=100=304 GET /repos/o/r=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=304 GET /repos/o/r/pulls/8/comments?per_page=100=304 POST /graphql=200 GET /repos/o/r/pulls/9=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=304 GET /repos/o/r/issues/9/comments?per_page=100=200 GET /repos/o/r=304 GET /repos/o/r/pulls/9/reviews?per_page=100=200 GET /repos/o/r/pulls/9/comments?per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=304 POST /graphql=200
+$ bin/fm-contributions.sh poll
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r
+{"permissions":{"push":false}}
+exit=0
+$ bin/fm-contributions.sh poll
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:49:39Z; last observations kept, marked stale
+exit=0
+$ bin/fm-contributions.sh poll
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r
+{"permissions":{"push":false}}
+exit=0
+$ bin/fm-contributions.sh poll
+exit=0
+$ bin/fm-fleet-snapshot.sh --contribution-input
+{
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-quota/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "local_note": null,
+        "hold_bucket": null,
+        "id": "delivery",
+        "repo": "sample",
+        "done": null,
+        "blocked_reason": null,
+        "captain_drop": false,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "priority": null,
+        "order": 1,
+        "unresolved_blocker_ids": [],
+        "pr_url": "https://github.com/o/r/pull/8",
+        "hold_until": null,
+        "checked": false,
+        "body_excerpt": null,
+        "current_role": "queued",
+        "raw": "- [ ] delivery - Lab contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "hold_kind": null,
+        "state": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "since": null,
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "blocked_by_ids": [],
+        "kind": "ship",
+        "reported": null,
+        "hold_reason": null,
+        "structured": true,
+        "body_lines": [],
+        "report_path": null,
+        "merged": null,
+        "title": "Lab contribution",
+        "blocked_by": null,
+        "captain_actionable": false,
+        "hold_set": null
+      },
+      {
+        "kind": "ship",
+        "links": [
+          "https://github.com/o/r/pull/8"
+        ],
+        "blocked_by_ids": [],
+        "state": "queued",
+        "requires_child_metadata": false,
+        "since": null,
+        "hold_age_days": null,
+        "hold_kind": null,
+        "blocked_by": null,
+        "captain_actionable": false,
+        "hold_set": null,
+        "merged": null,
+        "title": "Lab contribution",
+        "structured": true,
+        "body_lines": [],
+        "report_path": null,
+        "reported": null,
+        "hold_reason": null,
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "order": 2,
+        "priority": null,
+        "captain_drop": false,
+        "done": null,
+        "blocked_reason": null,
+        "hold_bucket": null,
+        "local_note": null,
+        "id": "aaa",
+        "repo": "sample",
+        "raw": "- [ ] aaa - Lab contribution https://github.com/o/r/pull/8 (repo: sample) (kind: ship)",
+        "checked": false,
+        "body_excerpt": null,
+        "current_role": "queued",
+        "hold_until": null,
+        "pr_url": "https://github.com/o/r/pull/8",
+        "unresolved_blocker_ids": []
+      },
+      {
+        "hold_kind": null,
+        "state": "queued",
+        "since": null,
+        "hold_age_days": null,
+        "requires_child_metadata": false,
+        "blocked_by_ids": [],
+        "links": [
+          "https://github.com/o/r/pull/9"
+        ],
+        "kind": "ship",
+        "reported": null,
+        "hold_reason": null,
+        "structured": true,
+        "report_path": null,
+        "body_lines": [],
+        "title": "Lab contribution",
+        "merged": null,
+        "captain_actionable": false,
+        "blocked_by": null,
+        "hold_set": null,
+        "local_note": null,
+        "hold_bucket": null,
+        "repo": "sample",
+        "id": "tail",
+        "blocked_reason": null,
+        "done": null,
+        "captain_drop": false,
+        "order": 3,
+        "priority": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "unresolved_blocker_ids": [],
+        "pr_url": "https://github.com/o/r/pull/9",
+        "hold_until": null,
+        "checked": false,
+        "current_role": "queued",
+        "body_excerpt": null,
+        "raw": "- [ ] tail - Lab contribution https://github.com/o/r/pull/9 (repo: sample) (kind: ship)"
+      }
+    ]
+  },
+  "tasks": []
+}
+exit=0
+$ bin/fm-contributions.sh snapshot .conditional-live-validation/poll-quota/input.json --all
+{
+  "known": 2,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 2,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0,
+  "rows": [
+    {
+      "task": "aaa",
+      "url": "https://github.com/o/r/pull/8",
+      "kind": "pr",
+      "checked_at": null,
+      "checked": false,
+      "final": false,
+      "head": null,
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 0,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [],
+      "actor": "fleet",
+      "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:49:39Z",
+      "tasks": [
+        "aaa",
+        "delivery"
+      ]
+    },
+    {
+      "task": "tail",
+      "url": "https://github.com/o/r/pull/9",
+      "kind": "pr",
+      "checked_at": null,
+      "checked": false,
+      "final": false,
+      "head": null,
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 0,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [],
+      "actor": "fleet",
+      "reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:49:39Z",
+      "tasks": [
+        "tail"
+      ]
+    }
+  ]
+}
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r
+{"permissions":{"push":false}}
+exit=0
+$ bin/fm-contributions.sh poll
+contributions: GitHub core quota low (300 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T14:49:39Z; last observations kept, marked stale
+exit=0
+$ bin/fm-contributions.sh poll
+exit=0
+
+SCENARIO 7: A completed low-quota issue remains measured while budget-skipped tail owners become stale
+Observed result: pass
+API responses: GET /repos/o/r/issues/9=200 GET /repos/o/r/issues/9/events?per_page=100=200 GET /repos/o/r/issues/9/comments?per_page=100=200 GET /repos/o/r/pulls/10=200 GET /repos/o/r=200 GET /repos/o/r/pulls/10/comments?per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=200 GET /repos/o/r/pulls/10/reviews?per_page=100=200 GET /repos/o/r/issues/10/comments?per_page=100=200 POST /graphql=200 GET /repos/o/r/issues/9=304 GET /repos/o/r/issues/9/events?per_page=100=304 GET /repos/o/r/issues/9/comments?per_page=100=304
+$ bin/fm-contributions.sh poll
+exit=0
+$ bin/fm-contributions.sh poll
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:51:36Z; last observations kept, marked stale
+exit=0
+$ bin/fm-fleet-snapshot.sh --contribution-input
+{
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/poll-wave-corrected-issue/data/backlog.md",
+    "records": [
+      {
+        "structured": true,
+        "body_excerpt": null,
+        "requires_child_metadata": false,
+        "links": [
+          "https://github.com/o/r/issues/9"
+        ],
+        "blocked_reason": null,
+        "raw": "- [ ] filed - Lab contribution https://github.com/o/r/issues/9 (repo: sample) (kind: ship)",
+        "merged": null,
+        "hold_bucket": null,
+        "priority": null,
+        "state": "queued",
+        "hold_age_days": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "checked": false,
+        "pr_url": null,
+        "title": "Lab contribution",
+        "id": "filed",
+        "hold_kind": null,
+        "hold_set": null,
+        "report_path": null,
+        "done": null,
+        "hold_until": null,
+        "reported": null,
+        "since": null,
+        "local_note": null,
+        "kind": "ship",
+        "hold_reason": null,
+        "blocked_by_ids": [],
+        "current_role": "queued",
+        "body_lines": [],
+        "unresolved_blocker_ids": [],
+        "blocked_by": null,
+        "repo": "sample",
+        "captain_actionable": false,
+        "order": 1,
+        "captain_drop": false
+      },
+      {
+        "current_role": "queued",
+        "blocked_by_ids": [],
+        "hold_reason": null,
+        "kind": "ship",
+        "local_note": null,
+        "since": null,
+        "captain_drop": false,
+        "captain_actionable": false,
+        "order": 2,
+        "repo": "sample",
+        "blocked_by": null,
+        "unresolved_blocker_ids": [],
+        "body_lines": [],
+        "pr_url": "https://github.com/o/r/pull/10",
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "checked": false,
+        "hold_age_days": null,
+        "state": "queued",
+        "priority": null,
+        "hold_bucket": null,
+        "merged": null,
+        "raw": "- [ ] tail - Lab contribution https://github.com/o/r/pull/10 (repo: sample) (kind: ship)",
+        "blocked_reason": null,
+        "links": [
+          "https://github.com/o/r/pull/10"
+        ],
+        "requires_child_metadata": false,
+        "body_excerpt": null,
+        "structured": true,
+        "reported": null,
+        "hold_until": null,
+        "done": null,
+        "report_path": null,
+        "hold_set": null,
+        "hold_kind": null,
+        "id": "tail",
+        "title": "Lab contribution"
+      }
+    ],
+    "present": true
+  },
+  "tasks": []
+}
+exit=0
+$ bin/fm-contributions.sh snapshot .conditional-live-validation/poll-wave-corrected-issue/input.json --all
+{
+  "known": 2,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 2,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 1791504900,
+  "captain": [],
+  "captain_omitted": 0,
+  "rows": [
+    {
+      "task": "filed",
+      "url": "https://github.com/o/r/issues/9",
+      "kind": "issue",
+      "checked_at": "2026-10-09T00:01:00Z",
+      "checked": false,
+      "final": false,
+      "head": null,
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 0,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [],
+      "actor": "fleet",
+      "reason": "contribution not recently checked",
+      "tasks": [
+        "filed"
+      ]
+    },
+    {
+      "task": "tail",
+      "url": "https://github.com/o/r/pull/10",
+      "kind": "pr",
+      "checked_at": "2026-10-09T00:00:00Z",
+      "checked": false,
+      "final": false,
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": null,
+      "reviews": [],
+      "distinct_checks": 1,
+      "missing_verdicts": 0,
+      "pending_checks": 0,
+      "failed_checks": 0,
+      "stale_verdicts": 0,
+      "signals": [],
+      "actor": "fleet",
+      "reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:51:36Z",
+      "tasks": [
+        "tail"
+      ]
+    }
+  ]
+}
+exit=0
+
+SCENARIO 8: A low-quota PR wave blocks GraphQL and marks every unmeasured tail owner
+Observed result: pass
+API responses: GET /repos/o/r/pulls/8=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=200 GET /repos/o/r/issues/8/comments?per_page=100=200 GET /repos/o/r/pulls/8/reviews?per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100=200 GET /repos/o/r=200 GET /repos/o/r/pulls/8/comments?per_page=100=200
+$ bin/fm-contributions.sh poll
+contributions: GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:52:56Z; last observations kept, marked stale
+exit=0
+
+SCENARIO 9: Ledger keeps all published rows stale under quota refusal and refreshes after reset
+Observed result: pass
+API responses: GET /repos/o/r/pulls?state=open&per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100=200 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=200 GET /repos/o/r/pulls?state=open&per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=304 GET /repos/o/r=200 GET /repos/o/r=200 GET /repos/o/r/pulls?state=open&per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100=304 GET /repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100=304 GET /repos/o/r/pulls?state=open&per_page=100=304
+$ bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791550443, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live", "complete": true, "rows": [{"id": "0bb7cb632cd5d10acc5c68be", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true}, {"id": "4b42e7d0e8233623e839ddeb", "category": "red_check", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 0, "limit_seconds": 0, "overdue": true, "evidence": "build"}]}
+exit=0
+$ bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791550445, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live", "complete": true, "rows": [{"id": "0bb7cb632cd5d10acc5c68be", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true}, {"id": "4b42e7d0e8233623e839ddeb", "category": "red_check", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2, "limit_seconds": 0, "overdue": true, "evidence": "build"}]}
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r
+{"permissions":{"push":false}}
+exit=0
+$ bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791550445, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live", "complete": false, "rows": [{"id": "81efc51801d899bfb6a622b7", "category": "coverage", "subject": "ledger stale", "owner": "firstmate", "next_action": "wait for the GitHub quota window to reset; the next run refreshes every row", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z", "informational": true}, {"id": "0bb7cb632cd5d10acc5c68be", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true, "stale": true}, {"id": "4b42e7d0e8233623e839ddeb", "category": "red_check", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 2, "limit_seconds": 0, "overdue": true, "evidence": "build", "stale": true}], "stale": true, "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z", "stale_until_epoch": 1791554043}
+exit=0
+$ bin/fm-gh-rest.sh get /repos/o/r
+{"permissions":{"push":false}}
+exit=0
+$ bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791550448, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-no-prior", "complete": false, "rows": [{"id": "d7b6078e39ab8b786a537a1f", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z"}], "stale": true, "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z", "stale_until_epoch": 1791554043}
+exit=0
+$ bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791550448, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live", "complete": true, "rows": [{"id": "0bb7cb632cd5d10acc5c68be", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true}, {"id": "4b42e7d0e8233623e839ddeb", "category": "red_check", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 5, "limit_seconds": 0, "overdue": true, "evidence": "build"}]}
+exit=0
+$ bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1791550448, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live", "complete": false, "rows": [{"id": "81efc51801d899bfb6a622b7", "category": "coverage", "subject": "ledger stale", "owner": "firstmate", "next_action": "wait for the GitHub quota window to reset; the next run refreshes every row", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z", "informational": true}, {"id": "0bb7cb632cd5d10acc5c68be", "category": "ready_not_started", "subject": "delivery", "owner": "firstmate", "next_action": "informational: queued and not selected for dispatch", "age_seconds": null, "limit_seconds": 1800, "overdue": false, "evidence": "", "informational": true, "stale": true}, {"id": "4b42e7d0e8233623e839ddeb", "category": "red_check", "subject": "https://github.com/o/r/pull/8", "owner": "firstmate", "next_action": "diagnose: code or test", "age_seconds": 5, "limit_seconds": 0, "overdue": true, "evidence": "build", "stale": true}], "stale": true, "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z", "stale_until_epoch": 1791554043}
+exit=0
+
+SCENARIO 10: PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor
+Observed result: pass
+API responses: POST /graphql=200 POST /graphql=200 POST /graphql=200 POST /graphql=200 POST /graphql=200 GET /repos/o/r/pulls/8/reviews?per_page=100=200 GET /repos/o/r/pulls/8/reviews?per_page=100&page=2=200 POST /graphql=200 POST /graphql=200 POST /graphql=200 GET /repos/o/r/pulls/8/reviews?per_page=100=304 GET /repos/o/r/pulls/8/reviews?per_page=100&page=2=304 GET /repos/o/r/pulls/8=200 GET /repos/o/r/pulls/8/files?per_page=100=200 GET /repos/o/r/pulls/8/files?per_page=100&page=2=200 GET /repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100=200 GET /repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=b.ts&per_page=100=200 GET /repos/o/r/pulls/8=304 GET /repos/o/r/pulls/8/files?per_page=100=304 GET /repos/o/r/pulls/8/files?per_page=100&page=2=304 GET /repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=dir%2Fa%20b.ts&per_page=100=304 GET /repos/o/r/commits?sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&path=b.ts&per_page=100=304
+$ bin/fm-pr-state.sh https://github.com/o/r/pull/8
+CHECKS: none reported yet
+REVIEW DECISION: CHANGES_REQUESTED
+REVIEW: maintainer CHANGES_REQUESTED
+STALE BLOCKING REVIEW: oldreviewer CHANGES_REQUESTED at bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+exit=0
+$ bin/fm-pr-state.sh https://github.com/o/r/pull/8
+CHECKS: none reported yet
+REVIEW DECISION: CHANGES_REQUESTED
+REVIEW: maintainer CHANGES_REQUESTED
+STALE BLOCKING REVIEW: oldreviewer CHANGES_REQUESTED at bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+exit=0
+$ bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8
+carol	2 recent commits
+bob	1 recent commit
+exit=0
+$ bin/fm-pr-reviewers.sh https://github.com/o/r/pull/8
+carol	2 recent commits
+bob	1 recent commit
+exit=0
+$ bin/fm-gh-rest.sh guard
+GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:55:29Z
+exit=75
+

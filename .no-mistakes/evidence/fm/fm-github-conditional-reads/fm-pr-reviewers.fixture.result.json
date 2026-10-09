@@ -1,0 +1,17 @@
+{
+  "kind": "supplemental fixture regression (not live)",
+  "command": [
+    "bash",
+    "tests/fm-pr-reviewers.test.sh"
+  ],
+  "returncode": 0,
+  "seconds": 8.001,
+  "environment": {
+    "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/empty-home",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.focused-fixtures-43kgnorh/tmp",
+    "LANG": "en_US.UTF-8"
+  },
+  "stdout": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/fm-pr-reviewers.fixture.stdout.log",
+  "stderr": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/fm-pr-reviewers.fixture.stderr.log"
+}

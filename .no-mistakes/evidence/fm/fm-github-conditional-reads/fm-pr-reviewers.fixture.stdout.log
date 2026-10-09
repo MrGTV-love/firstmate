@@ -1,0 +1,4 @@
+ok - reviewer candidates use API-resolved logins and unique commits
+ok - author-only evidence produces no candidate and says why
+ok - argument and lookup refusals exit nonzero
+ok - HTTP and passthrough shims preserve backend failures without a successful response

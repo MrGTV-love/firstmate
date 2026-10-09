@@ -1,0 +1,86 @@
+[
+  {
+    "name": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+    "result": "fail",
+    "live": true,
+    "reason": "(['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh', 'https://github.com/o/r/pull/8'], 2, '', 'struct field for \"repository\" doesn\\'t exist in any of 1 places to unmarshal\\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\\n')",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/drive.py\", line 61, in scenario\n    details=fn()\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/readers.py\", line 57, in advisory\n    first=run(p,[ROOT/'bin/fm-pr-state.sh','https://github.com/o/r/pull/8'])\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/drive.py\", line 36, in run\n    assert done.returncode == expected,(command,done.returncode,done.stdout,done.stderr)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: (['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh', 'https://github.com/o/r/pull/8'], 2, '', 'struct field for \"repository\" doesn\\'t exist in any of 1 places to unmarshal\\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\\n')\n",
+    "commands": [
+      {
+        "scenario": "PR advisory readers report all paginated blockers and reviewer evidence even below the sweep floor",
+        "command": [
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-pr-state.sh",
+          "https://github.com/o/r/pull/8"
+        ],
+        "exit": 2,
+        "stdout": "",
+        "stderr": "struct field for \"repository\" doesn't exist in any of 1 places to unmarshal\nfm-pr-state: could not read required checks for https://github.com/o/r/pull/8\n"
+      }
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "conditional": null,
+        "request_body": "{\"query\":\"\\n\\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\\n\\t\\trepository(owner: $owner, name: $repo) {\\n\\t\\t\\tpullRequest(number: $pr_number) {state,mergedAt,isDraft,headRefOid,author{login,...on User{id,name}},mergeable,reviewDecision,id,number}\\n\\t\\t}\\n\\t}\",\"variables\":{\"owner\":\"o\",\"pr_number\":8,\"repo\":\"r\"}}",
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791554101,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": null,
+        "link": null,
+        "response_body": {
+          "data": {
+            "repository": {
+              "pullRequest": {
+                "state": "OPEN",
+                "mergedAt": null,
+                "isDraft": false,
+                "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "author": {
+                  "login": "author",
+                  "id": null,
+                  "name": null
+                },
+                "mergeable": "MERGEABLE",
+                "reviewDecision": "CHANGES_REQUESTED",
+                "id": "PR_lab",
+                "number": 8
+              }
+            }
+          }
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "conditional": null,
+        "request_body": "{\"query\":\"\\n\\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\\n\\t\\trepository(owner: $owner, name: $repo) {\\n\\t\\t\\tpullRequest(number: $pr_number) {number,headRefName,id}\\n\\t\\t}\\n\\t}\",\"variables\":{\"owner\":\"o\",\"pr_number\":8,\"repo\":\"r\"}}",
+        "rate": {
+          "limit": 5000,
+          "remaining": 4000,
+          "reset": 1791554101,
+          "resource": "core"
+        },
+        "status": 200,
+        "etag": null,
+        "link": null,
+        "response_body": {
+          "data": {
+            "repository": {
+              "pullRequest": {
+                "number": 8,
+                "headRefName": "fm/lab",
+                "id": "PR_lab"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FKQKCEVXQYBJPMP1A0C6BN/live-10.json"
+  }
+]

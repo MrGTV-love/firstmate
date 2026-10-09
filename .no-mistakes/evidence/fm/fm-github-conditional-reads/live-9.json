@@ -1,0 +1,638 @@
+{
+  "name": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+  "result": "pass",
+  "live": true,
+  "reason": "",
+  "details": {
+    "healthy": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791550443,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live",
+      "complete": true,
+      "rows": [
+        {
+          "id": "0bb7cb632cd5d10acc5c68be",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true
+        },
+        {
+          "id": "4b42e7d0e8233623e839ddeb",
+          "category": "red_check",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "diagnose: code or test",
+          "age_seconds": 0,
+          "limit_seconds": 0,
+          "overdue": true,
+          "evidence": "build"
+        }
+      ]
+    },
+    "warm": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791550445,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live",
+      "complete": true,
+      "rows": [
+        {
+          "id": "0bb7cb632cd5d10acc5c68be",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true
+        },
+        {
+          "id": "4b42e7d0e8233623e839ddeb",
+          "category": "red_check",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "diagnose: code or test",
+          "age_seconds": 2,
+          "limit_seconds": 0,
+          "overdue": true,
+          "evidence": "build"
+        }
+      ]
+    },
+    "retained": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791550445,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live",
+      "complete": false,
+      "rows": [
+        {
+          "id": "81efc51801d899bfb6a622b7",
+          "category": "coverage",
+          "subject": "ledger stale",
+          "owner": "firstmate",
+          "next_action": "wait for the GitHub quota window to reset; the next run refreshes every row",
+          "age_seconds": null,
+          "limit_seconds": 0,
+          "overdue": false,
+          "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z",
+          "informational": true
+        },
+        {
+          "id": "0bb7cb632cd5d10acc5c68be",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true,
+          "stale": true
+        },
+        {
+          "id": "4b42e7d0e8233623e839ddeb",
+          "category": "red_check",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "diagnose: code or test",
+          "age_seconds": 2,
+          "limit_seconds": 0,
+          "overdue": true,
+          "evidence": "build",
+          "stale": true
+        }
+      ],
+      "stale": true,
+      "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z",
+      "stale_until_epoch": 1791554043
+    },
+    "missing_prior": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791550448,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-no-prior",
+      "complete": false,
+      "rows": [
+        {
+          "id": "d7b6078e39ab8b786a537a1f",
+          "category": "coverage",
+          "subject": "ledger degraded",
+          "owner": "firstmate",
+          "next_action": "restore the unreadable sources and rerun the reconciler",
+          "age_seconds": null,
+          "limit_seconds": 0,
+          "overdue": true,
+          "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z"
+        }
+      ],
+      "stale": true,
+      "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z",
+      "stale_until_epoch": 1791554043
+    },
+    "recovered": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791550448,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live",
+      "complete": true,
+      "rows": [
+        {
+          "id": "0bb7cb632cd5d10acc5c68be",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true
+        },
+        {
+          "id": "4b42e7d0e8233623e839ddeb",
+          "category": "red_check",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "diagnose: code or test",
+          "age_seconds": 5,
+          "limit_seconds": 0,
+          "overdue": true,
+          "evidence": "build"
+        }
+      ]
+    },
+    "midpage_retained": {
+      "schema": "fm-open-loops.v1",
+      "generated_epoch": 1791550448,
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live",
+      "complete": false,
+      "rows": [
+        {
+          "id": "81efc51801d899bfb6a622b7",
+          "category": "coverage",
+          "subject": "ledger stale",
+          "owner": "firstmate",
+          "next_action": "wait for the GitHub quota window to reset; the next run refreshes every row",
+          "age_seconds": null,
+          "limit_seconds": 0,
+          "overdue": false,
+          "evidence": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z",
+          "informational": true
+        },
+        {
+          "id": "0bb7cb632cd5d10acc5c68be",
+          "category": "ready_not_started",
+          "subject": "delivery",
+          "owner": "firstmate",
+          "next_action": "informational: queued and not selected for dispatch",
+          "age_seconds": null,
+          "limit_seconds": 1800,
+          "overdue": false,
+          "evidence": "",
+          "informational": true,
+          "stale": true
+        },
+        {
+          "id": "4b42e7d0e8233623e839ddeb",
+          "category": "red_check",
+          "subject": "https://github.com/o/r/pull/8",
+          "owner": "firstmate",
+          "next_action": "diagnose: code or test",
+          "age_seconds": 5,
+          "limit_seconds": 0,
+          "overdue": true,
+          "evidence": "build",
+          "stale": true
+        }
+      ],
+      "stale": true,
+      "stale_reason": "GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z",
+      "stale_until_epoch": 1791554043
+    }
+  },
+  "commands": [
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+        "--heartbeat",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550443, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": true, \"rows\": [{\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 0, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\"}]}\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+        "--heartbeat",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550445, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": true, \"rows\": [{\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 2, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\"}]}\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r"
+      ],
+      "exit": 0,
+      "stdout": "{\"permissions\":{\"push\":false}}\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+        "--heartbeat",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550445, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": false, \"rows\": [{\"id\": \"81efc51801d899bfb6a622b7\", \"category\": \"coverage\", \"subject\": \"ledger stale\", \"owner\": \"firstmate\", \"next_action\": \"wait for the GitHub quota window to reset; the next run refreshes every row\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": false, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"informational\": true}, {\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true, \"stale\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 2, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\", \"stale\": true}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"stale_until_epoch\": 1791554043}\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-gh-rest.sh",
+        "get",
+        "/repos/o/r"
+      ],
+      "exit": 0,
+      "stdout": "{\"permissions\":{\"push\":false}}\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+        "--heartbeat",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550448, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-no-prior\", \"complete\": false, \"rows\": [{\"id\": \"d7b6078e39ab8b786a537a1f\", \"category\": \"coverage\", \"subject\": \"ledger degraded\", \"owner\": \"firstmate\", \"next_action\": \"restore the unreadable sources and rerun the reconciler\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\"}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"stale_until_epoch\": 1791554043}\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+        "--heartbeat",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550448, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": true, \"rows\": [{\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 5, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\"}]}\n",
+      "stderr": ""
+    },
+    {
+      "scenario": "Ledger keeps all published rows stale under quota refusal and refreshes after reset",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/bin/fm-open-loops.sh",
+        "--heartbeat",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"schema\": \"fm-open-loops.v1\", \"generated_epoch\": 1791550448, \"home\": \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKQKCEVXQYBJPMP1A0C6BN/.conditional-live-validation/ledger-live\", \"complete\": false, \"rows\": [{\"id\": \"81efc51801d899bfb6a622b7\", \"category\": \"coverage\", \"subject\": \"ledger stale\", \"owner\": \"firstmate\", \"next_action\": \"wait for the GitHub quota window to reset; the next run refreshes every row\", \"age_seconds\": null, \"limit_seconds\": 0, \"overdue\": false, \"evidence\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"informational\": true}, {\"id\": \"0bb7cb632cd5d10acc5c68be\", \"category\": \"ready_not_started\", \"subject\": \"delivery\", \"owner\": \"firstmate\", \"next_action\": \"informational: queued and not selected for dispatch\", \"age_seconds\": null, \"limit_seconds\": 1800, \"overdue\": false, \"evidence\": \"\", \"informational\": true, \"stale\": true}, {\"id\": \"4b42e7d0e8233623e839ddeb\", \"category\": \"red_check\", \"subject\": \"https://github.com/o/r/pull/8\", \"owner\": \"firstmate\", \"next_action\": \"diagnose: code or test\", \"age_seconds\": 5, \"limit_seconds\": 0, \"overdue\": true, \"evidence\": \"build\", \"stale\": true}], \"stale\": true, \"stale_reason\": \"GitHub core quota low (500 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-09T13:54:03Z\", \"stale_until_epoch\": 1791554043}\n",
+      "stderr": ""
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls?state=open&per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"1516ee7ade76706c\"",
+      "link": null,
+      "response_body": [
+        {
+          "number": 8,
+          "html_url": "https://github.com/o/r/pull/8",
+          "state": "open",
+          "user": {
+            "login": "author"
+          },
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "fm/lab"
+          },
+          "base": {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "draft": false,
+          "mergeable": true,
+          "merged_at": null,
+          "updated_at": "2026-10-09T12:54:03Z",
+          "requested_reviewers": [],
+          "requested_teams": []
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"45dbe87b040d2b1f\"",
+      "link": null,
+      "response_body": {
+        "check_runs": [
+          {
+            "name": "build",
+            "id": 1,
+            "app": {
+              "id": 10
+            },
+            "status": "completed",
+            "conclusion": "failure",
+            "completed_at": "2026-10-09T12:54:03Z"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls?state=open&per_page=100",
+      "conditional": "\"1516ee7ade76706c\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"1516ee7ade76706c\"",
+      "link": null,
+      "response_body": [
+        {
+          "number": 8,
+          "html_url": "https://github.com/o/r/pull/8",
+          "state": "open",
+          "user": {
+            "login": "author"
+          },
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "fm/lab"
+          },
+          "base": {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "draft": false,
+          "mergeable": true,
+          "merged_at": null,
+          "updated_at": "2026-10-09T12:54:03Z",
+          "requested_reviewers": [],
+          "requested_teams": []
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100",
+      "conditional": "\"45dbe87b040d2b1f\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"45dbe87b040d2b1f\"",
+      "link": null,
+      "response_body": {
+        "check_runs": [
+          {
+            "name": "build",
+            "id": 1,
+            "app": {
+              "id": 10
+            },
+            "status": "completed",
+            "conclusion": "failure",
+            "completed_at": "2026-10-09T12:54:03Z"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": "\"4f53cda18c2baa0c\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"00a9f31979dc5909\"",
+      "link": null,
+      "response_body": {
+        "permissions": {
+          "push": false
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r",
+      "conditional": null,
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 200,
+      "etag": "\"00a9f31979dc5909\"",
+      "link": null,
+      "response_body": {
+        "permissions": {
+          "push": false
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls?state=open&per_page=100",
+      "conditional": "\"1516ee7ade76706c\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"1516ee7ade76706c\"",
+      "link": null,
+      "response_body": [
+        {
+          "number": 8,
+          "html_url": "https://github.com/o/r/pull/8",
+          "state": "open",
+          "user": {
+            "login": "author"
+          },
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "fm/lab"
+          },
+          "base": {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "draft": false,
+          "mergeable": true,
+          "merged_at": null,
+          "updated_at": "2026-10-09T12:54:03Z",
+          "requested_reviewers": [],
+          "requested_teams": []
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100",
+      "conditional": "\"45dbe87b040d2b1f\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"45dbe87b040d2b1f\"",
+      "link": null,
+      "response_body": {
+        "check_runs": [
+          {
+            "name": "build",
+            "id": 1,
+            "app": {
+              "id": 10
+            },
+            "status": "completed",
+            "conclusion": "failure",
+            "completed_at": "2026-10-09T12:54:03Z"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100",
+      "conditional": "\"4f53cda18c2baa0c\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4000,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"4f53cda18c2baa0c\"",
+      "link": null,
+      "response_body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/o/r/pulls?state=open&per_page=100",
+      "conditional": "\"1516ee7ade76706c\"",
+      "request_body": null,
+      "rate": {
+        "limit": 5000,
+        "remaining": 500,
+        "reset": 1791554043,
+        "resource": "core"
+      },
+      "status": 304,
+      "etag": "\"1516ee7ade76706c\"",
+      "link": "<https://api.github.com/repos/o/r/pulls?state=open&per_page=100&page=2>; rel=\"next\"",
+      "response_body": [
+        {
+          "number": 8,
+          "html_url": "https://github.com/o/r/pull/8",
+          "state": "open",
+          "user": {
+            "login": "author"
+          },
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "fm/lab"
+          },
+          "base": {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "draft": false,
+          "mergeable": true,
+          "merged_at": null,
+          "updated_at": "2026-10-09T12:54:03Z",
+          "requested_reviewers": [],
+          "requested_teams": []
+        }
+      ]
+    }
+  ]
+}
