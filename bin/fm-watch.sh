@@ -2890,7 +2890,12 @@ signal_phase_note_queued() {
       || ! printf '%s\n' "${SIGNAL_PHASE_QUEUED_REASON#signal:}" > "$SIGNAL_PHASE_LATE_MARKER.tmp.$$" \
       || ! mv -f "$SIGNAL_PHASE_LATE_MARKER.tmp.$$" "$SIGNAL_PHASE_LATE_MARKER"; then
       rm -f -- "$SIGNAL_PHASE_LATE_MARKER.tmp.$$"
-      exit 1
+      FM_WAKE_AFTER_OUTPUT_ACTION=
+      if [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ]; then
+        "$FM_WAKE_POST_OUTPUT_ACTION" 1 || true
+        FM_WAKE_POST_OUTPUT_ACTION=
+      fi
+      wake "$SIGNAL_PHASE_QUEUED_REASON"
     fi
   fi
   return 0
@@ -2898,7 +2903,7 @@ signal_phase_note_queued() {
 
 watch_before_wake() {
   case "$1" in
-    signal:*) rm -f -- "$SIGNAL_PHASE_LATE_MARKER" ;;
+    signal:*) rm -f -- "$SIGNAL_PHASE_LATE_MARKER" 2>/dev/null || true ;;
     *) signal_phase_flush ;;
   esac
 }

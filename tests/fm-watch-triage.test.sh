@@ -2337,25 +2337,30 @@ test_late_signal_follow_up_filters_drained_rows() {
 touch "$FM_STATE_OVERRIDE/late-check-injected"
 printf 'needs-decision [key=access]: need access\n' >> "$FM_STATE_OVERRIDE/a.status"
 printf 'done: routine task completed\n' >> "$FM_STATE_OVERRIDE/b.status"
-[ ! -e "$FM_STATE_OVERRIDE/late-marker-unwritable" ] || mkdir "$FM_STATE_OVERRIDE/.watch-late-signals"
+[ ! -e "$FM_STATE_OVERRIDE/late-marker-unwritable" ] || { mkdir "$FM_STATE_OVERRIDE/.watch-late-signals"; exit 0; }
 printf 'late check completed\n'
 SH
     chmod 0700 "$state/late.check.sh"
     FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" late >/dev/null || fail "could not register late signal check"
     [ "$consume" != unwritable ] || touch "$state/late-marker-unwritable"
-    watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" FM_CHECK_INTERVAL=1
+    watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" FM_CHECK_INTERVAL=1 \
+      FM_WATCH_HANDLING_SUCCESSOR=1
     pid=$!
     if [ "$consume" = unwritable ]; then
-      wait_for_exit "$pid" 300 && fail "watcher delivered without persisting the late signal marker"
-      [ ! -s "$out" ] || fail "unpersisted late signals allowed a wake delivery"
-      [ -s "$state/.watcher-down" ] || fail "failed late signal persistence did not leave recovery evidence"
+      wait_for_exit "$pid" 300 || { reap "$pid"; fail "marker-store failure did not deliver its queued signals"; }
+      [ "$(cat "$out")" = "signal: $state/a.status $state/b.status" ] \
+        || fail "marker-store failure lost its accumulated signal headline: $(cat "$out")"
+      assert_watch_offer "$state" "$out" 0 0 b
+      [ "$(cat "$state/.prelude-progress")" = 10 ] || fail "signal fallback skipped unfinished checks"
       rmdir "$state/.watch-late-signals"
       next_out="$dir/recovery.out"
-      watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config"
+      watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+        FM_WATCH_HANDLING_SUCCESSOR=1
       pid=$!
-      wait_for_exit "$pid" 600 || { reap "$pid"; fail "unpersisted late signals were not resurfaced by recovery: $(cat "$next_out")"; }
-      [ "$(cat "$next_out")" = 'check: rearm-resurface' ] || fail "failed persistence did not recover durable signals"
-      assert_watch_offer "$state" "$next_out" 0 0 b
+      wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "successor did not finish the interrupted checks: $(cat "$next_out")"; }
+      [ ! -s "$next_out" ] || { reap "$pid"; fail "marker failure caused a duplicate signal wake"; }
+      [ ! -e "$state/.prelude-progress" ] || { reap "$pid"; fail "successor left completed maintenance owed"; }
+      reap "$pid"
       continue
     fi
     wait_for_exit "$pid" 300 || { reap "$pid"; fail "late signal check did not deliver"; }
@@ -2389,7 +2394,72 @@ SH
     [ ! -e "$state/.watch-late-signals" ] || { reap "$pid"; fail "consumed late signal marker remained"; }
     reap "$pid"
   done
-  pass "follow-ups include only unread signal rows, skip drained batches, and require durable persistence"
+  pass "follow-ups filter drained rows and marker-store failures deliver signals in successor posture"
+}
+
+test_late_signal_marker_failure_before_procevent() {
+  local dir state fakebin out next_out pid fault real_mv marker
+  for fault in directory write rename; do
+    dir=$(make_case "late-marker-procevent-$fault"); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+    mkdir -p "$dir/approved" "$dir/config"
+    printf 'project=%s/approved\nkind=ship\n' "$dir" > "$state/a.meta"
+    printf 'working: setup\n' > "$state/a.status"
+    prime_status_seen "$state" "$state/a.status" || fail "could not prime process-event late signal"
+    append_wake "$state" check procevent:late-marker:1 'check: process-event fixture' \
+      || fail "could not queue process-event fixture"
+    printf '6\n' > "$state/.prelude-progress"
+    printf '%s\n' "$fault" > "$state/late-marker-fault"
+    real_mv=$(command -v mv)
+    printf '#!/usr/bin/env bash\nreal_mv=%q\n' "$real_mv" > "$fakebin/mv"
+    cat >> "$fakebin/mv" <<'SH'
+dest=${!#}
+if [ "$dest" = "$FM_STATE_OVERRIDE/.prelude-progress" ] \
+  && [ ! -e "$FM_STATE_OVERRIDE/late-signal-injected" ]; then
+  "$real_mv" "$@" || exit
+  [ "$(cat "$dest")" = 7 ] || exit 0
+  touch "$FM_STATE_OVERRIDE/late-signal-injected"
+  printf 'done: finished before process-event delivery\n' >> "$FM_STATE_OVERRIDE/a.status"
+  case "$(cat "$FM_STATE_OVERRIDE/late-marker-fault")" in
+    directory) mkdir "$FM_STATE_OVERRIDE/.watch-late-signals" ;;
+    write) mkdir "$FM_STATE_OVERRIDE/.watch-late-signals.tmp.$(cat "$FM_STATE_OVERRIDE/.watch.lock/pid")" ;;
+  esac
+  exit 0
+fi
+if [ "$dest" = "$FM_STATE_OVERRIDE/.watch-late-signals" ] \
+  && [ "$(cat "$FM_STATE_OVERRIDE/late-marker-fault" 2>/dev/null)" = rename ]; then
+  exit 1
+fi
+exec "$real_mv" "$@"
+SH
+    chmod 0700 "$fakebin/mv"
+    watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1
+    pid=$!
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$fault marker failure lost the queued signal"; }
+    [ "$(cat "$out")" = "signal: $state/a.status" ] \
+      || fail "$fault marker failure emitted the wrong headline: $(cat "$out")"
+    assert_watch_offer "$state" "$out" 1 0 a
+    [ "$(cat "$state/.prelude-progress")" = 7 ] || fail "signal fallback advanced process-event maintenance"
+    for marker in "$state"/.seen-procevent-*; do
+      [ ! -e "$marker" ] || fail "signal fallback marked the process-event headline delivered"
+    done
+    [ ! -e "$state/.wake-queue.lock" ] || fail "signal fallback retained the process-event queue lock"
+    case "$fault" in
+      directory) rmdir "$state/.watch-late-signals" ;;
+      write) rmdir "$state/.watch-late-signals.tmp.$pid" ;;
+    esac
+    rm -f "$state/late-marker-fault"
+    next_out="$dir/follow-up.out"
+    watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
+      FM_WATCH_HANDLING_SUCCESSOR=1
+    pid=$!
+    wait_for_exit "$pid" 300 || { reap "$pid"; fail "$fault marker failure lost the interrupted process-event wake"; }
+    [ "$(cat "$next_out")" = 'check: process-event result captured: procevent:late-marker:1' ] \
+      || fail "successor did not deliver the interrupted process-event headline: $(cat "$next_out")"
+    [ "$(cat "$state/.prelude-progress")" = 8 ] || fail "successful process-event delivery did not advance maintenance"
+    [ ! -e "$state/.wake-queue.lock" ] || fail "process-event delivery retained its queue lock"
+  done
+  pass "late marker failures deliver signals and leave interrupted process-event wakes owed"
 }
 
 test_late_signal_routing_regressions() {
@@ -2398,6 +2468,7 @@ test_late_signal_routing_regressions() {
   test_flushed_signals_preserve_main_owned_routing
   test_heartbeat_late_signal_retains_fleet_scope
   test_late_signal_follow_up_filters_drained_rows
+  test_late_signal_marker_failure_before_procevent
 }
 
 # A low-priority wake used to pre-empt the signal scan: an overdue-ledger wake
@@ -7248,6 +7319,7 @@ test_signal_not_held_behind_a_blocked_check
 test_flushed_signals_preserve_main_owned_routing
 test_heartbeat_late_signal_retains_fleet_scope
 test_late_signal_follow_up_filters_drained_rows
+test_late_signal_marker_failure_before_procevent
 test_signal_not_preempted_by_an_overdue_ledger
 test_cycle_work_runs_after_bounded_signal_deferrals
 test_invalid_prelude_deferral_marker_restores_the_previous_order
