@@ -974,6 +974,12 @@ Pi-family secondmates can start unattended in Firstmate-seeded homes without acc
 
 For omp session posture, worker-only memory scope, and safe secondmate extension loading, see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
 
+Before an omp launch that depends on the shared Default role, `fm-spawn.sh` reads the global `modelRoles.default` and refuses a missing role or a selector absent from a catalog that lists its provider.
+The remedy is to pass `--model <provider>/<id>` or a dispatch profile, or restore the Default role with `/model`; Firstmate never writes the shared omp config.
+Unreadable config or catalog evidence does not refuse the launch, unknown providers pass with a notice, and bare fuzzy patterns remain omp's responsibility.
+When raw commands are allowed, their native model arguments and expanded `__MODELFLAG__` determine whether the launch depends on that role; a separate spawn model option that is not inserted into the command does not bypass the guard.
+Config overlays are intentionally not inspected for model roles.
+
 ## Claude permission mode (config/claude-permission-mode)
 
 The optional local, gitignored `config/claude-permission-mode` selects the permission flag for every Claude worker launch: crewmates, scouts, Claude secondmates, and control-plane relaunches.

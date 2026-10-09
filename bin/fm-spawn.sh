@@ -2175,6 +2175,15 @@ shell_quote() {
   printf '%s' "$1" | sed "s/'/'\\\\''/g"
   printf "'"
 }
+model_flag_for_harness() {
+  local harness=$1 model=$2
+  [ -n "$model" ] && [ "$model" != default ] || return 0
+  case "$harness" in
+  claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
+    printf -- '--model %s ' "$(shell_quote "$model")"
+    ;;
+  esac
+}
 
 resolve_pi_executable() {
   local candidate dir
@@ -2264,9 +2273,44 @@ omp_catalog_verdict() { # <omp-bin> <provider/id>
 # establishes nothing, and a default that names a provider the listing does not
 # know or a bare pattern is omp's own matcher's job (same scope as
 # omp_model_validate).
-omp_default_role_validate() { # <omp-bin> <model>
-  local bin=$1 model=$2 roles role selector verdict remedy
-  { [ -z "$model" ] || [ "$model" = default ]; } || return 0
+omp_default_role_validate() {
+  local bin=$1 model=$2 raw=${3:-} roles role selector verdict remedy model_flag dependency
+  if [ -n "$raw" ]; then
+    model_flag=$(model_flag_for_harness omp "$model")
+    raw=${raw//__MODELFLAG__/$model_flag}
+    dependency=$(node --input-type=module - "$SCRIPT_DIR/fm-arm-command-policy.mjs" "$raw" 2>/dev/null <<'JS'
+import { pathToFileURL } from "node:url";
+const { Lexer } = await import(pathToFileURL(process.argv[2]).href);
+const { tokens, error } = new Lexer(process.argv[3]).tokenize();
+if (error) process.exit(1);
+const words = [];
+for (let i = 0; i < tokens.length; i++) {
+  const token = tokens[i];
+  if (token.type === "op" || token.type === "group") break;
+  if (token.type === "redir") {
+    if (!token.inlineTarget) i++;
+    continue;
+  }
+  words.push(token.value);
+}
+let i = 0;
+while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i] || "")) i++;
+let pinned = false;
+for (i++; i < words.length; i++) {
+  if (words[i] === "--") break;
+  if (/^--model=.+/.test(words[i]) ||
+      ((words[i] === "--model" || words[i] === "-m") && words[i + 1])) {
+    pinned = true;
+    break;
+  }
+}
+process.stdout.write(pinned ? "pinned" : "default");
+JS
+    ) || return 0
+    [ "$dependency" = default ] || return 0
+  else
+    { [ -z "$model" ] || [ "$model" = default ]; } || return 0
+  fi
   command -v jq >/dev/null 2>&1 || return 0
   roles=$(OMP_SKIP_SETUP=1 "$bin" config get modelRoles --json 2>/dev/null) || return 0
   printf '%s' "$roles" | jq -e '.value | type == "object"' >/dev/null 2>&1 || return 0
@@ -2282,10 +2326,15 @@ omp_default_role_validate() { # <omp-bin> <model>
   esac
   case "$selector" in */*) ;; *) return 0 ;; esac
   verdict=$(omp_catalog_verdict "$bin" "$selector")
-  if [ "$verdict" = unlisted ]; then
+  case "$verdict" in
+  unknown-provider)
+    echo "notice: omp provider '${selector%%/*}' is not in 'omp models --json' (extension-registered providers are never listed); launching '$role' unvalidated" >&2
+    ;;
+  unlisted)
     echo "error: omp modelRoles.default '$role' is not listed by 'omp models --json' although provider '${selector%%/*}' is, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); $remedy" >&2
     return 1
-  fi
+    ;;
+  esac
   return 0
 }
 
@@ -2822,11 +2871,13 @@ if [ "$EFFORT" = ultra ]; then
     exit 1
   }
 fi
+RAW_COMMAND=
+[ "$RAW_LAUNCH" = 0 ] || RAW_COMMAND=$ARG3
 if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
   omp_model_validate "$OMP_BIN" "$MODEL" || exit 1
 fi
 if [ "$HARNESS" = omp ]; then
-  omp_default_role_validate "$OMP_BIN" "$MODEL" || exit 1
+  omp_default_role_validate "$OMP_BIN" "$MODEL" "$RAW_COMMAND" || exit 1
 fi
 if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
@@ -2835,8 +2886,6 @@ fi
 # record exists. An absent pin selects nothing and leaves every later launch
 # step exactly as it was. A pinned Claude root is exported here as well, so the
 # trust registration below writes the store the worker will actually read.
-RAW_COMMAND=
-[ "$RAW_LAUNCH" = 0 ] || RAW_COMMAND=$ARG3
 WORKER_ACCOUNT=$(fm_worker_account_select "$HARNESS" "$CONFIG" "$MODEL" "${PI_BIN:-$HARNESS}" "$RAW_COMMAND") || exit 1
 WORKER_ACCOUNT_DECLARED=${WORKER_ACCOUNT%%$'\t'*}
 WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT#*$'\t'}
@@ -3030,15 +3079,6 @@ relaunch_resume_args() {  # <harness> <backend> <target>
   printf -- ' %s %s' "$flag" "$(shell_quote "$ref")"
 }
 
-model_flag_for_harness() {
-  local harness=$1 model=$2
-  [ -n "$model" ] && [ "$model" != default ] || return 0
-  case "$harness" in
-  claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
-    printf -- '--model %s ' "$(shell_quote "$model")"
-    ;;
-  esac
-}
 
 effort_flag_for_harness() {
   local harness=$1 effort=$2 model=${3:-}

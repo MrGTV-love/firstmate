@@ -260,6 +260,17 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   status=$?
   expect_code 0 "$status" "a launch that passes --model never reads the default role: $out"
 
+  rec=$(make_spawn_case role-bridge omp omp-role-bridge-q10)
+  read_case_record "$rec"
+  id=omp-role-bridge-q10
+  printf '%s' '{"default":"claude-bridge/claude-opus-4-8:high"}' > "$FAKEBIN_DIR/roles.json"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 0 "$status" "an unknown default-role provider must pass through: $out"
+  assert_contains "$out" "notice: omp provider 'claude-bridge' is not in 'omp models --json'" "default-role pass-through did not state its reason"
+  assert_contains "$out" "launching 'claude-bridge/claude-opus-4-8:high' unvalidated" "notice did not identify the default role"
+  assert_present "$HOME_DIR/state/$id.meta" "default-role pass-through must publish the task"
+
   rec=$(make_spawn_case role-unreadable omp omp-role-unreadable-q9)
   read_case_record "$rec"
   id=omp-role-unreadable-q9
@@ -267,6 +278,43 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   status=$?
   expect_code 0 "$status" "an unreadable roles config establishes nothing and must launch: $out"
   pass "fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy"
+}
+
+test_spawn_raw_omp_guard_uses_the_launch_model() {
+  local rec id out status command expected index=0
+  local model_args=()
+  while IFS='|' read -r command expected; do
+    index=$((index + 1))
+    id="omp-raw-role-$index"
+    rec=$(make_spawn_case "raw-role-$index" omp "$id")
+    read_case_record "$rec"
+    printf '%s' '{}' > "$FAKEBIN_DIR/roles.json"
+    model_args=()
+    case "$command" in
+      *'__MODELFLAG__'* | 'omp --auto-approve') model_args=(--model openai-codex/gpt-6-astra) ;;
+    esac
+    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command" ${model_args[@]+"${model_args[@]}"})
+    status=$?
+    expect_code "$expected" "$status" "raw omp guard must follow the effective model in '$command': $out"
+    if [ "$expected" = 0 ]; then
+      assert_present "$HOME_DIR/state/$id.meta" "a pinned raw launch must publish the task"
+      assert_contains "$(cat "$LAUNCH_LOG")" "${command//__MODELFLAG__/--model 'openai-codex/gpt-6-astra' }" "raw model selection did not reach the launch"
+    else
+      assert_contains "$out" "omp modelRoles.default is not set" "an unpinned raw launch must refuse the missing role"
+      assert_absent "$HOME_DIR/state/$id.meta" "a refused raw launch must publish no record"
+      [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw launch must record no launch"
+    fi
+  done <<'CASES'
+omp --model openai-codex/gpt-6-astra|0
+omp --model='openai-codex/gpt-6-astra'|0
+omp -m 'openai-codex/gpt-6-astra'|0
+omp __MODELFLAG__|0
+omp --model default|0
+omp --auto-approve|1
+omp -- '--model' 'openai-codex/gpt-6-astra'|1
+omp '--model openai-codex/gpt-6-astra'|1
+CASES
+  pass "fm-spawn: raw omp launches validate the default only without an effective model override"
 }
 
 test_secondmate_launch_relies_on_discovery() {
@@ -1435,6 +1483,7 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
 test_spawn_refuses_a_missing_or_unlisted_default_role
+test_spawn_raw_omp_guard_uses_the_launch_model
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
