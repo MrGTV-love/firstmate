@@ -1,0 +1,13 @@
+{
+  "regressions": [
+    "bash tests/fm-skill-pick.test.sh",
+    "bash tests/fm-typesafe-key-source.test.sh",
+    "bash tests/fm-jev-guard.test.sh",
+    "bash tests/fm-omp-harness.test.sh"
+  ],
+  "harnesses": {
+    "claude": "claude -p --permission-mode bypassPermissions --model sonnet --setting-sources local --strict-mcp-config --mcp-config {\"mcpServers\":{}} --no-session-persistence --output-format stream-json --verbose --include-hook-events --tools Bash,Read,Write,Edit --system-prompt <disposable-lab-instructions> <seven-step-prompt>",
+    "omp": "PI_EDIT_VARIANT=replace omp -p --mode json --no-session --no-extensions -e <lab-extension.ts> --auto-approve --thinking low --no-lsp --no-skills --no-rules --no-title --tools bash,read,write,edit --system-prompt <disposable-lab-instructions> <seven-step-prompt>"
+  },
+  "provider": "Disposable loopback HTTP service; synthetic keys, documented FM_TEST_SEAM endpoint overrides. Real installed harnesses and unchanged product hooks perform all decisions."
+}

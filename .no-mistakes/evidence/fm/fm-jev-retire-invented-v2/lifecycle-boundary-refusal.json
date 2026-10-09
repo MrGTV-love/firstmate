@@ -1,0 +1,6 @@
+{
+  "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-live-validation/lifecycle-home",
+  "exit": 1,
+  "stdout": "",
+  "stderr": "fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-live-validation/lifecycle-home': a lab home must live outside the repository; use mktemp -d \"${TMPDIR:-/tmp}/fm-lab.XXXXXX\"\n"
+}

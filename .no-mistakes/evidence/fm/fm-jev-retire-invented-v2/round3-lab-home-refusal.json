@@ -1,0 +1,7 @@
+{
+  "command": "bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-phase3/lab-home",
+  "exit": 1,
+  "stdout": "",
+  "stderr": "fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-phase3/lab-home': a lab home must live outside the repository; use mktemp -d \"${TMPDIR:-/tmp}/fm-lab.XXXXXX\"\n",
+  "reason": "The workspace boundary permits no intentional temporary lab-home writes outside the worktree; the supported helper requires a home outside every git worktree. No marker was fabricated and no fleet lifecycle was attempted."
+}

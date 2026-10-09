@@ -1,0 +1,21 @@
+{"kind":"jev","at":1791520904427,"task":"live-claude","source":"tool_call bash","answers":{"effect":{"type":"choice","choice":"read_only","confidence":1,"probabilities":{"read_only":1,"reversible":0,"irreversible":0}},"destructive_intent":{"type":"noul","noul":0.05}},"model":"disposable-jev-provider","provider":"typesafe","ms":344,"usage":{"input_tokens":3,"output_tokens":1}}
+{"kind":"hook","at":1791520904428,"task":"live-claude","hook":"tool_call","tool":"bash","block":false}
+{"kind":"jev","at":1791520928031,"task":"live-claude","source":"tool_result bash","answers":{"injection":{"type":"noul","noul":0.05}},"model":"disposable-jev-provider","provider":"typesafe","ms":189,"usage":{"input_tokens":3,"output_tokens":1}}
+{"kind":"hook","at":1791520928034,"task":"live-claude","hook":"tool_result","tool":"bash","flag":false,"noul":0.05}
+{"kind":"jev","at":1791520928705,"task":"live-claude","source":"tool_call bash","answers":{"effect":{"type":"choice","choice":"irreversible","confidence":1,"probabilities":{"read_only":0,"reversible":0,"irreversible":1}},"destructive_intent":{"type":"noul","noul":0.95}},"model":"disposable-jev-provider","provider":"typesafe","ms":99,"usage":{"input_tokens":3,"output_tokens":1}}
+{"kind":"hook","at":1791520928705,"task":"live-claude","hook":"tool_call","tool":"bash","block":true}
+{"kind":"jev","at":1791520929303,"task":"live-claude","source":"tool_result read","answers":{"injection":{"type":"noul","noul":0.95}},"model":"disposable-jev-provider","provider":"typesafe","ms":209,"usage":{"input_tokens":3,"output_tokens":1}}
+{"kind":"hook","at":1791520929303,"task":"live-claude","hook":"tool_result","tool":"read","flag":true,"noul":0.95}
+{"kind":"jev","at":1791520929885,"task":"live-claude","source":"tool_call write","answers":{"kind":{"type":"choice","choice":"source_code","confidence":1,"probabilities":{"source_code":1,"config":0,"secrets":0,"docs":0,"data":0}},"contains_secret":{"type":"noul","noul":0.05}},"model":"disposable-jev-provider","provider":"typesafe","ms":135,"usage":{"input_tokens":3,"output_tokens":1}}
+{"kind":"hook","at":1791520929890,"task":"live-claude","hook":"tool_call","tool":"write","block":false}
+{"kind":"jev","at":1791520930862,"task":"live-claude","source":"tool_call write","answers":{"kind":{"type":"choice","choice":"source_code","confidence":1,"probabilities":{"source_code":1,"config":0,"secrets":0,"docs":0,"data":0}},"contains_secret":{"type":"noul","noul":0.95}},"model":"disposable-jev-provider","provider":"typesafe","ms":166,"usage":{"input_tokens":3,"output_tokens":1}}
+{"kind":"hook","at":1791520930862,"task":"live-claude","hook":"tool_call","tool":"write","block":true}
+{"kind":"jev","at":1791520931591,"task":"live-claude","source":"tool_call edit","answers":{"kind":{"type":"choice","choice":"source_code","confidence":1,"probabilities":{"source_code":1,"config":0,"secrets":0,"docs":0,"data":0}},"contains_secret":{"type":"noul","noul":0.95}},"model":"disposable-jev-provider","provider":"typesafe","ms":86,"usage":{"input_tokens":3,"output_tokens":1}}
+{"kind":"hook","at":1791520931591,"task":"live-claude","hook":"tool_call","tool":"edit","block":true}
+{"kind":"hook","at":1791520931920,"task":"live-claude","hook":"tool_call","tool":"write","block":true}
+{"kind":"error","at":1791521150601,"task":"withheld-claude","hook":"tool_call"}
+{"kind":"error","at":1791521150601,"task":"withheld-claude","hook":"tool_result"}
+{"kind":"error","at":1791521164263,"task":"withheld-claude","hook":"tool_result"}
+{"kind":"error","at":1791521164727,"task":"withheld-claude","hook":"tool_call"}
+{"kind":"error","at":1791521165405,"task":"withheld-claude","hook":"tool_call"}
+{"kind":"hook","at":1791521166454,"task":"withheld-claude","hook":"tool_call","tool":"write","block":true}

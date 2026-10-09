@@ -1,0 +1,18 @@
+{
+  "claude": {
+    "exit": 0,
+    "provider_requests": [],
+    "customer_write": "sk-live-synthetic-customer",
+    "customer_edit": "sk-live-synthetic-customer-edit\n",
+    "outside_created": false,
+    "stderr": ""
+  },
+  "omp": {
+    "exit": 0,
+    "provider_requests": [],
+    "customer_write": "sk-live-synthetic-customer",
+    "customer_edit": "sk-live-synthetic-customer-edit\n",
+    "outside_created": false,
+    "stderr": ""
+  }
+}

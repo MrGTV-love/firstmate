@@ -1,0 +1,97 @@
+{
+  "product": {
+    "root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P",
+    "target_commit": "0a518f496ba11a4623e3247e251a27bd8f00061f"
+  },
+  "isolation": {
+    "fixture": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-live-validation",
+    "providers": "Disposable loopback HTTP service, not real TypeSafe/OpenRouter. Real Claude and omp CLIs used existing login; no credentials were copied or mutated.",
+    "lifecycle": "Not driven: supported lab-home helper refuses all workspace-contained homes, and the workspace boundary forbids the outside-worktree lab home it requires."
+  },
+  "native_commands": {
+    "claude_firstmate": [
+      "claude",
+      "--print",
+      "--no-session-persistence",
+      "--setting-sources",
+      "",
+      "--settings",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-live-validation/claude/settings.json",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "{\"mcpServers\":{}}",
+      "--tools",
+      "Bash,Read,Write,Edit",
+      "--dangerously-skip-permissions",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--include-hook-events",
+      "<seven independent tool actions recorded in claude-native-transcript.jsonl>"
+    ],
+    "omp_firstmate": [
+      "omp",
+      "--print",
+      "--no-session",
+      "--no-title",
+      "--no-extensions",
+      "--no-skills",
+      "--no-rules",
+      "--no-lsp",
+      "--no-pty",
+      "--tools",
+      "bash,read,write,edit",
+      "--extension",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-live-validation/omp/extension.ts",
+      "--model",
+      "openai-codex/gpt-6.1",
+      "--mode",
+      "json",
+      "<seven independent tool actions recorded in omp-native-transcript.jsonl>"
+    ],
+    "vernant": "Same real CLI flags; guard project=vernant, using withheld-settings.json / withheld-extension.ts; command, read, write, edit and outside-root attempt recorded in host-withheld-native-transcript.jsonl.",
+    "omp_adversarial": [
+      "env",
+      "PI_EDIT_VARIANT=hashline",
+      "omp",
+      "--print",
+      "--no-session",
+      "--no-title",
+      "--no-extensions",
+      "--no-skills",
+      "--no-rules",
+      "--no-lsp",
+      "--no-pty",
+      "--tools",
+      "read,write,edit",
+      "--extension",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FDXZJQ3MH7DAFTWDZ1MM5P/.jev-live-validation/omp/extension.ts",
+      "--model",
+      "openai-codex/gpt-6.1",
+      "--mode",
+      "json",
+      "<read, hashline edit and @-alias write recorded in omp-adversarial-native-transcript.jsonl>"
+    ]
+  },
+  "native_environment": {
+    "FM_HOME": "host-specific workspace-contained disposable home",
+    "FM_TEST_SEAM": "1",
+    "FM_JEV_GUARD_BASE_URL": "http://127.0.0.1:59605/v1/systemone",
+    "FM_JEV_GUARD_OPENROUTER_URL": "http://127.0.0.1:59605/api/alpha/decisions",
+    "PI_EDIT_VARIANT": "replace; hashline for adversarial native run"
+  },
+  "hook_interface": "bin/fm-jev-guard-hook.sh <disposable-home> <config> <state> <task> <worktree> <data> <project> receives real JSON hook payloads on stdin; inputs, outputs and captured HTTP requests are preserved in hook-live-transcript.json and privacy-key-boundary-transcript.json.",
+  "targeted_checks": {
+    "bash tests/fm-jev-guard.test.sh": "passed",
+    "bash tests/fm-typesafe-key-source.test.sh": "passed",
+    "bash tests/fm-skill-pick.test.sh": "initial 240-second command deadline was insufficient; complete rerun passed with 1800-second deadline",
+    "bash tests/fm-omp-harness.test.sh": "initial run invalid for ancestry-decoy assertions because it inherited the runner's omp ancestry; ancestry-isolated run passed the Jev-related cases then failed the unchanged watcher fixed-delay check",
+    "focused watcher diagnostic": "expected follow-up wake observed after 32673 ms with content and count assertions retained"
+  },
+  "cleanup": {
+    "disposable_provider": "shut down",
+    "workspace_fixture": true,
+    "temporary_diagnostic_test": true,
+    "permanent_source_changes": "none"
+  }
+}

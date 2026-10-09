@@ -1,0 +1,14 @@
+{
+  "host": "omp",
+  "project": "firstmate",
+  "exit": 0,
+  "seconds": 103,
+  "request_count": 8,
+  "files": {
+    "destructive_target_survives": true,
+    "outside_exists": false,
+    "clean": "plain validation text",
+    "edit": "old text\n",
+    "data": "task data validation"
+  }
+}

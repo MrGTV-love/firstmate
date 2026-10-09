@@ -1,0 +1,40 @@
+{
+  "lab": "/tmp/fm-lab-01M4FDXZ-QYEKLF",
+  "workers": {
+    "claude": {
+      "exit": "0",
+      "product_output": "stopped labjev-efb19e-claude harness=claude backend=tmux endpoint=primary:fm-labjev-efb19e-claude worktree=/private/tmp/fm-lab-01M4FDXZ-QYEKLF/pool/.treehouse/fm-lab-01M4FDXZ-QYEKLF-5a215d/1/fm-lab-01M4FDXZ-QYEKLF\n"
+    },
+    "omp": {
+      "exit": "0",
+      "product_output": "stopped labjev-efb19e-omp harness=omp backend=tmux endpoint=primary:fm-labjev-efb19e-omp worktree=/private/tmp/fm-lab-01M4FDXZ-QYEKLF/pool/.treehouse/fm-lab-01M4FDXZ-QYEKLF-5a215d/2/fm-lab-01M4FDXZ-QYEKLF\n"
+    }
+  },
+  "private_socket": "/tmp/fm-lab-01M4FDXZ-QYEKLF/tmux",
+  "grid": "160x48",
+  "guard_provider": "Disposable loopback decision service; synthetic guard credentials only; harness inference used existing authenticated logins.",
+  "process_registration_sweep": {
+    "exit": 0,
+    "stdout": "swept: attempted=0\n",
+    "stderr": ""
+  },
+  "private_tmux_kill_exit": 0,
+  "private_tmux_after_stop": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "no server running on /private/tmp/fm-lab-01M4FDXZ-QYEKLF/tmux/tmux-501/fm-lab\n"
+  },
+  "home_helper_teardown": {
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "removed_unique_lab_staging": [
+    "/tmp/fm-labjev-efb19e-claude",
+    "/tmp/fm-labjev-efb19e-omp",
+    "/tmp/fm-labjev-efb19e-claude+4746867abd666fa99ee8129c4d7cd0c1bad1bea1c6e3be0ad8ee6ccad03e945e",
+    "/tmp/fm-labjev-efb19e-omp+4746867abd666fa99ee8129c4d7cd0c1bad1bea1c6e3be0ad8ee6ccad03e945e"
+  ],
+  "lab_home_exists_after_removal": false,
+  "worktree_test_scratch_exists_after_removal": false
+}

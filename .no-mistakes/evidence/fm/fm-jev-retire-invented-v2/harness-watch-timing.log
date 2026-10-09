@@ -1,0 +1,12 @@
+Ancestry-isolated command: python3 .jev-live-validation/run-orphan.py /bin/bash tests/fm-omp-harness.test.sh
+Guard launch, worker-only replace-mode, project-scope and extension behavior checks passed before this watcher failure:
+Error: expected one follow-up wake, saw 0: []
+Location: tests/fm-omp-harness.test.sh:655
+Node.js v26.4.0
+
+Focused disposable timing diagnostic: python3 .jev-live-validation/run-orphan.py /bin/bash tests/.jev-watch-diagnostic.test.sh
+Observed output:
+diagnostic wake wait: 32673ms; sent=1
+ok - .omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up
+
+The diagnostic retained message count/content assertions and replaced the fixed 2500 ms delay with an observation window. The watch extension is unchanged by this branch. No permanent source or test edits were made.

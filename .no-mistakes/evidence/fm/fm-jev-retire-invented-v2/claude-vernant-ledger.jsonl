@@ -1,0 +1,9 @@
+{"kind":"error","at":1791523494472,"task":"live-claude-vernant","hook":"tool_call"}
+{"kind":"hook","at":1791523518688,"task":"live-claude-vernant","hook":"tool_result","tool":"bash","flag":false,"noul":0}
+{"kind":"error","at":1791523519922,"task":"live-claude-vernant","hook":"tool_call"}
+{"kind":"error","at":1791523520014,"task":"live-claude-vernant","hook":"tool_result"}
+{"kind":"error","at":1791523521666,"task":"live-claude-vernant","hook":"tool_result"}
+{"kind":"hook","at":1791523523160,"task":"live-claude-vernant","hook":"tool_call","tool":"write","block":true}
+{"kind":"error","at":1791523523799,"task":"live-claude-vernant","hook":"tool_call"}
+{"kind":"error","at":1791523525603,"task":"live-claude-vernant","hook":"tool_call"}
+{"kind":"error","at":1791523528382,"task":"live-claude-vernant","hook":"tool_call"}

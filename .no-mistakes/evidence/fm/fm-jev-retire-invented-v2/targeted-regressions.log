@@ -1,0 +1,75 @@
+FM_TEST_BEGIN 2026-10-09T08:00:59Z tests/fm-skill-pick.test.sh family=standalone expected_gate_skip=none
+ok - a clear task picks one project skill through TypeSafe direct
+ok - selected paths preserve repeated spaces, tabs and embedded newlines
+ok - non-skill links leave catalogs empty and do not reserve later tracked skill names
+ok - linked skill directories are visible but never read or judged, with earlier catalog precedence
+ok - empty, excluded and partially judged rosters have distinct outcomes
+ok - the cookbook's two thresholds can each pick nothing
+ok - selection uses the highest fit and the inclusive threshold
+ok - TypeSafe direct first, OpenRouter on a failed direct call, keys from the home .env only
+ok - fallback provenance is finalized for every outcome
+ok - the dispatch-never-send policy covers every string a request can carry
+ok - actual assembled criteria, instructions and both provider models are checked
+ok - non-point-mass chunk probabilities are not globally flattened
+ok - a hung TypeSafe call is bounded and falls back
+ok - a ship launch adds the pick to its instructions and task record
+ok - a launch with no key proceeds and records why nothing was picked
+ok - only absent catalogs are optional
+ok - the prerequisite imports the actual vendored modules
+ok - check and suite entry distinguish unsupported runtimes from broken imports
+ok - OpenRouter key-only fallback retains provenance
+ok - shared task extraction preserves private caller permissions
+ok - promotion and marked regions preserve effective task privacy
+ok - raw launch records match delivery capability
+ok - raw doorbell and pointer transports deliver picked, none and unavailable outcomes
+ok - failed Kimi, Rovo and doorbell relaunch delivery records undelivered selection for ships and scouts
+ok - pre-publication relaunch abort leaves prior selection metadata unchanged
+ok - successful picks are not claimed when overlay publication fails
+ok - explicit kind and entirely hidden promotion preserve task semantics
+# all fm-skill-pick tests passed
+FM_TEST_END 2026-10-09T08:23:38Z tests/fm-skill-pick.test.sh exit=0 duration_ms=1359072 gate_skip=false
+FM_TEST_BEGIN 2026-10-09T08:23:38Z tests/fm-typesafe-key-source.test.sh family=standalone expected_gate_skip=none
+ok - a home without .env resolves the key from the primary home
+ok - precedence is environment, then own .env, then primary .env
+ok - remote, malformed and absent bindings stay off
+ok - the OpenRouter fallback key resolves from own, then primary .env, never the environment
+ok - the jev-guard resolves the primary key and stays off without one
+ok - the wrapper hands the primary key to belay only, with redirecting variables cleared
+ok - exported keys retain private/public precedence and never reach wrapper or policy children
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+ok - actual task, final_message and checks_run JSON is gated with case and whitespace normalization
+{"event":"fetch-error","attempt":1,"name":"Error","message":"jev-belay request withheld"}
+ok - each fetch attempt is checked against its own request body
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+ok - config override selects the effective policy
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+ok - stalled policy is reaped and withheld at both its group deadline and outer startup ceiling
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+ok - invalid and unreadable policy refuse before transport
+ok - belay's own exit status reaches Claude
+ok - pin mismatch, missing clone and missing key exit 0 without running belay
+FM_TEST_END 2026-10-09T08:24:19Z tests/fm-typesafe-key-source.test.sh exit=0 duration_ms=40894 gate_skip=false
+FM_TEST_BEGIN 2026-10-09T08:24:19Z tests/fm-jev-guard.test.sh family=unclassified expected_gate_skip=none
+ok - vendored upstream level 6 tests pass unchanged
+ok - Claude Bash: upstream bash gate denies destructive commands and allows read-only ones
+ok - Claude Write/Edit: outside paths block in code; worktree, task data and temp writes reach Jev; credentials block
+ok - Claude Read/Bash results: flagged output gets the upstream banner as added context
+ok - never-send matches, HTTP failures, a missing key and malformed input allow without blocking
+ok - TypeSafe direct first; OpenRouter only after a failed direct call and only with its key
+ok - only firstmate reaches either provider; other and absent projects withhold every hook without weakening outside-root blocks
+ok - the Claude adapter runs under node type stripping as well as bun
+ok - omp: the unchanged upstream extension blocks, allows task-data writes and prepends the banner
+ok - omp write/edit: rewritten paths block without requests; plain paths retain credential judgment and project withholding
+ok - provider stalls and slow fallback finish before the host deadline, including replace edits and result screening
+ok - ledger: private, per-task, records usage, never the key or the request body
+FM_TEST_END 2026-10-09T08:26:09Z tests/fm-jev-guard.test.sh exit=0 duration_ms=108887 gate_skip=false
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=1510666
+FM_TEST_SUMMARY_FAMILY family=standalone count=2 duration_ms=1399966 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=108887 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-skill-pick.test.sh duration_ms=1359072
+FM_TEST_SLOWEST rank=2 script=tests/fm-jev-guard.test.sh duration_ms=108887
+FM_TEST_SLOWEST rank=3 script=tests/fm-typesafe-key-source.test.sh duration_ms=40894

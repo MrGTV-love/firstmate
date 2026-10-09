@@ -1,0 +1,24 @@
+{
+  "spawn": {
+    "window": "primary:fm-labjev-efb19e-claude",
+    "endpoint_task_id": "labjev-efb19e-claude",
+    "worktree": "/private/tmp/fm-lab-01M4FDXZ-QYEKLF/pool/.treehouse/fm-lab-01M4FDXZ-QYEKLF-5a215d/1/fm-lab-01M4FDXZ-QYEKLF",
+    "project": "/tmp/fm-lab-01M4FDXZ-QYEKLF",
+    "harness": "claude",
+    "kind": "ship",
+    "mode": "local-only",
+    "yolo": "off",
+    "branch": "fm/labjev-efb19e-claude",
+    "tasktmp": "/tmp/fm-labjev-efb19e-claude",
+    "model": "sonnet",
+    "effort": "low",
+    "skill_selection": "unavailable",
+    "skill_selection_reason": "openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)",
+    "busy_gen": "g1791533525.25513.29879",
+    "spawn_gen": "s1791533527.77818.17804"
+  },
+  "destructive_target_survived": true,
+  "target_content": "ordinary text\n",
+  "outside_probe_exists": false,
+  "authentication": "Existing normal Claude login, read-only token use; isolated config/trust store; no credentials included."
+}

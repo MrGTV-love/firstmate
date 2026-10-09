@@ -1,0 +1,22 @@
+ok - a home without .env resolves the key from the primary home
+ok - precedence is environment, then own .env, then primary .env
+ok - remote, malformed and absent bindings stay off
+ok - the OpenRouter fallback key resolves from own, then primary .env, never the environment
+ok - the jev-guard resolves the primary key and stays off without one
+ok - the wrapper hands the primary key to belay only, with redirecting variables cleared
+ok - exported keys retain private/public precedence and never reach wrapper or policy children
+ok - actual task, final_message and checks_run JSON is gated with case and whitespace normalization
+ok - each fetch attempt is checked against its own request body
+ok - config override selects the effective policy
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":1,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+not ok - timed-out policy left its checker running
+{"event":"policy-child","elapsedMs":5003,"status":null,"signal":"SIGKILL","error":"ETIMEDOUT"}
+dirname
+dirname
+dirname
+git

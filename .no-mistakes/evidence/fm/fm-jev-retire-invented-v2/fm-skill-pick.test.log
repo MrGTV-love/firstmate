@@ -1,0 +1,24 @@
+ok - a clear task picks one project skill through TypeSafe direct
+ok - selected paths preserve repeated spaces, tabs and embedded newlines
+ok - non-skill links leave catalogs empty and do not reserve later tracked skill names
+ok - linked skill directories are visible but never read or judged, with earlier catalog precedence
+ok - empty, excluded and partially judged rosters have distinct outcomes
+ok - the cookbook's two thresholds can each pick nothing
+ok - selection uses the highest fit and the inclusive threshold
+ok - TypeSafe direct first, OpenRouter on a failed direct call, keys from the home .env only
+ok - fallback provenance is finalized for every outcome
+ok - the dispatch-never-send policy covers every string a request can carry
+ok - actual assembled criteria, instructions and both provider models are checked
+ok - non-point-mass chunk probabilities are not globally flattened
+ok - a hung TypeSafe call is bounded and falls back
+ok - a ship launch adds the pick to its instructions and task record
+ok - a launch with no key proceeds and records why nothing was picked
+ok - only absent catalogs are optional
+ok - the prerequisite imports the actual vendored modules
+ok - check and suite entry distinguish unsupported runtimes from broken imports
+ok - OpenRouter key-only fallback retains provenance
+ok - shared task extraction preserves private caller permissions
+ok - promotion and marked regions preserve effective task privacy
+ok - raw launch records match delivery capability
+ok - raw doorbell and pointer transports deliver picked, none and unavailable outcomes
+not ok - selection completed before the picked relaunch failed (expected '2', got '0')

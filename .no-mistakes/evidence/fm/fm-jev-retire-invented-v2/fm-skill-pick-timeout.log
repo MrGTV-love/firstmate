@@ -1,0 +1,10 @@
+ok - a clear task picks one project skill through TypeSafe direct
+ok - selected paths preserve repeated spaces, tabs and embedded newlines
+ok - non-skill links leave catalogs empty and do not reserve later tracked skill names
+ok - linked skill directories are visible but never read or judged, with earlier catalog precedence
+ok - empty, excluded and partially judged rosters have distinct outcomes
+ok - the cookbook's two thresholds can each pick nothing
+ok - selection uses the highest fit and the inclusive threshold
+ok - TypeSafe direct first, OpenRouter on a failed direct call, keys from the home .env only
+ok - fallback provenance is finalized for every outcome
+ok - the dispatch-never-send policy covers every string a request can carry

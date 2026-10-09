@@ -1,0 +1,1 @@
+{"command": "bash tests/fm-omp-harness.test.sh", "exit": 1, "seconds": 659}

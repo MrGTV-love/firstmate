@@ -1,0 +1,17 @@
+{
+  "exit": 0,
+  "edit_content": "mode original\n",
+  "alias_target_exists": false,
+  "requests": [
+    {
+      "endpoint": "/v1/systemone",
+      "state": {
+        "tool": "read",
+        "content": "[mode-edit.txt#E40E]\n1:mode original"
+      },
+      "model": "jev-latest",
+      "auth": "Bearer disposable-direct-key"
+    }
+  ],
+  "stderr": ""
+}

@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Claude command hook denies destructive commands and silently allows read-only commands",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "Claude write hook blocks outside roots and credentials while allowing worktree, report, and scratch content",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "Read output receives the upstream injection warning and clean command output remains unchanged",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "Vernant, unrelated, blank, and absent project scopes send no command, content, or output to either provider",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "Never-send matching, missing keys, provider errors, and malformed hook input preserve upstream allow-on-error behavior",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "Direct TypeSafe failure falls back to the home-file OpenRouter key; healthy direct calls never use fallback or ambient OpenRouter keys",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "Guard ledger persists task decisions and numeric usage privately without credentials or submitted text",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "Slow direct requests can use fallback and complete command, edit, and result handlers stay below the unchanged host deadline",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "A local child home without copied keys resolves direct and fallback credentials from its primary home",
+    "result": "pass",
+    "live": true,
+    "evidence": "manual-guard-transcript.json",
+    "reason": "Real executable hook driven against a disposable loopback decision service; no production/customer data or paid Jev requests."
+  },
+  {
+    "name": "The real omp worker blocks credential replace edits and rewritten paths without side effects, but permits ordinary plain-path writes",
+    "result": "pass",
+    "live": true,
+    "evidence": "omp-ship-pane.txt, omp-ship-terminal.html, omp-execution-state.json",
+    "reason": "Real omp 18.8.1 tool execution; keep.txt unchanged after blocked replacement, rewritten outside file absent with zero provider requests, independent plain write persisted."
+  },
+  {
+    "name": "Fresh disposable Claude and omp ships automatically load the adopted guard rather than the retired runtime",
+    "result": "pass",
+    "live": true,
+    "evidence": "claude-ship-pane.txt, omp-ship-pane.txt, lab-guard-ledger.jsonl, lab-teardown.json",
+    "reason": "Both tasks launched through the lab copy of fm-spawn.sh on its private tmux server; no guard was manually installed. Native tools produced adopted block reasons and model-visible injection warnings. The same omp task was recovered through fm-control after Codex quota exhaustion and OpenRouter 401, then exercised using the existing Google login. Guard and test deadlines unchanged."
+  }
+]

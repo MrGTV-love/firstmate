@@ -1,0 +1,3 @@
+notice: labjev-efb19e-claude ships mode=local-only while the standing posture for fm-lab-01M4FDXZ-QYEKLF is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labjev-efb19e-claude: unavailable - openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)
+spawned labjev-efb19e-claude harness=claude kind=ship mode=local-only yolo=off window=primary:fm-labjev-efb19e-claude worktree=/private/tmp/fm-lab-01M4FDXZ-QYEKLF/pool/.treehouse/fm-lab-01M4FDXZ-QYEKLF-5a215d/1/fm-lab-01M4FDXZ-QYEKLF

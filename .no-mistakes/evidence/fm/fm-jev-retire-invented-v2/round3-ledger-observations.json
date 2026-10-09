@@ -1,0 +1,650 @@
+[
+  {
+    "host": "claude",
+    "project": "firstmate",
+    "mode": "0o600",
+    "rows": [
+      {
+        "kind": "jev",
+        "at": 1791527907354,
+        "task": "validation",
+        "source": "tool_call bash",
+        "answers": {
+          "effect": {
+            "type": "choice",
+            "choice": "irreversible",
+            "confidence": 1,
+            "probabilities": {
+              "read_only": 0,
+              "reversible": 0,
+              "irreversible": 1
+            }
+          },
+          "destructive_intent": {
+            "type": "noul",
+            "noul": 0.95
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 53,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527907355,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "bash",
+        "block": true
+      },
+      {
+        "kind": "jev",
+        "at": 1791527911131,
+        "task": "validation",
+        "source": "tool_call bash",
+        "answers": {
+          "effect": {
+            "type": "choice",
+            "choice": "read_only",
+            "confidence": 1,
+            "probabilities": {
+              "read_only": 1,
+              "reversible": 0,
+              "irreversible": 0
+            }
+          },
+          "destructive_intent": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 121,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527911131,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "bash",
+        "block": false
+      },
+      {
+        "kind": "jev",
+        "at": 1791527911137,
+        "task": "validation",
+        "source": "tool_result read",
+        "answers": {
+          "injection": {
+            "type": "noul",
+            "noul": 0.95
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 173,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527911138,
+        "task": "validation",
+        "hook": "tool_result",
+        "tool": "read",
+        "flag": true,
+        "noul": 0.95
+      },
+      {
+        "kind": "jev",
+        "at": 1791527915252,
+        "task": "validation",
+        "source": "tool_result bash",
+        "answers": {
+          "injection": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 94,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527915253,
+        "task": "validation",
+        "hook": "tool_result",
+        "tool": "bash",
+        "flag": false,
+        "noul": 0.05
+      },
+      {
+        "kind": "jev",
+        "at": 1791527918758,
+        "task": "validation",
+        "source": "tool_call write",
+        "answers": {
+          "kind": {
+            "type": "choice",
+            "choice": "source_code",
+            "confidence": 1,
+            "probabilities": {
+              "source_code": 1,
+              "config": 0,
+              "secrets": 0,
+              "docs": 0,
+              "data": 0
+            }
+          },
+          "contains_secret": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 52,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527918758,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": false
+      },
+      {
+        "kind": "jev",
+        "at": 1791527918993,
+        "task": "validation",
+        "source": "tool_result read",
+        "answers": {
+          "injection": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 46,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527918993,
+        "task": "validation",
+        "hook": "tool_result",
+        "tool": "read",
+        "flag": false,
+        "noul": 0.05
+      },
+      {
+        "kind": "jev",
+        "at": 1791527922083,
+        "task": "validation",
+        "source": "tool_call edit",
+        "answers": {
+          "kind": {
+            "type": "choice",
+            "choice": "source_code",
+            "confidence": 1,
+            "probabilities": {
+              "source_code": 1,
+              "config": 0,
+              "secrets": 0,
+              "docs": 0,
+              "data": 0
+            }
+          },
+          "contains_secret": {
+            "type": "noul",
+            "noul": 0.95
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 43,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527922083,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "edit",
+        "block": true
+      },
+      {
+        "kind": "hook",
+        "at": 1791527922408,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": true
+      },
+      {
+        "kind": "jev",
+        "at": 1791527922940,
+        "task": "validation",
+        "source": "tool_call write",
+        "answers": {
+          "kind": {
+            "type": "choice",
+            "choice": "source_code",
+            "confidence": 1,
+            "probabilities": {
+              "source_code": 1,
+              "config": 0,
+              "secrets": 0,
+              "docs": 0,
+              "data": 0
+            }
+          },
+          "contains_secret": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 51,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791527922940,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": false
+      }
+    ]
+  },
+  {
+    "host": "claude",
+    "project": "vernant",
+    "mode": "0o600",
+    "rows": [
+      {
+        "kind": "error",
+        "at": 1791527907671,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "hook",
+        "at": 1791527912941,
+        "task": "validation",
+        "hook": "tool_result",
+        "tool": "bash",
+        "flag": false,
+        "noul": 0
+      },
+      {
+        "kind": "error",
+        "at": 1791527915115,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "error",
+        "at": 1791527915327,
+        "task": "validation",
+        "hook": "tool_result"
+      },
+      {
+        "kind": "error",
+        "at": 1791527917447,
+        "task": "validation",
+        "hook": "tool_result"
+      },
+      {
+        "kind": "error",
+        "at": 1791527920220,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "error",
+        "at": 1791527920768,
+        "task": "validation",
+        "hook": "tool_result"
+      },
+      {
+        "kind": "error",
+        "at": 1791527923440,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "hook",
+        "at": 1791527923856,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": true
+      },
+      {
+        "kind": "error",
+        "at": 1791527924489,
+        "task": "validation",
+        "hook": "tool_call"
+      }
+    ]
+  },
+  {
+    "host": "omp",
+    "project": "firstmate",
+    "mode": "0o600",
+    "rows": [
+      {
+        "kind": "jev",
+        "at": 1791528360402,
+        "task": "validation",
+        "source": "tool_call bash",
+        "answers": {
+          "effect": {
+            "type": "choice",
+            "choice": "irreversible",
+            "confidence": 1,
+            "probabilities": {
+              "read_only": 0,
+              "reversible": 0,
+              "irreversible": 1
+            }
+          },
+          "destructive_intent": {
+            "type": "noul",
+            "noul": 0.95
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 497,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791528360410,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "bash",
+        "block": true
+      },
+      {
+        "kind": "jev",
+        "at": 1791528373541,
+        "task": "validation",
+        "source": "tool_call bash",
+        "answers": {
+          "effect": {
+            "type": "choice",
+            "choice": "read_only",
+            "confidence": 1,
+            "probabilities": {
+              "read_only": 1,
+              "reversible": 0,
+              "irreversible": 0
+            }
+          },
+          "destructive_intent": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 44,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791528373549,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "bash",
+        "block": false
+      },
+      {
+        "kind": "jev",
+        "at": 1791528373856,
+        "task": "validation",
+        "source": "tool_result bash",
+        "answers": {
+          "injection": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 159,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791528373860,
+        "task": "validation",
+        "hook": "tool_result",
+        "tool": "bash",
+        "flag": false,
+        "noul": 0.05
+      },
+      {
+        "kind": "jev",
+        "at": 1791528380212,
+        "task": "validation",
+        "source": "tool_result read",
+        "answers": {
+          "injection": {
+            "type": "noul",
+            "noul": 0.95
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 8,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791528380213,
+        "task": "validation",
+        "hook": "tool_result",
+        "tool": "read",
+        "flag": true,
+        "noul": 0.95
+      },
+      {
+        "kind": "jev",
+        "at": 1791528384312,
+        "task": "validation",
+        "source": "tool_call write",
+        "answers": {
+          "kind": {
+            "type": "choice",
+            "choice": "source_code",
+            "confidence": 1,
+            "probabilities": {
+              "source_code": 1,
+              "config": 0,
+              "secrets": 0,
+              "docs": 0,
+              "data": 0
+            }
+          },
+          "contains_secret": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 9,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791528384313,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": false
+      },
+      {
+        "kind": "hook",
+        "at": 1791528395033,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": true
+      },
+      {
+        "kind": "jev",
+        "at": 1791528399266,
+        "task": "validation",
+        "source": "tool_call write",
+        "answers": {
+          "kind": {
+            "type": "choice",
+            "choice": "source_code",
+            "confidence": 1,
+            "probabilities": {
+              "source_code": 1,
+              "config": 0,
+              "secrets": 0,
+              "docs": 0,
+              "data": 0
+            }
+          },
+          "contains_secret": {
+            "type": "noul",
+            "noul": 0.05
+          }
+        },
+        "model": "jev-loopback-validation",
+        "provider": "typesafe",
+        "ms": 7,
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1
+        }
+      },
+      {
+        "kind": "hook",
+        "at": 1791528399266,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": false
+      }
+    ]
+  },
+  {
+    "host": "omp",
+    "project": "vernant",
+    "mode": "0o600",
+    "rows": [
+      {
+        "kind": "error",
+        "at": 1791528344735,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "error",
+        "at": 1791528345290,
+        "task": "validation",
+        "hook": "tool_result"
+      },
+      {
+        "kind": "error",
+        "at": 1791528351338,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "error",
+        "at": 1791528352818,
+        "task": "validation",
+        "hook": "tool_result"
+      },
+      {
+        "kind": "error",
+        "at": 1791528356305,
+        "task": "validation",
+        "hook": "tool_result"
+      },
+      {
+        "kind": "error",
+        "at": 1791528361745,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "error",
+        "at": 1791528367865,
+        "task": "validation",
+        "hook": "tool_call"
+      },
+      {
+        "kind": "hook",
+        "at": 1791528373423,
+        "task": "validation",
+        "hook": "tool_call",
+        "tool": "write",
+        "block": true
+      },
+      {
+        "kind": "error",
+        "at": 1791528378525,
+        "task": "validation",
+        "hook": "tool_call"
+      }
+    ]
+  }
+]

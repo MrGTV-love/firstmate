@@ -1,0 +1,63 @@
+{
+  "hosts": [
+    {
+      "host": "claude",
+      "project": "firstmate",
+      "exit": 0,
+      "seconds": 102,
+      "request_count": 7,
+      "files": {
+        "destructive_target_survives": true,
+        "outside_exists": false,
+        "clean": "plain validation text",
+        "edit": "old text\n",
+        "data": "task data validation"
+      }
+    },
+    {
+      "host": "omp",
+      "project": "firstmate",
+      "exit": 0,
+      "seconds": 103,
+      "request_count": 8,
+      "files": {
+        "destructive_target_survives": true,
+        "outside_exists": false,
+        "clean": "plain validation text",
+        "edit": "old text\n",
+        "data": "task data validation"
+      }
+    },
+    {
+      "host": "claude",
+      "project": "vernant",
+      "exit": 0,
+      "seconds": 83,
+      "request_count": 0,
+      "files": {
+        "destructive_target_survives": false,
+        "outside_exists": false,
+        "clean": "plain validation text",
+        "edit": "sk-live-validation-synthetic\n",
+        "data": "task data validation"
+      }
+    },
+    {
+      "host": "omp",
+      "project": "vernant",
+      "exit": 0,
+      "seconds": 80,
+      "request_count": 0,
+      "files": {
+        "destructive_target_survives": false,
+        "outside_exists": false,
+        "clean": "plain validation text",
+        "edit": "sk-live-validation-synthetic\n",
+        "data": "task data validation"
+      }
+    }
+  ],
+  "provider": "Disposable loopback TypeSafe/OpenRouter protocol service; synthetic keys only. This checks real harness hook execution, not remote model judgment.",
+  "unsupported_spawn_reason": "Supported lab-home create refuses directories within any git worktree. The phase prohibits intentional lab-home writes outside this worktree. No lifecycle bypass, external lab, production session, or real fleet data was used.",
+  "screenshots": "No visual layout/copy change; these are non-interactive CLI/tool-hook surfaces. Complete runtime protocol transcripts and persisted state are provided."
+}

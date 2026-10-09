@@ -1,0 +1,2 @@
+ok - stalled policy work is bounded, reaped, and withheld without blocking Stop
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}

@@ -1,0 +1,28 @@
+{
+  "spawn": {
+    "window": "primary:fm-labjev-efb19e-omp",
+    "endpoint_task_id": "labjev-efb19e-omp",
+    "worktree": "/private/tmp/fm-lab-01M4FDXZ-QYEKLF/pool/.treehouse/fm-lab-01M4FDXZ-QYEKLF-5a215d/2/fm-lab-01M4FDXZ-QYEKLF",
+    "project": "/tmp/fm-lab-01M4FDXZ-QYEKLF",
+    "harness": "omp",
+    "kind": "ship",
+    "mode": "local-only",
+    "yolo": "off",
+    "branch": "fm/labjev-efb19e-omp",
+    "tasktmp": "/tmp/fm-labjev-efb19e-omp",
+    "model": "google/gemini-3.7-flash",
+    "effort": "low",
+    "skill_selection": "unavailable",
+    "skill_selection_reason": "openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)",
+    "busy_gen": "g1791534514.40717.30046",
+    "spawn_gen": "s1791534516.80496.26086",
+    "control_relaunch_tx": "35939.20261009T082759Z.30294"
+  },
+  "destructive_target_survived": true,
+  "credential_edit_target_unchanged": "ordinary text\n",
+  "plain_write_content": "ordinary text",
+  "outside_probe_exists": false,
+  "rewritten_probe_exists": false,
+  "rewritten_path_provider_requests": 0,
+  "completion_record": "v1 gen=g1791534514.40717.30046 seq=4 state=idle source=omp-ext event=agent-end ts=1791534797\n"
+}

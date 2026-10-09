@@ -1,0 +1,14 @@
+{
+  "host": "claude",
+  "project": "firstmate",
+  "exit": 0,
+  "seconds": 102,
+  "request_count": 7,
+  "files": {
+    "destructive_target_survives": true,
+    "outside_exists": false,
+    "clean": "plain validation text",
+    "edit": "old text\n",
+    "data": "task data validation"
+  }
+}

@@ -1,0 +1,180 @@
+[
+  {
+    "host": "claude",
+    "project": "firstmate",
+    "mode": "0o600",
+    "recorded_fields": [
+      "answers",
+      "at",
+      "block",
+      "flag",
+      "hook",
+      "kind",
+      "model",
+      "ms",
+      "noul",
+      "provider",
+      "source",
+      "task",
+      "tool",
+      "usage"
+    ],
+    "hook_outcomes": [
+      {
+        "tool": "bash",
+        "block": true,
+        "flag": null
+      },
+      {
+        "tool": "bash",
+        "block": false,
+        "flag": null
+      },
+      {
+        "tool": "read",
+        "block": null,
+        "flag": true
+      },
+      {
+        "tool": "bash",
+        "block": null,
+        "flag": false
+      },
+      {
+        "tool": "write",
+        "block": true,
+        "flag": null
+      },
+      {
+        "tool": "write",
+        "block": false,
+        "flag": null
+      },
+      {
+        "tool": "edit",
+        "block": true,
+        "flag": null
+      },
+      {
+        "tool": "write",
+        "block": false,
+        "flag": null
+      }
+    ]
+  },
+  {
+    "host": "omp",
+    "project": "firstmate",
+    "mode": "0o600",
+    "recorded_fields": [
+      "answers",
+      "at",
+      "block",
+      "flag",
+      "hook",
+      "kind",
+      "model",
+      "ms",
+      "noul",
+      "provider",
+      "source",
+      "task",
+      "tool",
+      "usage"
+    ],
+    "hook_outcomes": [
+      {
+        "tool": "bash",
+        "block": true,
+        "flag": null
+      },
+      {
+        "tool": "bash",
+        "block": false,
+        "flag": null
+      },
+      {
+        "tool": "bash",
+        "block": null,
+        "flag": false
+      },
+      {
+        "tool": "read",
+        "block": null,
+        "flag": true
+      },
+      {
+        "tool": "write",
+        "block": true,
+        "flag": null
+      },
+      {
+        "tool": "write",
+        "block": false,
+        "flag": null
+      },
+      {
+        "tool": "read",
+        "block": null,
+        "flag": false
+      },
+      {
+        "tool": "edit",
+        "block": true,
+        "flag": null
+      },
+      {
+        "tool": "write",
+        "block": false,
+        "flag": null
+      }
+    ]
+  },
+  {
+    "host": "claude",
+    "project": "vernant",
+    "mode": "0o600",
+    "recorded_fields": [
+      "at",
+      "block",
+      "flag",
+      "hook",
+      "kind",
+      "noul",
+      "task",
+      "tool"
+    ],
+    "hook_outcomes": [
+      {
+        "tool": "bash",
+        "block": null,
+        "flag": false
+      },
+      {
+        "tool": "write",
+        "block": true,
+        "flag": null
+      }
+    ]
+  },
+  {
+    "host": "omp",
+    "project": "vernant",
+    "mode": "0o600",
+    "recorded_fields": [
+      "at",
+      "block",
+      "hook",
+      "kind",
+      "task",
+      "tool"
+    ],
+    "hook_outcomes": [
+      {
+        "tool": "write",
+        "block": true,
+        "flag": null
+      }
+    ]
+  }
+]

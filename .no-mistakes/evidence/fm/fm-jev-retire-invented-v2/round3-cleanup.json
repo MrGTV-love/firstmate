@@ -1,0 +1,9 @@
+{
+  "worktree_fixture_removed": true,
+  "loopback_provider_stopped": true,
+  "native_harness_processes_completed": true,
+  "targeted_regression_processes_completed": true,
+  "external_lab_created": false,
+  "fleet_lifecycle_executed": false,
+  "source_files_changed": false
+}

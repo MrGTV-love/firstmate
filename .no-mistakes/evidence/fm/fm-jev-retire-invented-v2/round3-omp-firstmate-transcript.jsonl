@@ -1,0 +1,71 @@
+Reading prompt from piped stdin (waiting for EOF; ⌃C to abort)…
+Still starting after 10s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 20s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 30s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 40s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 50s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 60s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 70s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 81s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 91s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 101s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 111s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 121s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 131s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 141s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 151s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 161s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 171s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 181s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 191s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 201s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 211s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 221s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 231s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 241s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 251s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 261s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 271s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 281s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 291s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 301s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 311s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 321s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 331s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 341s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers
+Still starting after 351s — phase: readPipedInput
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-09.23821.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers

@@ -1,0 +1,16 @@
+[
+  {
+    "input": "not json",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "requests": []
+  },
+  {
+    "input": "{}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "requests": []
+  }
+]

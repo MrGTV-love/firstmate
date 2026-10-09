@@ -1,0 +1,4 @@
+Ancestry-isolated supervisor: pid=8635, ppid=1
+ok - watch restore editor-normalized-edited preserves delivery/composer invariants
+ok - watch restore duplicates preserves delivery/composer invariants
+ok - watch restore failed-send preserves delivery/composer invariants

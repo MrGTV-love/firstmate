@@ -1,0 +1,12 @@
+ok - vendored upstream level 6 tests pass unchanged
+ok - Claude Bash: upstream bash gate denies destructive commands and allows read-only ones
+ok - Claude Write/Edit: outside paths block in code; worktree, task data and temp writes reach Jev; credentials block
+ok - Claude Read/Bash results: flagged output gets the upstream banner as added context
+ok - never-send matches, HTTP failures, a missing key and malformed input allow without blocking
+ok - TypeSafe direct first; OpenRouter only after a failed direct call and only with its key
+ok - only firstmate reaches either provider; other and absent projects withhold every hook without weakening outside-root blocks
+ok - the Claude adapter runs under node type stripping as well as bun
+ok - omp: the unchanged upstream extension blocks, allows task-data writes and prepends the banner
+ok - omp write/edit: rewritten paths block without requests; plain paths retain credential judgment and project withholding
+ok - provider stalls and slow fallback finish before the host deadline, including replace edits and result screening
+ok - ledger: private, per-task, records usage, never the key or the request body

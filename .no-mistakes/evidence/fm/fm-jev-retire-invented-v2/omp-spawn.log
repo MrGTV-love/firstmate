@@ -1,0 +1,10 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+notice: labjev-efb19e-omp ships mode=local-only while the standing posture for fm-lab-01M4FDXZ-QYEKLF is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labjev-efb19e-omp: unavailable - openrouter HTTP 401. Check the OPENROUTER_API_KEY key.; TypeSafe direct failed (typesafe HTTP 401. Check the TYPESAFE_API_KEY key.; used OpenRouter)
+spawned labjev-efb19e-omp harness=omp kind=ship mode=local-only yolo=off window=primary:fm-labjev-efb19e-omp worktree=/private/tmp/fm-lab-01M4FDXZ-QYEKLF/pool/.treehouse/fm-lab-01M4FDXZ-QYEKLF-5a215d/2/fm-lab-01M4FDXZ-QYEKLF
