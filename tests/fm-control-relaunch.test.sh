@@ -334,6 +334,7 @@ new_case() {
   printf '%s\n' "fm-$id" > "$dir/fake/windows"
   printf '%s' fmses > "$dir/fake/session-name"
   make_tmux_stub "$dir"
+  fm_fake_version_tool "$dir/fakebin" omp FM_FAKE_OMP_VERSION 18.1.20
   printf '%s\n' "$dir"
 }
 

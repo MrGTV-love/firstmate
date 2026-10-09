@@ -251,10 +251,9 @@ case "${1:-}" in
         exit 0 ;;
       process-info)
         # The process-level view a registration is verified against (#4115):
-        # `agent` puts a live claude in the foreground, `shell` a bare zsh whose
-        # pid is the test script itself (a real, long-lived process with no
-        # harness descendant, so the adapter's real process-table walk finds
-        # it), and anything else answers nothing (unreadable).
+        # `agent` puts a live claude in the foreground; `shell` uses the
+        # shell-only process table supplied by herdr-ps, independent of host
+        # descendants. Anything else answers nothing (unreadable).
         pane=""; args=("$@"); for ((i=0; i<${#args[@]}; i++)); do [ "${args[$i]}" = --pane ] && pane=${args[$((i+1))]:-}; done
         case "${FM_FAKE_HERDR_PROCESS:-agent}" in
           agent) printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":424242,"foreground_processes":[{"pid":424242,"name":"claude","argv0":"claude"}]}}}\n' "$pane" "${FM_FAKE_HERDR_SHELL_PID:-$PPID}" ;;
@@ -276,6 +275,12 @@ case "${1:-}" in
 esac
 exit 0
 SH
+  cat > "$fb/herdr-ps" <<'SH'
+#!/usr/bin/env bash
+[ "$*" = '-axo pid=,ppid=,comm=' ] || exit 1
+printf '%s 1 zsh\n' "$FM_FAKE_HERDR_SHELL_PID"
+SH
+  chmod +x "$fb/herdr-ps"
   chmod +x "$fb/no-mistakes" "$fb/gh" "$fb/gh-axi" "$fb/glab" "$fb/gerrit-axi" "$fb/tmux" "$fb/herdr"
   printf '%s\n' "$fb"
 }
@@ -294,7 +299,7 @@ make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
 # Run the helper for one case dir. FM_FAKE_* env (run output, busy flag) are read
 # from the caller's environment by the fakes above.
 run_crew_state() {  # <case-dir> <id>
-  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" "$CREW_STATE" "$2"
+  PATH="$1/fakebin:$PATH" FM_HERDR_PS_BIN="$1/fakebin/herdr-ps" FM_STATE_OVERRIDE="$1/state" "$CREW_STATE" "$2"
 }
 
 new_case() {  # <name> -> echoes case dir with an empty state/
@@ -2689,6 +2694,7 @@ test_no_run_herdr_husk_dead_still_reads_gone() {
   # and the scrollback read fails besides.
   FM_FAKE_HERDR_READ_FAIL=1
   FM_FAKE_HERDR_HUSK=1
+  FM_FAKE_HERDR_PROCESS=shell
   local out; out=$(run_crew_state "$d" feat-herdr-husk)
   assert_contains "$out" "state: unknown" "a husk pane has no live current state"
   assert_contains "$out" "backend target gone" "a husk pane keeps its gone-class death evidence"

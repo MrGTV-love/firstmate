@@ -1299,27 +1299,36 @@ assert_contains "$UPDATE_OUT" 'synced:' "remote update did not report a host-loc
 assert_present "$REMOTE_HOME/REMOTE_UPDATE_PROBE" "remote update did not materialize the code-root commit"
 pass "remote update imports and fast-forwards the persistent home on its configured host"
 
-# The remote restart verb is not a second implementation: its host-local leg runs
-# the ORDINARY control plane against a record that is plain and local on that
-# host. These two refusals can only come from that plane's own pre-stop
-# capability tables, and they leave the live agent exactly as it was - which is
-# the whole safety property of asking before anything is stopped.
-RELAUNCH_UNVERIFIED=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
-  relaunch ios notaharness - - 2>&1) && fail "an unverified runtime should refuse a remote restart"
-assert_contains "$RELAUNCH_UNVERIFIED" 'unverified remote secondmate harness' \
-  "the remote restart verb did not refuse an unverified runtime"
+# The remote restart verb delegates to the ordinary host-local control plane.
+# Both an unverified replacement and an unaccountable checkout must refuse
+# without lifecycle input. A synthetic native PID also lacks launch attribution,
+# so the live-owner gate may refuse before the checkout gate.
+restart_writes_before=$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)
+restart_state_before=$(jq -c '{tabs,typed}' "$HERDR_STATE")
+if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
+  relaunch ios notaharness - - > "$TMP_ROOT/relaunch-unverified.out" 2>&1; then
+  fail "an unverified runtime should refuse a remote restart"
+fi
 RELAUNCH_ROUTE_META="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$RELAUNCH_ROUTE_META" "$TMP_ROOT/ios-before-relaunch.meta"
 mkdir -p "$TMP_ROOT/not-a-checkout"
 sed "s|^worktree=.*|worktree=$TMP_ROOT/not-a-checkout|" \
   "$TMP_ROOT/ios-before-relaunch.meta" > "$RELAUNCH_ROUTE_META"
-RELAUNCH_CHECKPOINT=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
-  relaunch ios codex - - 2>&1) && fail "a restart with no accountable checkout should refuse"
-assert_contains "$RELAUNCH_CHECKPOINT" 'refusing to relaunch without a checkout whose unlanded work can be accounted for' \
-  "the host-local restart did not reach the control plane's own pre-stop checkpoint"
+cp "$RELAUNCH_ROUTE_META" "$TMP_ROOT/ios-unaccountable.meta"
+if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
+  relaunch ios codex - - > "$TMP_ROOT/relaunch-checkpoint.out" 2>&1; then
+  fail "a restart with no accountable checkout should refuse"
+fi
+cmp -s "$TMP_ROOT/ios-unaccountable.meta" "$RELAUNCH_ROUTE_META" \
+  || fail "a refused remote restart changed its route metadata"
 cp "$TMP_ROOT/ios-before-relaunch.meta" "$RELAUNCH_ROUTE_META"
 [ "$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh state ios)" = alive ] \
   || fail "a refused remote restart must leave the running agent untouched"
+[ "$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)" = "$restart_writes_before" ] \
+  || fail "a refused remote restart sent lifecycle input"
+[ "$(jq -c '{tabs,typed}' "$HERDR_STATE")" = "$restart_state_before" ] \
+  || fail "a refused remote restart changed its endpoint"
+assert_absent "$REMOTE_HOME/state/parent-route/ios.control-relaunch" "a refused remote restart started a relaunch transaction"
 pass "the remote restart verb delegates to the host-local control plane and refuses before stopping anything"
 
 

@@ -19,6 +19,8 @@ mkdir -p "$CODE/.omp/extensions" "$CODE/.claude" "$CODE/.agents/skills"
 cp "$ROOT/.omp/fm-worker-overlay.yml" "$CODE/.omp/"
 cp "$ROOT/.omp/fm-session-overlay.yml" "$CODE/.omp/"
 cp "$ROOT/.omp/extensions/fm-jev-guardrail.ts" "$CODE/.omp/extensions/"
+mkdir -p "$CODE/.omp/extensions/lib"
+cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$CODE/.omp/extensions/lib/"
 cp "$ROOT/.claude/settings.json" "$CODE/.claude/"
 DRIVER="$TMP_ROOT/consumer.mjs"
 cat > "$DRIVER" <<'JS'
@@ -63,7 +65,7 @@ if (mode.endsWith('claude')) {
   };
 } else {
   const registrations = new Map();
-  const api = { on(name, handler) {
+  const api = { pi: { AgentRegistry: { global: () => ({ list: () => [] }) } }, on(name, handler) {
     const handlers = registrations.get(name) || [];
     handlers.push(handler); registrations.set(name, handlers);
   }};

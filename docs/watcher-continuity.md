@@ -317,6 +317,7 @@ An ordinary presentation drain bounds both its initial queue-lock acquire and it
 | Status-presentation lock | One such advisory after raw wake presentation, and status annotations, sections, and cursors are left retriable on the next drain. |
 
 Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics, so acknowledgement atomicity is unchanged.
+The wake drain and its bounded-lock handoff use native HUP/TERM handling, with EXIT cleanup releasing only locks still owned by the exiting process. Interrupted presentation leaves durable rows available for replay until explicit acknowledgement; a successfully transferred lock remains owned by its caller.
 
 ### Guard counts for branch-held rows
 
