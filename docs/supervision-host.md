@@ -69,7 +69,7 @@ The host's header owns the output contract they read.
 | Claude | the Stop auto-arm, `bin/fm-claude-stop-autoarm.sh`, inside its single-flight generation | the hook's exit-2 rewake (`Stop hook feedback`) |
 | Cursor | the `stop` hook park, `bin/fm-turnend-guard-cursor.sh` | the park's `watcher` follow-up |
 | OpenCode | the TUI plugin, `.opencode/plugins/fm-primary-watch-arm.js`, which restarts its own successor after each close | a `watcher` prompt through `promptAsync` |
-| omp | the watch extension, `.omp/extensions/fm-primary-omp-watch.ts`, which restarts its own successor after each close | the extension's `watcher` message; [watcher continuity](watcher-continuity.md#omp-idle-wake-delivery) owns delivery |
+| omp | the watch extension, `.omp/extensions/fm-primary-omp-watch.ts`, which restarts its own successor after each close | the extension's `watcher` message; [watcher continuity](watcher-continuity.md#omp-stale-wake-gating) owns delivery |
 | Grok | the model's tracked background call, rendered as `bin/fm-supervision-host.sh park` at session start | the background task's completion notification |
 | Codex | the foreground checkpoint, `bin/fm-watch-checkpoint.sh`, in the watcher's place | the checkpoint's own output |
 
@@ -308,6 +308,7 @@ It also starts no engine turn that could still be running at the boundary (the t
 It judges this when the close arrives and again just before the turn starts.
 When it declines such a turn, that close reaches main ahead of the boundary line instead, and its wake stays durable in the queue.
 One short main turn per boundary is the cost of never losing the park silently.
+omp is the exception: its boundary close restarts the park but opens a main turn only when a row is queued for main; [watcher continuity](watcher-continuity.md#omp-stale-wake-gating) owns that rule.
 
 ### Codex checkpoint bound
 
