@@ -1485,15 +1485,11 @@ fm_task_set_lock_path() {  # <state-dir>
 # duplicates however each directory is spelled. Returns 1 with
 # FM_LOCAL_FIRSTMATE_ERROR naming what could not be proved - an unresolvable
 # root, an unsafe or malformed registry, or an unavailable registered local
-# home. Set optional <check-registry-reads> to 1 for teardown's checked inventory:
-# every registry presence probe must pass bin/fm-path-lib.sh's fm_path_lookup_safe,
-# and every present registry must be readable; proven absence remains valid.
-# The default 0 preserves other callers' discovery behavior. Requires
-# bin/fm-secondmate-registry-lib.sh to be sourced first, and bin/fm-path-lib.sh
-# for checked discovery.
+# home - so a caller refuses rather than treating an unreadable home as one
+# with no tasks. Requires bin/fm-secondmate-registry-lib.sh to be sourced first.
 # shellcheck disable=SC2034 # FM_LOCAL_FIRSTMATE_ERROR is read by callers.
-fm_local_firstmate_state_dirs() {  # <first-state> [<check-registry-reads>]
-  local first=$1 check_registry_reads=${2:-0} root home reg line child known existing i=0
+fm_local_firstmate_state_dirs() {  # <first-state>
+  local first=$1 root home reg line child known existing i=0
   local -a homes
   FM_LOCAL_FIRSTMATE_STATES=("$first")
   FM_LOCAL_FIRSTMATE_ERROR=
@@ -1513,19 +1509,11 @@ fm_local_firstmate_state_dirs() {  # <first-state> [<check-registry-reads>]
     done
     [ "$known" = 1 ] || FM_LOCAL_FIRSTMATE_STATES+=("$home/state")
     reg="$home/data/secondmates.md"
-    if [ "$check_registry_reads" = 1 ] && ! fm_path_lookup_safe "$reg"; then
-      FM_LOCAL_FIRSTMATE_ERROR="cannot establish local Firstmate registry presence at $reg"
-      return 1
-    fi
     [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
     [ -f "$reg" ] && [ ! -L "$reg" ] || {
       FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
       return 1
     }
-    if [ "$check_registry_reads" = 1 ] && ! cat "$reg" >/dev/null; then
-      FM_LOCAL_FIRSTMATE_ERROR="cannot read local Firstmate registry at $reg"
-      return 1
-    fi
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         "- "*)

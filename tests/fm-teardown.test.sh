@@ -5679,93 +5679,6 @@ test_private_nm_launch_agent_is_retired_before_teardown() {
   pass "a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes"
 }
 
-test_forced_children_retire_private_nm_launch_agents() {
-  local backend case_dir home child wt store pid label rc
-  for backend in tmux orca recursive; do
-    case_dir=$(make_case "forced-private-nm-agent-$backend")
-    write_meta "$case_dir" local-only secondmate
-    if [ "$backend" = recursive ]; then
-      child=grandchild-herdr
-      wt="$case_dir/$child-wt"
-      git -C "$case_dir/project" worktree add -q -b "fm/$child" "$wt" main
-      configure_nested_secondmate_with_herdr_grandchild "$case_dir" "$wt"
-      home="$case_dir/secondmate-home/nested-home"
-    else
-      configure_secondmate_with_tmux_children "$case_dir"
-      home="$case_dir/secondmate-home"
-      child=child-a
-      wt="$case_dir/$child-wt"
-      if [ "$backend" = orca ]; then
-        fm_write_meta "$home/state/$child.meta" \
-          "window=fm-$child" "endpoint_task_id=$child" \
-          "worktree=$wt" "project=$case_dir/project" \
-          "kind=ship" "mode=local-only" "backend=orca" \
-          "terminal=$child-terminal" "orca_worktree_id=$case_dir/project::$wt"
-        cat > "$case_dir/fakebin/orca" <<'SH'
-#!/usr/bin/env bash
-printf '%s\n' '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}'
-SH
-        chmod +x "$case_dir/fakebin/orca"
-      fi
-    fi
-    configure_child_pipeline "$case_dir" "$child" "$wt" running
-    add_fake_launchctl "$case_dir"
-    mv "$case_dir/fakebin/launchctl" "$case_dir/fakebin/launchctl-default"
-    cat > "$case_dir/fakebin/launchctl" <<SH
-#!/usr/bin/env bash
-if [ "\${1:-}" = bootout ] && [ ! -e "$case_dir/$child-pipeline-aborted" ]; then
-  exit 5
-fi
-exec "$case_dir/fakebin/launchctl-default" "\$@"
-SH
-    chmod +x "$case_dir/fakebin/launchctl"
-    mkdir -p "$wt/.no-mistakes/h"
-    teardown_fixture_start "$wt/.no-mistakes/h" KILL sleep 300
-    pid=$TEARDOWN_FIXTURE_PID
-    label="$NM_AGENT_PREFIX.3baa54c9"
-    add_nm_launch_agent "$case_dir" 3baa54c9 "$(cd "$wt" && pwd -P)/.no-mistakes/h" "$pid"
-    store="$case_dir/docker-store"
-    : > "$store"
-    docker_store_add "$store" container c-child owned-child "fm.task=$child" ""
-    rc=0
-    FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" FM_FAKE_DOCKER_STORE="$store" \
-      FM_FAKE_DOCKER_RM_FAIL=owned-child FM_FAKE_HERDR_CONFIRMED_GONE=1 \
-      FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
-      FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
-      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "$backend private agent: Docker failure must retain the child"
-    assert_present "$case_dir/$child-pipeline-aborted" "$backend private agent: pipeline survived"
-    if kill -0 "$pid" 2>/dev/null; then
-      teardown_fixture_stop "$pid"
-      fail "$backend private agent: private daemon survived child quiescence"
-    fi
-    assert_absent "$case_dir/launchctl-loaded/$label" "$backend private agent: agent stayed loaded"
-    assert_absent "$case_dir/launchagents/$label.plist" "$backend private agent: plist stayed installed"
-    assert_present "$home/data/$child/launchagent-backup/$label.plist" \
-      "$backend private agent: plist was not archived in the child's own home"
-    assert_absent "$case_dir/data/$child/launchagent-backup/$label.plist" \
-      "$backend private agent: plist was archived in the parent home"
-    assert_present "$home/state/$child.meta" "$backend private agent: Docker failure retired identity"
-    assert_present "$wt" "$backend private agent: Docker failure removed the worktree"
-    assert_equals 'owned-child ' "$(docker_store_names "$store" container)" \
-      "$backend private agent: failed Docker removal was not exercised"
-    assert_grep 'docker rm -f -v c-child' "$case_dir/docker.log" \
-      "$backend private agent: cleanup stopped before Docker removal"
-    rc=0
-    FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" FM_FAKE_DOCKER_STORE="$store" \
-      FM_FAKE_HERDR_CONFIRMED_GONE=1 FM_FAKE_HERDR_LOG="$case_dir/herdr.log" \
-      FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
-      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-        > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
-    expect_code 0 "$rc" "$backend private agent: retry failed: $(cat "$case_dir/retry.stderr")"
-    assert_absent "$case_dir/secondmate-home" "$backend private agent: retry retained child homes"
-    assert_absent "$case_dir/state/task-x1.meta" "$backend private agent: retry retained parent identity"
-    assert_equals '' "$(docker_store_names "$store" container)" "$backend private agent: Docker stack survived"
-  done
-  pass "forced ordinary, Orca and recursive children retire private agents before Docker cleanup and retry"
-}
-
 test_private_nm_launch_agent_equivalent_roots_are_retired() {
   local spelling case_dir wt root pid label rc
   for spelling in dot separators parent symlink; do
@@ -6082,151 +5995,15 @@ make_docker_case() {
   docker_store_add "$store" network n-else other_default "com.docker.compose.project=other"
   docker_store_add "$store" volume task-x1-data "fm.task=task-x1"
   docker_store_add "$store" volume task-x1_pgdata "com.docker.compose.project=task-x1"
+  docker_store_add "$store" volume supabase_db_task-x1 "com.supabase.cli.project=task-x1"
   docker_store_add "$store" volume other-data "fm.task=task-x2"
+  docker_store_add "$store" volume other_pgdata "com.docker.compose.project=other"
+  docker_store_add "$store" volume supabase_db_vernant "com.supabase.cli.project=vernant"
+  docker_store_add "$store" volume task-x1-unlabelled ""
+  docker_store_add "$store" volume task-x1_beaten "fm.task=task-x2;com.docker.compose.project=task-x1"
   # A longer sibling task in the same home claims task-x1-v2-pg.
   fm_write_meta "$case_dir/state/task-x1-v2.meta" "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1-v2"
   printf '%s\n' "$case_dir"
-}
-
-test_incomplete_local_inventories_retain_tasks_and_docker() {
-  local caller scan failure case_dir home meta wt id sibling store before rc real_ls real_cat registry branch
-  real_ls=$(command -v ls)
-  real_cat=$(command -v cat)
-  for caller in top-level forced-child; do
-    for scan in process docker; do
-      for failure in state metadata enumeration registry registry-read registry-parent; do
-        case_dir=$(make_case "inventory-$caller-$scan-$failure")
-        write_meta "$case_dir" local-only ship
-        home="$case_dir/primary-home"
-        meta="$case_dir/state/task-x1.meta"
-        wt="$case_dir/wt"
-        id=task-x1
-        if [ "$caller" = forced-child ]; then
-          write_meta "$case_dir" local-only secondmate
-          configure_secondmate_with_tmux_children "$case_dir"
-          home="$case_dir/secondmate-home"
-          meta="$home/state/child-a.meta"
-          wt="$case_dir/child-a-wt"
-          id=child-a
-        fi
-        if [ "$scan" = docker ]; then
-          fm_write_meta "$meta" "window=firstmate:fm-$id" "endpoint_task_id=$id" \
-            "worktree=$case_dir/missing-wt" "project=$case_dir/project" \
-            "kind=ship" "mode=local-only" "spawn_gen=teardown-test-$id"
-        fi
-        sibling="$case_dir/sibling-home"
-        mkdir -p "$sibling/state" "$sibling/data" "$home/data" "$case_dir/primary-home/data"
-        fm_write_meta "$sibling/state/$id.meta" "kind=ship"
-        printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
-          "$sibling" > "$case_dir/primary-home/data/secondmates.md"
-        registry="$sibling/data/secondmates.md"
-        case "$failure" in
-          registry|registry-read|registry-parent)
-            branch="$case_dir/registry-home"
-            mkdir -p "$branch/state" "$branch/data" "$case_dir/later-home/state" "$case_dir/later-home/data"
-            printf -- '- branch - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n- later - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
-              "$branch" "$case_dir/later-home" > "$case_dir/primary-home/data/secondmates.md"
-            registry="$branch/data/secondmates.md"
-            printf -- '- nested - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
-              "$sibling" > "$registry"
-            ;;
-        esac
-        if [ "$caller" = forced-child ]; then
-          cp "$case_dir/primary-home/data/secondmates.md" "$home/data/secondmates.md"
-        fi
-        store="$case_dir/docker-store"
-        : > "$store"
-        docker_store_add "$store" container c-marker foreign-marker "fm.task=$id" ""
-        docker_store_add "$store" network n-marker foreign-network "fm.task=$id"
-        docker_store_add "$store" volume foreign-volume "fm.task=$id"
-        if [ "$scan" = process ]; then
-          docker_store_add "$store" container c-path owned-path "com.docker.compose.project.working_dir=$wt" ""
-        fi
-        before=$(cat "$store")
-        case "$failure" in
-          state)
-            chmod 111 "$sibling/state"
-            [ ! -r "$sibling/state" ] || fail "inventory: fixture state remains readable"
-            ;;
-          metadata)
-            chmod 000 "$sibling/state/$id.meta"
-            [ ! -r "$sibling/state/$id.meta" ] || fail "inventory: fixture metadata remains readable"
-            ;;
-          enumeration)
-            cat > "$case_dir/fakebin/ls" <<EOF
-#!/usr/bin/env bash
-if [ "\${*: -1}" = "$sibling/state" ]; then exit 1; fi
-exec "$real_ls" "\$@"
-EOF
-            chmod +x "$case_dir/fakebin/ls"
-            ;;
-          registry)
-            chmod 000 "$registry"
-            [ ! -r "$registry" ] || fail "inventory: fixture registry remains readable"
-            ;;
-          registry-read)
-            cat > "$case_dir/fakebin/cat" <<EOF
-#!/usr/bin/env bash
-if [ "\${*: -1}" = "$registry" ]; then exit 1; fi
-exec "$real_cat" "\$@"
-EOF
-            chmod +x "$case_dir/fakebin/cat"
-            ;;
-          registry-parent)
-            chmod 600 "${registry%/*}"
-            [ ! -x "${registry%/*}" ] || fail "inventory: fixture registry parent remains searchable"
-            ;;
-        esac
-        rc=0
-        FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
-          run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-            > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-        chmod 755 "$sibling/state"
-        chmod 644 "$sibling/state/$id.meta"
-        chmod 755 "${registry%/*}"
-        [ ! -e "$registry" ] || chmod 644 "$registry"
-        rm -f "$case_dir/fakebin/ls" "$case_dir/fakebin/cat"
-        expect_code 1 "$rc" "$caller $scan $failure: incomplete inventory allowed retirement"
-        assert_present "$meta" "$caller $scan $failure: task metadata was retired"
-        assert_present "$case_dir/state/task-x1.meta" "$caller $scan $failure: parent metadata was retired"
-        assert_present "$wt" "$caller $scan $failure: task worktree was removed"
-        assert_equals "$before" "$(cat "$store")" "$caller $scan $failure: Docker resources were changed"
-        assert_absent "$case_dir/docker.log" "$caller $scan $failure: Docker ran with an incomplete inventory"
-        case "$failure" in
-          metadata)
-            assert_grep "cannot read local Firstmate task record $sibling/state/$id.meta" \
-              "$case_dir/stderr" "$caller $scan $failure: failed metadata read was not exercised"
-            ;;
-          registry-parent)
-            assert_grep "cannot establish local Firstmate registry presence at $registry" \
-              "$case_dir/stderr" "$caller $scan $failure: inaccessible registry parent was not exercised"
-            ;;
-          registry|registry-read)
-            assert_grep "cannot read local Firstmate registry at $registry" \
-              "$case_dir/stderr" "$caller $scan $failure: failed registry read was not exercised"
-            ;;
-          *)
-            assert_grep "cannot enumerate local Firstmate state $sibling/state" \
-              "$case_dir/stderr" "$caller $scan $failure: failed enumeration was not exercised"
-            ;;
-        esac
-        rc=0
-        FM_FAKE_DOCKER_STORE="$store" \
-          run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-            > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
-        expect_code 0 "$rc" "$caller $scan $failure: retry failed: $(cat "$case_dir/retry.stderr")"
-        assert_absent "$meta" "$caller $scan $failure: retry retained task metadata"
-        assert_absent "$case_dir/state/task-x1.meta" "$caller $scan $failure: retry retained parent metadata"
-        assert_equals "foreign-marker " "$(docker_store_names "$store" container)" \
-          "$caller $scan $failure: ambiguous sibling container was removed or owned path survived"
-        assert_equals "foreign-network " "$(docker_store_names "$store" network)" \
-          "$caller $scan $failure: ambiguous sibling network was removed"
-        assert_equals "foreign-volume " "$(docker_store_names "$store" volume)" \
-          "$caller $scan $failure: ambiguous sibling volume was removed"
-      done
-    done
-  done
-  pass "unreadable or inaccessible inventories retain tasks and Docker until complete inventories permit retry"
 }
 
 test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings() {
@@ -6243,7 +6020,7 @@ test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings() {
         configure_secondmate_with_tmux_children "$case_dir"
         home="$case_dir/secondmate-home/state"
         meta="$home/child-a.meta"
-        id=child-a
+        id="child-a"
       fi
       fm_write_meta "$meta" "window=firstmate:fm-$id" "endpoint_task_id=$id" \
         "worktree=$case_dir/missing-wt" "project=$case_dir/project" \
@@ -6294,12 +6071,12 @@ test_teardown_removes_the_tasks_own_docker_stacks() {
   assert_equals "other_default supabase_network_vernant task-x1_shared " \
     "$(docker_store_names "$case_dir/docker-store" network)" \
     "docker-own-stacks: wrong networks remained"
-  assert_equals "other-data task-x1_pgdata " \
+  assert_equals "other-data other_pgdata supabase_db_vernant task-x1-unlabelled task-x1_beaten " \
     "$(docker_store_names "$case_dir/docker-store" volume)" \
     "docker-own-stacks: wrong volumes remained"
   assert_grep "removing Docker container(s) owned by task-x1" "$case_dir/stderr" \
     "docker-own-stacks: teardown did not say which containers it removed"
-  pass "teardown removes the task's labelled, named, compose-project and worktree-compose stacks and leaves every other Docker object"
+  pass "teardown removes the task's labelled, named, compose-project and worktree-compose stacks and its marker- or project-labelled volumes, and leaves every other Docker object"
 }
 
 test_docker_removal_failure_keeps_the_task_records_until_a_rerun_succeeds() {
@@ -6315,7 +6092,8 @@ EOF
   FM_FAKE_DOCKER_STORE="$case_dir/docker-store" FM_FAKE_DOCKER_RM_FAIL=task-x1-test-pg \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "docker-rm-fails: an owned container that survives removal must stop teardown"
-  assert_grep "task-x1-test-pg" "$case_dir/stderr" "docker-rm-fails: the surviving container was not named"
+  assert_grep "still present after removal: task-x1-test-pg" "$case_dir/stderr" "docker-rm-fails: the surviving container was not named"
+  assert_grep "Error: cannot remove container task-x1-test-pg" "$case_dir/stderr" "docker-rm-fails: Docker's own removal error was hidden"
   assert_present "$case_dir/state/task-x1.meta" "docker-rm-fails: the task record was removed while a container survived"
   assert_absent "$case_dir/treehouse.log" "docker-rm-fails: the worktree was returned while a container survived"
   rc=0
@@ -6327,6 +6105,68 @@ EOF
     "$(docker_store_names "$case_dir/docker-store" network)" \
     "docker-rm-fails: partial container removal lost derived network ownership on retry"
   pass "an owned container that cannot be removed stops teardown with the record kept, and a rerun finishes it"
+}
+
+test_docker_removal_error_without_a_survivor_does_not_stop_teardown() {
+  local case_dir store rc
+  case_dir=$(make_docker_case docker-rm-error-no-survivor)
+  store="$case_dir/docker-store"
+  : > "$store"
+  docker_store_add "$store" container c-own owned-container "fm.task=task-x1" ""
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_RM_ERROR_AFTER_REMOVE=1 FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "rm-error-no-survivor: a removal error with no surviving container stopped teardown: $(cat "$case_dir/stderr")"
+  assert_grep 'docker rm -f -v c-own' "$case_dir/docker.log" "rm-error-no-survivor: the failing removal was not exercised"
+  assert_absent "$case_dir/state/task-x1.meta" "rm-error-no-survivor: the task record was retained"
+  assert_equals "" "$(docker_store_names "$store" container)" "rm-error-no-survivor: the owned container survived"
+  pass "a Docker removal error that leaves no owned container does not stop teardown"
+}
+
+test_docker_failed_lane_scan_names_its_cause() {
+  local case_dir home store before rc
+  case_dir=$(make_case docker-lane-scan-fails)
+  write_meta "$case_dir" local-only secondmate
+  configure_secondmate_with_tmux_children "$case_dir"
+  home="$case_dir/secondmate-home"
+  store="$case_dir/docker-store"
+  : > "$store"
+  docker_store_add "$store" container c-own owned-child "fm.task=child-a" ""
+  before=$(cat "$store")
+  cat > "$case_dir/fakebin/tmux" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in
+  kill-window|kill-pane) : > "$case_dir/lane-scan-armed" ;;
+esac
+exit 0
+EOF
+  cat > "$case_dir/fakebin/git" <<EOF
+#!/usr/bin/env bash
+if [ -e "$case_dir/lane-scan-armed" ] && [ "\${1:-}" = -C ] && [ "\${3:-} \${4:-}" = "worktree list" ]; then
+  exit 1
+fi
+exec "$(command -v git)" "\$@"
+EOF
+  chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/git"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  rm -f "$case_dir/fakebin/git" "$case_dir/lane-scan-armed"
+  expect_code 1 "$rc" "lane-scan-fails: an unreadable worktree registry allowed retirement"
+  assert_present "$home/state/child-a.meta" "lane-scan-fails: the child record was retired"
+  assert_present "$case_dir/state/task-x1.meta" "lane-scan-fails: the parent record was retired"
+  assert_equals "$before" "$(cat "$store")" "lane-scan-fails: Docker state changed"
+  assert_absent "$case_dir/docker.log" "lane-scan-fails: Docker ran without a lane inventory"
+  assert_grep "cannot establish nested worktree lanes for child-a (worktree registration could not be read: " \
+    "$case_dir/stderr" "lane-scan-fails: the refusal did not name its cause"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+    > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+  expect_code 0 "$rc" "lane-scan-fails: retry failed: $(cat "$case_dir/retry.stderr")"
+  assert_absent "$home" "lane-scan-fails: retry retained the secondmate home"
+  assert_equals "" "$(docker_store_names "$store" container)" "lane-scan-fails: retry left the owned container"
+  pass "a failed lane scan before Docker cleanup names its cause and retains records until retry"
 }
 
 test_forced_teardown_retains_records_after_a_docker_removal_failure() {
@@ -6343,16 +6183,76 @@ test_forced_teardown_retains_records_after_a_docker_removal_failure() {
 }
 
 test_stopped_docker_daemon_blocks_teardown() {
-  local case_dir rc
-  case_dir=$(make_docker_case docker-daemon-down)
-  rc=0
-  FM_FAKE_DOCKER_STORE="$case_dir/docker-store" FM_FAKE_DOCKER_DOWN=1 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 1 "$rc" "docker-daemon-down: unavailable Docker must stop teardown"
-  assert_present "$case_dir/state/task-x1.meta" "docker-daemon-down: task identity was retired"
-  assert_present "$case_dir/wt" "docker-daemon-down: worktree was removed"
-  assert_grep "task-x1-test-pg" "$case_dir/docker-store" "docker-daemon-down: Docker state changed"
-  pass "an unavailable Docker daemon refuses teardown and retains task identity"
+  local path retained case_dir meta id store before rc
+  for path in ship scout forced-child; do
+    for retained in yes no; do
+      case_dir=$(make_case "docker-daemon-down-$path-$retained")
+      meta="$case_dir/state/task-x1.meta"
+      id=task-x1
+      case "$path" in
+        ship)
+          write_meta "$case_dir" no-mistakes ship
+          land_shippable_commit "$case_dir"
+          ;;
+        scout)
+          write_meta "$case_dir" no-mistakes scout
+          mkdir -p "$case_dir/data/task-x1"
+          printf 'Delivered investigation report.\n' > "$case_dir/data/task-x1/report.md"
+          ;;
+        forced-child)
+          write_meta "$case_dir" local-only secondmate
+          configure_secondmate_with_tmux_children "$case_dir"
+          meta="$case_dir/secondmate-home/state/child-a.meta"
+          id="child-a"
+          ;;
+      esac
+      [ "$retained" = no ] || printf 'docker_projects= derived\n' >> "$meta"
+      store="$case_dir/docker-store"
+      : > "$store"
+      docker_store_add "$store" container c-own owned-container "fm.task=$id;com.docker.compose.project=derived" ""
+      docker_store_add "$store" network n-own derived-network "com.docker.compose.project=derived"
+      before=$(cat "$store")
+      rc=0
+      if [ "$path" != ship ]; then
+        FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_DOWN=1 \
+          run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+            > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      else
+        FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_DOWN=1 \
+          run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      fi
+      assert_equals "$before" "$(cat "$store")" "daemon-down $path $retained: Docker state changed"
+      if [ "$retained" = yes ]; then
+        expect_code 1 "$rc" "daemon-down $path: a record with docker_projects must stop teardown"
+        assert_present "$meta" "daemon-down $path: task identity was retired"
+        assert_present "$case_dir/state/task-x1.meta" "daemon-down $path: top-level identity was retired"
+        assert_grep "docker_projects= derived" "$meta" "daemon-down $path: retained project identities were lost"
+        assert_grep "Docker could not be listed for $id" "$case_dir/stderr" \
+          "daemon-down $path: the refusal did not name the unlistable daemon: $(cat "$case_dir/stderr")"
+        rc=0
+        if [ "$path" != ship ]; then
+          FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+            > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+        else
+          FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" \
+            > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+        fi
+        expect_code 0 "$rc" "daemon-down $path: retry with Docker running failed: $(cat "$case_dir/retry.stderr")"
+        assert_absent "$meta" "daemon-down $path: retry retained task identity"
+        assert_equals "" "$(docker_store_names "$store" container)" "daemon-down $path: retry left the owned container"
+        assert_equals "" "$(docker_store_names "$store" network)" "daemon-down $path: retry left the derived network"
+      else
+        expect_code 0 "$rc" "daemon-down $path: a record without docker_projects must not stop teardown: $(cat "$case_dir/stderr")"
+        assert_absent "$meta" "daemon-down $path: task identity was retained"
+        assert_absent "$case_dir/state/task-x1.meta" "daemon-down $path: top-level identity was retained"
+        assert_grep "Docker could not be listed for $id" "$case_dir/stderr" \
+          "daemon-down $path: the skipped Docker cleanup was not reported"
+        assert_grep "Docker cleanup was skipped" "$case_dir/stderr" \
+          "daemon-down $path: the warning did not say cleanup was skipped"
+      fi
+    done
+  done
+  pass "a stopped Docker daemon stops ship, scout and forced-child teardown only when the task record retains docker_projects; otherwise it warns and continues"
 }
 
 test_teardown_without_a_docker_binary_skips_docker_cleanup() {
@@ -6387,6 +6287,9 @@ test_docker_configured_supabase_identity_vetoes_all_heuristics() {
     docker_store_add "$store" network n-cross cross-project "com.docker.compose.project=task-x1;com.supabase.cli.project=$protected"
     docker_store_add "$store" network n-reverse reverse-project "com.docker.compose.project=$protected;com.supabase.cli.project=task-x1"
     docker_store_add "$store" network n-marker marked-network "fm.task=task-x1;com.supabase.cli.project=$protected"
+    docker_store_add "$store" volume cross-volume "com.docker.compose.project=task-x1;com.supabase.cli.project=$protected"
+    docker_store_add "$store" volume reverse-volume "com.docker.compose.project=$protected;com.supabase.cli.project=task-x1"
+    docker_store_add "$store" volume marked-volume "fm.task=task-x1;com.supabase.cli.project=$protected"
     rc=0
     FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 0 "$rc" "$protected: teardown failed: $(cat "$case_dir/stderr")"
@@ -6394,14 +6297,16 @@ test_docker_configured_supabase_identity_vetoes_all_heuristics() {
       "$(docker_store_names "$store" container)" "$protected: protected project was claimed by a heuristic"
     assert_equals "cross-project reverse-project " "$(docker_store_names "$store" network)" \
       "$protected: protected network was claimed or explicit marker was ignored"
+    assert_equals "cross-volume reverse-volume " "$(docker_store_names "$store" volume)" \
+      "$protected: protected volume was claimed or explicit marker was ignored"
   done
   pass "actual configured Supabase identity vetoes names, paths and either project label, but not explicit markers"
 }
 
-test_docker_supabase_config_presence_requires_searchable_parents() {
+test_docker_unreadable_supabase_config_refuses_and_absence_proceeds() {
   local caller failure case_dir home meta id store before rc config
   for caller in top-level forced-child; do
-    for failure in unreadable-file unsearchable-parent hidden-absence missing-file missing-parent; do
+    for failure in unreadable-file missing-file missing-parent; do
       case_dir=$(make_case "docker-config-$caller-$failure")
       write_meta "$case_dir" local-only ship
       meta="$case_dir/state/task-x1.meta"
@@ -6411,7 +6316,7 @@ test_docker_supabase_config_presence_requires_searchable_parents() {
         configure_secondmate_with_tmux_children "$case_dir"
         home="$case_dir/secondmate-home"
         meta="$home/state/child-a.meta"
-        id=child-a
+        id="child-a"
       fi
       mkdir -p "$case_dir/project/supabase"
       config="$case_dir/project/supabase/config.toml"
@@ -6428,11 +6333,6 @@ test_docker_supabase_config_presence_requires_searchable_parents() {
           chmod 000 "$config"
           [ ! -r "$config" ] || fail "Supabase fixture config remains readable"
           ;;
-        unsearchable-parent|hidden-absence)
-          [ "$failure" != hidden-absence ] || rm "$config"
-          chmod 600 "${config%/*}"
-          [ ! -x "${config%/*}" ] || fail "Supabase fixture parent remains searchable"
-          ;;
         missing-file) rm "$config" ;;
         missing-parent) rm -rf "${config%/*}" ;;
       esac
@@ -6442,23 +6342,19 @@ test_docker_supabase_config_presence_requires_searchable_parents() {
           > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
       case "$failure" in
         missing-file|missing-parent)
-          expect_code 0 "$rc" "$caller $failure: genuine config absence refused teardown: $(cat "$case_dir/stderr")"
+          expect_code 0 "$rc" "$caller $failure: config absence refused teardown: $(cat "$case_dir/stderr")"
           assert_absent "$meta" "$caller $failure: task record was retained"
           assert_equals "" "$(docker_store_names "$store" container)" "$caller $failure: owned containers survived"
           ;;
         *)
-          chmod 755 "${config%/*}"
-          [ ! -e "$config" ] || chmod 644 "$config"
-          printf 'project_id = "vernant"\n' > "$config"
+          chmod 644 "$config"
           expect_code 1 "$rc" "$caller $failure: uncertain Supabase protection permitted teardown"
           assert_present "$meta" "$caller $failure: task record was retired"
           assert_present "$case_dir/state/task-x1.meta" "$caller $failure: parent record was retired"
           assert_equals "$before" "$(cat "$store")" "$caller $failure: Docker resources changed"
           assert_absent "$case_dir/docker.log" "$caller $failure: Docker ran before establishing Supabase protection"
-          if [ "$failure" != unreadable-file ]; then
-            assert_grep "cannot establish the shared Supabase configuration for $id" \
-              "$case_dir/stderr" "$caller $failure: inaccessible config parent was not exercised"
-          fi
+          assert_grep "cannot identify the shared Supabase stack for $id" \
+            "$case_dir/stderr" "$caller $failure: unreadable config was not exercised"
           rc=0
           FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
             > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
@@ -6472,7 +6368,7 @@ test_docker_supabase_config_presence_requires_searchable_parents() {
       assert_equals "" "$(docker_store_names "$store" volume)" "$caller $failure: owned volume survived"
     done
   done
-  pass "Supabase protection refuses unreadable files and unsearchable parents, preserves shared stacks on retry, and permits proven absence"
+  pass "Supabase protection refuses an unreadable config, preserves the shared stack on retry, and permits an absent config"
 }
 
 test_docker_project_labels_require_the_exact_task_id() {
@@ -6492,6 +6388,11 @@ test_docker_project_labels_require_the_exact_task_id() {
   docker_store_add "$store" network n-supabase exact-supabase "com.supabase.cli.project=task-x1"
   docker_store_add "$store" network n-prefix prefixed-compose "com.docker.compose.project=task-x1-stack"
   docker_store_add "$store" network n-prefix2 prefixed-supabase "com.supabase.cli.project=task-x1_stack"
+  docker_store_add "$store" volume exact-compose "com.docker.compose.project=task-x1"
+  docker_store_add "$store" volume exact-supabase "com.supabase.cli.project=task-x1"
+  docker_store_add "$store" volume prefixed-compose "com.docker.compose.project=task-x1-stack"
+  docker_store_add "$store" volume prefixed-supabase "com.supabase.cli.project=task-x1_stack"
+  docker_store_add "$store" volume task-x1-named ""
   rc=0
   FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "exact-project: teardown failed: $(cat "$case_dir/stderr")"
@@ -6499,7 +6400,9 @@ test_docker_project_labels_require_the_exact_task_id() {
     "exact-project: project prefixes or live sibling names were claimed"
   assert_equals "prefixed-compose prefixed-supabase " "$(docker_store_names "$store" network)" \
     "exact-project: project prefix network was claimed"
-  pass "project labels match only the exact id while container names retain boundary and live-sibling rules"
+  assert_equals "prefixed-compose prefixed-supabase task-x1-named " "$(docker_store_names "$store" volume)" \
+    "exact-project: a volume was claimed by a project prefix or its name, or an exact project volume survived"
+  pass "project labels match only the exact id for containers, networks and volumes while container names retain boundary and live-sibling rules"
 }
 
 test_docker_workdirs_canonicalize_and_exclude_foreign_lanes_and_tasktmp() {
@@ -6578,6 +6481,8 @@ test_docker_latest_foreign_carriers_veto_network_removal() {
   docker_store_add "$store" network n-derived derived-compose "com.docker.compose.project=derived"
   docker_store_add "$store" network n-derived-supa derived-supabase "com.supabase.cli.project=derived"
   docker_store_add "$store" network n-marked explicitly-owned "fm.task=task-x1;com.docker.compose.project=derived"
+  docker_store_add "$store" volume exact-volume "com.docker.compose.project=task-x1"
+  docker_store_add "$store" volume marked-volume "fm.task=task-x1;com.docker.compose.project=task-x1"
   rc=0
   FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_ADD_AFTER_RM="$case_dir/arriving-containers" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -6586,6 +6491,8 @@ test_docker_latest_foreign_carriers_veto_network_removal() {
     "latest-carriers: foreign carrier was removed"
   assert_equals "derived-compose derived-supabase exact-compose exact-supabase " "$(docker_store_names "$store" network)" \
     "latest-carriers: latest foreign evidence was ignored or explicit marker was vetoed"
+  assert_equals "exact-volume " "$(docker_store_names "$store" volume)" \
+    "latest-carriers: a foreign carrier did not veto the project-label volume or the explicit marker was vetoed"
   pass "foreign carriers observed after container removal veto both project-label heuristics but not explicit network markers"
 }
 
@@ -6662,8 +6569,8 @@ test_docker_ambiguous_ids_trust_only_worktree_evidence() {
 }
 
 test_docker_all_failure_channels_retain_forced_tasks_until_retry() {
-  local channel case_dir store rc fail_operation ps_fail rm_error network_fail volume_fail
-  for channel in initial-ps verify-ps final-ps container-rm container-rm-error network-ls volume-ls network-rm volume-rm; do
+  local channel case_dir store rc fail_operation ps_fail network_fail volume_fail
+  for channel in verify-ps final-ps container-rm network-ls volume-ls network-rm volume-rm; do
     case_dir=$(make_docker_case "docker-failure-$channel")
     store="$case_dir/docker-store"
     : > "$store"
@@ -6677,13 +6584,11 @@ test_docker_all_failure_channels_retain_forced_tasks_until_retry() {
 printf '%s\n' returned >> "$case_dir/retired"
 EOF
     chmod +x "$case_dir/fakebin/treehouse"
-    fail_operation='' ps_fail='' rm_error='' network_fail='' volume_fail=''
+    fail_operation='' ps_fail='' network_fail='' volume_fail=''
     case "$channel" in
-      initial-ps) fail_operation='ps' ;;
       verify-ps) ps_fail=2 ;;
       final-ps) ps_fail=3 ;;
       container-rm) fail_operation='rm' ;;
-      container-rm-error) rm_error=1 ;;
       network-ls) fail_operation=network-ls ;;
       volume-ls) fail_operation=volume-ls ;;
       network-rm) network_fail=owned-network ;;
@@ -6691,7 +6596,7 @@ EOF
     esac
     rc=0
     FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_FAIL="$fail_operation" \
-      FM_FAKE_DOCKER_PS_FAIL_AT="$ps_fail" FM_FAKE_DOCKER_RM_ERROR_AFTER_REMOVE="$rm_error" \
+      FM_FAKE_DOCKER_PS_FAIL_AT="$ps_fail" \
       FM_FAKE_DOCKER_NETWORK_RM_FAIL="$network_fail" FM_FAKE_DOCKER_VOLUME_RM_FAIL="$volume_fail" \
       run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
         > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -6701,10 +6606,8 @@ EOF
     assert_present "$case_dir/wt" "$channel: worktree was removed"
     assert_absent "$case_dir/retired" "$channel: worktree return ran before confirmed Docker cleanup"
     assert_no_grep "teardown task-x1 complete" "$case_dir/stdout" "$channel: teardown falsely reported completion"
-    if [ "$channel" != initial-ps ]; then
-      assert_grep 'docker_projects= derived derived-supa' "$case_dir/state/task-x1.meta" \
-        "$channel: retained task record lost its derived project identities"
-    fi
+    assert_grep 'docker_projects= derived derived-supa' "$case_dir/state/task-x1.meta" \
+      "$channel: retained task record lost its derived project identities"
     if [ "$channel" = network-rm ]; then
       assert_equals "" "$(docker_store_names "$store" container)" "$channel: regression requires container removal to succeed"
       assert_equals "owned-network owned-supa-project-network " "$(docker_store_names "$store" network)" \
@@ -6726,14 +6629,9 @@ configure_child_docker_race() {
   local case_dir=$1
   mkdir -p "$case_dir/child-producers"
   cp "$case_dir/fakebin/docker" "$case_dir/fakebin/docker-store"
-  mkdir -p "$case_dir/child-resource-listings"
   cat > "$case_dir/fakebin/docker" <<EOF
 #!/usr/bin/env bash
 if [ "\${1:-} \${2:-}" = "network ls" ]; then
-  if [ -f "$case_dir/current-child" ]; then
-    child=\$(cat "$case_dir/current-child")
-    : > "$case_dir/child-resource-listings/\$child"
-  fi
   if [ -f "$case_dir/current-child" ]; then
     child=\$(cat "$case_dir/current-child")
     if [ -e "$case_dir/child-producers/\$child.live" ]; then
@@ -6746,118 +6644,9 @@ if [ "\${1:-} \${2:-}" = "network ls" ]; then
     rm "$case_dir/arriving-containers"
   fi
 fi
-if [ "\${1:-}" = ps ] && [ -f "$case_dir/current-child" ]; then
-  child=\$(cat "$case_dir/current-child")
-  if [ -f "$case_dir/child-resource-listings/\$child" ]; then
-    "$case_dir/fakebin/docker-store" "\$@" || exit \$?
-    if [ -f "$case_dir/\$child-pipeline-status" ] && [ ! -e "$case_dir/\$child-pipeline-aborted" ]; then
-      printf 'container\tc-pipeline-%s\tpipeline-%s\tfm.task=%s\t\n' "\$child" "\$child" "\$child" >> "\${FM_FAKE_DOCKER_STORE:?}"
-      printf '%s\n' "\$child" >> "$case_dir/pipeline-race-created"
-    fi
-    exit 0
-  fi
-fi
 exec "$case_dir/fakebin/docker-store" "\$@"
 EOF
   chmod +x "$case_dir/fakebin/docker"
-}
-
-configure_child_pipeline() {
-  local case_dir=$1 child=$2 wt=$3 status=$4 out
-  out=$(running_axi_status_toon "$(git -C "$wt" symbolic-ref --short HEAD)" \
-    "$(git -C "$wt" rev-parse HEAD)" "$child-run")
-  printf '%s\n' "${out/status: running/status: $status}" > "$case_dir/$child-pipeline-status"
-  if [ -e "$case_dir/fakebin/no-mistakes-default" ]; then
-    return 0
-  fi
-  cp "$case_dir/fakebin/no-mistakes" "$case_dir/fakebin/no-mistakes-default"
-  cat > "$case_dir/fakebin/no-mistakes" <<EOF
-#!/usr/bin/env bash
-child=\${PWD##*/}
-child=\${child%-wt}
-if [ ! -f "$case_dir/\$child-pipeline-status" ]; then
-  exec "$case_dir/fakebin/no-mistakes-default" "\$@"
-fi
-case "\${1:-} \${2:-}" in
-  "axi status")
-    if [ "\${3:-}" = --run ]; then
-      [ "\${4:-}" = "\$child-run" ] || exit 1
-      case "\${FM_FAKE_CHILD_ABORT_RESULT:-terminal}" in
-        wrong-run) printf 'run:\n  id: foreign-run\n  outcome: cancelled\n'; exit 0 ;;
-        empty) exit 0 ;;
-        error) exit 1 ;;
-        not-found) printf 'error: "run \\\\"%s\\\\" not found"\n' "\$child-run" >&2; exit 1 ;;
-      esac
-    fi
-    if [ "\${3:-}" != --run ]; then
-      case "\${FM_FAKE_CHILD_QUERY_RESULT:-success}" in
-        uninitialized)
-          printf '%s\n' "\$child" >> "$case_dir/pipeline-query.log"
-          cat "$ROOT/tests/captures/no-mistakes-v1.70.1/uninitialized.toon"
-          exit 1 ;;
-        initial-error) exit 1 ;;
-        initial-timeout) sleep 30; exit 1 ;;
-      esac
-    fi
-    if [ -e "$case_dir/\$child-pipeline-aborted" ]; then
-      printf 'run:\n  id: "%s-run"\n  outcome: cancelled\n' "\$child"
-    else
-      cat "$case_dir/\$child-pipeline-status"
-    fi
-    ;;
-  "axi abort")
-    [ "\${3:-} \${4:-}" = "--run \$child-run" ] || exit 1
-    printf '%s\n' "\$*" >> "$case_dir/pipeline-abort.log"
-    case "\${FM_FAKE_CHILD_ABORT_RESULT:-terminal}" in
-      terminal|not-found) : > "$case_dir/\$child-pipeline-aborted" ;;
-    esac
-    ;;
-  "runs --limit")
-    printf '%s\n' "\$*" >> "$case_dir/pipeline-ledger.log"
-    [ "\${FM_FAKE_CHILD_QUERY_RESULT:-success}" != ledger-error ] || exit 1
-    cat "$case_dir/\$child-pipeline-ledger"
-    ;;
-esac
-EOF
-  chmod +x "$case_dir/fakebin/no-mistakes"
-}
-
-assert_forced_child_discovery_failures_retain_records() {
-  local case_dir=$1 child=$2 meta=$3 wt=$4 store=$5 clone head advanced out result rc before row
-  clone="$case_dir/$child-pipeline-clone"
-  git clone -q "$case_dir/project" "$clone"
-  git -C "$clone" checkout -q "fm/$child"
-  git -C "$clone" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "pipeline fix round"
-  advanced=$(git -C "$clone" rev-parse --short=7 HEAD)
-  head=$(git -C "$wt" rev-parse HEAD)
-  assert_head_absent_from_worktree "$wt" "$advanced" "$child discovery"
-  out=$(cat "$case_dir/$child-pipeline-status")
-  printf '%s\n' "${out/$head/$advanced}" > "$case_dir/$child-pipeline-status"
-  {
-    ledger_row running "fm/$child" "$advanced" 2026-09-03 07:55
-    ledger_row failed "fm/$child" "${head:0:7}" 2026-09-02 06:36
-  } > "$case_dir/$child-pipeline-ledger"
-  before=$(cat "$store")
-  for result in initial-error initial-timeout ledger-error; do
-    rc=0
-    FM_FAKE_CHILD_QUERY_RESULT="$result" FM_TEARDOWN_NM_TIMEOUT=1 \
-      FM_FAKE_DOCKER_STORE="$store" FM_FAKE_HERDR_CONFIRMED_GONE=1 \
-      FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
-      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-        > "$case_dir/discovery-$result.stdout" 2> "$case_dir/discovery-$result.stderr" || rc=$?
-    expect_code 1 "$rc" "$child: $result allowed retirement"
-    assert_present "$meta" "$child: $result retired child metadata"
-    assert_present "${meta%.meta}.status" "$child: $result retired child status"
-    assert_present "$case_dir/state/task-x1.meta" "$child: $result retired parent metadata"
-    assert_present "$wt" "$child: $result removed child worktree"
-    while IFS= read -r row; do
-      grep -Fxq -- "$row" "$store" || fail "$child: $result removed an existing Docker resource"
-    done <<< "$before"
-    assert_absent "$case_dir/pipeline-abort.log" "$child: $result authorized an abort"
-    assert_grep "cannot establish no-mistakes pipeline state for child $child" \
-      "$case_dir/discovery-$result.stderr" "$child: $result did not explain refusal"
-  done
-  assert_present "$case_dir/pipeline-ledger.log" "$child: ledger failure was not exercised"
 }
 
 test_top_level_pipeline_discovery_failures_remain_best_effort() {
@@ -6884,75 +6673,8 @@ test_top_level_pipeline_discovery_failures_remain_best_effort() {
   pass "top-level status and ledger query failures remain best effort"
 }
 
-test_forced_local_only_children_accept_recorded_uninitialized_pipeline() {
-  local backend case_dir home child rc
-  for backend in tmux orca; do
-    case_dir=$(make_case "uninitialized-children-$backend")
-    write_meta "$case_dir" local-only secondmate
-    configure_secondmate_with_tmux_children "$case_dir"
-    home="$case_dir/secondmate-home"
-    if [ "$backend" = orca ]; then
-      cat > "$case_dir/fakebin/orca" <<'EOF'
-#!/usr/bin/env bash
-case "${1:-} ${2:-}" in
-  "terminal close"|"worktree rm") printf '%s\n' '{"ok":true}' ;;
-  *) exit 2 ;;
-esac
-EOF
-      chmod +x "$case_dir/fakebin/orca"
-    fi
-    for child in child-a child-b; do
-      configure_child_pipeline "$case_dir" "$child" "$case_dir/$child-wt" running
-      if [ "$backend" = orca ]; then
-        fm_write_meta "$home/state/$child.meta" \
-          "window=fm-$child" "endpoint_task_id=$child" \
-          "worktree=$case_dir/$child-wt" "project=$case_dir/project" \
-          "kind=ship" "mode=local-only" "backend=orca" \
-          "terminal=$child-terminal" "orca_worktree_id=$case_dir/project::$case_dir/$child-wt"
-      fi
-    done
-    rc=0
-    FM_FAKE_CHILD_QUERY_RESULT=uninitialized \
-      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 0 "$rc" "$backend children: recorded absence blocked retirement: $(cat "$case_dir/stderr")"
-    assert_absent "$home" "$backend children: confirmed absence retained secondmate home"
-    assert_absent "$case_dir/state/task-x1.meta" "$backend children: confirmed absence retained parent"
-    for child in child-a child-b; do
-      assert_grep "$child" "$case_dir/pipeline-query.log" "$backend children: absence query was not exercised"
-    done
-    assert_absent "$case_dir/pipeline-abort.log" "$backend children: absent pipeline authorized abort"
-    assert_absent "$case_dir/pipeline-ledger.log" "$backend children: absent pipeline queried ledger"
-  done
-  pass "forced local-only ordinary and Orca children retire on recorded nonzero uninitialized pipeline absence"
-}
-
-test_forced_recursive_child_accepts_recorded_uninitialized_pipeline() {
-  local case_dir home grandchild_wt rc
-  case_dir=$(make_case uninitialized-grandchild)
-  write_meta "$case_dir" local-only secondmate
-  grandchild_wt="$case_dir/grandchild-herdr-wt"
-  git -C "$case_dir/project" worktree add -q -b fm/grandchild-herdr "$grandchild_wt" main
-  configure_nested_secondmate_with_herdr_grandchild "$case_dir" "$grandchild_wt"
-  home="$case_dir/secondmate-home"
-  configure_child_pipeline "$case_dir" grandchild-herdr "$grandchild_wt" ci
-  rc=0
-  FM_FAKE_CHILD_QUERY_RESULT=uninitialized FM_FAKE_HERDR_CONFIRMED_GONE=1 \
-    FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
-    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "recursive child: recorded absence blocked retirement: $(cat "$case_dir/stderr")"
-  assert_absent "$home" "recursive child: confirmed absence retained secondmate homes"
-  assert_absent "$case_dir/state/task-x1.meta" "recursive child: confirmed absence retained parent"
-  assert_grep grandchild-herdr "$case_dir/pipeline-query.log" "recursive child: absence query was not exercised"
-  assert_present "$case_dir/closed" "recursive child: endpoint was not closed"
-  assert_absent "$case_dir/pipeline-abort.log" "recursive child: absent pipeline authorized abort"
-  assert_absent "$case_dir/pipeline-ledger.log" "recursive child: absent pipeline queried ledger"
-  pass "recursive forced teardown retires a child on recorded nonzero uninitialized pipeline absence"
-}
-
 assert_forced_child_docker_cleanup_and_retry() {
-  local backend=$1 case_dir home store child rc pid result status
+  local backend=$1 case_dir home store child rc
   case_dir=$(make_case "docker-children-$backend")
   write_meta "$case_dir" local-only secondmate
   configure_secondmate_with_tmux_children "$case_dir"
@@ -6968,22 +6690,12 @@ assert_forced_child_docker_cleanup_and_retry() {
   docker_store_add "$store" volume child-b-volume "fm.task=child-b"
   for child in child-a child-b; do
     : > "$case_dir/child-producers/$child.live"
-    mkdir -p "$case_dir/$child-tmp"
-    printf 'tasktmp=%s\n' "$case_dir/$child-tmp" >> "$home/state/$child.meta"
-    teardown_fixture_start "$case_dir/$child-wt" KILL sleep 300
-    printf '%s\n' "$TEARDOWN_FIXTURE_PID" > "$case_dir/$child-worktree.pid"
-    teardown_fixture_start "$case_dir/$child-tmp" KILL sleep 300
-    printf '%s\n' "$TEARDOWN_FIXTURE_PID" > "$case_dir/$child-tasktmp.pid"
-    status=running
-    [ "$child" != child-b ] || status=fixing
-    configure_child_pipeline "$case_dir" "$child" "$case_dir/$child-wt" "$status"
     if [ "$backend" = orca ]; then
       fm_write_meta "$home/state/$child.meta" \
         "window=fm-$child" "endpoint_task_id=$child" \
         "worktree=$case_dir/$child-wt" "project=$case_dir/project" \
         "kind=ship" "mode=local-only" "backend=orca" \
-        "terminal=$child-terminal" "orca_worktree_id=$case_dir/project::$case_dir/$child-wt" \
-        "tasktmp=$case_dir/$child-tmp"
+        "terminal=$child-terminal" "orca_worktree_id=$case_dir/project::$case_dir/$child-wt"
     fi
   done
   cat > "$case_dir/fakebin/child-boundary" <<EOF
@@ -7033,24 +6745,6 @@ esac
 printf '%s\n' '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}'
 EOF
   chmod +x "$case_dir/fakebin/child-boundary" "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse" "$case_dir/fakebin/orca"
-  assert_forced_child_discovery_failures_retain_records "$case_dir" child-a \
-    "$home/state/child-a.meta" "$case_dir/child-a-wt" "$store"
-  for result in active wrong-run empty error; do
-    rc=0
-    FM_FAKE_CHILD_ABORT_RESULT="$result" FM_FAKE_DOCKER_STORE="$store" \
-      FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
-      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-        > "$case_dir/abort-$result.stdout" 2> "$case_dir/abort-$result.stderr" || rc=$?
-    expect_code 1 "$rc" "$backend child: unconfirmed $result abort allowed retirement"
-    assert_present "$home/state/child-a.meta" "$backend child: unconfirmed abort retired identity"
-    assert_present "$home/state/child-a.status" "$backend child: unconfirmed abort retired status"
-    assert_present "$case_dir/state/task-x1.meta" "$backend child: unconfirmed abort retired parent"
-    assert_present "$case_dir/child-a-wt" "$backend child: unconfirmed abort removed worktree"
-    assert_absent "$case_dir/docker.log" "$backend child: Docker ran before confirmed pipeline stop"
-    assert_absent "$case_dir/destructive.log" "$backend child: worktree retirement preceded pipeline stop"
-    assert_grep "axi abort --run child-a-run" "$case_dir/pipeline-abort.log" \
-      "$backend child: abort was not targeted to the child's run"
-  done
   rc=0
   FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_RM_FAIL=owned-child-a \
     run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -7059,14 +6753,7 @@ EOF
   assert_present "$home/state/child-a.meta" "$backend child: child metadata retired"
   assert_present "$home/state/child-a.status" "$backend child: child status retired"
   assert_present "$case_dir/child-a-wt" "$backend child: child worktree removed"
-  assert_grep child-a "$case_dir/closed.log" "$backend child: endpoint was not quiesced before Docker failure"
-  assert_present "$case_dir/child-a-pipeline-aborted" "$backend child: active pipeline survived"
-  for child in worktree tasktmp; do
-    pid=$(cat "$case_dir/child-a-$child.pid")
-    if kill -0 "$pid" 2>/dev/null; then
-      fail "$backend child: $child process survived Docker cleanup"
-    fi
-  done
+  assert_grep child-a "$case_dir/closed.log" "$backend child: endpoint was not closed before Docker failure"
   assert_absent "$case_dir/destructive.log" "$backend child: worktree mutation preceded Docker cleanup"
   rc=0
   FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_NETWORK_RM_FAIL=child-a-network \
@@ -7082,7 +6769,7 @@ EOF
   assert_present "$home/state/child-a.status" "$backend child: network failure retired status"
   assert_absent "$case_dir/destructive.log" "$backend child: network failure allowed worktree retirement"
   rc=0
-  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_CHILD_ABORT_RESULT=not-found \
+  FM_FAKE_DOCKER_STORE="$store" \
     run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
     > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
   expect_code 0 "$rc" "$backend child: retry failed: $(cat "$case_dir/retry.stderr")"
@@ -7092,14 +6779,6 @@ EOF
   assert_equals "" "$(docker_store_names "$store" network)" "$backend child: child network survived"
   assert_equals "" "$(docker_store_names "$store" volume)" "$backend child: child volume survived"
   assert_absent "$case_dir/race-created" "$backend child: a live endpoint created a container during network cleanup"
-  assert_absent "$case_dir/pipeline-race-created" "$backend child: active pipeline created a container after the final listing"
-  assert_present "$case_dir/child-b-pipeline-aborted" "$backend child: fixing pipeline survived"
-  for child in worktree tasktmp; do
-    pid=$(cat "$case_dir/child-b-$child.pid")
-    if kill -0 "$pid" 2>/dev/null; then
-      fail "$backend child: child-b $child process survived retirement"
-    fi
-  done
   assert_grep child-a:clean "$case_dir/boundary.log" "$backend child: child-a Docker cleanup was not observed before destruction"
   assert_grep child-b:clean "$case_dir/boundary.log" "$backend child: child-b workdir cleanup was not observed before destruction"
   assert_no_grep dirty "$case_dir/boundary.log" "$backend child: destructive operation ran before its own Docker cleanup"
@@ -7107,12 +6786,12 @@ EOF
 
 test_forced_secondmate_cleans_each_child_docker_before_retirement_and_retries() {
   assert_forced_child_docker_cleanup_and_retry tmux
-  pass "forced secondmate quiesces child endpoints, pipelines and processes before Docker cleanup and retains failures for retry"
+  pass "forced secondmate closes each child endpoint before its Docker cleanup and retains failures for retry"
 }
 
-test_forced_orca_children_quiesce_before_docker_and_worktree_removal() {
+test_forced_orca_children_clean_docker_before_worktree_removal() {
   assert_forced_child_docker_cleanup_and_retry orca
-  pass "forced Orca children quiesce before Docker cleanup and retain identity and worktrees on failure"
+  pass "forced Orca children clean Docker before worktree removal and retain identity and worktrees on failure"
 }
 
 test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_retries() {
@@ -7128,29 +6807,12 @@ test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_ret
   configure_child_docker_race "$case_dir"
   : > "$case_dir/child-producers/grandchild-herdr.live"
   printf '%s\n' grandchild-herdr > "$case_dir/current-child"
-  configure_child_pipeline "$case_dir" grandchild-herdr "$grandchild_wt" ci
   : > "$store"
   docker_store_add "$store" container c-grandchild owned-grandchild "fm.task=grandchild-herdr" ""
   docker_store_add "$store" container c-path grandchild-path "com.docker.compose.project.working_dir=$grandchild_wt" ""
   docker_store_add "$store" container c-foreign foreign-grandchild "fm.task=other" ""
   docker_store_add "$store" network n-grandchild grandchild-network "fm.task=grandchild-herdr"
   docker_store_add "$store" volume grandchild-volume "fm.task=grandchild-herdr"
-  assert_forced_child_discovery_failures_retain_records "$case_dir" grandchild-herdr \
-    "$nested_home/state/grandchild-herdr.meta" "$grandchild_wt" "$store"
-  rc=0
-  FM_FAKE_CHILD_ABORT_RESULT=active FM_FAKE_DOCKER_STORE="$store" FM_FAKE_HERDR_CONFIRMED_GONE=1 \
-    FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
-    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-      > "$case_dir/abort.stdout" 2> "$case_dir/abort.stderr" || rc=$?
-  expect_code 1 "$rc" "grandchild: active pipeline allowed recursive retirement"
-  assert_present "$home/state/nested-sm.meta" "grandchild: active pipeline retired nested identity"
-  assert_present "$nested_home/state/grandchild-herdr.meta" "grandchild: active pipeline retired identity"
-  assert_present "$nested_home/state/grandchild-herdr.status" "grandchild: active pipeline retired status"
-  assert_present "$grandchild_wt" "grandchild: active pipeline removed worktree"
-  assert_grep "axi abort --run grandchild-herdr-run" "$case_dir/pipeline-abort.log" \
-    "grandchild: abort was not targeted to the grandchild's run"
-  assert_grep "owned-grandchild" "$store" "grandchild: owned container was removed before pipeline stop"
-  assert_grep "grandchild-path" "$store" "grandchild: path-owned container was removed before pipeline stop"
   rc=0
   FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_RM_FAIL=owned-grandchild FM_FAKE_HERDR_CONFIRMED_GONE=1 \
     FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
@@ -7161,10 +6823,9 @@ test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_ret
   assert_present "$nested_home/state/grandchild-herdr.meta" "grandchild: grandchild identity retired"
   assert_present "$nested_home/state/grandchild-herdr.status" "grandchild: grandchild status retired"
   assert_present "$nested_home" "grandchild: nested home removed"
-  assert_present "$case_dir/closed" "grandchild: endpoint was not quiesced before Docker cleanup"
-  assert_present "$case_dir/grandchild-herdr-pipeline-aborted" "grandchild: ci pipeline survived Docker cleanup"
+  assert_present "$case_dir/closed" "grandchild: endpoint was not closed before Docker cleanup"
   assert_equals "foreign-grandchild owned-grandchild " "$(docker_store_names "$store" container)" \
-    "grandchild: containers produced before quiescence survived the cleanup attempt"
+    "grandchild: containers produced before the endpoint closed survived the cleanup attempt"
   rc=0
   FM_FAKE_DOCKER_STORE="$store" FM_FAKE_HERDR_CONFIRMED_GONE=1 \
     FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
@@ -7175,7 +6836,7 @@ test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_ret
   assert_equals "foreign-grandchild " "$(docker_store_names "$store" container)" "grandchild: wrong Docker objects survived"
   assert_equals "" "$(docker_store_names "$store" network)" "grandchild: network survived"
   assert_equals "" "$(docker_store_names "$store" volume)" "grandchild: volume survived"
-  pass "recursive forced secondmate cleanup quiesces the grandchild before Docker cleanup and retains failed identity for retry"
+  pass "recursive forced secondmate cleanup closes the grandchild endpoint before Docker cleanup and retains failed identity for retry"
 }
 
 test_docker_container_arriving_during_resource_cleanup_blocks_retirement() {
@@ -7579,7 +7240,6 @@ test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_private_nm_launch_agent_is_retired_before_teardown
-test_forced_children_retire_private_nm_launch_agents
 test_private_nm_launch_agent_equivalent_roots_are_retired
 test_foreign_nm_launch_agents_are_left_alone
 test_nested_nm_launch_agents_are_left_alone
@@ -7587,14 +7247,15 @@ test_absent_copy_nm_launch_agents_preserve_nested_ownership
 test_private_nm_launch_agent_bootout_failure_refuses
 test_private_nm_launch_agent_not_loaded_is_archived
 test_teardown_removes_the_tasks_own_docker_stacks
-test_incomplete_local_inventories_retain_tasks_and_docker
 test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings
 test_docker_removal_failure_keeps_the_task_records_until_a_rerun_succeeds
 test_forced_teardown_retains_records_after_a_docker_removal_failure
+test_docker_removal_error_without_a_survivor_does_not_stop_teardown
+test_docker_failed_lane_scan_names_its_cause
 test_stopped_docker_daemon_blocks_teardown
 test_teardown_without_a_docker_binary_skips_docker_cleanup
 test_docker_configured_supabase_identity_vetoes_all_heuristics
-test_docker_supabase_config_presence_requires_searchable_parents
+test_docker_unreadable_supabase_config_refuses_and_absence_proceeds
 test_docker_project_labels_require_the_exact_task_id
 test_docker_workdirs_canonicalize_and_exclude_foreign_lanes_and_tasktmp
 test_docker_mixed_project_carriers_spare_empty_heuristic_networks
@@ -7603,10 +7264,8 @@ test_standalone_secondmate_skips_docker_cleanup
 test_docker_project_record_failure_prevents_container_removal
 test_docker_ambiguous_ids_trust_only_worktree_evidence
 test_docker_all_failure_channels_retain_forced_tasks_until_retry
-test_forced_local_only_children_accept_recorded_uninitialized_pipeline
-test_forced_recursive_child_accepts_recorded_uninitialized_pipeline
 test_forced_secondmate_cleans_each_child_docker_before_retirement_and_retries
-test_forced_orca_children_quiesce_before_docker_and_worktree_removal
+test_forced_orca_children_clean_docker_before_worktree_removal
 test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_retries
 test_docker_container_arriving_during_resource_cleanup_blocks_retirement
 )

@@ -9,7 +9,6 @@ They are replay inputs, not evidence that every composed scenario was driven liv
 Each status file is unchanged stdout from `no-mistakes axi status --run <id>` executed from the test-phase worktree, without entering the recorded run's checkout.
 The command exited zero for all five run-specific captures.
 `uninitialized.toon` is unchanged stdout from `no-mistakes axi status` in that worktree, which exited one.
-Forced-child absence and query-failure replay coverage is listed below; [`fm-teardown.sh`'s header](../../../bin/fm-teardown.sh) owns the interpretation and refusal contract.
 Update notices on stderr are not part of the captured stdout contract.
 
 | File | Recorded run ID | Observed state |
@@ -47,7 +46,6 @@ The original review-gate, rebased-head, unrelated-metadata, and malformed-input 
 | Newer failure outranks an older live run | Genuine failed status and genuine live status | This relative ordering with both states on one branch was composed, not observed |
 | Changing or unverifiable authority | Genuine live and cancelled status formats | The transition between reads, malformed records, wrong identities, and unreadable inventory are injected; no live race or corrupt production inventory was captured |
 | Uninitialized repository preserves worker reporting | Actual uninitialized stdout; earlier live lifecycle-event/pane evidence | The portable test replays stdout and uses the existing pane fake |
-| Forced-child retirement on confirmed pipeline absence | Actual uninitialized stdout and recorded exit one | Ordinary, Orca, and recursive teardown paths are disposable-repository replays; no production child was retired during capture |
 | Development continues after completed validation | Genuine completed status | Advancing Git and emitting worker events after completion are disposable-repository actions, not an observed recorded worker sequence |
 | Optional inventory dependencies are absent | Genuine gate output and capped inventory | Missing Python/SQLite and complete-inventory compositions are simulated; the captured host had both dependencies |
 

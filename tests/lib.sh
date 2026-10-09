@@ -704,7 +704,7 @@ if ($cmd eq 'volume' && $sub eq 'ls') {
   for my $o (grep { $_->[0] eq 'volume' } @objs) {
     my %l = labels($o->[2]);
     next if grep { ($l{$_} // "\0") ne $want{$_} } keys %want;
-    print $o->[1], "\n";
+    print length($fmt) ? render($fmt, $o->[1], $o->[1], %l) : $o->[1], "\n";
   }
   exit 0;
 }

@@ -7,8 +7,9 @@
 #
 #   fm_task_docker_cleanup <task-id> <sibling-ids> <ambiguous> <protected> <meta> [<root>...]
 #       Removes the Docker containers, then the compose/labelled networks and
-#       labelled volumes, that this task owns. Returns 0 when nothing is owned,
-#       or when Docker is absent; returns nonzero when cleanup is incomplete.
+#       volumes, that this task owns. Returns 0 when nothing is owned, when Docker
+#       is absent, or when the first listing fails and <meta> retains no
+#       docker_projects; returns nonzero when cleanup is incomplete.
 #         <sibling-ids>  space-separated ids of every OTHER live task in any
 #                        local Firstmate home.
 #         <ambiguous>    1 when another local home has a live task with this
@@ -47,16 +48,22 @@
 # project identity carried in either project label by a foreign container in the
 # latest successful container listing, even if that container has no endpoint on
 # the network. An unambiguous marker bypasses both heuristic vetoes.
-# Named volumes require an unambiguous task marker; names and project labels do
-# not establish volume ownership. `docker rm -v` also removes anonymous volumes.
+# Named volumes need an unambiguous marker or an exact task-id Compose or Supabase
+# project label; names and derived projects do not establish volume ownership.
+# A marker naming another task, a protected identity, or a foreign container
+# carrying either volume project identity vetoes the project-label claim.
+# `docker rm -v` also removes anonymous volumes.
 # Objects with no qualifying ownership evidence are left alone.
 #
 # Before removing containers, cleanup atomically retains their Compose and Supabase
 # project identities in the task record's docker_projects field. Retries read that
 # field after the containers are gone; task-record retirement removes it.
 # Listing, metadata read/publication, removal, or verification failures return
-# nonzero. After container removal, any surviving owned container refuses cleanup;
-# a final container listing also rejects arrivals during network or volume cleanup.
+# nonzero, except that a failed first listing (a stopped or unreachable daemon)
+# only warns and returns 0 when the task record retains no docker_projects.
+# After container removal, any surviving owned container refuses cleanup and
+# prints the removal's own error; a failed removal with no survivor is not a failure.
+# A final container listing also rejects arrivals during network or volume cleanup.
 # Portable regression coverage: tests/fm-teardown.test.sh; real Docker CLI guard:
 # tests/fm-task-docker-live-e2e.test.sh.
 #
@@ -180,7 +187,7 @@ EOF
 
 fm_task_docker_cleanup() {
   local id=$1 siblings=$2 ambiguous=$3 protected=$4 record=$5 sep=$_FM_TASK_DOCKER_SEP
-  local objects cid names project supabase why projects foreign_projects="" nname candidate saved_projects tmp
+  local objects cid names project supabase why projects foreign_projects="" nname candidate saved_projects tmp rm_err
   local -a ids
   shift 5
   command -v docker >/dev/null 2>&1 || return 0
@@ -195,6 +202,10 @@ fm_task_docker_cleanup() {
   fi
   saved_projects=$projects
   if ! objects=$(fm_task_docker_containers "$id" "$siblings" "$ambiguous" "$protected" "$@"); then
+    if [ -z "$saved_projects" ]; then
+      echo "warning: Docker could not be listed for $id and its task record retains no Docker project identities, so Docker cleanup was skipped; with Docker running, list its own with: docker ps -a --filter label=$FM_TASK_DOCKER_MARKER_LABEL=$id" >&2
+      return 0
+    fi
     echo "warning: Docker could not be listed for $id, so its Docker stacks were not cleaned up; with Docker running, list its own with: docker ps -a --filter label=$FM_TASK_DOCKER_MARKER_LABEL=$id" >&2
     return 1
   fi
@@ -225,7 +236,7 @@ EOF
   fi
   if [ "${#ids[@]}" -gt 0 ]; then
     echo "teardown: removing Docker container(s) owned by $id:$names" >&2
-    fm_task_docker_run rm -f -v "${ids[@]}" >/dev/null 2>&1 || return 1
+    rm_err=$(fm_task_docker_run rm -f -v "${ids[@]}" 2>&1 >/dev/null) || true
     if ! objects=$(fm_task_docker_containers "$id" "$siblings" "$ambiguous" "$protected" "$@"); then
       echo "warning: Docker could not be listed again after removing the containers owned by $id, so the removal is unverified; check with: docker ps -a --filter label=$FM_TASK_DOCKER_MARKER_LABEL=$id" >&2
       return 1
@@ -233,6 +244,7 @@ EOF
     while IFS="$sep" read -r cid nname project supabase why; do
       [ -n "$cid" ] && [ -n "$why" ] || continue
       echo "error: Docker container owned by $id is still present after removal: $nname" >&2
+      [ -z "$rm_err" ] || printf '%s\n' "$rm_err" >&2
       return 1
     done <<EOF
 $objects
@@ -248,7 +260,7 @@ EOF
 $objects
 EOF
   fm_task_docker_remove_networks "$id" "$ambiguous" "$protected" "$projects" "$foreign_projects" || return 1
-  fm_task_docker_remove_volumes "$id" "$ambiguous" || return 1
+  fm_task_docker_remove_volumes "$id" "$ambiguous" "$protected" "$foreign_projects" || return 1
   if ! objects=$(fm_task_docker_containers "$id" "$siblings" "$ambiguous" "$protected" "$@"); then
     echo "warning: Docker could not be listed after cleaning the stacks owned by $id, so cleanup is unverified" >&2
     return 1
@@ -308,16 +320,32 @@ EOF
   return 0
 }
 
-fm_task_docker_remove_volumes() {  # <id> <ambiguous>
-  local id=$1 ambiguous=$2 out vol
+fm_task_docker_remove_volumes() {  # <id> <ambiguous> <protected> <foreign-projects>
+  local id=$1 ambiguous=$2 protected=$3 foreign_projects=$4 sep=$_FM_TASK_DOCKER_SEP out vol label proj supabase
   [ "$ambiguous" != 1 ] || return 0
-  out=$(fm_task_docker_run volume ls -q --filter "label=$FM_TASK_DOCKER_MARKER_LABEL=$id" 2>/dev/null) || return 1
-  while IFS= read -r vol; do
+  out=$(fm_task_docker_run volume ls --format \
+    "{{.Name}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}" \
+    2>/dev/null) || return 1
+  while IFS="$sep" read -r vol label proj supabase; do
     [ -n "$vol" ] || continue
+    if [ "$label" != "$id" ]; then
+      [ -z "$label" ] || continue
+      [ "$proj" = "$id" ] || [ "$supabase" = "$id" ] || continue
+      if fm_task_docker_protected "$protected" "$proj" \
+         || fm_task_docker_protected "$protected" "$supabase"; then
+        continue
+      fi
+      if [ -n "$proj" ]; then
+        case " $foreign_projects " in *" $proj "*) continue ;; esac
+      fi
+      if [ -n "$supabase" ]; then
+        case " $foreign_projects " in *" $supabase "*) continue ;; esac
+      fi
+    fi
     if fm_task_docker_run volume rm "$vol" >/dev/null 2>&1; then
       echo "teardown: removed Docker volume $vol owned by $id" >&2
     else
-      echo "warning: Docker volume $vol is labelled for $id but could not be removed (in use?); remove it by hand with: docker volume rm $vol" >&2
+      echo "warning: Docker volume $vol is owned by $id but could not be removed (in use?); remove it by hand with: docker volume rm $vol" >&2
       return 1
     fi
   done <<EOF

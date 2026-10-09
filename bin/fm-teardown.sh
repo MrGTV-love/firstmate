@@ -228,20 +228,19 @@
 # checks before any destructive return. Teardown output notes every wait, retry, and
 # removal so the operator can see what happened.
 #
-# Top-level pre-teardown cleanup sequence (runs once every landed/discard-work
-# safety refusal above has already passed, and BEFORE any worktree return,
-# branch delete, or backend kill below - a still-active run or a leaked process may
+# Pre-teardown cleanup sequence (runs once every landed/discard-work safety
+# refusal above has already passed, and BEFORE any worktree return, branch
+# delete, or backend kill below - a still-active run or a leaked process may
 # own live work in that worktree):
 #   Fix 1 - conclude the task's own no-mistakes run. A ship task's worktree can
 #     be torn down while its no-mistakes pipeline run is still PARKED at a gate
 #     (awaiting_approval/fix_review/any awaiting_agent field), with no worker
 #     left to ever answer it - the run then sits there holding a fleet slot
 #     indefinitely (observed 2026-08-03: runs parked 7h39m and parked at a
-#     post-CI approval gate after the worker was already cleaned up).
-#     In top-level teardown, a run with an autonomous step still under way
-#     (running/fixing/ci) is left alone: no-mistakes drives those against its own
-#     gate-repo clone, not the crew's worktree. Fix 4 below owns the Docker residual
-#     and the stricter forced-descendant cancellation scope.
+#     post-CI approval gate after the worker was already cleaned up). A run
+#     with an autonomous step still under way (running/fixing/ci) is left
+#     alone: no-mistakes drives those against its own gate-repo clone, not the
+#     crew's worktree, so they are not orphaned by removing the worktree.
 #     conclude_task_no_mistakes_run attributes the active-or-most-recent run to
 #     THIS task only when its branch AND code identity (bin/fm-nm-run-lib.sh's
 #     strict fm_nm_head_matches_worktree rule) both match this worktree, then
@@ -256,9 +255,9 @@
 #     finished history, never an abort authorization (observed 2026-09-03: a
 #     run parked at a post-CI gate after fix rounds advanced its head past
 #     the submitted head stayed parked forever once the task was cleaned up).
-#     A run already terminal (an outcome is set), or outside the cancellation
-#     scope above, is left untouched. Idempotent: an already-aborted run reads
-#     back terminal and is skipped on retry.
+#     A run already terminal
+#     (an outcome is set) or not parked at a gate is left untouched. Idempotent:
+#     an already-aborted run reads back terminal and is skipped on retry.
 #   Fix 2 - reap leaked descendant processes. A backgrounded/disowned process
 #     started under the worktree (or its per-task tasktmp) does not receive the
 #     SIGHUP/SIGTERM that closing the backend pane sends to its own foreground
@@ -327,45 +326,32 @@
 #     whose header owns object attribution, removal, and retry metadata.
 #     Any Docker listing, verification, or removal failure stops teardown with
 #     task identity records and the worktree kept, even under --force; rerun
-#     teardown after resolving the failure. A missing Docker CLI is silent;
-#     an unlistable daemon warns and stops teardown on Docker-cleanup paths.
+#     teardown after resolving the failure. A missing Docker CLI is silent.
+#     A stopped or unreachable daemon stops teardown only when the task record
+#     already retains docker_projects; otherwise teardown warns and continues,
+#     on ship, scout, and forced-descendant paths alike.
 #     Standalone secondmate retirement skips its own Docker cleanup.
 #     Forced cleanup closes each child's endpoint before its Docker snapshot.
-#     For ship children with an owned copy, it aborts an attributed parked or
-#     executing (running/fixing/ci) pipeline and confirms that exact run terminal
-#     or not found. Owned children then retire private launch agents through
-#     Fix 3, archiving plists under the child's own home, before Fix 2 reaps
-#     worktree and tasktmp processes. Attribution uses the branch/head proof in
-#     Fix 1. The captured exit-one `repo not initialized` status response proves
-#     pipeline absence; other initial status failures, required ledger query
-#     failures, or unconfirmed aborts refuse child retirement with its identity
-#     records and worktree kept. Top-level discovery stays best effort.
 #     Ordinary, Orca, and recursive descendants use their own metadata for Docker
 #     cleanup. Nested secondmate process events are swept before that secondmate's
 #     Docker cleanup and recursive descendant retirement. A Docker refusal retains
-#     the child's retry records even though its endpoint and processes may have
-#     already stopped. A reassigned slot is not reaped or used to attribute a
-#     pipeline or Docker workdir; its tasktmp is still reaped, and the library's
+#     the child's retry records even though its endpoint may have already stopped.
+#     A reassigned slot is not used to attribute a Docker workdir; the library's
 #     remaining non-path ownership rules still apply.
 #     Docker path roots are owned worktrees only, never tasktmp; nested registered
 #     Git lanes and linked worktrees are excluded, including through symlinks.
-#     Ownership inventories must be complete before removal: checked local-home
-#     discovery uses bin/fm-wake-lib.sh's fm_local_firstmate_state_dirs; teardown
-#     also requires every existing sibling state directory to be enumerable and
-#     every task metadata record readable. Registry, state, metadata, and shared
-#     config presence probes use bin/fm-path-lib.sh's fm_path_lookup_safe; failed
-#     lookup, enumeration, or read retains records for retry, never proves absence.
-#     Proven-absent registries, state directories, and shared configs are valid.
+#     A lane scan that fails names its cause and stops teardown; it is skipped
+#     when the task has no path root.
 #     Only matching metadata basenames AND inodes identify the same task record;
 #     differently named hardlinks remain sibling identities.
 #     The shared-stack identity comes from the primary project's
 #     supabase/config.toml project_id. Reading a present config requires python3's
 #     standard-library tomllib parser; unreadable or invalid configuration refuses
 #     cleanup before Docker removal.
-#     tests/fm-teardown.test.sh covers failure/retry and forced-child quiescence.
-#     Residual: top-level teardown leaves autonomous pipelines and the endpoint
-#     live; a still-live producer can create a stack after the final listing.
-#     Snapshot cleanup cannot stop a live producer.
+#     tests/fm-teardown.test.sh covers failure/retry and forced-descendant cleanup.
+#     Residual: teardown leaves autonomous pipelines live, and forced-descendant
+#     cleanup does not reap a child's processes; a still-live producer can create
+#     a stack after the final listing. Snapshot cleanup cannot stop a live producer.
 # After Fix 1, Fix 3, and Fix 2, but before Fix 4, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
@@ -2090,14 +2076,14 @@ validate_worktree_teardown_safety() {
 # this copy cannot resolve at all.
 NM_TEARDOWN_TIMEOUT=${FM_TEARDOWN_NM_TIMEOUT:-10}
 case "$NM_TEARDOWN_TIMEOUT" in ''|*[!0-9]*) NM_TEARDOWN_TIMEOUT=10 ;; esac
-# How many of the most recent `no-mistakes runs` rows the unresolved-head
+# How many of the most recent `no-mistakes runs` rows the parked-run
 # continuation proof may scan, mirroring bin/fm-crew-state.sh's limit posture
 # (generous: rows of other branches interleave freely in the real ledger).
 NM_TEARDOWN_RUNS_LIMIT=${FM_TEARDOWN_NM_RUNS_LIMIT:-200}
 case "$NM_TEARDOWN_RUNS_LIMIT" in ''|*[!0-9]*) NM_TEARDOWN_RUNS_LIMIT=200 ;; esac
 TASK_RUN_ID=
-task_status_is_own_run_to_conclude() {
-  local wt=$1 out=$2 scope=${3:-parked} branch run_id run_branch run_head status outcome awaiting has_gate ledger
+task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
+  local wt=$1 out=$2 branch run_id run_branch run_head status outcome awaiting has_gate ledger
   TASK_RUN_ID=
   branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null) || return 1
   [ -n "$branch" ] || return 1
@@ -2112,8 +2098,7 @@ task_status_is_own_run_to_conclude() {
   status=$(fm_nm_strip_quotes "$(fm_nm_field "$out" status)")
   [ -n "$status" ] || return 1
   case "$status" in
-    completed|failed|cancelled|passed|checks-passed) return 1 ;;
-    running|fixing|ci) [ "$scope" = forced-child ] || return 1 ;;
+    completed|failed|cancelled|passed|checks-passed|running|fixing|ci) return 1 ;;
   esac
   if ! fm_nm_head_matches_worktree "$wt" "$run_head"; then
     # The strict object-local rule rejected this run head. That rejection is
@@ -2125,19 +2110,14 @@ task_status_is_own_run_to_conclude() {
     # nothing for any ledger shape it cannot prove, so the run stays
     # untouched unless the ledger proves this exact continuation. Cleanup
     # consumes only an explicitly active (`running`) proved word: a terminal
-    # newest row is finished history, never this run's abort
+    # newest row is finished history, never this parked run's abort
     # authorization (the read path classifies the same owner's answer; the
     # abort here must never fire for a run that already ended).
     [ -n "$run_head" ] || return 1
     [ -z "$(fm_nm_resolve_commit "$wt" "$run_head")" ] || return 1
-    ledger=$(fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" runs --limit "$NM_TEARDOWN_RUNS_LIMIT") || {
-      [ "$scope" != forced-child ] || return 2
-    }
+    ledger=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" runs --limit "$NM_TEARDOWN_RUNS_LIMIT")
     [ "$(fm_nm_runs_status_for_worktree "$wt" "$branch" "$ledger" "$run_head")" = running ] || return 1
   fi
-  case "$status" in
-    running|fixing|ci) TASK_RUN_ID=$run_id; return 0 ;;
-  esac
   awaiting=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*awaiting_agent:' | head -1 || true)
   has_gate=$(printf '%s\n' "$out" | grep -Eq '^[[:space:]]*gate:[[:space:]]*' && echo 1 || echo 0)
   case "$status" in
@@ -2150,18 +2130,12 @@ task_status_is_own_run_to_conclude() {
   return 1
 }
 
-task_run_is_own_run_to_conclude() {
-  local wt=$1 scope=${2:-parked} out query_rc
-  out=$(fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" axi status) || {
-    query_rc=$?
-    if [ "$scope" = forced-child ]; then
-      if [ "$query_rc" -eq 1 ] && [ "${out%%$'\n'*}" = "error: repo not initialized (run 'no-mistakes init' first)" ]; then
-        return 1
-      fi
-      return 2
-    fi
-  }
-  task_status_is_own_run_to_conclude "$wt" "$out" "$scope"
+task_run_is_own_parked_run() {  # <worktree>
+  local wt=$1 out
+  # Accepted best-effort residual: query failures stay fail-open because making
+  # no-mistakes availability a prerequisite would block ship tasks with no run.
+  out=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" axi status)
+  task_status_is_own_parked_run "$wt" "$out"
 }
 
 task_status_is_terminal_run() {  # <axi-status-output> <run-id>
@@ -2182,28 +2156,19 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
   [ "$actual" = "$expected" ]
 }
 
-# Keep branch/head attribution before any abort; Fix 1 and Fix 4 in the script
-# header own the top-level and forced-child cancellation scopes.
+# Abort THIS task's own parked no-mistakes run before the worker that would
+# have answered its gate is removed, so no run is left orphaned holding a
+# fleet slot. Only KIND=ship drives a no-mistakes validation of its own
+# worktree (scouts and secondmates never do, mirroring bin/fm-crew-state.sh);
+# a run not attributed to this exact branch+head is left completely alone.
 conclude_task_no_mistakes_run() {  # <worktree>
-  local wt=$1 scope=${2:-parked} out run_id query_rc state_description="parked at a gate" refusal_state=parked
+  local wt=$1 out run_id
   [ "$KIND" = ship ] || return 0
   [ -d "$wt" ] || return 0
   command -v no-mistakes >/dev/null 2>&1 || return 0
-  query_rc=0
-  task_run_is_own_run_to_conclude "$wt" "$scope" || query_rc=$?
-  if [ "$query_rc" -ne 0 ]; then
-    if [ "$scope" = forced-child ] && [ "$query_rc" -eq 2 ]; then
-      echo "REFUSED: cannot establish no-mistakes pipeline state for child $ID; retaining its records until status and ledger queries succeed." >&2
-      return 1
-    fi
-    return 0
-  fi
+  task_run_is_own_parked_run "$wt" || return 0
   run_id=$TASK_RUN_ID
-  if [ "$scope" = forced-child ]; then
-    state_description=active
-    refusal_state=active
-  fi
-  echo "teardown: no-mistakes run for $ID is $state_description; aborting before the worker is removed" >&2
+  echo "teardown: no-mistakes run for $ID is parked at a gate; aborting before the worker is removed" >&2
   # Accepted best-effort residual: abort supports run-id targeting but no atomic
   # live-state condition; fully closing the resume race needs upstream compare-and-cancel.
   fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" axi abort --run "$run_id" >/dev/null 2>&1 || true
@@ -2212,7 +2177,7 @@ conclude_task_no_mistakes_run() {  # <worktree>
   elif task_status_is_run_not_found "$out" "$run_id"; then
     return 0
   fi
-  echo "REFUSED: no-mistakes run for $ID is still $refusal_state after axi abort; confirm it stopped (no-mistakes axi status) or abort it manually (no-mistakes axi abort --run <id>) before retrying teardown." >&2
+  echo "REFUSED: no-mistakes run for $ID is still parked after axi abort; confirm it stopped (no-mistakes axi status) or abort it manually (no-mistakes axi abort --run <id>) before retrying teardown." >&2
   return 1
 }
 
@@ -2612,10 +2577,13 @@ teardown_docker_stacks() {
       roots+=("$canon")
     fi
   fi
-  task_registered_lanes_under_roots ${roots[@]+"${roots[@]}"} 2>/dev/null || return 1
-  if [ -n "$PROJ" ] && ! fm_path_lookup_safe "$PROJ/supabase/config.toml"; then
-    echo "error: cannot establish the shared Supabase configuration for $ID; retaining task records" >&2
-    return 1
+  if [ "${#roots[@]}" -gt 0 ]; then
+    TASK_PIDS_FAILED_DIR=
+    TASK_PIDS_ERROR=
+    if ! task_registered_lanes_under_roots "${roots[@]}"; then
+      echo "error: cannot establish nested worktree lanes for $ID${TASK_PIDS_ERROR:+ ($TASK_PIDS_ERROR: $TASK_PIDS_FAILED_DIR)}; retaining task records" >&2
+      return 1
+    fi
   fi
   if [ -n "$PROJ" ] && { [ -e "$PROJ/supabase/config.toml" ] || [ -L "$PROJ/supabase/config.toml" ]; }; then
     protected=$(python3 - "$PROJ/supabase/config.toml" <<'PY'
@@ -2756,37 +2724,15 @@ teardown_live_slot_path() {
   canonical_existing_dir "$WT"
 }
 
-# Local-home discovery is owned by bin/fm-wake-lib.sh; the checked state and
-# record inventory required by teardown is described in this script's Fix 4.
+# Every local Firstmate state directory whose records can name a pool slot this
+# task's slot might also be; bin/fm-wake-lib.sh's fm_local_firstmate_state_dirs
+# owns the walk and what it refuses.
 collect_local_firstmate_states() {
-  local state_dir meta
-  fm_local_firstmate_state_dirs "$1" 1 || {
+  fm_local_firstmate_state_dirs "$1" || {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
     return 1
   }
   TREEHOUSE_OWNER_STATES=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
-  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
-    if ! fm_path_lookup_safe "$state_dir"; then
-      echo "REFUSED: cannot establish local Firstmate state presence at $state_dir; retaining task records" >&2
-      return 1
-    fi
-    [ -e "$state_dir" ] || [ -L "$state_dir" ] || continue
-    if ! { [ -d "$state_dir" ] && [ -r "$state_dir" ] && [ -x "$state_dir" ] && ls -A "$state_dir" >/dev/null; }; then
-      echo "REFUSED: cannot enumerate local Firstmate state $state_dir; retaining task records" >&2
-      return 1
-    fi
-    for meta in "$state_dir"/*.meta; do
-      if ! fm_path_lookup_safe "$meta"; then
-        echo "REFUSED: cannot establish local Firstmate task record presence at $meta; retaining task records" >&2
-        return 1
-      fi
-      [ -e "$meta" ] || [ -L "$meta" ] || continue
-      if ! { [ -f "$meta" ] && cat "$meta" >/dev/null; }; then
-        echo "REFUSED: cannot read local Firstmate task record $meta; retaining task records" >&2
-        return 1
-      fi
-    done
-  done
 }
 
 require_exclusive_worktree_slot_record() {
@@ -3425,7 +3371,6 @@ preflight_descendant_treehouse_slots() {
 validate_firstmate_home_children_removal() {
   local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend
   sub_state="$home/state"
-  collect_local_firstmate_states "$sub_state" || return 1
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
@@ -3639,7 +3584,6 @@ teardown_herdr_reacquire_meta() {
 preflight_firstmate_home_herdr_children() {  # <home>
   local home=$1 sub_state child_meta child_id child_backend child_kind child_home child_wt
   sub_state="$home/state"
-  collect_local_firstmate_states "$sub_state" || return 1
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
@@ -3704,27 +3648,9 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
   return 1
 }
 
-# Keep the child's task context function-local while its cleanup runs in a subshell.
-quiesce_firstmate_home_child() {
-  local ID=$1 KIND=$2 STATE=$3 PROJ=$4 WT=$5 TASK_TMP
-  TASK_TMP=$(meta_value "$6" tasktmp)
-  local FM_HOME=$7 FM_STATE_OVERRIDE=$3 DATA="$7/data" FM_DATA_OVERRIDE="$7/data" FM_CONFIG_OVERRIDE="$7/config"
-  (
-    export FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE
-    if [ "$8" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
-      reap_task_worktree_processes tasktmp "$TASK_TMP" || exit 1
-    else
-      conclude_task_no_mistakes_run "$WT" forced-child || exit 1
-      retire_task_private_nm_launch_agents "$WT" || exit 1
-      reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
-    fi
-  )
-}
-
 cleanup_firstmate_home_children() {
   local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i
   sub_state="$home/state"
-  collect_local_firstmate_states "$sub_state" || return 1
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
@@ -3785,9 +3711,6 @@ cleanup_firstmate_home_children() {
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
       cleanup_firstmate_home_process_events "$child_home" "child firstmate home" || return 1
-    else
-      quiesce_firstmate_home_child "$child_id" "$child_kind" "$sub_state" "$child_proj" \
-        "$child_wt" "$child_meta" "$home" "$child_owner_rc" || return 1
     fi
     if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
       teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1

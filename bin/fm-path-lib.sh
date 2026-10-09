@@ -2,7 +2,7 @@
 # fm-path-lib.sh - fork-free pathname helpers with no source-time side effects,
 # so read-only callers can load them without any library's state setup.
 #
-# fm_dirname_to and fm_basename_to assign <output-variable> exactly what `$(dirname -- <path>)` or
+# Each assigns <output-variable> exactly what `$(dirname -- <path>)` or
 # `$(basename -- <path>)` would: POSIX component rules, and the command
 # substitution's removal of trailing newlines.
 
@@ -36,23 +36,4 @@ fm_basename_to() {  # <output-variable> <path>
   esac
   while [ "${fm_path%$'\n'}" != "$fm_path" ]; do fm_path=${fm_path%$'\n'}; done
   printf -v "$1" '%s' "$fm_path"
-}
-
-# A failed existence probe proves absence only when each existing parent is a
-# searchable directory. Return nonzero for an inaccessible or non-directory
-# parent, so callers refuse rather than treating hidden ownership evidence as
-# absent. A missing parent reached through searchable ancestors proves absence;
-# success does not prove that the target itself exists or is readable.
-fm_path_lookup_safe() {
-  local path=$1 parent
-  case "$path" in
-    '') return 1 ;;
-    /|.) [ -d "$path" ] && [ -x "$path" ]; return $? ;;
-  esac
-  parent=${path%/*}
-  [ "$parent" != "$path" ] || parent=.
-  [ -n "$parent" ] || parent=/
-  fm_path_lookup_safe "$parent" || return 1
-  [ -e "$parent" ] || [ -L "$parent" ] || return 0
-  [ -d "$parent" ] && [ -x "$parent" ]
 }

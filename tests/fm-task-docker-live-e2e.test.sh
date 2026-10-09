@@ -4,7 +4,7 @@
 # The teardown suite drives the library through a fake docker that renders the
 # library's own --format templates, so it proves the ownership rules but not that
 # real Docker prints those fields the way the library reads them. Only a real
-# daemon proves the ps, network ls, volume ls, rm, and label-filter calls work
+# daemon proves the ps, network ls, volume ls, rm, and label-template calls work
 # where they are executed. The guard creates containers without starting them
 # from an image that is already local, so it pulls nothing and spends no network.
 #
@@ -101,6 +101,9 @@ test_real_docker_removes_only_the_tasks_own_objects() {
   docker volume create --label "fm.test=$RUN" --label "fm.task=$TASK" "$RUN-own-vol" >/dev/null || fail "volume create failed"
   docker volume create --label "fm.test=$RUN" "$RUN-unmarked-vol" >/dev/null || fail "volume create failed"
   docker volume create --label "fm.test=$RUN" --label "fm.task=$OTHER" "$RUN-foreign-vol" >/dev/null || fail "volume create failed"
+  docker volume create --label "fm.test=$RUN" --label "com.docker.compose.project=$TASK" "$RUN-proj-vol" >/dev/null || fail "volume create failed"
+  docker volume create --label "fm.test=$RUN" --label "com.supabase.cli.project=$TASK" "$RUN-supa-vol" >/dev/null || fail "volume create failed"
+  docker volume create --label "fm.test=$RUN" --label "com.docker.compose.project=$RUN-else" "$RUN-else-vol" >/dev/null || fail "volume create failed"
 
   fm_task_docker_cleanup "$TASK" "$OTHER" 0 "" "$TMP_ROOT/$TASK.meta" "$wt" 2> "$TMP_ROOT/stderr" || rc=$?
   expect_code 0 "$rc" "real docker: cleanup should succeed: $(cat "$TMP_ROOT/stderr")"
@@ -117,6 +120,9 @@ test_real_docker_removes_only_the_tasks_own_objects() {
   ! volume_exists "$RUN-own-vol" || fail "real docker: the task's labelled volume survived"
   volume_exists "$RUN-unmarked-vol" || fail "real docker: an unmarked named volume was removed"
   volume_exists "$RUN-foreign-vol" || fail "real docker: another task's volume was removed"
+  ! volume_exists "$RUN-proj-vol" || fail "real docker: the task's Compose project volume survived"
+  ! volume_exists "$RUN-supa-vol" || fail "real docker: the task's Supabase project volume survived"
+  volume_exists "$RUN-else-vol" || fail "real docker: another project's volume was removed"
   pass "real Docker: the task's labelled, named, compose-project and worktree stacks are removed and every other object survives"
 }
 
@@ -165,10 +171,12 @@ test_real_docker_never_claims_the_projects_own_shared_stack() {
   create_container "$RUN-shared-path" "com.docker.compose.project=$RUN-sp" \
     "com.docker.compose.project.working_dir=$wt"
   create_network "$RUN-shared-net" "com.docker.compose.project=$TASK" "com.supabase.cli.project=$TASK"
+  docker volume create --label "fm.test=$RUN" --label "com.supabase.cli.project=$TASK" "$RUN-shared-vol" >/dev/null || fail "volume create failed"
   fm_task_docker_cleanup "$TASK" "" 0 "$TASK" "$TMP_ROOT/$TASK.meta" "$wt" 2> "$TMP_ROOT/stderr4" || rc=$?
   expect_code 0 "$rc" "real docker protected: cleanup should succeed: $(cat "$TMP_ROOT/stderr4")"
   exists "$RUN-shared-db" || fail "real docker protected: the project's shared stack container was removed"
   network_exists "$RUN-shared-net" || fail "real docker protected: the project's shared stack network was removed"
+  volume_exists "$RUN-shared-vol" || fail "real docker protected: the project's shared stack volume was removed"
   ! exists "$RUN-shared-path" || fail "real docker protected: the worktree compose container survived"
   pass "real Docker: protected project identity vetoes every heuristic while an isolated worktree stack is removed"
 }
