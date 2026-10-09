@@ -324,12 +324,13 @@
 #   Fix 4 - remove the task's own Docker stacks. Docker resources survive process
 #     exit, so after the process reap teardown calls bin/fm-task-docker-lib.sh,
 #     whose header owns object attribution, removal, and retry metadata.
-#     Any Docker listing, verification, or removal failure stops teardown with
-#     task identity records and the worktree kept, even under --force; rerun
-#     teardown after resolving the failure. A missing Docker CLI is silent.
-#     A stopped or unreachable daemon stops teardown only when the task record
-#     already retains docker_projects; otherwise teardown warns and continues,
-#     on ship, scout, and forced-descendant paths alike.
+#     Apart from the daemon case below, any Docker listing, verification, or
+#     removal failure stops teardown with task identity records and the worktree
+#     kept, even under --force; rerun teardown after resolving the failure.
+#     A missing Docker CLI is silent. A stopped or unreachable daemon stops
+#     teardown only when the task record already retains docker_projects;
+#     otherwise teardown warns and continues, on ship, scout, and
+#     forced-descendant paths alike.
 #     Standalone secondmate retirement skips its own Docker cleanup.
 #     Forced cleanup closes each child's endpoint before its Docker snapshot.
 #     Ordinary, Orca, and recursive descendants use their own metadata for Docker
