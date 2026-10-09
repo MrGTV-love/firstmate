@@ -1073,6 +1073,12 @@ sweep_facts() {  # <state-dir> <lavish-store>
       }
     }
     my $newest = sub { my $m = 0; for (@_) { my $t = (stat $_)[9]; $m = $t if defined $t && $t > $m } $m };
+    my $inbox = "$state/procevent-inbox";
+    my @inbox_files;
+    if (opendir my $dir, $inbox) {
+      @inbox_files = readdir $dir;
+      closedir $dir;
+    }
     sub unescape {
       my ($v) = @_;
       $v =~ s/&#[xX]([0-9a-fA-F]+);/chr(hex($1))/ge;
@@ -1093,7 +1099,7 @@ sweep_facts() {  # <state-dir> <lavish-store>
         : ($! == ENOENT ? "missing" : "unknown");
       my ($sessions, $status, $pending, @keys) = ("unknown", "", 0);
       my $keys_unknown = 0;
-      my $activity = $newest->(glob("$state/procevent-inbox/$id.*"));
+      my $activity = $newest->(map { "$inbox/$_" } grep { /\A\Q$id\E\./ } @inbox_files);
       if ($file_state eq "present") {
         my $t = $stat[9];
         $activity = $t if $t > $activity;

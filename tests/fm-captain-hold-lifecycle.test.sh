@@ -5026,6 +5026,43 @@ test_sweep_retires_only_finished_board_listeners() {
   pass "the sweep retires finished boards and keeps every board that could still carry an answer"
 }
 
+test_sweep_keeps_recently_handled_boards_in_literal_home_paths() {
+  local name home store board sid idle_board idle_sid out list
+  for name in board-sweep-handled 'board sweep handled' 'board sweep [literal]*?'; do
+    home=$(make_home "$name")
+    fm_test_track_procevent_home "$home" "$home/procevent-claims"
+    store="$home/lavish-state"
+    board=$(sweep_board "$home" recently-handled old)
+    idle_board=$(sweep_board "$home" idle old)
+    sid=$(sweep_register "$home" "$board")
+    idle_sid=$(sweep_register "$home" "$idle_board")
+    sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
+    sweep_session "$store" "$idle_board" open 0 2000-01-01T00:00:00.000Z
+    mkdir -p "$home/state/procevent-inbox"
+    printf 'session:\n  status: feedback\n' > "$home/state/procevent-inbox/$sid.1.result"
+    printf 'lavish\n' > "$home/state/procevent-inbox/$sid.1.adapter"
+    touch -t 200001010000 "$home/state/procevent-inbox/$sid.1.result" \
+      "$home/state/procevent-inbox/$sid.1.adapter"
+    run_procevent "$home" handled "$sid" 1 >/dev/null \
+      || fail "could not acknowledge the captured board round"
+    assert_present "$home/state/procevent-inbox/$sid.1.handled" \
+      "the captured round has no durable acknowledgement"
+
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
+      || fail "the handled-board dry run failed: $out"
+    assert_contains "$out" "kept: $sid" "the dry run missed recent handling in $home: $out"
+    assert_contains "$out" "would-retire: $idle_sid" "another board inherited recent handling: $out"
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+      || fail "the handled-board sweep failed: $out"
+    assert_contains "$out" "kept: $sid" "recent handling did not keep the listener in $home: $out"
+    assert_contains "$out" "retired: $idle_sid" "another board inherited recent handling: $out"
+    list=$(run_procevent "$home" list)
+    assert_contains "$list" "$sid" "the recently handled listener lost its registration"
+    assert_not_contains "$list" "$idle_sid" "the idle listener kept its registration"
+  done
+  pass "recent acknowledgements keep only their own listeners in literal home paths"
+}
+
 # The point of the sweep is the resident processes: a live listener's board is
 # finished, and after the sweep neither its runner nor its blocked poll remains.
 # Count of resident `lavish-axi poll` processes serving the live-idle board.
@@ -5329,6 +5366,7 @@ test_sweep_stops_a_live_listener_of_a_finished_board
 test_sweep_preserves_deleted_board_keep_guards
 test_sweep_keeps_boards_with_unsearchable_parents
 test_sweep_preserves_rearmed_registration_generations
+test_sweep_keeps_recently_handled_boards_in_literal_home_paths
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair
