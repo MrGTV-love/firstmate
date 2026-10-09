@@ -2544,6 +2544,7 @@ This guard does not modify remote secondmates, unrelated panes, shared worktree 
 #### Recorded-task attribution
 
 `tests/fm-launch-proof.test.sh` covers matching and missing kernel environment pins, versioned and legacy records, foreground ancestry, shells and helpers, interpreter-based harnesses, and rejection of argv, cwd, and initial-message shortcuts.
+Its kernel-environment probes are identity-registered and remain alive until cleanup, rather than expiring while a slow host is still reading them.
 Its `test_launch_proof_pinned_personal_switch` case changes only the active session proof and verifies that a same-PID personal-session switch loses managed authority.
 `test_reboot_recovery_inspects_without_native_attribution` in `tests/fm-control-relaunch.test.sh` covers inspection without lifecycle input or task-record mutation.
 `tests/fm-omp-harness.test.sh` covers activation, cancelled and rolled-back transitions, shutdown, and child-event preservation with both minimum-runtime and newer context shapes.
@@ -2552,6 +2553,8 @@ The token-free installed-runtime refresh for the production proof extension is:
 ```sh
 FM_OMP_TASK_SESSION_LIVE=1 bash tests/fm-omp-task-session-live-e2e.test.sh
 ```
+
+The RPC refresh drains complete frames directly from the stdout file descriptor, including frames coalesced into one read, and allows the same 90-second cold-start bound as control-plane relaunch.
 
 For focused real-native cleanup proof without the lifecycle matrix:
 
@@ -3182,6 +3185,15 @@ Under the captain's `unicode` symbol preset the idle screen through Herdr was a 
 Before the status-row rule the shared classifier folded that row into the bare composer's wrap region and read the idle pane `pending`, so `bin/fm-send.sh` skipped its doorbell on the first live omp worker.
 After the rule, the same live Herdr capture read `empty`, a steer's doorbell landed, and the worker opened a turn on it.
 `tests/fm-composer-lib.test.sh` pins the unicode idle row, the nerd-preset idle row, the busy spinner row, and typed text over the same fixture in both locales.
+
+The saved omp 18.8.1 default-band capture in
+`tests/fixtures/omp-native-band-18.8.1-empty.ansi` includes the expanded meter
+`▶─0.2%─────────────────────────────╎─┃─────1M─` and bright effort keys with dim
+hint text. Replaying that capture through the public composer APIs proves
+`empty` with no extracted draft when styling is available; without styling,
+the hint remains input risk (`pending`). `bash tests/fm-composer-native-band.test.sh`
+also checks that bright typed hints and pasted band frames remain drafts.
+This captured-screen regression does not itself rerun the live managed-worker exit.
 
 #### Owned frame status substrings (2026-10-06)
 

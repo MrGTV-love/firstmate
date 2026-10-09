@@ -19,8 +19,10 @@ mkdir -p "$HOME"
 . "$ROOT/bin/fm-operational-input.sh"
 start_probe() {
   rm -f "$TMP/ready"
-  FM_SPAWN_GEN=$1 FM_PROOF_NOTE=${3:-} python3 -c 'import pathlib,sys,time; pathlib.Path(sys.argv[1]).touch(); time.sleep(120)' "$TMP/ready" "${2:-}" &
+  FM_SPAWN_GEN=$1 FM_PROOF_NOTE=${3:-} python3 -c 'import pathlib,signal,sys; pathlib.Path(sys.argv[1]).touch(); signal.pause()' "$TMP/ready" "${2:-}" &
   PID=$!
+  fm_test_record_process "$TMP/probe-$PID.process" "$PID" || fail 'could not record launch-proof probe identity'
+  fm_test_track_process "$TMP/probe-$PID.process" "$TMP/ready"
   for _ in $(seq 1 200); do
     [ ! -f "$TMP/ready" ] || return 0
     sleep 0.01

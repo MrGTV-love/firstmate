@@ -61,7 +61,7 @@
 #                side-bordered rows, and `╰─ <input> ─╯` input-bearing floor.
 #                Unlike ordinary boxes, the floor is content, not just a rule.
 #                Rule-only floors and misaligned body rows remain unproven.
-#   omp-band   - native omp's `π > model > 📁 path > ⑂ branch ▶…%┃…` status
+#   omp-band   - native omp's `π > model > 📁 path > ⑂ branch ▶…%…┃…` status
 #                header, one column inset from its `╰─` input row, followed by
 #                literal three-space-gutter continuations. The floor and every
 #                owned continuation are input; no right closing border exists.
@@ -559,10 +559,10 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # composer unnoticed. The ascii preset's `pi` is left out on purpose: an
 # unverified shape must read `unknown`, never `empty`.
 FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT='^(π|󰵗)[[:space:]]+(>|·)[[:space:]]|^'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+([0-9]+[smh])+[[:space:]]+(>|·)[[:space:]]'
-# omp draws this hint, right-aligned, in the box shape's EMPTY last row until a
-# turn has completed. Its key glyphs are bright and its words dim, so a styled
-# read keeps `⇧⇥` and a plain read cannot tell the whole hint from typed text.
-# It is consulted only on an omp box's last row, never as a fleet-wide idle
+# omp draws this hint, right-aligned, in the box or band's EMPTY input floor
+# until a turn has completed. Its key glyphs are bright and its words dim, so a
+# styled read keeps `⇧⇥` and a plain read cannot tell the whole hint from typed
+# text. It is consulted only on an omp input floor, never as a fleet-wide idle
 # placeholder.
 FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT='^⇧⇥ to change thinking effort$'
 # Pi's footer stats row opens at column 0 with the session cost when every
@@ -833,7 +833,7 @@ _fm_composer_pi_separator_row() {  # <trimmed-row>
 # Native omp's default band has no corners. Require its model/path/branch
 # structure AND the usage meters before admitting its adjacent input floor.
 _fm_composer_omp_band_header() {  # <trimmed-row>
-  [[ "$1" =~ ^π\ \>\ .+\ \>\ 📁\ .+\ \>\ ⑂\ .+\ ▶(─)*[0-9]+(\.[0-9]+)?%┃(─)*[0-9]+(\.[0-9]+)?[KMGT]?(─)*$ ]]
+  [[ "$1" =~ ^π\ \>\ .+\ \>\ 📁\ .+\ \>\ ⑂\ .+\ ▶(─)*[0-9]+(\.[0-9]+)?%((─)*╎(─)*)?┃(─)*[0-9]+(\.[0-9]+)?[KMGT]?(─)*$ ]]
 }
 
 # _fm_composer_titled_rule_row: 0 when the trimmed row is a `─` rule that
@@ -1654,6 +1654,13 @@ _fm_composer_row_content() {  # <raw-row> <styled> [omp-shape] [literal] -> cont
   if [ "$omp" = 2 ]; then
     case "$stripped" in '╰─'|'╰─ '*) stripped=${stripped#╰─} ;; esac
     fm_composer_normalize_trim_var stripped
+    if [ "$styled" = 1 ] && [ "$stripped" = '⇧⇥' ]; then
+      plain=${plain#╰─}
+      fm_composer_normalize_trim_var plain
+      if fm_composer_idle_matches "$plain" "$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT" sensitive; then
+        stripped=
+      fi
+    fi
     printf '%s' "$stripped"
     return 0
   fi

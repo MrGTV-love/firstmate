@@ -40,18 +40,25 @@ with (lab / 'stderr.log').open('w+') as errors:
         process.stdin.flush()
         selector = selectors.DefaultSelector()
         selector.register(process.stdout, selectors.EVENT_READ)
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
+        deadline = time.monotonic() + 90
+        pending = b''
+        ready = False
+        while time.monotonic() < deadline and not ready:
             if not selector.select(timeout=0.2):
                 continue
-            line = process.stdout.readline()
-            if not line:
+            # Read the fd directly so buffered frames cannot evade readiness.
+            chunk = os.read(process.stdout.fileno(), 65536)
+            if not chunk:
                 raise AssertionError('omp exited before startup')
-            frame = json.loads(line)
-            if frame.get('id') == 'ready':
-                assert frame.get('success'), frame
-                break
-        else:
+            pending += chunk
+            while b'\n' in pending:
+                line, pending = pending.split(b'\n', 1)
+                frame = json.loads(line)
+                if frame.get('id') == 'ready':
+                    assert frame.get('success'), frame
+                    ready = True
+                    break
+        if not ready:
             raise AssertionError('omp did not answer get_state')
         proof_path = state / 'demo.omp-session.json'
         assert proof_path.exists(), 'standalone omp did not publish session ownership proof'
