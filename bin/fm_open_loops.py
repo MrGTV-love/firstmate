@@ -204,6 +204,8 @@ class Collector:
         except (subprocess.TimeoutExpired, CollectionDeadline):
             self.stop_command(child)
             raise
+        if child.returncode == 75 and command[0] == str(GH_REST):
+            raise QuotaLow(stderr.strip())
         if missing_ok and child.returncode == 1 and not stderr:
             return ""
         if child.returncode:
@@ -477,17 +479,8 @@ class Collector:
 
     def forge(self, path):
         """Pages of one conditional REST read, flattened; fm-gh-rest.sh owns the ETag cache and quota headers."""
-        reason = self.quota_low()
-        if reason:
-            raise QuotaLow(reason)
-        pages = json.loads(self.run([GH_REST, "get", path, "--paginate", "--slurp"]))
+        pages = json.loads(self.run([GH_REST, "get", path, "--floor", "--paginate", "--slurp"]))
         return [row for page in pages for row in (page if isinstance(page, list) else [page])]
-
-    def quota_low(self):
-        """The reason when the recorded GitHub quota is below the floor and its window is open (no network)."""
-        done = subprocess.run([str(GH_REST), "guard"], env=self.env, capture_output=True, text=True,
-                              stdin=subprocess.DEVNULL, timeout=self.timeout)
-        return done.stdout.strip() if done.returncode == 75 else None
 
     def quota_reset(self):
         try:

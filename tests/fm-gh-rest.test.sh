@@ -34,12 +34,16 @@ if match:
     index = int(match[1]) - 1
 body = json.dumps(pages[index])
 etag = '"' + hashlib.sha1(body.encode()).hexdigest()[:16] + '"'
-rate = ('X-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: ' + open(site + '/remaining').read().strip()
-        + '\r\nX-Ratelimit-Reset: ' + open(site + '/reset').read().strip() + '\r\nX-Ratelimit-Resource: core\r\n')
+rate = ('X-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: ' + os.environ.get('FAKE_GH_REMAINING', open(site + '/remaining').read().strip())
+        + '\r\nX-Ratelimit-Reset: ' + os.environ.get('FAKE_GH_RESET', open(site + '/reset').read().strip()) + '\r\nX-Ratelimit-Resource: core\r\n')
 link = ''
 if index + 1 < len(pages):
     link = 'Link: <https://api.github.com/repositories/1/items?per_page=2&page=%d>; rel="next"\r\n' % (index + 2)
+elif os.path.exists(site + '/terminal-link'):
+    link = 'Link: <https://api.github.com/repositories/1/items?per_page=2&page=1>; rel="prev"\r\n'
 if conditional == etag:
+    if os.path.exists(site + '/omit-304-link'):
+        link = ''
     log('not-modified')
     sys.stdout.write('HTTP/2.0 304 Not Modified\r\nEtag: ' + etag + '\r\n' + rate + link + '\r\n')
     sys.stderr.write('gh: HTTP 304\n')
@@ -125,6 +129,27 @@ test_pagination_follows_link_and_caches_every_page() {
   pass 'pagination follows Link and every page rides the cache'
 }
 
+test_304_updates_pagination_and_retains_omitted_metadata() {
+  local site out
+  site=$(new_site changed_links)
+  get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp >/dev/null || fail 'seed read failed'
+  printf '[[{"id":1},{"id":2}],[{"id":3}]]\n' > "$site/pages.json"
+  out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp) || fail 'expanded read failed'
+  assert_equals '[[{"id":1},{"id":2}],[{"id":3}]]' "$out" 'a new page behind an unchanged first page was omitted'
+  : > "$site/omit-304-link"
+  out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp) || fail 'read with omitted links failed'
+  assert_equals '[[{"id":1},{"id":2}],[{"id":3}]]' "$out" 'current pagination metadata was not cached'
+  rm "$site/omit-304-link"
+  : > "$site/terminal-link"
+  printf '[[{"id":1},{"id":2}]]\n' > "$site/pages.json"
+  out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp) || fail 'contracted read failed'
+  assert_equals '[[{"id":1},{"id":2}]]' "$out" 'a supplied Link without next retained a removed page'
+  : > "$site/omit-304-link"
+  out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp) || fail 'repeated contracted read failed'
+  assert_equals '[[{"id":1},{"id":2}]]' "$out" 'cleared pagination metadata was not cached'
+  pass '304 pagination metadata adds and removes pages, and survives omitted headers'
+}
+
 test_query_fields_are_encoded_and_distinct_cache_keys() {
   local site
   site=$(new_site query)
@@ -170,24 +195,72 @@ test_the_quota_floor_reads_headers_from_calls_already_made() {
   assert_contains "$out" "$(jq -rn --argjson r "$reset" '$r | todate')" 'the reason must state the reset time'
   FM_GH_RATE_FLOOR_PERCENT=10 guard "$site" || fail 'the floor is not overridable by environment'
   FM_GH_RATE_FLOOR_PERCENT=nonsense guard "$site" >/dev/null && fail 'an unparsable floor must fall back to 15%'
-  printf '%s\n' "$(( $(date +%s) - 5 ))" > "$site/reset"
-  get "$site" repos/o/r/items >/dev/null || fail 'read failed'
+  jq --argjson past "$(( $(date +%s) - 5 ))" '.reset = $past' "$site/state/gh-ratelimit.core.json" > "$site/past.json"
+  mv "$site/past.json" "$site/state/gh-ratelimit.core.json"
   guard "$site" || fail 'a window that has reset must not refuse'
   pass 'the floor comes from response headers, is overridable, and ends at the reset'
 }
 
 test_parallel_responses_keep_the_lowest_remaining() {
-  local site out status=0
+  local site out status=0 low_pid high_pid
   site=$(new_site lowest)
-  printf '300\n' > "$site/remaining"
-  get "$site" repos/o/r/items >/dev/null || fail 'read failed'
-  printf '900\n' > "$site/remaining" # a slower response from earlier in the same window
-  printf '[[{"id":7}]]\n' > "$site/pages.json"
-  get "$site" repos/o/r/other >/dev/null || fail 'read failed'
+  printf '800\n' > "$site/remaining"
+  get "$site" repos/o/r/items >/dev/null || fail 'seed read failed'
+  mkdir "$site/bin"
+  cat > "$site/bin/jq" <<'SH'
+#!/usr/bin/env bash
+set -eu
+case "${FAKE_GH_REMAINING:-}:$*" in
+  749:*gh-ratelimit.core.json|750:*gh-ratelimit.core.json)
+    out=$("$REAL_JQ" "$@")
+    : > "$FAKE_GH_SITE/read.$FAKE_GH_REMAINING"
+    peer=749
+    [ "$FAKE_GH_REMAINING" = 749 ] && peer=750
+    for ((n=0; n<20; n++)); do
+      [ ! -e "$FAKE_GH_SITE/read.$peer" ] || break
+      sleep 0.1
+    done
+    if [ "$FAKE_GH_REMAINING" = 750 ]; then
+      for ((n=0; n<20; n++)); do
+        [ ! -e "$FAKE_GH_SITE/low-finished" ] || break
+        sleep 0.1
+      done
+    fi
+    printf '%s\n' "$out"
+    ;;
+  *) exec "$REAL_JQ" "$@" ;;
+esac
+SH
+  chmod +x "$site/bin/jq"
+  (
+    FAKE_GH_REMAINING=749 REAL_JQ="$(command -v jq)" PATH="$site/bin:$PATH" get "$site" repos/o/r/low >/dev/null \
+      || exit 1
+    : > "$site/low-finished"
+  ) &
+  low_pid=$!
+  FAKE_GH_REMAINING=750 REAL_JQ="$(command -v jq)" PATH="$site/bin:$PATH" get "$site" repos/o/r/high >/dev/null &
+  high_pid=$!
+  wait "$low_pid" || fail 'low response failed'
+  wait "$high_pid" || fail 'high response failed'
   out=$(guard "$site") || status=$?
-  assert_equals 75 "$status" 'an out-of-order response raised the recorded remaining quota'
-  assert_contains "$out" '300 of 5000' 'the lowest remaining in a window is the one to keep'
-  pass 'out-of-order responses never raise the recorded remaining quota'
+  assert_equals 75 "$status" 'a concurrent response raised the quota above the floor'
+  assert_contains "$out" '749 of 5000' 'the lowest concurrent remaining value was lost'
+  pass 'concurrent responses retain the lowest remaining quota'
+}
+
+test_older_windows_cannot_replace_newer_quota() {
+  local site reset out status=0
+  site=$(new_site older_window)
+  reset=$(cat "$site/reset")
+  FAKE_GH_REMAINING=700 get "$site" repos/o/r/new >/dev/null || fail 'new window read failed'
+  FAKE_GH_REMAINING=900 FAKE_GH_RESET="$((reset - 3600))" get "$site" repos/o/r/old >/dev/null || fail 'old response failed'
+  out=$(guard "$site") || status=$?
+  assert_equals 75 "$status" 'an older window replaced the newer quota'
+  assert_contains "$out" '700 of 5000' 'an older response changed the newer remaining value'
+  assert_equals "$reset" "$(jq -r .reset "$site/state/gh-ratelimit.core.json")" 'the newest reset was lost'
+  FAKE_GH_REMAINING=4000 FAKE_GH_RESET="$((reset + 3600))" get "$site" repos/o/r/next >/dev/null || fail 'next window read failed'
+  guard "$site" || fail 'a newer window must accept replenished quota'
+  pass 'older windows cannot replace newer quota, and new windows replenish it'
 }
 
 test_304_responses_also_record_headers() {
@@ -216,13 +289,36 @@ test_get_with_floor_refuses_before_any_network_call() {
   pass 'get --floor refuses below the floor before any network call, and a plain get still reads'
 }
 
+test_get_with_floor_stops_between_pages() {
+  local site mode status out
+  for mode in fresh cached; do
+    site=$(new_site "floor-pages-$mode")
+    printf '[[{"id":1},{"id":2}],[{"id":3}]]\n' > "$site/pages.json"
+    if [ "$mode" = cached ]; then
+      get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp >/dev/null || fail 'seed pages failed'
+    fi
+    : > "$site/calls"
+    printf '500\n' > "$site/remaining"
+    status=0
+    out=$(get "$site" 'repos/o/r/items?per_page=2' --floor --paginate --slurp 2>"$site/error") || status=$?
+    assert_equals 75 "$status" "a $mode response did not stop the next page at the floor"
+    assert_equals '' "$out" 'a refused paginated read published incomplete data'
+    assert_equals 1 "$(wc -l < "$site/calls" | tr -d ' ')" 'a page was fetched after quota fell below the floor'
+    assert_contains "$(cat "$site/error")" 'quota low (500 of 5000' 'pagination lost the quota refusal reason'
+  done
+  pass 'fresh and cached pages stop pagination at the quota floor without partial output'
+}
+
 test_304_serves_cached_body_without_a_counted_call
 test_changed_data_replaces_the_cache
 test_missing_or_corrupt_cache_falls_back_to_a_normal_get
 test_pagination_follows_link_and_caches_every_page
+test_304_updates_pagination_and_retains_omitted_metadata
 test_query_fields_are_encoded_and_distinct_cache_keys
 test_a_failed_read_exits_nonzero_and_caches_nothing
 test_the_quota_floor_reads_headers_from_calls_already_made
 test_parallel_responses_keep_the_lowest_remaining
+test_older_windows_cannot_replace_newer_quota
 test_304_responses_also_record_headers
 test_get_with_floor_refuses_before_any_network_call
+test_get_with_floor_stops_between_pages

@@ -689,14 +689,14 @@ A malformed configuration is reported as an error rather than ignored.
 ### GitHub REST reads and the quota floor
 
 `bin/fm-contributions.sh`, `bin/fm_open_loops.py`, `bin/fm-pr-state.sh`, and `bin/fm-pr-reviewers.sh` read GitHub REST through `bin/fm-gh-rest.sh`.
-It sends `If-None-Match` from a per-URL ETag cache under the home's `state/gh-rest-cache/` and serves the cached body on a 304, which GitHub does not count against the rate limit.
+It sends `If-None-Match` from a per-URL ETag cache under the home's `state/gh-rest-cache/` and serves the cached body on a 304, which GitHub does not count against the rate limit. A 304 updates cached pagination metadata when it supplies a Link header; when that header is omitted, the cached links remain in use.
 A missing, corrupt, or unparsable cache entry is a normal GET, and entries unused for a week are pruned.
-Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent and are unchanged.
-Every response, including a 304 and an error, records its `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers in `state/gh-ratelimit.<resource>.json`, keeping the lowest remaining value within one window.
+Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent. The contributions poll also checks the recorded core quota before its final GraphQL head read.
+Every response, including a 304 and an error, records its `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers in `state/gh-ratelimit.<resource>.json`. Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
 `gh api rate_limit` is not evidence: on the fleet's account it has reported an unused core bucket while the enforcing headers showed thousands of calls spent.
 
-When the recorded core remaining quota is below `FM_GH_RATE_FLOOR_PERCENT` of its limit (default 15) and its window has not reset, the contributions poll and the open-work ledger make no forge read.
-The contributions poll keeps each row's last observation, marks it unverified with the reset time as its reason, and reports that once per episode.
+When the recorded core remaining quota is below `FM_GH_RATE_FLOOR_PERCENT` of its limit (default 15) and its window has not reset, the contributions poll and the open-work ledger make no further forge read. Floor-protected REST reads check before every page and exit 75 without publishing a partial response when refused.
+The contributions poll keeps every remaining live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode. Changes to the remaining quota update the reason without another announcement.
 The ledger behavior is in the open-work ledger section above.
 The check needs no call of its own because it reads headers from calls the sweeps were already making.
 
