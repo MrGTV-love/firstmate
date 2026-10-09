@@ -3217,12 +3217,12 @@ EOF
     # busy state has no verified semantic source, bounded so it cannot defer that
     # task's turn-ends forever. Absorb stays evidence-driven: with neither proof the
     # wake surfaces exactly as before.
-    # Actionable -> enqueue, advance .seen-* markers, exit. Benign (a no-verb wake
-    # whose crew is still executing) in always-on mode -> advance the markers so it
-    # will not re-fire, log, and keep blocking without enqueuing. Both evidence
-    # checks are costly (a bounded no-mistakes call, then a pane capture), so the ||
-    # ordering evaluates them ONLY for a non-afk signal with no captain-relevant
-    # status span, and the capture only once the authoritative verdict comes up short.
+    # Actionable -> enqueue and advance .seen-* markers before delivery. A scan
+    # before a non-signal close must not exit here and replace that close's routing.
+    # Benign no-verb wakes in always-on mode advance markers without enqueuing.
+    # Both evidence checks are costly (a bounded no-mistakes call, then a pane
+    # capture), so the || ordering evaluates them ONLY for a non-afk signal with
+    # no captain-relevant status span, and captures only after the verdict comes up short.
     FM_SIGNAL_SURFACE_ENDPOINTS=''
     FM_SIGNAL_NEEDS_DECISION_FILES=''
     # shellcheck disable=SC2086  # $files is a space-separated status-path list (ids carry no spaces)
