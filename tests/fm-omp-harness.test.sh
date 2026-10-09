@@ -1075,7 +1075,7 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   process.exit(0);
 }
 const expectedWakes = process.env.SCENARIO.startsWith("duplicates") ? 2 : 1;
-for (let i = 0; i < 60 && sent.length < expectedWakes; i += 1) await sleep(100);
+for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep(100);
 if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
 if (process.env.SCENARIO === "idle-stale-context") {

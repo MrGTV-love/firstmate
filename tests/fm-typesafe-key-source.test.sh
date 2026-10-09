@@ -299,24 +299,46 @@ cat > "$STALLBIN/jq" <<'SH'
 printf '%s' "$$" > "$FM_TEST_POLICY_PID"
 exec sleep 60
 SH
-chmod +x "$STALLBIN/jq"
-started=$SECONDS
-run_belay "$LANE" FM_TEST_BELAY_POLICY_PATH="$STALLBIN:$PATH" FM_TEST_POLICY_PID="$TMP_ROOT/policy-pid" \
-  JEV_BELAY_TIMEOUT_MS=60000 || fail "stalled policy must fail open"
-elapsed=$((SECONDS - started))
-[ "$elapsed" -lt 10 ] || fail "synchronous policy work was not bounded"
-[ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "timed-out policy reached transport"
-[ -s "$TMP_ROOT/policy-pid" ] || fail "stalled policy fixture did not run"
-policy_pid=$(cat "$TMP_ROOT/policy-pid")
-for _ in 1 2 3 4 5; do
-  kill -0 "$policy_pid" 2>/dev/null || break
-  sleep 0.1
-done
-if kill -0 "$policy_pid" 2>/dev/null; then
-  kill -KILL "$policy_pid" 2>/dev/null || true
-  fail "timed-out policy left its checker running"
+cat > "$STALLBIN/bash" <<'SH'
+#!/bin/bash
+if [ "${FM_TEST_POLICY_DELAY_START:-0}" = 1 ] && [ "${FM_TEST_POLICY_BASH_STARTED:-0}" != 1 ]; then
+  export FM_TEST_POLICY_BASH_STARTED=1
+  # Start the inner three-second deadline late enough for the outer five-second
+  # ceiling to win, but leave time for the actual checker to report its PID.
+  sleep 3
 fi
-pass "stalled policy work is bounded, reaped, and withheld without blocking Stop"
+exec "$FM_TEST_POLICY_REAL_BASH" "$@"
+SH
+chmod +x "$STALLBIN/jq" "$STALLBIN/bash"
+real_bash=$(command -v bash) || fail "missing policy fixture Bash"
+for delayed_start in 0 1; do
+  rm -f "$TMP_ROOT/policy-pid"
+  started=$SECONDS
+  run_belay "$LANE" FM_TEST_BELAY_POLICY_PATH="$STALLBIN:$PATH" FM_TEST_POLICY_PID="$TMP_ROOT/policy-pid" \
+    FM_TEST_POLICY_REAL_BASH="$real_bash" FM_TEST_POLICY_DELAY_START="$delayed_start" \
+    JEV_BELAY_TIMEOUT_MS=60000 || fail "stalled policy must fail open"
+  elapsed=$((SECONDS - started))
+  [ "$elapsed" -lt 10 ] || fail "synchronous policy work was not bounded"
+  [ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "timed-out policy reached transport"
+  [ -s "$TMP_ROOT/policy-pid" ] || fail "stalled policy fixture did not run"
+  if [ "$delayed_start" -eq 0 ]; then
+    jq -se 'any(.[]; .event == "policy-child" and .status == 124 and .signal == null and .error == null)' \
+      "$DIAGNOSTICS" >/dev/null || fail "stalled policy did not hit its process-group deadline"
+  else
+    jq -se 'any(.[]; .event == "policy-child" and .signal == "SIGKILL" and .error == "ETIMEDOUT")' \
+      "$DIAGNOSTICS" >/dev/null || fail "delayed policy startup did not hit the synchronous-child ceiling"
+  fi
+  policy_pid=$(cat "$TMP_ROOT/policy-pid")
+  for _ in 1 2 3 4 5; do
+    kill -0 "$policy_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  if kill -0 "$policy_pid" 2>/dev/null; then
+    kill -KILL "$policy_pid" 2>/dev/null || true
+    fail "timed-out policy left its checker running"
+  fi
+done
+pass "stalled policy is reaped and withheld at both its group deadline and outer startup ceiling"
 
 printf '# dispatch-never-send malformed directive\n' > "$POLICY"
 run_belay "$LANE" || fail "invalid policy must allow stop"
