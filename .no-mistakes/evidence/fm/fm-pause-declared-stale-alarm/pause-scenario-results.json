@@ -1,0 +1,663 @@
+{
+  "isolation": "Marked disposable FM_HOME; real private tmux; Claude normal login; no default fleet operations",
+  "fixture_limits": [
+    "14400-second cadence exercised with persisted-marker mtime aging, not four hours of wall-clock waiting",
+    "Secondmate path uses an isolated kind=secondmate endpoint record",
+    "Busy and concurrent paths use real fm-busy-event.sh recovery events as disposable inputs, not a native Claude busy hook",
+    "Concurrent live writer emitted 171 same-key events; deterministic append-during-read regression also passed"
+  ],
+  "targeted_selectors": [
+    "test_status_declared_wait_identity",
+    "test_wait_identity_concurrent_append_uses_one_snapshot",
+    "test_live_keyed_wait_restatement_is_not_a_new_wait",
+    "test_restated_wait_recheck_uses_last_surface_time",
+    "test_restated_wait_preserves_fired_deadline_phase",
+    "test_live_paused_until_controls_recheck_time",
+    "test_captain_held_never_rechecked_while_away_record_exists",
+    "test_afk_busy_declared_pause_ticking_pane_hands_off_once"
+  ],
+  "targeted_exit": 0,
+  "rounds": [
+    {
+      "name": "baseline first-sight",
+      "expected": "wake",
+      "passed": false,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539314\t1\tcheck\topen-loop-ledger\tcheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)"
+      ],
+      "marker_before": null,
+      "marker_after": null,
+      "output": "check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log",
+      "classification": "setup-only: unavailable disposable backlog; seeded isolated backlog and re-drove successfully"
+    },
+    {
+      "name": "baseline first-sight repaired setup",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539371\t2\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": null,
+      "marker_after": {
+        "scope": "declared:r1:3532007374726f6e673a31363737373233323a3136353436333231393a313739313533393239352e38383230333930393600526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65",
+        "mtime": 1791539372
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "baseline restatement reproduces stale alarm",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539389\t3\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": {
+        "scope": "declared:r1:3532007374726f6e673a31363737373233323a3136353436333231393a313739313533393239352e38383230333930393600526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65",
+        "mtime": 1791539372
+      },
+      "marker_after": {
+        "scope": "declared:r1:313132007374726f6e673a31363737373233323a3136353436333231393a313739313533393239352e38383230333930393600526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65",
+        "mtime": 1791539390
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "fixed first-sight remains visible",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539418\t4\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": null,
+      "marker_after": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539418
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "same-key restatement stays silent",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539418
+      },
+      "marker_after": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539418
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "buried wait opener remains throttled",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539418
+      },
+      "marker_after": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539418
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "further continuation does not reopen alarm",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539418
+      },
+      "marker_after": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539418
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "stable hash eight-minute restatement stays silent",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539126
+      },
+      "marker_after": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539126
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "stable hash rechecks despite fresh status mtime",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539651\t5\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20016s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+      ],
+      "marker_before": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791519635
+      },
+      "marker_after": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539651
+      },
+      "output": "stale: primary:fm-parked (paused 20016s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "changing hash rechecks despite fresh status mtime",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539680\t6\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791519662
+      },
+      "marker_after": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539681
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "different keyed wait surfaces immediately",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539718\t7\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": {
+        "scope": "declared:validation-wait:987624751:1",
+        "mtime": 1791539681
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:1757535686:447",
+        "mtime": 1791539718
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "resolved and redeclared key starts new episode",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791539741\t8\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:1757535686:447",
+        "mtime": 1791539718
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449",
+        "mtime": 1791539741
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "first elapsed deadline expedites stable hash recheck",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791540752\t9\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 487s, awaiting external - the declared clearing time has passed, rechecked on a long cadence not a wedge; confirm the wait cleared)"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449",
+        "mtime": 1791540265
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540752
+      },
+      "output": "stale: primary:fm-parked (paused 487s, awaiting external - the declared clearing time has passed, rechecked on a long cadence not a wedge; confirm the wait cleared)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "undated restatement preserves fired due phase stable hash",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540296
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540296
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "undated restatement preserves fired due phase changing hash",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540296
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540296
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "periodic recheck keeps due phase after omitted deadline",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791540847\t10\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20008s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791520838
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540847
+      },
+      "output": "stale: primary:fm-parked (paused 20008s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "repeated expired deadline cannot reopen due phase",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540373
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540373
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "future deadline stays quiet inside cadence",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540415
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540415
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "future deadline remains bounded on changing hash",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791540915\t11\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20012s, awaiting external - the declared time is beyond the recheck cadence; confirm the wait still holds)"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791520903
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540915
+      },
+      "output": "stale: primary:fm-parked (paused 20012s, awaiting external - the declared time is beyond the recheck cadence; confirm the wait still holds)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "secondmate restatement preserves fired deadline throttle",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540471
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540471
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "secondmate rechecks from actual surface not fresh status",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791540967\t12\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20005s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791520962
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540967
+      },
+      "output": "stale: primary:fm-parked (paused 20005s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "over-age busy restatement stays inside fired deadline cadence",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540494
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540494
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "over-age busy rechecks despite fresh status mtime",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791540985\t13\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20003s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791520982
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "output": "stale: primary:fm-parked (paused 20003s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "concurrent same-episode appends do not reopen alarms",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "post-concurrency consistent poll retains same scope",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "away busy first declaration hands off once",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791541074\t14\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "away busy keyed restatement does not replay handoff",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "marker_after": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "keyless wait remains a distinct first alert",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791541148\t15\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": {
+        "scope": "declared:release-wait:2363572704:449:due",
+        "mtime": 1791540986
+      },
+      "marker_after": {
+        "scope": "declared:-:1122645937:633",
+        "mtime": 1791541149
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "new keyless text does not inherit keyed throttle",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791541199\t16\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+      ],
+      "marker_before": {
+        "scope": "declared:-:1122645937:633",
+        "mtime": 1791541149
+      },
+      "marker_after": {
+        "scope": "declared:-:3043841304:634",
+        "mtime": 1791541199
+      },
+      "output": "stale: primary:fm-parked\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "stopped declared wait reaches first bounded recheck",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791541211\t17\tstale\tprimary:fm-stopped\tstale: primary:fm-stopped (paused 20006s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+      ],
+      "marker_before": null,
+      "marker_after": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791541211
+      },
+      "output": "stale: primary:fm-stopped (paused 20006s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "stopped same-episode restatement stays silent",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791540752
+      },
+      "marker_after": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791540752
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "stopped wait rechecks despite recent status append",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791541266\t18\tstale\tprimary:fm-stopped\tstale: primary:fm-stopped (paused 20009s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+      ],
+      "marker_before": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791521257
+      },
+      "marker_after": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791541268
+      },
+      "output": "stale: primary:fm-stopped (paused 20009s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "captain-held wait remains silent while away posture stands",
+      "expected": "absorb",
+      "passed": true,
+      "watcher_was_blocking": true,
+      "exit": -15,
+      "queued_rows": [],
+      "marker_before": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791541268
+      },
+      "marker_after": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791541268
+      },
+      "output": "",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    },
+    {
+      "name": "captain-held wait rechecks after return",
+      "expected": "wake",
+      "passed": true,
+      "watcher_was_blocking": false,
+      "exit": 0,
+      "queued_rows": [
+        "1791541371\t19\tstale\tprimary:fm-stopped\tstale: primary:fm-stopped (captain-held 20083s, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the held decision or release the hold)"
+      ],
+      "marker_before": {
+        "scope": "declared:stopped-wait:3572817465:1",
+        "mtime": 1791541268
+      },
+      "marker_after": {
+        "scope": "declared:captain-wait:2641614996:1",
+        "mtime": 1791541376
+      },
+      "output": "stale: primary:fm-stopped (captain-held 20083s, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the held decision or release the hold)\n",
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/pause-watcher-live.log"
+    }
+  ],
+  "cleanup": {
+    "private_tmux_stopped": true,
+    "lab_and_test_scratch_removed": true,
+    "baseline_executable_removed": true
+  }
+}

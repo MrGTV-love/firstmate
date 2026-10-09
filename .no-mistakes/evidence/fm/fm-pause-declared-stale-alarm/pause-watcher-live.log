@@ -1,0 +1,920 @@
+ACTUAL CLI: Claude Code v2.1.295; ready reply LAB_READY; endpoint alive; PTY 120x40.
+ISOLATION: marked evidence-directory lab; repository short-socket helper used after evidence path exceeded macOS UNIX socket length; no default server calls.
+PRODUCT: unmodified bin/fm-watch.sh, real tmux, real fm-crew-state.sh, durable wake queue and production drain/ack. Status events are disposable worker-log inputs, marked inspected by production cursor owner before stale polling. Four-hour boundaries use persisted-marker mtime fixtures, not a clock mock.
+INSPECTED STATUS EVENT: paused [key=validation-wait]: waiting on validation
+{
+  "name": "baseline first-sight",
+  "expected": "wake",
+  "passed": false,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539314\t1\tcheck\topen-loop-ledger\tcheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)"
+  ],
+  "marker_before": null,
+  "marker_after": null,
+  "output": "check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-1-baseline-first-sight.log"
+}
+SETUP REPAIR: seeded an empty isolated markdown backlog so the real open-loop reconciler can publish complete coverage. Initial unrelated ledger alarm was not a pause result.
+DRAIN:
+1791539314	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 61959.1791539314.ISK6nN
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 45s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FMK7GT1AYZYG9RNY8ND34P/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FMK7GT1AYZYG9RNY8ND34P/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused [key=validation-wait]: waiting on validation
+{
+  "name": "baseline first-sight repaired setup",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539371\t2\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": null,
+  "marker_after": {
+    "scope": "declared:r1:3532007374726f6e673a31363737373233323a3136353436333231393a313739313533393239352e38383230333930393600526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65",
+    "mtime": 1791539372
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-2-baseline-first-sight-repaired-setup.log"
+}
+DRAIN:
+1791539371	2	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 81089.1791539371.VxLj3n
+WARNING: watcher still down (same stale episode; last beat: 7s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+REAL PANE CHANGE: typed unsent composer note baseline-restatement
+INSPECTED STATUS EVENT: paused [key=validation-wait]: still waiting, fresh progress
+{
+  "name": "baseline restatement reproduces stale alarm",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539389\t3\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": {
+    "scope": "declared:r1:3532007374726f6e673a31363737373233323a3136353436333231393a313739313533393239352e38383230333930393600526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65",
+    "mtime": 1791539372
+  },
+  "marker_after": {
+    "scope": "declared:r1:313132007374726f6e673a31363737373233323a3136353436333231393a313739313533393239352e38383230333930393600526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65",
+    "mtime": 1791539390
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-3-baseline-restatement-reproduces-stale-alarm.log"
+}
+DRAIN:
+1791539389	3	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 6886.1791539389.fKY4Xe
+WARNING: watcher still down (same stale episode; last beat: 15s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused [key=validation-wait]: waiting on validation
+{
+  "name": "fixed first-sight remains visible",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539418\t4\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": null,
+  "marker_after": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539418
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-4-fixed-first-sight-remains-visible.log"
+}
+DRAIN:
+1791539418	4	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 56810.1791539418.m1Ohp0
+WARNING: watcher still down (same stale episode; last beat: 14s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+REAL PANE CHANGE: typed unsent composer note fixed-restatement
+INSPECTED STATUS EVENT: paused [key=validation-wait]: still waiting, fresh progress
+{
+  "name": "same-key restatement stays silent",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539418
+  },
+  "marker_after": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539418
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-5-same-key-restatement-stays-silent.log"
+}
+STATUS TAIL FIXTURE: 440 continuation/blank lines bury the original keyed pause beyond the 200-line window.
+REAL PANE CHANGE: typed unsent composer note long-tail
+{
+  "name": "buried wait opener remains throttled",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539418
+  },
+  "marker_after": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539418
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-6-buried-wait-opener-remains-throttled.log"
+}
+INSPECTED STATUS EVENT: Continuation appended after buried opener.
+REAL PANE CHANGE: typed unsent composer note long-tail-again
+{
+  "name": "further continuation does not reopen alarm",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539418
+  },
+  "marker_after": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539418
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-7-further-continuation-does-not-reopen-alarm.log"
+}
+CADENCE FIXTURE: last actual surface aged 480s; status age 48s
+INSPECTED STATUS EVENT: paused [key=validation-wait]: eight-minute progress restatement
+{
+  "name": "stable hash eight-minute restatement stays silent",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539126
+  },
+  "marker_after": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539126
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-8-stable-hash-eight-minute-restatement-stays-silent.log"
+}
+CADENCE FIXTURE: last actual surface aged 20000s; status age 28s
+INSPECTED STATUS EVENT: paused [key=validation-wait]: freshly restated beyond four-hour surface age
+{
+  "name": "stable hash rechecks despite fresh status mtime",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539651\t5\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20016s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+  ],
+  "marker_before": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791519635
+  },
+  "marker_after": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539651
+  },
+  "output": "stale: primary:fm-parked (paused 20016s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-9-stable-hash-rechecks-despite-fresh-status-mtime.log"
+}
+DRAIN:
+1791539651	5	stale	primary:fm-parked	stale: primary:fm-parked (paused 20016s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 86579.1791539651.ISRHvf
+WARNING: watcher still down (same stale episode; last beat: 10s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+CADENCE FIXTURE: last actual surface aged 20000s; status age 27s
+INSPECTED STATUS EVENT: paused [key=validation-wait]: freshly restated on changing pane
+REAL PANE CHANGE: typed unsent composer note periodic-changing
+{
+  "name": "changing hash rechecks despite fresh status mtime",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539680\t6\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791519662
+  },
+  "marker_after": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539681
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-10-changing-hash-rechecks-despite-fresh-status-mtime.log"
+}
+DRAIN:
+1791539680	6	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 56582.1791539680.OeEjR4
+WARNING: watcher still down (same stale episode; last beat: 16s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused [key=release-wait]: waiting on another dependency
+REAL PANE CHANGE: typed unsent composer note replacement-key
+{
+  "name": "different keyed wait surfaces immediately",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539718\t7\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": {
+    "scope": "declared:validation-wait:987624751:1",
+    "mtime": 1791539681
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:1757535686:447",
+    "mtime": 1791539718
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-11-different-keyed-wait-surfaces-immediately.log"
+}
+DRAIN:
+1791539718	7	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 43721.1791539718.3bKYFE
+WARNING: watcher still down (same stale episode; last beat: 15s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: resolved [key=release-wait]: dependency cleared
+INSPECTED STATUS EVENT: paused [key=release-wait]: next dependency using same key
+REAL PANE CHANGE: typed unsent composer note resolved-redeclared
+{
+  "name": "resolved and redeclared key starts new episode",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791539741\t8\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:1757535686:447",
+    "mtime": 1791539718
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449",
+    "mtime": 1791539741
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-12-resolved-and-redeclared-key-starts-new-episode.log"
+}
+DRAIN:
+1791539741	8	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 35703.1791539741.a2FYPR
+WARNING: watcher still down (same stale episode; last beat: 23s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused [key=release-wait]: still waiting until 2026-10-09T10:10:25Z
+CADENCE FIXTURE: last actual surface aged 480s; status age 0s
+{
+  "name": "first elapsed deadline expedites stable hash recheck",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791540752\t9\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 487s, awaiting external - the declared clearing time has passed, rechecked on a long cadence not a wedge; confirm the wait cleared)"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449",
+    "mtime": 1791540265
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540752
+  },
+  "output": "stale: primary:fm-parked (paused 487s, awaiting external - the declared clearing time has passed, rechecked on a long cadence not a wedge; confirm the wait cleared)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-13-first-elapsed-deadline-expedites-stable-hash-recheck.log"
+}
+DRAIN:
+1791540752	9	stale	primary:fm-parked	stale: primary:fm-parked (paused 487s, awaiting external - the declared clearing time has passed, rechecked on a long cadence not a wedge; confirm the wait cleared)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 53254.1791540752.hvF6D7
+WARNING: watcher still down (same stale episode; last beat: 22s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused [key=release-wait]: still waiting without restated deadline
+CADENCE FIXTURE: last actual surface aged 480s; status age 0s
+{
+  "name": "undated restatement preserves fired due phase stable hash",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540296
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540296
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-14-undated-restatement-preserves-fired-due-phase-stable-hash.log"
+}
+REAL PANE CHANGE: typed unsent composer note deadline-undated-changing
+{
+  "name": "undated restatement preserves fired due phase changing hash",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540296
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540296
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-15-undated-restatement-preserves-fired-due-phase-changing-hash.log"
+}
+CADENCE FIXTURE: last actual surface aged 20000s; status age 62s
+INSPECTED STATUS EVENT: paused [key=release-wait]: fresh progress after periodic cadence
+{
+  "name": "periodic recheck keeps due phase after omitted deadline",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791540847\t10\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20008s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791520838
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540847
+  },
+  "output": "stale: primary:fm-parked (paused 20008s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-16-periodic-recheck-keeps-due-phase-after-omitted-deadline.log"
+}
+DRAIN:
+1791540847	10	stale	primary:fm-parked	stale: primary:fm-parked (paused 20008s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 74942.1791540847.hwaZlK
+WARNING: watcher still down (same stale episode; last beat: 7s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused [key=release-wait]: same old deadline until 2026-10-09T10:12:13Z
+CADENCE FIXTURE: last actual surface aged 480s; status age 0s
+REAL PANE CHANGE: typed unsent composer note repeat-deadline
+{
+  "name": "repeated expired deadline cannot reopen due phase",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540373
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540373
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-17-repeated-expired-deadline-cannot-reopen-due-phase.log"
+}
+INSPECTED STATUS EVENT: paused [key=release-wait]: wait extended until 2027-10-09T10:14:55Z
+CADENCE FIXTURE: last actual surface aged 480s; status age 0s
+{
+  "name": "future deadline stays quiet inside cadence",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540415
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540415
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-18-future-deadline-stays-quiet-inside-cadence.log"
+}
+CADENCE FIXTURE: last actual surface aged 20000s; status age 8s
+INSPECTED STATUS EVENT: paused [key=release-wait]: freshly extended until 2027-10-09T10:15:03Z
+REAL PANE CHANGE: typed unsent composer note future-periodic
+{
+  "name": "future deadline remains bounded on changing hash",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791540915\t11\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20012s, awaiting external - the declared time is beyond the recheck cadence; confirm the wait still holds)"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791520903
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540915
+  },
+  "output": "stale: primary:fm-parked (paused 20012s, awaiting external - the declared time is beyond the recheck cadence; confirm the wait still holds)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-19-future-deadline-remains-bounded-on-changing-hash.log"
+}
+DRAIN:
+1791540915	11	stale	primary:fm-parked	stale: primary:fm-parked (paused 20012s, awaiting external - the declared time is beyond the recheck cadence; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 11333.1791540915.AgwiyH
+WARNING: watcher still down (same stale episode; last beat: 5s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+ACTUAL TRIAGE LOG:
+[2026-10-09T04:50:40-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:50:44-0500] absorbed stale (paused, awaiting external, age 26s): primary:fm-parked
+[2026-10-09T04:50:48-0500] absorbed stale (paused, awaiting external, age 30s): primary:fm-parked
+[2026-10-09T04:52:29-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:53:12-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:53:19-0500] absorbed stale (paused, awaiting external, age 181s): primary:fm-parked
+[2026-10-09T04:53:35-0500] absorbed stale (paused, awaiting external, age 489s): primary:fm-parked
+[2026-10-09T04:53:48-0500] absorbed stale (paused, awaiting external, age 500s): primary:fm-parked
+[2026-10-09T05:13:03-0500] absorbed stale (paused, awaiting external, age 487s): primary:fm-parked
+[2026-10-09T05:13:09-0500] absorbed stale (paused, awaiting external, age 493s): primary:fm-parked
+[2026-10-09T05:13:26-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T05:13:29-0500] absorbed stale (paused, awaiting external, age 513s): primary:fm-parked
+[2026-10-09T05:13:45-0500] absorbed stale (paused, awaiting external, age 528s): primary:fm-parked
+[2026-10-09T05:13:51-0500] absorbed stale (paused, awaiting external, age 535s): primary:fm-parked
+[2026-10-09T05:14:26-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T05:14:30-0500] absorbed stale (paused, declared time reached, age 497s): primary:fm-parked
+[2026-10-09T05:14:35-0500] absorbed stale (paused, declared time reached, age 502s): primary:fm-parked
+[2026-10-09T05:14:39-0500] absorbed stale (paused, declared time reached, age 506s): primary:fm-parked
+[2026-10-09T05:14:42-0500] absorbed stale (paused, declared time reached, age 509s): primary:fm-parked
+[2026-10-09T05:14:46-0500] absorbed stale (paused, declared time reached, age 513s): primary:fm-parked
+[2026-10-09T05:14:49-0500] absorbed stale (paused, declared time reached, age 516s): primary:fm-parked
+[2026-10-09T05:14:52-0500] absorbed stale (paused, declared time reached, age 519s): primary:fm-parked
+[2026-10-09T05:14:57-0500] absorbed stale (paused until 31535998s from now, declared time not reached): primary:fm-parked
+[2026-10-09T05:15:01-0500] absorbed stale (paused until 31535995s from now, declared time not reached): primary:fm-parked
+
+ENDPOINT FIXTURE: same live Claude endpoint recorded as secondmate; product kind-specific cadence is exercised without a liveness stub.
+INSPECTED STATUS EVENT: paused [key=release-wait]: secondmate progress without deadline
+CADENCE FIXTURE: last actual surface aged 480s; status age 0s
+{
+  "name": "secondmate restatement preserves fired deadline throttle",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540471
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540471
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-20-secondmate-restatement-preserves-fired-deadline-throttle.log"
+}
+CADENCE FIXTURE: last actual surface aged 20000s; status age 11s
+INSPECTED STATUS EVENT: paused [key=release-wait]: secondmate newly restated after cadence
+{
+  "name": "secondmate rechecks from actual surface not fresh status",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791540967\t12\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20005s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791520962
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540967
+  },
+  "output": "stale: primary:fm-parked (paused 20005s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-21-secondmate-rechecks-from-actual-surface-not-fresh-status.log"
+}
+DRAIN:
+1791540967	12	stale	primary:fm-parked	stale: primary:fm-parked (paused 20005s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 31995.1791540967.sKjBUP
+WARNING: watcher still down (same stale episode; last beat: 7s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+SEMANTIC INPUT FIXTURE: real fm-busy-event.sh arm/apply with fm-recovery/restored-busy; live Claude remains the actual endpoint. No tmux or crew-state substitutes.
+REAL CREW STATE: state: working · source: pane · harness busy (fm-recovery)
+INSPECTED STATUS EVENT: paused [key=release-wait]: over-age busy wait freshly restated
+CADENCE FIXTURE: last actual surface aged 480s; status age 0s
+{
+  "name": "over-age busy restatement stays inside fired deadline cadence",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540494
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540494
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-22-over-age-busy-restatement-stays-inside-fired-deadline-cadence.log"
+}
+CADENCE FIXTURE: last actual surface aged 20000s; status age 8s
+INSPECTED STATUS EVENT: paused [key=release-wait]: busy freshly restated after cadence
+{
+  "name": "over-age busy rechecks despite fresh status mtime",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791540985\t13\tstale\tprimary:fm-parked\tstale: primary:fm-parked (paused 20003s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791520982
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "output": "stale: primary:fm-parked (paused 20003s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-23-over-age-busy-rechecks-despite-fresh-status-mtime.log"
+}
+DRAIN:
+1791540985	13	stale	primary:fm-parked	stale: primary:fm-parked (paused 20003s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 71862.1791540985.W03E5u
+WARNING: watcher still down (same stale episode; last beat: 5s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+CONCURRENT INPUT: a real asynchronous worker-log writer appends 300 same-key progress events while the real busy watcher scans; new signals are classified by real fm-crew-state.
+{
+  "name": "concurrent same-episode appends do not reopen alarms",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-24-concurrent-same-episode-appends-do-not-reopen-alarms.log"
+}
+CONCURRENT EVENTS WRITTEN: 171
+CONCURRENT FIXTURE NOTE: cleanup stopped the time-limited writer after 171 actual appends; this is the exercised event set, not 300. No product alarm or marker change occurred.
+{
+  "name": "post-concurrency consistent poll retains same scope",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-25-post-concurrency-consistent-poll-retains-same-scope.log"
+}
+POST-CONCURRENCY REAL TRIAGE:
+[2026-10-09T04:50:40-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:50:44-0500] absorbed stale (paused, awaiting external, age 26s): primary:fm-parked
+[2026-10-09T04:50:48-0500] absorbed stale (paused, awaiting external, age 30s): primary:fm-parked
+[2026-10-09T04:52:29-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:53:12-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:53:19-0500] absorbed stale (paused, awaiting external, age 181s): primary:fm-parked
+[2026-10-09T04:53:35-0500] absorbed stale (paused, awaiting external, age 489s): primary:fm-parked
+[2026-10-09T04:53:48-0500] absorbed stale (paused, awaiting external, age 500s): primary:fm-parked
+[2026-10-09T05:13:03-0500] absorbed stale (paused, awaiting external, age 487s): primary:fm-parked
+[2026-10-09T05:13:09-0500] absorbed stale (paused, awaiting external, age 493s): primary:fm-parked
+[2026-10-09T05:13:26-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T05:13:29-0500] absorbed stale (paused, awaiting external, age 513s): primary:fm-parked
+[2026-10-09T05:13:45-0500] absorbed stale (paused, awaiting external, age 528s): primary:fm-parked
+[2026-10-09T05:13:51-0500] absorbed stale (paused, awaiting external, age 535s): primary:fm-parked
+[2026-10-09T05:14:26-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T05:14:30-0500] absorbed stale (paused, declared time reached, age 497s): primary:fm-parked
+[2026-10-09T05:14:35-0500] absorbed stale (paused, declared time reached, age 502s): primary:fm-parked
+[2026-10-09T05:14:39-0500] absorbed stale (paused, declared time reached, age 506s): primary:fm-parked
+[2026-10-09T05:14:42-0500] absorbed stale (paused, declared time reached, age 509s): primary:fm-parked
+[2026-10-09T05:14:46-0500] absorbed stale (paused, declared time reached, age 513s): primary:fm-parked
+[2026-10-09T05:14:49-0500] absorbed stale (paused, declared time reached, age 516s): primary:fm-parked
+[2026-10-09T05:14:52-0500] absorbed stale (paused, declared time reached, age 519s): primary:fm-parked
+[2026-10-09T05:14:57-0500] absorbed stale (paused until 31535998s from now, declared time not reached): primary:fm-parked
+[2026-10-09T05:15:01-0500] absorbed stale (paused until 31535995s from now, declared time not reached): primary:fm-parked
+[2026-10-09T05:15:55-0500] absorbed stale (paused, awaiting external, age 484s): primary:fm-parked
+[2026-10-09T05:15:58-0500] absorbed stale (paused, awaiting external, age 487s): primary:fm-parked
+[2026-10-09T05:16:17-0500] absorbed stale (paused, awaiting external, age 483s): primary:fm-parked
+[2026-10-09T05:16:21-0500] absorbed stale (paused, awaiting external, age 487s): primary:fm-parked
+[2026-10-09T05:17:06-0500] absorbed benign signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/fm-lab.iBfhSS/state/parked.status
+[2026-10-09T05:17:06-0500] absorbed stale (paused, awaiting external, age 40s): primary:fm-parked
+[2026-10-09T05:17:45-0500] absorbed stale (paused, awaiting external, age 79s): primary:fm-parked
+[2026-10-09T05:17:50-0500] absorbed stale (paused, awaiting external, age 84s): primary:fm-parked
+
+INSPECTED STATUS EVENT: paused [key=away-wait]: waiting on remote validation
+{
+  "name": "away busy first declaration hands off once",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791541074\t14\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-26-away-busy-first-declaration-hands-off-once.log"
+}
+DRAIN:
+1791541074	14	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 21415.1791541074.Ooa8Ig
+WARNING: watcher still down (same stale episode; last beat: 9s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused [key=away-wait]: same remote validation fresh progress
+REAL PANE CHANGE: typed unsent composer note away-progress
+{
+  "name": "away busy keyed restatement does not replay handoff",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "marker_after": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-27-away-busy-keyed-restatement-does-not-replay-handoff.log"
+}
+INSPECTED STATUS EVENT: paused: waiting on a keyless dependency
+REAL PANE CHANGE: typed unsent composer note keyless-one
+{
+  "name": "keyless wait remains a distinct first alert",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791541148\t15\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": {
+    "scope": "declared:release-wait:2363572704:449:due",
+    "mtime": 1791540986
+  },
+  "marker_after": {
+    "scope": "declared:-:1122645937:633",
+    "mtime": 1791541149
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-28-keyless-wait-remains-a-distinct-first-alert.log"
+}
+DRAIN:
+1791541148	15	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 15 --recovery-generation 9439.1791541148.TEptYX
+WARNING: watcher still down (same stale episode; last beat: 7s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: paused: waiting on another keyless dependency
+REAL PANE CHANGE: typed unsent composer note keyless-two
+{
+  "name": "new keyless text does not inherit keyed throttle",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791541199\t16\tstale\tprimary:fm-parked\tstale: primary:fm-parked"
+  ],
+  "marker_before": {
+    "scope": "declared:-:1122645937:633",
+    "mtime": 1791541149
+  },
+  "marker_after": {
+    "scope": "declared:-:3043841304:634",
+    "mtime": 1791541199
+  },
+  "output": "stale: primary:fm-parked\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-29-new-keyless-text-does-not-inherit-keyed-throttle.log"
+}
+DRAIN:
+1791541199	16	stale	primary:fm-parked	stale: primary:fm-parked
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 16 --recovery-generation 44310.1791541199.ZgUwOz
+WARNING: watcher still down (same stale episode; last beat: 6s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+REAL STOPPED ENDPOINT: ambiguous
+INSPECTED STATUS EVENT: paused [key=stopped-wait]: external dependency remains
+{
+  "name": "stopped declared wait reaches first bounded recheck",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791541211\t17\tstale\tprimary:fm-stopped\tstale: primary:fm-stopped (paused 20006s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+  ],
+  "marker_before": null,
+  "marker_after": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791541211
+  },
+  "output": "stale: primary:fm-stopped (paused 20006s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-30-stopped-declared-wait-reaches-first-bounded-recheck.log"
+}
+DRAIN:
+1791541211	17	stale	primary:fm-stopped	stale: primary:fm-stopped (paused 20006s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 89205.1791541211.0y2cDx
+WARNING: watcher still down (same stale episode; last beat: 21s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+CADENCE FIXTURE: last actual surface aged 480s; status age 20026s
+INSPECTED STATUS EVENT: paused [key=stopped-wait]: recently restated after stopped surface
+{
+  "name": "stopped same-episode restatement stays silent",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791540752
+  },
+  "marker_after": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791540752
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-31-stopped-same-episode-restatement-stays-silent.log"
+}
+CADENCE FIXTURE: last actual surface aged 20000s; status age 25s
+INSPECTED STATUS EVENT: paused [key=stopped-wait]: freshly restated after cadence
+{
+  "name": "stopped wait rechecks despite recent status append",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791541266\t18\tstale\tprimary:fm-stopped\tstale: primary:fm-stopped (paused 20009s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+  ],
+  "marker_before": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791521257
+  },
+  "marker_after": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791541268
+  },
+  "output": "stale: primary:fm-stopped (paused 20009s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-32-stopped-wait-rechecks-despite-recent-status-append.log"
+}
+DRAIN:
+1791541266	18	stale	primary:fm-stopped	stale: primary:fm-stopped (paused 20009s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 18 --recovery-generation 17547.1791541266.YRHSSx
+WARNING: watcher still down (same stale episode; last beat: 15s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+INSPECTED STATUS EVENT: captain-held [key=captain-wait]: awaiting the captain
+AWAY ENTER:
+Away posture recorded at 2026-10-09T10:21:26Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-09T10:21:26Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Disposable pause-watcher validation only; hold decisions for return.
+
+{
+  "name": "captain-held wait remains silent while away posture stands",
+  "expected": "absorb",
+  "passed": true,
+  "watcher_was_blocking": true,
+  "exit": -15,
+  "queued_rows": [],
+  "marker_before": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791541268
+  },
+  "marker_after": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791541268
+  },
+  "output": "",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-33-captain-held-wait-remains-silent-while-away-posture-stands.log"
+}
+AWAY ARCHIVE: /Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/fm-lab.iBfhSS/state/afk-contracts/1791541286.afk-contract
+{
+  "name": "captain-held wait rechecks after return",
+  "expected": "wake",
+  "passed": true,
+  "watcher_was_blocking": false,
+  "exit": 0,
+  "queued_rows": [
+    "1791541371\t19\tstale\tprimary:fm-stopped\tstale: primary:fm-stopped (captain-held 20083s, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the held decision or release the hold)"
+  ],
+  "marker_before": {
+    "scope": "declared:stopped-wait:3572817465:1",
+    "mtime": 1791541268
+  },
+  "marker_after": {
+    "scope": "declared:captain-wait:2641614996:1",
+    "mtime": 1791541376
+  },
+  "output": "stale: primary:fm-stopped (captain-held 20083s, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the held decision or release the hold)\n",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/round-34-captain-held-wait-rechecks-after-return.log"
+}
+DRAIN:
+1791541371	19	stale	primary:fm-stopped	stale: primary:fm-stopped (captain-held 20083s, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the held decision or release the hold)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 19 --recovery-generation 3833.1791541372.5SWH0l
+WARNING: watcher still down (same stale episode; last beat: 35s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+ACK: 
+TARGETED REGRESSION SELECTORS EXIT: 0
+FINAL REAL SHELL-ENDPOINT STATE: dead
+TEARDOWN: private tmux -L fm-lab kill-server completed, default server never addressed.
+TEARDOWN: repository fm-lab-home.sh teardown confirmed private socket server stopped and removed its temporary socket directory.
+TEARDOWN: disposable lab records, backlog, fixture worktree and targeted-test scratch removed.

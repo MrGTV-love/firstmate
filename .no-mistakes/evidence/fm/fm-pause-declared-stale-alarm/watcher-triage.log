@@ -1,0 +1,35 @@
+[2026-10-09T04:50:40-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:50:44-0500] absorbed stale (paused, awaiting external, age 26s): primary:fm-parked
+[2026-10-09T04:50:48-0500] absorbed stale (paused, awaiting external, age 30s): primary:fm-parked
+[2026-10-09T04:52:29-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:53:12-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T04:53:19-0500] absorbed stale (paused, awaiting external, age 181s): primary:fm-parked
+[2026-10-09T04:53:35-0500] absorbed stale (paused, awaiting external, age 489s): primary:fm-parked
+[2026-10-09T04:53:48-0500] absorbed stale (paused, awaiting external, age 500s): primary:fm-parked
+[2026-10-09T05:13:03-0500] absorbed stale (paused, awaiting external, age 487s): primary:fm-parked
+[2026-10-09T05:13:09-0500] absorbed stale (paused, awaiting external, age 493s): primary:fm-parked
+[2026-10-09T05:13:26-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T05:13:29-0500] absorbed stale (paused, awaiting external, age 513s): primary:fm-parked
+[2026-10-09T05:13:45-0500] absorbed stale (paused, awaiting external, age 528s): primary:fm-parked
+[2026-10-09T05:13:51-0500] absorbed stale (paused, awaiting external, age 535s): primary:fm-parked
+[2026-10-09T05:14:26-0500] absorbed non-terminal stale (declared wait or open captain call already re-surfaced this window): primary:fm-parked
+[2026-10-09T05:14:30-0500] absorbed stale (paused, declared time reached, age 497s): primary:fm-parked
+[2026-10-09T05:14:35-0500] absorbed stale (paused, declared time reached, age 502s): primary:fm-parked
+[2026-10-09T05:14:39-0500] absorbed stale (paused, declared time reached, age 506s): primary:fm-parked
+[2026-10-09T05:14:42-0500] absorbed stale (paused, declared time reached, age 509s): primary:fm-parked
+[2026-10-09T05:14:46-0500] absorbed stale (paused, declared time reached, age 513s): primary:fm-parked
+[2026-10-09T05:14:49-0500] absorbed stale (paused, declared time reached, age 516s): primary:fm-parked
+[2026-10-09T05:14:52-0500] absorbed stale (paused, declared time reached, age 519s): primary:fm-parked
+[2026-10-09T05:14:57-0500] absorbed stale (paused until 31535998s from now, declared time not reached): primary:fm-parked
+[2026-10-09T05:15:01-0500] absorbed stale (paused until 31535995s from now, declared time not reached): primary:fm-parked
+[2026-10-09T05:15:55-0500] absorbed stale (paused, awaiting external, age 484s): primary:fm-parked
+[2026-10-09T05:15:58-0500] absorbed stale (paused, awaiting external, age 487s): primary:fm-parked
+[2026-10-09T05:16:17-0500] absorbed stale (paused, awaiting external, age 483s): primary:fm-parked
+[2026-10-09T05:16:21-0500] absorbed stale (paused, awaiting external, age 487s): primary:fm-parked
+[2026-10-09T05:17:06-0500] absorbed benign signal: /Users/charlesabrooker/.no-mistakes/evidence/01M4FMK7GT1AYZYG9RNY8ND34P/fm-lab.iBfhSS/state/parked.status
+[2026-10-09T05:17:06-0500] absorbed stale (paused, awaiting external, age 40s): primary:fm-parked
+[2026-10-09T05:17:45-0500] absorbed stale (paused, awaiting external, age 79s): primary:fm-parked
+[2026-10-09T05:17:50-0500] absorbed stale (paused, awaiting external, age 84s): primary:fm-parked
+[2026-10-09T05:20:36-0500] absorbed stale (paused, awaiting external, age 484s): primary:fm-stopped
+[2026-10-09T05:20:42-0500] absorbed stale (paused, awaiting external, age 490s): primary:fm-stopped
+[2026-10-09T05:20:46-0500] absorbed stale (paused, awaiting external, age 494s): primary:fm-stopped

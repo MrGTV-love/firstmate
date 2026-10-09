@@ -1,0 +1,8 @@
+ok - status_declared_wait_identity: restatements share an identity; new keys, re-declared keys, and keyless text do not
+ok - a concurrent status append cannot mix declaration and episode positions
+ok - restating a keyed wait stays inside its window, while a new key or a re-declared resolved key still surfaces
+ok - restated waits recheck four hours after their last surface on every absorbed path
+ok - deadline rechecks expedite once and survive undated restatements and periodic rechecks
+ok - a live paused worker stays absorbed until its declared time, then rechecks
+ok - a captain-held item is never rechecked while the away-posture record exists, and the recheck returns once the record is archived
+ok - away mode wakes the daemon once per declaration for a busy pane whose footer ticks on every capture

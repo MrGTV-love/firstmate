@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.295
+▝▜██████▀  Opus 5.5 with high effort · Claude Max
+ ▝▝   ▝▝   @claude · ~/.no-mistakes/worktrees/32d18ed9638d/01M4FMK7GT1AYZYG9RNY8ND34P
+
+
+❯ This is a disposable Firstmate pause-watcher validation primary. FM_HOME points only to the isolated lab. Do not
+  spawn, supervise, change files, run startup or lifecycle commands, use background work, or access any other home.
+  Reply exactly LAB_READY and wait.
+
+⏺ LAB_READY
+
+✻ Brewed for 5s · done 4:46 AM
+
+※ recap: Captain, this is a throwaway test home for checking the pause watcher, and it is ready and idle. Next, you send
+  the first test step, because nothing has started or changed yet. (disable recaps in /config)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────── pause-watcher validation lab ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 6% 64k/1.0M 01M4FMK7GT1AYZYG9RNY8ND34P:b9258691
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents
