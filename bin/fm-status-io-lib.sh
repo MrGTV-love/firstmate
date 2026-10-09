@@ -41,6 +41,28 @@ _fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
 }
 
 
+# A scan scopes these facts with `local _FM_STATUS_STAT_BATCH`, then refreshes
+# them before walking the fleet. Never carry them across scans or reuse them for
+# a post-read validation. Reader seams keep their per-file calls unchanged.
+_fm_status_stat_batch_into() {  # <state> <out-var>
+  local __fm_sb_file __fm_sb_data='' __fm_sb_files=()
+  printf -v "$2" '%s' ''
+  [ -z "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ] || return 0
+  for __fm_sb_file in "$1"/*.status; do
+    [ -f "$__fm_sb_file" ] && [ -r "$__fm_sb_file" ] && [ ! -L "$__fm_sb_file" ] || continue
+    # Unusual path bytes cannot be represented in this private row format.
+    case "$__fm_sb_file" in *$'\t'*|*$'\n'*) return 0 ;; esac
+    __fm_sb_files[${#__fm_sb_files[@]}]=$__fm_sb_file
+  done
+  [ "${#__fm_sb_files[@]}" -gt 0 ] || return 0
+  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+    __fm_sb_data=$(LC_ALL=C /usr/bin/stat -f $'%N\t%d:%i|%B|%FB|%z|%m' "${__fm_sb_files[@]}" 2>/dev/null) || return 0
+  else
+    __fm_sb_data=$(LC_ALL=C stat -c $'%n\t%d:%i|%W|%w|%s|%Y' "${__fm_sb_files[@]}" 2>/dev/null) || return 0
+  fi
+  printf -v "$2" '%s' "$__fm_sb_data"
+}
+
 # One stat per file: the device:inode identity, the size, and the mtime come
 # back from a single child process, because the drain reads them for every
 # status log several times per run and each separate stat was a fork.
@@ -51,11 +73,18 @@ _fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
 # Every local below carries the __fm_ prefix because an out-var named like an
 # unprefixed local would be assigned here and lost under bash's dynamic scope.
 _fm_status_stat_raw() {  # <file> <ident-var> <size-var> <mtime-var>
-  local __fm_st_facts __fm_st_dev_ino __fm_st_epoch __fm_st_birth __fm_st_rest __fm_st_size __fm_st_mtime
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-    __fm_st_facts=$(LC_ALL=C /usr/bin/stat -f '%d:%i|%B|%FB|%z|%m' "$1" 2>/dev/null) || return 1
-  else
-    __fm_st_facts=$(LC_ALL=C stat -c '%d:%i|%W|%w|%s|%Y' "$1" 2>/dev/null) || return 1
+  local __fm_st_facts='' __fm_st_path __fm_st_row __fm_st_dev_ino __fm_st_epoch __fm_st_birth __fm_st_rest __fm_st_size __fm_st_mtime
+  while IFS=$'\t' read -r __fm_st_path __fm_st_row; do
+    if [ "$__fm_st_path" = "$1" ]; then __fm_st_facts=$__fm_st_row; break; fi
+  done <<EOF
+${_FM_STATUS_STAT_BATCH:-}
+EOF
+  if [ -z "$__fm_st_facts" ]; then
+    if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+      __fm_st_facts=$(LC_ALL=C /usr/bin/stat -f '%d:%i|%B|%FB|%z|%m' "$1" 2>/dev/null) || return 1
+    else
+      __fm_st_facts=$(LC_ALL=C stat -c '%d:%i|%W|%w|%s|%Y' "$1" 2>/dev/null) || return 1
+    fi
   fi
   __fm_st_dev_ino=${__fm_st_facts%%|*}; __fm_st_rest=${__fm_st_facts#*|}
   __fm_st_epoch=${__fm_st_rest%%|*}; __fm_st_rest=${__fm_st_rest#*|}
@@ -232,6 +261,7 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
   case "$event_endpoint" in ''|*[!0-9]*) return 1 ;; esac
   [ -n "$line" ] || return 1
 
+  local _FM_STATUS_STAT_BATCH=''
   _fm_status_stat_into "$f" after_ident after_size after_mtime || return 1
   after_size=${after_size//[[:space:]]/}
   case "$after_mtime:$after_size" in *[!0-9:]*) return 1 ;; esac
