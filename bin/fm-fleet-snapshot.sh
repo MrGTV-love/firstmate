@@ -661,12 +661,21 @@ snapshot_task_cleanup() {
   SNAPSHOT_TASK_META_COUNT=0
 }
 
-snapshot_wait_current_reads() {  # <pid>...
-  local pid rc=0
-  for pid in "$@"; do
-    wait "$pid" || rc=1
+snapshot_wait_current_read_slot() {
+  local out_var=$1 pid slot
+  shift
+  while :; do
+    slot=0
+    for pid in "$@"; do
+      if ! kill -0 "$pid" 2>/dev/null; then
+        printf -v "$out_var" '%s' "$slot"
+        wait "$pid"
+        return $?
+      fi
+      slot=$((slot + 1))
+    done
+    sleep 0.05
   done
-  return "$rc"
 }
 
 snapshot_capture_optional() {  # <source> <destination>
@@ -770,7 +779,7 @@ prefetch_task_observations() {  # <meta> <id>
 # window rather than five in series, while every command bound remains owned by
 # fm-timeout-lib.sh.
 prefetch_task_current_states() {
-  local meta captured_meta id index=0 rc=0 waited=0 kind
+  local meta captured_meta id index=0 rc=0 read_slot=0 pid kind
   local -a pids=()
   snapshot_task_cleanup
   SNAPSHOT_TASK_DIR=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-fleet-tasks.XXXXXX") || return 1
@@ -803,25 +812,24 @@ prefetch_task_current_states() {
     SNAPSHOT_TASK_METAS[SNAPSHOT_TASK_META_COUNT]=$captured_meta
     SNAPSHOT_TASK_META_COUNT=$((SNAPSHOT_TASK_META_COUNT + 1))
   done
-  # A rolling window: as soon as the window is full, the oldest read is collected
-  # and the next task starts, so one slow task delays only its own slot instead
-  # of idling every slot of a fixed batch until the batch's slowest read ends.
   while [ "$index" -lt "$SNAPSHOT_TASK_META_COUNT" ]; do
+    if [ "$index" -ge "$FM_SNAPSHOT_LOCAL_READ_CONCURRENCY" ]; then
+      snapshot_wait_current_read_slot read_slot "${pids[@]}" || rc=1
+    else
+      read_slot=$index
+    fi
     meta=${SNAPSHOT_TASK_METAS[index]}
     id=${meta##*/}
     id=${id%.meta}
     prefetch_task_observations "$meta" "$id" &
-    pids[index]=$!
+    pids[read_slot]=$!
     index=$((index + 1))
-    if [ $((index - waited)) -ge "$FM_SNAPSHOT_LOCAL_READ_CONCURRENCY" ]; then
-      snapshot_wait_current_reads "${pids[waited]}" || rc=1
-      waited=$((waited + 1))
-    fi
   done
-  while [ "$waited" -lt "$index" ]; do
-    snapshot_wait_current_reads "${pids[waited]}" || rc=1
-    waited=$((waited + 1))
-  done
+  if [ "$index" -gt 0 ]; then
+    for pid in "${pids[@]}"; do
+      wait "$pid" || rc=1
+    done
+  fi
   if [ "$rc" -ne 0 ]; then
     snapshot_task_cleanup
     return 1
@@ -1039,25 +1047,27 @@ task_json_one() {  # <captured-meta> - prints one task record
 # observations: a record starts as soon as a slot frees, and the finished files are
 # merged in id order.
 task_json_lines() {
-  local meta id index=0 waited=0 rc=0
+  local meta id index=0 read_slot=0 pid rc=0
   local -a pids=() files=()
   while [ "$index" -lt "$SNAPSHOT_TASK_META_COUNT" ]; do
+    if [ "$index" -ge "$FM_SNAPSHOT_LOCAL_READ_CONCURRENCY" ]; then
+      snapshot_wait_current_read_slot read_slot "${pids[@]}" || rc=1
+    else
+      read_slot=$index
+    fi
     meta=${SNAPSHOT_TASK_METAS[index]}
     id=${meta##*/}
     id=${id%.meta}
     files[index]="$SNAPSHOT_TASK_DIR/$id.task.json"
     task_json_one "$meta" > "${files[index]}" &
-    pids[index]=$!
+    pids[read_slot]=$!
     index=$((index + 1))
-    if [ $((index - waited)) -ge "$FM_SNAPSHOT_LOCAL_READ_CONCURRENCY" ]; then
-      snapshot_wait_current_reads "${pids[waited]}" || rc=1
-      waited=$((waited + 1))
-    fi
   done
-  while [ "$waited" -lt "$index" ]; do
-    snapshot_wait_current_reads "${pids[waited]}" || rc=1
-    waited=$((waited + 1))
-  done
+  if [ "$index" -gt 0 ]; then
+    for pid in "${pids[@]}"; do
+      wait "$pid" || rc=1
+    done
+  fi
   if [ "$rc" -ne 0 ]; then
     snapshot_task_cleanup
     return 1
