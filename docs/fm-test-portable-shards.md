@@ -75,7 +75,7 @@ Assignment is longest-processing-time bin packing over per-script duration hints
 Thirteen supplemental hints come from the complete green [run 37404365422](https://github.com/MrGTV-love/firstmate/actions/runs/37404365422), whose nine serial shard summaries all report `failed=0`: every then-unhinted serial script measured with `exit=0` and `gate_skip=false`.
 Fork-main supplemental maxima are retained where they exceed the shared baseline, including the former combined host's 877426 ms in [run 37774962436](https://github.com/MrGTV-love/firstmate/actions/runs/37774962436) (historical calibration only after the split) and skill-pick's 120549 ms in [run 37778222434](https://github.com/MrGTV-love/firstmate/actions/runs/37778222434).
 An unfinished or failed invocation is not a healthy duration sample.
-On 2026-10-07, the previously missing `tests/fm-procevent-runner-backlog.test.sh` and `tests/fm-procevent-runner-custody.test.sh` hints were added from successful completed per-script records in the portable-serial timing artifacts of [run 37619080376](https://github.com/MrGTV-love/firstmate/actions/runs/37619080376).
+On 2026-10-07, 32 previously missing hints were added from successful completed per-script records in the portable-serial timing artifacts of [run 37619080376](https://github.com/MrGTV-love/firstmate/actions/runs/37619080376).
 That run was not green: its successful records supplement the retained baseline, while failed and unfinished invocations supply no hints.
 Capability skips measure only the portable gate path, not the opt-in live scenario.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.

@@ -791,7 +791,7 @@ tests/fm-forge-detect.test.sh 193
 tests/fm-fork-free-helpers.test.sh 795
 tests/fm-gate-refuse.test.sh 9953
 tests/fm-gemini-harness.test.sh 947
-tests/fm-git-strip-ai-trailers.test.sh 2500
+tests/fm-git-strip-ai-trailers.test.sh 14282
 tests/fm-gitignore-config.test.sh 59
 tests/fm-gotmp.test.sh 1509
 tests/fm-grok-continuity-live-e2e.test.sh 46
@@ -811,7 +811,7 @@ tests/fm-host-mirror-live-e2e.test.sh 79
 tests/fm-host-mirror.test.sh 11587
 tests/fm-idle-session-reap.test.sh 35000
 tests/fm-inactive-reconcile.test.sh 60823
-tests/fm-inbox.test.sh 6062
+tests/fm-inbox.test.sh 6316
 tests/fm-jev-guardrail-home.test.sh 10731
 tests/fm-jev-guardrail.test.sh 50636
 tests/fm-jev-mem-guard.test.sh 336
@@ -827,7 +827,7 @@ tests/fm-mail-check.test.sh 9162
 tests/fm-mail.test.sh 9703
 tests/fm-mem-guard.test.sh 505
 tests/fm-model-index-live-e2e.test.sh 781
-tests/fm-model-index.test.sh 87807
+tests/fm-model-index.test.sh 100613
 tests/fm-muse-harness.test.sh 46548
 tests/fm-muse-signals-live-e2e.test.sh 77
 tests/fm-nm-test-contract.test.sh 853
@@ -912,9 +912,9 @@ tests/fm-sessionstart-nudge.test.sh 71802
 tests/fm-shared-captain-inheritance.test.sh 7991
 tests/fm-skill-pick.test.sh 120549
 tests/fm-spawn-acquisition-cleanup.test.sh 7374
-tests/fm-spawn-claude-api-key-guard.test.sh 56894
+tests/fm-spawn-claude-api-key-guard.test.sh 63664
 tests/fm-spawn-compact-adviser-disable-remote.test.sh 170462
-tests/fm-spawn-compact-adviser-disable.test.sh 85958
+tests/fm-spawn-compact-adviser-disable.test.sh 125346
 tests/fm-spawn-dispatch-profile.test.sh 314611
 tests/fm-spawn-orca-worktree.test.sh 2433
 tests/fm-spawn-pool-base-freshen.test.sh 68652
@@ -929,7 +929,7 @@ tests/fm-supervision-fork-budget.test.sh 7400
 tests/fm-supervision-host-attended-live-e2e.test.sh 49
 tests/fm-supervision-host-live-e2e.test.sh 75
 tests/fm-supervision-host-hook.test.sh 70651
-tests/fm-supervision-host.test.sh 413717
+tests/fm-supervision-host.test.sh 877426
 tests/fm-tangle-guard.test.sh 8501
 tests/fm-task-delivery.test.sh 32789
 tests/fm-task-inbox.test.sh 64895
@@ -968,7 +968,7 @@ tests/fm-watch-triage.test.sh 1074843
 tests/fm-watcher-lock.test.sh 108940
 tests/fm-watchdog-check.test.sh 23000
 tests/fm-worker-account-live-e2e.test.sh 3179
-tests/fm-worker-account.test.sh 125208
+tests/fm-worker-account.test.sh 130030
 EOF
 }
 

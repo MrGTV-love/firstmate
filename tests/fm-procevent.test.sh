@@ -739,6 +739,287 @@ SH
   pass "connection retries are bounded; other error variants retain exact bytes and refuse relisten"
 }
 
+# Without a readable PID hand-off, retain the shipped bounded refusal even
+# when the runner is still alive under its source lock. Never publish failure
+# under that lock or advertise readiness without a claim.
+confirm_without_pid_at_boundary() {
+  local operation=$1 HANDOFF_FAILURE=${2:-missing} HELD HELD_ID HELD_ROOT=$ROOT REAL_SED REAL_PERL rc=0 output began elapsed
+  local preclaim_state held_pid held_identity current_identity claim_home claim_pid claim_token claim_identity claim_before
+  local -a command=()
+  HELD="$TMP_ROOT/held-unclaimed-$operation-$HANDOFF_FAILURE"
+  mkdir -p "$HELD/bin" "$HELD/home/state"
+  REAL_SED=$(command -v sed)
+  REAL_PERL=$(command -v perl)
+  if [ "$operation" = reconcile ]; then
+    HELD_ID=held-unclaimed-src
+    pe_register "$HELD/home" lavish "$HELD_ID" -- \
+      "$STARTED_BLOCKER" "$HELD/started" "$BLOCKER" "$HELD/poll-release" "done" >/dev/null
+    command=("$ROOT/bin/fm-procevent.sh" reconcile)
+  else
+    cat > "$HELD/bin/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'started\n' > "$HELD/started"
+while [ ! -e "$HELD/poll-release" ]; do
+  [ "$SECONDS" -lt 120 ] || exit 75
+  sleep 0.05
+done
+printf 'session:\n  status: ended\n'
+SH
+    chmod +x "$HELD/bin/lavish-axi"
+    printf '<h1>held unclaimed runner</h1>\n' > "$HELD/board.html"
+    lavish_session "$HELD/board.html"
+    HELD_ID=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$HELD/board.html")
+    fm_test_track_procevent_home "$HELD/home"
+    command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$HELD/board.html")
+  fi
+  export HELD HELD_ID HELD_ROOT REAL_SED REAL_PERL HANDOFF_FAILURE
+  cat > "$HELD/bin/perl" <<'SH'
+#!/usr/bin/env bash
+case "${4-}" in
+  "$HELD/home/state/procevent/.launch-pid."*)
+    handoff=$4
+    "$REAL_PERL" -e 'exit(((stat $ARGV[0])[2] & 0777) == 0600 ? 0 : 1)' "$handoff" || exit 75
+    "$REAL_PERL" "$@"; rc=$?
+    case "$HANDOFF_FAILURE" in
+      missing) rm -f -- "$handoff" ;;
+      empty) : > "$handoff" ;;
+      unreadable) chmod 000 "$handoff" ;;
+    esac
+    exit "$rc"
+    ;;
+esac
+exec "$REAL_PERL" "$@"
+SH
+  cat > "$HELD/bin/sed" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "-n s/^argc=//p "*"/$HELD_ID.source")
+    if mkdir "$HELD/held" 2>/dev/null; then
+      pgid=$(ps -o pgid= -p $$ | tr -d '[:space:]')
+      identity=$(bash -c '. "$1/bin/fm-wake-lib.sh"; fm_pid_identity "$2"' _ "$HELD_ROOT" "$pgid") \
+        || exit 75
+      if [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+        && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+        && [ -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.lock" ] \
+        && kill -0 "$pgid" 2>/dev/null; then
+        printf 'alive-unclaimed\n%s\n%s\n' "$pgid" "$identity" > "$HELD/preclaim"
+      fi
+      deadline=$((SECONDS + 30))
+      while [ ! -e "$HELD/runner-release" ]; do
+        if [ "$SECONDS" -ge "$deadline" ]; then
+          : > "$HELD/safety-expired"
+          break
+        fi
+        sleep 0.05
+      done
+      [ ! -e "$HELD/runner-release" ] || : > "$HELD/runner-released"
+    fi
+    ;;
+esac
+exec "$REAL_SED" "$@"
+SH
+  chmod +x "$HELD/bin/sed" "$HELD/bin/perl"
+  began=$SECONDS
+  PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS='' \
+    "${command[@]}" > "$HELD/out" 2> "$HELD/err" || rc=$?
+  elapsed=$((SECONDS - began))
+  [ "$elapsed" -lt 10 ] \
+    || fail "$operation exceeded the default-window completion bound (${elapsed}s): $(cat "$HELD/out") $(cat "$HELD/err")"
+  [ "$elapsed" -ge 3 ] || fail "$operation refused before the unchanged default 3 s confirmation window (${elapsed}s)"
+  [ -s "$HELD/preclaim" ] || fail "fixture did not hold a live unclaimed $operation runner"
+  {
+    IFS= read -r preclaim_state
+    IFS= read -r held_pid
+    IFS= read -r held_identity
+  } < "$HELD/preclaim" || fail "fixture did not record the held $operation runner's identity"
+  [ "$preclaim_state" = alive-unclaimed ] \
+    || fail "fixture did not hold a live unclaimed $operation runner"
+  assert_absent "$HELD/runner-release" "$operation returned only after the runner was released"
+  assert_absent "$HELD/runner-released" "$operation waited for the runner's release"
+  assert_absent "$HELD/safety-expired" "$operation waited for the fixture's 30 s safety deadline"
+  kill -0 "$held_pid" 2>/dev/null || fail "$operation lost the real held runner before returning"
+  current_identity=$(bash -c '. "$1/bin/fm-wake-lib.sh"; fm_pid_identity "$2"' _ "$ROOT" "$held_pid") \
+    || fail "could not identify the held $operation runner after the consumer returned"
+  [ "$current_identity" = "$held_identity" ] \
+    || fail "$operation replaced the held runner before returning"
+  [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    || fail "$operation returned only after the held runner claimed"
+  assert_present "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.lock" "$operation returned after the held runner released its source lock"
+  assert_absent "$HELD/started" "$operation returned only after the actual source command started"
+  assert_present "$HELD/home/state/procevent/$HELD_ID.source" "$operation removed the held runner's registration"
+  assert_absent "$HELD/home/state/procevent/.$HELD_ID.launch-failed" \
+    "$operation published a launch-failure marker without the source lock"
+  [ "$(launch_failed_wake_count "$HELD/home" "$HELD_ID")" -eq 0 ] \
+    || fail "$operation published a launch-failure wake without the source lock"
+  output=$(cat "$HELD/out")
+  [ "$rc" -ne 0 ] || fail "$operation confirmed a genuinely unclaimed runner"
+  if [ "$operation" = reconcile ]; then
+    assert_contains "$output" "started=0" "reconcile confirmed a runner that remained unclaimed in its window"
+    assert_contains "$output" "uncertain=1" "reconcile lost the contended unconfirmed launch"
+    assert_contains "$output" "failed=0" "reconcile classified lock contention as a confirmed launch failure"
+  else
+    [ "$(cat "$HELD/err")" = "error: listener is not running: $HELD_ID" ] \
+      || fail "arm did not explain its unconfirmed listener: $(cat "$HELD/err")"
+    assert_not_contains "$output" "armed:" "arm advertised an unclaimed listener as ready"
+  fi
+  : > "$HELD/runner-release"
+  wait_for "$HELD/started" || fail "the retained $operation runner never ran after its delayed claim"
+  [ -f "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    || fail "the delayed $operation runner did not publish a real claim"
+  {
+    IFS= read -r claim_home
+    IFS= read -r claim_pid
+    IFS= read -r claim_token
+    IFS= read -r claim_identity
+  } < "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" \
+    || fail "the delayed $operation runner's claim is unreadable"
+  [ "$claim_home" = "$HELD/home" ] && [ "$claim_pid" = "$held_pid" ] \
+    && [ "$claim_identity" = "$held_identity" ] && [ -n "$claim_token" ] \
+    || fail "$operation did not retain the same real runner through delayed claim publication"
+  [ "$(pe "$HELD/home" list | awk -v id="$HELD_ID" '$1 == id { print $3 }')" = live ] \
+    || fail "$operation did not retain a fully verified live owner"
+  claim_before=$(cat "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim")
+  assert_contains "$(pe "$HELD/home" start "$HELD_ID")" "already owned" \
+    "the delayed $operation claim did not retain exactly one owner"
+  [ "$(cat "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim")" = "$claim_before" ] \
+    || fail "a duplicate start replaced the delayed $operation runner's claim"
+  : > "$HELD/poll-release"
+  pe "$HELD/home" retire "$HELD_ID" >/dev/null 2>&1 || true
+  pass "$operation retains bounded refusal with a $HANDOFF_FAILURE PID hand-off"
+}
+
+test_launch_pid_confirmation() {
+  local operation=$1 outcome=${2:-delayed} fixture id pgid recorded identity rc=0 began elapsed rest claim_identity
+  local other_home=${3-} other_claim='' other_root=''
+  local -a command=("$ROOT/bin/fm-procevent.sh" "$operation")
+  local REAL_SED
+  fixture="$TMP_ROOT/launch-pid-$operation-$outcome${other_home:+-foreign}"
+  id="launch-pid-$operation-$outcome"
+  mkdir -p "$fixture/bin" "$fixture/home/state"
+  REAL_SED=$(command -v sed)
+  if [ "$operation" = arm ]; then
+    printf '<h1>delayed claim</h1>\n' > "$fixture/board.html"
+    lavish_session "$fixture/board.html"
+    id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$fixture/board.html")
+    fm_test_track_procevent_home "$fixture/home"
+    cat > "$fixture/bin/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+printf started > "$LAUNCH_PID_FIXTURE/started"
+while [ ! -e "$LAUNCH_PID_FIXTURE/release" ]; do
+  [ "$SECONDS" -lt 120 ] || exit 75
+  sleep 0.05
+done
+printf 'session:\n  status: ended\n'
+SH
+    chmod +x "$fixture/bin/lavish-axi"
+    command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$fixture/board.html")
+  else
+    pe_register "$fixture/home" lavish "$id" -- \
+      "$STARTED_BLOCKER" "$fixture/started" "$BLOCKER" "$fixture/release" 'done' >/dev/null
+    [ "$operation" = reconcile ] || command+=("$id")
+  fi
+  if [ -n "$other_home" ]; then
+    other_home="$fixture/other-home"
+    other_root="$fixture/other-claims"
+    mkdir -p "$other_home/state"
+    FM_PROCEVENT_CLAIM_ROOT="$other_root" pe_register "$other_home" lavish "$id" -- \
+      "$STARTED_BLOCKER" "$fixture/other-started" "$BLOCKER" "$fixture/release" 'done' >/dev/null
+    FM_PROCEVENT_CLAIM_ROOT="$other_root" pe "$other_home" ensure-listening "$id" \
+      || fail "could not start the other home's same-named runner"
+    wait_for "$fixture/other-started" || fail "the other home's runner never started"
+    other_claim=$(cat "$other_root/$id.claim")
+  fi
+  cat > "$fixture/bin/sed" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "-n s/^argc=//p "*"/$LAUNCH_PID_ID.source")
+    pgid=$(ps -o pgid= -p $$ | tr -d '[:space:]')
+    identity=$(bash -c '. "$1/bin/fm-wake-lib.sh"; fm_pid_identity "$2"' _ "$LAUNCH_PID_ROOT" "$pgid") || exit 75
+    printf '%s\n%s\n' "$pgid" "$identity" > "$LAUNCH_PID_FIXTURE/preclaim"
+    if [ "$LAUNCH_PID_OUTCOME" = exit ]; then
+      perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'print clock_gettime(CLOCK_MONOTONIC)' \
+        > "$LAUNCH_PID_FIXTURE/exited-at"
+      kill -TERM "$pgid"
+      exit 75
+    fi
+    sleep 6
+    ;;
+esac
+exec "$REAL_SED" "$@"
+SH
+  chmod +x "$fixture/bin/sed"
+  began=$SECONDS
+  PATH="$fixture/bin:$PATH" FM_HOME="$fixture/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS='' \
+    LAUNCH_PID_FIXTURE="$fixture" LAUNCH_PID_ID="$id" LAUNCH_PID_ROOT="$ROOT" \
+    LAUNCH_PID_OUTCOME="$outcome" REAL_SED="$REAL_SED" \
+    "${command[@]}" \
+    > "$fixture/out" 2> "$fixture/err" || rc=$?
+  elapsed=$((SECONDS - began))
+  perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'print clock_gettime(CLOCK_MONOTONIC)' \
+    > "$fixture/returned-at"
+  [ -s "$fixture/preclaim" ] || fail "$operation did not reach the preclaim boundary"
+  { IFS= read -r pgid; IFS= read -r recorded; } < "$fixture/preclaim"
+  if [ "$outcome" = exit ]; then
+    [ "$rc" -ne 0 ] || fail "$operation accepted a runner that exited before claiming"
+    perl -e 'local $/; open my $in, "<", $ARGV[0] or die $!; my $exit = <$in>;
+      open my $out, "<", $ARGV[1] or die $!; my $delay = <$out> - $exit;
+      printf "exit-to-refusal: %.3fs\n", $delay; exit($delay < 3 ? 0 : 1);' \
+      "$fixture/exited-at" "$fixture/returned-at" \
+      || fail "$operation waited out the default window after the runner exited"
+    assert_absent "$fixture/started" "$operation ran the source after a preclaim exit"
+    assert_absent "$FM_PROCEVENT_CLAIM_ROOT/$id.claim" "$operation accepted a preclaim exit as ownership"
+  else
+    [ "$rc" -eq 0 ] || fail "$operation refused a healthy delayed claim: $(cat "$fixture/err") $(cat "$fixture/out")"
+    [ "$elapsed" -ge 6 ] || fail "$operation confirmed before the delayed claim"
+    wait_for "$fixture/started" || fail "$operation never started the delayed source"
+    { IFS= read -r rest; IFS= read -r identity; IFS= read -r rest; IFS= read -r claim_identity; } \
+      < "$FM_PROCEVENT_CLAIM_ROOT/$id.claim" || fail "$operation did not publish a claim"
+    [ "$identity" = "$pgid" ] && [ "$claim_identity" = "$recorded" ] \
+      || fail "$operation confirmed a different runner identity"
+    assert_contains "$(pe "$fixture/home" start "$id")" 'already owned' \
+      "$operation did not preserve one listener"
+  fi
+  for rest in "$fixture/home/state/procevent"/.launch-pid.*; do
+    [ ! -e "$rest" ] || fail "$operation left a private PID hand-off behind"
+  done
+  if [ -n "$other_home" ]; then
+    [ "$(cat "$other_root/$id.claim")" = "$other_claim" ] \
+      || fail "$operation disturbed another home's same-named runner"
+    [ "$(FM_PROCEVENT_CLAIM_ROOT="$other_root" pe "$other_home" list | awk -v id="$id" '$1 == id { print $3 }')" = live ] \
+      || fail "$operation waited on or stopped another home's live runner"
+    FM_PROCEVENT_CLAIM_ROOT="$other_root" pe "$other_home" retire "$id" >/dev/null 2>&1 \
+      || fail "could not retire the other home's fixture"
+  fi
+  : > "$fixture/release"
+  pe "$fixture/home" retire "$id" >/dev/null 2>&1 || true
+  pass "$operation follows the launched runner through $outcome startup"
+}
+
+confirm_unclaimed_at_boundary() {
+  test_launch_pid_confirmation "$1" exit
+}
+
+test_launch_pid_confirmations() {
+  local operation
+  for operation in reconcile ensure-listening arm; do
+    test_launch_pid_confirmation "$operation" delayed
+    confirm_unclaimed_at_boundary "$operation"
+  done
+  test_launch_pid_confirmation ensure-listening exit foreign
+  for operation in reconcile arm; do
+    confirm_without_pid_at_boundary "$operation" missing
+    confirm_without_pid_at_boundary "$operation" empty
+    confirm_without_pid_at_boundary "$operation" unreadable
+  done
+}
+
+if [ "${FM_TEST_ONLY:-}" = launch-pid-confirmation ]; then
+  test_launch_pid_confirmations
+  exit 0
+fi
+
 if [ "${FM_TEST_ONLY:-}" = restart-connection-failure ]; then
   test_restart_connection_failure
   exit 0
@@ -3707,6 +3988,7 @@ HOST_SEEN="$TMP_ROOT/session-route-seen"
 HOST_BIN=$(fm_fakebin "$TMP_ROOT/session-route-bin")
 cat > "$HOST_BIN/lavish-axi" <<'SH'
 #!/usr/bin/env bash
+[ "${1-}" != --version ] || { printf '0.1.79\n'; exit 0; }
 [ "${1-}" = poll ] || exit 2
 printf '%s:%s\n' "${LAVISH_AXI_HOST-unset}" "${LAVISH_AXI_PORT-unset}" >> "$HOST_SEEN"
 printf '%s\0' "$@" >> "$HOST_SEEN.argv"
@@ -5623,140 +5905,7 @@ confirm_without_unproved_reader_contention ensure-listening
 confirm_without_unproved_reader_contention reconcile stale
 confirm_without_unproved_reader_contention ensure-listening stale
 
-# Holding the source lock is not a claim: argv is read before the claim file is
-# written. Keep the same live runner unclaimed until the consumer returns, and
-# require bounded refusal without publishing failure under the runner's lock.
-confirm_unclaimed_at_boundary() {
-  local operation=$1 HELD HELD_ID HELD_ROOT=$ROOT REAL_SED rc=0 output began elapsed
-  local preclaim_state held_pid held_identity current_identity claim_home claim_pid claim_token claim_identity claim_before
-  local -a command=()
-  HELD="$TMP_ROOT/held-unclaimed-$operation"
-  mkdir -p "$HELD/bin" "$HELD/home/state"
-  REAL_SED=$(command -v sed)
-  if [ "$operation" = reconcile ]; then
-    HELD_ID=held-unclaimed-src
-    pe_register "$HELD/home" lavish "$HELD_ID" -- \
-      "$STARTED_BLOCKER" "$HELD/started" "$BLOCKER" "$HELD/poll-release" "done" >/dev/null
-    command=("$ROOT/bin/fm-procevent.sh" reconcile)
-  else
-    cat > "$HELD/bin/lavish-axi" <<'SH'
-#!/usr/bin/env bash
-printf 'started\n' > "$HELD/started"
-while [ ! -e "$HELD/poll-release" ]; do
-  [ "$SECONDS" -lt 120 ] || exit 75
-  sleep 0.05
-done
-printf 'session:\n  status: ended\n'
-SH
-    chmod +x "$HELD/bin/lavish-axi"
-    printf '<h1>held unclaimed runner</h1>\n' > "$HELD/board.html"
-    lavish_session "$HELD/board.html"
-    HELD_ID=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$HELD/board.html")
-    fm_test_track_procevent_home "$HELD/home"
-    command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$HELD/board.html")
-  fi
-  export HELD HELD_ID HELD_ROOT REAL_SED
-  cat > "$HELD/bin/sed" <<'SH'
-#!/usr/bin/env bash
-case "$*" in
-  "-n s/^argc=//p "*"/$HELD_ID.source")
-    if mkdir "$HELD/held" 2>/dev/null; then
-      pgid=$(ps -o pgid= -p $$ | tr -d '[:space:]')
-      identity=$(bash -c '. "$1/bin/fm-wake-lib.sh"; fm_pid_identity "$2"' _ "$HELD_ROOT" "$pgid") \
-        || exit 75
-      if [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
-        && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
-        && [ -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.lock" ] \
-        && kill -0 "$pgid" 2>/dev/null; then
-        printf 'alive-unclaimed\n%s\n%s\n' "$pgid" "$identity" > "$HELD/preclaim"
-      fi
-      deadline=$((SECONDS + 30))
-      while [ ! -e "$HELD/runner-release" ]; do
-        if [ "$SECONDS" -ge "$deadline" ]; then
-          : > "$HELD/safety-expired"
-          break
-        fi
-        sleep 0.05
-      done
-      [ ! -e "$HELD/runner-release" ] || : > "$HELD/runner-released"
-    fi
-    ;;
-esac
-exec "$REAL_SED" "$@"
-SH
-  chmod +x "$HELD/bin/sed"
-  began=$SECONDS
-  PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS='' \
-    "${command[@]}" > "$HELD/out" 2> "$HELD/err" || rc=$?
-  elapsed=$((SECONDS - began))
-  [ "$elapsed" -lt 10 ] \
-    || fail "$operation exceeded the default-window completion bound (${elapsed}s): $(cat "$HELD/out") $(cat "$HELD/err")"
-  [ "$elapsed" -ge 3 ] || fail "$operation refused before the unchanged default 3 s confirmation window (${elapsed}s)"
-  [ -s "$HELD/preclaim" ] || fail "fixture did not hold a live unclaimed $operation runner"
-  {
-    IFS= read -r preclaim_state
-    IFS= read -r held_pid
-    IFS= read -r held_identity
-  } < "$HELD/preclaim" || fail "fixture did not record the held $operation runner's identity"
-  [ "$preclaim_state" = alive-unclaimed ] \
-    || fail "fixture did not hold a live unclaimed $operation runner"
-  assert_absent "$HELD/runner-release" "$operation returned only after the runner was released"
-  assert_absent "$HELD/runner-released" "$operation waited for the runner's release"
-  assert_absent "$HELD/safety-expired" "$operation waited for the fixture's 30 s safety deadline"
-  kill -0 "$held_pid" 2>/dev/null || fail "$operation lost the real held runner before returning"
-  current_identity=$(bash -c '. "$1/bin/fm-wake-lib.sh"; fm_pid_identity "$2"' _ "$ROOT" "$held_pid") \
-    || fail "could not identify the held $operation runner after the consumer returned"
-  [ "$current_identity" = "$held_identity" ] \
-    || fail "$operation replaced the held runner before returning"
-  [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
-    && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
-    || fail "$operation returned only after the held runner claimed"
-  assert_present "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.lock" "$operation returned after the held runner released its source lock"
-  assert_absent "$HELD/started" "$operation returned only after the actual source command started"
-  assert_present "$HELD/home/state/procevent/$HELD_ID.source" "$operation removed the held runner's registration"
-  assert_absent "$HELD/home/state/procevent/.$HELD_ID.launch-failed" \
-    "$operation published a launch-failure marker without the source lock"
-  [ "$(launch_failed_wake_count "$HELD/home" "$HELD_ID")" -eq 0 ] \
-    || fail "$operation published a launch-failure wake without the source lock"
-  output=$(cat "$HELD/out")
-  [ "$rc" -ne 0 ] || fail "$operation confirmed a genuinely unclaimed runner"
-  if [ "$operation" = reconcile ]; then
-    assert_contains "$output" "started=0" "reconcile confirmed a runner that remained unclaimed in its window"
-    assert_contains "$output" "uncertain=1" "reconcile lost the contended unconfirmed launch"
-    assert_contains "$output" "failed=0" "reconcile classified lock contention as a confirmed launch failure"
-  else
-    [ "$(cat "$HELD/err")" = "error: listener is not running: $HELD_ID" ] \
-      || fail "arm did not explain its unconfirmed listener: $(cat "$HELD/err")"
-    assert_not_contains "$output" "armed:" "arm advertised an unclaimed listener as ready"
-  fi
-  : > "$HELD/runner-release"
-  wait_for "$HELD/started" || fail "the retained $operation runner never ran after its delayed claim"
-  [ -f "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
-    && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
-    || fail "the delayed $operation runner did not publish a real claim"
-  {
-    IFS= read -r claim_home
-    IFS= read -r claim_pid
-    IFS= read -r claim_token
-    IFS= read -r claim_identity
-  } < "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" \
-    || fail "the delayed $operation runner's claim is unreadable"
-  [ "$claim_home" = "$HELD/home" ] && [ "$claim_pid" = "$held_pid" ] \
-    && [ "$claim_identity" = "$held_identity" ] && [ -n "$claim_token" ] \
-    || fail "$operation did not retain the same real runner through delayed claim publication"
-  [ "$(pe "$HELD/home" list | awk -v id="$HELD_ID" '$1 == id { print $3 }')" = live ] \
-    || fail "$operation did not retain a fully verified live owner"
-  claim_before=$(cat "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim")
-  assert_contains "$(pe "$HELD/home" start "$HELD_ID")" "already owned" \
-    "the delayed $operation claim did not retain exactly one owner"
-  [ "$(cat "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim")" = "$claim_before" ] \
-    || fail "a duplicate start replaced the delayed $operation runner's claim"
-  : > "$HELD/poll-release"
-  pe "$HELD/home" retire "$HELD_ID" >/dev/null 2>&1 || true
-  pass "$operation refuses a live unclaimed runner at the unchanged default confirmation boundary"
-}
-confirm_unclaimed_at_boundary reconcile
-confirm_unclaimed_at_boundary arm
+test_launch_pid_confirmations
 
 # --- arm reports ready only once this registration's listener is running ----
 # The public arm path used to print armed as soon as registration was stored.
@@ -6607,5 +6756,82 @@ assert_contains "$(wake_payloads "$MISSING/home")" "procevent lavish $missing_id
   "missing session still informs its owner"
 [ "$(cat "$CONT/count")" = 6 ] || fail "a missing saved session contacted the poll backend"
 pass "a missing saved Lavish session retires through the existing adapter path"
+
+# A second poller left on a page answers every round with `waiting`, and each
+# round is announced. The wait before the next poll must grow with the streak.
+WAITBACK="$TMP_ROOT/waiting-backoff"
+mkdir -p "$WAITBACK/bin" "$WAITBACK/inbox"
+cat > "$WAITBACK/bin/sleep" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$1" >> "$WAITBACK/sleeps"
+SH
+chmod +x "$WAITBACK/bin/sleep"
+waiting_delay() {  # <result-file>
+  rm -f "$WAITBACK/sleeps"
+  PATH="$WAITBACK/bin:$PATH" "$ROOT/bin/fm-procevent-lavish.sh" relisten "$1" \
+    || fail "relisten refused ${1##*/}"
+  cat "$WAITBACK/sleeps"
+}
+for seq in 1 2 3 4 5 6 7; do
+  printf 'session:\n  status: waiting\n' > "$WAITBACK/inbox/lavish-streak.$seq.result"
+done
+assert_equals 5 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.1.result")" "first waiting round keeps the quiet delay"
+assert_equals 10 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.2.result")" "second consecutive waiting round doubles the delay"
+assert_equals 20 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.3.result")" "third consecutive waiting round doubles again"
+assert_equals 40 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.4.result")" "fourth consecutive waiting round doubles again"
+assert_equals 60 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.5.result")" "waiting delay stops at the maximum"
+assert_equals 60 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.7.result")" "a long waiting streak stays at the maximum"
+printf 'session:\n  status: browser_disconnected\n' > "$WAITBACK/inbox/lavish-streak.5.result"
+assert_equals 5 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.6.result")" "a different round ends the waiting streak"
+assert_equals 10 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.7.result")" "the streak restarts after the different round"
+assert_equals 5 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.5.result")" "a disconnected round keeps the quiet delay"
+printf 'session:\n  status: waiting\n' > "$WAITBACK/inbox/lavish-other.3.result"
+assert_equals 10 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.2.result")" "another source's rounds do not join the streak"
+pass "consecutive waiting rounds back off from the quiet delay to the maximum and reset on any other round"
+
+# Leftover poll processes: listed only when every ownership fact is proved, and
+# signalled only on request.
+ORPH="$TMP_ROOT/orphans"
+mkdir -p "$ORPH/bin" "$ORPH/home/state/procevent" "$ORPH/home/state/procevent-inbox" "$ORPH/other"
+printf '#!/usr/bin/env bash\nwhile :; do sleep 1; done\n' > "$ORPH/bin/lavish-axi"
+orph_art="$ORPH/review.html"; orph_foreign="$ORPH/other/review.html"
+printf '<h1>orphan review</h1>\n' > "$orph_art"
+printf '<h1>foreign review</h1>\n' > "$orph_foreign"
+orph_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$orph_art")
+orphans() { FM_HOME="$ORPH/home" "$ROOT/bin/fm-procevent-lavish.sh" orphans "$@"; }
+bash "$ORPH/bin/lavish-axi" poll "$orph_art" & orph_pid=$!
+bash "$ORPH/bin/lavish-axi" poll "$orph_foreign" & orph_foreign_pid=$!
+orph_line() { orphans "${@:2}" | awk -v pid="$1" '$2 == pid'; }
+for _ in $(seq 1 100); do [ -n "$(orph_line "$orph_pid")" ] && break; sleep 0.1; done
+assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (not in this home's records)" \
+  "a poll for a page this home never recorded is kept"
+orph_result="$ORPH/home/state/procevent-inbox/$orph_id.1.result"
+printf 'session:\n  status: feedback\n' > "$orph_result"
+touch -t 202001010000 "$orph_result"
+assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (started after the last claim)" \
+  "a poll newer than the source's last claim is kept"
+sleep 2
+touch "$orph_result"
+orph_pgid=$(ps -o pgid= -p "$orph_pid" | tr -d ' ')
+mkdir -p "$FM_PROCEVENT_CLAIM_ROOT"
+printf '%s\n' "$ORPH/home" "$orph_pgid" orphan-token orphan-identity '' '' active \
+  > "$FM_PROCEVENT_CLAIM_ROOT/$orph_id.claim"
+assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (owned by a claim)" \
+  "a poll inside a claimed runner's process group is kept"
+printf 'not a claim\n' > "$FM_PROCEVENT_CLAIM_ROOT/$orph_id.claim"
+assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (claim cannot be read)" \
+  "an unreadable claim keeps the poll"
+rm -f "$FM_PROCEVENT_CLAIM_ROOT/$orph_id.claim"
+assert_contains "$(orph_line "$orph_pid")" "orphan: $orph_pid $orph_id " \
+  "an unowned poll older than the last claim is listed"
+kill -0 "$orph_pid" 2>/dev/null || fail "listing orphans signalled a process"
+assert_contains "$(orph_line "$orph_pid" --kill)" "killed: $orph_pid $orph_id " \
+  "the explicit flag signals the listed orphan"
+for _ in $(seq 1 100); do kill -0 "$orph_pid" 2>/dev/null || break; sleep 0.1; done
+kill -0 "$orph_pid" 2>/dev/null && fail "the listed orphan survived the explicit kill"
+kill -0 "$orph_foreign_pid" 2>/dev/null || fail "the kill reached a poll outside this home's records"
+kill "$orph_foreign_pid" 2>/dev/null || true
+wait "$orph_pid" "$orph_foreign_pid" 2>/dev/null || true
+pass "orphaned Lavish polls are listed by default and signalled only on request, within this home's proved records"
 
 printf '\nall procevent tests passed\n'

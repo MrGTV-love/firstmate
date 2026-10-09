@@ -12,6 +12,7 @@
 #   fm-procevent-lavish.sh source-id <artifact.html>
 #   fm-procevent-lavish.sh retire <artifact.html>
 #   fm-procevent-lavish.sh sweep [--dry-run]
+#   fm-procevent-lavish.sh orphans [--kill]
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
 #   fm-procevent-lavish.sh deliver-reply poll <artifact.html> --agent-reply-file <path>
 #   fm-procevent-lavish.sh check <artifact.html>
@@ -37,6 +38,20 @@
 #            Captain-supplied body lines are visibly prefixed so they cannot
 #            forge structural labels. Empty message and annotation sections
 #            are reported explicitly.
+# orphans    List leftover Lavish poll processes that no listener owns, one
+#            `orphan:` or `kept:` line per process plus an `orphans:` total.
+#            Nothing is signalled without --kill, which sends TERM to each listed
+#            orphan and prints `killed:` for it. A process is an orphan only when
+#            all of these are proved: its command is this adapter's `poll` or the
+#            native `lavish-axi poll` for an artifact whose source id this home
+#            has a registration, launch stamp or captured result for; no live
+#            claim's process group contains it; and it started before the latest
+#            of that source's claim, launch stamp and captured results. Anything
+#            unproved - an unresolvable artifact, another home's source, a busy
+#            source lock, an uncertain claim, no claim-time record, or a process
+#            whose identity changed before the signal - is kept with its reason.
+#            This is a one-time cleanup for polls orphaned before runners
+#            drained their own process group; it never retires a registration.
 # sweep      Retire this home's Lavish listeners whose boards are finished, and
 #            print one `retired:`, `kept:` or (with --dry-run) `would-retire:`
 #            line per registration plus a `sweep:` total. Choice answers do not
@@ -113,7 +128,9 @@
 #            failures without retrying them forever. The optional result file
 #            is the runner's unhandled-capture continuation check; without one,
 #            it is an empty or handled round. Quiet rounds wait poll_retry_delay
-#            seconds before another poll. Worker-owned feedback still waits for
+#            seconds before another poll, and consecutive captured waiting
+#            rounds double that wait up to POLL_RETRY_DELAY_MAX seconds
+#            (waiting_retry_delay). Worker-owned feedback still waits for
 #            its owner's acknowledgement.
 # silent     Exit 0 when the captured result is a routine no-op the runner should
 #            record and never announce; any other exit publishes the wake. This
@@ -530,8 +547,7 @@ cmd_arm() {
 cmd_deliver_reply() {
   [ "$#" -eq 4 ] && [ "$1" = poll ] && [ "$3" = --agent-reply-file ] || usage
   lavish_reply_compatible || exit 3
-  apply_session_host "$2" \
-    || die "cannot resolve the board server from its Lavish session: $2"
+  apply_session_host "$2" || die "cannot resolve the board server from its Lavish session: $2"
   post_lavish_reply "$2" "$4"
 }
 
@@ -631,6 +647,29 @@ poll_retry_delay() {
   esac
   [ "$delay" -ge "$POLL_RETRY_DELAY_MIN" ] && [ "$delay" -le "$POLL_RETRY_DELAY_MAX" ] \
     || die "FM_LAVISH_POLL_RETRY_DELAY must be whole seconds from $POLL_RETRY_DELAY_MIN to $POLL_RETRY_DELAY_MAX: $delay"
+  printf '%s\n' "$delay"
+}
+
+# Delay before polling again after a captured `waiting` round. A second poller
+# that stays on the page answers every round with `waiting`, and each one is
+# announced, so the delay doubles with each consecutive captured `waiting`
+# round, from the quiet-retry delay up to POLL_RETRY_DELAY_MAX. The streak is
+# read from the durable captures themselves, so it survives a runner restart
+# and ends at the first round that was anything else.
+waiting_retry_delay() {  # <result-file> <base-seconds>
+  local result=$1 delay=$2 dir id seq previous
+  dir=$(dirname -- "$result")
+  id=$(fm_procevent_result_source_id "$result")
+  seq=$(fm_procevent_result_sequence "$result")
+  case "$seq" in ''|*[!0-9]*) printf '%s\n' "$delay"; return 0 ;; esac
+  seq=$((10#$seq))
+  while [ "$delay" -lt "$POLL_RETRY_DELAY_MAX" ] && [ "$seq" -gt 1 ]; do
+    seq=$((seq - 1))
+    previous="$dir/$id.$seq.result"
+    [ -f "$previous" ] && [ "$(cmd_classify "$previous" 2>/dev/null)" = waiting ] || break
+    delay=$((delay * 2))
+  done
+  [ "$delay" -le "$POLL_RETRY_DELAY_MAX" ] || delay=$POLL_RETRY_DELAY_MAX
   printf '%s\n' "$delay"
 }
 
@@ -1118,6 +1157,107 @@ cmd_read() {
   ' "$file" "$lifecycle" "$session_ended"
 }
 
+# --- orphans: leftover poll processes no listener owns -----------------------
+# The header owns the eligibility contract. Prints "pid<TAB>pgid<TAB>start-epoch
+# <TAB>artifact" for every process whose command is a Lavish poll.
+orphan_poll_processes() {
+  ps -axo pid=,pgid=,etime=,command= 2>/dev/null | perl -e '
+    use strict; use warnings;
+    my $now = time;
+    while (my $line = <STDIN>) {
+      chomp $line;
+      $line =~ /\A\s*(\d+)\s+(\d+)\s+(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)\s+(.*)\z/ or next;
+      my ($pid, $pgid, $d, $h, $m, $sec, $command) = ($1, $2, $3 // 0, $4 // 0, $5, $6, $7);
+      $command =~ m{(?:\A|[ /])(?:lavish-axi|fm-procevent-lavish\.sh) poll (.+?)(?: --agent-reply-file .+)?\z} or next;
+      my $artifact = $1;
+      next if $artifact =~ /\t/;
+      print join("\t", $pid, $pgid, $now - ((($d * 24 + $h) * 60 + $m) * 60 + $sec), $artifact), "\n";
+    }
+  '
+}
+
+# Latest mtime among this home's claim-time records for one source, or nothing.
+orphan_last_claim() {  # <state-dir> <source-id>
+  local reg inbox
+  reg=$(fm_procevent_registry_dir "$1")
+  inbox=$(fm_procevent_inbox_dir "$1")
+  perl -e '
+    my $latest;
+    for my $path (@ARGV) {
+      next if -l $path || !-f _;
+      my $mtime = (stat _)[9];
+      $latest = $mtime if !defined $latest || $mtime > $latest;
+    }
+    print "$latest\n" if defined $latest;
+  ' "$(fm_procevent_claim_path "$2")" "$reg/$2".*.last-launch "$inbox/$2".*.result 2>/dev/null
+}
+
+cmd_orphans() {
+  local kill_mode=0 state reg inbox pid pgid started artifact id identity last reason
+  local found=0 killed=0 kept=0 rec known
+  case "${1-}" in
+    '') ;;
+    --kill) kill_mode=1; shift ;;
+    *) usage ;;
+  esac
+  [ "$#" -eq 0 ] || usage
+  state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
+  reg=$(fm_procevent_registry_dir "$state")
+  inbox=$(fm_procevent_inbox_dir "$state")
+  while IFS=$'\t' read -r pid pgid started artifact; do
+    [ -n "$pid" ] && [ "$pid" != "$$" ] || continue
+    identity=$(fm_pid_identity "$pid" 2>/dev/null) || continue
+    reason=''
+    if ! id=$(cmd_source_id "$artifact" 2>/dev/null); then
+      reason='artifact cannot be resolved'
+    else
+      known=0
+      for rec in "$reg/$id.source" "$reg/$id".*.last-launch "$inbox/$id".*.result; do
+        [ -f "$rec" ] && [ ! -L "$rec" ] && { known=1; break; }
+      done
+      if [ "$known" -eq 0 ]; then
+        reason='not in this home'"'"'s records'
+      elif ! fm_procevent_source_lock_try_acquire "$id" 2>/dev/null; then
+        reason='source is busy'
+      else
+        if fm_procevent_claim_load_locked "$id" 2>/dev/null; then
+          if [ "$FM_PROCEVENT_CLAIM_PID" = "$pgid" ] || [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ]; then
+            reason='owned by a claim'
+          fi
+        elif [ -e "$(fm_procevent_claim_path "$id")" ]; then
+          reason='claim cannot be read'
+        fi
+        if [ -z "$reason" ]; then
+          last=$(orphan_last_claim "$state" "$id")
+          if [ -z "$last" ]; then
+            reason='no claim-time record'
+          elif [ "$started" -ge "$last" ]; then
+            reason='started after the last claim'
+          fi
+        fi
+        if [ -z "$reason" ]; then
+          found=$((found + 1))
+          if [ "$kill_mode" -eq 0 ]; then
+            printf 'orphan: %s %s started=%s last-claim=%s %s\n' "$pid" "$id" "$started" "$last" "$artifact"
+          elif [ "$(fm_pid_identity "$pid" 2>/dev/null || true)" = "$identity" ] && kill -TERM "$pid" 2>/dev/null; then
+            killed=$((killed + 1))
+            printf 'killed: %s %s started=%s last-claim=%s %s\n' "$pid" "$id" "$started" "$last" "$artifact"
+          else
+            found=$((found - 1))
+            reason='process changed before the signal'
+          fi
+        fi
+        fm_procevent_source_lock_release "$id" 2>/dev/null || true
+      fi
+    fi
+    if [ -n "$reason" ]; then
+      kept=$((kept + 1))
+      printf 'kept: %s (%s) %s\n' "$pid" "$reason" "$artifact"
+    fi
+  done < <(orphan_poll_processes)
+  printf 'orphans: found=%s killed=%s kept=%s\n' "$found" "$killed" "$kept"
+}
+
 # --- sweep: retire listeners whose boards are finished -----------------------
 # The header owns the rules. This section only reads facts and applies them; the
 # generic `retire` in bin/fm-procevent.sh stays the one place a registration and
@@ -1399,6 +1539,7 @@ case "${1-}" in
   arm)       shift; cmd_arm "$@" ;;
   retire)    shift; cmd_retire "$@" ;;
   sweep)     shift; cmd_sweep "$@" ;;
+  orphans)   shift; cmd_orphans "$@" ;;
   poll)      shift; cmd_poll "$@" ;;
   deliver-reply) shift; cmd_deliver_reply "$@" ;;
   check)     shift; cmd_check "$@" ;;
@@ -1411,11 +1552,13 @@ case "${1-}" in
     if [ -n "${1-}" ] && [ -s "$1" ]; then
       case "$(cmd_classify "$1")" in
         feedback) exit 0 ;;
-        disconnected|waiting) ;;
+        disconnected) ;;
+        waiting) waiting_result=$1 ;;
         *) exit 1 ;;
       esac
     fi
     delay=$(poll_retry_delay) || exit 1
+    [ -z "${waiting_result-}" ] || delay=$(waiting_retry_delay "$waiting_result" "$delay")
     sleep "$delay"
     ;;
   silent)    shift; cmd_silent "$@" ;;

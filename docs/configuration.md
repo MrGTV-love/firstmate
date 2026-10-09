@@ -2434,26 +2434,21 @@ Passing this syntax-only check does not prove that handlers run, cancel native s
 **Open the Lavish artifact first**
 
 Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; reply and poll attempts derive their host and port from that session and refuse invalid session evidence before posting or consuming a staged worker reply.
-A valid session store with no saved session for the board refuses a reply attempt, while a poll attempt instead produces the adapter's terminal `missing` result so its registration retires through the normal path.
-Lavish rewrites its session store in place, so a poll attempt that reads an undecodable snapshot takes the adapter's bounded quiet retry rather than being treated as a missing session; the adapter header owns the routing and retry details.
+A valid session store with no saved session for the board instead produces the poll adapter's terminal `missing` result so its registration retires through the normal path; synchronous reply delivery refuses the missing session without consuming the staged reply.
+Lavish rewrites its session store in place, so an undecodable snapshot takes the poll adapter's bounded quiet retry rather than being treated as a missing session; the adapter header owns the routing and retry details.
 
 **Retry interrupted Lavish polls**
 
 The [`bin/fm-procevent-lavish.sh` header](../bin/fm-procevent-lavish.sh) owns the exact transient response forms, completion-relative backoff, retry bound, delay override, and outputless killed-poll continuation.
 Real feedback, terminal responses, unknown errors or help text, and exhausted interruptions remain captured and announced rather than being suppressed.
 
-**Retire finished Lavish listeners**
-
-Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
-For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
-The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
-
 **Keep open Lavish reviews listening**
 
 An ordinary firstmate-owned review armed through the shipped Lavish adapter keeps the same runner and exclusive claim after feedback, browser disconnection, a spurious `waiting` response, or an empty poll return.
 It does not wait for watcher reconciliation or for firstmate to handle an earlier answer before collecting the next one.
 Disconnected and empty rounds wait the adapter's retry delay before listening again, so an immediately returning source cannot spin.
-Only an ended or missing session retires from its own poll result; an open session is never retired merely because its browser disconnected or its registration is old, and finished open boards leave through the listener retirement above.
+Consecutive captured `waiting` rounds double that delay up to its 60-second maximum, so a second poller left on the page cannot produce an unbounded stream of announcements.
+Only an ended or missing session retires automatically; an open session is never retired merely because its browser disconnected or its registration is old.
 Unknown poll failures still reach the handler and release the listener rather than retrying indefinitely.
 The runner's existing owner lease and source launch pacing remain in force.
 An arbitrary source command registered with the Lavish classifier still completes after one poll; the `bin/fm-procevent.sh` header owns the tracked-adapter identity requirement for continuation.
@@ -2472,6 +2467,13 @@ Worker-owned rounds, away homes, inherited source-runner contexts, Cursor compat
 A reply arriving while Claude is reasoning or executing one long tool is delivered at the next tool completion, not asynchronously inside that operation.
 Other primary integrations retain their native supervision delivery paths.
 
+**Retire finished Lavish listeners**
+
+Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
+Use `bin/fm-procevent-lavish.sh orphans` to list leftover poll processes that no listener owns; the same header owns its eligibility proof and the explicit `--kill` flag.
+For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
+The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
+
 ### Crew-hosted Lavish review boards
 
 **Arm and confirm a listener**
@@ -2481,7 +2483,7 @@ After opening the artifact as required above, the worker arms it with `bin/fm-pr
 
 `arm` prints `armed` only after the process-event owner confirms this registration generation's listener is running, and otherwise returns nonzero without that line.
 
-- The confirmation is the same live claim or launch-stamp evidence `reconcile` already uses, bounded by `FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS`; a failed confirmation returns without waiting on cleanup and retains the registration for a delayed runner, a later `reconcile`, or guarded retirement.
+- Confirmation follows **Confirm detached launches** below; a failed confirmation retains the registration and does not wait on cleanup.
 - An earlier registration's listener that releases the board inside the confirm window lets the new registration start, and `arm` then reports `armed` as usual.
 - When a live listener from an earlier registration of the same board still holds it when the window ends, `arm` exits zero with `still-listening` instead of `armed`, because that earlier listener keeps serving the board.
   Replacement-registration adoption follows the same-command relisten rule in the `bin/fm-procevent.sh` header; changing the listener command requires retirement and a fresh arm.
@@ -2610,9 +2612,9 @@ Under the default ordering, this happens after the initial `check` publication.
 **Apply built-in results automatically**
 
 Applying a captured result through code is a built-in adapter seam, and some built-in results carry no judgement at all: they must simply be applied idempotently to this home's own durable state.
-Leaving that to a handler means it can silently not happen, so the runner calls `bin/fm-procevent-<adapter>.sh autohandle <source-id> <sequence> <result-file>` and lets the built-in adapter apply and acknowledge its own result, using the adapter-controlled announcement order below.
+Leaving that to a handler means it can silently not happen, so after capture the runner calls `bin/fm-procevent-<adapter>.sh autohandle <source-id> <sequence> <result-file>` according to the announcement ordering below and lets the built-in adapter apply and acknowledge its own result.
 
-Terminal retirement follows application and targets only the registration generation captured by the claim, so a successor registered by the handling adapter survives.
+Terminal retirement follows automatic application and targets only the registration generation held by the runner's claim, preserving any replacement the handling adapter registered for its next round.
 Exit 0 means the adapter fully applied and acknowledged the result; a missing command, an error, or any other exit is not a capture failure but leaves the result unacknowledged and therefore still eligible for re-announcement, so a handler receives it exactly as before and an adapter with no such command needs no change.
 
 **Adapter-controlled announcement order**
@@ -2784,8 +2786,14 @@ The generation's first launch is immediate, later launches share its monotonic p
 
 **Confirm detached launches**
 
-`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) bounds the polling window for `reconcile` to observe a live claim or an advanced launch stamp.
-The whole-second clock adds at most one second to that polling window, followed by one final evidence read; local command execution time is not a wall-clock startup guarantee.
+`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) remains the polling window when no readable launcher PID hand-off is available.
+The whole-second clock adds at most one second to that window, followed by one final evidence read; local command execution time is not a wall-clock startup guarantee.
+For a fresh detached launch, the caller creates a private mode-0600 single-use file under its own process-event state directory.
+The launcher writes the forked runner PID immediately, and confirmation reads its full `fm_pid_identity` and removes the file; no persistent runner record or claim-protocol change is introduced.
+While that exact runner remains alive and unclaimed, confirmation continues beyond the normal window.
+Exit or identity change before a claim refuses immediately; a live but still-unclaimed runner at the fixed 60-second safety bound (or the configured window, if longer) is reported distinctly as `runner is alive but unclaimed after startup safety bound`.
+The PID alone never confirms readiness, and another home's same-named runner is not substituted for the launched PID.
+A missing, empty or unreadable hand-off retains the original window behavior.
 
 - Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports an unconfirmed launch as `failed=` with a non-zero exit only if that registration still exists and remains launchable when the failure is committed.
 - Both signals are durable evidence a runner claimed: ownership is the only evidence a runner still blocked on its source ever shows, and the stamp - written after the claim and before the source command runs, and removed only by registration replacement - covers a runner that claimed, ran and exited between two polls.
@@ -2793,10 +2801,12 @@ The whole-second clock adds at most one second to that polling window, followed 
   An absent claim or an unlocked snapshot whose full PID identity is not live leaves ownership unproved without taking the publisher's lock, so the confirmation reader does not delay the runner replacing an old stale claim.
   A live snapshot is only a hint to try that lock without waiting; readiness still requires a fresh locked read validating the full claim tuple and the snapshotted registration generation.
   Neither record presence nor the unlocked hint proves readiness.
-  A runner takes that lock before it writes its claim, so a held lock is not evidence of ownership and cannot extend the confirmation window; a still-unclaimed runner remains unconfirmed.
+  A runner takes that lock before it writes its claim, so a held lock alone is not evidence of ownership or grounds for extending the fallback window.
+  Only the handed-off runner's live full identity extends waiting, never readiness.
   Reconcile finalization also tries the lock without waiting: an already-confirmed launch remains `started=`, while an unconfirmed launch under contention returns nonzero with `uncertain=` and defers failure-marker and wake publication until a later locked observation.
-- A healthy launch can therefore confirm on the first poll; an unconfirmed launch may have died before claiming or merely be too slow to claim inside the window, and confirmation cannot tell those apart.
-- All of a reconcile pass's launches share one confirmation window rather than paying a separate window for each source.
+- A healthy launch can confirm on the first poll.
+  With a PID hand-off, a slow live runner is distinguished from a runner that exits before claiming; without one, these remain indistinguishable within the fallback window.
+- All of a reconcile pass's launches share the fallback window and startup safety bound rather than paying a separate wait for each source.
 - A retired or replaced registration, or an unconfirmed launch whose claim has become uncertain, stranded or retirement-pending, is counted as `uncertain=` instead of publishing an obsolete launch failure.
 
 **Keep confirmation below the watcher interval**
@@ -2818,7 +2828,7 @@ Failure commits recheck the registration identity, claim and launch stamp under 
 A later fresh failure gets a fresh key, because the watcher never re-surfaces a key it has already surfaced.
 
 - The announcement changes nothing about the launch: `reconcile` keeps relaunching the source on each eligible reconcile pass exactly as before, and nothing is retried differently, throttled, or recovered from that signal.
-- The wake reports only the observed failure: the launch did not prove that it took the claim within the window.
+- The wake reports only the observed failure: the launch did not prove that it took the claim before confirmation ended.
 - If the failure persists, inspect the source command and adapter binary named in the registration.
   The wake names both, along with the attached `bin/fm-procevent.sh start <source-id>` command that reproduces the refusal on stderr.
   The detached launch discards that output.
@@ -2952,7 +2962,7 @@ FM_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; defaul
 FM_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400
 FM_PROCEVENT_OWNER_CHECK_SECONDS=15     # a runner guard's detection interval, read twice per interval; 1..3600
 FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1     # minimum interval between launches of one registration generation's source command; 1..3600
-FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=3   # how long reconcile waits for the runners it started to prove they are running; 1..600, keep well below FM_POLL
+FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=3   # fallback window; see "Confirm detached launches" above
 FM_WHEN_OUTPUT_TAIL_BYTES=8192          # bound on the command-output tail inside one condition->action outcome document
 FM_CODEX_WATCH_CHECKPOINT=180   # seconds per foreground watcher checkpoint in Codex primary supervision
 FM_CODEX_WATCH_CHECKPOINT_AWAY=3600  # requested away checkpoint bound on a home that runs the supervision host; longer of this and attended bound, capped at 27000
