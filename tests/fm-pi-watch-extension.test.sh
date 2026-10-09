@@ -75,11 +75,7 @@ export const Type = {
 JS
 }
 
-# A replacement shutdown that no successor session_start follows is not a dead
-# end: after the successor grace the extension binds a fresh generation and
-# arms exactly once; a real session_start inside the grace arms nothing twice;
-# and a terminal quit never heals and keeps the shutting-down refusal.
-test_pi_replacement_without_successor_heals_once() {
+test_pi_missing_successor_reports_without_rearming() {
   local repo home plugin out status
   repo="$TMP_ROOT/pi-heal-root"
   home="$TMP_ROOT/pi-heal-home"
@@ -102,12 +98,13 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 const home = process.env.FM_HOME;
-const handlers = new Map(); let tool = null;
+const handlers = new Map(); let tool = null; let command = null;
+let deliveryAttempts = 0;
 const pi = {
   on(event, handler) { handlers.set(event, handler); },
-  registerCommand() {},
+  registerCommand(_name, candidate) { command = candidate; },
   registerTool(candidate) { if (candidate.name === "fm_watch_arm_pi") tool = candidate; },
-  sendUserMessage: async () => {},
+  sendUserMessage: async () => { deliveryAttempts++; throw new Error("Extension runtime has been invalidated"); },
   events: { on() {}, emit() {} },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -120,34 +117,41 @@ await handlers.get("session_start")({ type: "session_start", reason: "startup" }
 for (let i = 0; i < 60 && arms() < 1; i += 1) await sleep(50);
 if (arms() !== 1) throw new Error(`startup should arm once, saw ${arms()}`);
 
-await handlers.get("session_shutdown")({ type: "session_shutdown", reason: "new" }, {});
-await sleep(150);
-if (arms() !== 1) throw new Error(`a heal fired before the successor grace: ${arms()} arms`);
-for (let i = 0; i < 60 && arms() < 2; i += 1) await sleep(50);
-if (arms() !== 2) throw new Error(`a replacement with no successor was not healed: ${arms()} arms`);
-await sleep(900);
-if (arms() !== 2) throw new Error(`the self-heal armed more than once: ${arms()} arms`);
-const healed = await tool.execute("after-heal", {}, undefined, undefined, {});
-if (!healed.details?.ok || !String(healed.details.message).includes("unchanged")) {
-  throw new Error(`the healed generation does not own its arm: ${JSON.stringify(healed.details)}`);
+let expected = 1;
+for (const reason of ["reload", "new", "resume", "fork"]) {
+  const before = readFileSync(`${home}/state/.pi-watch-extension-loaded`, "utf8");
+  const expiredBefore = lifecycle().split("\n").filter(row => row.includes("event=bound-expired") && row.includes("waited-on=session_start")).length;
+  await handlers.get("session_shutdown")({ reason }, {});
+  const handoff = readFileSync(`${home}/state/.pi-watch-extension-loaded`, "utf8");
+  if (!handoff.includes("phase=handoff")) throw new Error(`${reason} did not retire active ownership`);
+  await sleep(900);
+  if (arms() !== expected) throw new Error(`${reason} rearmed the invalidated runtime`);
+  const refused = await tool.execute();
+  if (refused.details?.ok !== false || !refused.details.message.includes("shutting down")) throw new Error(`${reason} tool revived the retired runtime`);
+  let notification;
+  await command.handler("", { ui: { notify(message, level) { notification = { message, level }; } } });
+  if (notification?.level !== "warning" || !notification.message.includes("shutting down")) throw new Error(`${reason} command claimed successful repair`);
+  if (readFileSync(`${home}/state/.pi-watch-extension-loaded`, "utf8") !== handoff) throw new Error(`${reason} published false active ownership`);
+  const expired = lifecycle().split("\n").filter(row => row.includes("event=bound-expired") && row.includes("waited-on=session_start"));
+  if (expired.length !== expiredBefore + 1) throw new Error(`${reason} must record exactly one expiry`);
+  for (const field of ["waiter=pi-watch-extension", "bound=400ms", "actual=", "outcome=successor-missing"]) {
+    if (!expired.at(-1).includes(field)) throw new Error(`expiry lacks ${field}`);
+  }
+  if (!lifecycle().includes("event=successor-missing")) throw new Error(`${reason} missing diagnostic`);
+  if (deliveryAttempts !== 0) throw new Error(`${reason} used the invalidated delivery API`);
+  await handlers.get("session_start")({}, {});
+  for (let i = 0; i < 60 && arms() < expected + 1; i++) await sleep(50);
+  expected++;
+  await sleep(900);
+  if (arms() !== expected) throw new Error(`${reason} successor must arm exactly once`);
+  const active = readFileSync(`${home}/state/.pi-watch-extension-loaded`, "utf8");
+  if (active === before || !active.includes("phase=active")) throw new Error(`${reason} successor did not publish fresh ownership`);
 }
-for (const needle of ["event=bound-expired", "waiter=pi-watch-extension", "waited-on=session_start", "bound=400ms", "outcome=self-heal", "cause=self-heal"]) {
-  if (!lifecycle().includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${lifecycle()}`);
-}
-
-await handlers.get("session_shutdown")({ type: "session_shutdown", reason: "resume" }, {});
-await handlers.get("session_start")({ type: "session_start", reason: "resume" }, {});
-for (let i = 0; i < 60 && arms() < 3; i += 1) await sleep(50);
+await handlers.get("session_shutdown")({ reason: "quit" }, {});
 await sleep(900);
-if (arms() !== 3) throw new Error(`a successor session_start must arm exactly once with no heal: ${arms()} arms`);
-
-await handlers.get("session_shutdown")({ type: "session_shutdown", reason: "quit" }, {});
-await sleep(900);
-if (arms() !== 3) throw new Error(`a terminal quit was healed: ${arms()} arms`);
-const quitArm = await tool.execute("after-quit", {}, undefined, undefined, {});
-if (quitArm.details?.ok !== false || quitArm.details.message !== "watcher: not armed - Pi session is shutting down") {
-  throw new Error(`terminal quit must keep the shutting-down refusal: ${JSON.stringify(quitArm.details)}`);
-}
+if (arms() !== expected) throw new Error("terminal quit was revived");
+const quitArm = await tool.execute();
+if (quitArm.details?.ok !== false || !quitArm.details.message.includes("shutting down")) throw new Error("terminal quit lost its refusal");
 const rebound = (module) => {
   const handlers = new Map(); const box = {};
   module.default({
@@ -168,39 +172,41 @@ const successorModule = await import(`${pathToFileURL(process.env.PLUGIN).href}?
 rebound(successorModule);
 const terminalAgain = rebound(successorModule);
 await sleep(900);
-if (arms() !== 3) throw new Error("factory rebinding revived a terminal quit");
+if (arms() !== expected) throw new Error("factory rebinding revived a terminal quit");
 const terminalArm = await terminalAgain.box.tool.execute();
 if (terminalArm.details.ok || !terminalArm.details.message.includes("shutting down")) throw new Error("repeated factory binding revived terminal ownership");
 await terminalAgain.handlers.get("session_start")({}, {});
-await waitForArms(4);
+await waitForArms(++expected);
 let owner = terminalAgain;
 for (const reason of ["reload", "new", "resume", "fork"]) {
   const shutdown = owner.handlers.get("session_shutdown")({ reason }, {});
   const successor = rebound(successorModule);
   await shutdown;
-  await waitForArms(armsExpected(reason));
+  await sleep(900);
+  if (arms() !== expected) throw new Error(`factory ${reason} claimed recovery before session start`);
+  await successor.handlers.get("session_start")({}, {});
+  await waitForArms(++expected);
   const owned = await successor.box.tool.execute();
   if (!owned.details.ok || !owned.details.message.includes("unchanged")) throw new Error(`factory ${reason} successor did not own automatic recovery`);
   const stale = await owner.box.tool.execute();
   if (stale.details.ok || !stale.details.message.includes("shutting down")) throw new Error("superseded Pi factory did not preserve the stale refusal");
   owner = successor;
 }
-function armsExpected(reason) { return 5 + ["reload", "new", "resume", "fork"].indexOf(reason); }
 await owner.handlers.get("session_shutdown")({ reason: "new" }, {});
 const started = rebound(successorModule);
 await started.handlers.get("session_start")({}, {});
-await waitForArms(9);
+await waitForArms(++expected);
 await started.handlers.get("session_shutdown")({ reason: "resume" }, {});
 const repaired = rebound(successorModule);
 await repaired.box.tool.execute();
-await waitForArms(10);
+await waitForArms(++expected);
 await repaired.handlers.get("session_shutdown")({ reason: "fork" }, {});
 const foreignLock = spawn("sleep", ["30"], { stdio: "ignore" });
 process.once("exit", () => foreignLock.kill());
 writeFileSync(`${home}/state/.lock`, `${foreignLock.pid}\n`);
 const foreign = rebound(successorModule);
 await sleep(900);
-if (arms() !== 10) throw new Error("factory recovery armed under a foreign lock");
+if (arms() !== expected) throw new Error("factory recovery armed under a foreign lock");
 const refused = await foreign.box.tool.execute();
 if (refused.details.ok || !refused.details.message.includes("read-only")) throw new Error("foreign factory recovery did not preserve lock ownership");
 foreignLock.kill();
@@ -208,14 +214,14 @@ writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 await foreign.handlers.get("session_shutdown")({ reason: "quit" }, {});
 rebound(successorModule);
 await sleep(900);
-if (arms() !== 10) throw new Error("factory recovery revived a terminal quit after replacement");
+if (arms() !== expected) throw new Error("factory recovery revived a terminal quit after replacement");
 process.exit(0);
 EOF
 )
   status=$?
-  [ "$status" -eq 0 ] || fail "Pi replacement self-heal (exit $status): $out"
-  [ -z "$out" ] || fail "Pi replacement self-heal test printed output: $out"
-  pass "Pi replacement with no successor heals once; a real successor never double-arms; quit never heals"
+  [ "$status" -eq 0 ] || fail "Pi missing-successor diagnostics (exit $status): $out"
+  [ -z "$out" ] || fail "Pi missing-successor test printed output: $out"
+  pass "Pi missing successors log one expiry without reviving retired delivery; live successors arm once"
 }
 
 test_pi_owner_publication_failure_does_not_poison_retirement() {
@@ -291,7 +297,7 @@ await owner.handlers.get("session_start")({}, {});
 await waitForArms(1);
 let expected = 1;
 for (const operation of ["write", "rename"]) {
-  for (const recovery of ["session", "arm", "timer", "factory-stopped", "factory-live"]) {
+  for (const recovery of ["session", "factory-arm", "expiry", "factory-stopped", "factory-live"]) {
     const predecessor = owner;
     const before = readFileSync(marker, "utf8");
     const predecessorPid = Number(readFileSync(process.env.FM_CHILD_PID_FILE, "utf8").trim());
@@ -311,11 +317,20 @@ for (const operation of ["write", "rename"]) {
       throw new Error(`publication failure diagnostic was lost: ${lifecycle()}`);
     }
     if (recovery === "session") await owner.handlers.get("session_start")({}, {});
-    if (recovery === "arm") {
+    if (recovery === "factory-arm") {
+      owner = bind();
       const repair = await owner.box.tool.execute();
-      if (!repair.details.ok) throw new Error(`arm recovery rejected: ${JSON.stringify(repair.details)}`);
+      if (!repair.details.ok) throw new Error(`successor arm recovery rejected: ${JSON.stringify(repair.details)}`);
+    }
+    if (recovery === "expiry") {
+      await sleep(900);
+      if (rows().length !== expected) throw new Error("expiry revived a retired runtime after publication failure");
+      const refused = await owner.box.tool.execute();
+      if (refused.details.ok) throw new Error("retired runtime allowed repair after publication failure");
+      await owner.handlers.get("session_start")({}, {});
     }
     if (recovery === "factory-stopped") owner = bind();
+    if (recovery === "factory-stopped" || recovery === "factory-live") await owner.handlers.get("session_start")({}, {});
     await waitForArms(++expected);
     const after = readFileSync(marker, "utf8");
     if (after === before || !after.includes("phase=active")) throw new Error(`${operation}/${recovery} did not publish a fresh active generation`);
@@ -327,23 +342,6 @@ for (const operation of ["write", "rename"]) {
     }
     if (unhandled.length) throw new Error(`unhandled retirement rejection: ${unhandled.join("; ")}`);
   }
-}
-for (const operation of ["write", "rename"]) {
-  await owner.handlers.get("session_shutdown")({ reason: "reload" }, {});
-  const previousFaults = injected;
-  const previousFailures = sent.length;
-  fault = operation;
-  for (let i = 0; i < 100 && injected === previousFaults; i++) await sleep(20);
-  await sleep(100);
-  if (injected !== previousFaults + 1 || rows().length !== expected) throw new Error(`timed ${operation} failure did not stop activation`);
-  const failures = sent.slice(previousFailures);
-  if (failures.length !== 1 || !failures[0].includes(`transient owner ${operation} failure`)) throw new Error("timed activation lost its failure wake");
-  if (unhandled.length) throw new Error(`unhandled activation rejection: ${unhandled.join("; ")}`);
-  const beforeRepair = lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length;
-  const repair = await owner.box.tool.execute();
-  if (!repair.details.ok) throw new Error("timed activation failure poisoned arm repair");
-  if (lifecycle().split("\n").filter((line) => line.includes("event=generation-activate") && line.includes("cause=arm-call")).length !== beforeRepair + 1) throw new Error("failed activation consumed the recovery obligation");
-  await waitForArms(++expected);
 }
 await owner.handlers.get("session_shutdown")({ reason: "quit" }, {});
 await sleep(900);
@@ -5583,7 +5581,7 @@ test_pi_lifecycle_deadline_diagnostics() {
 
 test_pi_lifecycle_deadline_diagnostics
 test_pi_extension_reports_external_healthy_watcher
-test_pi_replacement_without_successor_heals_once
+test_pi_missing_successor_reports_without_rearming
 test_pi_factory_replacement_retires_and_hands_off
 test_pi_owner_publication_failure_does_not_poison_retirement
 test_pi_tool_returns_agent_tool_result

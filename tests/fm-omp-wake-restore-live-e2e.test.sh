@@ -311,6 +311,7 @@ IDLE="$LAB/idle"
 mkdir -p "$IDLE/agent" "$IDLE/home/.omp/extensions" "$IDLE/home/.pi/extensions/lib" "$IDLE/home/bin" "$IDLE/home/state"
 cp "$PROJECT/.omp/extensions/fm-primary-omp-watch.ts" "$IDLE/home/.omp/extensions/"
 cp "$PROJECT/.pi/extensions/lib/fm-operational-input.ts" "$IDLE/home/.pi/extensions/lib/"
+cp "$PROJECT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$IDLE/home/.pi/extensions/lib/"
 cp "$PROJECT/bin/fm-operational-input.sh" "$IDLE/home/bin/"
 cat > "$IDLE/home/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash

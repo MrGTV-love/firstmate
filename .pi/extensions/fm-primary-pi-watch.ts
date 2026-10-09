@@ -12,11 +12,7 @@
 // state/extensions/pi-primary-watch/session-replacement-actionable.json.
 // Terminal quit leaves the final generation stopped so late callbacks cannot rearm.
 // Stale callbacks from a prior generation are no-ops against the active replacement.
-// A replacement shutdown is never a dead end: if no successor has bound within
-// FM_PI_SUCCESSOR_GRACE_MS (15s) while this process still owns the home lock,
-// the extension binds a fresh generation itself, exactly as session_start
-// would, and an arm call on that stopped generation does the same at once. A
-// terminal quit never heals. Duplicate factories in one Pi loader runtime are
+// Duplicate factories in one Pi loader runtime are
 // ignored before registration, preserving one tool and one watcher. A reload
 // removes the loader-owned discovery subscription and binds a new instance;
 // the latest bound instance owns the home, and earlier instances refuse arms.
@@ -670,78 +666,55 @@ export default function (pi: ExtensionAPI) {
   lifecycle("generation-create", { generation: generation.id, cause: "factory-bind" });
   activateGeneration(generation);
   lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
-  // The stop of the latest generation and whether it was a replacement, so a
-  // self-heal never races that stop and never follows a terminal quit.
   let generationStopped: Promise<void> = Promise.resolve();
-  let stoppedForReplacement = false;
-  let healTimer: ReturnType<typeof setTimeout> | null = null;
+  let successorTimer: ReturnType<typeof setTimeout> | null = null;
   let recoveryPending = false;
   lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
   if (instance.previous?.api) {
     const predecessor = instance.previous.api.retire();
     generationStopped = predecessor.stopped;
     recoveryPending = predecessor.recovery;
-    stoppedForReplacement = recoveryPending;
     if (!recoveryPending) generation.stopping = true;
-    if (recoveryPending) scheduleSelfHeal(generation);
+    if (recoveryPending) scheduleSuccessorExpiry(generation);
     void generationStopped.catch(() => {});
   }
 
-  function clearHealTimer(): void {
-    if (healTimer) clearTimeout(healTimer);
-    healTimer = null;
+  function clearSuccessorTimer(): void {
+    if (successorTimer) clearTimeout(successorTimer);
+    successorTimer = null;
   }
 
-  // Bind the generation a live session runs on: the existing one when it is
-  // still live, otherwise a fresh one. session_start, the timed self-heal, and
-  // an arm call after a replacement shutdown all bind through here.
-  function bindLiveGeneration(cause: string): void {
-    clearHealTimer();
-    if (generation.stopping) {
-      generation = createGeneration();
-      lifecycle("generation-create", { generation: generation.id, cause });
-    }
-    activateGeneration(generation);
-    lifecycle("generation-activate", { generation: generation.id, cause });
-  }
-
-  function scheduleSelfHeal(stopped: SessionGeneration): void {
+  function scheduleSuccessorExpiry(stopped: SessionGeneration): void {
     if (!instance.isCurrent() || generation !== stopped || !recoveryPending) return;
-    clearHealTimer();
+    clearSuccessorTimer();
     const shutdownAt = Date.now();
     const retirement = generationStopped;
     const timer = setTimeout(async () => {
-      if (healTimer === timer) healTimer = null;
+      if (successorTimer === timer) successorTimer = null;
       try {
         await retirement;
         if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement || !recoveryPending) return;
-        const owned = lockOwnership() === "owned";
         lifecycle("bound-expired", {
           waiter: "pi-watch-extension",
           "waited-on": "session_start",
           bound: `${successorGraceMs}ms`,
           actual: `${Date.now() - shutdownAt}ms`,
-          outcome: owned ? "self-heal" : "lock-not-owned",
+          outcome: "successor-missing",
         });
-        if (!owned) return;
-        bindLiveGeneration("self-heal");
-        const result = activateOwnedWatch(generation);
-        lifecycle("self-heal", { generation: generation.id, ok: result.ok });
-        if (!result.ok) surfaceFailure(generation, `watcher: FAILED - Pi extension could not activate successor recovery\n${result.message}`);
+        lifecycle("successor-missing", {
+          generation: generation.id,
+          message: "watcher: not armed - Pi replacement runtime did not start; reload the extension in a live session",
+        });
       } catch (error) {
         if (!instance.isCurrent()) return;
         const detail = error instanceof Error ? error.message : String(error);
-        lifecycle("self-heal-failed", { generation: generation.id, error: detail });
-        surfaceFailure(generation, `watcher: FAILED - Pi extension could not activate successor recovery\n${detail}`);
+        lifecycle("successor-wait-failed", { generation: generation.id, error: detail });
       }
     }, successorGraceMs);
     timer.unref();
-    healTimer = timer;
+    successorTimer = timer;
   }
 
-  // The arm tool and command. A superseded instance keeps the stale refusal;
-  // a generation stopped for a replacement is healed first, because the call
-  // itself proves the session is live. A terminal quit keeps the refusal.
   async function armFromSession(): Promise<ArmResult> {
     if (!instance.isCurrent()) {
       lifecycle("arm-refused", { reason: "superseded-instance", current: instance.current()?.id });
@@ -753,10 +726,6 @@ export default function (pi: ExtensionAPI) {
     if (!instance.isCurrent()) return { ok: false, message: shuttingDownMessage };
     if (generation !== stopped || generationStopped !== retirement) {
       return armFromSession();
-    }
-    if ((generation.stopping || recoveryPending) && stoppedForReplacement) {
-      lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
-      bindLiveGeneration("arm-call");
     }
     return activateOwnedWatch(generation);
   }
@@ -1388,7 +1357,13 @@ export default function (pi: ExtensionAPI) {
     lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
     await generationStopped;
     if (!instance.isCurrent()) return;
-    bindLiveGeneration("session_start");
+    clearSuccessorTimer();
+    if (generation.stopping) {
+      generation = createGeneration();
+      lifecycle("generation-create", { generation: generation.id, cause: "session_start" });
+    }
+    activateGeneration(generation);
+    lifecycle("generation-activate", { generation: generation.id, cause: "session_start" });
     if (lockOwnership() !== "owned") return;
     activateOwnedWatch(generation);
   });
@@ -1400,16 +1375,15 @@ export default function (pi: ExtensionAPI) {
     const replacement = event.reason === "reload" || event.reason === "new" || event.reason === "resume" || event.reason === "fork";
     lifecycle("session_shutdown", { generation: generation.id, reason: String(event.reason ?? "") });
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
-    clearHealTimer();
+    clearSuccessorTimer();
     const stopped = generation;
-    stoppedForReplacement = replacement;
     recoveryPending = replacement;
     generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, replacement, lifecycle)]).then(() => {});
     try {
       await generationStopped;
     } finally {
       lifecycle("generation-stop", { generation: stopped.id, replacement });
-      if (replacement) scheduleSelfHeal(stopped);
+      if (replacement) scheduleSuccessorExpiry(stopped);
     }
   });
 
@@ -1467,12 +1441,11 @@ export default function (pi: ExtensionAPI) {
 
   instance.publish({
     retire: () => {
-      clearHealTimer();
+      clearSuccessorTimer();
       lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
       if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
       const stopped = generation;
       if (!stopped.stopping) {
-        stoppedForReplacement = true;
         recoveryPending = true;
         generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true, lifecycle)]).then(() => {});
       }
