@@ -189,6 +189,55 @@ test_sweep_runs_detached_on_its_interval_with_the_home() {
   pass "the poll loop starts the sweep detached, on its interval, for this home, without a wake"
 }
 
+test_stock_lab_watcher_reaps_through_real_teardown() (
+  local dir home state fakebin out pid name now old
+  for name in "${!FM_@}"; do
+    case "$name" in *_OVERRIDE) unset "$name" ;; esac
+  done
+  dir=$(make_case idle-reap-lab); fakebin="$dir/fakebin"; out="$dir/watch.out"
+  mkdir -p "$dir/code-root"
+  ln -s "$ROOT/bin" "$dir/code-root/bin"
+  fm_git_worktree "$dir/project" "$dir/wt" fm/lab-worker || fail "could not create the scout worktree"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fakebin/treehouse"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fakebin/axi"
+  chmod +x "$fakebin/treehouse" "$fakebin/axi"
+  home="$dir/home"
+  mkdir -p "$home"
+  # shellcheck source=bin/fm-gate-refuse-lib.sh
+  . "$ROOT/bin/fm-gate-refuse-lib.sh"
+  fm_gate_lab_mark "$home" || fail "could not mark the empty lab fixture"
+  state="$home/state"
+  mkdir -p "$state" "$home/data/lab-worker" "$home/config" "$home/projects"
+  fm_test_track_watcher_state "$state"
+  printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\n' > "$home/.tasks.toml"
+  fm_write_meta "$state/lab-worker.meta" "window=firstmate:fm-lab-worker" \
+    "kind=scout" "harness=claude" "backend=tmux" "spawn_gen=spawn-lab-worker" \
+    "worktree=$dir/wt" "project=$dir/project"
+  now=$(date +%s); old=$((now - 7200))
+  printf 'done [at=%s]: report written\n' "$old" > "$state/lab-worker.status"
+  printf 'g1.1.1\n' > "$state/lab-worker.busy-gen"
+  printf 'v1 gen=g1.1.1 seq=1 state=idle source=claude-hook event=Stop ts=%s\n' "$now" > "$state/lab-worker.busy-state"
+  printf '# Report\nCompleted findings.\n' > "$home/data/lab-worker/report.md"
+  fm_touch_epoch "$old" "$home/data/lab-worker/report.md"
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" complete lab-worker --none >/dev/null \
+    || fail "could not complete the scout's captain-call inventory"
+  prime_status_seen "$state" "$state/lab-worker.status"
+  start_watcher "$state" "$fakebin" "$out" -u FM_STATE_OVERRIDE -u FM_GATE_REFUSE_BYPASS \
+    NO_MISTAKES_GATE=1 FM_HOME="$home" FM_IDLE_REAP_INTERVAL=1 FM_WATCH_HANDLING_SUCCESSOR=1 \
+    FM_IDLE_REAP_BIN="$dir/code-root/bin/fm-idle-session-reap.sh" \
+    FM_IDLE_REAP_TEARDOWN_BIN="$dir/code-root/bin/fm-teardown.sh" FM_TEARDOWN_GUARD_DONE=1
+  pid=$!
+  fm_test_wait_until 100 test -f "$state/idle-sessions.report" \
+    || { stop_owned_watcher "$pid"; fail "the lab watcher did not publish a cleanup report: $(cat "$out.err")"; }
+  stop_owned_watcher "$pid"
+  assert_grep $'reaped\tlab-worker\t' "$state/idle-sessions.report" \
+    "real teardown must admit the eligible task under lab authority: $(cat "$state/idle-sessions.report")"
+  assert_absent "$state/lab-worker.meta" "real teardown removes the finished task record"
+  assert_absent "$state/.idle-reap/lab-worker.refused" "lab authorization must not become a standing refusal"
+  assert_present "$home/data/lab-worker/report.md" "the scout's durable work remains"
+  pass "the stock-layout lab watcher reaches real teardown admission and cleans up an eligible scout"
+)
+
 test_first_sweep_waits_a_full_interval() {
   local dir state fakebin out pid
   dir=$(make_case idle-reap-first); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
@@ -253,6 +302,7 @@ test_hung_sweep_is_never_doubled() {
 }
 
 test_sweep_runs_detached_on_its_interval_with_the_home
+test_stock_lab_watcher_reaps_through_real_teardown || exit $?
 test_first_sweep_waits_a_full_interval
 test_zero_interval_disables_the_sweep
 test_failing_sweep_never_stops_the_poll

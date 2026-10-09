@@ -2661,8 +2661,7 @@ idle_reap_tick() {
     wait "$IDLE_REAP_PID" 2>/dev/null || true
     IDLE_REAP_PID=
   fi
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$IDLE_REAP_BIN" reap </dev/null >/dev/null 2>&1 &
+  FM_HOME="$FM_HOME" "$IDLE_REAP_BIN" reap </dev/null >/dev/null 2>&1 &
   IDLE_REAP_PID=$!
 }
 

@@ -113,7 +113,8 @@ A secondmate retains a durable receipt for its idempotent report through the est
 A secondmate home's terminal child ledger lines, PR registrations, captain holds, and merges are published on that same parent route by the scripts that record them, so no captain-facing outcome depends on the mate model appending it ([secondmate-parent-channel.md](secondmate-parent-channel.md)).
 The poll also starts [`bin/fm-idle-session-reap.sh`](../bin/fm-idle-session-reap.sh) detached so cleanup of finished idle workers does not depend on a supervising model; [configuration.md](configuration.md#environment-variables) owns its cadence.
 The sweep's header owns eligibility, parked-reason reporting, and locked automatic-teardown admission through the shared `bin/fm-idle-reap-lib.sh` classifier; `bin/fm-teardown.sh` remains the sole landed-work authority.
-The sweep preserves caller relocations rather than synthesizing overrides for the stock home layout, so automatic cleanup remains subject to the existing [gate authority boundary](#no-mistakes-gate-authority-boundary).
+An ordinary ship or scout whose latest event declares a parked state is reported with that reason even while busy, unknown, or awaiting steering; reporting never authorizes cleanup.
+The watcher and sweep preserve caller relocations rather than synthesizing overrides for the stock home layout, so automatic cleanup remains subject to the existing [gate authority boundary](#no-mistakes-gate-authority-boundary).
 Absorbed wakes advance their suppression markers, log to `state/.watch-triage.log`, and keep the watcher blocking without a queue record or LLM turn.
 Each `fm-wake-drain.sh` presentation runs the same liveness guard as the supervision scripts, so a lapsed watcher chain surfaces even on a turn that only handles queued wakes.
 Routine watcher polling, supervision no-ops, elapsed waiting time, and absorbed benign wakes stay silent.

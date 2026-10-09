@@ -65,6 +65,14 @@ fm_idle_reap_classify() {
     ship|scout) ;;
     *) IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="not an ordinary ship or scout"; return 0 ;;
   esac
+  status="$state/$id.status"
+  IDLE_REAP_LAST=$(last_status_line "$status")
+  status_line_verb "$IDLE_REAP_LAST" verb
+  note=$(status_line_note "$IDLE_REAP_LAST")
+  case "$verb" in
+    paused|blocked|needs-decision|failed|captain-held)
+      IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="$verb: $note"; return 0 ;;
+  esac
   busy=$(fm_busy_classify_meta "$meta" "$id" "$state")
   if [ "${busy%% *}" != idle ]; then
     IDLE_REAP_DETAIL="busy state $busy"
@@ -77,19 +85,13 @@ fm_idle_reap_classify() {
       return 0
     fi
   done
-  status="$state/$id.status"
-  IDLE_REAP_LAST=$(last_status_line "$status")
   if [ -z "$IDLE_REAP_LAST" ]; then
     IDLE_REAP_CLASS=idle-unreported
     IDLE_REAP_DETAIL="idle with no status event"
     return 0
   fi
-  status_line_verb "$IDLE_REAP_LAST" verb
-  note=$(status_line_note "$IDLE_REAP_LAST")
   case "$verb" in
     done) ;;
-    paused|blocked|needs-decision|failed|captain-held)
-      IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="$verb: $note"; return 0 ;;
     *) IDLE_REAP_CLASS=idle-unreported; IDLE_REAP_DETAIL="idle after $verb: $note"; return 0 ;;
   esac
   FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" \

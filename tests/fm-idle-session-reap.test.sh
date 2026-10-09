@@ -201,6 +201,54 @@ test_selection_matrix() {
   pass "scan selects exactly the finished, idle, landed tasks and reports parked ones with their reason"
 }
 
+test_paused_reasons_survive_busy_and_steering_gates() {
+  local home out kind mode id busy reason
+  home=$(make_home paused-gates)
+  : > "$STUB_LOG"
+  for kind in ship scout; do
+    for mode in busy unknown steer; do
+      id="$kind-$mode"
+      busy=$mode
+      [ "$mode" != steer ] || busy=idle
+      reason="waiting for validation approval for $id"
+      mk_task "$home" "$id" "$kind" "$busy" "done [at=$OLD]: finished" "paused: $reason" \
+        -- pr=https://github.com/acme/widget/pull/41
+      if [ "$kind" = scout ]; then scout_report "$home" "$id"; else merge_marker "$home" "$id" acme/widget 41; fi
+      if [ "$mode" = steer ]; then
+        mkdir -p "$home/state/$id.inbox"
+        printf 'new instruction\n' > "$home/state/$id.inbox/007.msg"
+      fi
+    done
+  done
+  out=$(run_reap "$home" scan) || fail "paused scan failed: $out"
+  for kind in ship scout; do
+    for mode in busy unknown steer; do
+      id="$kind-$mode"
+      expect_class "$out" "$id" parked "a declared pause outranks $mode for reporting"
+      [ "$(row_detail "$out" "$id")" = "paused: waiting for validation approval for $id" ] \
+        || fail "scan lost $id's pause reason: $out"
+    done
+  done
+  out=$(run_reap "$home" reap) || fail "paused reap failed: $out"
+  for kind in ship scout; do
+    for mode in busy unknown steer; do
+      id="$kind-$mode"
+      assert_present "$home/state/$id.meta" "a paused $id remains untouched"
+      [ "$(row_detail "$(cat "$home/state/idle-sessions.report")" "$id")" = "paused: waiting for validation approval for $id" ] \
+        || fail "published report lost $id's pause reason"
+      printf 'done [at=%s]: finished again\n' "$OLD" >> "$home/state/$id.status"
+    done
+  done
+  [ "$(calls)" = 0 ] || fail "paused tasks must never be offered to teardown"
+  out=$(run_reap "$home" scan) || fail "resumed scan failed: $out"
+  for kind in ship scout; do
+    expect_class "$out" "$kind-busy" active "a newer done event keeps the busy safety gate"
+    expect_class "$out" "$kind-unknown" active "a newer done event keeps the unknown safety gate"
+    expect_class "$out" "$kind-steer" steer-pending "a newer done event keeps the steering safety gate"
+  done
+  pass "busy, unknown, and steered workers retain declared pause reasons in scan and published reports"
+}
+
 # --- reap ------------------------------------------------------------------
 
 test_reap_asks_teardown_without_force() {
@@ -562,6 +610,7 @@ SH
 }
 
 test_selection_matrix
+test_paused_reasons_survive_busy_and_steering_gates
 test_reap_asks_teardown_without_force
 test_budget_bounds_teardowns_per_pass
 test_refusal_is_remembered_and_retried_on_change
