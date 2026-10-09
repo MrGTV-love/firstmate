@@ -1190,7 +1190,7 @@ command_answer() {
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
   body=$(show_field "$show" body)
-  if [ "$auto_release" = 1 ] && [ "$state" != done ] \
+  if [ "$auto_release" = 1 ] && [ "$state" != "done" ] \
     && { live_work_item "$id" "$state" \
       || { [ "$hold_kind" != captain ] \
         && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
@@ -1524,10 +1524,10 @@ command_answers() {
         state=$(show_field "$show" state)
         hold_kind=$(show_field_value "$show" hold_kind)
         if [ "$(show_field "$show" body)" != "$body" ] \
-          || ! { { [ "$release_flag" = --auto-release ] && [ "$state" = done ] \
+          || ! { { [ "$release_flag" = --auto-release ] && [ "$state" = "done" ] \
               && { closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
                 || [ "$recorded_mode" = released ]; }; } \
-            || { [ "$state" != done ] && [ "$hold_kind" != captain ] \
+            || { [ "$state" != "done" ] && [ "$hold_kind" != captain ] \
               && [ "$recorded_mode" = released ]; }; }; then
           release_task_control_lock || fail "cannot release task control for $id"
           printf 'skipped: %s (task changed before answer replay)\n' "$id"

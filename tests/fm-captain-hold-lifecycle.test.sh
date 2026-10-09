@@ -1832,7 +1832,7 @@ test_keyed_answer_waits_for_cleanup_before_selecting_its_mode() {
   local real_perl real_sleep
   real_perl=$(command -v perl)
   real_sleep=$(command -v sleep)
-  for mode in default done; do
+  for mode in default "done"; do
     home=$(make_home "answer-waits-for-cleanup-$mode")
     id=sample-answer-cleanup-race
     mkdir -p "$home/data/$id" "$home/projects/$id" "$home/projects/sample"
@@ -1911,7 +1911,7 @@ SH
 
 test_interrupted_keyed_release_closes_after_teardown() {
   local home parent channel id mode row show out open published body
-  for mode in default done; do
+  for mode in default "done"; do
     home=$(make_home "interrupted-keyed-release-$mode")
     parent=$(make_home "interrupted-keyed-release-parent-$mode")
     printf 'interrupted-release-mate\n' > "$home/.fm-secondmate-home"
@@ -1952,7 +1952,7 @@ exec "$REAL_TASKS_AXI" "$@"
 SH
     chmod +x "$home/fakebin/tasks-axi"
     row=$(printf '%s\tgo\tProceed' "$id")
-    [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+    [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
     if printf '%s\n' "$row" | run_captain "$home" answers \
       --source "interrupted release fixture" > "$home/answer.out" 2> "$home/answer.err"; then
       fail "the interrupted unhold reported success"
@@ -2029,7 +2029,7 @@ SH
 
 test_completed_keyed_release_replays_after_publication_failure() {
   local home parent channel id mode failure row out show published open request body before rc
-  for mode in default done; do
+  for mode in default "done"; do
     for failure in ordinary failed-publication; do
       home=$(make_home "completed-keyed-release-$mode-$failure")
       parent=$(make_home "completed-keyed-release-parent-$mode-$failure")
@@ -2060,7 +2060,7 @@ test_completed_keyed_release_replays_after_publication_failure() {
         mkdir "$channel"
       fi
       row=$(printf '%s\tgo\tProceed' "$id")
-      [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+      [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
       rc=0
       out=$(printf '%s\n' "$row" | run_captain "$home" answers \
         --source "completed release fixture" 2>&1) || rc=$?
@@ -2138,7 +2138,7 @@ test_completed_keyed_release_replays_after_publication_failure() {
 
 test_stale_keyed_replay_preserves_a_concurrent_hold() {
   local home parent channel id mode row replay_pid replay_rc show open published request
-  for mode in default done release; do
+  for mode in default "done" release; do
     home=$(make_home "stale-keyed-replay-$mode")
     parent=$(make_home "stale-keyed-replay-parent-$mode")
     printf 'stale-replay-mate\n' > "$home/.fm-secondmate-home"
@@ -2239,7 +2239,7 @@ SH
 test_repeated_keyed_answer_resolves_its_own_hold() {
   local home parent channel id mode interruption row show out open published body
   local first_stamp=2026-07-14T12:00:00Z second_stamp=2026-07-14T12:00:01Z expected_mode
-  for mode in default done; do
+  for mode in default "done"; do
     for interruption in interrupted ordinary; do
       home=$(make_home "reheld-keyed-answer-$mode-$interruption")
       parent=$(make_home "reheld-keyed-answer-parent-$mode-$interruption")
@@ -2267,7 +2267,7 @@ test_repeated_keyed_answer_resolves_its_own_hold() {
         _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
       assert_contains "$open" "captain-hold-$id-1" "the first parent decision did not open"
       row=$(printf '%s\tgo\tProceed' "$id")
-      [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+      [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
       out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "reheld answer fixture" 2>&1) \
         || fail "the first keyed answer failed: $out"
       show=$(tasks_in "$home" show "$id" --full)
@@ -2372,7 +2372,7 @@ SH
 
 test_legacy_keyed_release_requires_explicit_closure() {
   local home id mode row show body out
-  for mode in default done; do
+  for mode in default "done"; do
     home=$(make_home "legacy-keyed-release-$mode")
     id=sample-legacy-keyed-release
     tasks_in "$home" add "$id" "Investigate legacy answer recovery" \
@@ -2385,7 +2385,7 @@ test_legacy_keyed_release_requires_explicit_closure() {
       --reason "captain initial report choice pending" >/dev/null || fail "could not open the legacy first hold"
     complete_through_sibling "$home" "$id" >/dev/null || fail "could not complete the legacy task inventory"
     row=$(printf '%s\tgo\tProceed' "$id")
-    [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+    [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
     printf '%s\n' "$row" | run_captain "$home" answers --source "legacy release fixture" >/dev/null \
       || fail "could not release the legacy first hold"
     FM_CAPTAIN_HOLD_NOW=2026-07-15T12:00:00Z run_captain "$home" hold "$id" \
