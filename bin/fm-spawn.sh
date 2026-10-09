@@ -5018,11 +5018,27 @@ if [ "$KIND" != secondmate ]; then
   esac
   case "$HARNESS" in
   claude* | omp)
-    guardrail_config=$CONFIG
-    case "$guardrail_config" in
+    # The ten-levels jev-guard (bin/fm-jev-guard.ts) judges against the owning
+    # home's key, never-send policy, ledger and this task's data directory.
+    guard_config=$CONFIG
+    case "$guard_config" in
     /*) ;;
-    *) guardrail_config="$PWD/$guardrail_config" ;;
+    *) guard_config="$PWD/$guard_config" ;;
     esac
+    guard_data="$DATA/$ID"
+    case "$guard_data" in
+    /*) ;;
+    *) guard_data="$PWD/$guard_data" ;;
+    esac
+    guard_project=
+    if guard_proj_real=$(cd "$PROJ_ABS" 2>/dev/null && pwd -P) \
+      && guard_root_real=$(cd "$FM_ROOT" 2>/dev/null && pwd -P); then
+      if [ "$guard_proj_real" = "$guard_root_real" ]; then
+        guard_project=firstmate
+      else
+        guard_project=$(basename "$PROJ_ABS")
+      fi
+    fi
     ;;
   esac
   case "$HARNESS" in
@@ -5034,17 +5050,18 @@ if [ "$KIND" != secondmate ]; then
     # interrupt: fm-control preserves the adapter-owned state, while the
     # legacy fm-send --key Escape path records idle/fm-interrupt.
     # Busy-event publication tolerates a refused event (|| true) so a stale-gen
-    # writer can never break Claude's own lifecycle.
+    # writer can never break Claude's own lifecycle. PreToolUse and PostToolUse
+    # carry the ten-levels jev-guard through bin/fm-jev-guard-hook.sh.
     mkdir -p "$WT/.claude"
     busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
     busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source claude-hook"
     j_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
-    j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guardrail_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
+    j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guard_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
-    j_guardrail=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guardrail_config") FM_STATE_OVERRIDE=$(shell_quote "$STATE_REAL") node $(shell_quote "$FM_ROOT/bin/fm-jev-guardrail.mjs") hook --host claude")
+    j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project")")
     cat >"$WT/.claude/settings.local.json" <<EOF
-{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guardrail","timeout":5}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop","timeout":25}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Write|Edit)$","hooks":[{"type":"command","command":"$j_guard","timeout":30}]}],"PostToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guard","timeout":30}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop","timeout":25}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
 EOF
     exclude_path '.claude/settings.local.json'
     ;;
@@ -5208,8 +5225,9 @@ EOF
     # has no trust gate, yet its cwd-only extension auto-discovery would load a
     # worktree-resident copy a SECOND time next to the explicit -e (verified,
     # omp 18.1.11). Lives in state/, cleaned by teardown.
-    guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
-      '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
+    guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
+      --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
+      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project}') || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
@@ -5223,7 +5241,7 @@ EOF
 // because session_stop is awaited before the session settles, so gating on it
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
-import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
+import { installJevGuard } from "$FM_ROOT/bin/fm-jev-guard.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -5232,7 +5250,7 @@ const busyEvent = (state: string, event: string) =>
     ], () => resolve());
   });
 export default function (pi: any) {
-  installGuardrail(pi, $guardrail_context);
+  installJevGuard(pi, $guard_context);
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
@@ -5241,6 +5259,7 @@ export default function (pi: any) {
   pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
 }
 EOF
+    LAUNCH="env PI_EDIT_VARIANT=replace $LAUNCH"
     ;;
   codex*)
     # Semantic busy-state source negotiation (bin/fm-busy-lib.sh owns the

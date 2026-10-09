@@ -121,11 +121,11 @@ SH
   chmod +x "$1/omp"
 }
 
-make_spawn_case() {  # <name> <harness> <id>
+make_spawn_case() {  # <name> <harness> <id> [project-name]
   local name=$1 harness=$2 id=$3 case_dir home proj wt fakebin
   case_dir="$TMP_ROOT/$name"
   home="$case_dir/home"
-  proj="$case_dir/project"
+  proj="$case_dir/${4-project}"
   wt="$case_dir/wt"
   fakebin=$(make_spawn_fakebin "$case_dir/fake" claude)
   make_fake_omp "$fakebin"
@@ -177,6 +177,95 @@ test_spawn_launch_line_and_worker_wiring() {
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy fm-spawn" ] \
     || fail "omp spawn must seed the busy-state contract"
   pass "fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension"
+}
+
+test_worker_replace_mode_environment() {
+  local kind rec id out status launch seen
+  for kind in ship scout; do
+    id="omp-replace-$kind-q1"
+    rec=$(make_spawn_case "replace-$kind" omp "$id")
+    read_case_record "$rec"
+    if [ "$kind" = ship ]; then
+      out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+        "$id" "$PROJ_DIR" --harness omp --mode no-mistakes --yolo off)
+    else
+      : > "$HOME_DIR/config/launch-env-allowlist"
+      out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+    fi
+    status=$?
+    expect_code 0 "$status" "omp $kind spawn should succeed: $out"
+    cat > "$FAKEBIN_DIR/omp" <<'SH'
+#!/bin/sh
+printf '%s\n' "${PI_EDIT_VARIANT-unset}"
+SH
+    launch=$(cat "$LAUNCH_LOG")
+    seen=$(env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" PI_EDIT_VARIANT=hashline \
+      /bin/sh -c "$launch
+printf '%s\n' \"\$PI_EDIT_VARIANT\"") \
+      || fail "omp $kind emitted launch failed"
+    [ "$seen" = $'replace\nhashline' ] \
+      || fail "omp $kind must use replace mode without changing the pane environment, got: $seen"
+  done
+  pass "omp ship and scout launches select replace edit mode only in the worker process"
+}
+
+test_worker_guard_project_scope() {
+  local project rec id out
+  for project in firstmate vernant; do
+    id="omp-scope-$project"
+    rec=$(make_spawn_case "scope-$project" omp "$id" "$project")
+    read_case_record "$rec"
+    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+    expect_code 0 $? "omp $project spawn should succeed: $out"
+    printf 'TYPESAFE_API_KEY=omp-scope-key\nOPENROUTER_API_KEY=omp-fallback-key\n' > "$HOME_DIR/.env"
+    out=$(EXT_PATH="$HOME_DIR/state/$id.omp-ext.ts" PROJECT="$project" WT="$WT_DIR" FM_TEST_SEAM=1 \
+      node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
+import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
+const requests = [];
+const server = createServer((req, res) => {
+  let body = "";
+  req.on("data", chunk => { body += chunk; });
+  req.on("end", () => {
+    requests.push({ path: req.url, state: JSON.parse(body).state });
+    if (req.url === "/direct") { res.writeHead(500).end("{}"); return; }
+    const answers = {};
+    for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
+      const keys = Object.keys(q.criteria ?? {});
+      const choice = keys.includes("irreversible") ? "irreversible" : keys[0];
+      answers[id] = q.type === "noul" ? { type: "noul", noul: 0.95 }
+        : { type: "choice", choice, confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === choice ? 1 : 0])) };
+    }
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ model: "jev-fake", answers, usage: { input_tokens: 3, output_tokens: 1 } }));
+  });
+});
+await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+try {
+  const base = `http://127.0.0.1:${server.address().port}`;
+  process.env.FM_JEV_GUARD_BASE_URL = `${base}/direct`;
+  process.env.FM_JEV_GUARD_OPENROUTER_URL = `${base}/fallback`;
+  const handlers = {};
+  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; } });
+  const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
+  if (process.env.PROJECT === "firstmate") {
+    assert.equal(result?.block, true);
+    assert.deepEqual(requests.map(row => row.path), ["/direct", "/fallback"]);
+    assert.ok(requests.every(row => row.state.command === "rm -rf customer-record"));
+  } else {
+    assert.equal(result, undefined);
+    assert.deepEqual(requests, []);
+  }
+} finally {
+  await new Promise(resolve => server.close(resolve));
+}
+console.log("scope-ok");
+JS
+)
+    [ "$out" = scope-ok ] || fail "generated omp extension lost $project egress scope: $out"
+  done
+  pass "real omp spawns authorize firstmate only and carry project scope through the generated extension"
 }
 
 test_spawn_model_validation_scoped_to_listed_providers() {
@@ -321,7 +410,7 @@ test_busy_extension_lifecycle() {
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
   esac
-  for handler in agent_start agent_end turn_end; do
+  for handler in agent_start agent_end turn_end tool_call tool_result; do
     case " $out " in
       *" $handler "*) ;;
       *) fail "the omp extension must register $handler, got '$out'" ;;
@@ -345,7 +434,7 @@ test_busy_extension_lifecycle() {
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
   fm_busy_source_trusted omp omp-ext || fail "omp must trust its own extension's records"
-  pass "omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification"
+  pass "omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification, jev-guard tool hooks installed"
 }
 
 # --- 4. Control, composer, supervision model -----------------------------------
@@ -562,7 +651,8 @@ const marker = readFileSync(`${process.env.FM_HOME}/state/.omp-watch-extension-l
 if (marker[1] !== String(process.pid)) throw new Error("loaded marker must record the session pid");
 const again = await tool.execute();
 if (!/^watcher: unchanged - omp extension already owns an arm child/.test(again.content[0].text)) throw new Error(`redundant arm was not an ownership no-op: ${again.content[0].text}`);
-await new Promise((r) => setTimeout(r, 2500));
+// Wait for delivery, bounded at 60 seconds, rather than assuming child-close timing.
+for (let i = 0; i < 600 && sent.length < 1; i += 1) await new Promise((r) => setTimeout(r, 100));
 if (sent.length !== 1) throw new Error(`expected one follow-up wake, saw ${sent.length}: ${JSON.stringify(sent)}`);
 if (!sent[0].m.startsWith("⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: omp-e2e done")) throw new Error(`unexpected wake text: ${sent[0].m}`);
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("wake must be delivered as a follow-up");
@@ -985,7 +1075,7 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   process.exit(0);
 }
 const expectedWakes = process.env.SCENARIO.startsWith("duplicates") ? 2 : 1;
-for (let i = 0; i < 60 && sent.length < expectedWakes; i += 1) await sleep(100);
+for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep(100);
 if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
 if (process.env.SCENARIO === "idle-stale-context") {
@@ -1372,6 +1462,8 @@ EOF
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
+test_worker_replace_mode_environment
+test_worker_guard_project_scope
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated

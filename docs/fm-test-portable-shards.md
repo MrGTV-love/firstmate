@@ -124,6 +124,7 @@ The Herdr recovery lab loads its run, backlog, and wake dependencies once in the
 The retained open-work scan fixture observes the complete ledger's actual overdue obligation before beginning its unchanged watcher-delivery wait, matching the synchronous collector fixtures' publication-before-delivery ordering. Its shared launcher sets unrelated cadence intervals above the missing-file age sentinel, so empty fixture homes do not start real summary refreshes or checks. Collector and delivery timeout values are unchanged; collector survival, no overlapping scans, and durable wake checks remain required.
 The runner and CPU-pass fixtures resolve their generated Python wrappers' shebangs through `sys.executable`, not `command -v`: a PATH entry can be a shell-based version-manager shim, which macOS cannot use to interpret another script's Python body.
 Collector deadline fixtures require cancellation to prevent a third source attempt, not require exactly two attempts: the real overall deadline can expire before the fixture's second-attempt alarm. An initialized attempt log represents early expiry without inventing source activity, and the same boundary applies to origins, PR checks, PR state, and questions.
+The Jev guard suite reads ledger permission bits through Node's filesystem API on both Linux and macOS; a BSD/GNU `stat` fallback can mix filesystem diagnostics into the mode and falsely reject a private ledger.
 
 ## Timing artifacts
 
@@ -170,7 +171,7 @@ The workflow retains per-PR supersession without cancelling main pushes or chang
 ## Local entry points
 
 [CONTRIBUTING.md](../CONTRIBUTING.md) owns the local test policy and common entry points.
-`bin/fm-test-run.sh --help` owns exact lane names, selection flags, and bounded `--jobs` mechanics.
+`bin/fm-test-run.sh --help` owns exact lane names, changed-file selection (including retired assets), and bounded `--jobs` mechanics.
 
 ## Timeouts
 
