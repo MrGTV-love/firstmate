@@ -5355,7 +5355,7 @@ test_sweep_keeps_unknown_inbox_evidence() {
 }
 
 test_sweep_preserves_rearmed_registration_generations() (
-  local mode home store board sid real_perl sweep_pid poll_pid out list rc
+  local mode home store board sid real_perl sweep_pid poll_pid out list rc tries
   real_perl=$(command -v perl)
   for mode in plain worker pending; do
     home=$(make_home "board-sweep-rearmed-$mode")
@@ -5430,7 +5430,12 @@ SH
       wait "$sweep_pid" 2>/dev/null || true
       fail "could not re-arm the $mode replacement: $out"
     fi
-    if ! wait_for_test_file "$home/poll.pid" "$sweep_pid"; then
+    tries=0
+    while [ ! -s "$home/poll.pid" ] && [ "$tries" -lt 300 ]; do
+      tries=$((tries + 1))
+      sleep 0.1
+    done
+    if [ ! -s "$home/poll.pid" ]; then
       : > "$home/sweep-release"
       wait "$sweep_pid" 2>/dev/null || true
       fail "the replacement listener did not start polling"
