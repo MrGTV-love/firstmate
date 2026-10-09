@@ -2291,7 +2291,7 @@ class LaunchLexer extends Lexer {
   }
 }
 const { tokens, error } = new LaunchLexer(process.argv[3]).tokenize();
-if (error) process.exit(1);
+if (error || tokens.some(token => token.type === "word" && (!token.literal || token.unquotedExpansion))) process.exit(1);
 const words = [];
 for (let i = 0; i < tokens.length; i++) {
   const token = tokens[i];
@@ -2307,14 +2307,13 @@ let agentDir = "";
 let certain = tokens.every(token => token.type === "word" || token.type === "redir");
 while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
   const word = words[i++];
-  if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(word.source) || !word.literal ||
-      word.unquotedExpansion || word.source.includes("\\")) certain = false;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(word.source) || word.source.includes("\\")) certain = false;
   if (word.value.startsWith("PI_CODING_AGENT_DIR=")) {
     agentDir = word.value.slice("PI_CODING_AGENT_DIR=".length);
   }
   if (/^(OMP_PROFILE|PI_PROFILE)=.+/.test(word.value)) certain = false;
 }
-if (!words[i]?.literal || !/(^|\/)omp$/.test(words[i]?.value || "")) certain = false;
+if (!/(^|\/)omp$/.test(words[i]?.value || "")) certain = false;
 let pinned = false;
 for (i++; i < words.length; i++) {
   if (words[i].value === "--") break;

@@ -473,6 +473,67 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
   pass "fm-spawn: omp profile flags, assignments, and invoking environment pass through without default-role catalog probes"
 }
 
+test_spawn_raw_omp_expansions_pass_through_unchanged() {
+  local rec id out status mode role command launch_dir first_arg
+  for mode in profile after-delimiter substitution backticks redirect glob; do
+    for role in missing unlisted; do
+      id="omp-expansion-$mode-$role"
+      rec=$(make_spawn_case "expansion-$mode-$role" omp "$id")
+      read_case_record "$rec"
+      launch_dir=$(dirname "$GLOBAL_CONFIG")
+      if [ "$role" = missing ]; then
+        printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
+      else
+        printf 'modelRoles:\n  default: openai-codex/gpt-gone\n' > "$GLOBAL_CONFIG"
+      fi
+      command="PI_CODING_AGENT_DIR='$launch_dir' omp"
+      first_arg=--auto-approve
+      case "$mode" in
+        profile)
+          command="$command \"\$PROFILE_FLAG\" --auto-approve"
+          first_arg=--profile=work
+          ;;
+        after-delimiter) command="$command --auto-approve -- \"\$PROFILE_FLAG\"" ;;
+        substitution)
+          command="$command \"\$(printf evaluated > '$CASE_DIR/expanded'; printf %s --profile=work)\" --auto-approve"
+          first_arg=--profile=work
+          ;;
+        backticks)
+          command="$command \"\`printf evaluated > '$CASE_DIR/expanded'; printf %s --profile=work\`\" --auto-approve"
+          first_arg=--profile=work
+          ;;
+        redirect) command="$command --auto-approve 2>\"\$ERROR_LOG\"" ;;
+        glob)
+          printf 'input\n' > "$CASE_DIR/input.txt"
+          command="$command --auto-approve '$CASE_DIR'/*.txt"
+          ;;
+      esac
+      out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+        run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
+      status=$?
+      expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
+      assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
+      assert_absent "$CASE_DIR/omp-env.log" "expanded raw launch must establish no catalog evidence"
+      assert_absent "$CASE_DIR/expanded" "validation must not evaluate command substitutions"
+      assert_absent "$CASE_DIR/errors.log" "validation must not evaluate redirections"
+      assert_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
+      HOME="$HOME_DIR/user-home" PROFILE_FLAG=--profile=work ERROR_LOG="$CASE_DIR/errors.log" \
+        PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+        bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
+      status=$?
+      expect_code 0 "$status" "expanded raw command must execute in the pane ($mode)"
+      assert_grep "$first_arg:$launch_dir" "$CASE_DIR/omp-env.log" "expanded raw command must launch omp in its assigned directory"
+      case "$mode" in
+        substitution | backticks)
+          [ "$(cat "$CASE_DIR/expanded")" = evaluated ] || fail "the pane must evaluate the command substitution"
+          ;;
+        redirect) assert_present "$CASE_DIR/errors.log" "the pane must evaluate the redirection" ;;
+      esac
+    done
+  done
+  pass "fm-spawn: any expanded raw token passes through unchanged without evaluating it or probing the default-role catalog"
+}
+
 test_spawn_raw_omp_guard_uses_the_launch_model() {
   local rec id out status command expected index=0
   local model_args=()
@@ -1684,6 +1745,7 @@ test_spawn_global_config_is_read_only_and_unlayered
 test_spawn_raw_omp_guard_uses_the_launch_model
 test_spawn_raw_omp_guard_uses_the_launch_agent_dir
 test_spawn_omp_profiles_leave_directory_evidence_unreadable
+test_spawn_raw_omp_expansions_pass_through_unchanged
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
