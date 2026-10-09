@@ -57,12 +57,13 @@
 #
 # Before removing containers, cleanup atomically retains their Compose and Supabase
 # project identities in the task record's docker_projects field. Retries read that
-# field after the containers are gone; task-record retirement removes it.
+# field after the containers are gone; a fully verified cleanup removes it.
 # Listing, metadata read/publication, removal, or verification failures return
 # nonzero, except that a failed first listing (a stopped or unreachable daemon)
 # only warns and returns 0 when the task record retains no docker_projects.
 # After container removal, any surviving owned container refuses cleanup and
 # prints the removal's own error; a failed removal with no survivor is not a failure.
+# A failed network or volume removal prints Docker's own error with its warning.
 # A final container listing also rejects arrivals during network or volume cleanup.
 # Portable regression coverage: tests/fm-teardown.test.sh; real Docker CLI guard:
 # tests/fm-task-docker-live-e2e.test.sh.
@@ -185,9 +186,21 @@ $out
 EOF
 }
 
+# Atomically replace <record>'s docker_projects field; empty <projects> removes it.
+fm_task_docker_write_projects() {  # <record> <projects>
+  local record=$1 projects=$2 tmp
+  tmp=$(umask 077; mktemp "${record%/*}/.docker-projects.XXXXXXXX") || return 1
+  if ! { LC_ALL=C awk 'index($0, "docker_projects=") != 1' "$record" \
+         && { [ -z "$projects" ] || printf 'docker_projects=%s\n' "$projects"; }; } > "$tmp" \
+     || ! mv -f "$tmp" "$record"; then
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
 fm_task_docker_cleanup() {
   local id=$1 siblings=$2 ambiguous=$3 protected=$4 record=$5 sep=$_FM_TASK_DOCKER_SEP
-  local objects cid names project supabase why projects foreign_projects="" nname candidate saved_projects tmp rm_err
+  local objects cid names project supabase why projects foreign_projects="" nname candidate saved_projects rm_err
   local -a ids
   shift 5
   command -v docker >/dev/null 2>&1 || return 0
@@ -224,15 +237,9 @@ fm_task_docker_cleanup() {
   done <<EOF
 $objects
 EOF
-  if [ "$projects" != "$saved_projects" ]; then
-    tmp=$(umask 077; mktemp "${record%/*}/.docker-projects.XXXXXXXX") || return 1
-    if ! { LC_ALL=C awk 'index($0, "docker_projects=") != 1' "$record" \
-           && printf 'docker_projects=%s\n' "$projects"; } > "$tmp" \
-       || ! mv -f "$tmp" "$record"; then
-      rm -f "$tmp"
-      echo "error: cannot retain Docker project identities for $id before removal" >&2
-      return 1
-    fi
+  if [ "$projects" != "$saved_projects" ] && ! fm_task_docker_write_projects "$record" "$projects"; then
+    echo "error: cannot retain Docker project identities for $id before removal" >&2
+    return 1
   fi
   if [ "${#ids[@]}" -gt 0 ]; then
     echo "teardown: removing Docker container(s) owned by $id:$names" >&2
@@ -272,11 +279,15 @@ EOF
   done <<EOF
 $objects
 EOF
+  if [ -n "$projects" ] && ! fm_task_docker_write_projects "$record" ""; then
+    echo "error: cannot clear retained Docker project identities for $id after cleanup" >&2
+    return 1
+  fi
   return 0
 }
 
 fm_task_docker_remove_networks() {
-  local id=$1 ambiguous=$2 protected=$3 projects=$4 foreign_projects=$5 sep=$_FM_TASK_DOCKER_SEP out nid nname label proj supabase claim
+  local id=$1 ambiguous=$2 protected=$3 projects=$4 foreign_projects=$5 sep=$_FM_TASK_DOCKER_SEP out nid nname label proj supabase claim rm_err
   out=$(fm_task_docker_run network ls --no-trunc --format \
     "{{.ID}}${sep}{{.Name}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}" \
     2>/dev/null) || return 1
@@ -308,10 +319,11 @@ fm_task_docker_remove_networks() {
       fi
     fi
     [ "$claim" = 1 ] || continue
-    if fm_task_docker_run network rm "$nid" >/dev/null 2>&1; then
+    if rm_err=$(fm_task_docker_run network rm "$nid" 2>&1 >/dev/null); then
       echo "teardown: removed Docker network $nname owned by $id" >&2
     else
       echo "warning: Docker network $nname owned by $id could not be removed" >&2
+      [ -z "$rm_err" ] || printf '%s\n' "$rm_err" >&2
       return 1
     fi
   done <<EOF
@@ -321,7 +333,7 @@ EOF
 }
 
 fm_task_docker_remove_volumes() {  # <id> <ambiguous> <protected> <foreign-projects>
-  local id=$1 ambiguous=$2 protected=$3 foreign_projects=$4 sep=$_FM_TASK_DOCKER_SEP out vol label proj supabase
+  local id=$1 ambiguous=$2 protected=$3 foreign_projects=$4 sep=$_FM_TASK_DOCKER_SEP out vol label proj supabase rm_err
   [ "$ambiguous" != 1 ] || return 0
   out=$(fm_task_docker_run volume ls --format \
     "{{.Name}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}" \
@@ -342,10 +354,11 @@ fm_task_docker_remove_volumes() {  # <id> <ambiguous> <protected> <foreign-proje
         case " $foreign_projects " in *" $supabase "*) continue ;; esac
       fi
     fi
-    if fm_task_docker_run volume rm "$vol" >/dev/null 2>&1; then
+    if rm_err=$(fm_task_docker_run volume rm "$vol" 2>&1 >/dev/null); then
       echo "teardown: removed Docker volume $vol owned by $id" >&2
     else
       echo "warning: Docker volume $vol is owned by $id but could not be removed (in use?); remove it by hand with: docker volume rm $vol" >&2
+      [ -z "$rm_err" ] || printf '%s\n' "$rm_err" >&2
       return 1
     fi
   done <<EOF

@@ -333,9 +333,10 @@
 #     Standalone secondmate retirement skips its own Docker cleanup.
 #     Forced cleanup closes each child's endpoint before its Docker snapshot.
 #     Ordinary, Orca, and recursive descendants use their own metadata for Docker
-#     cleanup. Nested secondmate process events are swept before that secondmate's
-#     Docker cleanup and recursive descendant retirement. A Docker refusal retains
-#     the child's retry records even though its endpoint may have already stopped.
+#     cleanup. A nested secondmate's own Docker cleanup runs before its recursive
+#     descendant retirement and home removal, which owns its process-event sweep.
+#     A Docker refusal retains the child's retry records even though its endpoint
+#     may have already stopped.
 #     A reassigned slot is not used to attribute a Docker workdir; the library's
 #     remaining non-path ownership rules still apply.
 #     Docker path roots are owned worktrees only, never tasktmp; nested registered
@@ -3710,7 +3711,6 @@ cleanup_firstmate_home_children() {
     if [ "$child_kind" = secondmate ]; then
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
-      cleanup_firstmate_home_process_events "$child_home" "child firstmate home" || return 1
     fi
     if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
       teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1
@@ -3718,11 +3718,9 @@ cleanup_firstmate_home_children() {
       teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 0 || return 1
     fi
     if [ "$child_kind" = secondmate ]; then
-      if [ -n "$child_home" ]; then
+      if [ -n "$child_home" ] && [ -d "$child_home" ]; then
         cleanup_firstmate_home_children "$child_home" || return $?
-        if [ -d "$child_home" ]; then
-          remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
-        fi
+        remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
       fi
     elif [ "$child_backend" = orca ]; then
       if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then

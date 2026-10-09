@@ -6545,6 +6545,36 @@ test_docker_project_record_failure_prevents_container_removal() {
   pass "failed project-identity publication preserves the task record and container evidence"
 }
 
+test_docker_verified_cleanup_clears_retained_projects() {
+  local case_dir store meta rc
+  case_dir=$(make_docker_case docker-clears-projects)
+  store="$case_dir/docker-store"
+  meta="$case_dir/state/task-x1.meta"
+  : > "$store"
+  docker_store_add "$store" container c-own own-derived "com.docker.compose.project=derived;com.docker.compose.project.working_dir=$case_dir/wt" ""
+  docker_store_add "$store" network n-own derived-network "com.docker.compose.project=derived"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_NETWORK_RM_FAIL=derived-network PATH="$case_dir/fakebin:$PATH" \
+    bash -c '. "$1/bin/fm-task-docker-lib.sh"; fm_task_docker_cleanup task-x1 "" 0 "" "$2" "$3"' \
+      _ "$ROOT" "$meta" "$case_dir/wt" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "clears-projects: a failed network removal reported success"
+  assert_grep 'docker_projects= derived' "$meta" "clears-projects: an incomplete cleanup did not retain project identities"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" PATH="$case_dir/fakebin:$PATH" \
+    bash -c '. "$1/bin/fm-task-docker-lib.sh"; fm_task_docker_cleanup task-x1 "" 0 "" "$2" "$3"' \
+      _ "$ROOT" "$meta" "$case_dir/wt" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "clears-projects: verified cleanup failed: $(cat "$case_dir/stderr")"
+  assert_equals "" "$(docker_store_names "$store" network)" "clears-projects: derived network survived"
+  assert_no_grep 'docker_projects=' "$meta" "clears-projects: verified cleanup left retained project identities"
+  assert_grep 'kind=ship' "$meta" "clears-projects: clearing project identities damaged the task record"
+  rc=0
+  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_DOWN=1 PATH="$case_dir/fakebin:$PATH" \
+    bash -c '. "$1/bin/fm-task-docker-lib.sh"; fm_task_docker_cleanup task-x1 "" 0 "" "$2" "$3"' \
+      _ "$ROOT" "$meta" "$case_dir/wt" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "clears-projects: a stopped daemon refused a task whose cleanup was already verified: $(cat "$case_dir/stderr")"
+  pass "a verified Docker cleanup clears retained project identities, so a later stopped daemon does not refuse the retry"
+}
+
 test_docker_ambiguous_ids_trust_only_worktree_evidence() {
   local case_dir store rc
   case_dir=$(make_docker_case docker-ambiguous-id)
@@ -6608,6 +6638,16 @@ EOF
     assert_no_grep "teardown task-x1 complete" "$case_dir/stdout" "$channel: teardown falsely reported completion"
     assert_grep 'docker_projects= derived derived-supa' "$case_dir/state/task-x1.meta" \
       "$channel: retained task record lost its derived project identities"
+    case "$channel" in
+      network-rm)
+        assert_grep "Error: cannot remove network owned-network" "$case_dir/stderr" \
+          "$channel: Docker's own network removal error was hidden"
+        ;;
+      volume-rm)
+        assert_grep "Error: cannot remove volume owned-volume" "$case_dir/stderr" \
+          "$channel: Docker's own volume removal error was hidden"
+        ;;
+    esac
     if [ "$channel" = network-rm ]; then
       assert_equals "" "$(docker_store_names "$store" container)" "$channel: regression requires container removal to succeed"
       assert_equals "owned-network owned-supa-project-network " "$(docker_store_names "$store" network)" \
@@ -7262,6 +7302,7 @@ test_docker_mixed_project_carriers_spare_empty_heuristic_networks
 test_docker_latest_foreign_carriers_veto_network_removal
 test_standalone_secondmate_skips_docker_cleanup
 test_docker_project_record_failure_prevents_container_removal
+test_docker_verified_cleanup_clears_retained_projects
 test_docker_ambiguous_ids_trust_only_worktree_evidence
 test_docker_all_failure_channels_retain_forced_tasks_until_retry
 test_forced_secondmate_cleans_each_child_docker_before_retirement_and_retries
