@@ -50,33 +50,81 @@ printf 'schema=fm-secondmate-parent.v1\nroute=local\n' > "$CREW_HOME/.fm-secondm
 link_home "$CREW_HOME" "$LANE"
 pass "remote, malformed and absent bindings stay off"
 
-# The guardrail hook is a separate process; it must reach the primary key too.
-FAKEBIN="$TMP_ROOT/fakebin"
-mkdir -p "$FAKEBIN"
-cat > "$FAKEBIN/curl" <<'JS'
-#!/usr/bin/env node
-const fs = require('node:fs');
-if (process.env.TYPESAFE_API_KEY || process.env.TYPESAFE_API_KEY_PRIVATE) process.exit(9);
-fs.appendFileSync(process.env.FM_TEST_TRANSPORT, fs.readFileSync(0, 'utf8'));
-process.stdout.write(JSON.stringify({ model: 'jev-1.13.0', usage: { input_tokens: 100, output_tokens: 1 }, answers: { risk: { type: 'choice', choice: 'risky', confidence: 0.9, probabilities: { risky: 0.9, routine: 0.05, uncertain: 0.05 } } } }) + '\n200');
-JS
-chmod +x "$FAKEBIN/curl"
-
-hook_status() {  # <home>
-  local home=$1
-  mkdir -p "$home/state" "$home/config"
-  : > "$TMP_ROOT/transport"
-  printf '{"tool_name":"Bash","tool_input":{"command":"rm -rf ./sandbox"}}' \
-    | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE FM_HOME="$home" FM_ROOT_OVERRIDE='' \
-        FM_CONFIG_OVERRIDE='' FM_STATE_OVERRIDE='' FM_TEST_TRANSPORT="$TMP_ROOT/transport" PATH="$FAKEBIN:$PATH" \
-        node "$ROOT/bin/fm-jev-guardrail.mjs" hook --host claude >/dev/null 2>&1
-  tail -n1 "$home/state/jev-guardrail.jsonl" | jq -r .status
+# resolve_openrouter <home> [env-key]: prints the resolved fallback key, or "absent".
+resolve_openrouter() {
+  # shellcheck disable=SC2016 # the child shell script is intentionally single-quoted.
+  env -u OPENROUTER_API_KEY ${2:+OPENROUTER_API_KEY=$2} bash -c '
+    . "$1/bin/fm-typesafe-lib.sh"
+    if fm_openrouter_key "$2"; then printf %s "$OPENROUTER_API_KEY_PRIVATE"; else printf absent; fi
+  ' _ "$ROOT" "$1"
 }
 
-[ "$(hook_status "$LANE")" = judged ] || fail "guardrail in a home without .env must reach the primary key"
-grep -q 'Bearer primary-key' "$TMP_ROOT/transport" || fail "guardrail did not send the primary key"
-[ "$(hook_status "$REMOTE")" = missing_key ] || fail "guardrail in a remote-bound home must stay off"
-pass "the Jev guardrail resolves the primary key and stays off without one"
+printf 'TYPESAFE_API_KEY=primary-key\nOPENROUTER_API_KEY=primary-or\n' > "$PRIMARY/.env"
+[ "$(resolve_openrouter "$CREW_HOME")" = primary-or ] || fail "nested home without .env did not resolve the primary OpenRouter key"
+printf 'OPENROUTER_API_KEY=lane-or\n' > "$LANE/.env"
+[ "$(resolve_openrouter "$LANE")" = lane-or ] || fail "own .env did not win for the OpenRouter key"
+rm -f "$LANE/.env"
+[ "$(resolve_openrouter "$REMOTE" env-or)" = absent ] || fail "the OpenRouter key must not come from the process environment or a remote binding"
+printf 'TYPESAFE_API_KEY=primary-key\n' > "$PRIMARY/.env"
+pass "the OpenRouter fallback key resolves from own, then primary .env, never the environment"
+
+# The jev-guard hook is a separate process; it must reach the primary key too.
+cat > "$TMP_ROOT/fake-jev.mjs" <<'JS'
+import { createServer } from 'node:http';
+import { appendFileSync, writeFileSync } from 'node:fs';
+const [log, portFile] = process.argv.slice(2);
+const server = createServer((req, res) => {
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', () => {
+    appendFileSync(log, `${req.headers.authorization}\n`);
+    const answers = {};
+    for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
+      const keys = Object.keys(q.criteria ?? {});
+      const pick = keys.includes('irreversible') ? 'irreversible' : keys[0];
+      answers[id] = q.type === 'noul' ? { type: 'noul', noul: 0.05 }
+        : { type: 'choice', choice: pick, confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === pick ? 1 : 0])) };
+    }
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ model: 'jev-fake', answers, usage: { input_tokens: 3, output_tokens: 1 } }));
+  });
+});
+server.listen(0, '127.0.0.1', () => writeFileSync(portFile, String(server.address().port)));
+JS
+: > "$TMP_ROOT/transport"
+node "$TMP_ROOT/fake-jev.mjs" "$TMP_ROOT/transport" "$TMP_ROOT/jev-port" &
+FAKE_JEV_PID=$!
+trap 'kill "$FAKE_JEV_PID" 2>/dev/null; fm_test_cleanup' EXIT
+for _ in $(seq 1 100); do [ -s "$TMP_ROOT/jev-port" ] && break; sleep 0.05; done
+[ -s "$TMP_ROOT/jev-port" ] || fail "fake Jev endpoint did not start"
+
+guard_decision() {
+  local home=$1 out err="$TMP_ROOT/hook.err" status
+  mkdir -p "$home/state" "$home/config" "$home/data/t1" "$TMP_ROOT/wt"
+  : > "$TMP_ROOT/transport"
+  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf ./sandbox"}}' \
+    | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE -u OPENROUTER_API_KEY FM_TEST_SEAM=1 \
+        FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/jev-port")/v1/systemone" \
+        "$ROOT/bin/fm-jev-guard-hook.sh" "$home" "$home/config" "$home/state" t1 "$TMP_ROOT/wt" "$home/data/t1" firstmate 2>"$err")
+  status=$?
+  [ "$status" -eq 0 ] || fail "hook exited $status for $home"
+  [ ! -s "$err" ] || fail "hook wrote stderr for $home: $(cat "$err")"
+  if [ -z "$out" ]; then
+    decision=allow
+  else
+    decision=$(jq -er .hookSpecificOutput.permissionDecision <<<"$out") || fail "hook returned no permission decision for $home"
+  fi
+}
+
+guard_decision "$LANE"
+[ "$decision" = deny ] || fail "jev-guard in a home without .env must reach the primary key"
+grep -qx 'Bearer primary-key' "$TMP_ROOT/transport" || fail "jev-guard did not send the primary key"
+guard_decision "$REMOTE"
+[ "$decision" = allow ] || fail "jev-guard in a remote-bound home must stay off"
+[ ! -s "$TMP_ROOT/transport" ] || fail "jev-guard in a remote-bound home must make no request"
+kill "$FAKE_JEV_PID" 2>/dev/null
+wait "$FAKE_JEV_PID" 2>/dev/null
+pass "the jev-guard resolves the primary key and stays off without one"
 
 # The jev-belay Stop-hook wrapper delivers the key to one process only.
 BELAY_ROOT="$PRIMARY/data/vendor/jev-belay"
@@ -251,24 +299,46 @@ cat > "$STALLBIN/jq" <<'SH'
 printf '%s' "$$" > "$FM_TEST_POLICY_PID"
 exec sleep 60
 SH
-chmod +x "$STALLBIN/jq"
-started=$SECONDS
-run_belay "$LANE" FM_TEST_BELAY_POLICY_PATH="$STALLBIN:$PATH" FM_TEST_POLICY_PID="$TMP_ROOT/policy-pid" \
-  JEV_BELAY_TIMEOUT_MS=60000 || fail "stalled policy must fail open"
-elapsed=$((SECONDS - started))
-[ "$elapsed" -lt 10 ] || fail "synchronous policy work was not bounded"
-[ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "timed-out policy reached transport"
-[ -s "$TMP_ROOT/policy-pid" ] || fail "stalled policy fixture did not run"
-policy_pid=$(cat "$TMP_ROOT/policy-pid")
-for _ in 1 2 3 4 5; do
-  kill -0 "$policy_pid" 2>/dev/null || break
-  sleep 0.1
-done
-if kill -0 "$policy_pid" 2>/dev/null; then
-  kill -KILL "$policy_pid" 2>/dev/null || true
-  fail "timed-out policy left its checker running"
+cat > "$STALLBIN/bash" <<'SH'
+#!/bin/bash
+if [ "${FM_TEST_POLICY_DELAY_START:-0}" = 1 ] && [ "${FM_TEST_POLICY_BASH_STARTED:-0}" != 1 ]; then
+  export FM_TEST_POLICY_BASH_STARTED=1
+  # Start the inner three-second deadline late enough for the outer five-second
+  # ceiling to win, but leave time for the actual checker to report its PID.
+  sleep 3
 fi
-pass "stalled policy work is bounded, reaped, and withheld without blocking Stop"
+exec "$FM_TEST_POLICY_REAL_BASH" "$@"
+SH
+chmod +x "$STALLBIN/jq" "$STALLBIN/bash"
+real_bash=$(command -v bash) || fail "missing policy fixture Bash"
+for delayed_start in 0 1; do
+  rm -f "$TMP_ROOT/policy-pid"
+  started=$SECONDS
+  run_belay "$LANE" FM_TEST_BELAY_POLICY_PATH="$STALLBIN:$PATH" FM_TEST_POLICY_PID="$TMP_ROOT/policy-pid" \
+    FM_TEST_POLICY_REAL_BASH="$real_bash" FM_TEST_POLICY_DELAY_START="$delayed_start" \
+    JEV_BELAY_TIMEOUT_MS=60000 || fail "stalled policy must fail open"
+  elapsed=$((SECONDS - started))
+  [ "$elapsed" -lt 10 ] || fail "synchronous policy work was not bounded"
+  [ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "timed-out policy reached transport"
+  [ -s "$TMP_ROOT/policy-pid" ] || fail "stalled policy fixture did not run"
+  if [ "$delayed_start" -eq 0 ]; then
+    jq -se 'any(.[]; .event == "policy-child" and .status == 124 and .signal == null and .error == null)' \
+      "$DIAGNOSTICS" >/dev/null || fail "stalled policy did not hit its process-group deadline"
+  else
+    jq -se 'any(.[]; .event == "policy-child" and .signal == "SIGKILL" and .error == "ETIMEDOUT")' \
+      "$DIAGNOSTICS" >/dev/null || fail "delayed policy startup did not hit the synchronous-child ceiling"
+  fi
+  policy_pid=$(cat "$TMP_ROOT/policy-pid")
+  for _ in 1 2 3 4 5; do
+    kill -0 "$policy_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  if kill -0 "$policy_pid" 2>/dev/null; then
+    kill -KILL "$policy_pid" 2>/dev/null || true
+    fail "timed-out policy left its checker running"
+  fi
+done
+pass "stalled policy is reaped and withheld at both its group deadline and outer startup ceiling"
 
 printf '# dispatch-never-send malformed directive\n' > "$POLICY"
 run_belay "$LANE" || fail "invalid policy must allow stop"

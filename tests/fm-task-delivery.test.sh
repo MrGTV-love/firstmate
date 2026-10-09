@@ -1215,6 +1215,15 @@ test_forge_gerrit_changes_what_no_mistakes_means() {
   assert_grep 'recover_custody' "$brief" "the worker was not told which state requires recovery"
   assert_grep 'no-mistakes axi sync --recover' "$brief" \
     "the worker was not given the recovery command"
+  # The run can also strand the branch with no recovery offered: the pipeline head diverged from the
+  # submitted head and status says inspect_and_reconcile_manually. The worker must stop and report that
+  # code to firstmate, which owns the bind-archive route, instead of resetting, merging or rerunning.
+  assert_grep 'inspect_and_reconcile_manually' "$brief" \
+    "the worker was not told what to do when status offers no recovery for a diverged pipeline head"
+  assert_grep 'bind-archive route' "$brief" \
+    "the worker was not pointed at the route firstmate owns for a diverged pipeline head"
+  assert_grep 'validation-supervision' "$brief" \
+    "the worker was not told which firstmate skill owns the diverged-head route"
   assert_grep 'You may not publish until you have closed that gap' "$brief" \
     "custody recovery was offered as advice rather than required before publishing"
   assert_grep 'how the UNFIXED code reaches review' "$brief" \

@@ -72,8 +72,8 @@ Phase 1 completes only when the Vernant participant lands as a separate Vernant-
 
 `bin/fm-load-report.sh` records host load and reads pipeline agent durations; its [engine header](../bin/fm-load-report.py) owns the sample format and command behavior, while this recipe owns the measurement window and acceptance criteria.
 
-1. Only once Phase 1 is complete, note the time with `date +%s` and start one recorder per host: `nohup bin/fm-load-report.sh watch --interval 60 >/dev/null 2>&1 &`.
-2. After 24 to 48 hours of normal fleet work, run `bin/fm-load-report.sh report --since <that epoch>`.
+1. Only once Phase 1 is complete, note the time with `date +%s` and start one recorder per host: `nohup bin/fm-proc-budget.sh -- bin/fm-load-report.sh watch --interval 60 >/dev/null 2>&1 &`.
+2. After 24 to 48 hours of normal fleet work, run `bin/fm-proc-budget.sh -- bin/fm-load-report.sh report --since <that epoch>`.
 3. Read its two verdicts: `load_within_2x_cpus` (1-minute load p95 at or under twice the CPU count) and `converged_within_2_fix_rounds` (the fixed first ten pipeline runs that reached review and were created after the recorded cutover epoch, ordered by creation time then run id, completed successfully with at most two review-fix rounds and none hit a timeout).
    Failed and cancelled cohort members count as not converged.
    The convergence verdict is pending (`null` in JSON, `pending` in text) until ten review-reaching runs exist and every pending or running run that sorts at or before the tenth member is terminal, including runs that have not reached review yet.

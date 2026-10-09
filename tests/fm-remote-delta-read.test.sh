@@ -96,12 +96,15 @@ assert_contains "$(<"$TMP_ROOT/growth2.out")" 'status=delta' 'the shimmed run lo
 pass 'the capture and hashing path runs exactly once a real change lands'
 
 # A shrunk file reports the truncation with the hash of what actually remains.
+# Publish the complete short file atomically so the reader cannot capture the
+# empty state between shell redirection's truncation and printf's write.
 printf 'alpha\nbeta\n' > "$DELTA_HOME/$DELTA_LOG_REL"
 PREFIX_SHA=$(sha 'alpha\nbeta\n')
 run_reader 11 "$PREFIX_SHA" 4 > "$TMP_ROOT/truncated.out" &
 READER_PID=$!
 sleep 0.3
-printf 'a\n' > "$DELTA_HOME/$DELTA_LOG_REL"
+printf 'a\n' > "$DELTA_HOME/$DELTA_LOG_REL.next"
+mv "$DELTA_HOME/$DELTA_LOG_REL.next" "$DELTA_HOME/$DELTA_LOG_REL"
 wait "$READER_PID" || fail 'the truncated read did not exit 0'
 OUT=$(<"$TMP_ROOT/truncated.out")
 assert_contains "$OUT" 'status=continuity-broken' 'truncation did not produce a break'
@@ -112,12 +115,13 @@ pass 'a shrunk log breaks continuity as truncated with the remaining hash'
 
 # A same-size in-place rewrite changes only mtime/ctime: the stat gate must
 # still take the snapshot, where the prefix hash catches the changed bytes.
-# This rewrite lands in a later epoch second.
+# This rewrite lands in a later epoch second without ever shrinking the log.
 printf 'alpha\nbeta\n' > "$DELTA_HOME/$DELTA_LOG_REL"
 run_reader 11 "$PREFIX_SHA" 4 > "$TMP_ROOT/rewrite.out" &
 READER_PID=$!
 sleep 1.1
-printf 'OMEGA\nbeta\n' > "$DELTA_HOME/$DELTA_LOG_REL"
+printf 'OMEGA\nbeta\n' | dd of="$DELTA_HOME/$DELTA_LOG_REL" conv=notrunc 2>/dev/null \
+  || fail 'the in-place rewrite failed'
 wait "$READER_PID" || fail 'the rewritten read did not exit 0'
 OUT=$(<"$TMP_ROOT/rewrite.out")
 assert_contains "$OUT" 'status=continuity-broken' 'a same-size rewrite did not produce a break'
@@ -147,7 +151,7 @@ case "\$3" in
     if [ "\${FM_TEST_REMOVE_LOG:-0}" = 1 ]; then
       rm -- "\$FM_TEST_REWRITE_LOG"
     else
-      printf 'OMEGA\\nbeta\\n' > "\$FM_TEST_REWRITE_LOG"
+      printf 'OMEGA\\nbeta\\n' | dd of="\$FM_TEST_REWRITE_LOG" conv=notrunc 2>/dev/null || exit \$?
     fi
     : > "\$FM_TEST_REWRITE_DONE"
   fi

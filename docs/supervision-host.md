@@ -270,6 +270,8 @@ So it never stops the owner's host or watcher or releases its leases.
 ### A host that dies without a close
 
 The host's owner retries it.
+Claude's Stop hook retries a non-actionable host close as a crash only when its exit status is above 128, not merely because its output is empty.
+An explicit failed hand-back instead reaches the failure-notification path immediately, even if no readiness line was printed or its successor watcher remains healthy.
 Grok's model and Codex's checkpoint see it as a failed cycle and start the next one.
 Before it arms, the next host does two things:
 
