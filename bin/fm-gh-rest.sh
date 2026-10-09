@@ -58,23 +58,11 @@ header_pairs() { # headers-file
     { name = tolower($1); if (name in want) { v = $0; sub(/^[^:]*: */, "", v); print name "=" v } }' "$1"
 }
 
-record_rate() ( # headers-file
-  local limit='' remaining='' reset='' resource=core file previous prev_reset prev_remaining name value
-  while IFS='=' read -r name value; do
-    case "$name" in
-      x-ratelimit-limit) limit=$value ;;
-      x-ratelimit-remaining) remaining=$value ;;
-      x-ratelimit-reset) reset=$value ;;
-      x-ratelimit-resource) resource=$(printf '%s' "$value" | tr -c 'A-Za-z0-9_-' '_') ;;
-    esac
-  done < <(header_pairs "$1")
+record_rate() (
+  local limit=$1 remaining=$2 reset=$3 resource=$4 file previous prev_reset prev_remaining
   case "$limit$remaining$reset" in ''|*[!0-9]*) return 0 ;; esac
   [ -n "$limit" ] && [ -n "$remaining" ] && [ -n "$reset" ] || return 0
   file="$STATE/gh-ratelimit.$resource.json"
-  mkdir -p "$STATE" 2>/dev/null || return 0
-  . "$SCRIPT_DIR/fm-wake-lib.sh"
-  fm_lock_acquire_wait "$file.lock" || return 0
-  trap 'fm_lock_release "$file.lock"' EXIT
   if [ -f "$file" ]; then
     previous=$(jq -r 'select((.reset | type) == "number" and (.remaining | type) == "number") | "\(.reset) \(.remaining)"' "$file" 2>/dev/null || true)
     if [ -n "$previous" ]; then
@@ -109,16 +97,38 @@ prune_cache() {
   fi
 }
 
+record_response() (
+  local headers=$1 staged=${2:-} entry=${3:-} snapshot=${4:-}
+  local lock="$STATE/gh-ratelimit.core.json.lock"
+  local limit='' remaining='' reset='' resource=core name value
+  while IFS='=' read -r name value; do
+    case "$name" in
+      x-ratelimit-limit) limit=$value ;;
+      x-ratelimit-remaining) remaining=$value ;;
+      x-ratelimit-reset) reset=$value ;;
+      x-ratelimit-resource) resource=$(printf '%s' "$value" | tr -c 'A-Za-z0-9_-' '_') ;;
+    esac
+  done < <(header_pairs "$headers")
+  mkdir -p "$STATE" 2>/dev/null || return 0
+  . "$SCRIPT_DIR/fm-wake-lib.sh"
+  fm_lock_acquire_wait "$lock" || return 0
+  trap 'fm_lock_release "$lock"' EXIT
+  record_rate "$limit" "$remaining" "$reset" "$resource"
+  [ -n "$staged" ] || return 0
+  [ -z "$snapshot" ] || cmp -s "$snapshot" "$entry" || return 0
+  mv -f -- "$staged" "$entry"
+)
+
 # fetch_page <endpoint> <body-out> : prints the next endpoint (or nothing) on stdout; returns 1 on a forge error.
 fetch_page() {
-  local endpoint=$1 body_out=$2 entry etag='' raw hdr err status next staged
+  local endpoint=$1 body_out=$2 entry snapshot etag='' raw hdr err status next staged=''
   entry=$(cache_path "$endpoint")
-  if [ -f "$entry" ] && jq -e '(.etag | type == "string" and length > 0) and (.body | type == "string") and (.body | fromjson | true)' \
-    "$entry" >/dev/null 2>&1; then
-    etag=$(jq -r .etag "$entry")
-  fi
   raw="$work/raw.$RANDOM$RANDOM"
-  hdr="$raw.hdr"; err="$raw.err"
+  hdr="$raw.hdr"; err="$raw.err"; snapshot="$raw.cache"
+  if cat "$entry" > "$snapshot" 2>/dev/null && jq -e '(.etag | type == "string" and length > 0) and (.body | type == "string") and (.body | fromjson | true)' \
+    "$snapshot" >/dev/null 2>&1; then
+    etag=$(jq -r .etag "$snapshot")
+  fi
   local -a conditional=()
   [ -z "$etag" ] || conditional=(-H "If-None-Match: $etag")
   env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 gh api -i ${conditional[@]+"${conditional[@]}"} "$endpoint" \
@@ -129,25 +139,25 @@ fetch_page() {
     inhead { if ($0 == "") { inhead = 0 } else { print > hdr } ; next }
     { print > body }'
   status=$(awk 'NR == 1 { print $2 }' "$hdr" 2>/dev/null)
-  record_rate "$hdr"
   local name value response_etag='' link='' has_link=0
   while IFS='=' read -r name value; do
     case "$name" in etag) response_etag=$value ;; link) link=$value; has_link=1 ;; esac
   done < <(header_pairs "$hdr")
   next=$(printf '%s' "$link" | tr ',' '\n' | sed -n 's/^[[:space:]]*<\([^>]*\)>[[:space:]]*;[[:space:]]*rel="next".*/\1/p' | head -1 | sed -E 's#^https?://[^/]+/##')
   if [ "$status" = 304 ] && [ -n "$etag" ]; then
-    jq -r .body "$entry" > "$body_out"
+    jq -r .body "$snapshot" > "$body_out"
     if [ "$has_link" -eq 0 ]; then
-      next=$(jq -r '.next // empty' "$entry")
-    elif staged=$(mktemp "$CACHE/.entry.XXXXXX" 2>/dev/null); then
-      if jq --arg next "$next" '.next = (if $next == "" then null else $next end)' "$entry" > "$staged" \
-        && chmod 600 "$staged"; then
-        mv -f -- "$staged" "$entry" || rm -f -- "$staged"
-      else
+      next=$(jq -r '.next // empty' "$snapshot")
+    fi
+    if staged=$(mktemp "$CACHE/.entry.XXXXXX" 2>/dev/null); then
+      if ! { jq --arg next "$next" '.next = (if $next == "" then null else $next end)' "$snapshot" > "$staged" \
+        && chmod 600 "$staged"; }; then
         rm -f -- "$staged"
+        staged=''
       fi
     fi
-    touch "$entry" 2>/dev/null || true
+    record_response "$hdr" "$staged" "$entry" "$snapshot" || true
+    [ -z "$staged" ] || rm -f -- "$staged"
     rm -f -- "$raw" "$hdr" "$err"
     printf '%s' "$next"
     return 0
@@ -157,20 +167,22 @@ fetch_page() {
       if [ "$rc" -eq 0 ] && jq -e . "$body_out" >/dev/null 2>&1; then
         etag=$response_etag
         if [ -n "$etag" ] && mkdir -p "$CACHE" 2>/dev/null && staged=$(mktemp "$CACHE/.entry.XXXXXX" 2>/dev/null); then
-          if jq -n --arg etag "$etag" --rawfile body "$body_out" --arg next "$next" \
+          if ! { jq -n --arg etag "$etag" --rawfile body "$body_out" --arg next "$next" \
             '{etag:$etag,body:$body,next:(if $next == "" then null else $next end)}' > "$staged" \
-            && chmod 600 "$staged"; then
-            mv -f -- "$staged" "$entry" || rm -f -- "$staged"
-          else
+            && chmod 600 "$staged"; }; then
             rm -f -- "$staged"
+            staged=''
           fi
         fi
+        record_response "$hdr" "$staged" "$entry" || true
+        [ -z "$staged" ] || rm -f -- "$staged"
         rm -f -- "$raw" "$hdr" "$err"
         printf '%s' "$next"
         return 0
       fi
       ;;
   esac
+  record_response "$hdr" || true
   { head -c 300 "$err"; [ -s "$err" ] || head -c 300 "$body_out"; } | tr '\n' ' ' | sed 's/ *$//' > "$raw.msg"
   [ -s "$raw.msg" ] || printf 'gh api failed' > "$raw.msg"
   cat "$raw.msg" >&2; printf '\n' >&2

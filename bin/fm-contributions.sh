@@ -263,6 +263,14 @@ mark_quota_stale() { # canonical-url task... : keep the last observation, make t
   local url=$1 task kind
   shift
   case "$url" in */issues/*) kind=issue ;; *) kind="pr" ;; esac
+  if ! jq -e --arg error "$QUOTA_REASON" '
+    ($error | split(" quota low (")) as $new
+    | any(.[] | .records[];
+      (.error // "" | split(" quota low (")) as $old
+      | ($old | length) == 2 and $old[0] == $new[0]
+        and ($old[1] | split("resets at ")[-1]) == ($new[1] | split("resets at ")[-1]))' "$TMP/saved.json" >/dev/null; then
+    QUOTA_ANNOUNCE=1
+  fi
   for task in "$@"; do
     fm_pr_task_id_valid "$task" || { printf 'contributions: invalid durable task id\n'; continue; }
     jq -n --slurpfile saved "$TMP/saved.json" --arg task "$task" --arg url "$url" --arg kind "$kind" '
@@ -270,13 +278,6 @@ mark_quota_stale() { # canonical-url task... : keep the last observation, make t
       // {url:$url,kind:$kind,checked_at:null,observation:null,verdict:null,seen:[],pending:[],notified:[]}' > "$TMP/old.json"
     if jq -e --arg error "$QUOTA_REASON" '.error == $error' "$TMP/old.json" >/dev/null; then
       continue
-    fi
-    if ! jq -e --arg error "$QUOTA_REASON" '
-      (.error // "" | split(" quota low (")) as $old
-      | ($error | split(" quota low (")) as $new
-      | ($old | length) == 2 and $old[0] == $new[0]
-        and ($old[1] | split("resets at ")[-1]) == ($new[1] | split("resets at ")[-1])' "$TMP/old.json" >/dev/null; then
-      QUOTA_ANNOUNCE=1
     fi
     jq --arg error "$QUOTA_REASON" '.error = $error' "$TMP/old.json" > "$TMP/row.json"
     write_record "$task" "$TMP/row.json"
@@ -444,6 +445,7 @@ poll() {
   QUOTA_ANNOUNCE=0
   QUOTA_REASON=
   while IFS=$'\t' read -r -a row; do
+    [ -n "$QUOTA_REASON" ] || QUOTA_REASON=$("$SCRIPT_DIR/fm-gh-rest.sh" guard) || true
     if [ -n "$QUOTA_REASON" ]; then
       mark_quota_stale "${row[0]}" "${row[@]:1}"
       continue
@@ -454,6 +456,10 @@ poll() {
     observe "$url" || observed=$?
     if [ -e "$TMP/quota-low" ]; then
       QUOTA_REASON=$(head -1 "$TMP/quota-low")
+    elif [ "$observed" -ne 0 ]; then
+      QUOTA_REASON=$("$SCRIPT_DIR/fm-gh-rest.sh" guard) || true
+    fi
+    if [ -n "$QUOTA_REASON" ]; then
       mark_quota_stale "$url" "${row[@]:1}"
       continue
     fi

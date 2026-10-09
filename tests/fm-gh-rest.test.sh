@@ -41,6 +41,14 @@ if index + 1 < len(pages):
     link = 'Link: <https://api.github.com/repositories/1/items?per_page=2&page=%d>; rel="next"\r\n' % (index + 2)
 elif os.path.exists(site + '/terminal-link'):
     link = 'Link: <https://api.github.com/repositories/1/items?per_page=2&page=1>; rel="prev"\r\n'
+delay = os.environ.get('FAKE_GH_DELAY') if index == 0 else None
+if delay:
+    open(site + '/' + delay + '.ready', 'w').close()
+    deadline = time.monotonic() + 10
+    while not os.path.exists(site + '/' + delay + '.release'):
+        if time.monotonic() >= deadline:
+            sys.exit('response barrier timed out')
+        time.sleep(0.01)
 if conditional == etag:
     if os.path.exists(site + '/omit-304-link'):
         link = ''
@@ -148,6 +156,48 @@ test_304_updates_pagination_and_retains_omitted_metadata() {
   out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp) || fail 'repeated contracted read failed'
   assert_equals '[[{"id":1},{"id":2}]]' "$out" 'cleared pagination metadata was not cached'
   pass '304 pagination metadata adds and removes pages, and survives omitted headers'
+}
+
+test_304_uses_its_generation_during_concurrent_replacement() {
+  local site mode older_pid conditional_pid n out
+  for mode in supplied omitted; do
+    site=$(new_site "generation-$mode")
+    get "$site" 'repos/o/r/items?per_page=2' >/dev/null || fail 'seed generation failed'
+    printf '[[{"id":2}]]\n' > "$site/pages.json"
+    FAKE_GH_DELAY=older get "$site" 'repos/o/r/items?per_page=2' > "$site/older.out" &
+    older_pid=$!
+    for ((n=0; n<500; n++)); do
+      [ ! -e "$site/older.ready" ] || break
+      sleep 0.01
+    done
+    [ "$n" -lt 500 ] || fail 'older response did not reach its barrier'
+    if [ "$mode" = omitted ]; then
+      printf '[[{"id":3}],[{"id":4}]]\n' > "$site/pages.json"
+    else
+      printf '[[{"id":3}]]\n' > "$site/pages.json"
+    fi
+    get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp >/dev/null || fail 'newer generation failed'
+    printf '[[{"id":3}],[{"id":4}]]\n' > "$site/pages.json"
+    [ "$mode" != omitted ] || : > "$site/omit-304-link"
+    FAKE_GH_DELAY=conditional get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp > "$site/conditional.out" &
+    conditional_pid=$!
+    for ((n=0; n<500; n++)); do
+      [ ! -e "$site/conditional.ready" ] || break
+      sleep 0.01
+    done
+    [ "$n" -lt 500 ] || fail 'conditional response did not reach its barrier'
+    : > "$site/older.release"
+    wait "$older_pid" || fail 'older response failed'
+    : > "$site/conditional.release"
+    wait "$conditional_pid" || fail 'conditional response failed'
+    assert_equals '[[{"id":3}],[{"id":4}]]' "$(cat "$site/conditional.out")" "a 304 with $mode links used another generation"
+    printf '[[{"id":2}]]\n' > "$site/pages.json"
+    : > "$site/omit-304-link"
+    out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp) || fail 'replacement generation read failed'
+    assert_equals '[[{"id":2}]]' "$out" 'a 304 rewrote another generation or its links'
+    assert_equals 4 "$(counted "$site")" 'the replaced generation was not retained for a conditional read'
+  done
+  pass 'a concurrent 304 serves its ETag generation without rewriting the replacement body or links'
 }
 
 test_query_fields_are_encoded_and_distinct_cache_keys() {
@@ -314,6 +364,7 @@ test_changed_data_replaces_the_cache
 test_missing_or_corrupt_cache_falls_back_to_a_normal_get
 test_pagination_follows_link_and_caches_every_page
 test_304_updates_pagination_and_retains_omitted_metadata
+test_304_uses_its_generation_during_concurrent_replacement
 test_query_fields_are_encoded_and_distinct_cache_keys
 test_a_failed_read_exits_nonzero_and_caches_nothing
 test_the_quota_floor_reads_headers_from_calls_already_made
