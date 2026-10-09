@@ -176,6 +176,7 @@ The workflow retains per-PR supersession without cancelling main pushes or chang
 
 [CONTRIBUTING.md](../CONTRIBUTING.md) owns the local test policy and common entry points.
 `bin/fm-test-run.sh --help` owns exact lane names, changed-file selection (including retired assets), and bounded `--jobs` mechanics.
+Changed-file selection maps the flat omp bordered captures to `fm-composer-lib.test.sh` and the native-band captures, including both 18.8.1 directory and linked-worktree layouts, to `fm-composer-native-band.test.sh`; unrelated flat captures still require a consumer mapping.
 
 ## Timeouts
 

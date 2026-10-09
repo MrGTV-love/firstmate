@@ -2073,13 +2073,15 @@ test_changed_omp_composer_captures_select_their_consumers() {
   printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-composer-lib.test.sh"
   chmod +x "$repo/tests/fm-composer-lib.test.sh"
   mkdir -p "$repo/tests/fixtures"
-  for fixture in omp-bordered-empty omp-bordered-pending omp-native-band-empty omp-native-band-pending; do
+  for fixture in omp-bordered-empty omp-bordered-pending omp-native-band-empty omp-native-band-pending \
+    omp-native-band-18.8.1-empty omp-native-band-18.8.1-worktree-empty; do
     : >"$repo/tests/fixtures/$fixture.ansi"
   done
   git -C "$repo" add tests
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm capture-baseline
 
-  for fixture in omp-bordered-empty omp-bordered-pending omp-native-band-empty omp-native-band-pending; do
+  for fixture in omp-bordered-empty omp-bordered-pending omp-native-band-empty omp-native-band-pending \
+    omp-native-band-18.8.1-empty omp-native-band-18.8.1-worktree-empty; do
     printf '\n' >>"$repo/tests/fixtures/$fixture.ansi"
     listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
       || fail "changed omp capture was refused: $fixture"

@@ -1873,7 +1873,8 @@ families_for_changed_path() {
     tests/fixtures/omp-bordered-empty.ansi|tests/fixtures/omp-bordered-pending.ansi)
       printf '%s\n' "__script__:fm-composer-lib.test.sh"
       ;;
-    tests/fixtures/omp-native-band-empty.ansi|tests/fixtures/omp-native-band-pending.ansi)
+    tests/fixtures/omp-native-band-empty.ansi|tests/fixtures/omp-native-band-pending.ansi|\
+    tests/fixtures/omp-native-band-18.8.1-empty.ansi|tests/fixtures/omp-native-band-18.8.1-worktree-empty.ansi)
       printf '%s\n' "__script__:fm-composer-native-band.test.sh"
       ;;
     tests/fixtures/*/*)
