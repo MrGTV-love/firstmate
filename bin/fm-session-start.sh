@@ -902,7 +902,11 @@ for meta in "$STATE"/*.meta; do
 
   window=$(fm_meta_get "$meta" window)
   target=$(fm_backend_target_of_meta "$meta")
-  if [ -n "$window" ]; then
+  remote_host=$(fm_meta_get "$meta" remote_host)
+  case "$window" in remote:*) remote_host=${remote_host:-unknown} ;; esac
+  if [ -n "$remote_host" ]; then
+    printf 'endpoint: unknown (window=%s - remote endpoint on %s; not probed locally)\n' "$window" "$remote_host"
+  elif [ -n "$window" ]; then
     backend=$(fm_backend_of_meta "$meta")
     endpoint_rc=0
     fm_session_start_endpoint_read "$backend" "${target:-$window}" "fm-$id" || endpoint_rc=$?

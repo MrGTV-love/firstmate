@@ -157,38 +157,42 @@ fm_backend_tmux_window_inventory() {  # <session-target>
   return 1
 }
 
-# fm_backend_tmux_target_exists: cheap, READ-ONLY presence check for one
-# recorded target. `tmux display-message -t` cannot serve as one: while any
-# server runs it answers success for an absent window, an absent session, and an
-# unused window index alike, falling back to some other pane (verified on tmux
-# 3.5a; the same fallback fm_backend_tmux_agent_state and fm-spawn.sh already
-# guard against). Only the window inventory is truthful, so a recorded
-# `session:window` name is present only when the exact session
-# (`=session`) lists a whole line equal to the window - never a prefix.
-# A target that is not a plain `session:name` (a window or pane id, a window
-# index, or a malformed shape) cannot be matched against window names, so it
-# keeps the direct probe; firstmate records only `session:name` targets.
 fm_backend_tmux_target_exists() {  # <target>
-  local target=$1 session window windows inventory_status
+  local target=$1 session window windows inventory_status panes
   case "$target" in
     *:*:*|'':*|*:'') ;;
     *:*)
       session=${target%%:*}
+      session=${session#=}
       window=${target#*:}
+      window=${window#=}
+      if windows=$(fm_backend_tmux_window_inventory "=$session"); then
+        :
+      else
+        inventory_status=$?
+        [ "$inventory_status" -eq 2 ] && return 1
+        return 2
+      fi
+      printf '%s\n' "$windows" | grep -qxF -- "$window" && return 0
       case "$window" in
-        @*|%*) ;;
-        *[!0-9]*)
-          if windows=$(fm_backend_tmux_window_inventory "=$session"); then
-            :
-          else
-            inventory_status=$?
-            [ "$inventory_status" -eq 2 ] && return 1
-            return 2
-          fi
-          printf '%s\n' "$windows" | grep -qxF -- "$window"
+        @*|%*|*[!0-9]*.[0-9]*|[0-9]*)
+          panes=$(tmux list-panes -s -t "=$session" -F '#{window_name}.#{pane_index}
+#{window_index}.#{pane_index}
+#{window_id}.#{pane_index}
+#{pane_id}
+#{window_index}
+#{window_id}' 2>/dev/null) || return 2
+          printf '%s\n' "$panes" | grep -qxF -- "$window"
           return
           ;;
       esac
+      return 1
+      ;;
+    @*|%*)
+      panes=$(tmux list-panes -a -F '#{window_id}
+#{pane_id}' 2>/dev/null) || return 2
+      printf '%s\n' "$panes" | grep -qxF -- "$target"
+      return
       ;;
   esac
   tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
@@ -329,7 +333,7 @@ fm_backend_tmux_agent_state() {  # <target>
   esac
   session=${target%%:*}
   window=${target#*:}
-  windows=$(fm_backend_tmux_window_inventory "$session")
+  windows=$(fm_backend_tmux_window_inventory "=${session#=}")
   inventory_status=$?
   if [ "$inventory_status" -ne 0 ]; then
     if [ "$inventory_status" -eq 2 ]; then
