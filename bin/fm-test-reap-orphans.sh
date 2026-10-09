@@ -217,13 +217,19 @@ if [ -n "$OWNER_PID" ]; then
 else
   for dir in "${TMPDIRS[@]}"; do
     dir=$(physical_dir "$dir") || continue
-    for marker in "$dir"/fm-*/.fm-test-fixture "$dir"/fm-*/.fm-lab-home "$dir"/fmlab.*/.fm-live-lab; do
+    while IFS= read -r -d '' marker; do
       [ -f "$marker" ] || continue
       marker_owner_dead "$marker" || continue
       root=$(dirname "$marker")
       case "$marker" in */.fm-test-fixture) ;; *) lab_inactive "$root" || continue ;; esac
       add_root "$root"
-    done
+    done < <(
+      printf '%s\0' "$dir"/fm-*/.fm-test-fixture "$dir"/fmlab.*/.fm-live-lab
+      for container in "$dir"/fm-* "$dir"/fmlab.*; do
+        [ -d "$container" ] && [ ! -L "$container" ] || continue
+        find "$container" -type f -name .fm-lab-home -print0 2>/dev/null
+      done
+    )
   done
 fi
 [ -s "$WORK/roots" ] || exit 0

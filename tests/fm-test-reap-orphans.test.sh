@@ -420,3 +420,28 @@ alive "$KILLED_STUB" || fail "the killed test's stub did not outlive its owner, 
 env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REAP=0 bash -c '. "$FM_TEST_LIB"' >/dev/null 2>&1
 wait_gone "$KILLED_STUB" 10 || fail "sourcing the test library did not reap the stub of a killed test"
 pass "sourcing the test library reaps the stub a killed test left behind"
+
+NESTED_LAB_ROOT="$SCAN/fm-lab-nested/home"
+bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
+NESTED_LAB_OWNER=$!
+track "$NESTED_LAB_OWNER"
+wait_file "$NESTED_LAB_ROOT/ready" 5 || fail "the nested lab creator did not finish"
+mkdir -p "$NESTED_LAB_ROOT/bin" "$NESTED_LAB_ROOT-unmarked/bin"
+write_stub "$NESTED_LAB_ROOT/bin/fm-watch.sh"
+orphan "$TMP_ROOT/nested-lab-watch.pid" bash "$NESTED_LAB_ROOT/bin/fm-watch.sh" "$NESTED_LAB_ROOT/release"
+NESTED_LAB_WATCH=$(cat "$TMP_ROOT/nested-lab-watch.pid")
+write_stub "$NESTED_LAB_ROOT-unmarked/bin/fm-watch.sh"
+orphan "$TMP_ROOT/nested-lab-unmarked.pid" bash "$NESTED_LAB_ROOT-unmarked/bin/fm-watch.sh" "$NESTED_LAB_ROOT-unmarked/release"
+NESTED_LAB_UNMARKED_WATCH=$(cat "$TMP_ROOT/nested-lab-unmarked.pid")
+out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the nested lab scan failed: $out"
+alive "$NESTED_LAB_WATCH" || fail "the reaper stopped a live creator's nested lab watcher"
+alive "$NESTED_LAB_UNMARKED_WATCH" || fail "the reaper stopped an unmarked nested lab watcher"
+kill -KILL "$NESTED_LAB_OWNER" 2>/dev/null || true
+wait "$NESTED_LAB_OWNER" 2>/dev/null || true
+out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the ended nested lab scan failed: $out"
+assert_contains "$out" "reaped pid=$NESTED_LAB_WATCH root=$NESTED_LAB_ROOT " "the scan did not attribute the watcher to its marked nested lab home"
+wait_gone "$NESTED_LAB_WATCH" 10 || fail "the ended nested lab's watcher survived"
+alive "$NESTED_LAB_UNMARKED_WATCH" || fail "the ended lab scan stopped an unmarked nested lab watcher"
+touch "$NESTED_LAB_ROOT-unmarked/release"
+wait_gone "$NESTED_LAB_UNMARKED_WATCH" 5 || fail "the unmarked nested lab watcher did not accept its release"
+pass "nested marked lab watchers are reaped while unmarked nested homes are left alone"
