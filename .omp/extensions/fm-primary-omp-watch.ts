@@ -789,9 +789,9 @@ export default function (pi: ExtensionAPI) {
   function consumeWake(owner: SessionGeneration, text: string): void {
     for (const [token, wake] of owner.unconsumedWakes) {
       if (wake.content !== text) continue;
-      if (!wake.pending || operationalHandback(wake.pending.message)) owner.unconsumedWakes.delete(token);
+      if (wake.pending) wake.pending.delivered = true;
+      owner.unconsumedWakes.delete(token);
       if (!wake.pending) return;
-      wake.pending.delivered = true;
       try {
         finishPendingActionable(owner, wake.pending);
       } catch (error) {
@@ -851,16 +851,8 @@ export default function (pi: ExtensionAPI) {
   function releaseWatcherWakes(owner: SessionGeneration, droppedOnly = false): void {
     for (const [token, wake] of [...owner.unconsumedWakes]) {
       if (!wake.pending || operationalHandback(wake.pending.message)) continue;
-      if (droppedOnly && (!wake.prepared || wake.pending.delivered)) continue;
-      if (wake.pending.delivered) {
-        owner.unconsumedWakes.delete(token);
-        const pending = owner.heldWakes.values().next().value?.pending
-          ?? createPendingActionable(wakeDueMessage, "");
-        enqueuePendingActionable(owner, pending);
-        owner.heldWakes.set(pending.token, { pending });
-      } else {
-        owner.heldWakes.set(token, { pending: wake.pending });
-      }
+      if (droppedOnly && !wake.prepared) continue;
+      owner.heldWakes.set(token, { pending: wake.pending });
     }
   }
 
