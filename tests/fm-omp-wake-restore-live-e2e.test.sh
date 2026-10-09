@@ -35,7 +35,8 @@
 # host, so the pane alone cannot be relied on to catch it.
 # Steps 1-3 submit model prompts, so the guard is opt-in; it fails naming omp
 # and `omp --version`. Refresh docs/verification/runtime-backends.md
-# ("omp injected text" and "omp idle wake") from its output after any omp upgrade.
+# ("omp injected text", "omp idle wake", and "omp stranded wake text") from its
+# output after any omp upgrade.
 # Every Herdr call, including adapter calls, is routed through bin/fm-herdr-lab.sh.
 set -u
 unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE
