@@ -11,7 +11,7 @@
 # This wrapper reads the current count and sets the limit (soft and hard) to
 # count + <extra>, then execs the command, so only the tree below it carries the
 # lowered limit and the rest of the user keeps its headroom. <extra> is a
-# positive decimal integer; omit it for 1500.
+# positive decimal integer without leading zeros; omit it for 1500.
 #
 # The budget only tightens. A limit the command already inherits that is lower
 # than count + <extra> stays as it is, and the hard limit is lowered with the

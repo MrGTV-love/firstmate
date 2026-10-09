@@ -131,7 +131,7 @@ The stale-owner claim occurs only after the existing AFK and supervision-need ga
 
 ### Claude arm failures
 
-After each non-actionable arm close, the hook rechecks the identity-matched watcher lock and fresh beacon before retrying a bounded number of times.
+With the supervision host disabled, after each non-actionable arm close the hook rechecks the identity-matched watcher lock and fresh beacon before retrying a bounded number of times.
 The beacon is `state/.last-watcher-beat`, which only the watcher process touches.
 
 - A cycle-end failure is benign when that live-watcher predicate is true.
@@ -146,7 +146,7 @@ The Claude turn-end guard owns that notice commit contract, the monotonic failur
 
 On a non-Pi primary, a home that runs the supervision host runs `bin/fm-supervision-host.sh` in place of the arm its re-arm owner would start.
 The host owns successive watcher cycles through the same arm.
-[supervision-host.md](supervision-host.md#failure-direction) owns the hand-back's downtime restoration, including when the successor already exited; the arm's recovery and acknowledgement contracts below still apply.
+[supervision-host.md](supervision-host.md#failure-direction) owns host-close handling and hand-back downtime restoration; the arm's recovery and acknowledgement contracts below still apply.
 
 ## Actionable wake ordering
 
