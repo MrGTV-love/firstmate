@@ -64,10 +64,10 @@
 # tasks-axi --archive-body). It closes a question with `tasks-axi done` - or,
 # with `--release`, lifts the hold with `tasks-axi unhold` so a captain-gated
 # WORK item resumes without closing - and restores resolution-first body
-# ordering. An exact retry also completes unfinished ordering normalization and
-# is idempotent only when its requested close mode
-# matches the newest record; a changed decision or a mode mismatch is rejected.
-# A re-held task may record a new answer on top. On a task already closed outside this script,
+# ordering. For direct callers, an exact retry also completes unfinished ordering
+# normalization and requires the requested close mode to match the newest record;
+# a changed decision or a mode mismatch is rejected. A re-held task may record
+# a new answer on top. On a task already closed outside this script,
 # `answer` records the missing resolution block (the old `repair` path) only
 # when the task still carries the captain-hold provenance tasks-axi preserves
 # through a close, so an ordinary finished task cannot be dressed up as an
@@ -82,14 +82,19 @@
 # task through the very same `answer` path above, so every guard applies
 # identically no matter which channel the answer arrived on. The key IS the
 # task id - no identity arithmetic. The optional fourth field selects the close:
-# empty or `done` completes the task, `release` lifts the hold so held work
-# resumes; anything else is skipped. A task a worker still owns (a live runtime
-# record or an In flight row) is always released, whatever mode was declared,
-# because completing it would record a landing that has not happened. A key that names no task, a task that is
-# not held for the captain, or a task already closed is reported as `skipped:`
-# and feeds nothing. A replayed delivery whose answer digest and requested
-# close mode both match the newest record is reported `closed:` and is a no-op;
-# a mode mismatch is skipped. The command exits nonzero when any key was
+# empty or `done` selects automatic resolution through the internal
+# `answer --auto-release` path; `release` explicitly lifts the hold so held work
+# resumes; anything else is skipped. Automatic resolution never completes work
+# still owned by a worker. docs/captain-hold-lifecycle.md#answer-time-resolution
+# owns fresh-state selection, interrupted-release recovery, and replay safety.
+# A successful resolution, including a release or compatible replay, is reported
+# as `closed:`. An exact released-record replay is compatible on an unheld open
+# task in either mode, and on a Done task only in automatic mode. Other Done
+# replays require an automatic mode and a compatible recorded close. Missing,
+# unheld, or already-closed keys outside those replay cases, and incompatible
+# replays, are reported as `skipped:` and feed nothing. These Done/unheld replay
+# paths preserve the recorded decision and task state but can finish parent
+# publication and pending reconcile-request retirement. The command exits nonzero when any key was
 # skipped. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
 # branch and no knowledge of chat, review decks, or any transport.

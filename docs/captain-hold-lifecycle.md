@@ -90,9 +90,7 @@ A matching retry also completes any resolution-first normalization left unfinish
 
 ### Answer retries and tasks closed elsewhere
 
-- An exact retry is idempotent only when the requested close mode matches the newest record.
-- A drifted answer or a mode mismatch is rejected.
-- A re-held task accepts a new answer as a new record on top.
+[`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns direct-answer retry compatibility; [answer-time resolution](#answer-time-resolution) explains automatic recovery.
 
 On a task closed outside the script, `answer` records the missing block only when the captain-hold annotations tasks-axi preserves through a close prove the captain owned it.
 It also verifies the task stays closed.
@@ -159,7 +157,7 @@ It remains on the appropriate Captain's Call or Charted Next decision surface in
 
 The interrupted close/retention marker's publication and replay safety gates are owned by [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh)'s CRASH RECOVERY header.
 
-If the captain answers before replay, `answer` validates that record and copies any supported retained pull request or report into the row before closing it.
+If a direct answer closes the row before replay, `answer` validates that record and copies any supported retained pull request or report into the row before closing it.
 A retained Gerrit change URL is instead recorded as a `Gerrit change <url>` note on that close.
 Replay then retires the record.
 
@@ -189,37 +187,24 @@ Only `answer` with the captain's words or evidence-backed `reconcile close` reso
 
 "A keyed answer resolves its matching captain-held task" is one capability with one owner.
 `answers` is its channel-agnostic entry point.
-It reads `<task-id>\t<answer>\t<label>[\t<mode>]` lines and resolves each named task through the same `answer` path.
+[`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns keyed input syntax, card-declared modes, replay compatibility, per-key output, and exit status.
 Every guard therefore applies identically no matter which channel the answer arrived on.
 
-The optional mode column carries a card-declared close:
-
-| Mode | Effect |
-| --- | --- |
-| `done` (default) | Completes the task. |
-| `release` | Lifts the hold so held work resumes. |
-| Any other value | Skipped. |
-
-The live task record overrides the column.
-The answer path chooses the automatic mode from fresh state under the task control lock shared with teardown.
-A task whose worker still owns it, shown by a live runtime record or an In flight backlog row, is released rather than completed.
+Automatic resolution chooses whether to release or complete from fresh state under the task control lock shared with teardown.
+A task whose worker still owns it, shown by an existing runtime record or an In flight backlog row, is released rather than completed.
 If teardown finishes first and returns the held item to Queued without a runtime record, the answer closes it.
-Completing live work would record a landing that has not happened, so only cleanup closes it; interrupted cleanup replay closes the finished item once its captain hold has been resolved.
+Completing live work would record a landing that has not happened, so cleanup remains responsible for completion; its [recovery owner](../bin/fm-backlog-transition-lib.sh) describes replay after a resolved hold.
 A replay of that answer on an unheld, open item after the worker has ended stays a release.
-Resolution records are never changed after they are written. If a release was recorded but interrupted before lifting the hold, an automatic retry after teardown completes the finished held item without unholding it, leaving the record as `released`, only when its `Resolves hold set:` stamp identifies the currently open hold; the occurrence and parent decision key stay unchanged across retries.
-A new hold receives its stamp under the task control lock and cannot reuse the newest resolution's associated stamp; a colliding `FM_CAPTAIN_HOLD_NOW` is refused. A repeated answer on a re-held task is recorded as that hold's own answer, preserving prior resolution records.
-An exact automatic answer replay after cleanup reaches Done preserves the recorded release and completed state while finishing parent publication and reconcile-request retirement. Legacy records without a hold association and explicit direct-answer callers still require matching modes; an ambiguous legacy release must be closed through reconciliation or a direct answer.
-Replay classification, parent publication, and reconcile-request retirement share the task control lock. A released-row snapshot invalidated by a concurrent hold is skipped without resolving that hold or retiring its reconcile request.
+Resolution records are never changed after they are written.
+If a release was recorded but interrupted before lifting the hold, an automatic retry after teardown completes the finished held item without unholding it, leaving the record as `released`, only when its `Resolves hold set:` stamp identifies the currently open hold; the occurrence and parent decision key stay unchanged across retries.
+A new hold receives its stamp under the task control lock and cannot reuse the newest resolution's associated stamp; a colliding `FM_CAPTAIN_HOLD_NOW` is refused.
+A repeated answer on a re-held task is recorded as that hold's own answer, preserving prior resolution records.
+An exact automatic answer replay after cleanup reaches Done preserves the recorded release and completed state while finishing parent publication and reconcile-request retirement.
+An ambiguous legacy release without a hold association on finished, still-held work must be closed through reconciliation or a fresh direct answer rather than automatically completed.
+Explicit direct-answer callers retain their strict mode checks.
+Replay classification, parent publication, and reconcile-request retirement share the task control lock.
+A released-row snapshot invalidated by a concurrent hold is skipped without resolving that hold or retiring its reconcile request.
 
-Each key is reported as follows:
-
-| Key | Result |
-| --- | --- |
-| Names no task, names a task that is not captain-held, or names a task already closed | Reported as `skipped:` and feeds nothing. |
-| A replay whose answer and requested close mode match the newest record | An idempotent `closed:`. |
-| A replay with a mode mismatch | Skipped. |
-
-The command exits nonzero when any key was skipped.
 `--source` is provenance text recorded in the durable decision, never a behavior switch, and the command carries no per-channel branch.
 
 ### Source bindings
@@ -509,7 +494,7 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
   An ordinary finished task in the same home still closes with its report link.
 - An interrupted cleanup leaves the row In flight and untouched with its pending record.
   When the row remains unanswered, the next session start retains it as queued and held with the deliverable recorded.
-  An answer before replay preserves that record's completed report while closing the call, so the next session start retires the satisfied record without losing the delivery from Recently Landed.
+  `test_answer_before_cleanup_replay_preserves_the_retained_report` covers direct and keyed answers before [cleanup recovery](#interrupted-cleanup), including loss of runtime metadata, without losing the completed report from Recently Landed.
   The Gerrit answer-before-replay case uses ordinary cleanup of already-landed Git work, preserving the change URL rather than recording a forced ship discard as `dropped`.
 - A pending-close record that cannot be validated refuses the answer while naming the record and the reason.
 - A relocated data directory keeps the retention in its one configured backlog.
@@ -538,8 +523,11 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 ### Answers, stamps, and deferral
 
-- Answer-time resolution works through a bound channel with task-id keys.
-  This includes the `release` mode, mode-matched replay idempotence, and the refusal of drifted, mode-mismatched, absent, unheld, and already-closed keys.
+- [`tests/fm-captain-hold-lifecycle.test.sh`](../tests/fm-captain-hold-lifecycle.test.sh) covers bound-channel answer-time resolution and the intake's invalid-key and incompatible-replay refusals.
+  Its `test_keyed_answer_releases_a_live_work_item` and `test_keyed_answer_waits_for_cleanup_before_selecting_its_mode` cover [automatic mode selection](#answer-time-resolution).
+  `test_interrupted_keyed_release_closes_after_teardown` and `test_completed_keyed_release_replays_after_publication_failure` cover interrupted and completed release recovery.
+  `test_stale_keyed_replay_preserves_a_concurrent_hold` covers replay invalidated by a concurrent hold.
+  `test_repeated_keyed_answer_resolves_its_own_hold` and `test_legacy_keyed_release_requires_explicit_closure` cover hold association and the legacy refusal boundary.
 - The chat channel reaches the same intake.
 - Hold-set stamping precedes visible hold state, preserves an active lifecycle's timestamp, and resets after release.
 - Interrupted answer closure retains the stamp until close and restores resolution-first ordering on retry.
