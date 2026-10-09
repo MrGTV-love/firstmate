@@ -2826,7 +2826,6 @@ PRELUDE_PROGRESS_MARKER="$STATE/.prelude-progress"
 PRELUDE_NEXT_STEP=
 SIGNAL_PHASE_DELIVERY_ONLY=0
 SIGNAL_PHASE_QUEUED_REASON=
-SIGNAL_PHASE_MAIN_REQUIRED=0
 
 # Loads the persisted count into PRELUDE_DEFER_COUNT without a subshell: absent
 # reads 0, anything unreadable or non-numeric reads as the bound (work owed).
@@ -2885,7 +2884,6 @@ signal_phase_note_queued() {
       *) SIGNAL_PHASE_QUEUED_REASON="$SIGNAL_PHASE_QUEUED_REASON $f" ;;
     esac
   done
-  [ -z "$FM_SIGNAL_NEEDS_DECISION_FILES" ] || SIGNAL_PHASE_MAIN_REQUIRED=1
   return 0
 }
 
@@ -2893,8 +2891,7 @@ watch_before_wake() {
   case "$1" in signal:*) ;; *) signal_phase_flush ;; esac
   case "$1" in
     check:*) ;;
-    signal:*) FM_WAKE_OUTPUT_REASON=$SIGNAL_PHASE_QUEUED_REASON ;;
-    *) [ "$SIGNAL_PHASE_MAIN_REQUIRED" -eq 0 ] || FM_WAKE_OUTPUT_REASON=$SIGNAL_PHASE_QUEUED_REASON ;;
+    *) [ -z "$SIGNAL_PHASE_QUEUED_REASON" ] || FM_WAKE_OUTPUT_REASON=$SIGNAL_PHASE_QUEUED_REASON ;;
   esac
 }
 

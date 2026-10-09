@@ -2089,20 +2089,43 @@ SH
 test_flushed_signals_preserve_main_owned_routing() {
   local dir state fakebin out pid mode ownership id line expected window key
   for mode in two-checks stale; do
-    for ownership in decision routine; do
+    for ownership in decision routine ship-blocked mate-blocked mate-blocked-unkeyed mate-resolution \
+      mate-reference mate-held mate-routine host-open host-closed; do
       dir=$(make_case "flushed-routing-$mode-$ownership"); state="$dir/state"; fakebin="$dir/fakebin"
       out="$dir/watch.out"; window=test:fm-b; key=test_fm-b
       mkdir -p "$dir/approved" "$dir/config"
       for id in a b; do
         printf 'project=%s/approved\nwindow=test:fm-%s\nkind=ship\n' "$dir" "$id" > "$state/$id.meta"
         printf 'working: setup\n' > "$state/$id.status"
-        prime_status_seen "$state" "$state/$id.status" || fail "could not prime signal $id"
       done
-      if [ "$ownership" = decision ]; then
-        line='needs-decision [key=pick-one]: choose A or B'
-      else
-        line='done: first task completed'
-      fi
+      case "$ownership" in
+        decision) line='needs-decision [key=pick-one]: choose A or B' ;;
+        routine|host-open|host-closed) line='done: first task completed' ;;
+        mate-blocked|ship-blocked) line='blocked [key=access]: need access' ;;
+        mate-blocked-unkeyed) line='blocked: need access' ;;
+        mate-resolution) line='resolved [key=access]: access granted' ;;
+        mate-reference) line='note [key=access]: access request updated' ;;
+        mate-held) line='captain-held [key=access]: awaiting the captain' ;;
+        mate-routine) line='note: parent update after the decision closed' ;;
+      esac
+      case "$ownership" in
+        mate-*) printf 'project=%s/approved\nwindow=test:fm-a\nkind=secondmate\n' "$dir" > "$state/a.meta" ;;
+      esac
+      case "$ownership" in
+        mate-resolution|host-open|host-closed|mate-routine)
+          printf 'needs-decision [key=access]: need access\n' >> "$state/a.status" ;;
+        mate-reference)
+          printf 'blocked [key=access]: need access\n' >> "$state/a.status" ;;
+      esac
+      case "$ownership" in
+        host-closed|mate-routine)
+          printf 'resolved [key=access]: access granted\n' >> "$state/a.status" ;;
+      esac
+      for id in a b; do
+        prime_status_seen "$state" "$state/$id.status" || fail "could not prime signal $id"
+        printf '%s\t%s\t%s\t\n' "$id" "$(_fm_open_decisions_file_ident "$state/$id.status")" \
+          "$(size_of "$state/$id.status")" >> "$state/.status-presentation-cursor"
+      done
       if [ "$mode" = two-checks ]; then
         for id in a b; do
           printf '#!/usr/bin/env bash\nid=%s\n' "$id" > "$state/$id.check.sh"
@@ -2144,11 +2167,7 @@ SH
         watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
           FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$dir/pane.txt" FM_TEST_ROUTING_LINE="$line"
         pid=$!
-        if [ "$ownership" = decision ]; then
-          expected="signal: $state/a.status"
-        else
-          expected="stale: $window"
-        fi
+        expected="signal: $state/a.status"
       fi
       wait_for_exit "$pid" 300 || { reap "$pid"; fail "$mode/$ownership watcher did not deliver"; }
       [ "$(cat "$out")" = "$expected" ] \
@@ -2167,16 +2186,19 @@ const state = process.env.STATE;
 const message = readFileSync(process.env.WATCH_OUT, "utf8").trim();
 const rows = readFileSync(`${state}/.wake-queue`, "utf8").trim().split("\n").map(line => line.split("\t"));
 const signal = task => rows.find(row => row[2] === "signal" && row[3] === `${task}.status`);
-const decision = process.env.OWNERSHIP === "decision";
+const payloadDecision = ["decision", "mate-held"].includes(process.env.OWNERSHIP);
+const spanDecision = process.env.OWNERSHIP.startsWith("mate-") && process.env.OWNERSHIP !== "mate-routine";
 assert.ok(signal("a"), "first flushed signal is durable");
-assert.match(signal("a")[4], decision ? /^needs-decision:/ : /^signal:/);
+assert.match(signal("a")[4], payloadDecision ? /^needs-decision:/ : /^signal:/);
 if (process.env.MODE === "two-checks") assert.ok(signal("b"), "second flushed signal is durable");
 for (const attendedHost of [false, true]) {
+  const decision = payloadDecision || spanDecision || (attendedHost && process.env.OWNERSHIP === "host-open");
   const verdict = branchOfferForWake(state, message, false, attendedHost);
   assert.equal(verdict.scope.corrupted, false);
   assert.equal(verdict.scope.eligible, true, "an unrelated branch-eligible row must remain available");
   assert.equal(verdict.eligible, !decision, "Main-owned signals must route the close to Main");
   if (decision) assert.ok(verdict.scope.needsDecisionKeys.includes("a.status"));
+  else assert.ok(!verdict.scope.needsDecisionKeys.includes("a.status"));
   assert.equal(branchOfferForWake(state, message, true, attendedHost).eligible, true, "away routing remains eligible");
 }
 JS
