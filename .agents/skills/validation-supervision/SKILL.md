@@ -1,6 +1,6 @@
 ---
 name: validation-supervision
-description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, when a failed run's branch needs custody returned (status offers `recover_custody` or `inspect_and_reconcile_manually`), and before deciding or answering any ask-user finding.
+description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, when a failed or aborted run's branch needs custody returned (status offers `recover_custody` or `inspect_and_reconcile_manually`), and before deciding or answering any ask-user finding.
 user-invocable: false
 metadata:
   internal: true
@@ -38,15 +38,17 @@ The copy sits clean at the submitted head S and the gate holds a different pipel
 `axi sync --recover` is not offered until an archive of P is bound, so this state is the route below and not a reason to wait for a ruling.
 Firstmate sends this route to the worker that owns the run, with the run id, S and P, as authorization for exactly these steps.
 Stop at the first refusal, conflict, or mismatch and report the exact output.
-Never force, waive, edit no-mistakes records or gate refs, delete a ref or bundle, or start a second run while the failed run still owns the branch.
+Never force, waive, edit no-mistakes records or gate refs, delete a ref or bundle, or start a second run while the failed or aborted run still owns the branch.
 Run every git command directly, never inside a script, alias, subshell, or other wrapper, because getting a guarded command past a project guard that way is a guard escape.
 
-1. Confirm `axi status` still shows the run failed, the tree is clean, `HEAD` is S, and P resolves in the run's gate repository.
-2. Create the two archives without overwriting anything: `git branch archive/<task>-submitted-<S8> <S>` and `git fetch --no-tags <gate repo> refs/no-mistakes/recover/<run>:refs/heads/archive/<task>-pipeline-<P8>`.
-   Verify each resolves to its expected commit.
+1. Confirm `axi status` still shows the run failed or aborted, the tree is clean, `HEAD` is S, and P resolves in the run's gate repository.
+2. Create `git branch archive/<task>-submitted-<S8> <S>`, then fetch the recovery object without an archive destination: `git fetch --no-tags <gate repo> refs/no-mistakes/recover/<run>`.
+   Verify `FETCH_HEAD` resolves to P, then create `git branch archive/<task>-pipeline-<P8> <P>`.
+   Both branch creations must refuse an existing name; verify each archive resolves to its expected commit.
 3. Run `no-mistakes axi sync --bind-archive-ref refs/heads/archive/<task>-pipeline-<P8>` and read `axi status`.
    Then run only the recovery it now offers, `no-mistakes axi sync --recover --keep-local`, and confirm `branch_sync.state` is `custody_returned` on a clean tree.
    Bind while the run still owns P and before anything moves the branch: `blocked_recover_archive_not_applicable` means custody already returned or the branch moved, and the step stops there.
+   If the captain invalidated this work, custody recovery is complete: return to the supersession workflow above, replace the obsolete work from the correct pre-invalidation base, and validate once with the replacement intent. Do not adopt P or perform steps 4–6.
 4. Run `git reset --keep refs/heads/archive/<task>-pipeline-<P8>` to adopt P.
    Then `git range-diff` the submitted commits against the new head and report any submitted commit that is missing.
 5. A fresh run refuses at the private-mirror guard until S is an ancestor of the head, because the gate's mirror branch still holds S.
@@ -55,8 +57,7 @@ Run every git command directly, never inside a script, alias, subshell, or other
    Let B be the pipeline's rebased copy of the submitted commits, the commit just below the first pipeline fix commit.
    Prove both of these first: `git cherry -v <B> <S>` prints no `+` line, and `git diff --quiet <S> <B> -- <files>` passes for every file that `<B>..HEAD` changes.
    If either proof fails, stop and report the output.
-   Create `git branch archive/<task>-pre-replay-<H8> HEAD`, run `git reset --keep refs/heads/archive/<task>-submitted-<S8>`, and cherry-pick every commit of `git rev-list --reverse <B>..<pre-replay>` in that order.
-   If the commit-intent freshness check fires, run its own printed re-scaffold once and then `git cherry-pick --continue`.
+   Run `git reset --keep refs/heads/archive/<task>-submitted-<S8>` and cherry-pick every commit of `git rev-list --reverse <B>..refs/heads/archive/<task>-pipeline-<P8>` in that order.
    A merge commit in the range cannot be picked without a mainline: stop and report it rather than choose one.
-6. Prove `git merge-base --is-ancestor <S> HEAD` exits 0, `git range-diff <B>..<pre-replay> <S>..HEAD` shows every commit as `=`, and `no-mistakes axi sync --check` offers `run_pipeline`.
+6. Prove `git merge-base --is-ancestor <S> HEAD` exits 0, `git range-diff <B>..refs/heads/archive/<task>-pipeline-<P8> <S>..HEAD` shows every commit as `=`, and `no-mistakes axi sync --check` offers `run_pipeline`.
    Then start exactly one fresh run with the original intent; its rebase step restores a newer main base.
