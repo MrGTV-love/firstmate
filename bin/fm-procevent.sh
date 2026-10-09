@@ -109,7 +109,10 @@
 #            exists, and --if-owner removes only the exact extension registration
 #            token printed by register-extension, so a stale owner cannot retire
 #            a replacement generation. --if-identity compares the built-in
-#            registration file identity under the source lock before stopping it.
+#            registration file identity under the source lock before stopping it
+#            and refuses while any captured round of the source is unacknowledged.
+#            Built-in captures do not take this lock: a capture can still arrive
+#            between the check and runner stop; retirement never deletes inbox results.
 # sweep-home Retire a bounded snapshot of this home's registrations and owned
 #            claims, then refuse unless no registration, runner record, or owned
 #            claim remains. Used by supported Firstmate home retirement.
@@ -2190,6 +2193,10 @@ cmd_retire() {
     if [ "$current_identity" != "$expected_identity" ]; then
       fm_procevent_source_lock_release "$id"
       die "source registration generation changed: $id"
+    fi
+    if [ -n "$(source_pending "$id" | head -1)" ]; then
+      fm_procevent_source_lock_release "$id"
+      die "cannot retire source $id while a captured round is unacknowledged"
     fi
   fi
   if source_retirement_blocked_locked "$id"; then

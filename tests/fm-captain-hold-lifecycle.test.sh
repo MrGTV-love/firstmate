@@ -5077,7 +5077,7 @@ SH
 }
 
 test_sweep_preserves_deleted_board_keep_guards() {
-  local home store guard board sid out list before
+  local home store guard board sid out list before hop next
   local -a kept_ids=()
   home=$(make_home board-sweep-deleted)
   fm_test_track_procevent_home "$home" "$home/procevent-claims"
@@ -5137,6 +5137,56 @@ test_sweep_preserves_deleted_board_keep_guards() {
     assert_contains "$list" "$sid" "a deleted protected board lost its registration"
   done
   [ "$before" = "$(cksum < "$store/state.json")" ] || fail "the deleted-board sweep changed Lavish sessions"
+  printf '#!/usr/bin/env bash\nexec sleep 120\n' > "$home/fakebin/lavish-axi"
+  chmod +x "$home/fakebin/lavish-axi"
+  for guard in absolute relative chain cycle limit; do
+    board=$(sweep_board "$home" "standing-$guard" old)
+    case "$guard" in
+      relative) ln -s "../boards/standing-$guard.html" "$home/.lavish/bearings-board.html" ;;
+      chain)
+        ln -s "standing-$guard.html" "$home/boards/standing-link.html"
+        ln -s ../boards/standing-link.html "$home/.lavish/bearings-board.html"
+        ;;
+      *) ln -s "$board" "$home/.lavish/bearings-board.html" ;;
+    esac
+    sid=$(run_lavish "$home" source-id "$board") || fail "could not derive the standing target source id"
+    sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z
+    out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60 LAVISH_AXI_STATE_DIR="$store" \
+      run_lavish "$home" arm "$home/.lavish/bearings-board.html") \
+      || fail "could not arm the $guard standing symlink: $out"
+    assert_contains "$out" "artifact: $board" "arm did not record the standing board's physical target: $out"
+    rm "$board"
+    case "$guard" in
+      cycle)
+        rm "$home/.lavish/bearings-board.html"
+        ln -s bearings-board.html "$home/.lavish/bearings-board.html"
+        ;;
+      limit)
+        rm "$home/.lavish/bearings-board.html"
+        ln -s standing-hop-1 "$home/.lavish/bearings-board.html"
+        for hop in {1..40}; do
+          next=$((hop + 1))
+          ln -s "standing-hop-$next" "$home/.lavish/standing-hop-$hop"
+        done
+        ;;
+    esac
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
+      || fail "the deleted $guard standing symlink dry run failed: $out"
+    assert_contains "$out" "kept: $sid $board - the standing Bearings board" \
+      "the deleted $guard standing board was not protected in the dry run: $out"
+    out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) \
+      || fail "the deleted $guard standing symlink sweep failed: $out"
+    assert_contains "$out" "kept: $sid $board - the standing Bearings board" \
+      "the deleted $guard standing board was not protected: $out"
+    case "$guard" in
+      cycle|limit) assert_contains "$out" 'the standing Bearings board path cannot be resolved' \
+        "the unresolved standing symlink did not keep listeners: $out" ;;
+    esac
+    list=$(run_procevent "$home" list)
+    assert_contains "$list" "$sid" "the deleted $guard standing board lost its registration"
+    run_procevent "$home" retire "$sid" >/dev/null || fail "could not retire the standing symlink fixture"
+    rm "$home/.lavish/bearings-board.html"
+  done
   pass "deleted boards retain standing, feedback, ownership and captured-result protections"
 }
 
@@ -5179,7 +5229,7 @@ test_sweep_keeps_boards_with_unsearchable_parents() {
 test_sweep_preserves_rearmed_registration_generations() (
   local mode home store board sid real_perl sweep_pid poll_pid out list rc
   real_perl=$(command -v perl)
-  for mode in plain worker; do
+  for mode in plain worker pending; do
     home=$(make_home "board-sweep-rearmed-$mode")
     fm_test_track_procevent_home "$home" "$home/procevent-claims"
     store="$home/lavish-state"
@@ -5210,6 +5260,29 @@ SH
       : > "$home/sweep-release"
       wait "$sweep_pid" 2>/dev/null || true
       fail "the sweep did not reach its post-snapshot barrier"
+    fi
+    if [ "$mode" = pending ]; then
+      mkdir -p "$home/state/procevent-inbox"
+      printf 'session:\n  status: feedback\n' > "$home/state/procevent-inbox/$sid.1.result"
+      printf 'lavish\n' > "$home/state/procevent-inbox/$sid.1.adapter"
+      touch -t 200001010000 "$home/state/procevent-inbox/$sid.1.result" \
+        "$home/state/procevent-inbox/$sid.1.adapter"
+      : > "$home/sweep-release"
+      wait "$sweep_pid" || fail "the capture-race sweep failed: $(cat "$home/sweep.err")"
+      exec 7<&-
+      out=$(cat "$home/sweep.out")
+      assert_contains "$out" "kept: $sid" "the stale sweep retired a newly captured round: $out"
+      assert_contains "$out" 'retire refused' "the new capture did not block conditional retirement: $out"
+      assert_contains "$out" 'while a captured round is unacknowledged' "retirement refused for the wrong reason: $out"
+      list=$(run_procevent "$home" list)
+      assert_contains "$list" "$sid" "the source with a newly captured round lost its registration"
+      assert_present "$home/state/procevent-inbox/$sid.1.result" "the new captured round was deleted"
+      assert_absent "$home/state/procevent-inbox/$sid.1.handled" "the new captured round was acknowledged"
+      run_procevent "$home" retire "$sid" >/dev/null \
+        || fail "ordinary retirement refused the plain source's captured round"
+      assert_present "$home/state/procevent-inbox/$sid.1.result" "ordinary retirement deleted the captured round"
+      assert_absent "$home/state/procevent-inbox/$sid.1.handled" "ordinary retirement acknowledged the captured round"
+      continue
     fi
     run_procevent "$home" retire "$sid" >/dev/null \
       || { : > "$home/sweep-release"; wait "$sweep_pid"; fail "could not retire the snapshotted board"; }
@@ -5247,7 +5320,7 @@ SH
     run_procevent "$home" retire "$sid" >/dev/null \
       || fail "ordinary retirement refused the replacement listener"
   done
-  pass "stale sweeps preserve rearmed plain and worker-owned listener generations"
+  pass "stale sweeps preserve replacement generations and newly captured rounds"
 )
 
 tests=(

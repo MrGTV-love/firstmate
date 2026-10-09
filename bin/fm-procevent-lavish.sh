@@ -1189,10 +1189,19 @@ cmd_sweep() {
   reg=$(fm_procevent_registry_dir "$state")
   store=${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json
   now=$(date +%s)
-  standing=$(perl -MCwd=realpath -e '
+  standing=$(perl -MCwd=realpath -MFile::Basename=dirname,basename -e '
     my $home = realpath($ARGV[0]) // exit 1;
-    my $dir = realpath("$home/.lavish") // "$home/.lavish";
-    print realpath("$home/.lavish/bearings-board.html") // "$dir/bearings-board.html";
+    my $p = "$home/.lavish/bearings-board.html";
+    if (defined(my $real = realpath($p))) { print $real; exit }
+    my $hops = 0;
+    while (-l $p) {
+      if ($hops++ >= 40) { print "?"; exit }
+      my $target = readlink($p);
+      if (!defined $target) { print "?"; exit }
+      $p = $target =~ m{\A/} ? $target : dirname($p) . "/$target";
+    }
+    my $dir = realpath(dirname($p));
+    print defined($dir) ? "$dir/" . basename($p) : $p;
   ' "$FM_HOME" 2>/dev/null || true)
   pending_ids=$(fm_procevent_pending "$state" | sed -n 's|.*/\([^/.]*\)\.[0-9][0-9]*\.result$|\1|p')
 
@@ -1236,7 +1245,9 @@ cmd_sweep() {
       [ "${ids[$idx]}" = "$id" ] && { kind=${kinds[$idx]}; identity=${identities[$idx]}; break; }
     done
     verdict=keep
-    if [ -n "$standing" ] && [ "$artifact" = "$standing" ]; then
+    if [ "$standing" = '?' ]; then
+      reason='the standing Bearings board path cannot be resolved'
+    elif [ -n "$standing" ] && [ "$artifact" = "$standing" ]; then
       reason='the standing Bearings board'
     elif [ "$sessions" = unknown ]; then
       reason='Lavish session evidence cannot be read unambiguously'
