@@ -83,9 +83,61 @@ _status_observed_path_state() {
   fi
 }
 
-status_observed_signature() {
-  local f=$1 size=${2-} ident=${3-} path_state link_target=- access kind encoded
-  path_state=$(_status_observed_path_state "$f") || path_state=stat-error
+# Path type and mode, size, device and inode, and birth time of one path from a
+# single stat process, bar separated: the reported signature below needs all of
+# them, and each used to be its own stat. No field can hold a bar, and the birth
+# text is last, so the split below is unambiguous. Fails when stat cannot read
+# the path, which is the case every one of the old separate stats failed on.
+_status_observed_facts() {  # <file>
+  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+    LC_ALL=C /usr/bin/stat -f '%HT:%p|%z|%d:%i|%B|%FB' "$1" 2>/dev/null
+  else
+    LC_ALL=C stat -c '%F:%f|%s|%d:%i|%W|%w' "$1" 2>/dev/null
+  fi
+}
+
+# Lower-case hex of the fields' bytes, joined by a NUL byte (hex 00), into
+# <out-var>: one printf per byte instead of a printf, od and tr pipeline. The
+# signature's fields are printable ASCII except a symlink target, which can hold
+# any byte, so a call with any other byte takes the od pipeline this replaced.
+_status_hex_fields_to() {  # <out-var> <six fields...>
+  local LC_ALL=C _hx_var=$1 _hx_out='' _hx_field _hx_byte _hx_i _hx_first=1 _hx_plain=1
+  shift
+  for _hx_field in "$@"; do
+    case "$_hx_field" in *[!\ -~]*) _hx_plain=0 ;; esac
+  done
+  if [ "$_hx_plain" -eq 1 ]; then
+    for _hx_field in "$@"; do
+      [ "$_hx_first" -eq 1 ] || _hx_out="${_hx_out}00"
+      _hx_first=0
+      for ((_hx_i = 0; _hx_i < ${#_hx_field}; _hx_i++)); do
+        printf -v _hx_byte '%02x' "'${_hx_field:_hx_i:1}"
+        _hx_out="$_hx_out$_hx_byte"
+      done
+    done
+  else
+    _hx_out=$(printf '%s\0%s\0%s\0%s\0%s\0%s' "$@" | od -An -v -tx1 | tr -d ' \n') || return 1
+  fi
+  printf -v "$_hx_var" '%s' "$_hx_out"
+}
+
+# Reported-state signature of <file> into <out-var>. A caller that already holds
+# the size or identity passes them; otherwise one stat supplies them, unless a
+# test seam replaces the identity or size reader, which keeps the separate reads.
+status_observed_signature_to() {  # <out-var> <file> [size] [ident]
+  local f=$2 size=${3-} ident=${4-} path_state link_target=- access kind
+  local facts='' f_state f_size f_ident f_epoch f_birth birth rest hex
+  if [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
+    path_state=$(_status_observed_path_state "$f") || path_state=stat-error
+  elif facts=$(_status_observed_facts "$f"); then
+    f_state=${facts%%|*}; rest=${facts#*|}
+    f_size=${rest%%|*}; rest=${rest#*|}
+    f_ident=${rest%%|*}; rest=${rest#*|}
+    f_epoch=${rest%%|*}; f_birth=${rest#*|}
+    path_state=$f_state
+  else
+    path_state=stat-error
+  fi
   if [ -L "$f" ]; then
     link_target=$(readlink "$f" 2>/dev/null) || link_target=readlink-error
     kind=symlink
@@ -99,21 +151,43 @@ status_observed_signature() {
     kind=unreadable
   fi
   if [ -z "$size" ]; then
-    size=$(_fm_status_file_size "$f") || size='size-error'
+    if [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
+      size=$(_fm_status_file_size "$f") || size='size-error'
+    else
+      size=${f_size-size-error}
+    fi
     size=${size//[[:space:]]/}
     case "$size" in ''|*[!0-9]*) size='size-error' ;; esac
   fi
   if [ -z "$ident" ]; then
-    ident=$(_fm_open_decisions_file_ident "$f") || ident=identity-error
+    if [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
+      ident=$(_fm_open_decisions_file_ident "$f") || ident=identity-error
+    elif [ -n "${f_ident-}" ]; then
+      # Same rule as _fm_open_decisions_file_ident: a birth time is part of the
+      # identity only when the file system records one.
+      birth=''
+      [ "$f_epoch" = 0 ] || birth=$f_birth
+      case "$f_ident$birth" in
+        *$'\t'*|*$'\n'*) ident=identity-error ;;
+        *)
+          if [ -n "$birth" ]; then ident="strong:$f_ident:$birth"; else ident="weak:$f_ident"; fi
+          ;;
+      esac
+    else
+      ident=identity-error
+    fi
     [ -n "$ident" ] || ident=identity-error
   fi
   if [ -r "$f" ]; then access=readable; else access=unreadable; fi
-  encoded=$(printf '%s\0%s\0%s\0%s\0%s\0%s' \
-    "$size" "$ident" "$path_state" "$link_target" "$access" "$kind" \
-    | LC_ALL=C od -An -v -tx1 | tr -d ' \n') || return 1
-  printf 'r1:%s' "$encoded"
+  _status_hex_fields_to hex "$size" "$ident" "$path_state" "$link_target" "$access" "$kind" || return 1
+  printf -v "$1" 'r1:%s' "$hex"
 }
 
+status_observed_signature() {  # <file> [size] [ident]
+  local _fm_sig_out
+  status_observed_signature_to _fm_sig_out "$@" || return 1
+  printf '%s' "$_fm_sig_out"
+}
 
 status_presentation_marker_commit() {
   local marker=$1 file=$2 endpoint=$3 ident=$4 current reported classified

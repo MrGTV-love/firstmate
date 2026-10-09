@@ -406,12 +406,14 @@ await_marker() { # <marker> <pid> <name>
 await_allocation() { await_marker "$1-at-allocation" "$2" "$1"; }
 touch "$TEST_DIR/hold-primary"
 spawn primary "$RECOVERY-primary" primary >"$TEST_DIR/primary.out" 2>"$TEST_DIR/primary.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 PRIMARY_PID=$!
 await_allocation primary "$PRIMARY_PID"
 # Primary stays alive beyond the contender's entire acquisition window. The
 # contender must complete before release, so success cannot come from a retry,
 # a larger acquisition deadline, or faster scheduling of the allocation.
 spawn bravo "$RECOVERY-bravo" bravo >"$TEST_DIR/bravo.out" 2>"$TEST_DIR/bravo.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 BRAVO_PID=$!
 wait "$BRAVO_PID" || fail "cross-home recovery failed while primary allocation was held: $(cat "$TEST_DIR/bravo.err")"
 BRAVO_PID=
@@ -456,12 +458,14 @@ echo 'ok - cross-home recovery completes while unrelated allocation is held, pre
 : > "$TEST_DIR/mutation-owners"
 touch "$TEST_DIR/hold-abort" "$TEST_DIR/fail-abort" "$TEST_DIR/hold-fresh"
 spawn bravo "$RECOVERY-abort" abort >"$TEST_DIR/abort.out" 2>"$TEST_DIR/abort.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 ABORT_PID=$!
 await_allocation abort "$ABORT_PID"
 REPLACEMENT_PANE=$(field "$TEST_DIR/home-bravo/state/$RECOVERY-abort.herdr-presentation" pane_id)
 [ -n "$REPLACEMENT_PANE" ] && [ "$REPLACEMENT_PANE" != "$(field "$TEST_DIR/abort-old.meta" herdr_pane_id)" ] || fail "abort recovery did not advance its exact journal"
 lab pane get "$REPLACEMENT_PANE" >/dev/null || fail "abort replacement pane was not live before setup failed"
 spawn primary "$FRESH-primary" fresh >"$TEST_DIR/fresh.out" 2>"$TEST_DIR/fresh.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 FRESH_PID=$!
 await_allocation fresh "$FRESH_PID"
 FRESH_JOURNAL="$TEST_DIR/home-primary/state/$FRESH-primary.herdr-presentation"
@@ -498,6 +502,7 @@ echo 'ok - recovery and failed-setup abort cleanup complete beside a held fresh 
 # any acquisition window.
 touch "$TEST_DIR/hold-doomed" "$TEST_DIR/fail-doomed" "$TEST_DIR/hold-return-primary"
 spawn bravo "$FRESH-bravo" doomed >"$TEST_DIR/doomed.out" 2>"$TEST_DIR/doomed.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 DOOMED_PID=$!
 await_allocation doomed "$DOOMED_PID"
 DOOMED_JOURNAL="$TEST_DIR/home-bravo/state/$FRESH-bravo.herdr-presentation"
@@ -507,6 +512,7 @@ lab pane get "$DOOMED_PANE" >/dev/null || fail "doomed fresh pane was not live b
 TORN_META="$TEST_DIR/home-primary/state/$RECOVERY-primary.meta"
 TORN_PANE=$(field "$TORN_META" herdr_pane_id)
 teardown primary "$RECOVERY-primary" >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 TEARDOWN_PID=$!
 await_marker primary-at-return "$TEARDOWN_PID" teardown
 touch "$TEST_DIR/release-doomed"
@@ -577,6 +583,7 @@ for phase in conclude reap; do
   touch "$TEST_DIR/hold-$phase-$lane"
   [ "$phase" != conclude ] || touch "$TEST_DIR/run-$lane"
   FIXTURE_REAP_LANE=$lane teardown primary "$id" >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   TEARDOWN_PID=$!
   teardown_owner=$TEARDOWN_PID
   await_marker "$lane-at-$phase" "$TEARDOWN_PID" teardown
@@ -584,18 +591,21 @@ for phase in conclude reap; do
   if (teardown primary "$id") >"$TEST_DIR/duplicate.out" 2>"$TEST_DIR/duplicate.err"; then fail "$phase duplicate teardown escaped task custody"; fi
   grep -F 'another lifecycle action is already running' "$TEST_DIR/duplicate.err" >/dev/null || fail "$phase duplicate did not refuse at task custody"
   spawn bravo "$RECOVERY-$recover" "$recover" >"$TEST_DIR/$recover.out" 2>"$TEST_DIR/$recover.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   BRAVO_PID=$!
   recover_owner=$BRAVO_PID
   wait "$BRAVO_PID" || fail "$phase recovery failed: $(cat "$TEST_DIR/$recover.err")"
   BRAVO_PID=
   assert_owned_cleanup_held "$phase" "$lane" "$id" "$TEARDOWN_PID"
   spawn bravo "$RECOVERY-$abort" "$abort" >"$TEST_DIR/$abort.out" 2>"$TEST_DIR/$abort.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   ABORT_PID=$!
   abort_owner=$ABORT_PID
   if wait "$ABORT_PID"; then fail "$phase reclaimed abort unexpectedly launched"; fi
   ABORT_PID=
   assert_owned_cleanup_held "$phase" "$lane" "$id" "$TEARDOWN_PID"
   spawn bravo "$fresh_id" "$fresh" >"$TEST_DIR/$fresh.out" 2>"$TEST_DIR/$fresh.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   DOOMED_PID=$!
   fresh_owner=$DOOMED_PID
   if wait "$DOOMED_PID"; then fail "$phase fresh abort unexpectedly launched"; fi
@@ -676,6 +686,7 @@ cp "$FORCED_NESTED_HOME/state/$FORCED_CHILD_ID.meta" "$TEST_DIR/forced-child-bef
 touch "$TEST_DIR/hold-return-forced-child"
 env PATH="$TEST_DIR/teardownbin:$PATH" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-primary" \
   FM_ROOT_OVERRIDE="$TEST_DIR/forced-code-root" bash "$ROOT/bin/fm-teardown.sh" "$FORCED_PARENT_ID" --force --drop-file "$(fm_test_drop_file)" >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 TEARDOWN_PID=$!
 await_marker forced-child-at-return "$TEARDOWN_PID" teardown
 assert_forced_return_held() {
@@ -698,6 +709,7 @@ assert_forced_return_held() {
 }
 assert_forced_return_held
 spawn bravo "$RECOVERY-recover-forced" recover-forced >"$TEST_DIR/recover-forced.out" 2>"$TEST_DIR/recover-forced.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 BRAVO_PID=$!
 wait "$BRAVO_PID" || fail "recovery failed beside forced recursive return: $(cat "$TEST_DIR/recover-forced.err")"
 BRAVO_PID=
@@ -705,6 +717,7 @@ assert_reclaimed bravo recover-forced
 assert_forced_return_held
 touch "$TEST_DIR/fail-abort-forced" "$TEST_DIR/fail-fresh-forced"
 spawn bravo "$RECOVERY-abort-forced" abort-forced >"$TEST_DIR/abort-forced.out" 2>"$TEST_DIR/abort-forced.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 ABORT_PID=$!
 if wait "$ABORT_PID"; then fail "forced-return reclaimed abort unexpectedly launched"; fi
 ABORT_PID=
@@ -714,6 +727,7 @@ cmp -s "$TEST_DIR/abort-forced-old.meta" "$TEST_DIR/home-bravo/state/$RECOVERY-a
 assert_forced_return_held
 write_brief "$TEST_DIR/home-bravo" "$FRESH-forced"
 spawn bravo "$FRESH-forced" fresh-forced >"$TEST_DIR/fresh-forced.out" 2>"$TEST_DIR/fresh-forced.err" &
+# shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 DOOMED_PID=$!
 if wait "$DOOMED_PID"; then fail "forced-return fresh abort unexpectedly launched"; fi
 DOOMED_PID=
@@ -774,6 +788,7 @@ for phase in conclude reap; do
   touch "$TEST_DIR/hold-$phase-$lane"
   [ "$phase" != conclude ] || touch "$TEST_DIR/run-$lane"
   FIXTURE_REAP_LANE=$lane teardown primary "$id" >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   TEARDOWN_PID=$!
   await_marker "$lane-at-$phase" "$TEARDOWN_PID" teardown
   assert_owned_cleanup_held "$phase" "$lane" "$id" "$TEARDOWN_PID"

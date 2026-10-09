@@ -11,6 +11,7 @@
 #   fm-procevent-lavish.sh read <result-file>
 #   fm-procevent-lavish.sh source-id <artifact.html>
 #   fm-procevent-lavish.sh retire <artifact.html>
+#   fm-procevent-lavish.sh sweep [--dry-run]
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
 #   fm-procevent-lavish.sh deliver-reply poll <artifact.html> --agent-reply-file <path>
 #   fm-procevent-lavish.sh check <artifact.html>
@@ -35,6 +36,39 @@
 #            Captain-supplied body lines are visibly prefixed so they cannot
 #            forge structural labels. Empty message and annotation sections
 #            are reported explicitly.
+# sweep      Retire this home's Lavish listeners whose boards are finished, and
+#            print one `retired:`, `kept:` or (with --dry-run) `would-retire:`
+#            line per registration plus a `sweep:` total. Choice answers do not
+#            end Lavish sessions, so idle boards need explicit listener retirement.
+#            Keep guards run first: the standing Bearings board, unreadable or
+#            ambiguous Lavish session evidence, queued feedback or status
+#            feedback, then worker-task ownership. These guards also apply after
+#            the artifact is deleted. The standing-board exemption survives a
+#            deleted symlink target; an unresolved chain keeps every listener.
+#            Board and inbox lookup, stat, enumeration and read errors keep the
+#            affected listener with a reason; confirmed absence is not a read error.
+#            Otherwise a board is FINISHED when its artifact file is confirmed
+#            gone, or when Lavish holds no session or an ended session for it and
+#            every card key is known not to name an open captain call. Other
+#            boards must also be idle for FM_BOARD_LISTENER_IDLE_HOURS (default
+#            48, whole hours 1..8760); an unusable value refuses the sweep by name.
+#            Activity is the latest artifact mtime, session updated_at, or mtime
+#            of this source's inbox entries, including handled acknowledgements.
+#            Static discovery recognizes quoted and unquoted question attributes,
+#            case-insensitive attribute names and decoded HTML entities. Zero keys,
+#            scripts, event handlers, embedded surfaces, unkeyed forms, malformed
+#            markup, valueless question attributes and invalid decoded keys leave
+#            discovery unknown and keep a present board, even alongside static keys.
+#            `bin/fm-captain-hold.sh open-bound` checks keys in source-binding
+#            context; only exit 1 (resolved and not an open captain call) permits
+#            retirement. Its header owns the binding and key-resolution contract.
+#            A call held in another home's backlog is invisible here, so dormancy
+#            is the safeguard for live sessions.
+#            An unacknowledged captured round blocks every sweep retirement.
+#            Retirement uses the generic `retire --if-identity` boundary, whose
+#            header owns generation checks, inbox revalidation and capture limits.
+#            It stops the listener and releases its claim without ending the
+#            Lavish session, so the board stays readable and `arm` brings it back.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
 #            and prints its response verbatim, absorbing only the one exact
@@ -1008,9 +1042,287 @@ cmd_read() {
   ' "$file" "$lifecycle" "$session_ended"
 }
 
+# --- sweep: retire listeners whose boards are finished -----------------------
+# The header owns the rules. This section only reads facts and applies them; the
+# generic `retire` in bin/fm-procevent.sh stays the one place a registration and
+# its runner are actually removed.
+BOARD_IDLE_HOURS_DEFAULT=48
+BOARD_IDLE_HOURS_MAX=8760
+
+board_idle_seconds() {
+  local value=${FM_BOARD_LISTENER_IDLE_HOURS-$BOARD_IDLE_HOURS_DEFAULT}
+  case "$value" in ''|*[!0-9]*) return 1 ;; esac
+  value=$((10#$value))
+  [ "$value" -ge 1 ] && [ "$value" -le "$BOARD_IDLE_HOURS_MAX" ] || return 1
+  printf '%s\n' $((value * 3600))
+}
+
+# `sessions` is "unknown" when Lavish's store cannot be read, so an unreadable
+# store keeps every board instead of reading as "no session".
+sweep_facts() {  # <state-dir> <lavish-store>
+  local inbox_facts
+  inbox_facts=$(fm_procevent_inbox_facts "$1" "${@:3}") || return 1
+  perl -MJSON::PP -MCwd=realpath -MErrno=ENOENT -MEncode=decode,FB_DEFAULT -MTime::Local=timegm -e '
+    use strict; use warnings;
+    my ($inbox_facts, $store) = @ARGV;
+    my (%by, $store_ok, %inbox);
+    for my $row (split /\n/, $inbox_facts) {
+      my ($id, @facts) = split /\t/, $row, 4;
+      $inbox{$id} = \@facts;
+    }
+    if (open my $sf, "<", $store) {
+      local $/;
+      local $! = 0;
+      my $json = <$sf>;
+      my $read_ok = !$!;
+      my $close_ok = close $sf;
+      my $doc = eval { decode_json($json) };
+      if ($read_ok && $close_ok && ref($doc) eq "HASH" && ref($doc->{sessions}) eq "HASH") {
+        $store_ok = 1;
+        for my $s (values %{$doc->{sessions}}) {
+          push @{$by{$s->{file}}}, $s if ref($s) eq "HASH" && defined $s->{file} && !ref($s->{file});
+        }
+      }
+    }
+    sub unescape {
+      my ($v) = @_;
+      $v =~ s/&#[xX]([0-9a-fA-F]+);/chr(hex($1))/ge;
+      $v =~ s/&#([0-9]+);/chr($1)/ge;
+      $v =~ s/&quot;/"/g;
+      $v =~ s/&apos;/\x27/g;
+      $v =~ s/&lt;/</g;
+      $v =~ s/&gt;/>/g;
+      $v =~ s/&amp;/&/g;
+      return $v;
+    }
+    while (my $line = <STDIN>) {
+      chomp $line;
+      my ($id, $art) = split /\t/, $line, 2;
+      next unless defined $art;
+      my @stat = stat $art;
+      my $file_state = @stat ? (-f _ && defined realpath($art) ? "present" : "unknown")
+        : ($! == ENOENT ? "missing" : "unknown");
+      my ($sessions, $status, $pending, @keys) = ("unknown", "", 0);
+      my $keys_unknown = 0;
+      my ($activity, $captured, $evidence) = @{$inbox{$id} // [0, 0, "inbox evidence cannot be read"]};
+      $evidence = "the board file cannot be checked" if $file_state eq "unknown";
+      if ($file_state eq "present") {
+        my $t = $stat[9];
+        $activity = $t if $t > $activity;
+        if (open my $in, "<:raw", $art) {
+          local $/;
+          local $! = 0;
+          my $html = <$in>;
+          my $read_ok = !$!;
+          my $close_ok = close $in;
+          if ($read_ok && $close_ok) {
+            $html //= "";
+            my %seen;
+            $html =~ s{<!--.*?(?:-->|\z)}{}gs;
+            while ($html =~ m{<([A-Za-z][\w:-]*)(?=[\s/>])}g) {
+              my $tag = lc $1;
+              my %attr;
+              while ($html =~ m{\G\s*([^\s"\x27<>/=]+)(?:\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s"\x27=<>`]+)))?}gc) {
+                my $name = lc $1;
+                $attr{$name} //= unescape($2 // $3 // $4 // "");
+              }
+              if ($html !~ m{\G\s*/?>}gc
+                  || $tag =~ /\A(?:script|iframe|object|embed|template)\z/
+                  || grep { /\Aon/i || lc($_) eq "srcdoc" || $attr{$_} =~ /\A\s*javascript:/i } keys %attr) {
+                $keys_unknown = 1;
+                last;
+              }
+              if (!exists $attr{"data-lavish-question"}) {
+                $keys_unknown = 1 if $tag eq "form";
+                next;
+              }
+              my $k = $attr{"data-lavish-question"};
+              if ($k !~ /\A[A-Za-z0-9._-]{1,128}\z/) {
+                $keys_unknown = 1;
+                last;
+              }
+              push @keys, $k unless $seen{$k}++;
+            }
+            $keys_unknown = 1 unless @keys;
+          } else {
+            $evidence = "the board file cannot be read";
+          }
+        } elsif ($! == ENOENT) {
+          $file_state = "missing";
+        } else {
+          $evidence = "the board file cannot be opened";
+        }
+      }
+      if ($store_ok) {
+        my $list = $by{decode("UTF-8", $art, FB_DEFAULT)} // [];
+        $sessions = @$list > 1 ? "unknown" : scalar @$list;
+        if (@$list == 1) {
+          my $s = $list->[0];
+          $status = $s->{status} // "";
+          $pending = $s->{pending_prompts} // 0;
+          $pending = 0 unless $pending =~ /\A[0-9]+\z/;
+          if (($s->{updated_at} // "") =~ /\A(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)/) {
+            my $t = eval { timegm($6, $5, $4, $3, $2 - 1, $1) } // 0;
+            $activity = $t if $t > $activity;
+          }
+        }
+      }
+      print join("\t", $id, $art, $file_state, $sessions, $status || "-", $pending, $activity, $keys_unknown ? "?" : (join(",", @keys) || "-"), $captured, $evidence), "\n";
+    }
+  ' "$inbox_facts" "$2"
+}
+
+sweep_cards_closed() {
+  local source=$1 keys=$2 key rc IFS=,
+  if [ "$keys" = '?' ] || [ "$keys" = '-' ] || [ -z "$keys" ]; then
+    reason="the board's complete card-key set cannot be established"
+    return 1
+  fi
+  for key in $keys; do
+    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open-bound "$source" "$key" \
+      >/dev/null 2>&1 </dev/null
+    rc=$?
+    if [ "$rc" -ne 1 ]; then
+      reason="card $key is an open captain call or cannot be checked"
+      return 1
+    fi
+  done
+  return 0
+}
+
+cmd_sweep() {
+  local dry=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
+  local facts file_state sessions status queued activity keys captured evidence reason verdict out identity current_identity
+  local retired=0 kept=0 idx
+  local -a ids=() kinds=() identities=()
+  case "${1-}" in
+    '') ;;
+    --dry-run) dry=1; shift ;;
+    *) usage ;;
+  esac
+  [ "$#" -eq 0 ] || usage
+  idle=$(board_idle_seconds) \
+    || die "FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to $BOARD_IDLE_HOURS_MAX"
+  state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
+  reg=$(fm_procevent_registry_dir "$state")
+  store=${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json
+  now=$(date +%s)
+  standing=$(perl -MCwd=realpath -MFile::Basename=dirname,basename -e '
+    my $home = realpath($ARGV[0]) // exit 1;
+    my $p = "$home/.lavish/bearings-board.html";
+    if (defined(my $real = realpath($p))) { print $real; exit }
+    my $hops = 0;
+    while (-l $p) {
+      if ($hops++ >= 40) { print "?"; exit }
+      my $target = readlink($p);
+      if (!defined $target) { print "?"; exit }
+      $p = $target =~ m{\A/} ? $target : dirname($p) . "/$target";
+    }
+    my $dir = realpath(dirname($p));
+    print defined($dir) ? "$dir/" . basename($p) : $p;
+  ' "$FM_HOME" 2>/dev/null || true)
+
+  facts=''
+  for rec in "$reg"/lavish-*.source; do
+    [ -f "$rec" ] && [ ! -L "$rec" ] || continue
+    id=${rec##*/}; id=${id%.source}
+    fm_procevent_source_id_valid "$id" || continue
+    identity=$(fm_pr_file_identity "$rec" 2>/dev/null) || continue
+    adapter=''; kind=plain; argv_poll=''; artifact=''; n=0; in_argv=0
+    while IFS= read -r line || [ -n "$line" ]; do
+      if [ "$in_argv" = 1 ]; then
+        n=$((n + 1))
+        [ "$n" -ne 2 ] || argv_poll=$line
+        [ "$n" -ne 3 ] || artifact=$line
+        continue
+      fi
+      case "$line" in
+        adapter=*) adapter=${line#adapter=} ;;
+        kind=*) kind=${line#kind=} ;;
+        argv:) in_argv=1 ;;
+      esac
+    done < "$rec"
+    current_identity=$(fm_pr_file_identity "$rec" 2>/dev/null) || continue
+    [ "$current_identity" = "$identity" ] || continue
+    [ "$adapter" = lavish ] && [ "$argv_poll" = poll ] && [ -n "$artifact" ] || continue
+    ids+=("$id"); kinds+=("$kind"); identities+=("$identity")
+    facts="$facts$id"$'\t'"$artifact"$'\n'
+  done
+  if [ "${#ids[@]}" -eq 0 ]; then
+    printf 'sweep: retired=0 kept=0\n'
+    return 0
+  fi
+  facts=$(printf '%s' "$facts" | sweep_facts "$state" "$store" "${ids[@]}") || die "cannot read the Lavish board facts"
+
+  while IFS=$'\t' read -r id artifact file_state sessions status queued activity keys captured evidence; do
+    [ -n "$id" ] || continue
+    kind=plain; identity=''
+    for idx in "${!ids[@]}"; do
+      [ "${ids[$idx]}" = "$id" ] && { kind=${kinds[$idx]}; identity=${identities[$idx]}; break; }
+    done
+    verdict=keep
+    if [ "$evidence" != - ]; then
+      reason=$evidence
+    elif [ "$standing" = '?' ]; then
+      reason='the standing Bearings board path cannot be resolved'
+    elif [ -n "$standing" ] && [ "$artifact" = "$standing" ]; then
+      reason='the standing Bearings board'
+    elif [ "$sessions" = unknown ]; then
+      reason='Lavish session evidence cannot be read unambiguously'
+    elif [ "$status" = feedback ] || [ "$queued" -gt 0 ]; then
+      reason='Lavish holds queued feedback for the board'
+    elif [ "$kind" = task-owned ]; then
+      reason='owned by a worker task'
+    elif [ "$file_state" = missing ]; then
+      verdict=retire; reason='the board file is gone'
+    elif [ "$sessions" != 0 ] && [ "$status" != ended ] && [ $((now - activity)) -lt "$idle" ]; then
+      reason="active within the last $((idle / 3600)) hours"
+    else
+      if [ "$sessions" = 0 ]; then
+        reason='Lavish holds no session for the board'
+      elif [ "$status" = ended ]; then
+        reason='the Lavish session has ended'
+      else
+        reason="idle for $(((now - activity) / 3600)) hours with no open captain call"
+      fi
+      if sweep_cards_closed "$id" "$keys"; then
+        verdict=retire
+      fi
+    fi
+    if [ "$verdict" = retire ] && [ "$captured" = 1 ]; then
+      verdict=keep; reason='a captured round of the board is unacknowledged'
+    fi
+    if [ "$verdict" = retire ] && [ "$dry" = 0 ]; then
+      if ! out=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" retire "$id" --if-identity "$identity" 2>&1 </dev/null); then
+        verdict=keep
+        reason="retire refused: ${out%%$'\n'*}"
+      fi
+    fi
+    if [ "$verdict" = retire ]; then
+      retired=$((retired + 1))
+      if [ "$dry" = 1 ]; then
+        printf 'would-retire: %s %s - %s\n' "$id" "$artifact" "$reason"
+      else
+        printf 'retired: %s %s - %s\n' "$id" "$artifact" "$reason"
+      fi
+    else
+      kept=$((kept + 1))
+      printf 'kept: %s %s - %s\n' "$id" "$artifact" "$reason"
+    fi
+  done <<SWEEP_FACTS
+$facts
+SWEEP_FACTS
+  if [ "$dry" = 1 ]; then
+    printf 'sweep: would-retire=%s kept=%s\n' "$retired" "$kept"
+  else
+    printf 'sweep: retired=%s kept=%s\n' "$retired" "$kept"
+  fi
+}
+
 case "${1-}" in
   arm)       shift; cmd_arm "$@" ;;
   retire)    shift; cmd_retire "$@" ;;
+  sweep)     shift; cmd_sweep "$@" ;;
   poll)      shift; cmd_poll "$@" ;;
   deliver-reply) shift; cmd_deliver_reply "$@" ;;
   check)     shift; cmd_check "$@" ;;

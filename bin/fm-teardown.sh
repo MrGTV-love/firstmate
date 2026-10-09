@@ -30,6 +30,9 @@
 # lift the deferral (it authorizes discarding unlanded WORK, never the
 # captain's question), and bin/fm-captain-hold.sh answer stays the only act
 # that closes the call.
+# Automatic sweep calls additionally require reap eligibility before cleanup;
+# bin/fm-idle-session-reap.sh's header owns that admission contract.
+# The captain-call retention path below applies to ordinary teardown admission.
 # REFUSES if a ship's deliverable has not LANDED, because cleanup
 # hard-resets/removes the worktree and kills its processes.
 # A pushed branch is recoverable work, not a delivered result.
@@ -562,6 +565,21 @@ fm_backlog_record_present "$META" "task record" "$STATE" || {
   echo "error: teardown refused after locking: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
+if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
+  if [ -n "$FORCE" ] || ! (
+    trap - EXIT
+    teardown_require_source "$SCRIPT_DIR/fm-idle-reap-lib.sh"
+    # shellcheck source=/dev/null # Analyzed separately as a canonical lint root; this re-source is subshell-only.
+    . "$SCRIPT_DIR/fm-idle-reap-lib.sh"
+    fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
+    if [ "$IDLE_REAP_CLASS" != reap ]; then
+      printf 'REFUSED: automatic reap ineligible: %s: %s\n' "$IDLE_REAP_CLASS" "$IDLE_REAP_DETAIL" >&2
+      exit 1
+    fi
+  ); then
+    exit 1
+  fi
+fi
 TEARDOWN_META_KIND=$(fm_meta_get "$META" kind)
 [ -n "$TEARDOWN_META_KIND" ] || TEARDOWN_META_KIND=ship
 if [ "$FORCE" = --force ] && { [ "$TEARDOWN_META_KIND" != secondmate ] || [ -n "$DROP_FILE" ]; }; then

@@ -39,6 +39,9 @@
 #                    tmux-dir, with no user tmux config (its plugins never run
 #                    in a lab), started from an empty environment so no inherited
 #                    TMUX, Herdr, or Pi marker reaches a lab process.
+#                    The server starts through bin/fm-proc-budget.sh (whose
+#                    header owns the budget contract), so every pane inherits
+#                    its process limit.
 #                    TREEHOUSE_ROOT points into <lab-root>, so a worker's pool
 #                    never lands in ~/.treehouse, and DISABLE_AUTOUPDATER=1
 #                    keeps Claude Code from replacing the shared binary under
@@ -176,7 +179,7 @@ lab_run() {  # [NAME=VALUE...] <command...>: run in the lab's clean environment
   local -a base=()
   local line
   while IFS= read -r line; do base+=("$line"); done < <(lab_env_base)
-  env -i "${base[@]}" "$@"
+  "$SCRIPT_DIR/fm-proc-budget.sh" -- env -i "${base[@]}" "$@"
 }
 
 # window_id <name>: the tmux id of the lab window with exactly this name, or
