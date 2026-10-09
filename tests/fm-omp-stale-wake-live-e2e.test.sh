@@ -17,9 +17,9 @@
 #   owed    The same closes, but the lane does not drain during the long turn.
 #           Exactly one wake turn may follow; the lane drains inside it, and no
 #           further wake turn may follow that drain.
-#   legacy  The stale scenario with the gate disabled (FM_OMP_WAKE_HOLD_MAX_MS=0)
-#           must still produce the stale turns, which proves the scenario can see
-#           the defect it guards against.
+#   legacy  A fixture-only extension queues every watcher headline behind the
+#           turn without production gating, and must still produce stale turns
+#           to prove the scenario can see the defect it guards against.
 # It spends no model tokens, so it runs by default wherever omp is installed and
 # fails naming omp and `omp --version`. Refresh docs/verification/runtime-backends.md
 # ("omp stale wake gating") from its output after any omp upgrade.
@@ -81,7 +81,8 @@ for src, dst in (
     (".omp/extensions/fm-primary-omp-watch.ts", ".omp/extensions/"),
     (".pi/extensions/lib/fm-operational-input.ts", ".pi/extensions/lib/"),
 ):
-    subprocess.run(["cp", os.path.join(root, src), os.path.join(home, dst)], check=True)
+    if mode != "legacy":
+        subprocess.run(["cp", os.path.join(root, src), os.path.join(home, dst)], check=True)
 subprocess.run(["cp", "-R", os.path.join(root, "bin"), os.path.join(home, "bin")], check=True)
 arm = os.path.join(home, "bin", "fm-watch-arm.sh")
 with open(arm, "w") as handle:
@@ -103,10 +104,41 @@ while :; do
 done
 ''')
 os.chmod(arm, 0o755)
+if mode == "legacy":
+    with open(os.path.join(home, ".omp", "extensions", "legacy-watch.ts"), "w") as handle:
+        handle.write('''import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+export default function (pi: any) {
+  const home = process.env.FM_HOME!;
+  let child: ReturnType<typeof spawn> | undefined;
+  let stopped = false;
+  function arm() {
+    if (stopped) return;
+    let output = "";
+    child = spawn(home + "/bin/fm-watch-arm.sh", [], { env: process.env });
+    child.stdout!.on("data", (chunk) => { output += chunk.toString(); });
+    child.on("close", () => {
+      if (stopped) return;
+      for (const line of output.split("\\n")) {
+        if (line.startsWith("signal: ")) {
+          pi.sendUserMessage("FIRSTMATE WATCHER WAKE\\n" + line, { deliverAs: "followUp" });
+        }
+      }
+      arm();
+    });
+  }
+  pi.on("session_start", () => {
+    writeFileSync(home + "/state/.omp-watch-extension-loaded", "legacy fixture\\n");
+    arm();
+  });
+  pi.on("session_shutdown", () => { stopped = true; child?.kill(); });
+}
+''')
 subprocess.run(["git", "init", "-q"], cwd=home, check=True)
 
 log = []
 log_lock = threading.Lock()
+longturn_release = threading.Event()
 state = os.path.join(home, "state")
 
 def lane_drains():
@@ -144,7 +176,8 @@ class Model(BaseHTTPRequestHandler):
         if mode == "owed" and "FIRSTMATE WATCHER WAKE" in last:
             lane_drains()
         if "LONGTURN" in last:
-            time.sleep(float(os.environ.get("LONGTURN_SECONDS", "9")))
+            if not longturn_release.wait(120):
+                raise TimeoutError("the driver never released the long turn")
         self.send_response(200)
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
@@ -163,14 +196,9 @@ with open(os.path.join(agent, "config.yml"), "w") as handle:
 with open(os.path.join(agent, "models.yml"), "w") as handle:
     handle.write(f"providers:\n  lab:\n    baseUrl: http://127.0.0.1:{port}/v1\n    apiKey: lab-key\n    api: openai-completions\n    models:\n      - id: m1\n        contextWindow: 200000\n        maxTokens: 4096\n")
 
-env = dict(
-    os.environ, FM_HOME=home, PI_CODING_AGENT_DIR=agent, FM_OMP_WAKE_FLUSH_MS="300",
-    FM_OMP_ARM_READY_TIMEOUT_MS="8000", FM_WATCH_REARM_RETRY_LIMIT="2",
-)
+env = dict(os.environ, FM_HOME=home, PI_CODING_AGENT_DIR=agent, FM_WATCH_REARM_RETRY_LIMIT="2")
 for name in ("FM_STATE_OVERRIDE", "FM_ROOT_OVERRIDE", "FM_CONFIG_OVERRIDE", "FM_DATA_OVERRIDE", "FM_SUPERVISION_ACTOR"):
     env.pop(name, None)
-if mode == "legacy":
-    env["FM_OMP_WAKE_HOLD_MAX_MS"] = "0"
 
 # The pid written to state/.lock is the omp the shell execs, so the extension
 # owns the lock and arms at session_start without a model turn.
@@ -217,8 +245,8 @@ def fire(name):
     wait_for(lambda: not os.path.exists(os.path.join(state, name)), 20, f"the watcher to take {name}")
     time.sleep(1.0)
 
-wait_for(lambda: any(e.get("type") == "ready" for _, e in events), 30, "omp to be ready")
-wait_for(lambda: os.path.exists(os.path.join(state, ".omp-watch-extension-loaded")), 30, "the watch extension to load")
+wait_for(lambda: any(e.get("type") == "ready" for _, e in events), 120, "omp to be ready")
+wait_for(lambda: os.path.exists(os.path.join(state, ".omp-watch-extension-loaded")), 120, "the watch extension to load")
 time.sleep(3)
 send({"type": "prompt", "message": "LONGTURN start the long turn"})
 wait_for(lambda: any("LONGTURN" in entry["last"] for entry in log), 30, "the long turn to start")
@@ -230,6 +258,7 @@ if mode in ("stale", "legacy"):
     if not lane_drains():
         print("the lane's drain had nothing to present: the closes left no durable row", file=sys.stderr)
         shutdown(1)
+longturn_release.set()
 wait_for(lambda: any(e.get("type") == "agent_end" for t, e in events if t > long_started), 40, "the long turn to end")
 settle = float(os.environ.get("SETTLE_SECONDS", "8"))
 time.sleep(settle)
@@ -246,9 +275,9 @@ elif mode == "stale":
     print("stale: no wake turn after the lane drained and acknowledged every row")
 else:
     if len(turns) < 2:
-        print(f"the gate was disabled yet only {len(turns)} stale wake turn(s) appeared: the scenario cannot see the defect", file=sys.stderr)
+        print(f"the fixture-only legacy injector produced only {len(turns)} stale wake turn(s): the scenario cannot see the defect", file=sys.stderr)
         shutdown(1)
-    print(f"legacy: {len(turns)} stale wake turns without the gate")
+    print(f"legacy: {len(turns)} stale wake turns from the fixture-only ungated injector")
 shutdown(0)
 PY
 
@@ -260,6 +289,6 @@ for mode in stale owed legacy; do
   case "$mode" in
     stale) pass "live omp stale wake: $SUBJECT delivered no wake turn after the lane drained and acknowledged every row inside a long turn ($out)" ;;
     owed) pass "live omp owed wake: $SUBJECT delivered exactly one wake turn to a lane that had not drained, and none after the drain that turn ran ($out)" ;;
-    legacy) pass "live omp control: $SUBJECT with the gate disabled still shows the stale wake turns the guard exists to prevent ($out)" ;;
+    legacy) pass "live omp control: $SUBJECT with the fixture-only legacy injector still shows the stale wake turns the guard exists to prevent ($out)" ;;
   esac
 done
