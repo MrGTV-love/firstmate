@@ -316,7 +316,14 @@ An ordinary presentation drain bounds both its initial queue-lock acquire and it
 | Initial queue lock | One PID-naming advisory, and the whole drain is skipped before any claim or mutation. |
 | Status-presentation lock | One such advisory after raw wake presentation, and status annotations, sections, and cursors are left retriable on the next drain. |
 
-Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics, so acknowledgement atomicity is unchanged.
+Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics while the lock's parent directory exists, so acknowledgement atomicity is unchanged.
+
+### Vanished fixture state
+
+Queue/grant operations and both acknowledgement acquisitions stop before entering the failed acquisition's critical section when fixture state vanishes, even if the directory returns immediately after failure.
+[`fm_lock_acquire_wait` in `bin/fm-wake-lib.sh`](../bin/fm-wake-lib.sh) owns the missing-parent grace and caller safety contract; [`tests/fm-orphan-safety.test.sh`](../tests/fm-orphan-safety.test.sh) exercises failure propagation with returning state.
+
+For ended lab/test process cleanup and its regression entry points, see the authoritative [`bin/fm-test-reap-orphans.sh` header](../bin/fm-test-reap-orphans.sh).
 
 ### Guard counts for branch-held rows
 
@@ -385,7 +392,7 @@ Attended, a grant names no check row and each scan finds nothing.
 - A concurrent main turn cannot present or acknowledge an active branch grant.
 - A no-op stale acknowledgement names the current presented wake's exact command.
 - Live-holder presentation contention stays bounded and retriable.
-- Acknowledgement locking remains blocking.
+- Acknowledgement locking follows the [lock deadline contract](#lock-deadlines-during-presentation).
 
 The same suite pins the counted-equals-presentable invariant against `bin/fm-guard.sh` and `bin/fm-wake-drain.sh` together:
 

@@ -28,6 +28,12 @@
 # Aggregation (no suite execution):
 #   fm-test-run.sh --aggregate-json <out.json> <lane.json> [more lane.json...]
 #
+# Leftovers: after each script finishes, the runner invokes the reaper beside it
+# in its own checkout, including when running from a scratch copy. The
+# bin/fm-test-reap-orphans.sh header owns ended lab/test ownership proof.
+# A script killed before cleanup completes can leave stubs behind; the sweep
+# logs its reaper output and never changes the script's result.
+#
 # Options:
 #   --json <path>   write a deterministic timing artifact after the run. Each
 #                   script record carries its family, expected gate-skip class,
@@ -923,6 +929,7 @@ tests/fm-teardown.test.sh 202132
 tests/fm-test-fixture-cleanup.test.sh 937
 tests/fm-test-fixtures.test.sh 1802
 tests/fm-test-isolation-proof.test.sh 2866
+tests/fm-test-reap-orphans.test.sh 10537
 tests/fm-timeout-lib.test.sh 10750
 tests/fm-tmux-agent-liveness.test.sh 3770
 tests/fm-tool-update-check.test.sh 14383
@@ -2604,6 +2611,16 @@ record_script_result() {
   TOTAL=$((TOTAL + 1))
 }
 
+# Run the header's leftovers sweep before this worker moves to its next script.
+reap_script_leftovers() {  # <script>
+  local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line
+  [ -x "$reaper" ] || return 0
+  while IFS= read -r line; do
+    [ -z "$line" ] || log "reaped after $1: $line"
+  done < <("$reaper" 2>/dev/null || true)
+  return 0
+}
+
 # Run <script>, capturing output to <out>. <stream> 1 also echoes it live.
 # <id> only has to be unique within this run. When PER_SCRIPT_TIMEOUT_SECS is
 # positive, a script that outruns it is terminated and reported as exit 124: a
@@ -2652,6 +2669,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"
     [ "$stream" -eq 1 ] && tail -1 "$out"
   fi
+  reap_script_leftovers "$script"
   return "$rc"
 }
 

@@ -1279,9 +1279,29 @@ fm_lock_try_acquire() {
   return "$rc"
 }
 
+# fm_lock_acquire_wait <lockdir>
+#
+# Waits without a contention deadline while the lock's parent directory exists.
+# Returns 1 after that parent stays absent for five seconds, because no lock can
+# be created there and retrying would leave a deleted fixture or scratch copy
+# spinning indefinitely. A parent that returns inside the grace resets the wait.
+# Callers must stop before entering the critical section on failure, even if the
+# parent returns afterward; set held flags only on success and release any
+# already-held sibling locks. tests/fm-wake-queue.test.sh covers the grace, and
+# tests/fm-orphan-safety.test.sh covers failure propagation with returning state.
 fm_lock_acquire_wait() {
-  local lockdir=$1
+  local lockdir=$1 parent gone_since=
+  parent=${lockdir%/*}
+  [ "$parent" != "$lockdir" ] || parent=.
+  [ -n "$parent" ] || parent=/
   while ! fm_lock_try_acquire "$lockdir"; do
+    if [ -d "$parent" ]; then
+      gone_since=
+    elif [ -z "$gone_since" ]; then
+      gone_since=$SECONDS
+    elif [ $((SECONDS - gone_since)) -ge 5 ]; then
+      return 1
+    fi
     sleep 0.1
   done
 }
@@ -2120,7 +2140,7 @@ fm_wake_clean_field() {
 
 fm_wake_append() {
   local status=0
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
   fm_wake_append_locked "$@" || status=$?
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   return "$status"
@@ -2180,7 +2200,7 @@ fm_wake_queued_keys() {
     signal|stale|check|heartbeat) ;;
     *) printf 'fm_wake_queued_keys: invalid wake kind: %s\n' "$kind" >&2; return 2 ;;
   esac
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
   fm_wake_queued_keys_locked "$kind"
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
 }

@@ -1745,7 +1745,7 @@ spawn_herdr_presentation_order_lock_acquire() {
   lock_path=$(fm_backend_herdr_presentation_session_lock_path "$session") || return 1
   HERDR_PRESENTATION_ORDER_LOCK="$lock_path"
   if [ "$mode" = wait ]; then
-    fm_lock_acquire_wait "$HERDR_PRESENTATION_ORDER_LOCK"
+    fm_lock_acquire_wait "$HERDR_PRESENTATION_ORDER_LOCK" || return 1
     HERDR_PRESENTATION_ORDER_LOCK_HELD=1
     return 0
   fi
@@ -6123,7 +6123,7 @@ spawn_record_traceparent() {
   # independent critical section so other metadata interfaces can serialize.
   if [ "$SPAWN_META_LOCK_HELD" != 1 ]; then
     SPAWN_META_LOCK=$(fm_meta_lock_path "$meta") || return 1
-    fm_lock_acquire_wait "$SPAWN_META_LOCK"
+    fm_lock_acquire_wait "$SPAWN_META_LOCK" || return 1
     SPAWN_META_LOCK_HELD=1
     acquired=1
   fi
