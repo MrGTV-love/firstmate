@@ -12,42 +12,65 @@
 # kept running for hours at ten to a hundred forks a second each (observed
 # 2026-10-08: seven CPU-minutes in one lock-holder stub alone).
 #
-# Ownership proof. Test and lab markers name the owning process's pid and birth
-# identity; live-lab launch records and private tmux activity retain ownership.
+# Ownership proof. This header owns ended lab/test process eligibility.
+# Test roots carry .fm-test-fixture; scratch lab homes carry .fm-lab-home; live
+# labs carry .fm-live-lab. Markers must be regular, non-symlink files owned by
+# this user and name the owning process's pid and birth identity. Lab markers
+# retain their v1 token and append owner_pid and owner_identity; a token without
+# that provenance does not authorize reaping. A live owner's unreadable identity
+# leaves its root untouched. Lab roots also require inactive runtime evidence:
+# recorded launch identities and private tmux servers retain ownership while
+# live, and incomplete records or indeterminate probes do not prove termination.
+# A scratch home under a live-lab record also requires that parent lab to end.
 # A process is reaped only when ALL of these hold:
 #   1. its command line or working directory names a marked root or a path below it;
 #   2. that root's marker proves the owner: either the owner is dead (its pid is
 #      gone or now has a different birth identity) in the default scan, or the
 #      owner is the caller (--owner-pid names this process or an ancestor of it
 #      and the marker names the same pid and identity) in the owner-exit sweep;
-#   3. it has no live parent that could still want it: it is the child of init
-#      or a subreaper, or, in the owner-exit sweep, a descendant of the owner.
+#   3. its parent is init or a recognized init/subreaper, or, in the owner-exit
+#      sweep, it is a descendant of the validated owner.
 # Its descendants go with it. A command line that merely mentions a path, such as
 # a person's `tail -f` in another terminal, has a live shell parent and is never
 # touched. A fixture whose marker is gone (already removed) proves nothing and is
 # left alone; the sweep therefore runs BEFORE the root is removed.
 #
-# Matching never uses a process name, an environment tag, or unrelated open files.
+# Root attribution never uses the target's process name, an environment tag, or
+# unrelated open files; parent classification is owned by initlike below.
 # Environment tags were rejected because macOS hides the environment of Apple
 # signed binaries such as /bin/bash and /bin/sleep (measured 2026-10-08: a tag on
 # /bin/bash and /bin/sleep was unreadable, on python3 it was readable), and bash
 # stubs are exactly what leaks.
 #
-# This process and every ancestor are never signalled. Before each signal the
-# target's birth identity is rechecked, so a recycled pid is skipped. TERM goes
-# first; a survivor of the 2 second grace gets KILL.
+# This process and every ancestor are never signalled. Each target's birth
+# identity and command, including descendants, come from the ownership process
+# snapshot and are rechecked before each signal, so a recycled pid is skipped.
+# CONT lets stopped targets act on TERM; a survivor of the 2 second grace gets
+# KILL only if its identity still matches.
 #
 # Options:
-#   --tmpdir DIR    directory holding fixture roots to scan (repeatable). The
-#                   default scan covers $TMPDIR (when set) and /tmp.
+#   --tmpdir DIR    directory holding lab/test containers to scan (repeatable).
+#                   Defaults to $TMPDIR (when set) and /tmp. Scans discover
+#                   .fm-test-fixture and .fm-lab-home at any depth inside
+#                   immediate fm-* and fmlab.* directories without following
+#                   directory symlinks, including parallel workers' wN/tmp roots;
+#                   .fm-live-lab is read at immediate fmlab.* roots only.
+#                   An unmarked container or sibling is not ownership evidence.
 #   --owner-pid PID with --root, the caller's own pid: reap what this owner left
 #                   under its own roots. Refused unless PID is this process or
 #                   one of its ancestors.
 #   --root DIR      a fixture root the owner made (repeatable, needs --owner-pid).
 #
 # Prints one `reaped` line per process and nothing otherwise.
-# Exits 0 unless it was misused or the process list could not be read, so a
-# caller can sweep without risking its own outcome.
+# Exits 2 on misuse and 1 if scratch allocation or reading the process list fails;
+# otherwise exits 0. Runner and fixture cleanup callers treat it as best-effort.
+#
+# Regression coverage: tests/fm-test-reap-orphans.test.sh exercises real-process
+# eligibility, cwd-attributed Go test binaries, lab runtime lifetimes, nested
+# discovery, owner-exit cleanup, and killed-test startup recovery. Its fixture
+# checks and cleanup signals use identities captured after exec and before the
+# owner exits. tests/fm-orphan-safety.test.sh covers snapshot PID reuse, identity
+# changes between signals, and unknown live owners.
 set -u
 
 SCRIPT_DIR=$(CDPATH='' cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)

@@ -1258,13 +1258,14 @@ fm_lock_try_acquire() {
 
 # fm_lock_acquire_wait <lockdir>
 #
-# Waits for the lock for as long as a live holder keeps it. It returns 1 only
-# when the lock's own directory has stayed missing for five seconds:
-# nothing can create or contend for a lock there, so the wait would otherwise
-# spin at ten sleeps a second until
-# the host reboots. A deleted test fixture, a discarded scratch copy, or a
-# returned worktree slot leaves exactly that orphan behind. A directory that
-# comes back inside the grace is waited for as before.
+# Waits without a contention deadline while the lock's parent directory exists.
+# Returns 1 after that parent stays absent for five seconds, because no lock can
+# be created there and retrying would leave a deleted fixture or scratch copy
+# spinning indefinitely. A parent that returns inside the grace resets the wait.
+# Callers must stop before entering the critical section on failure, even if the
+# parent returns afterward; set held flags only on success and release any
+# already-held sibling locks. tests/fm-wake-queue.test.sh covers the grace, and
+# tests/fm-orphan-safety.test.sh covers failure propagation with returning state.
 fm_lock_acquire_wait() {
   local lockdir=$1 parent gone_since=
   parent=${lockdir%/*}

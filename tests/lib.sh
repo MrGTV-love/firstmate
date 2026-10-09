@@ -344,13 +344,9 @@ fm_test_reap_jobs() {
 
 # --- fixture-root process reaping ------------------------------------------
 #
-# A stub a subshell or `disown` started is outside the job table that
-# fm_test_reap_jobs walks, and removing its fixture root does not stop it: it
-# polls for the root's release file for as long as its own bound allows, at
-# ten to a hundred forks a second. bin/fm-test-reap-orphans.sh owns the rule for
-# which processes are provably this test's (their command line names a root this
-# shell stamped with its own pid, and they are its descendants or orphans). It
-# runs BEFORE the roots are removed, because the marker in each root is the proof.
+# Subshell-started or disowned stubs escape fm_test_reap_jobs' job table;
+# bin/fm-test-reap-orphans.sh's header owns their process-ownership proof.
+# Sweep BEFORE removing roots, because deleting a marker discards that proof.
 
 fm_test_reap_fixture_processes() {
   local d

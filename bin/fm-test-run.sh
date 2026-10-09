@@ -28,11 +28,11 @@
 # Aggregation (no suite execution):
 #   fm-test-run.sh --aggregate-json <out.json> <lane.json> [more lane.json...]
 #
-# Leftovers: after every script the runner runs bin/fm-test-reap-orphans.sh
-# from its own checkout (so a scratch copy reaps with its own copy), which stops
-# only processes that a fixture marker proves belong to an ended run. A script
-# killed by its bound or by a signal never ran its cleanup trap, and its stubs
-# would otherwise poll for hours. The sweep never changes a script's result.
+# Leftovers: after each script finishes, the runner invokes the reaper beside it
+# in its own checkout, including when running from a scratch copy. The
+# bin/fm-test-reap-orphans.sh header owns ended lab/test ownership proof.
+# A script killed before cleanup completes can leave stubs behind; the sweep
+# logs its reaper output and never changes the script's result.
 #
 # Options:
 #   --json <path>   write a deterministic timing artifact after the run. Each
@@ -2609,11 +2609,7 @@ record_script_result() {
   TOTAL=$((TOTAL + 1))
 }
 
-# A script the bound or a signal killed never ran its own cleanup trap, so the
-# stubs it started outlive it. Stop what its fixture markers prove it left behind
-# before the next script runs; bin/fm-test-reap-orphans.sh owns that proof. It
-# lives beside this runner, so a run from a scratch copy of the repo reaps with
-# that copy's own reaper. The sweep never changes the script's result.
+# Run the header's leftovers sweep before this worker moves to its next script.
 reap_script_leftovers() {  # <script>
   local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line
   [ -x "$reaper" ] || return 0

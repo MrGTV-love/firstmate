@@ -320,13 +320,10 @@ Acknowledgement invocations and every other mutation-critical queue-lock acquire
 
 ### Vanished fixture state
 
-`fm_lock_acquire_wait` returns failure when the lock's parent stays absent for five seconds. Queue/grant operations, both acknowledgement acquisitions, watcher presentation, mail delivery and polling, AFK catch-up, session claims, task mutations, handoff recovery, lifecycle cleanup, spawn publication, and request-link mutations stop before entering their critical sections on that failure, even if the directory returns immediately afterward. Held flags are set only after successful acquisition; already-acquired sibling locks are released on failure.
+Queue/grant operations and both acknowledgement acquisitions stop before entering the failed acquisition's critical section when fixture state vanishes, even if the directory returns immediately after failure.
+[`fm_lock_acquire_wait` in `bin/fm-wake-lib.sh`](../bin/fm-wake-lib.sh) owns the missing-parent grace and caller safety contract; [`tests/fm-orphan-safety.test.sh`](../tests/fm-orphan-safety.test.sh) exercises failure propagation with returning state.
 
-Orphan reaping recognizes test roots marked by `.fm-test-fixture`, scratch lab homes marked by `.fm-lab-home`, and `fmlab.*` roots marked by `.fm-live-lab`. Default scans discover test-fixture and lab-home markers at any depth inside immediate `fm-*` and `fmlab.*` temporary containers without following directory symlinks, including parallel test workers' `wN/tmp` roots; an unmarked container or sibling is not ownership evidence. Lab markers retain their existing token and record the creator's PID and birth identity. A live lab also retains ownership while a recorded launch identity or private tmux server remains live; incomplete or indeterminate runtime evidence does not prove termination. Targets must name a proven root in argv or have cwd at or below it, and must be detached from a live parent unless the validated owner is performing its exit sweep. Each target's birth identity and command come from the ownership process snapshot, including descendants, and are rechecked before CONT, TERM, and KILL. A live owner's unreadable identity leaves its root untouched.
-
-`tests/fm-orphan-safety.test.sh` covers reused direct and descendant PIDs, identity changes between signals, unknown live owners, returning-state acquisition failures for queue/grant operations and both acknowledgement acquisitions, and all three request-link mutations. `tests/fm-test-reap-orphans.test.sh` exercises real-process termination and non-termination, a compiled Go test binary attributed by cwd, lab creator/runtime lifetimes, owner-exit cleanup, and startup cleanup after a killed test. Fixture disappearance checks and cleanup signals use identities captured before the owning run exits.
-
-Run `bash tests/fm-orphan-safety.test.sh` without arguments to execute all of its regressions.
+For ended lab/test process cleanup and its regression entry points, see the authoritative [`bin/fm-test-reap-orphans.sh` header](../bin/fm-test-reap-orphans.sh).
 
 ### Guard counts for branch-held rows
 
@@ -395,7 +392,7 @@ Attended, a grant names no check row and each scan finds nothing.
 - A concurrent main turn cannot present or acknowledge an active branch grant.
 - A no-op stale acknowledgement names the current presented wake's exact command.
 - Live-holder presentation contention stays bounded and retriable.
-- Acknowledgement locking remains blocking.
+- Acknowledgement locking follows the [lock deadline contract](#lock-deadlines-during-presentation).
 
 The same suite pins the counted-equals-presentable invariant against `bin/fm-guard.sh` and `bin/fm-wake-drain.sh` together:
 
