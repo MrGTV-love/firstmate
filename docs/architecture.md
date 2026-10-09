@@ -114,6 +114,7 @@ A secondmate home's terminal child ledger lines, PR registrations, captain holds
 The poll also starts `bin/fm-idle-session-reap.sh` detached on its own cadence, retaining the next deadline across watcher handoffs, so a finished idle worker whose work landed is cleaned up without waiting for a supervising model to remember it.
 The sweep only selects tasks and asks `bin/fm-teardown.sh`, which stays the sole landed-work authority; a parked, busy, or unsure task is reported with its reason and never touched.
 Automatic reap admission repeats the same eligibility check under teardown's task control and metadata locks, including durable captain holds and pending steering, before any destructive cleanup.
+The sweep inherits explicit caller relocations without synthesizing overrides for the stock home layout, so teardown can honor the marked disposable-lab allowance during lifecycle validation.
 Absorbed wakes advance their suppression markers, log to `state/.watch-triage.log`, and keep the watcher blocking without a queue record or LLM turn.
 Each `fm-wake-drain.sh` presentation runs the same liveness guard as the supervision scripts, so a lapsed watcher chain surfaces even on a turn that only handles queued wakes.
 Routine watcher polling, supervision no-ops, elapsed waiting time, and absorbed benign wakes stay silent.

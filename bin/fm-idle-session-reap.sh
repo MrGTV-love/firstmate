@@ -201,7 +201,7 @@ EOF
 reap_one() {  # <task-id> <status-line>
   local id=$1 last=$2 out rc=0 reason
   replace_reap_row "$id"
-  out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_IDLE_REAP_ADMISSION=1 \
+  out=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 \
     fm_run_timed 600 "$TEARDOWN_BIN" "$id" </dev/null 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     rm -f -- "$REAP_DIR/$id.refused"
