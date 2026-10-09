@@ -5,6 +5,21 @@
 # host process-creation rates before/after, see:
 # data/fm-supervision-fork-budget/evidence/R1-evidence.md
 #
+# User-supplied measurements from that evidence report compare main fd9b8b02
+# with branch 400ec4b5, counting every fork and posix_spawn (not this counter):
+#   quiet watcher poll cycle: 2,157 -> 366 process starts (-83%);
+#   scan_signals quiet pass: 1,375 -> 83 starts;
+#   owner-watchdog tick: 38 -> 13 starts;
+#   crew-state pass over 44 live tasks: 12,203 -> 8,216 starts, with all 44
+#     outputs byte-identical;
+#   fleet snapshot on a frozen home: 13,756 -> 12,774 starts (summary),
+#     14,404 -> 13,421 (json), byte-identical after dropping time fields.
+# Host rates used the same sampler (host-rate.sh 240 5), the same 240-second
+# window, and 8 lab watchers on a frozen copy of the same 38 tasks, in 3 paired
+# rounds. Idle host rates ranged from 2,197 to 2,529 process starts/second;
+# watchers added +221/second on main versus +37/second on the branch on average
+# (-83%). Live homes have no after sample until rollout.
+#
 # A loaded host pays for every process a bash loop starts, and the loops that
 # run all day (the watcher's signal scan and its per-task checks, the crew
 # current-state read, the owner watchdog tick) used to start one process or
