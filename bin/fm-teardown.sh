@@ -2520,10 +2520,13 @@ fm_task_docker_path_excluded() {  # <root> <path>
 # the same id elsewhere makes the id ambiguous) and the task's path roots - then
 # lets it remove the stacks this task owns.
 teardown_docker_stacks() {
-  local state_dir other other_id siblings="" ambiguous=0 root canon
-  local -a roots canon_roots
+  local ID=$1 META=$2 STATE=$3 reassigned=$4 PROJ WT
+  local state_dir other other_id siblings="" ambiguous=0 canon protected=""
+  local -a roots
   roots=()
-  canon_roots=()
+  command -v docker >/dev/null 2>&1 || return 0
+  WT=$(meta_value "$META" worktree)
+  PROJ=$(meta_value "$META" project)
   if collect_local_firstmate_states "$STATE" 2>/dev/null; then
     for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
       for other in "$state_dir"/*.meta; do
@@ -2538,18 +2541,28 @@ teardown_docker_stacks() {
     ambiguous=1
     echo "warning: the other local Firstmate homes could not be enumerated, so Docker objects are matched to $ID only by a compose working directory under its own copy" >&2
   fi
-  for root in "$WT" "$TASK_TMP"; do
-    [ -n "$root" ] || continue
-    [ "$root" != "$WT" ] || teardown_owns_worktree || continue
-    roots+=("$root")
-    canon=
-    if canon=$(task_canonical_path "$root" 2>/dev/null) && [ "$canon" != "$root" ]; then
+  if [ "$(meta_value "$META" kind)" != secondmate ] && [ "$reassigned" != 1 ] && [ -n "$WT" ]; then
+    if canon=$(task_canonical_path "$WT" 2>/dev/null); then
       roots+=("$canon")
     fi
-    [ -z "$canon" ] || canon_roots+=("$canon")
-  done
-  task_registered_lanes_under_roots ${canon_roots[@]+"${canon_roots[@]}"} 2>/dev/null || TASK_REGISTERED_LANES=()
-  fm_task_docker_cleanup "$ID" "$siblings" "$ambiguous" "$(basename "${PROJ:-.}")" ${roots[@]+"${roots[@]}"}
+  fi
+  task_registered_lanes_under_roots ${roots[@]+"${roots[@]}"} 2>/dev/null || return 1
+  if [ -n "$PROJ" ] && { [ -e "$PROJ/supabase/config.toml" ] || [ -L "$PROJ/supabase/config.toml" ]; }; then
+    protected=$(python3 - "$PROJ/supabase/config.toml" <<'PY'
+import sys
+import tomllib
+with open(sys.argv[1], "rb") as config:
+    project = tomllib.load(config).get("project_id")
+if not isinstance(project, str) or not project or any(c.isspace() for c in project):
+    raise SystemExit("invalid Supabase project_id")
+print(project)
+PY
+    ) || {
+      echo "error: cannot identify the shared Supabase stack for $ID; retaining task records" >&2
+      return 1
+    }
+  fi
+  fm_task_docker_cleanup "$ID" "$siblings" "$ambiguous" "$protected" ${roots[@]+"${roots[@]}"}
 }
 
 
@@ -3625,6 +3638,19 @@ cleanup_firstmate_home_children() {
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
     fi
+    child_owner_rc=0
+    if [ "$child_kind" != secondmate ] && fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
+      require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
+    fi
+    if [ "$child_owner_rc" -ne 0 ] && [ "$child_owner_rc" -ne "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+      require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
+      child_owner_rc=0
+    fi
+    if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1
+    else
+      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 0 || return 1
+    fi
     if [ -n "$child_t" ]; then
       if [ "$child_backend" = herdr ]; then
         fm_backend_herdr_parse_target "$child_t" || return 1
@@ -3667,14 +3693,8 @@ cleanup_firstmate_home_children() {
       # slot reassigned to another task is not this child's to kill, reset,
       # or return, so only its records are cleaned up. The preflight above
       # already named the reassignment on stderr under the same lock.
-      child_owner_rc=0
-      if fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
-      fi
       if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
         :
-      elif [ "$child_owner_rc" -ne 0 ]; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
       else
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
@@ -3932,14 +3952,9 @@ fi
 # Fix 3 (see script header): the task's own Docker stacks go in this same
 # pre-destructive cleanup, before any record or endpoint is touched, so a
 # refusal leaves everything for a rerun.
-if [ "$KIND" != secondmate ] && ! teardown_docker_stacks; then
-  if [ "$FORCE" = "--force" ]; then
-    echo "error: --force authorizes continuing past Docker objects that could not be removed; reconcile them yourself with: docker ps -a --filter label=fm.task=$ID" >&2
-  else
-    echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
-    echo "error: rerun teardown once they can be removed, or rerun with --force to discard this task's records deliberately." >&2
-    exit 1
-  fi
+if ! teardown_docker_stacks "$ID" "$META" "$STATE" "$TEARDOWN_SLOT_REASSIGNED"; then
+  echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
+  exit 1
 fi
 
 if [ "$BACKEND" = herdr ]; then

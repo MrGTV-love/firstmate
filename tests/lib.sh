@@ -617,6 +617,17 @@ sub render {
 my $cmd = shift @a // '';
 my $sub = '';
 if ($cmd eq 'network' || $cmd eq 'volume') { $sub = shift @a // ''; }
+my $operation = length($sub) ? "$cmd-$sub" : $cmd;
+my %fail_operation = map { $_ => 1 } split /,/, ($ENV{FM_FAKE_DOCKER_FAIL} // '');
+if ($fail_operation{$operation}) { print STDERR "fake docker: $operation failed\n"; exit 1; }
+if ($cmd eq 'ps' && length($ENV{FM_FAKE_DOCKER_PS_FAIL_AT} // '')) {
+  my $counter = "$store.ps-count";
+  my $count = 0;
+  if (-f $counter) { open my $in, '<', $counter or die; $count = <$in>; close $in; }
+  ++$count;
+  open my $out, '>', $counter or die; print {$out} $count; close $out;
+  if ($count == $ENV{FM_FAKE_DOCKER_PS_FAIL_AT}) { print STDERR "fake docker: ps failed\n"; exit 1; }
+}
 my ($fmt, $quiet, @filters, @ids) = ('', 0);
 while (@a) {
   my $x = shift @a;
@@ -640,7 +651,7 @@ if ($cmd eq 'rm') {
     if ($hit && $fail{$hit->[2]}) { print STDERR "Error: cannot remove container $hit->[2]\n"; $bad = 1; next; }
     @objs = grep { !($_->[0] eq 'container' && ($_->[1] eq $id || $_->[2] eq $id)) } @objs;
   }
-  save(); exit($bad ? 1 : 0);
+  save(); exit($bad || ($ENV{FM_FAKE_DOCKER_RM_ERROR_AFTER_REMOVE} // '') eq '1' ? 1 : 0);
 }
 if ($cmd eq 'network' && $sub eq 'ls') {
   for my $o (grep { $_->[0] eq 'network' } @objs) {
@@ -652,6 +663,8 @@ if ($cmd eq 'network' && $sub eq 'rm') {
   for my $id (@ids) {
     my ($net) = grep { $_->[0] eq 'network' && ($_->[1] eq $id || $_->[2] eq $id) } @objs;
     unless ($net) { print STDERR "Error: No such network: $id\n"; exit 1; }
+    my %fail = map { $_ => 1 } split /,/, ($ENV{FM_FAKE_DOCKER_NETWORK_RM_FAIL} // '');
+    if ($fail{$net->[2]}) { print STDERR "Error: cannot remove network $net->[2]\n"; exit 1; }
     for my $c (grep { $_->[0] eq 'container' } @objs) {
       if (grep { $_ eq $net->[2] } split /,/, ($c->[4] // '')) {
         print STDERR "Error response from daemon: network $net->[2] has active endpoints\n"; exit 1;
@@ -671,7 +684,11 @@ if ($cmd eq 'volume' && $sub eq 'ls') {
   exit 0;
 }
 if ($cmd eq 'volume' && $sub eq 'rm') {
-  for my $id (@ids) { @objs = grep { !($_->[0] eq 'volume' && $_->[1] eq $id) } @objs; }
+  my %fail = map { $_ => 1 } split /,/, ($ENV{FM_FAKE_DOCKER_VOLUME_RM_FAIL} // '');
+  for my $id (@ids) {
+    if ($fail{$id}) { print STDERR "Error: cannot remove volume $id\n"; exit 1; }
+    @objs = grep { !($_->[0] eq 'volume' && $_->[1] eq $id) } @objs;
+  }
   save(); exit 0;
 }
 print STDERR "fake docker: unsupported command: $cmd $sub @ids\n";
