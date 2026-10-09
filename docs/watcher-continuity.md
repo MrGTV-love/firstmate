@@ -65,6 +65,7 @@ The extension header owns how consumption is observed and why it only decides wh
 ### omp session replacement
 
 The [omp extension header](../.omp/extensions/fm-primary-omp-watch.ts) owns replacement activation, predecessor retirement, and actionable-close replay, including recovery after handoff publication fails.
+Watcher handoff publication failures remain visible as separate continuity diagnostics; replaying the watcher mark still requires a current queued row.
 
 ### omp idle wake delivery
 

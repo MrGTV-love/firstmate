@@ -1024,6 +1024,11 @@ export default function (pi: ExtensionAPI) {
     owner: SessionGeneration,
     pending: PendingActionableClose,
   ): void {
+    if (!operationalHandback(pending.message)) {
+      const failure = pending.message.indexOf("\n\nwatcher: FAILED - ");
+      if (failure >= 0) surfaceFailure(owner, pending.message.slice(failure + 2));
+      pending.message = wakeDueMessage;
+    }
     const existing = owner.pendingActionables.find((item) => item.token === pending.token);
     if (existing && !owner.stopping) return;
     if (!existing) owner.pendingActionables.push(pending);

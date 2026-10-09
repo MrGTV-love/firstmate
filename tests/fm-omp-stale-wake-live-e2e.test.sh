@@ -82,6 +82,7 @@ for d in (agent, os.path.join(home, ".omp", "extensions"), os.path.join(home, ".
 for src, dst in (
     (".omp/extensions/fm-primary-omp-watch.ts", ".omp/extensions/"),
     (".pi/extensions/lib/fm-operational-input.ts", ".pi/extensions/lib/"),
+    (".pi/extensions/lib/fm-watch-lifecycle.ts", ".pi/extensions/lib/"),
 ):
     if mode != "legacy":
         subprocess.run(["cp", os.path.join(root, src), os.path.join(home, dst)], check=True)

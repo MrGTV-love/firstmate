@@ -2279,6 +2279,8 @@ printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
 if [ ! -e "$FM_HOME/state/.fired" ]; then
   : > "$FM_HOME/state/.fired"
+  . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+  fm_wake_append check publication-failure 'check: publication failure wake' || exit 1
   printf 'check: publication failure wake\n'
   exit 0
 fi
@@ -2289,6 +2291,7 @@ SH
       FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
       REPAIR="$repair" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const waitFor = async (predicate) => {
@@ -2308,7 +2311,8 @@ const makePi = () => {
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.EXT).href);
 const first = makePi(); mod.default(first.pi);
-await first.handlers.get("session_start")({}, {});
+const ctx = { isIdle: () => true };
+await first.handlers.get("session_start")({}, ctx);
 await waitFor(() => first.sent.length === 1 && arms() === 2);
 const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
 mkdirSync(handoff);
@@ -2316,12 +2320,12 @@ let owner = first;
 if (process.env.REPAIR === "factory") {
   owner = makePi(); mod.default(owner.pi);
 } else {
-  await first.handlers.get("session_shutdown")({}, {});
+  await first.handlers.get("session_shutdown")({}, ctx);
 }
 rmSync(handoff, { recursive: true });
 if (process.env.REPAIR === "command") {
   const notifications = [];
-  await owner.commands.get("fm-watch-arm-omp").handler("", { ui: { notify(message) { notifications.push(message); } } });
+  await owner.commands.get("fm-watch-arm-omp").handler("", { ...ctx, ui: { notify(message) { notifications.push(message); } } });
   if (notifications.length !== 1 || !notifications[0].startsWith("watcher: started")) throw new Error("command repair was poisoned by publication failure");
 } else {
   const repaired = await owner.box.tool.execute();
@@ -2329,13 +2333,15 @@ if (process.env.REPAIR === "command") {
 }
 await waitFor(() => owner.sent.some((message) => message.includes("could not persist a replacement-session actionable wake")));
 const failures = owner.sent.filter((message) => message.includes("could not persist a replacement-session actionable wake"));
-if (failures.length !== 1 || !failures[0].includes("check: publication failure wake")) throw new Error("repair lost the actionable wake or its persistence failure");
-await owner.handlers.get("message_start")({ message: { role: "user", content: failures[0] } }, {});
+if (failures.length !== 1) throw new Error("repair lost or duplicated its persistence failure");
+const queued = spawnSync("bash", [`${process.env.FM_ROOT_OVERRIDE}/bin/fm-wake-drain.sh`, "--queued"], { env: process.env, encoding: "utf8" });
+if (queued.status !== 0 || queued.stdout.trim().split("\t").slice(4).join("\t") !== "check: publication failure wake") throw new Error("publication failure repair lost the durable actionable row");
+await owner.handlers.get("message_start")({ message: { role: "user", content: failures[0] } }, ctx);
 await sleep(900);
 if (arms() !== 3) throw new Error("publication failure repair double-armed");
 const unchanged = await owner.box.tool.execute();
 if (!unchanged.details.ok || !unchanged.details.message.includes("unchanged")) throw new Error("repaired watcher lost ordinary arm ownership");
-await owner.handlers.get("session_shutdown")({}, {});
+await owner.handlers.get("session_shutdown")({}, ctx);
 process.exit(0);
 EOF
 )
