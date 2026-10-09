@@ -828,6 +828,7 @@ pass "a bash Directory Services login shell is rendered with -l -c"
 new_case Darwin with-herdr gui
 CASE_LOGIN_SHELL="$CASE_DIR/My Shell/fish&dev"
 mkdir -p "$(dirname "$CASE_LOGIN_SHELL")"
+# shellcheck disable=SC2016 # The login-shell stub expands its own "$3".
 printf '#!/bin/sh\nexec /bin/sh -c "$3"\n' > "$CASE_LOGIN_SHELL"
 chmod +x "$CASE_LOGIN_SHELL"
 CASE_RESOLVE_DSCL=1

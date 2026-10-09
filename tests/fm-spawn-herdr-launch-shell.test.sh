@@ -95,6 +95,7 @@ PY
   for harness in omp codex; do
     printf '#!/bin/sh\n' > "$FAKEBIN/$harness"
     if [ "$harness" = omp ]; then
+      # shellcheck disable=SC2016 # The fake harness script expands its own "$1".
       printf 'if [ "${1:-}" = --version ]; then\n  printf "omp/18.1.20\\n"\n  exit 0\nfi\n' >> "$FAKEBIN/$harness"
     fi
     printf 'exec "%s" "%s" "$@"\n' "$PYTHON_BIN" "$CASE_DIR/probe.py" >> "$FAKEBIN/$harness"

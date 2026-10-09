@@ -324,7 +324,7 @@ Projected children are placed in one contiguous block immediately after their ow
 - The protocol.
 - The socket.
 - `python3`.
-- The machine-private per-session lock.
+- The account-private per-session lock.
 
 Existing legacy child labels may extend an already adjacent block read-only but are never renamed or migrated.
 A foreign, ambiguous, detached, or manually interleaved child makes ordering skip with a warning rather than rewriting the layout.
@@ -421,6 +421,8 @@ Once the exact pane is confirmed gone, teardown retires the task's own journal w
 Recovery is deliberately conservative and presentation-only.
 An existing journal suppresses another projected create.
 Before any recovery mutation, Firstmate holds both the task spawn lock and the named-session presentation lock.
+That presentation lock lives in a namespace private to the OS account, so another account on the same host running its own Firstmate on Herdr cannot block this account's spawn, recovery, or teardown.
+A namespace at this account's name that another account owns, or that is not mode 700, is still refused and is never adopted, chowned, or removed.
 
 A same-identity version 2 binding may replace one exact agent-free restart husk in place.
 The [restart and liveness contract](#restart-and-liveness-behavior) owns husk proof; registration absence alone is not enough.
@@ -516,8 +518,13 @@ Any of these preserves the candidate and lets session startup continue with at m
 - A failed journal publication or projected workspace create stops that spawn instead of falling back flat.
   So a Herdr create failure surfaces as a spawn failure in every Herdr home, rather than only in homes that opted in.
   Every earlier degradation on the fresh projected-create path (no session server, contended presentation lock, absent or ambiguous parent) still warns and continues flat.
-- Recovery of an existing presentation journal deliberately refuses the spawn when the shared presentation lock is contended, rather than falling back flat.
-  Default-on makes that refusal reachable in any Herdr home.
+- Recovery of an existing presentation journal refuses by default when the shared presentation lock is contended, rather than falling back flat.
+  Pass `fm-spawn.sh --herdr-resume-lock-wait` to opt that recovery into waiting for the lock instead, so concurrent recoveries can serialize.
+  The flag applies to a fresh ship or scout spawn that recovers a journal.
+  The multi-task path forwards the flag to each per-pair spawn.
+  `fm-spawn.sh --relaunch` and `--secondmate` take no exact-resume presentation-order lock, so the flag has no effect there.
+  Dead-owner reclaim still stops the wait when a holder crashed.
+  Unbounded blocking on the session lock is never the default.
 - Existing layouts are not force-renamed or rearranged.
 - Missing or ambiguous restart bindings fall back to the ordinary home workspace while the old projection remains untouched.
 - Crashes, lost responses, failed exact-pane cleanup, or human renames can leave quarantined spaces.
@@ -600,6 +607,7 @@ Enter, Escape, and Ctrl-C are supported.
 
 Typed-plane slash input, and dollar-prefixed skill input for Codex, uses the shared harness-aware settle before the first Enter, so a completion popup cannot consume it.
 Typed-plane text is typed once; only Enter is retried.
+The [shared backend submit contract](../bin/fm-backend.sh) owns refusal before typing and retry suppression when the composer classifier identifies a blocking dialog.
 
 ### Claude composer proof
 
@@ -642,7 +650,7 @@ On an idle or done native baseline, submit confirmation proceeds in this order:
 1. Wait for `working` or `blocked` across a bounded polling window.
    Native transition alone confirms every positively identified harness except omp, including future harnesses; only omp and missing or unavailable identity still require composer clearance, because resumed omp work on another turn cannot prove this Enter delivered retained text.
 2. If native status stays idle, or identity is ineligible for native-transition-only proof, use the shared composer verdict as the next positive signal.
-   A cleared composer is delivery; pending and unproven pending text receive a fresh composer read before another Enter is allowed.
+   A cleared composer is delivery; pending and unproven pending text without a recognized blocking dialog receive a fresh composer read before another Enter is allowed.
    If the initial or refreshed composer reads unknown, every positively identified non-omp harness receives another native confirmation window against the same idle baseline, without sending another Enter; omp and missing or unavailable identity remain fail-closed.
 3. After the retry budget, `fm_composer_queued_enter_verdict` accepts retained proven pending text only for positively identified OpenCode with native `working`, whose Enter queue semantics are verified.
    omp, Claude, unknown harnesses, and idle or unreadable busy signals remain pending; a different active turn is not delivery proof.
@@ -846,7 +854,7 @@ The watcher maps the pane back to the task and skips these:
 - Declared `paused:` waits, because the worker's declared wait already accounts for its quiet.
   It is left to the watcher's own bounded pause cadence.
 - Verified `captain-held` transfers.
-  A captain-held transfer remains silent without rechecks while the away-posture record exists.
+  Their posture-sensitive rechecks follow the [architecture's supervision contract](architecture.md#event-driven-supervision).
 
 ### Polling fallback
 
@@ -875,7 +883,7 @@ The pane-independent max-defer alert is configured in [`wedge-alarm.md`](wedge-a
 
 - Harnesses with native tracked background execution can run the daemon in their terminal.
 - Pi and pi-signed no longer launch the away daemon; their ordinary supervision session continues under the posture record.
-- An opted-in non-Pi home also skips the daemon for `/afk`; see [supervision-host.md](supervision-host.md).
+- A non-Pi home that runs the supervision host also skips the daemon for `/afk`; see [supervision-host.md](supervision-host.md).
 - For another harness without native tracked background execution, `bin/fm-afk-launch.sh` runs the daemon in a Herdr workspace, as described next.
 
 In that last case, `bin/fm-afk-launch.sh`:

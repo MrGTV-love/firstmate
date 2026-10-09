@@ -198,7 +198,7 @@ test_launch_proof_recorded_native_identity() {
   pass 'recorded generation binds the positively identified live PID across harnesses, shells and helpers'
 
   start_probe ''
-  BRIEF="$(fm_brief_worker_role "$FM_HOME/state" t)"$'\n\nTask assigned by Firstmate.'
+  BRIEF="$(fm_brief_worker_role "$FM_HOME/state" t "$ROOT")"$'\n\nTask assigned by Firstmate.'
   fm_operational_input_encode launch-brief "$BRIEF" MESSAGE
   jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"recorded",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
   # shellcheck disable=SC2153 # MESSAGE is assigned by name by fm_operational_input_encode.
