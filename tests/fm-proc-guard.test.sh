@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Behavioral tests for bin/fm-proc-guard.sh: the per-user process count, the
 # pile-up threshold and hold, the one-shot census, and the one-census-per-episode
-# gate. Every case drives the public CLI against real processes; thresholds are
-# moved with --limit so no case depends on how busy the host happens to be,
-# except the dip case, which uses a large real burst with wide margins.
+# gate. Controlled Python cases cover platform reads and exact boundaries. The
+# shell cases drive the public CLI against real processes, moving thresholds
+# with --limit; the dip case uses a large real burst with wide margins.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -57,21 +57,28 @@ now() { python3 -I -c 'import time; print(time.time())'; }
 since() { python3 -I -c 'import sys, time; print(round(time.time() - float(sys.argv[1]), 2))' "$1"; }
 num_ge() { python3 -I -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= float(sys.argv[2]) else 1)' "$1" "$2"; }
 
+python3 -I "$ROOT/tests/fm-proc-guard.behavior.test.py" || fail "controlled guard behavior tests failed"
+pass "guard real-UID, limit, privacy, and fixed-boundary behavior"
+
 # --- check ------------------------------------------------------------------
 
 out=$("$GUARD" check --json) || fail "check exited nonzero"
 status=$(printf '%s\n' "$out" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["status"])')
 case "$status" in
-  OK|WARNING|CRITICAL) ;;
-  *) fail "check could not read the host (status $status): $out" ;;
+  OK|WARNING|CRITICAL|UNKNOWN) ;;
+  *) fail "check returned an invalid status ($status): $out" ;;
 esac
 printf '%s\n' "$out" | python3 -I -c '
 import json, sys
 j = json.load(sys.stdin)
-assert j["count"] > 0 and j["limit"] > j["count"] // 100, j
+assert j["count"] > 0, j
+if j["limit"] is None:
+    assert j["status"] == "UNKNOWN" and "unlimited" in j["reason"], j
+else:
+    assert j["limit"] > j["count"] // 100, j
 assert j["name"] == "fm-proc-guard" and "recommendation" in j, j
-' || fail "check --json did not report a positive count and limit: $out"
-pass "check reads the user's process count and limit"
+' || fail "check --json did not report a positive count and a limit or UNKNOWN: $out"
+pass "check reads the user's process count and reports its limit or UNKNOWN"
 
 [ "$("$GUARD" check --json --limit 1000000000 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["status"])')" = OK ] \
   || fail "a huge limit was not OK"
@@ -79,24 +86,30 @@ pass "check reads the user's process count and limit"
 [ "$("$GUARD" check --json --limit 1 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["status"])')" = CRITICAL ] \
   || fail "a limit below the count was not CRITICAL"
 if "$GUARD" check --check --limit 1 >/dev/null; then fail "--check exited zero on a CRITICAL verdict"; fi
-[ "$("$GUARD" check --json --limit 1 --warn-pct 100 --crit-pct 100 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["status"])')" = CRITICAL ] \
+[ "$("$GUARD" check --json --limit 1 --crit-pct 100 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["status"])')" = CRITICAL ] \
   || fail "a count above 100% of the limit was not CRITICAL"
 pass "check classifies the count against the limit and --check exits on WARNING or CRITICAL"
 
-for bad in "--warn-pct 0" "--warn-pct 101" "--limit x"; do
+for command in check census watch; do
+  for bad in "--warn-pct 60" "--clear-pct 50"; do
+    # shellcheck disable=SC2086
+    if "$GUARD" "$command" $bad >/dev/null 2>&1; then fail "$command accepted $bad"; fi
+  done
+done
+for bad in "--crit-pct 0" "--crit-pct 101" "--limit x"; do
   # shellcheck disable=SC2086
   if "$GUARD" check $bad >/dev/null 2>&1; then fail "check accepted $bad"; fi
 done
-for bad in "--hold 0" "--interval 0" "--clear-pct 0" "--clear-pct 101"; do
+for bad in "--hold 0" "--interval 0"; do
   # shellcheck disable=SC2086
   if "$GUARD" watch --state-dir "$STATE" $bad >/dev/null 2>&1; then fail "watch accepted $bad"; fi
 done
-pass "out-of-range thresholds are refused"
+pass "warning and clear customization are refused, as are invalid remaining options"
 
 # --- census of a real self-recursive tree -----------------------------------
 
 export NESTSLEEP="$LAB/nestsleep" BURSTSLEEP="$LAB/burstsleep"
-"$LAB/nestbash" "$LAB/nest.sh" 60 >/dev/null 2>&1 &
+"$LAB/nestbash" "$LAB/nest.sh" 60 --user alice:secret >/dev/null 2>&1 &
 ROOT_PID=$!
 fm_test_wait_until 20 pgrep -f "$LAB/nestsleep 120" || fail "the recursive tree never reached its leaf"
 
@@ -118,11 +131,13 @@ assert any(re.search(r"bash\+", e["chain"]) and e["count"] >= 59 for e in c["by_
 deepest = c["deepest_chains"]
 assert 1 <= len(deepest) <= 5, len(deepest)
 top = deepest[0]
-assert "nestsleep 120" in top["leaf"]["argv"], top["leaf"]
+assert "sleep" in top["leaf"]["executable"] and top["leaf"]["script"] == "", top["leaf"]
 runs = [int(n) for n in re.findall(r"bash\(x(\d+)\)", top["chain"])]
 assert runs and max(runs) >= 60, top["chain"]
 assert top["run_length"] >= 60 and top["depth"] >= 61, top
-assert any("nest.sh" in sample["argv"] for sample in top["run_samples"]), top["run_samples"]
+assert any(sample["script"] == "nest.sh" for sample in top["run_samples"]), top["run_samples"]
+assert c["schema"] == 2, c
+assert all("argv" not in entry for entry in c["oldest"] + c["newest"])
 assert [d["depth"] for d in deepest] == sorted((d["depth"] for d in deepest), reverse=True)
 assert 1 <= len(c["oldest"]) <= 5 and 1 <= len(c["newest"]) <= 5
 assert c["oldest"][0]["age_seconds"] >= c["newest"][0]["age_seconds"]

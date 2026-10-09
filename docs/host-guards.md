@@ -17,6 +17,13 @@ It makes no Jev, model, or network call, so its former `fm-jev-mem-guard` name h
 The process family is `fm-proc-guard`; its engine header owns the count semantics, thresholds, and census document.
 Its `check` and `census` commands follow the one-shot contract below.
 Its `watch` command is the one long-running mode: it samples without forking so it keeps working when the user is at the process cap, and `bin/fm-procevent-proc.sh` runs it as a standing process-event source that the primary home arms at bootstrap.
+Arming confirms a detached canonical listener; it does not depend on the watcher or an active turn.
+The standing adapter authorizes lifetime while its registration and physical state root remain present, and the runner retains its claim across captures without waiting for acknowledgement.
+An episode record under the machine-wide process-event claim root suppresses duplicate censuses across ownership handoffs; direct `watch` defaults to an episode in its supplied state directory.
+Warning/trigger and clear thresholds are fixed at 60% and 50%, respectively.
+Linux selects real-UID membership and counts threads against RLIMIT_NPROC; an unlimited per-user limit yields `UNKNOWN` unless `--limit` supplies a comparison.
+Census schema 2 retains command names plus executable/script basenames, not arbitrary command-line arguments.
+Behavioral coverage in `tests/fm-proc-guard.behavior.test.py`, `tests/fm-procevent-proc.test.sh`, and the bootstrap `proc-detector` case exercises real-UID accounting, privacy, fixed threshold boundaries, watcher-free lifetime, durable capture/wake delivery, cross-home episode suppression, and override-only home routing.
 
 ## Engine contract
 

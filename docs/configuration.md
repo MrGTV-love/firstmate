@@ -2781,6 +2781,11 @@ Detaching a runner into its own process group is what lets a persistent source o
 - That guard accepts the lease only while the state root retains the device/inode identity recorded by the runner's claim, and initiates the verified stop after two consecutive reads cannot prove that identity and lease freshness, so one unreadable read cannot kill a live runner.
 - Those two reads are spaced half a check interval apart, so the pair the debounce requires completes inside one check interval instead of costing two of them.
 
+The built-in `proc` adapter opts into `standing` lifetime: its guard requires the recorded physical state root and its registration, rather than recent home activity.
+Bootstrap's `arm` confirms a detached canonical listener, and `relisten` continues after an unhandled pile-up capture while preserving that claim.
+Retirement and physical state-root disappearance still stop the detector through the same identity-gated runner cleanup.
+Other adapters retain the home-lease and handled-capture requirements.
+
 **Detection and stop timing**
 
 For a runner whose ownership can still be proved, the nominal detection bound is the lease plus one check interval.

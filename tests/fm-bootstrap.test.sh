@@ -29,6 +29,7 @@ set -u
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(fm_test_tmproot fm-bootstrap-tests)
 export FM_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
+export FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
 
 # Hermetic runtime-backend detection. These cases pin the backend per-home via
 # config/backend; the dev shell's ambient runtime markers ($TMUX inside tmux,
@@ -1410,6 +1411,8 @@ SH
 test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
   local case_dir fakebin home sm lab out
   case_dir="$TMP_ROOT/pileup-detector-arm"
+  local FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60
+  export FM_PROCEVENT_CLAIM_ROOT FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS
   home="$case_dir/home"
   sm="$case_dir/sm"
   lab="$case_dir/lab"
@@ -1420,6 +1423,7 @@ test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
   printf '%s\n' sm > "$sm/.fm-secondmate-home"
   printf '%s\n' 'fm-lab-home v1' > "$lab/.fm-lab-home"
   fakebin=$(make_fake_toolchain "$case_dir")
+  fm_test_track_procevent_home "$home" "$FM_PROCEVENT_CLAIM_ROOT"
 
   out=$(PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/fm-bootstrap.sh")
@@ -1436,13 +1440,17 @@ test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
   assert_not_contains "$out" "pile-up detector" "a lab bootstrap reported on the detector"
   assert_absent "$lab/state/procevent/proc-guard.source" "a disposable lab home armed the host-wide detector"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+  out=$(env -u FM_HOME -u FM_STATE_OVERRIDE PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_ROOT_OVERRIDE="$home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
   assert_not_contains "$out" "pile-up detector" "arming the detector was not silent"
   assert_present "$home/state/procevent/proc-guard.source" "the primary home did not arm the detector"
+  fm_test_wait_until 300 test -s "$home/state/procevent/proc-guard.runner" || fail "bootstrap registered without listening"
+  kill -0 "$(cat "$home/state/procevent/proc-guard.runner")" 2>/dev/null || fail "bootstrap listener is not live"
   PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" >/dev/null \
     || fail "a second bootstrap failed over the armed detector"
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-procevent-proc.sh" retire >/dev/null \
+    || fail "bootstrap detector retirement failed"
 
   rm -rf "$home/state/procevent"
   mkdir -p "$case_dir/no-python"
@@ -1455,6 +1463,11 @@ test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
   assert_absent "$home/state/procevent/proc-guard.source" "an unmeasurable host still armed the detector"
   pass "bootstrap arms the process pile-up detector in a primary home only, silently, and not when read-only, a secondmate, a lab, or unmeasurable"
 }
+
+if [ "${1-}" = proc-detector ]; then
+  test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only
+  exit 0
+fi
 
 test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap

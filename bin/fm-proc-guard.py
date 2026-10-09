@@ -11,31 +11,32 @@ This guard samples that one count cheaply and writes ONE census when it stays hi
 Commands (run --help on each for flags):
   check    One reading: count, limit, percent, and an OK/WARNING/CRITICAL/UNKNOWN verdict.
   census   Write one process census to <state>/proc-census.<epoch>.<pid>.json now.
-  watch    Sample once per --interval; when the count stays above --warn-pct of the
+  watch    Sample once per --interval; when the count stays above 60% of the
            limit for more than --hold seconds, write one census, print a result
            document (see below), and exit.
-           An open episode (state/proc-guard.episode) makes the next watch wait,
-           silently, until the count has stayed at or below --clear-pct for --hold
-           seconds, so one pile-up yields one census however often watch restarts.
+           An open episode (--episode-file, default state/proc-guard.episode) makes
+           the next watch wait silently until the count has stayed at or below 50%
+           for --hold seconds, so one pile-up yields one census across restarts.
 
 Thresholds (named here so a reader can audit every verdict):
-  --warn-pct  60   percent of the limit above which the count is a pile-up
+  warning     60   percent of the limit above which the count is a pile-up (fixed)
   --crit-pct  90   check only: percent at which forks are about to fail for everyone
-  --clear-pct 50   percent at or below which an open episode closes
-  --hold       5   seconds the count must stay above warn-pct (more than, not equal)
+  clear       50   percent at or below which an open episode closes (fixed)
+  --hold       5   seconds the count must stay above warning (more than, not equal)
 
 Why a library call and not ps(1): the sampler must keep working at the cap.
 A sampler that forks cannot start its probe once the cap is reached, which is the
 moment it matters (measured: ps fails with EAGAIN, the library call still reads).
 macOS reads proc_listpids(PROC_UID_ONLY) and proc_pidinfo through libproc, and
-argv through the kern.procargs2 sysctl; Linux reads /proc.
+executable and script identifiers through the kern.procargs2 sysctl; Linux reads /proc.
 Neither path forks, execs, or writes to anything it measures.
 
 Count semantics, measured:
   macOS  the count includes zombies, as the kernel's per-user count does, and runs
          about 9 above it (long-lived root-forked processes that later became this
          uid are listed but were charged to root), so the guard warns slightly early.
-  Linux  RLIMIT_NPROC bounds threads, so the count is the sum of the user's threads.
+  Linux  RLIMIT_NPROC bounds threads belonging to the real UID, so the count sums
+         that UID's threads. An unlimited RLIMIT_NPROC leaves the limit unknown.
 
 Result document printed by watch (the process-event runner stores it verbatim):
   proc-guard: <source-id>
@@ -48,12 +49,11 @@ Result document printed by watch (the process-event runner stores it verbatim):
 
 Invariants:
   - Read-only diagnostics: never signals, kills, or changes any process.
-    The only writes are the census, its pruning, and the episode record under --state-dir.
+    The only writes are the census, its pruning, and the episode record.
   - Fail-open: an unreadable count skips that sample; thirty skipped samples in a row
     make watch report status: error once instead of looping.
-  - Census argv text is captured only for each deepest chain's leaf and three members of
-    its longest run, and for the oldest and the newest processes, each cut to 160
-    characters; the file is mode 0600.
+  - Census identifiers contain only executable and interpreter script basenames,
+    never arbitrary arguments; the file is mode 0600.
 """
 
 import argparse
@@ -70,7 +70,8 @@ from datetime import datetime, timezone
 NAME = "fm-proc-guard"
 CENSUS_PREFIX = "proc-census."
 EPISODE_FILE = "proc-guard.episode"
-ARGV_LIMIT = 160
+WARN_PERCENT = 60
+CLEAR_PERCENT = 50
 CENSUS_TOP = 5
 CENSUS_KEEP = 20
 MAX_SKIPPED_SAMPLES = 30
@@ -159,22 +160,22 @@ class Darwin:
         return Proc(pid, info.ppid, command, state,
                     info.start_sec + info.start_usec / 1e6, 1)
 
-    def argv(self, pid):
+    def identifier(self, pid):
         mib = (ctypes.c_int * 3)(self.CTL_KERN, self.KERN_PROCARGS2, pid)
         size = ctypes.c_size_t(ctypes.sizeof(self.args_buffer))
         if self.libc.sysctl(mib, 3, self.args_buffer, ctypes.byref(size), None, 0) != 0:
-            return ""
+            return process_identifier(b"", ())
         raw = self.args_buffer.raw[: size.value]
         if len(raw) < 4:
-            return ""
+            return process_identifier(b"", ())
         argc = int.from_bytes(raw[:4], sys.byteorder)
         body = raw[4:]
         end = body.find(b"\0")
         if end < 0:
-            return ""
-        rest = body[end:].lstrip(b"\0")
-        return " ".join(
-            part.decode("utf-8", "replace") for part in rest.split(b"\0")[:argc])
+            return process_identifier(b"", ())
+        executable = body[:end]
+        argv = body[end:].lstrip(b"\0").split(b"\0")[:argc]
+        return process_identifier(executable, argv)
 
 
 class Linux:
@@ -198,11 +199,7 @@ class Linux:
         soft = resource.getrlimit(resource.RLIMIT_NPROC)[0]
         if soft != resource.RLIM_INFINITY:
             return soft, "RLIMIT_NPROC"
-        try:
-            with open("/proc/sys/kernel/threads-max") as handle:
-                return int(handle.read()), "kernel.threads-max (RLIMIT_NPROC is unlimited)"
-        except (OSError, ValueError):
-            return None, "no per-user process limit readable"
+        return None, "RLIMIT_NPROC is unlimited; no per-user process limit"
 
     def pids(self):
         found = []
@@ -212,9 +209,13 @@ class Linux:
                     if not entry.name.isdigit():
                         continue
                     try:
-                        if entry.stat().st_uid == self.uid:
-                            found.append(int(entry.name))
-                    except OSError:
+                        with open("/proc/%s/status" % entry.name) as status:
+                            for line in status:
+                                if line.startswith("Uid:"):
+                                    if int(line.split()[1]) == self.uid:
+                                        found.append(int(entry.name))
+                                    break
+                    except (OSError, ValueError, IndexError):
                         continue
         except OSError as error:
             raise ReadError("/proc unreadable: %s" % error)
@@ -250,13 +251,17 @@ class Linux:
         return Proc(pid, int(rest[1]), command, rest[0],
                     self.boot + int(rest[19]) / self.ticks, int(rest[17]))
 
-    def argv(self, pid):
+    def identifier(self, pid):
+        try:
+            executable = os.fsencode(os.readlink("/proc/%d/exe" % pid))
+        except OSError:
+            executable = b""
         try:
             with open("/proc/%d/cmdline" % pid, "rb") as handle:
-                raw = handle.read()
+                argv = handle.read().split(b"\0")
         except OSError:
-            return ""
-        return " ".join(part.decode("utf-8", "replace") for part in raw.split(b"\0") if part)
+            argv = ()
+        return process_identifier(executable, argv)
 
 
 def open_source():
@@ -267,9 +272,17 @@ def open_source():
     raise ReadError("unsupported platform: %s" % sys.platform)
 
 
-def cut(text):
-    text = " ".join(text.split())
-    return text if len(text) <= ARGV_LIMIT else text[: ARGV_LIMIT - 3] + "..."
+def process_identifier(executable, argv):
+    executable = os.path.basename(os.fsdecode(executable))
+    script = ""
+    interpreter = executable
+    if interpreter.startswith("python"):
+        version = interpreter[len("python"):]
+        interpreter = "python" if not version or version.replace(".", "").isdigit() else interpreter
+    if interpreter in ("sh", "bash", "zsh", "dash", "ksh", "python", "perl", "ruby", "node", "php", "lua"):
+        if len(argv) > 1 and argv[1] and not argv[1].startswith(b"-"):
+            script = os.path.basename(os.fsdecode(argv[1]))
+    return {"executable": executable, "script": script}
 
 
 def segments_text(segments, repeats):
@@ -338,8 +351,10 @@ def build_census(source, count, limit, limit_source, threshold, trigger):
 
     def who(pid):
         proc = procs.get(pid) or lookup(pid)
-        return {"pid": pid, "command": proc.command if proc else "",
-                "argv": cut(source.argv(pid)) if proc and proc.state != "Z" else ""}
+        entry = {"pid": pid, "command": proc.command if proc else ""}
+        entry.update(source.identifier(pid) if proc and proc.state != "Z"
+                     else process_identifier(b"", ()))
+        return entry
 
     def chain_pids(pid):
         """Root-first pids of one process's ancestry."""
@@ -392,7 +407,7 @@ def build_census(source, count, limit, limit_source, threshold, trigger):
     deepest_depth = deepest[0]["depth"] if deepest else 0
     return {
         "name": NAME,
-        "schema": 1,
+        "schema": 2,
         "captured_at": utc(now),
         "epoch": int(now),
         "platform": source.name,
@@ -488,7 +503,7 @@ def cmd_check(args):
                 report.update(status="CRITICAL", recommendation=(
                     "The user process count is near the cap; forks fail for every process "
                     "of this user, which can explain worker silence while it holds."))
-            elif count > limit * args.warn_pct / 100.0:
+            elif count > limit * WARN_PERCENT / 100.0:
                 report.update(status="WARNING", recommendation=(
                     "The user process count is high but forks still work; run the census "
                     "to see what is piling up."))
@@ -518,7 +533,7 @@ def cmd_census(args):
     except (ReadError, OSError) as error:
         print("error: %s" % error, file=sys.stderr)
         sys.exit(1)
-    threshold = limit * args.warn_pct / 100.0 if limit else None
+    threshold = limit * WARN_PERCENT / 100.0 if limit else None
     census = build_census(source, count, limit, limit_source, threshold, {"reason": "requested"})
     print(write_census(args.state_dir or default_state_dir(), census, args.keep))
 
@@ -540,7 +555,7 @@ def result_document(source_id, status, fields):
 
 def cmd_watch(args):
     state_dir = args.state_dir or default_state_dir()
-    episode = os.path.join(state_dir, EPISODE_FILE)
+    episode = args.episode_file or os.path.join(state_dir, EPISODE_FILE)
     sampling_cpu, samples, skipped = 0.0, 0, 0
     try:
         source = open_source()
@@ -558,8 +573,8 @@ def cmd_watch(args):
                 ("sampler_cpu_ms_per_sample", "%.3f" % (1000.0 * sampling_cpu / samples) if samples else "0"),
                 ("sampler_peak_rss_kb", rss_kb)]
 
-    threshold = limit * args.warn_pct / 100.0
-    clear = limit * args.clear_pct / 100.0
+    threshold = limit * WARN_PERCENT / 100.0
+    clear = limit * CLEAR_PERCENT / 100.0
     armed = read_episode(episode) is None
     over_since = quiet_since = None
     deadline = time.monotonic() + args.duration if args.duration else None
@@ -606,10 +621,15 @@ def cmd_watch(args):
                         census = build_census(source, count, limit, limit_source, threshold, trigger)
                         summary = census["summary"]
                         path = write_census(state_dir, census, args.keep)
-                        with open(episode, "w") as handle:
-                            json.dump({"opened": census["epoch"], "census": path, "count": count}, handle)
                     except Exception as error:  # noqa: BLE001 - report, never crash the detector
                         problem = "%s: %s" % (type(error).__name__, error)
+                    try:
+                        os.makedirs(os.path.dirname(os.path.abspath(episode)), exist_ok=True)
+                        with open(episode, "w") as handle:
+                            json.dump({"opened": int(time.time()), "census": path, "count": count}, handle)
+                    except OSError as error:
+                        episode_problem = "%s: %s" % (type(error).__name__, error)
+                        problem = "%s; %s" % (problem, episode_problem) if problem else episode_problem
                     fields = [("count", count), ("limit", limit), ("threshold", int(threshold)),
                               ("held_seconds", "%.2f" % held)]
                     fields += [("census", path)] if path else []
@@ -649,8 +669,6 @@ def main():
     def common(sub):
         sub.add_argument("--limit", type=int, default=0,
                          help="override the per-user process limit (default: read it from the host)")
-        sub.add_argument("--warn-pct", type=percent, default=60.0,
-                         help="percent of the limit above which the count is a pile-up (default: %(default)s)")
 
     check = commands.add_parser("check", help="one reading and verdict")
     common(check)
@@ -670,13 +688,13 @@ def main():
 
     watch = commands.add_parser("watch", help="sample until a pile-up, write one census, exit")
     common(watch)
-    watch.add_argument("--state-dir", help="where the census and episode record go (default: the home's state/)")
+    watch.add_argument("--state-dir", help="where the census goes (default: the home's state/)")
+    watch.add_argument("--episode-file",
+                       help="shared episode record path (default: <state-dir>/proc-guard.episode)")
     watch.add_argument("--interval", type=positive, default=1.0,
                        help="seconds between samples (default: %(default)s)")
     watch.add_argument("--hold", type=positive, default=5.0,
                        help="seconds the count must stay above the threshold, strictly more than (default: %(default)s)")
-    watch.add_argument("--clear-pct", type=percent, default=50.0,
-                       help="percent at or below which an open episode closes (default: %(default)s)")
     watch.add_argument("--keep", type=int, default=CENSUS_KEEP,
                        help="census files to keep, newest first (default: %(default)s)")
     watch.add_argument("--duration", type=float, default=0.0,

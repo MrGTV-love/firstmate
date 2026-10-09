@@ -2,8 +2,8 @@
 # Process pile-up process-event adapter.
 #
 # Usage:
-#   fm-procevent-proc.sh arm [--warn-pct <percent>] [--hold <secs>] [--interval <secs>] [--limit <n>]
-#   fm-procevent-proc.sh poll [--warn-pct <percent>] [--hold <secs>] [--interval <secs>] [--limit <n>]
+#   fm-procevent-proc.sh arm [--hold <secs>] [--interval <secs>] [--limit <n>]
+#   fm-procevent-proc.sh poll [--hold <secs>] [--interval <secs>] [--limit <n>]
 #   fm-procevent-proc.sh classify <result-file>
 #   fm-procevent-proc.sh terminal <result-file>
 #   fm-procevent-proc.sh source-id
@@ -12,7 +12,7 @@
 # arm        Register the standing pile-up detector. Its blocking child is
 #            bin/fm-proc-guard.sh watch: it samples the user's process count once
 #            per --interval (default 1s) and, when the count stays above
-#            --warn-pct of the per-user limit (default 60) for more than --hold
+#            60% of the per-user limit for more than --hold
 #            seconds (default 5), writes one census to state/proc-census.*.json
 #            and ends with a result that becomes the durable
 #            `check: procevent proc-guard:<seq>` wake. --limit overrides the host's
@@ -26,9 +26,9 @@
 # source-id  Print the canonical source id.
 # retire     Retire the registration.
 #
-# After a capture the runner exits and the watcher's next reconcile starts a new
-# poll. An open episode (state/proc-guard.episode) makes that poll wait, silently,
-# until the count has dropped back, so one pile-up produces one census and one wake.
+# Arming establishes a detached listener. The registration authorizes its
+# standing lifetime, and the runner keeps its canonical claim across captures.
+# The canonical episode record keeps one pile-up to one census across homes.
 # bin/fm-proc-guard.py owns the thresholds, the count semantics, and the census
 # document.
 set -u
@@ -39,6 +39,8 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 
 SOURCE_ID=proc-guard
+
+. "$SCRIPT_DIR/fm-procevent-lib.sh"
 
 usage() {
   awk '
@@ -68,10 +70,6 @@ parse_flags() {
   local LC_ALL=C
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --warn-pct)
-        positive_number "${2-}" && [[ "$2" =~ ^([0-9]{1,2}(\.[0-9]+)?|100(\.0+)?)$ ]] \
-          || die "--warn-pct needs a percent above 0 and at most 100"
-        GUARD_FLAGS+=(--warn-pct "$2"); CHECK_FLAGS+=(--warn-pct "$2"); shift 2 ;;
       --hold)
         positive_number "${2-}" || die "--hold needs a positive number of seconds"
         GUARD_FLAGS+=(--hold "$2"); shift 2 ;;
@@ -97,12 +95,16 @@ cmd_arm() {
   esac
   "$SCRIPT_DIR/fm-procevent.sh" register proc "$SOURCE_ID" \
     -- "$SCRIPT_DIR/fm-procevent-proc.sh" poll ${GUARD_FLAGS[@]+"${GUARD_FLAGS[@]}"} || exit 1
+  local rc=0
+  "$SCRIPT_DIR/fm-procevent.sh" ensure-listening "$SOURCE_ID" || rc=$?
+  [ "$rc" -eq 0 ] || [ "$rc" -eq 3 ] || return "$rc"
   printf 'armed: %s\n' "$SOURCE_ID"
 }
 
 cmd_poll() {
   parse_flags "$@"
   exec "$SCRIPT_DIR/fm-proc-guard.sh" watch --state-dir "$STATE" --source-id "$SOURCE_ID" \
+    --episode-file "$(fm_procevent_claim_root)/proc-guard.episode" \
     ${GUARD_FLAGS[@]+"${GUARD_FLAGS[@]}"}
 }
 
@@ -131,6 +133,7 @@ case "${1-}" in
   poll)      shift; cmd_poll "$@" ;;
   classify)  shift; cmd_classify "$@" ;;
   terminal)  shift; cmd_terminal "$@" ;;
+  standing|relisten) shift; [ "$#" -eq 0 ] || usage; exit 0 ;;
   source-id) shift; printf '%s\n' "$SOURCE_ID" ;;
   retire)    shift; [ "$#" -eq 0 ] || usage; "$SCRIPT_DIR/fm-procevent.sh" retire "$SOURCE_ID" ;;
   ''|-h|--help|help) usage ;;

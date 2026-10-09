@@ -180,7 +180,8 @@
 # registration only when that same claim still owns it and the registered
 # command is unchanged. A missing command, an error, or any other exit releases
 # the claim after that one result, exactly as before. The runner still does not
-# refresh the owner lease, so a home that has gone still ends the poll.
+# refresh the owner lease. A `standing` adapter instead authorizes lifetime with
+# its registration and physical state root, and may relisten before acknowledgement.
 #
 # Keyed captain answers from built-in adapters use one more seam of the same kind,
 # and this runner still decides nothing about them. Some sources carry the
@@ -401,6 +402,13 @@ adapter_self_announcing() {  # <adapter>
   script=$(adapter_script "$1")
   [ -f "$script" ] && [ ! -L "$script" ] || return 1
   "$script" self-announcing >/dev/null 2>&1
+}
+
+adapter_is_standing() {
+  local script
+  script=$(adapter_script "$1")
+  [ -f "$script" ] && [ ! -L "$script" ] || return 1
+  "$script" standing >/dev/null 2>&1
 }
 
 source_file()  { printf '%s/%s.source\n' "$REG" "$1"; }
@@ -991,7 +999,7 @@ cmd_start_public() {
 }
 
 cmd_start() {
-  local id=${1-} adapter out rc claimed bound_rc published_capture=0 handled_capture=0 self_announcing=0 task_owner='' task_pending
+  local id=${1-} adapter out rc claimed bound_rc published_capture=0 handled_capture=0 self_announcing=0 task_owner='' task_pending standing=0
   local extension_owner=0 extension_load_state extension_sequence='' extension_request_id=''
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   require_runner_group
@@ -1077,6 +1085,7 @@ cmd_start() {
   CLAIM_REG_IDENTITY=$FM_PROCEVENT_CLAIM_REG_IDENTITY
   CLAIM_STATE_DEVICE=$FM_PROCEVENT_CLAIM_STATE_DEVICE
   CLAIM_STATE_INODE=$FM_PROCEVENT_CLAIM_STATE_INODE
+  [ "$extension_owner" -ne 0 ] || ! adapter_is_standing "$adapter" || standing=1
   STAGED_OUTPUT=
   # Exit cleanup must not wait for the source lock: retire and reconcile hold it
   # while waiting for this runner, so blocking here creates a circular wait
@@ -1427,7 +1436,7 @@ EOF
     fm_procevent_claim_capture_reservation_remove_locked || true
     exec 6<&-
   fi
-  if [ "$handled_capture" -eq 1 ] && adopt_relisten; then
+  if { [ "$handled_capture" -eq 1 ] || [ "$standing" -eq 1 ]; } && adopt_relisten; then
     continue
   fi
   break
@@ -1517,7 +1526,7 @@ start_owner_guard() {  # <source-id>
 # proves its own owner through that home's own lease.
 cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file> <state-device> <state-inode>
   local id=${1-} pid=${2-} identity=${3-} ready=${4-} state_device=${5-} state_inode=${6-}
-  local lease tick half misses=0 pid_state state_identity current_device current_inode
+  local lease tick half misses=0 pid_state state_identity current_device current_inode standing=0 adapter
   [ "$#" -eq 6 ] || usage
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   case "$pid" in ''|*[!0-9]*) die "runner pid must be a positive integer: $pid" ;; esac
@@ -1542,6 +1551,15 @@ cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file
   # configurable interval still yields two reads rather than collapsing to one.
   half=$((tick / 2))
   [ $((tick % 2)) -eq 0 ] || half="$half.5"
+  adapter=$(read_adapter "$id") || die "source adapter is unreadable"
+  ! adapter_is_standing "$adapter" || standing=1
+  watchdog_owner_alive() {
+    if [ "$standing" -eq 1 ]; then
+      [ "$(read_adapter "$id" 2>/dev/null)" = "$adapter" ]
+    else
+      fm_procevent_owner_alive "$STATE" "$lease"
+    fi
+  }
   fm_procevent_pid_state "$pid" "$identity"
   pid_state=$?
   [ "$pid_state" -eq 0 ] || die "runner identity changed before owner guard initialization"
@@ -1550,8 +1568,8 @@ cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file
   IFS=$'\t' read -r _ current_device current_inode _ _ <<< "$state_identity"
   [ "$current_device" = "$state_device" ] && [ "$current_inode" = "$state_inode" ] \
     || die "owning state root identity changed before owner guard initialization"
-  fm_procevent_owner_alive "$STATE" "$lease" \
-    || die "owning home lease is not fresh at owner guard initialization"
+  watchdog_owner_alive \
+    || die "owning home is not present at owner guard initialization"
   printf 'ready\n' > "$ready" || die "cannot confirm owner guard initialization"
   trap - EXIT
   while :; do
@@ -1570,7 +1588,7 @@ cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file
       || IFS=$'\t' read -r _ current_device current_inode _ _ <<< "$state_identity"
     if [ "$current_device" = "$state_device" ] \
       && [ "$current_inode" = "$state_inode" ] \
-      && fm_procevent_owner_alive "$STATE" "$lease"; then
+      && watchdog_owner_alive; then
       misses=0
       continue
     fi
