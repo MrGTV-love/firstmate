@@ -265,20 +265,55 @@
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
-#   ~/.omp/agent/config.yml (model roles, providers, theme) is never written.
+#   ~/.omp/agent/config.yml (model roles, providers, theme) is never written or
+#   renamed by Firstmate.
 #   A non-index-entry literal <provider>/<id> is validated against
 #   `omp models --json` only when that provider appears in the listing; a
 #   provider absent from the listing (an extension-registered provider such as
 #   claude-bridge, which omp never lists) passes through unvalidated with a
 #   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
-#   own matcher. An omp launch that resolves no model reads the shared
-#   modelRoles.default, which any interactive omp session can clear and which
-#   omp replaces with the first credentialed model when it is missing or
-#   unlisted; that launch is refused with the remedy when the global config
-#   shows the role unset or `omp models --json` shows it unlisted, and an
-#   unreadable config or listing establishes nothing. Indexed
-#   selections follow docs/configuration.md "Fleet model
-#   index". A crewmate or scout loads its per-task busy-state extension with -e
+#   own matcher. Indexed selections follow docs/configuration.md "Fleet model
+#   index".
+#   An omp launch with no effective model override depends on the shared
+#   modelRoles.default (modelRoleStorage: global). A missing or unresolvable
+#   Default role can make omp silently use the first credentialed model instead.
+#   When the launch's agent directory is known, fm-spawn reads its global
+#   config.yml directly with Ruby's YAML parser, without `omp config get`.
+#   A readable config with a missing or empty role refuses the launch; a
+#   <provider>/<id> absent from a catalog that lists its provider also refuses.
+#   For this default-role catalog check only, a trailing thinking suffix
+#   (:off|minimal|low|medium|high|xhigh|max|auto) is stripped; other colons remain
+#   part of the model id. Unknown providers pass with a notice, and bare fuzzy
+#   patterns remain omp's responsibility. Unreadable or malformed config,
+#   an unavailable parser, or unreadable catalog evidence establishes nothing
+#   and does not refuse the launch. An effective model override skips the role
+#   read. The refusal remedy is: pass --model <provider>/<id> (or a dispatch
+#   profile) so this launch stops depending on the shared default, or restore
+#   the Default role in omp with /model.
+#   Canonical launches without an omp profile carry the resolved
+#   ${PI_CODING_AGENT_DIR:-$HOME/.omp/agent} directory into the pane, including
+#   through launch-environment filtering. When raw commands are allowed, native
+#   --model <value>, --model=<value>, -m <value>, and expanded __MODELFLAG__
+#   determine whether the command depends on the role; a spawn --model option
+#   not inserted into that command does not bypass the guard.
+#   Raw default-role evidence accepts only words composed of unquoted
+#   [A-Za-z0-9_./:=,@%+-] characters, plain single-quoted text, or double-quoted
+#   text without dollar signs, backticks, or backslashes, plus literal
+#   redirections (>, >>, <, <>, >&, <&). This applies to command words,
+#   assignments, arguments, and redirection targets. Anything else, including
+#   tilde expansion, process substitution, and here-documents, passes through
+#   unchanged without evaluation or a default-role catalog probe. Long literal
+#   prefixes ending in expansion characters also pass through promptly.
+#   Otherwise, raw launches honor literal absolute PI_CODING_AGENT_DIR
+#   assignments, including with redirections. An unknown effective directory
+#   (including ambient pane inheritance or profile selection via --profile,
+#   --profile=, OMP_PROFILE, or PI_PROFILE) passes through unchanged. When known,
+#   the same directory supplies both the role read and catalog probe.
+#   Project settings and --config overlays are intentionally not inspected for
+#   roles. This guard covers fm-spawn launches only, not pipeline-agent sessions
+#   or direct operator launches; tests/fm-omp-harness.test.sh owns the behavioral
+#   regression coverage.
+#   A crewmate or scout loads its per-task busy-state extension with -e
 #   from state/ (outside the worktree, so
 #   auto-discovery cannot load it a second time); a secondmate passes no -e at
 #   all and relies on omp auto-discovering the home's tracked .omp/extensions/
@@ -2263,16 +2298,9 @@ omp_catalog_verdict() { # <omp-bin> <provider/id>
   fi
 }
 
-# omp's shared default role is global (modelRoleStorage: global), so every omp
-# session the captain opens can change or clear it. When it is missing or names
-# an id the catalog does not list, omp does not fail: it silently takes the
-# first model that has credentials, which here is a free-tier model that answers
-# every call with HTTP 429. A launch that passes no --model depends on that
-# role, so it is refused here with the remedy rather than left to fall back.
-# A launch with --model never reads the role, an unreadable config or listing
-# establishes nothing, and a default that names a provider the listing does not
-# know or a bare pattern is omp's own matcher's job (same scope as
-# omp_model_validate).
+# Read YAML directly: `omp config get` can layer project settings and initialize
+# writable Settings, so it is not a read-only global-file probe. The header
+# owns the default-role admission contract and points to its regression suite.
 omp_default_role_validate() {
   local bin=$1 model=$2 raw=${3:-} agent_dir=${4:-} role selector verdict remedy model_flag dependency
   [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ] || return 0
