@@ -633,7 +633,7 @@ A snapshot invalidated with `current_state.detail` equal to `task generation cha
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
 The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.
 Status questions age from their stamped opening.
-The dated reader folds each log once without per-transition subshells, retaining compact opening-record IDs while keeping dates and summaries separately so later transitions do not reread every open summary.
+The dated reader folds each log once without per-transition subshells, normalizes each transition once for key and note parsing, and dates only surviving openings; compact opening-record IDs keep later transitions from rereading every open summary.
 Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata.
 Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.

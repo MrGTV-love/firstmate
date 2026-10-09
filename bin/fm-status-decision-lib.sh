@@ -190,10 +190,14 @@ _fm_decision_slug_ok() {  # <slug>
 # worker-written stamp cannot move it: a readable time like [at=10:30] carries
 # colons that would otherwise end the head mid-tag and hand the caller a note
 # and a key sliced out of the timestamp. The line's own bytes are never altered.
-status_line_note() {  # <status-line> [<out-var>] -> text after the first colon, trimmed
+status_line_note() {  # <status-line> [<out-var>] [<unstamped-line>] -> text after the first colon, trimmed
   local __fm_note_text __fm_note_key __fm_note_unstamped
   local __fm_note_re='^[^:]*:([[:space:]]*)(.*)$' __fm_note_trim_re='^([[:space:]]*)(.*)$'
-  _fm_status_unstamped "$1" __fm_note_unstamped
+  if [ "$#" -gt 2 ]; then
+    __fm_note_unstamped=$3
+  else
+    _fm_status_unstamped "$1" __fm_note_unstamped
+  fi
   if [[ "$__fm_note_unstamped" =~ $__fm_note_re ]]; then
     __fm_note_text=${BASH_REMATCH[2]}
   else
@@ -209,9 +213,13 @@ status_line_note() {  # <status-line> [<out-var>] -> text after the first colon,
   fi
   if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$__fm_note_text"; else printf '%s' "$__fm_note_text"; fi
 }
-_fm_decision_key() {  # <status-line> [<keyless>] [<out-var>] -> slug, or <keyless> (default "default") when no token
+_fm_decision_key() {  # <status-line> [<keyless>] [<out-var>] [<unstamped-line>] -> slug, or <keyless> (default "default") when no token
   local __fm_key_value __fm_key_unstamped __fm_key_head_re='^([^:]*)'
-  _fm_status_unstamped "$1" __fm_key_unstamped
+  if [ "$#" -gt 3 ]; then
+    __fm_key_unstamped=$4
+  else
+    _fm_status_unstamped "$1" __fm_key_unstamped
+  fi
   if _fm_key_before_colon "$__fm_key_unstamped"; then
     [[ "$__fm_key_unstamped" =~ $__fm_key_head_re ]] && __fm_key_value=${BASH_REMATCH[1]}
     __fm_key_value=${__fm_key_value#*\[key=}
@@ -320,8 +328,8 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
   # instead of rereading every open summary on each later transition. Guards
   # still inspect the real note, and accepted openings return that note to it.
   [ "$#" -lt 8 ] || printf -v "$8" '%s' ''
-  # Both colon tests below ask where the head ends, the same question the note
-  # and key readers ask, so they read the same unstamped copy those readers do.
+  # Normalize once for the colon guards and both key/note readers; repeating
+  # timestamp stripping for each reader dominates wide-log parsing on bash 3.2.
   # A worker-written time tag must never decide whether a decision opens or
   # closes: a readable [at=10:30] carries colons that would otherwise make bare
   # prose look like a transition, or make a keyless line open a phantom
@@ -347,8 +355,8 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
     needs-decision|blocked|"$__fm_fold_resolve"|"$__fm_fold_held") ;;
     *) return 0 ;;
   esac
-  _fm_decision_key "$__fm_fold_line" default __fm_fold_key || return 0
-  status_line_note "$__fm_fold_line" __fm_fold_note
+  _fm_decision_key "$__fm_fold_line" default __fm_fold_key "$__fm_fold_unstamped" || return 0
+  status_line_note "$__fm_fold_line" __fm_fold_note "$__fm_fold_unstamped"
   _fm_decision_key_transition_allowed "$__fm_fold_key" "$__fm_fold_note" || return 0
   _fm_decision_drop "$__fm_fold_open" "$__fm_fold_key" __fm_fold_open
   case "$__fm_fold_verb" in
@@ -459,9 +467,9 @@ status_own_open_decisions() {  # <status-file>
 # The opening is the LAST line that opens the key, found with the same verb and
 # key readers the fold uses, and its time comes from _fm_status_at_epoch, so a
 # tag quoted in another line's prose or a malformed stamp can never set an age.
-# A single fold retains small record IDs, with dates and summaries held outside
-# the open set. Historical transitions neither fork nor repeatedly read the
-# retained summaries, which otherwise dominate the cost of wide lane logs.
+# A single fold retains small record IDs, with opening lines and summaries held
+# outside the open set. Only surviving openings have their dates parsed;
+# historical transitions neither fork nor reread every retained summary.
 # Regression coverage: tests/fm-classify-decision-key.test.sh.
 status_open_decisions_dated() {  # <status-file> [<kind>]
   local f=$1 open='' key verb summary line kind resolve held index=0 epoch
@@ -477,14 +485,14 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
       *) continue ;;
     esac
     _fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind" open "$index" summary
-    _fm_status_at_epoch "$line" epoch || epoch=
-    opened[index]=$epoch
+    opened[index]=$line
     summaries[index]=$summary
     index=$((index + 1))
   done < "$f"
   while IFS=$'\t' read -r key verb index; do
     [ -n "$verb" ] || continue
-    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "${opened[index]}" "${summaries[index]}"
+    _fm_status_at_epoch "${opened[index]}" epoch || epoch=
+    printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "${summaries[index]}"
   done <<EOF
 $open
 EOF
