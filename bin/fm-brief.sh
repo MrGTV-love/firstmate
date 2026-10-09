@@ -596,12 +596,35 @@ IFS= read -r -d '' SHARED_INFRA_RULE <<'EOF' || true
 EOF
 SHARED_INFRA_RULE=${SHARED_INFRA_RULE%$'\n'}
 
+# One shared string keeps the ship and scout process-budget rule identical.
+# The kernel counts the user's whole process table, so one runaway scratch tree
+# starves every lane; bin/fm-proc-budget.sh owns the budget, this is the one
+# line that reaches ad-hoc scripts no runner wraps.
+SHARED_PROC_BUDGET_RULE="9. Run any shim, lab, or measurement script through \`$(shell_quote "$FM_ROOT/bin/fm-proc-budget.sh") -- <command...>\`: a runaway process tree then stops at its own limit instead of starving every lane of fork."
+
 if [ -n "$BASE_BRANCH" ]; then
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean copy of its base branch.
 Base branch: $BASE_BRANCH"
 else
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean default branch."
 fi
+
+# Private services outlive the worker that started them: a launchd agent
+# survives reboots and restarts its daemon after every kill, so teardown cannot
+# prove custody of what it leaves running (fm-teardown.sh Fix 3 is the backstop,
+# this rule is the first line). Shared by the ship and scout scaffolds only; a
+# secondmate charter has its own lifecycle.
+IFS= read -r -d '' PRIVATE_SERVICE_RULE <<'EOF' || true
+8. Stop every private service you start. A private service is any daemon, server, or watcher that
+   only your task needs, including a `no-mistakes` home whose `NO_MISTAKES_HOME` sits inside your
+   worktree: that home installs its own launchd agent that keeps running and restarts after a kill
+   or a reboot. Before you append a `__PAUSED_VERB__`, `blocked`, `needs-decision`, `done`, or `failed`
+   line that ends your turn, stop each one and name it in that status line. Stop a launchd agent
+   with `launchctl bootout gui/$(id -u)/<label>` once its `--root` is confirmed to be inside your
+   worktree. Never use `no-mistakes daemon stop` for this: it stops the shared daemon (rule 7).
+EOF
+PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE%$'\n'}
+PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE//__PAUSED_VERB__/$PAUSED_VERB}
 
 if [ "$KIND" = scout ]; then
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then
@@ -643,6 +666,8 @@ $CREWMATE_PAUSE_INSTRUCTIONS
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
+$PRIVATE_SERVICE_RULE
+$SHARED_PROC_BUDGET_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 
@@ -723,6 +748,8 @@ $ASK_USER_BLOCK
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
+$PRIVATE_SERVICE_RULE
+$SHARED_PROC_BUDGET_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 

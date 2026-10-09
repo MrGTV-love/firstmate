@@ -21,7 +21,9 @@ globalThis.fetch = async (url, options) => {
       request=$(cat <&3) || exit 1
       fm_typesafe_permitted "$request" "$2" "$scratch"
     }
-    FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed 3 check_request "$1" "$2" 3<&0
+    export -f check_request
+    # The watchdog survives this shell's outer SIGKILL and reaps its group.
+    fm_timeout_perl_bound 3 bash -c 'check_request "$@"' _ "$1" "$2" 3<&0
   `, '_', library, policy, timeoutLibrary], {
     input: options.body,
     env,

@@ -46,6 +46,9 @@
 # live owner also gets a replacement before build returns, because
 # `already-armed` is not the same fact as `listening`.
 #
+# LISTENER HYGIENE. A successful build ends by running `fm-procevent-lavish.sh
+# sweep`, which owns the rules for retiring the listeners of finished boards.
+#
 # CAPTAIN'S CALL HYGIENE. A decision card is dropped when its work item, PR, or
 # structured artifact/version subject appears among the payload's own landed
 # rows, or when `bin/fm-captain-hold.sh open` reports the task is no longer an
@@ -469,6 +472,12 @@ command_build() {
     fi
     printf 'listening: live\n'
   fi
+  # Boards other workers armed and the captain has since left idle keep their
+  # listeners until someone retires them; a rebuild is the one point this script
+  # owns where the live set can be trimmed. Best effort, and silent: the
+  # retirement rules live in bin/fm-procevent-lavish.sh, and a sweep failure
+  # never fails the board that was just built.
+  "$SCRIPT_DIR/fm-procevent-lavish.sh" sweep >/dev/null 2>&1 || true
 }
 
 case "${1-}" in

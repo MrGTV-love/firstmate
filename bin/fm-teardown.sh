@@ -30,6 +30,9 @@
 # lift the deferral (it authorizes discarding unlanded WORK, never the
 # captain's question), and bin/fm-captain-hold.sh answer stays the only act
 # that closes the call.
+# Automatic sweep calls additionally require reap eligibility before cleanup;
+# bin/fm-idle-session-reap.sh's header owns that admission contract.
+# The captain-call retention path below applies to ordinary teardown admission.
 # REFUSES if a ship's deliverable has not LANDED, because cleanup
 # hard-resets/removes the worktree and kills its processes.
 # A pushed branch is recoverable work, not a delivered result.
@@ -272,10 +275,11 @@
 #     never signalled, because no record proves which task owns that lane.
 #     Teardown refuses instead, even with --force, naming the pid, its birth
 #     identity, the matched path, and the lane. A lane is either a worktree
-#     the project or a git-backed root's repository still registers there,
-#     even when its directory or .git is missing or prunable, or a linked
-#     worktree git discovers from the cwd; outer-worktree discovery never
-#     proves custody. Only a cwd exactly equal to a live recorded scan root is
+#     the project, a git-backed scan root, or an available local task project's
+#     repository still registers there, even when its directory or .git is
+#     missing or prunable, or a linked worktree git discovers from the cwd;
+#     outer-worktree discovery never proves custody.
+#     Only a cwd exactly equal to a live recorded scan root is
 #     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
@@ -290,7 +294,34 @@
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
 #     vanished; a live matching target or uncertain result refuses, as do authorization
 #     and write failures. Idempotent: nothing left to find is a silent no-op.
-# After Fix 1 and Fix 2, when config/pipeline-spend opts this home in, a ship
+#   Fix 3 - retire task-private no-mistakes launch agents (runs after Fix 1 and
+#     BEFORE Fix 2, because Fix 2 can neither prove custody of nor durably stop
+#     what an agent owns). A private no-mistakes home can install a KeepAlive
+#     launchd agent, com.kunchenguid.no-mistakes.daemon.<hash>, that survives
+#     reboots and relaunches its daemon after a kill; killing the process alone
+#     cannot release the copy durably.
+#     retire_task_private_nm_launch_agents reads every such plist in
+#     $FM_LAUNCH_AGENTS_DIR (default ~/Library/LaunchAgents) and acts only on
+#     one whose Label matches its file name and whose absolute `--root` is the
+#     task copy or inside it after resolving symlinks and normalizing path
+#     segments and separators; lookalike prefixes such as <copy>-x never match.
+#     The Fix 2 nested-lane boundary also applies: a root belonging to a nested
+#     lane is skipped, and unreadable registry or lane classification refuses.
+#     Registries are checked even when the task copy is already gone, so
+#     admitted missing-copy recovery still excludes registered nested lanes.
+#     For a loaded service it runs `launchctl bootout gui/<uid>/<label>`, then
+#     requires `launchctl print` to report the service gone (exit 113) before
+#     moving the plist to data/<id>/launchagent-backup/.
+#     An already-unloaded agent's plist is archived without bootout.
+#     The shared daemon's agent (root ~/.no-mistakes), another task's agent,
+#     symlinked plists, and plists whose root cannot be proven are left as found;
+#     teardown never runs `no-mistakes daemon stop`, which targets the shared
+#     daemon. Missing launchctl, a service that stays loaded, an unreadable load
+#     state, or a failed archive refuses even with --force, preserving the
+#     unarchived plist and any remaining copy.
+#     tests/fm-teardown.test.sh's private, foreign, nested, and absent-copy
+#     launch-agent cases exercise this boundary with a fake launchctl.
+# After Fix 1, Fix 3, and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
 # ledger. It runs before the task branch it attributes runs by is deleted and
@@ -534,6 +565,21 @@ fm_backlog_record_present "$META" "task record" "$STATE" || {
   echo "error: teardown refused after locking: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
+if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
+  if [ -n "$FORCE" ] || ! (
+    trap - EXIT
+    teardown_require_source "$SCRIPT_DIR/fm-idle-reap-lib.sh"
+    # shellcheck source=/dev/null # Analyzed separately as a canonical lint root; this re-source is subshell-only.
+    . "$SCRIPT_DIR/fm-idle-reap-lib.sh"
+    fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
+    if [ "$IDLE_REAP_CLASS" != reap ]; then
+      printf 'REFUSED: automatic reap ineligible: %s: %s\n' "$IDLE_REAP_CLASS" "$IDLE_REAP_DETAIL" >&2
+      exit 1
+    fi
+  ); then
+    exit 1
+  fi
+fi
 TEARDOWN_META_KIND=$(fm_meta_get "$META" kind)
 [ -n "$TEARDOWN_META_KIND" ] || TEARDOWN_META_KIND=ship
 if [ "$FORCE" = --force ] && { [ "$TEARDOWN_META_KIND" != secondmate ] || [ -n "$DROP_FILE" ]; }; then
@@ -2182,8 +2228,10 @@ task_canonical_path() {  # <path>
 
 # Prints a discovered nested worktree lane beneath <root> that holds <path>.
 # A lane in TASK_REGISTERED_LANES wins even when its directory or .git is gone;
-# otherwise git classifies the nearest existing directory. Empty output is
-# not proof of custody. Fails when git cannot classify <path> under a git <root>.
+# otherwise git classifies the nearest existing directory within <root>.
+# A missing root returns empty after the registry check, supporting absent-copy
+# recovery. Empty output is not proof of process custody.
+# Fails when git cannot classify <path> under a git <root>.
 task_nested_lane_for_path() {  # <root> <path>
   local root=$1 path=$2 dir lane top git_dir common_dir
   [ -e "$path" ] || path=${path% (deleted)}
@@ -2192,7 +2240,7 @@ task_nested_lane_for_path() {  # <root> <path>
   done
   dir=$path
   while [ ! -d "$dir" ]; do
-    case "$dir" in "$root"/*) dir=${dir%/*} ;; *) return 1 ;; esac
+    case "$dir" in "$root"/*) dir=${dir%/*} ;; "$root") return 0 ;; *) return 1 ;; esac
   done
   while :; do
     if ! top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null); then
@@ -2215,18 +2263,27 @@ task_nested_lane_for_path() {  # <root> <path>
 }
 
 # Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
-# entries, that the project or a git-backed scan root's repository registers
-# strictly beneath a scan root. No git-backed root means no registry is read.
+# entries, registered strictly beneath a scan root by the recorded project,
+# git-backed scan roots, or available task projects in reachable local Firstmate
+# states. Project registries remain sources when the scan root is missing.
 task_registered_lanes_under_roots() {  # <canonical-root>...
-  local root src registry line lane
+  local root src registry line lane state_dir meta project
   local -a sources
   TASK_REGISTERED_LANES=()
   sources=()
   for root in "$@"; do
     git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
   done
-  [ "${#sources[@]}" -gt 0 ] || return 0
   [ -z "$PROJ" ] || sources+=("$PROJ")
+  collect_local_firstmate_states "$STATE" || return 1
+  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+    for meta in "$state_dir"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      project=$(fm_meta_get "$meta" project)
+      [ -n "$project" ] || continue
+      git -C "$project" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$project")
+    done
+  done
   for src in "${sources[@]}"; do
     if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
       TASK_PIDS_FAILED_DIR=$src
@@ -2447,6 +2504,116 @@ EOF
   [ -z "$TASK_PIDS" ] && return 0
   echo "REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2
   return 1
+}
+
+
+# Fix 3 (see script header): "label<TAB>root" for a no-mistakes daemon launch
+# agent plist, from its Label and the `--root` of its `daemon run` arguments.
+# Fails for anything that is not that exact, parsable shape.
+nm_launch_agent_fields() {  # <plist>
+  perl -e '
+    local $/;
+    my $x = <STDIN>;
+    my ($label) = $x =~ m{<key>Label</key>\s*<string>([^<]*)</string>} or exit 1;
+    $x =~ m{<key>ProgramArguments</key>\s*<array>(.*?)</array>}s or exit 1;
+    my @a = $1 =~ m{<string>([^<]*)</string>}g;
+    my $root;
+    for my $i (0 .. $#a - 3) {
+      next unless $a[$i] eq "daemon" && $a[$i + 1] eq "run" && $a[$i + 2] eq "--root";
+      $root = $a[$i + 3];
+      last;
+    }
+    defined $root && length $root or exit 1;
+    my %e = (amp => "&", lt => "<", gt => ">", quot => "\"", apos => "\x27");
+    for ($label, $root) { s/&(amp|lt|gt|quot|apos);/$e{$1}/g }
+    exit 1 if $label =~ /[^A-Za-z0-9._-]/ || $root =~ /[\t\n\r]/;
+    print "$label\t$root\n";
+  ' < "$1"
+}
+
+# Fix 3: apply the script header's private-agent ownership and retirement
+# contract before process reaping.
+retire_task_private_nm_launch_agents() {  # <worktree>
+  local wt=$1 dir plist label root canon_wt canon_root fields uid backup dest rc attempt lane
+  dir=${FM_LAUNCH_AGENTS_DIR:-${HOME:-}/Library/LaunchAgents}
+  [ -d "$dir" ] || return 0
+  canon_wt=$(task_canonical_path "$wt") || return 0
+  if ! task_registered_lanes_under_roots "$canon_wt"; then
+    echo "REFUSED: cannot establish nested worktree ownership under $canon_wt; preserving the launch agents and task $ID." >&2
+    return 1
+  fi
+  uid=$(id -u)
+  backup="$DATA/$ID/launchagent-backup"
+  for plist in "$dir"/com.kunchenguid.no-mistakes.daemon.*.plist; do
+    [ -f "$plist" ] || continue
+    if [ -L "$plist" ] || ! fields=$(nm_launch_agent_fields "$plist"); then
+      echo "teardown: leaving unreadable no-mistakes launch agent $plist as found; its root cannot be proven to be $ID's" >&2
+      continue
+    fi
+    label=${fields%%$'\t'*}
+    root=${fields#*$'\t'}
+    [ "$plist" = "$dir/$label.plist" ] || continue
+    case "$root" in /*) ;; *) continue ;; esac
+    canon_root=$(perl -MCwd=abs_path -e '
+      my $path = "/";
+      for my $part (split m{/+}, $ARGV[0]) {
+        next if $part eq "" || $part eq ".";
+        if ($part eq "..") {
+          $path =~ s{/[^/]+$}{};
+          $path = "/" if $path eq "";
+          next;
+        }
+        my $next = ($path eq "/" ? "" : $path) . "/$part";
+        if (-d $next) {
+          $path = abs_path($next);
+          defined $path or exit 1;
+        } else {
+          exit 1 if -e $next || -l $next;
+          $path = $next;
+        }
+      }
+      print "$path\n";
+    ' "$root") || continue
+    case "$canon_root" in "$canon_wt"|"$canon_wt"/*) ;; *) continue ;; esac
+    if ! lane=$(task_nested_lane_for_path "$canon_wt" "$canon_root"); then
+      echo "REFUSED: cannot classify the worktree holding no-mistakes launch agent $label's root $canon_root; preserving the launch agent and task $ID." >&2
+      return 1
+    fi
+    [ -z "$lane" ] || continue
+    if ! command -v launchctl >/dev/null 2>&1; then
+      echo "REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable, so it cannot be unloaded; preserving the worktree and $plist." >&2
+      return 1
+    fi
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      rc=0
+      launchctl print "gui/$uid/$label" >/dev/null 2>&1 || rc=$?
+      case "$rc" in
+        113) break ;;
+        0) ;;
+        *)
+          echo "REFUSED: cannot tell whether no-mistakes launch agent $label (rooted in $ID's copy) is loaded (launchctl print exited $rc); preserving the worktree and $plist." >&2
+          return 1
+          ;;
+      esac
+      if [ "$attempt" = 1 ]; then
+        launchctl bootout "gui/$uid/$label" >/dev/null 2>&1 || true
+      else
+        sleep 0.25
+      fi
+      rc=0
+    done
+    if [ "$rc" != 113 ]; then
+      echo "REFUSED: no-mistakes launch agent $label (rooted in $ID's copy) is still loaded after launchctl bootout; preserving the worktree and $plist." >&2
+      return 1
+    fi
+    dest="$backup/$label.plist"
+    [ ! -e "$dest" ] || dest="$dest.$(date +%s)"
+    if ! mkdir -p "$backup" || ! mv -- "$plist" "$dest"; then
+      echo "REFUSED: could not archive no-mistakes launch agent plist $plist to $dest; preserving the worktree." >&2
+      return 1
+    fi
+    echo "teardown: retired task-private no-mistakes launch agent $label (root $root); plist archived to $dest" >&2
+  done
 }
 
 
@@ -3697,14 +3864,15 @@ if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
 fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
-# them). Fix 1 and Fix 2 (see script header) run here, unconditionally on
-# --force, and before ANY destructive step below - a still-parked run or a
-# leaked process can own live work in this exact worktree. Not for
+# them). Fix 1, Fix 3, and Fix 2 (see script header) run here, unconditionally on
+# --force, and before ANY destructive step below - a still-parked run, loaded
+# private agent, or leaked process can own live work in this exact worktree. Not for
 # kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   conclude_task_no_mistakes_run "$WT"
+  retire_task_private_nm_launch_agents "$WT" || exit 1
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"

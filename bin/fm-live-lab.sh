@@ -39,6 +39,9 @@
 #                    tmux-dir, with no user tmux config (its plugins never run
 #                    in a lab), started from an empty environment so no inherited
 #                    TMUX, Herdr, or Pi marker reaches a lab process.
+#                    The server starts through bin/fm-proc-budget.sh (whose
+#                    header owns the budget contract), so every pane inherits
+#                    its process limit.
 #                    TREEHOUSE_ROOT points into <lab-root>, so a worker's pool
 #                    never lands in ~/.treehouse, and DISABLE_AUTOUPDATER=1
 #                    keeps Claude Code from replacing the shared binary under
@@ -176,7 +179,7 @@ lab_run() {  # [NAME=VALUE...] <command...>: run in the lab's clean environment
   local -a base=()
   local line
   while IFS= read -r line; do base+=("$line"); done < <(lab_env_base)
-  env -i "${base[@]}" "$@"
+  "$SCRIPT_DIR/fm-proc-budget.sh" -- env -i "${base[@]}" "$@"
 }
 
 # window_id <name>: the tmux id of the lab window with exactly this name, or
@@ -495,6 +498,10 @@ cmd_up() {
     mkdir -p "$root" || die "cannot create '$root'"
   fi
   ROOT=$(real_dir "$root")
+  # shellcheck source=bin/fm-wake-lib.sh
+  FM_STATE_OVERRIDE="$ROOT" . "$SCRIPT_DIR/fm-wake-lib.sh"
+  local owner_identity
+  owner_identity=$(fm_pid_identity "$$") || die "cannot identify the lab creator"
   LAB="$ROOT/home"
   HARNESS=$harness EXPECT_HOST=$expect_host WANT_MATE=$mate WANT_WORKER=$worker
   NONCE=$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')
@@ -504,6 +511,7 @@ cmd_up() {
   treehouse_listing | sort > "$ROOT/.treehouse-before"
   {
     echo "$RECORD_TOKEN"
+    printf 'owner_pid=%s\nowner_identity=%s\n' "$$" "$owner_identity"
     echo "harness=$harness"
     echo "home=$LAB"
     echo "expect_host=$expect_host"
