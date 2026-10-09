@@ -196,7 +196,7 @@ class Collector:
     def run(self, args, cwd=None, missing_ok=False, env=None):
         command = [str(a) for a in args]
         child = subprocess.Popen(command, cwd=cwd, env=self.env if env is None else env,
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
                                  stdin=subprocess.DEVNULL, start_new_session=True)
         try:
             stdout, stderr = child.communicate(timeout=self.timeout)

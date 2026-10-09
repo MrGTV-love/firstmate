@@ -635,6 +635,13 @@ status_blind = ledger()
 assert not status_blind['complete'] and len(rows(status_blind, 'coverage')) == 1, status_blind
 assert 'questions unreadable.status' in rows(status_blind, 'coverage')['ledger degraded']['evidence'], status_blind
 unreadable.chmod(0o600); unreadable.unlink()
+# A byte cap can cut a multibyte character; an invalid UTF-8 byte must not blind the questions source.
+cut = home / 'state/cut.status'
+cut.write_bytes(f'needs-decision [at={hours(1)}] [key=cut]: caf\xe9 question\n'.encode('latin-1'))
+cut_report = ledger()
+assert cut_report['complete'] and not rows(cut_report, 'coverage'), cut_report
+assert 'cut:cut' in rows(cut_report, 'unanswered_question'), cut_report
+cut.unlink()
 (home / 'state/symlink.status').symlink_to(home / 'state/asker.status')
 assert ledger()['complete'], 'symlink status exclusion is not coverage failure'
 state_mode = (home / 'state').stat().st_mode & 0o777
