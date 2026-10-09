@@ -109,6 +109,7 @@ record_response() (
     esac
   done < <(header_pairs "$headers")
   mkdir -p "$STATE" 2>/dev/null || return 0
+  # shellcheck source=bin/fm-wake-lib.sh
   . "$SCRIPT_DIR/fm-wake-lib.sh"
   fm_lock_acquire_wait "$lock" || return 0
   trap 'fm_lock_release "$lock"' EXIT
