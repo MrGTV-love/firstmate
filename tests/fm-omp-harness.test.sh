@@ -47,6 +47,7 @@ HARNESS="$ROOT/bin/fm-harness.sh"
 TMP_ROOT=$(fm_test_tmproot fm-omp-harness)
 export NODE_NO_WARNINGS=1
 export PI_CODING_AGENT_DIR=
+export OMP_PROFILE= PI_PROFILE=
 
 # A process whose kernel-recorded identity is the bare name `omp`: a SYMLINK to
 # the system shell, never a copy (a copied platform binary fails macOS code
@@ -352,7 +353,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
 
 test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
   local rec id out status caller_dir launch_dir mode command
-  for mode in missing listed unlisted uncertain; do
+  for mode in missing listed unlisted uncertain stderr stdin append descriptor; do
     id="omp-raw-agent-$mode"
     rec=$(make_spawn_case "raw-agent-$mode" omp "$id")
     read_case_record "$rec"
@@ -376,15 +377,21 @@ test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
     esac
     command="PI_CODING_AGENT_DIR='$launch_dir' omp --auto-approve"
     [ "$mode" != uncertain ] || command='PI_CODING_AGENT_DIR="$PANE_AGENT_DIR" omp --auto-approve'
+    case "$mode" in
+      stderr) command="$command 2>'$CASE_DIR/errors.log'" ;;
+      stdin) command="$command <'$launch_dir/config.yml'" ;;
+      append) command="$command >>'$CASE_DIR/output.log'" ;;
+      descriptor) command="$command 2>&1" ;;
+    esac
     out=$(PI_CODING_AGENT_DIR="$caller_dir" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
       run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
     status=$?
     case "$mode" in
-      missing | unlisted)
+      missing | unlisted | stderr | stdin | append | descriptor)
         expect_code 1 "$status" "raw omp must refuse the launch directory's invalid role ($mode): $out"
         assert_absent "$HOME_DIR/state/$id.meta" "a refused raw-directory launch must publish no record"
         [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw-directory launch must record no launch"
-        if [ "$mode" = missing ]; then
+        if [ "$mode" != unlisted ]; then
           assert_contains "$out" "omp modelRoles.default is not set" "raw assignment must not read the caller's listed role"
         else
           assert_contains "$out" "is not listed by 'omp models --json'" "raw catalog must use the launch directory"
@@ -408,6 +415,62 @@ test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
     esac
   done
   pass "fm-spawn: raw role and catalog inspection honor the actual launch directory and uncertain evidence passes through"
+}
+
+test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
+  local rec id out status mode role command first_arg omp_profile pi_profile launch_dir
+  local spawn_args=()
+  for mode in flag flag-equals assignment-omp assignment-pi env-omp env-pi raw-env-omp raw-env-pi; do
+    for role in missing unlisted; do
+      id="omp-profile-$mode-$role"
+      rec=$(make_spawn_case "profile-$mode-$role" omp "$id")
+      read_case_record "$rec"
+      launch_dir="$CASE_DIR/launch-agent"
+      mkdir -p "$launch_dir"
+      if [ "$role" = missing ]; then
+        printf 'modelRoles: {}\n' > "$launch_dir/config.yml"
+      else
+        printf 'modelRoles:\n  default: openai-codex/gpt-gone\n' > "$launch_dir/config.yml"
+      fi
+      omp_profile= pi_profile=
+      command="PI_CODING_AGENT_DIR='$launch_dir' omp --auto-approve"
+      first_arg=--auto-approve
+      case "$mode" in
+        flag) command="$command --profile work" ;;
+        flag-equals) command="$command --profile=work" ;;
+        assignment-omp) command="OMP_PROFILE=work $command" ;;
+        assignment-pi) command="PI_PROFILE=work $command" ;;
+        env-omp | raw-env-omp) omp_profile=work ;;
+        env-pi | raw-env-pi) pi_profile=work ;;
+      esac
+      spawn_args=("$command")
+      case "$mode" in
+        env-omp | env-pi)
+          spawn_args=(--harness omp)
+          first_arg=--config
+          ;;
+      esac
+      out=$(OMP_PROFILE="$omp_profile" PI_PROFILE="$pi_profile" PI_CODING_AGENT_DIR="$launch_dir" \
+        FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+        run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "${spawn_args[@]}")
+      status=$?
+      expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
+      assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
+      assert_absent "$CASE_DIR/omp-env.log" "profile selection must establish no catalog evidence"
+      case "$mode" in
+        env-omp | env-pi) ;;
+        *) assert_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
+      esac
+      HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$launch_dir" \
+        OMP_PROFILE="$omp_profile" PI_PROFILE="$pi_profile" \
+        PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+        bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
+      status=$?
+      expect_code 0 "$status" "the profile-selecting launch must execute ($mode)"
+      assert_grep "$first_arg:$launch_dir" "$CASE_DIR/omp-env.log" "profile selection must still launch omp ($mode)"
+    done
+  done
+  pass "fm-spawn: omp profile flags, assignments, and invoking environment pass through without default-role catalog probes"
 }
 
 test_spawn_raw_omp_guard_uses_the_launch_model() {
@@ -1620,6 +1683,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role
 test_spawn_global_config_is_read_only_and_unlayered
 test_spawn_raw_omp_guard_uses_the_launch_model
 test_spawn_raw_omp_guard_uses_the_launch_agent_dir
+test_spawn_omp_profiles_leave_directory_evidence_unreadable
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle

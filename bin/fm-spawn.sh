@@ -2275,6 +2275,7 @@ omp_catalog_verdict() { # <omp-bin> <provider/id>
 # omp_model_validate).
 omp_default_role_validate() {
   local bin=$1 model=$2 raw=${3:-} agent_dir=${4:-} role selector verdict remedy model_flag dependency
+  [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ] || return 0
   if [ -n "$raw" ]; then
     model_flag=$(model_flag_for_harness omp "$model")
     raw=${raw//__MODELFLAG__/$model_flag}
@@ -2303,7 +2304,7 @@ for (let i = 0; i < tokens.length; i++) {
 }
 let i = 0;
 let agentDir = "";
-let certain = tokens.every(token => token.type === "word");
+let certain = tokens.every(token => token.type === "word" || token.type === "redir");
 while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
   const word = words[i++];
   if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(word.source) || !word.literal ||
@@ -2311,18 +2312,20 @@ while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
   if (word.value.startsWith("PI_CODING_AGENT_DIR=")) {
     agentDir = word.value.slice("PI_CODING_AGENT_DIR=".length);
   }
+  if (/^(OMP_PROFILE|PI_PROFILE)=.+/.test(word.value)) certain = false;
 }
 if (!words[i]?.literal || !/(^|\/)omp$/.test(words[i]?.value || "")) certain = false;
-if (!certain || !agentDir.startsWith("/") || /[\n\r]/.test(agentDir)) agentDir = "";
 let pinned = false;
 for (i++; i < words.length; i++) {
   if (words[i].value === "--") break;
+  if (words[i].value === "--profile" || words[i].value.startsWith("--profile=")) certain = false;
   if (/^--model=.+/.test(words[i].value) ||
       ((words[i].value === "--model" || words[i].value === "-m") && words[i + 1]?.value)) {
     pinned = true;
     break;
   }
 }
+if (!certain || !agentDir.startsWith("/") || /[\n\r]/.test(agentDir)) agentDir = "";
 process.stdout.write(JSON.stringify({ pinned, agentDir }));
 JS
     ) || return 0
@@ -2906,7 +2909,7 @@ if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
 fi
 if [ "$HARNESS" = omp ]; then
   OMP_AGENT_DIR=
-  if [ "$RAW_LAUNCH" = 0 ]; then
+  if [ "$RAW_LAUNCH" = 0 ] && [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ]; then
     OMP_AGENT_DIR=$(ruby -e 'print File.expand_path(ARGV.fetch(0))' \
       "${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}" 2>/dev/null) || OMP_AGENT_DIR=
     if [ -n "$OMP_AGENT_DIR" ]; then
