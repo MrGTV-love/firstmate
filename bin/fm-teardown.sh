@@ -2583,6 +2583,10 @@ teardown_docker_stacks() {
     fi
   fi
   task_registered_lanes_under_roots ${roots[@]+"${roots[@]}"} 2>/dev/null || return 1
+  if [ -n "$PROJ" ] && ! fm_path_lookup_safe "$PROJ/supabase/config.toml"; then
+    echo "error: cannot establish the shared Supabase configuration for $ID; retaining task records" >&2
+    return 1
+  fi
   if [ -n "$PROJ" ] && { [ -e "$PROJ/supabase/config.toml" ] || [ -L "$PROJ/supabase/config.toml" ]; }; then
     protected=$(python3 - "$PROJ/supabase/config.toml" <<'PY'
 import sys
@@ -2733,12 +2737,20 @@ collect_local_firstmate_states() {
   }
   TREEHOUSE_OWNER_STATES=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
   for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+    if ! fm_path_lookup_safe "$state_dir"; then
+      echo "REFUSED: cannot establish local Firstmate state presence at $state_dir; retaining task records" >&2
+      return 1
+    fi
     [ -e "$state_dir" ] || [ -L "$state_dir" ] || continue
     if ! { [ -d "$state_dir" ] && [ -r "$state_dir" ] && [ -x "$state_dir" ] && ls -A "$state_dir" >/dev/null; }; then
       echo "REFUSED: cannot enumerate local Firstmate state $state_dir; retaining task records" >&2
       return 1
     fi
     for meta in "$state_dir"/*.meta; do
+      if ! fm_path_lookup_safe "$meta"; then
+        echo "REFUSED: cannot establish local Firstmate task record presence at $meta; retaining task records" >&2
+        return 1
+      fi
       [ -e "$meta" ] || [ -L "$meta" ] || continue
       if ! { [ -f "$meta" ] && cat "$meta" >/dev/null; }; then
         echo "REFUSED: cannot read local Firstmate task record $meta; retaining task records" >&2
@@ -3384,6 +3396,7 @@ preflight_descendant_treehouse_slots() {
 validate_firstmate_home_children_removal() {
   local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend
   sub_state="$home/state"
+  collect_local_firstmate_states "$sub_state" || return 1
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
@@ -3597,6 +3610,7 @@ teardown_herdr_reacquire_meta() {
 preflight_firstmate_home_herdr_children() {  # <home>
   local home=$1 sub_state child_meta child_id child_backend child_kind child_home child_wt
   sub_state="$home/state"
+  collect_local_firstmate_states "$sub_state" || return 1
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
@@ -3680,6 +3694,7 @@ quiesce_firstmate_home_child() {
 cleanup_firstmate_home_children() {
   local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i
   sub_state="$home/state"
+  collect_local_firstmate_states "$sub_state" || return 1
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
@@ -3750,9 +3765,11 @@ cleanup_firstmate_home_children() {
       teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 0 || return 1
     fi
     if [ "$child_kind" = secondmate ]; then
-      if [ -n "$child_home" ] && [ -d "$child_home" ]; then
+      if [ -n "$child_home" ]; then
         cleanup_firstmate_home_children "$child_home" || return $?
-        remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
+        if [ -d "$child_home" ]; then
+          remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
+        fi
       fi
     elif [ "$child_backend" = orca ]; then
       if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then

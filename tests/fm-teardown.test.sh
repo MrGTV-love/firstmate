@@ -6007,7 +6007,7 @@ test_incomplete_local_inventories_retain_tasks_and_docker() {
   real_cat=$(command -v cat)
   for caller in top-level forced-child; do
     for scan in process docker; do
-      for failure in state metadata enumeration registry registry-read; do
+      for failure in state metadata enumeration registry registry-read registry-parent; do
         case_dir=$(make_case "inventory-$caller-$scan-$failure")
         write_meta "$case_dir" local-only ship
         home="$case_dir/primary-home"
@@ -6034,7 +6034,7 @@ test_incomplete_local_inventories_retain_tasks_and_docker() {
           "$sibling" > "$case_dir/primary-home/data/secondmates.md"
         registry="$sibling/data/secondmates.md"
         case "$failure" in
-          registry|registry-read)
+          registry|registry-read|registry-parent)
             branch="$case_dir/registry-home"
             mkdir -p "$branch/state" "$branch/data" "$case_dir/later-home/state" "$case_dir/later-home/data"
             printf -- '- branch - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n- later - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
@@ -6085,6 +6085,10 @@ exec "$real_cat" "\$@"
 EOF
             chmod +x "$case_dir/fakebin/cat"
             ;;
+          registry-parent)
+            chmod 600 "${registry%/*}"
+            [ ! -x "${registry%/*}" ] || fail "inventory: fixture registry parent remains searchable"
+            ;;
         esac
         rc=0
         FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
@@ -6092,6 +6096,7 @@ EOF
             > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         chmod 755 "$sibling/state"
         chmod 644 "$sibling/state/$id.meta"
+        chmod 755 "${registry%/*}"
         [ ! -e "$registry" ] || chmod 644 "$registry"
         rm -f "$case_dir/fakebin/ls" "$case_dir/fakebin/cat"
         expect_code 1 "$rc" "$caller $scan $failure: incomplete inventory allowed retirement"
@@ -6104,6 +6109,10 @@ EOF
           metadata)
             assert_grep "cannot read local Firstmate task record $sibling/state/$id.meta" \
               "$case_dir/stderr" "$caller $scan $failure: failed metadata read was not exercised"
+            ;;
+          registry-parent)
+            assert_grep "cannot establish local Firstmate registry presence at $registry" \
+              "$case_dir/stderr" "$caller $scan $failure: inaccessible registry parent was not exercised"
             ;;
           registry|registry-read)
             assert_grep "cannot read local Firstmate registry at $registry" \
@@ -6130,7 +6139,7 @@ EOF
       done
     done
   done
-  pass "unreadable registries, states, metadata and failed enumeration retain tasks and Docker until complete inventories permit retry"
+  pass "unreadable or inaccessible inventories retain tasks and Docker until complete inventories permit retry"
 }
 
 test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings() {
@@ -6300,6 +6309,83 @@ test_docker_configured_supabase_identity_vetoes_all_heuristics() {
       "$protected: protected network was claimed or explicit marker was ignored"
   done
   pass "actual configured Supabase identity vetoes names, paths and either project label, but not explicit markers"
+}
+
+test_docker_supabase_config_presence_requires_searchable_parents() {
+  local caller failure case_dir home meta id store before rc config
+  for caller in top-level forced-child; do
+    for failure in unreadable-file unsearchable-parent hidden-absence missing-file missing-parent; do
+      case_dir=$(make_case "docker-config-$caller-$failure")
+      write_meta "$case_dir" local-only ship
+      meta="$case_dir/state/task-x1.meta"
+      id=task-x1
+      if [ "$caller" = forced-child ]; then
+        write_meta "$case_dir" local-only secondmate
+        configure_secondmate_with_tmux_children "$case_dir"
+        home="$case_dir/secondmate-home"
+        meta="$home/state/child-a.meta"
+        id=child-a
+      fi
+      mkdir -p "$case_dir/project/supabase"
+      config="$case_dir/project/supabase/config.toml"
+      printf 'project_id = "vernant"\n' > "$config"
+      store="$case_dir/docker-store"
+      : > "$store"
+      docker_store_add "$store" container c-shared "$id-shared" "com.docker.compose.project=vernant" ""
+      docker_store_add "$store" container c-own owned-container "fm.task=$id" ""
+      docker_store_add "$store" network n-own owned-network "fm.task=$id"
+      docker_store_add "$store" volume owned-volume "fm.task=$id"
+      before=$(cat "$store")
+      case "$failure" in
+        unreadable-file)
+          chmod 000 "$config"
+          [ ! -r "$config" ] || fail "Supabase fixture config remains readable"
+          ;;
+        unsearchable-parent|hidden-absence)
+          [ "$failure" != hidden-absence ] || rm "$config"
+          chmod 600 "${config%/*}"
+          [ ! -x "${config%/*}" ] || fail "Supabase fixture parent remains searchable"
+          ;;
+        missing-file) rm "$config" ;;
+        missing-parent) rm -rf "${config%/*}" ;;
+      esac
+      rc=0
+      FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+        run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+          > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      case "$failure" in
+        missing-file|missing-parent)
+          expect_code 0 "$rc" "$caller $failure: genuine config absence refused teardown: $(cat "$case_dir/stderr")"
+          assert_absent "$meta" "$caller $failure: task record was retained"
+          assert_equals "" "$(docker_store_names "$store" container)" "$caller $failure: owned containers survived"
+          ;;
+        *)
+          chmod 755 "${config%/*}"
+          [ ! -e "$config" ] || chmod 644 "$config"
+          printf 'project_id = "vernant"\n' > "$config"
+          expect_code 1 "$rc" "$caller $failure: uncertain Supabase protection permitted teardown"
+          assert_present "$meta" "$caller $failure: task record was retired"
+          assert_present "$case_dir/state/task-x1.meta" "$caller $failure: parent record was retired"
+          assert_equals "$before" "$(cat "$store")" "$caller $failure: Docker resources changed"
+          assert_absent "$case_dir/docker.log" "$caller $failure: Docker ran before establishing Supabase protection"
+          if [ "$failure" != unreadable-file ]; then
+            assert_grep "cannot establish the shared Supabase configuration for $id" \
+              "$case_dir/stderr" "$caller $failure: inaccessible config parent was not exercised"
+          fi
+          rc=0
+          FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+            > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+          expect_code 0 "$rc" "$caller $failure: retry failed: $(cat "$case_dir/retry.stderr")"
+          assert_absent "$meta" "$caller $failure: retry retained task record"
+          assert_equals "$id-shared " "$(docker_store_names "$store" container)" \
+            "$caller $failure: retry removed the protected stack or retained owned containers"
+          ;;
+      esac
+      assert_equals "" "$(docker_store_names "$store" network)" "$caller $failure: owned network survived"
+      assert_equals "" "$(docker_store_names "$store" volume)" "$caller $failure: owned volume survived"
+    done
+  done
+  pass "Supabase protection refuses unreadable files and unsearchable parents, preserves shared stacks on retry, and permits proven absence"
 }
 
 test_docker_project_labels_require_the_exact_task_id() {
@@ -7420,6 +7506,7 @@ test_forced_teardown_retains_records_after_a_docker_removal_failure
 test_stopped_docker_daemon_blocks_teardown
 test_teardown_without_a_docker_binary_skips_docker_cleanup
 test_docker_configured_supabase_identity_vetoes_all_heuristics
+test_docker_supabase_config_presence_requires_searchable_parents
 test_docker_project_labels_require_the_exact_task_id
 test_docker_workdirs_canonicalize_and_exclude_foreign_lanes_and_tasktmp
 test_docker_mixed_project_carriers_spare_empty_heuristic_networks

@@ -1454,6 +1454,10 @@ fm_local_firstmate_state_dirs() {  # <first-state>
     done
     [ "$known" = 1 ] || FM_LOCAL_FIRSTMATE_STATES+=("$home/state")
     reg="$home/data/secondmates.md"
+    if [ "$check_registry_reads" = 1 ] && ! fm_path_lookup_safe "$reg"; then
+      FM_LOCAL_FIRSTMATE_ERROR="cannot establish local Firstmate registry presence at $reg"
+      return 1
+    fi
     [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
     [ -f "$reg" ] && [ ! -L "$reg" ] || {
       FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"

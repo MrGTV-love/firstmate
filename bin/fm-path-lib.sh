@@ -37,3 +37,17 @@ fm_basename_to() {  # <output-variable> <path>
   while [ "${fm_path%$'\n'}" != "$fm_path" ]; do fm_path=${fm_path%$'\n'}; done
   printf -v "$1" '%s' "$fm_path"
 }
+
+fm_path_lookup_safe() {
+  local path=$1 parent
+  case "$path" in
+    '') return 1 ;;
+    /|.) [ -d "$path" ] && [ -x "$path" ]; return $? ;;
+  esac
+  parent=${path%/*}
+  [ "$parent" != "$path" ] || parent=.
+  [ -n "$parent" ] || parent=/
+  fm_path_lookup_safe "$parent" || return 1
+  [ -e "$parent" ] || [ -L "$parent" ] || return 0
+  [ -d "$parent" ] && [ -x "$parent" ]
+}

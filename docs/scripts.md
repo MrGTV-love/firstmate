@@ -186,7 +186,10 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 [`fm-teardown.sh`'s header](../bin/fm-teardown.sh) owns cleanup ordering, forced-child pipeline cancellation, reassigned-slot handling, prerequisites, and failure/retry behavior.
 The worker Docker instructions rendered by [`fm-brief.sh`](../bin/fm-brief.sh) own how ship and scout workers mark resources and isolate Supabase configuration.
 
-Teardown refuses cleanup when any present local Firstmate registry cannot be read, any existing local sibling state directory cannot be enumerated, or any task metadata record cannot be read, retaining records for retry. Absent registries remain valid. Differently named metadata hardlinks remain sibling identities; only matching basenames and inodes identify the same record. Forced-child cleanup treats the recorded nonzero `repo not initialized` status response as confirmed pipeline absence, not a discovery failure.
+Teardown refuses cleanup when any present local Firstmate registry cannot be read, any existing local sibling state directory cannot be enumerated, any task metadata record cannot be read, or ownership-evidence absence cannot be established through searchable parent paths, retaining records for retry.
+Absent registries and shared Supabase configs remain valid when their absence can be proved.
+Differently named metadata hardlinks remain sibling identities; only matching basenames and inodes identify the same record.
+Forced-child cleanup treats the recorded nonzero `repo not initialized` status response as confirmed pipeline absence, not a discovery failure.
 
 Residual: a still-live top-level producer can create a stack after the final listing; snapshot cleanup cannot stop a live producer.
 
