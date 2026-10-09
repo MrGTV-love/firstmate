@@ -235,8 +235,9 @@ _fm_decision_key() {  # <status-line> [<keyless>] -> key slug, or <keyless> (def
   _fm_decision_key_into "$1" "${2-default}" __fm_dk_out || return 1
   printf '%s' "$__fm_dk_out"
 }
-# Drop the record for <key> from a newline-terminated "<key>\t<verb>\t<note>" set.
-# Portable (no associative arrays) so the fold runs on bash 3.2 as well as 4+.
+# Drop the record for <key> from a newline-separated "<key>\t<verb>\t<note>" set.
+# Stdout terminates a nonempty result with a newline; <out-var> strips trailing
+# newlines to match command substitution. Portable on bash 3.2 (no associative arrays).
 _fm_decision_drop() {  # <open-set> <key> [<out-var>]
   local __fm_drop_line __fm_drop_out=$1
   while [[ "$__fm_drop_out" == *$'\n' ]]; do __fm_drop_out=${__fm_drop_out%$'\n'}; done
@@ -260,13 +261,11 @@ EOF
     printf '%s\n' "$__fm_drop_out"
   fi
 }
-# Fold ONE status line into an existing "<key>\t<verb>\t<note>\n"-per-line open
-# set, applying the same needs-decision/blocked-opens, resolved/captain-held-closes
-# rule the status-fold contract above documents. Pure text transform, no file I/O.
-# This is the ONE place the per-line open/resolved rule is written; both the
-# whole-file fold (status_open_decisions) and the incremental cursor-backed fold
-# (status_open_decisions_incremental in bin/fm-classify-lib.sh) call this instead of re-deriving the
-# rule, so the two consumption strategies can never drift apart on semantics.
+# Fold one status line into a newline-separated "<key>\t<verb>\t<note>" open set.
+# status_open_decisions below owns the transition contract; the whole-file fold
+# uses the stdout wrapper and the incremental fold calls the out-var form.
+# Both return the same set with no trailing newlines, preserving the bytes the
+# original command-substitution callers stored in checkpoints. No file I/O.
 # Reserved decision-key namespaces, and the rule that makes them mean something.
 #
 # A key like `pending-reply-<id>` names a decision that one library raises and is
@@ -523,6 +522,8 @@ _fm_open_decisions_fold_signature() {  # <kind> [<out-var>]
 # checkpoint. Shared by the writer in bin/fm-classify-lib.sh and the whole-file
 # readers here; the legacy offset/export reader in bin/fm-status-wake-lib.sh
 # applies the same signature, identity, size, and boundary checks.
+# Keep the cat read as the checkpoint fault-injection seam: a failed read must
+# never seed a fold, even when the checkpoint header and file metadata are valid.
 _fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
   local cf=$1 data first rest line
   _FM_ODC_VERSION='' _FM_ODC_OFFSET=0 _FM_ODC_IDENT='' _FM_ODC_OPEN=''

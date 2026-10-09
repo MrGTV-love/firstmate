@@ -2,10 +2,10 @@
 
 _FM_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd 2>/dev/null)" || _FM_CLASSIFY_LIB_DIR="."
 
-# The kernel name, read once at source time rather than forked by every status
-# stat helper below. These helpers mostly run inside $() subshells, where a lazy
-# cache would never persist. fm-wake-lib.sh's _FM_UNAME is reused when it is
-# already loaded; either value is compared only against Darwin.
+# Read the kernel name once at source time, not per status metadata lookup.
+# This also serves stdout helpers called through $(), where a lazy cache would
+# not persist. Reuse fm-wake-lib.sh's _FM_UNAME when already loaded; either value
+# is compared only against Darwin.
 _FM_CLASSIFY_UNAME_S=${_FM_UNAME:-$(uname -s 2>/dev/null)}
 
 
@@ -43,7 +43,9 @@ _fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
 
 # A scan scopes these facts with `local _FM_STATUS_STAT_BATCH`, then refreshes
 # them before walking the fleet. Never carry them across scans or reuse them for
-# a post-read validation. Reader seams keep their per-file calls unchanged.
+# a post-read validation; cursor commitment must start a new metadata scan.
+# Identity/size reader seams bypass batching and keep their per-file calls.
+# An unavailable batch or unrepresentable path falls back to per-file metadata.
 _fm_status_stat_batch_into() {  # <state> <out-var>
   local __fm_sb_file __fm_sb_data='' __fm_sb_files=()
   printf -v "$2" '%s' ''
@@ -63,11 +65,9 @@ _fm_status_stat_batch_into() {  # <state> <out-var>
   printf -v "$2" '%s' "$__fm_sb_data"
 }
 
-# One stat per file: the device:inode identity, the size, and the mtime come
-# back from a single child process, because the drain reads them for every
-# status log several times per run and each separate stat was a fork.
-# The three values also describe the same instant, which two separate stats
-# cannot promise.
+# Use this scan's batch row when available; otherwise read device:inode identity,
+# birth time, size, and mtime together in one per-file stat, avoiding separate
+# forks and observations for each field. A batch row is not fresh validation.
 # <ident-var>, <size-var>, and <mtime-var> name the variables to set; an empty
 # name skips that value. A value this host cannot read fails the whole call.
 # Every local below carries the __fm_ prefix because an out-var named like an
@@ -150,8 +150,8 @@ _fm_status_file_mtime() {  # <status-file> [<out-var>]
   fi
 }
 
-# Identity, size, and mtime together for a caller that needs more than one: a
-# single stat unless a test seam replaces the identity or size reader.
+# Identity, size, and mtime together: use scan-batched facts or one per-file stat,
+# unless a reader seam requires separate reads.
 _fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
   if [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
     if [ -n "${2-}" ]; then _fm_open_decisions_file_ident "$1" "$2" || return 1; fi

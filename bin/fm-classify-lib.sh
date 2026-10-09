@@ -248,8 +248,8 @@ EOF
 #
 # status_open_decisions in bin/fm-status-decision-lib.sh is a read-only fold;
 # this incremental sibling persists the checkpoint that lets later readers
-# avoid re-folding consumed history. Both use the same _fm_decision_fold_line
-# rule. With a valid checkpoint, each call folds only new appends plus a
+# avoid re-folding consumed history. Both use the shared fold implementation in
+# bin/fm-status-decision-lib.sh. With a valid checkpoint, each call folds only new appends plus a
 # one-byte boundary check; a cold or refused checkpoint requires a byte-0 rebuild.
 #
 # Correctness invariant (unchanged from the whole-file fold): cursor advancement,
