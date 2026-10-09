@@ -1,0 +1,291 @@
+[
+  {
+    "name": "installed-locales",
+    "argv": [
+      "/usr/bin/locale",
+      "-a"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard"
+    }
+  },
+  {
+    "name": "drain-bootstrap",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/lifecycle-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-unchanged",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/lifecycle-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-append",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/lifecycle-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-buried-resolution",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/lifecycle-read-probe.tsv"
+    }
+  },
+  {
+    "name": "warm-benchmark",
+    "argv": [
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/loaded-warm-bench.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/state/synthetic-secondmate.status",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/lifecycle-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-replacement-bootstrap",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/adversarial-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-same-size-new-inode-replacement",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/adversarial-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-same-inode-shrink",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/adversarial-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-unfinished-line-initial",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/adversarial-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-unfinished-line-completion-rebuild",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/adversarial-read-probe.tsv"
+    }
+  },
+  {
+    "name": "drain-corrupted-checkpoint-clean-rebuild",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/bin/fm-wake-drain.sh"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/adversarial/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/adversarial-read-probe.tsv"
+    }
+  },
+  {
+    "name": "library-cases",
+    "argv": [
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases/state",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/library-cases"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "env": {
+      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/user-home",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/tmp/",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "FM_SUPERVISION_ACTOR": "main",
+      "FM_WEDGE_ALARM_EXEC": "discard",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases",
+      "FM_STATE_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases/state",
+      "FM_DATA_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases/data",
+      "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases/config",
+      "FM_OPEN_DECISIONS_READ_PROBE": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/library-read-probe.tsv"
+    }
+  }
+]

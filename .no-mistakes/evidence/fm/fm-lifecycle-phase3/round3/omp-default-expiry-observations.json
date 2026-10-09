@@ -1,0 +1,24 @@
+[
+  {
+    "scenario": "arm default readiness and retirement expiry",
+    "frozen": 25123,
+    "readiness": [
+      "2026-10-09T12:48:09.995Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=12000ms actual=12002ms"
+    ],
+    "retirement": [
+      "2026-10-09T12:48:10.996Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1001ms"
+    ],
+    "modelSawFailure": true
+  },
+  {
+    "scenario": "host default readiness and retirement expiry",
+    "frozen": 84350,
+    "readiness": [
+      "2026-10-09T12:48:49.448Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=supervision-host-readiness bound=30000ms actual=30002ms"
+    ],
+    "retirement": [
+      "2026-10-09T12:48:50.450Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1002ms"
+    ],
+    "modelSawFailure": true
+  }
+]

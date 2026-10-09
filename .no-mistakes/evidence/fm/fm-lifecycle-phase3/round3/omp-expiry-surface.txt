@@ -1,0 +1,40 @@
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-tur │
+│ nend-guard.ts and                                                                                                    │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-omp │
+│ -watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).    │
+│ ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                                             │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                           │
+│ ⟦Wall: 5.31s | Timeout: 300s⟧                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+ /Users/charlesabrooker/tmp/fm-lab.hcuQK0/state/live-wake.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791549898   1   check   open-loop-ledger   check: open-loop-ledger (1 overdue assigned obligations; read            │
+│ state/open-loops.json)                                                                                               │
+│ 1791549976   3   signal   live-wake.status   needs-decision:                                                         │
+│ /Users/charlesabrooker/tmp/fm-lab.hcuQK0/state/live-wake.status                                                      │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation           │
+│ 36035.1791549922.dCJnJ5                                                                                              │
+│ wake annotation: latest wake-EVENT observed at drain, not current state: live-wake.status: needs-decision            │
+│ [key=live-recovered]: prove recovered wake                                                                           │
+│                                                                                                                      │
+│ [1]+  Stopped   bin/fm-wake-drain.sh                                                                                 │
+│ ⟦Wall: 9.12s | Timeout: 300s | Exit: 148⟧                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ LAB: shutdown and successor
+
+ ack
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B > ⑂ detached ?5 ▶────10%───────────────────────╎───┃─────200K─
+╰─

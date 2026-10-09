@@ -1,0 +1,7 @@
+2026-10-09T12:46:28.483Z pid=47750 instance=2 event=session_shutdown generation=4
+2026-10-09T12:46:29.489Z pid=47750 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1006ms
+2026-10-09T12:46:29.489Z pid=47750 instance=2 event=generation-stop generation=4
+2026-10-09T12:46:29.496Z pid=47750 instance=2 event=session_start generation=4 stopping=true
+2026-10-09T12:46:29.498Z pid=47750 instance=2 event=generation-create generation=5 cause=session_start
+2026-10-09T12:46:29.498Z pid=47750 instance=2 event=generation-activate generation=5 cause=session_start
+2026-10-09T12:46:32.692Z pid=47750 instance=2 event=session_shutdown generation=5

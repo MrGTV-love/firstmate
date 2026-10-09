@@ -1,0 +1,29 @@
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       ▀▄▄▀ █ █ █ █▄▄▀
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m                  █
+                                                   [38;5;74m██[39m       [38;5;243mv18.8.1[39m
+
+                          [38;5;180mTip: [38;5;248mPress ⌃R to search your prompt history and reuse a past message[39m
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [38;5;215mUpdate Available[39m
+ [38;5;248mNew version 18.8.6 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m
+ ⁣[38;5;254mFIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+[39m [38;5;254m/Users/charlesabrooker/tmp/fm-lab.w2vdul/state/expiry-arm.status[39m
+
+ [38;5;254mwatcher: FAILED - omp extension could not verify a ready successor watcher[39m
+ [38;5;254mwatcher: FAILED - omp extension could not restore watcher continuity because the unready successor arm did not exit
+[39m [38;5;254mwithin 1000ms[39m
+
+ [38;5;254mRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.[39m
+
+
+[49m ack
+
+[48;5;233m [38;5;243mπ[39m [38;5;236m>[39m [38;5;39m⬢ m1[38;5;48m 🙈[39m [38;5;236m>[39m [38;5;255m🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B[39m [38;5;236m>[39m [38;5;215m⑂ detached [38;5;248m?5[39m [38;5;233m[49m▶[38;5;39m────10%[38;5;236m───────────────────────[38;5;248m╎[38;5;236m───[38;5;67m┃[38;5;236m─────[38;5;67m200K[38;5;236m─
+[38;5;239m╰─ [39m

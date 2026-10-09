@@ -1,0 +1,121 @@
+{
+  "method": "Bash builtin time TIMEFORMAT=%R, functions called in one already-loaded /bin/bash process; no library sourcing or interpreter startup in measured block",
+  "loaded_bash_pid": "89128",
+  "log_bytes": 1406009,
+  "log_sha256": "a2a50bc2e4f1fde6322e9b5515c8d1493a6ef81d68c1cec8263287f7123bf243",
+  "samples": [
+    {
+      "function": "status_open_decisions_incremental",
+      "sample": 1,
+      "seconds": 0.025,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions_incremental-1.output"
+    },
+    {
+      "function": "status_open_decisions_incremental",
+      "sample": 2,
+      "seconds": 0.021,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions_incremental-2.output"
+    },
+    {
+      "function": "status_open_decisions_incremental",
+      "sample": 3,
+      "seconds": 0.02,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions_incremental-3.output"
+    },
+    {
+      "function": "status_open_decisions_incremental",
+      "sample": 4,
+      "seconds": 0.025,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions_incremental-4.output"
+    },
+    {
+      "function": "status_open_decisions_incremental",
+      "sample": 5,
+      "seconds": 0.029,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions_incremental-5.output"
+    },
+    {
+      "function": "status_open_decisions_incremental",
+      "sample": 6,
+      "seconds": 0.034,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions_incremental-6.output"
+    },
+    {
+      "function": "status_open_decisions_incremental",
+      "sample": 7,
+      "seconds": 0.026,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions_incremental-7.output"
+    },
+    {
+      "function": "status_open_decisions",
+      "sample": 1,
+      "seconds": 0.02,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions-1.output"
+    },
+    {
+      "function": "status_open_decisions",
+      "sample": 2,
+      "seconds": 0.024,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions-2.output"
+    },
+    {
+      "function": "status_open_decisions",
+      "sample": 3,
+      "seconds": 0.021,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions-3.output"
+    },
+    {
+      "function": "status_open_decisions",
+      "sample": 4,
+      "seconds": 0.018,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions-4.output"
+    },
+    {
+      "function": "status_open_decisions",
+      "sample": 5,
+      "seconds": 0.024,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions-5.output"
+    },
+    {
+      "function": "status_open_decisions",
+      "sample": 6,
+      "seconds": 0.027,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions-6.output"
+    },
+    {
+      "function": "status_open_decisions",
+      "sample": 7,
+      "seconds": 0.019,
+      "exit_code": 0,
+      "output": "anchor\tblocked\tindependent decision remains open",
+      "output_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live/warm-benchmark/status_open_decisions-7.output"
+    }
+  ],
+  "acceptance_seconds": 1.0
+}

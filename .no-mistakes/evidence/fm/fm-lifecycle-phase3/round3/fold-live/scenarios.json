@@ -1,0 +1,220 @@
+[
+  {
+    "scenario": "real drain bootstrap buried secondmate decisions",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 1404739,
+      "sha256": "38d9460b471b972881a99035346d36390fa0029a74c52b8ea634ca2ab3676e3c",
+      "read_probe": [
+        [
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/lifecycle/state/synthetic-secondmate.status",
+          "1404739"
+        ]
+      ],
+      "wall_seconds": 4.279194667004049,
+      "stdout": "drain-bootstrap.stdout",
+      "checkpoint": "checkpoints/bootstrap/.synthetic-secondmate.open-decisions-cursor"
+    }
+  },
+  {
+    "scenario": "real drain unchanged reuses checkpoint",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "additional_probe_rows": 0,
+      "wall_seconds": 2.4635875420062803,
+      "stdout": "drain-unchanged.stdout",
+      "checkpoint_unchanged": true
+    }
+  },
+  {
+    "scenario": "real drain append reads only exact new bytes",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "appended_bytes": 67,
+      "probe_bytes": 67,
+      "stdout": "drain-append.stdout"
+    }
+  },
+  {
+    "scenario": "real drain buried resolution compacts open set only",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 1406009,
+      "original_log_preserved": true,
+      "resolution_increment_bytes": 1203,
+      "probe_bytes": 1203,
+      "checkpoint_bytes": 156,
+      "stdout": "drain-buried-resolution.stdout"
+    }
+  },
+  {
+    "scenario": "warm loaded Bash incremental and read-only folds under one second",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "samples_per_function": 7,
+      "maximum_seconds": 0.034,
+      "benchmark": "benchmark.json"
+    }
+  },
+  {
+    "scenario": "replacement-bootstrap",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 222,
+      "expected_fold_bytes": 222,
+      "probe_bytes": 222,
+      "stdout": "drain-replacement-bootstrap.stdout",
+      "wall_seconds": 1.924708999984432
+    }
+  },
+  {
+    "scenario": "same-size-new-inode-replacement",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 222,
+      "expected_fold_bytes": 222,
+      "probe_bytes": 222,
+      "stdout": "drain-same-size-new-inode-replacement.stdout",
+      "wall_seconds": 2.0128337090136483,
+      "old_inode": 168262053,
+      "new_inode": 168262343,
+      "same_size": true
+    }
+  },
+  {
+    "scenario": "same-inode-shrink",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 48,
+      "expected_fold_bytes": 48,
+      "probe_bytes": 48,
+      "stdout": "drain-same-inode-shrink.stdout",
+      "wall_seconds": 1.5858422910096124
+    }
+  },
+  {
+    "scenario": "unfinished-line-initial",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 40,
+      "expected_fold_bytes": 40,
+      "probe_bytes": 40,
+      "stdout": "drain-unfinished-line-initial.stdout",
+      "wall_seconds": 1.8717498750193045
+    }
+  },
+  {
+    "scenario": "unfinished-line-completion-rebuild",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 62,
+      "expected_fold_bytes": 62,
+      "probe_bytes": 62,
+      "stdout": "drain-unfinished-line-completion-rebuild.stdout",
+      "wall_seconds": 2.2286685420549475
+    }
+  },
+  {
+    "scenario": "corrupted-checkpoint-clean-rebuild",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 62,
+      "expected_fold_bytes": 62,
+      "probe_bytes": 62,
+      "stdout": "drain-corrupted-checkpoint-clean-rebuild.stdout",
+      "wall_seconds": 1.566563041007612
+    }
+  },
+  {
+    "scenario": "locale C to installed en_US.UTF-8 to C invalidates and refolds",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "log_bytes": 59,
+      "probe_rows": [
+        [
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases/state/locale.status",
+          "59"
+        ],
+        [
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases/state/locale.status",
+          "59"
+        ],
+        [
+          "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.round3-fold-live-fixtures/library-cases/state/locale.status",
+          "59"
+        ]
+      ],
+      "checkpoint_versions": [
+        "version=11:secondmate:ctype=C:collate=C",
+        "version=11:secondmate:ctype=en_US.UTF-8:collate=en_US.UTF-8",
+        "version=11:secondmate:ctype=C:collate=C"
+      ],
+      "outputs": "library-cases/locale-*.output"
+    }
+  },
+  {
+    "scenario": "golden ship seeded versus unseeded exact equality",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "seeded_output": "delta\tneeds-decision\tfinal open",
+      "unseeded_output": "delta\tneeds-decision\tfinal open",
+      "read_only_checkpoint_unchanged": true,
+      "evidence": "library-cases/golden-ship-*"
+    }
+  },
+  {
+    "scenario": "golden scout seeded versus unseeded exact equality",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "seeded_output": "delta\tneeds-decision\tfinal open",
+      "unseeded_output": "delta\tneeds-decision\tfinal open",
+      "read_only_checkpoint_unchanged": true,
+      "evidence": "library-cases/golden-scout-*"
+    }
+  },
+  {
+    "scenario": "golden secondmate seeded versus unseeded exact equality",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "initial_driver_oracle_result": "FAIL",
+      "oracle_correction": "The throwaway driver omitted gamma from the expected secondmate open set. Both captured live outputs already match exactly. Under the documented secondmate contract, failed: does not close the independently opened gamma decision; its observed retention is correct. Reclassified from existing output evidence without rerunning product operations. The executed driver-source.txt remains unchanged.",
+      "seeded_output": "beta\tblocked\tretained\npending-reply-abcd\tneeds-decision\tpending-reply-missed: response absent\ngamma\tneeds-decision\tafter terminal\ndelta\tneeds-decision\tfinal open",
+      "unseeded_output": "beta\tblocked\tretained\npending-reply-abcd\tneeds-decision\tpending-reply-missed: response absent\ngamma\tneeds-decision\tafter terminal\ndelta\tneeds-decision\tfinal open",
+      "read_only_checkpoint_unchanged": true,
+      "evidence": "library-cases/golden-secondmate-*"
+    }
+  },
+  {
+    "scenario": "snapshot checkpoint carry and read-only no mutation",
+    "live": true,
+    "result": "pass",
+    "details": {
+      "live_checkpoint_unchanged": true,
+      "captured_checkpoint_unchanged": true,
+      "captured_identity_differs": true,
+      "output": "beta\tblocked\tretained\npending-reply-abcd\tneeds-decision\tpending-reply-missed: response absent\ngamma\tneeds-decision\tafter terminal\ndelta\tneeds-decision\tfinal open",
+      "evidence": "library-cases/carry-*"
+    }
+  },
+  {
+    "scenario": "private d7 corpus parity/performance",
+    "live": false,
+    "result": "untested",
+    "reason": "Private d7 log not available/provided; generated synthetic secondmate log used as explicit surrogate. No operator private records accessed."
+  }
+]

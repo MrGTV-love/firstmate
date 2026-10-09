@@ -1,0 +1,43 @@
+[
+  {
+    "setup": {
+      "pid": 41322,
+      "home": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/pi-lab-9Pn7F5",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/pi-lab-9Pn7F5"
+    }
+  },
+  {
+    "initialArm": {
+      "content": [
+        {
+          "type": "text",
+          "text": "watcher: unchanged - Pi extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy"
+        }
+      ],
+      "details": {
+        "ok": true,
+        "message": "watcher: unchanged - Pi extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy"
+      }
+    }
+  },
+  {
+    "scenario": "duplicate entrypoint and idempotent tool",
+    "firstWatcher": 43935,
+    "armResult": {
+      "ok": true,
+      "message": "watcher: unchanged - Pi extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy"
+    }
+  },
+  {
+    "scenario": "repeated genuine reload",
+    "reload": 1,
+    "retiredWatcher": 43935,
+    "currentWatcher": 50137
+  },
+  {
+    "scenario": "repeated genuine reload",
+    "reload": 2,
+    "retiredWatcher": 50137,
+    "currentWatcher": 79372
+  }
+]

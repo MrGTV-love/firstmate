@@ -1,0 +1,40 @@
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ … (10 earlier lines, showing 10 of 20) ⟦⌃O: Expand⟧                                                                  │
+│ ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.                   │
+│ ●  This is a supervision warning only; the guarded operation WILL still run.                                         │
+│ ●  After draining queued wakes, source '/Users/charlesabrooker/tmp/fm-lab.hcuQK0/config/x-mode.env' first, then      │
+│ repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so      │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-tur │
+│ nend-guard.ts and                                                                                                    │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-omp │
+│ -watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).    │
+│ ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                                             │
+│ WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.                           │
+│ ⟦Wall: 5.31s | Timeout: 300s⟧                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal:
+ /Users/charlesabrooker/tmp/fm-lab.hcuQK0/state/live-wake.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Working…
+ ⠇ 2s > ⬢ m1 👁 > 🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B > ⑂ detached ?5 ▶────10%─────────────────────╎───┃─────200K─
+╰─ operator draft kept

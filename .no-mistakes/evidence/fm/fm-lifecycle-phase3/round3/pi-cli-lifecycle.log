@@ -1,0 +1,40 @@
+2026-10-09T12:39:55.587Z pid=76421 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T12:39:55.587Z pid=76421 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T12:39:55.587Z pid=76421 instance=1 event=factory-bind generation=1
+2026-10-09T12:39:55.633Z pid=76421 instance=1 event=duplicate-load-ignored
+2026-10-09T12:39:56.394Z pid=76421 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T12:39:56.394Z pid=76421 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T12:40:03.278Z pid=76421 instance=1 event=session_shutdown generation=1 reason=reload
+2026-10-09T12:40:03.280Z pid=76421 instance=1 event=generation-stop generation=1 replacement=true
+2026-10-09T12:40:03.395Z pid=76421 instance=2 event=generation-create generation=2 cause=factory-bind
+2026-10-09T12:40:03.395Z pid=76421 instance=2 event=generation-activate generation=2 cause=factory-bind
+2026-10-09T12:40:03.395Z pid=76421 instance=2 event=factory-bind generation=2 superseded=1
+2026-10-09T12:40:03.396Z pid=76421 instance=1 event=instance-retired generation=1 by=2
+2026-10-09T12:40:03.397Z pid=76421 instance=1 event=generation-stop generation=1 cause=factory-retire
+2026-10-09T12:40:03.407Z pid=76421 instance=2 event=duplicate-load-ignored
+2026-10-09T12:40:03.407Z pid=76421 instance=2 event=session_start generation=2 stopping=false
+2026-10-09T12:40:03.408Z pid=76421 instance=2 event=generation-activate generation=2 cause=session_start
+2026-10-09T12:40:05.796Z pid=76421 instance=2 event=session_shutdown generation=2 reason=reload
+2026-10-09T12:40:05.798Z pid=76421 instance=2 event=generation-stop generation=2 replacement=true
+2026-10-09T12:40:05.830Z pid=76421 instance=3 event=generation-create generation=3 cause=factory-bind
+2026-10-09T12:40:05.830Z pid=76421 instance=3 event=generation-activate generation=3 cause=factory-bind
+2026-10-09T12:40:05.830Z pid=76421 instance=3 event=factory-bind generation=3 superseded=2
+2026-10-09T12:40:05.830Z pid=76421 instance=2 event=instance-retired generation=2 by=3
+2026-10-09T12:40:05.831Z pid=76421 instance=2 event=generation-stop generation=2 cause=factory-retire
+2026-10-09T12:40:05.834Z pid=76421 instance=3 event=duplicate-load-ignored
+2026-10-09T12:40:05.835Z pid=76421 instance=3 event=session_start generation=3 stopping=false
+2026-10-09T12:40:05.835Z pid=76421 instance=3 event=generation-activate generation=3 cause=session_start
+2026-10-09T12:40:07.650Z pid=76421 instance=3 event=session_shutdown generation=3 reason=reload
+2026-10-09T12:40:07.652Z pid=76421 instance=3 event=generation-stop generation=3 replacement=true
+2026-10-09T12:40:07.681Z pid=76421 instance=4 event=generation-create generation=4 cause=factory-bind
+2026-10-09T12:40:07.681Z pid=76421 instance=4 event=generation-activate generation=4 cause=factory-bind
+2026-10-09T12:40:07.681Z pid=76421 instance=4 event=factory-bind generation=4 superseded=3
+2026-10-09T12:40:07.682Z pid=76421 instance=3 event=instance-retired generation=3 by=4
+2026-10-09T12:40:07.684Z pid=76421 instance=3 event=generation-stop generation=3 cause=factory-retire
+2026-10-09T12:40:07.687Z pid=76421 instance=4 event=duplicate-load-ignored
+2026-10-09T12:40:07.688Z pid=76421 instance=4 event=session_start generation=4 stopping=false
+2026-10-09T12:40:07.688Z pid=76421 instance=4 event=generation-activate generation=4 cause=session_start
+2026-10-09T12:40:09.380Z pid=76421 instance=4 event=session_shutdown generation=4 reason=reload
+2026-10-09T12:40:09.381Z pid=76421 instance=4 event=generation-stop generation=4 replacement=true
+2026-10-09T12:40:24.382Z pid=76421 instance=4 event=bound-expired waiter=pi-watch-extension waited-on=session_start bound=15000ms actual=15001ms outcome=successor-missing
+2026-10-09T12:40:24.382Z pid=76421 instance=4 event=successor-missing generation=4 message=watcher:_not_armed_-_Pi_replacement_runtime_did_not_start;_reload_the_extension_in_a_live_session

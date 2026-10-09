@@ -1,0 +1,11 @@
+needs-decision corr=0123456789abcdef [key=alpha]: first
+blocked [key=beta]: retained
+resolved [key=alpha]: answered
+needs-decision [key=held]: transfer
+captain-held [key=held]: durable transfer
+needs-decision [key=pending-reply-abcd]: pending-reply-missed: response absent
+resolved [key=pending-reply-abcd]: unrelated must not clear
+needs-decision malformed=token [key=phantom]: ignored
+done: terminal declaration
+needs-decision: [key=gamma] after terminal
+failed: terminal failure

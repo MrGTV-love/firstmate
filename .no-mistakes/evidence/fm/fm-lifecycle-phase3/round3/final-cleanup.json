@@ -1,0 +1,13 @@
+{
+  "observedAt": "2026-10-09T12:57:36.794Z",
+  "ownedProductProcesses": [],
+  "removedFixtures": [
+    ".phase3-live",
+    "tests/.phase3-pi-targeted.sh",
+    "tests/.phase3-omp-targeted.sh",
+    "tests/.phase3-fold-golden-shard.sh"
+  ],
+  "allOwnedFixturesAbsent": true,
+  "temporaryDependencySymlinkAbsent": true,
+  "scope": "Only test-created fixtures, local dependencies and test runners removed; existing worktree files and evidence retained"
+}

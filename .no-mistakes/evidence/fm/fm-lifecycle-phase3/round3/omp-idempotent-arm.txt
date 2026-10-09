@@ -1,0 +1,20 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.1
+
+                          Tip: Press ⌥P (or /switch) to switch provider, and ⌃P to cycle role
+                                               models smol -> slow -> etc
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.6 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_omp again
+ only after a later notification says the cycle is missing, failed, or unhealthy
+
+ π > ⬢ m1 👁 > 🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B > ⑂ detached ?5 ▶────10%───────────────────────╎────┃─────200K─
+╰─                                                                                          ⇧⇥ to change thinking effort

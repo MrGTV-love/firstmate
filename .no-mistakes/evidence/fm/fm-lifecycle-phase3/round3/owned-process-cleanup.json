@@ -1,0 +1,5 @@
+{
+  "observedAt": "2026-10-09T12:54:40.300Z",
+  "matchingProcesses": [],
+  "method": "ps command paths restricted to this run’s disposable fixture and watcher scripts"
+}

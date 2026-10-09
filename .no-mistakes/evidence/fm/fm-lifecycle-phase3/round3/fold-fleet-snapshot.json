@@ -1,0 +1,280 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-09T12:53:21Z",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/config",
+    "projects": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/projects"
+  },
+  "backlog": {
+    "path": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/data/backlog.md",
+    "present": false,
+    "records": []
+  },
+  "tasks": [
+    {
+      "id": "task",
+      "kind": "secondmate",
+      "harness": "",
+      "mode": "",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/state/task.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/state/task.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "unrelated latest",
+            "raw": "working: unrelated latest",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/data/task/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown · source: none · worktree gone (torn down?)",
+        "observed_at": "2026-10-09T12:53:21Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": null,
+        "exists": null,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:53:21Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": true,
+        "blocked_event": true,
+        "open_decisions": [
+          {
+            "key": "beta",
+            "verb": "blocked",
+            "summary": "retained"
+          },
+          {
+            "key": "pending-reply-abcd",
+            "verb": "needs-decision",
+            "summary": "pending-reply-missed: response absent"
+          },
+          {
+            "key": "gamma",
+            "verb": "needs-decision",
+            "summary": "after terminal"
+          },
+          {
+            "key": "delta",
+            "verb": "needs-decision",
+            "summary": "final open"
+          }
+        ],
+        "scout_report_present": false,
+        "last_event_text": "working: unrelated latest"
+      },
+      "actions": {
+        "send": "bin/fm-send.sh fm-task '<request>'",
+        "watch": "read status/doc return channel; do not routinely fm-peek a secondmate for answers",
+        "return_channel_note": "Secondmate answers come back through status/doc paths after a marked fm-send request."
+      },
+      "backlog": null
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": false,
+    "proven_clear": false,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 1,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": {
+      "present": false,
+      "available": true,
+      "complete": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/tmp/fm-lab.BJ1taS/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-10-09T12:53:21Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [
+      {
+        "id": "task",
+        "home": null,
+        "host": null,
+        "remote": false,
+        "registered": false,
+        "spawn_gen": null,
+        "current": {
+          "state": "unknown",
+          "reason": "secondmate metadata is not registered"
+        },
+        "invalidity": null,
+        "reconcile_inventory": null,
+        "provenance": {
+          "selected": "parent-event-fallback",
+          "structured_home": null,
+          "parent_event_role": "fallback-only-not-current"
+        },
+        "freshness": {
+          "status": "historical-event",
+          "observed_at": "2026-10-09T12:53:21Z",
+          "age_seconds": 3
+        },
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [],
+        "landed": [],
+        "endpoints": [],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 0,
+          "landed": 0,
+          "endpoints": 0
+        },
+        "omitted": [],
+        "parent_event": {
+          "raw": "working: unrelated latest",
+          "note": "unrelated latest",
+          "age_seconds": null,
+          "open_activities": [
+            {
+              "key": "default",
+              "verb": "working",
+              "summary": "unrelated latest"
+            }
+          ],
+          "open_decisions": [
+            {
+              "key": "beta",
+              "verb": "blocked",
+              "summary": "retained"
+            },
+            {
+              "key": "pending-reply-abcd",
+              "verb": "needs-decision",
+              "summary": "pending-reply-missed: response absent"
+            },
+            {
+              "key": "gamma",
+              "verb": "needs-decision",
+              "summary": "after terminal"
+            },
+            {
+              "key": "delta",
+              "verb": "needs-decision",
+              "summary": "final open"
+            }
+          ],
+          "activity_scan": {
+            "records": [
+              {
+                "key": "default",
+                "verb": "working",
+                "summary": "unrelated latest"
+              }
+            ],
+            "available": true,
+            "input_truncated": false,
+            "retained_truncated": false,
+            "reasons": [],
+            "lines_in_window": 13,
+            "records_in_window": 1
+          }
+        },
+        "terminal_evidence": {
+          "provenance": "parent-direct-report-terminal",
+          "trust": "untrusted-supplement",
+          "captured": false,
+          "observed_at": "2026-10-09T12:53:21Z",
+          "freshness": "unknown",
+          "reason": "no recorded endpoint",
+          "lines": 0,
+          "bytes": 0,
+          "event_note_seen": false,
+          "contradiction": false
+        },
+        "contradiction": false
+      }
+    ],
+    "total_registered": 0,
+    "total": 1,
+    "shown": 1,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [
+      "<task: unavailable>"
+    ],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

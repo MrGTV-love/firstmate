@@ -1,0 +1,3 @@
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose café
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

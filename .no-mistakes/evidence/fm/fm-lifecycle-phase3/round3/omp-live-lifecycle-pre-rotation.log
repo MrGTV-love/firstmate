@@ -1,0 +1,30 @@
+2026-10-09T12:44:52.695Z pid=47750 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T12:44:52.695Z pid=47750 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T12:44:52.695Z pid=47750 instance=1 event=factory-bind generation=1
+2026-10-09T12:44:52.696Z pid=47750 instance=2 event=generation-create generation=1 cause=factory-bind
+2026-10-09T12:44:52.696Z pid=47750 instance=2 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T12:44:52.696Z pid=47750 instance=2 event=factory-bind generation=1 superseded=1
+2026-10-09T12:44:52.696Z pid=47750 instance=1 event=instance-retired generation=1 by=2
+2026-10-09T12:44:52.697Z pid=47750 instance=1 event=generation-stop generation=1 cause=factory-retire
+2026-10-09T12:44:53.602Z pid=47750 instance=1 event=session_start-ignored reason=superseded-instance
+2026-10-09T12:44:53.602Z pid=47750 instance=2 event=session_start generation=1 stopping=false
+2026-10-09T12:44:53.602Z pid=47750 instance=2 event=generation-activate generation=1 cause=session_start
+2026-10-09T12:44:59.844Z pid=47750 instance=2 event=session_shutdown generation=1
+2026-10-09T12:45:00.854Z pid=47750 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1007ms
+2026-10-09T12:45:00.854Z pid=47750 instance=2 event=generation-stop generation=1
+2026-10-09T12:45:15.855Z pid=47750 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=session_start bound=15000ms actual=15001ms outcome=self-heal
+2026-10-09T12:45:15.855Z pid=47750 instance=2 event=generation-create generation=2 cause=self-heal
+2026-10-09T12:45:15.855Z pid=47750 instance=2 event=generation-activate generation=2 cause=self-heal
+2026-10-09T12:45:15.868Z pid=47750 instance=2 event=self-heal generation=2 ok=true
+2026-10-09T12:45:19.558Z pid=47750 instance=2 event=session_shutdown generation=2
+2026-10-09T12:45:20.560Z pid=47750 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1002ms
+2026-10-09T12:45:20.560Z pid=47750 instance=2 event=generation-stop generation=2
+2026-10-09T12:45:20.561Z pid=47750 instance=2 event=session_start generation=2 stopping=true
+2026-10-09T12:45:20.561Z pid=47750 instance=2 event=generation-create generation=3 cause=session_start
+2026-10-09T12:45:20.561Z pid=47750 instance=2 event=generation-activate generation=3 cause=session_start
+2026-10-09T12:45:45.560Z pid=47750 instance=2 event=session_shutdown generation=3
+2026-10-09T12:45:46.551Z pid=47750 instance=2 event=generation-stop generation=3
+2026-10-09T12:46:01.562Z pid=47750 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=session_start bound=15000ms actual=15006ms outcome=self-heal
+2026-10-09T12:46:01.564Z pid=47750 instance=2 event=generation-create generation=4 cause=self-heal
+2026-10-09T12:46:01.564Z pid=47750 instance=2 event=generation-activate generation=4 cause=self-heal
+2026-10-09T12:46:01.591Z pid=47750 instance=2 event=self-heal generation=4 ok=true

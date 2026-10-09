@@ -1,0 +1,26 @@
+[
+  {
+    "locale": "C",
+    "key": "default",
+    "logBytes": 41,
+    "foldedBytes": 41,
+    "cursorSignature": "version=11:secondmate:ctype=C:collate=C",
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask needs-decision:  [key=api] choose café\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "locale": "C.UTF-8",
+    "key": "api",
+    "logBytes": 41,
+    "foldedBytes": 41,
+    "cursorSignature": "version=11:secondmate:ctype=C.UTF-8:collate=C.UTF-8",
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=api] needs-decision: choose café\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "locale": "C",
+    "key": "default",
+    "logBytes": 41,
+    "foldedBytes": 41,
+    "cursorSignature": "version=11:secondmate:ctype=C:collate=C",
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask needs-decision:  [key=api] choose café\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  }
+]

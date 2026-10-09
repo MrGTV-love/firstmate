@@ -1,0 +1,14 @@
+2026-10-09T12:47:45.626Z pid=82577 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T12:47:45.626Z pid=82577 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T12:47:45.626Z pid=82577 instance=1 event=factory-bind generation=1
+2026-10-09T12:47:45.799Z pid=82577 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T12:47:45.799Z pid=82577 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T12:48:09.995Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-readiness bound=12000ms actual=12002ms
+2026-10-09T12:48:10.996Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1001ms
+2026-10-09T12:48:15.393Z pid=82577 instance=1 event=session_shutdown generation=1
+2026-10-09T12:48:16.017Z pid=82577 instance=1 event=generation-stop generation=1
+2026-10-09T12:48:16.018Z pid=82577 instance=1 event=session_start generation=1 stopping=true
+2026-10-09T12:48:16.018Z pid=82577 instance=1 event=generation-create generation=2 cause=session_start
+2026-10-09T12:48:16.018Z pid=82577 instance=1 event=generation-activate generation=2 cause=session_start
+2026-10-09T12:48:49.448Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=supervision-host-readiness bound=30000ms actual=30002ms
+2026-10-09T12:48:50.450Z pid=82577 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=unready-arm-close bound=1000ms actual=1002ms

@@ -1,0 +1,13 @@
+[
+  {
+    "scenario": "real Pi default arm-readiness and unready retirement expiry",
+    "child": 44957,
+    "readiness": [
+      "2026-10-09T12:50:00.678Z pid=7957 instance=1 event=bound-expired waiter=pi-watch-extension waited-on=arm-readiness bound=12000ms actual=12002ms"
+    ],
+    "retirement": [
+      "2026-10-09T12:50:01.681Z pid=7957 instance=1 event=bound-expired waiter=pi-watch-extension waited-on=unready-arm-close bound=1000ms actual=1003ms"
+    ],
+    "modelSawFailure": true
+  }
+]

@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync,cpSync} from 'node:fs';
+import {join} from 'node:path';import {spawnSync} from 'node:child_process';import {createServer} from 'node:http';
+const root=process.cwd(), evidence=process.env.FM_TEST_EVIDENCE, work=join(root,'.phase3-live/omp');mkdirSync(work,{recursive:true});
+const home=mkdtempSync(join(process.env.TMPDIR||'/tmp','fm-lab.')), agent=join(work,'agent');mkdirSync(agent,{recursive:true});
+const run=(cmd,args,extra={})=>{const r=spawnSync(cmd,args,{cwd:root,env:env,encoding:'utf8',...extra});if(r.status!==0)throw new Error(`${cmd} ${args.join(' ')}: ${r.stderr}${r.stdout}`);return r.stdout.trimEnd()};
+const env={...process.env};for(const key of ['NO_MISTAKES_GATE','FM_GATE_REFUSE_BYPASS','FM_ROOT_OVERRIDE','FM_STATE_OVERRIDE','FM_DATA_OVERRIDE','FM_CONFIG_OVERRIDE','FM_PROJECTS_OVERRIDE','FM_HOME','TMUX','HERDR_ENV','HERDR_PANE_ID','HERDR_SESSION','HERDR_SOCKET_PATH'])delete env[key];
+run('bin/fm-lab-home.sh',['create',home]);mkdirSync(join(home,'tmux'));
+writeFileSync(join(home,'config/x-mode.env'),'unset FM_ROOT_OVERRIDE FM_CONFIG_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE\n');
+Object.assign(env,{FM_HOME:home,TMUX_TMPDIR:join(home,'tmux'),PI_CODING_AGENT_DIR:agent,OMP_SKIP_SETUP:'1',FM_POLL:'1',FM_SIGNAL_GRACE:'0',FM_HEARTBEAT:'600'});
+env.PATH=join(root,'.phase3-live/stock-bash')+':'+env.PATH;
+const observations=[], requests=[], ownedFrozen=new Set();let advised=false;
+const texts=m=>typeof m.content==='string'?m.content:Array.isArray(m.content)?m.content.filter(p=>p.type==='text').map(p=>p.text).join(' '):'';
+const server=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;const payload=JSON.parse(raw||'{}');const messages=payload.messages||[];const toolnames=(payload.tools||[]).map(t=>t.function?.name);const advise=!advised&&toolnames.includes('advise')&&messages.some(m=>texts(m).includes('LIVE-ADVISE'));advised ||= advise;const drain=!advise&&toolnames.includes('bash')&&messages.at(-1)?.role==='user'&&texts(messages.at(-1)).includes('FIRSTMATE WATCHER WAKE:');requests.push({at:new Date().toISOString(),advise,drain,user:messages.filter(m=>m.role==='user').map(texts),hasAdvisorNote:messages.some(m=>texts(m).includes('LIVE-ADVISOR-NOTE'))});const delta=advise||drain?{role:'assistant',tool_calls:[{index:0,id:'call_live_'+(advise?'advisor':'drain'),type:'function',function:{name:advise?'advise':'bash',arguments:JSON.stringify(advise?{note:'LIVE-ADVISOR-NOTE verify before finishing.',severity:'concern'}:{command:'bin/fm-wake-drain.sh'})}}]}:{role:'assistant',content:'ack'};res.writeHead(200,{'content-type':'text/event-stream'});const base={id:'lab',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'m1'};for(const d of [delta,{}])res.write('data: '+JSON.stringify({...base,choices:[{index:0,delta:d,finish_reason:Object.keys(d).length?null:advise||drain?'tool_calls':'stop'}]})+'\n\n');res.end('data: [DONE]\n\n');});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));
+writeFileSync(join(agent,'config.yml'),'setupVersion: 2\nmodelRoles:\n  default: lab/m1\n  tiny: lab/m1\n  advisor: lab/m1\nadvisor:\n  enabled: true\n');
+writeFileSync(join(agent,'models.yml'),`providers:\n  lab:\n    baseUrl: http://127.0.0.1:${server.address().port}/v1\n    apiKey: lab-key\n    api: openai-completions\n    models:\n      - id: m1\n        contextWindow: 200000\n        maxTokens: 4096\n`);
+const wrapper=join(work,'.omp/extensions/fm-primary-omp-watch.ts'), duplicate=join(work,'duplicate.ts');
+writeFileSync(duplicate,`export {default} from './.omp/extensions/fm-primary-omp-watch.ts';\n`);
+writeFileSync(join(evidence,'omp-fault-injection.txt'),'Disposable extension copy: lab-no-start and lab-with-start invoke actual registered lifecycle handlers with installed omp context. Production arms, message delivery, grace and retirement bounds remain unchanged.');
+const tmux=(...args)=>run('tmux',['-L','fm-lab',...args]);
+const screen=()=>tmux('capture-pane','-p','-t','primary');
+const saveScreen=name=>{writeFileSync(join(evidence,name+'.txt'),screen());writeFileSync(join(evidence,name+'.ansi'),tmux('capture-pane','-p','-e','-t','primary'));};
+const logPath=join(home,'state/extensions/omp-primary-watch/lifecycle.log');const log=()=>existsSync(logPath)?readFileSync(logPath,'utf8'):'';
+const pid=()=>{try{return Number(readFileSync(join(home,'state/.watch.lock/pid'),'utf8').trim())}catch{return 0}};
+const alive=p=>{if(!p)return false;try{process.kill(p,0);return true}catch{return false}};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));async function waitFor(fn,label,ms=90000){for(let n=0;n<ms/100;n++){if(fn())return;await sleep(100)}throw new Error(`timeout: ${label}\n${screen()}\n${log()}`)}
+async function command(text){tmux('send-keys','-t','primary','C-u');tmux('send-keys','-t','primary','-l',text);tmux('send-keys','-t','primary','Enter');await sleep(700)}
+const processRows=()=>run('ps',['-axo','pid=,ppid=,command=']).split('\n').map(l=>{const m=l.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);return m?{pid:+m[1],ppid:+m[2],command:m[3]}:null}).filter(Boolean);
+let started=false;
+try{
+ tmux('new-session','-d','-s','primary','-x','120','-y','40','-c',root,'-e',`FM_HOME=${home}`,`omp --no-session --no-extensions --no-skills --no-rules --no-lsp --no-title --auto-approve --model lab/m1 --thinking off -e '${wrapper}' -e '${duplicate}'`);started=true;
+ await waitFor(()=>existsSync(join(home,'state/.omp-watch-extension-loaded'))&&alive(pid()),'real watcher startup');await sleep(3000);
+ const first=pid();await command('/fm-watch-arm-omp');assert.equal(pid(),first);saveScreen('omp-idempotent-arm');
+ const primary=Number(readFileSync(join(home,'state/.lock'),'utf8').trim());let rows=processRows();const arms=rows.filter(r=>r.ppid===primary&&r.command.includes('fm-watch-arm'));assert.equal(arms.length,1,JSON.stringify(rows.filter(r=>r.command.includes(home))));observations.push({scenario:'duplicate entrypoints retain one live arm',primary,watcher:first,arms});
+ await command('/lab-no-start');await waitFor(()=>log().includes('event=self-heal ')&&alive(pid())&&pid()!==first,'missing successor self-heal');await sleep(1800);const healed=pid();assert.ok(!alive(first));observations.push({scenario:'shutdown without successor self-heals',predecessor:first,successor:healed,expiry:log().split('\n').filter(l=>l.includes('waited-on=session_start'))});saveScreen('omp-recovered-arm');
+ const heals=log().split('\n').filter(l=>l.includes('event=self-heal ')).length;await command('/lab-with-start');await waitFor(()=>alive(pid())&&pid()!==healed,'explicit successor arm');const successor=pid();await sleep(16500);assert.equal(log().split('\n').filter(l=>l.includes('event=self-heal ')).length,heals);const activeArms=processRows().filter(r=>r.ppid===primary&&r.command.includes('fm-watch-arm'));assert.equal(activeArms.length,1);observations.push({scenario:'shutdown then start never double arms',predecessor:healed,initialSuccessor:successor,currentWatcher:pid(),activeArms});
+ await command('LIVE-ADVISE reply ack');await waitFor(()=>screen().includes('LIVE-ADVISOR-NOTE'),'real advisor note');await sleep(4000);
+ const beforeRecovery=pid();await command('/lab-no-start');tmux('send-keys','-t','primary','-l','operator draft kept');await sleep(500);saveScreen('omp-advisor-tail-before-wake');
+ const beforeRequests=requests.length;await waitFor(()=>log().split('\n').filter(l=>l.includes('event=self-heal ')).length===heals+1,'retained context recovery');
+ writeFileSync(join(home,'state/live-wake.meta'),'kind=secondmate\n');writeFileSync(join(home,'state/live-wake.status'),'needs-decision [key=live-recovered]: prove recovered wake\n');
+ await waitFor(()=>requests.slice(beforeRequests).some(r=>r.user.some(t=>t.includes('FIRSTMATE WATCHER WAKE:')&&t.includes('live-wake'))),'real recovered status wake model consumption');await sleep(2500);
+ const wakeRequests=requests.slice(beforeRequests).filter(r=>r.user.some(t=>t.includes('FIRSTMATE WATCHER WAKE:')));assert.ok(wakeRequests.every(r=>r.user.every(t=>!t.includes('operator draft kept'))));assert.ok(screen().includes('operator draft kept'));observations.push({scenario:'recovered idle wake behind advisor tail preserves draft',wakeRequests});saveScreen('omp-recovered-wake');
+ writeFileSync(join(evidence,'omp-live-lifecycle-pre-rotation.log'),log());writeFileSync(logPath,log()+'2026-10-09T00:00:00.000Z pid=0 instance=0 event=lab-padding\n'.repeat(5000));await command('/fm-watch-arm-omp');await command('/lab-with-start');await waitFor(()=>existsSync(logPath+'.1'),'real lifecycle rotation');cpSync(logPath,join(evidence,'omp-rotated-lifecycle.log'));cpSync(logPath+'.1',join(evidence,'omp-rotated-lifecycle.log.1'));observations.push({scenario:'bounded lifecycle log rotation',rotated:true});
+ // Stop every real arm descendant, leaving the real primary responsive. The
+ // production retirement path must log its existing one-second bound expiry.
+ await sleep(2000);rows=processRows();const currentPrimary=Number(readFileSync(join(home,'state/.lock'),'utf8').trim());const descendants=new Set([currentPrimary]);for(let i=0;i<8;i++)for(const r of rows)if(descendants.has(r.ppid))descendants.add(r.pid);descendants.delete(currentPrimary);
+ for(const p of descendants){try{process.kill(p,'SIGSTOP');ownedFrozen.add(p)}catch{}}
+ await command('/lab-no-start');await waitFor(()=>log().includes('waited-on=shutdown-arm-close'),'default retirement expiry',15000);const expiry=log().split('\n').filter(l=>l.includes('waited-on=shutdown-arm-close'));assert.equal(expiry.length,1);assert.match(expiry[0],/waiter=omp-watch-extension.*bound=1000ms.*actual=\d+ms/);observations.push({scenario:'real frozen arm shutdown reports one expiry',frozen:[...ownedFrozen],expiry});saveScreen('omp-expiry-surface');
+ console.log(JSON.stringify(observations,null,2));
+}finally{
+ writeFileSync(join(evidence,'omp-live-observations.json'),JSON.stringify(observations,null,2)+'\n');writeFileSync(join(evidence,'omp-model-requests.json'),JSON.stringify(requests,null,2)+'\n');writeFileSync(join(evidence,'omp-live-lifecycle.log'),log());
+ if(started){try{saveScreen('omp-live-terminal')}catch{}try{tmux('kill-server')}catch{}}
+ for(const p of ownedFrozen){try{process.kill(p,'SIGKILL')}catch{}}
+ try{run('bin/fm-watch-arm.sh',['--stop'])}catch{}
+ await new Promise(r=>server.close(r));rmSync(home,{recursive:true,force:true});writeFileSync(join(evidence,'omp-lab-teardown.json'),JSON.stringify({privateTmuxStopped:true,disposableHomeRemoved:!existsSync(home),frozenChildrenKilled:ownedFrozen.size})+'\n');
+}

@@ -1,0 +1,1 @@
+Disposable extension copy: lab-no-start and lab-with-start invoke actual registered lifecycle handlers with installed omp context. Production arms, message delivery, grace and retirement bounds remain unchanged.

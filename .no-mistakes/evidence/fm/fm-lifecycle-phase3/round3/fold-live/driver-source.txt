@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+import hashlib, json, os, pathlib, shlex, shutil, subprocess, sys, time, traceback
+ROOT=pathlib.Path.cwd()
+E=pathlib.Path('/Users/charlesabrooker/.no-mistakes/evidence/01M4EYP71G0F1N9FSDAAWHXV2B/round3/fold-live')
+F=ROOT/'.round3-fold-live-fixtures'
+E.mkdir(parents=True,exist_ok=True)
+F.mkdir()
+(F/'tmp').mkdir()
+commands=[]; results=[]
+base={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':str(F/'user-home'),'TMPDIR':str(F/'tmp')+'/', 'LC_ALL':'C', 'LANG':'C','FM_SUPERVISION_ACTOR':'main','FM_WEDGE_ALARM_EXEC':'discard'}
+(F/'user-home').mkdir()
+
+def save(name,data):
+    p=E/name; p.parent.mkdir(parents=True,exist_ok=True)
+    p.write_bytes(data if isinstance(data,bytes) else data.encode())
+    return str(p)
+
+def record(name,ok,details):
+    results.append({'scenario':name,'live':True,'result':'pass' if ok else 'FAIL','details':details})
+
+def home(name):
+    h=F/name; (h/'state').mkdir(parents=True); (h/'data').mkdir(); (h/'config').write_text('')
+    return h
+
+def env_for(h,probe):
+    return dict(base,FM_HOME=str(h),FM_ROOT_OVERRIDE=str(h),FM_STATE_OVERRIDE=str(h/'state'),FM_DATA_OVERRIDE=str(h/'data'),FM_CONFIG_OVERRIDE=str(h/'config'),FM_OPEN_DECISIONS_READ_PROBE=str(probe))
+
+def run(name,args,env,timeout=180):
+    commands.append({'name':name,'argv':list(map(str,args)),'cwd':str(ROOT),'env':env})
+    started=time.perf_counter(); p=subprocess.run(args,cwd=ROOT,env=env,capture_output=True,timeout=timeout)
+    elapsed=time.perf_counter()-started
+    save(name+'.stdout',p.stdout); save(name+'.stderr',p.stderr)
+    save(name+'.run.json',json.dumps({'exit_code':p.returncode,'wall_seconds':elapsed},indent=2))
+    return p,elapsed
+
+def state_copy(label,h):
+    for p in (h/'state').iterdir():
+        if p.is_file() and (p.name.endswith('cursor') or p.name in ('.wake-queue','.watcher-down')):
+            save('checkpoints/'+label+'/'+p.name,p.read_bytes())
+
+def probe_rows(probe):
+    if not probe.exists(): return []
+    return [line.split('\t') for line in probe.read_text().splitlines()]
+
+def checkpoint_offset(path):
+    return int(path.read_text().splitlines()[1].split('=',1)[1])
+
+try:
+    save('driver-source.txt',pathlib.Path(__file__).read_bytes())
+    metadata={'python':sys.version,'bash_version':subprocess.run(['/bin/bash','--version'],env=base,capture_output=True).stdout.decode(),'synthetic_surrogate':True,'private_d7_corpus':'untested: not provided; no private records accessed','production_edits':False}
+    save('runtime.json',json.dumps(metadata,indent=2))
+    p,_=run('installed-locales',['/usr/bin/locale','-a'],base,20)
+    utf8='en_US.UTF-8'
+    if utf8 not in p.stdout.decode().splitlines(): raise RuntimeError('Requested UTF8 locale is not installed')
+    h=home('lifecycle'); probe=E/'lifecycle-read-probe.tsv'; env=env_for(h,probe)
+    status=h/'state'/'synthetic-secondmate.status'; cursor=h/'state'/'.synthetic-secondmate.open-decisions-cursor'
+    (h/'state'/'synthetic-secondmate.meta').write_text('kind=secondmate\n')
+    history=b''.join((f'needs-decision [key=closed-{i}]: historical question\nresolved [key=closed-{i}]: historical answer\n').encode() for i in range(12))
+    opens=b'needs-decision [key=api-shape]: choose REST or RPC\nblocked [key=anchor]: independent decision remains open\n'
+    filler=b''.join((f'working: synthetic routine record {i:05d} '+('x'*360)+'\n').encode() for i in range(3500))
+    original=history+opens+filler
+    status.write_bytes(original); save('logs/lifecycle-bootstrap.status',original)
+    initial_sha=hashlib.sha256(original).hexdigest()
+    drain=[str(ROOT/'bin/fm-wake-drain.sh')]
+    p,t=run('drain-bootstrap',drain,env); state_copy('bootstrap',h)
+    rows=probe_rows(probe)
+    record('real drain bootstrap buried secondmate decisions',len(original)>=1330000 and p.returncode==0 and b'[key=api-shape]' in p.stdout and b'[key=anchor]' in p.stdout and rows and int(rows[-1][1])==len(original),{'log_bytes':len(original),'sha256':initial_sha,'read_probe':rows,'wall_seconds':t,'stdout':'drain-bootstrap.stdout','checkpoint':'checkpoints/bootstrap/.synthetic-secondmate.open-decisions-cursor'})
+    before=len(rows); checkpoint_before=cursor.read_bytes()
+    p,t=run('drain-unchanged',drain,env); state_copy('unchanged',h)
+    record('real drain unchanged reuses checkpoint',p.returncode==0 and b'[key=api-shape]' in p.stdout and len(probe_rows(probe))==before and cursor.read_bytes()==checkpoint_before,{'additional_probe_rows':len(probe_rows(probe))-before,'wall_seconds':t,'stdout':'drain-unchanged.stdout','checkpoint_unchanged':cursor.read_bytes()==checkpoint_before})
+    appended=b'working: short appended increment\nnote: visible appended awareness\n'
+    with status.open('ab') as f:f.write(appended)
+    save('logs/lifecycle-append.bytes',appended)
+    p,t=run('drain-append',drain,env); state_copy('append',h)
+    record('real drain append reads only exact new bytes',p.returncode==0 and b'[key=api-shape]' in p.stdout and b'visible appended awareness' in p.stdout and int(probe_rows(probe)[-1][1])==len(appended),{'appended_bytes':len(appended),'probe_bytes':int(probe_rows(probe)[-1][1]),'stdout':'drain-append.stdout'})
+    resolution=b'resolved [key=api-shape]: REST chosen\n'+b''.join((f'working: resolution buried under later line {i}\n').encode() for i in range(25))
+    with status.open('ab') as f:f.write(resolution)
+    save('logs/lifecycle-resolution.bytes',resolution)
+    p,t=run('drain-buried-resolution',drain,env); state_copy('resolution',h)
+    cp=cursor.read_bytes(); final_log=status.read_bytes(); save('logs/lifecycle-final.status',final_log)
+    record('real drain buried resolution compacts open set only',p.returncode==0 and b'[key=api-shape]' not in p.stdout and b'[key=anchor]' in p.stdout and b'api-shape\t' not in cp and b'closed-' not in cp and b'anchor\tblocked\t' in cp and final_log.startswith(original) and len(final_log)==len(original)+len(appended)+len(resolution) and int(probe_rows(probe)[-1][1])==len(resolution),{'log_bytes':len(final_log),'original_log_preserved':final_log.startswith(original),'resolution_increment_bytes':len(resolution),'probe_bytes':int(probe_rows(probe)[-1][1]),'checkpoint_bytes':len(cp),'stdout':'drain-buried-resolution.stdout'})
+    # Loaded Bash process; only the function itself is inside the builtin time block.
+    bench=F/'loaded-warm-bench.sh'
+    bench.write_text('''#!/bin/bash
+. "$1/bin/fm-classify-lib.sh"
+TIMEFORMAT='%R'
+printf '%s\\n' "$$" > "$3/loaded-bash.pid"
+for func in status_open_decisions_incremental status_open_decisions; do
+  for sample in 1 2 3 4 5 6 7; do
+    { time "$func" "$2" > "$3/${func}-${sample}.output"; } 2> "$3/${func}-${sample}.seconds"
+    printf '%s\\n' "$?" > "$3/${func}-${sample}.rc"
+  done
+done
+''')
+    bd=E/'warm-benchmark'; bd.mkdir()
+    save('warm-benchmark/command-source.txt',bench.read_bytes())
+    p,t=run('warm-benchmark', ['/bin/bash',str(bench),str(ROOT),str(status),str(bd)],env)
+    samples=[]
+    for func in ('status_open_decisions_incremental','status_open_decisions'):
+        for n in range(1,8):
+            seconds=float((bd/f'{func}-{n}.seconds').read_text().strip()); out=(bd/f'{func}-{n}.output').read_text(); rc=int((bd/f'{func}-{n}.rc').read_text())
+            samples.append({'function':func,'sample':n,'seconds':seconds,'exit_code':rc,'output':out,'output_file':str(bd/f'{func}-{n}.output')})
+    benchmark={'method':'Bash builtin time TIMEFORMAT=%R, functions called in one already-loaded /bin/bash process; no library sourcing or interpreter startup in measured block','loaded_bash_pid':(bd/'loaded-bash.pid').read_text().strip(),'log_bytes':len(final_log),'log_sha256':hashlib.sha256(final_log).hexdigest(),'samples':samples,'acceptance_seconds':1.0}
+    save('benchmark.json',json.dumps(benchmark,indent=2))
+    record('warm loaded Bash incremental and read-only folds under one second',p.returncode==0 and all(s['seconds']<1 and s['exit_code']==0 and s['output']=='anchor\tblocked\tindependent decision remains open' for s in samples),{'samples_per_function':7,'maximum_seconds':max(s['seconds'] for s in samples),'benchmark':'benchmark.json'})
+    ah=home('adversarial'); ap=E/'adversarial-read-probe.tsv'; ae=env_for(ah,ap)
+    af=ah/'state'/'adversarial.status'; ac=ah/'state'/'.adversarial.open-decisions-cursor'; (af.with_suffix('.meta')).write_text('kind=secondmate\n')
+    def adversarial(name,expected,expected_bytes):
+        p,t=run('drain-'+name,drain,ae); state_copy(name,ah)
+        save('logs/'+name+'.status',af.read_bytes())
+        pr=probe_rows(ap); actual=int(pr[-1][1]) if pr else None
+        ok=p.returncode==0 and expected.encode() in p.stdout and actual==expected_bytes
+        record(name,ok,{'log_bytes':af.stat().st_size,'expected_fold_bytes':expected_bytes,'probe_bytes':actual,'stdout':'drain-'+name+'.stdout','wall_seconds':t})
+    af.write_bytes(b'needs-decision [key=old]: old declaration\nworking: '+b'x'*170+b'\n')
+    adversarial('replacement-bootstrap','[key=old]',af.stat().st_size)
+    same_size=af.stat().st_size; old_inode=af.stat().st_ino
+    text=b'needs-decision [key=new]: replacement declaration\n'; replacement=text+b'working: '+b'z'*(same_size-len(text)-len(b'working: \n'))+b'\n'
+    repl=ah/'replacement'; repl.write_bytes(replacement); repl.replace(af)
+    new_inode=af.stat().st_ino
+    adversarial('same-size-new-inode-replacement','[key=new]',len(replacement))
+    results[-1]['details'].update({'old_inode':old_inode,'new_inode':new_inode,'same_size':len(replacement)==same_size})
+    af.write_bytes(b'needs-decision [key=shrink]: shrunk declaration\n')
+    adversarial('same-inode-shrink','[key=shrink]',af.stat().st_size)
+    partial=b'needs-decision [key=partial]: unfinished'; af.write_bytes(partial)
+    adversarial('unfinished-line-initial','unfinished',len(partial))
+    completion=b' completed accurately\n'; af.open('ab').write(completion)
+    adversarial('unfinished-line-completion-rebuild','unfinished completed accurately',len(partial)+len(completion))
+    results[-1]['result']='pass' if results[-1]['result']=='pass' and b'partial\tneeds-decision\tunfinished completed accurately' in ac.read_bytes() else 'FAIL'
+    ac.write_bytes(b'version=corrupt\noffset=not-a-number\nident=broken\nphantom\tblocked\tphantom\n'); save('checkpoints/corrupted-before',ac.read_bytes())
+    adversarial('corrupted-checkpoint-clean-rebuild','unfinished completed accurately',af.stat().st_size)
+    results[-1]['result']='pass' if results[-1]['result']=='pass' and b'phantom' not in ac.read_bytes() else 'FAIL'
+    # Source library execution, locale invalidation and golden equality in one Bash process.
+    lh=home('library-cases'); lp=E/'library-read-probe.tsv'; le=env_for(lh,lp)
+    locale_status=lh/'state'/'locale.status'; locale_status.write_bytes('needs-decision [key=utf8]: décision café\nworking: stable\n'.encode()); locale_status.with_suffix('.meta').write_text('kind=secondmate\n')
+    golden_prefix=('needs-decision corr=0123456789abcdef [key=alpha]: first\nblocked [key=beta]: retained\nresolved [key=alpha]: answered\nneeds-decision [key=held]: transfer\ncaptain-held [key=held]: durable transfer\nneeds-decision [key=pending-reply-abcd]: pending-reply-missed: response absent\nresolved [key=pending-reply-abcd]: unrelated must not clear\nneeds-decision malformed=token [key=phantom]: ignored\ndone: terminal declaration\nneeds-decision: [key=gamma] after terminal\nfailed: terminal failure\n').encode()
+    golden_tail=b'needs-decision [key=delta]: final open\nworking: unrelated latest\n'
+    for kind in ('ship','scout','secondmate'):
+        q=lh/'state'/f'golden-{kind}.status'; q.write_bytes(golden_prefix); q.with_suffix('.meta').write_text('kind='+kind+'\n')
+        save('logs/golden-'+kind+'-prefix.status',golden_prefix); save('logs/golden-'+kind+'-tail.bytes',golden_tail)
+    library=F/'library-cases.sh'; ld=E/'library-cases'; ld.mkdir()
+    library.write_text('''#!/bin/bash
+. "$1/bin/fm-classify-lib.sh"
+s=$2; e=$3
+for loc in C en_US.UTF-8 C; do
+  i=$(( ${i:-0} + 1 ))
+  export LC_ALL=$loc
+  status_open_decisions_incremental "$s/locale.status" > "$e/locale-$i.output"
+  cp "$s/.locale.open-decisions-cursor" "$e/locale-$i.checkpoint"
+  status_open_decisions "$s/locale.status" > "$e/locale-$i.readonly-output"
+done
+for kind in ship scout secondmate; do
+  f="$s/golden-$kind.status"; c="$s/.golden-$kind.open-decisions-cursor"
+  status_open_decisions_incremental "$f" > "$e/golden-$kind-prefix.output"
+  printf 'needs-decision [key=delta]: final open\\nworking: unrelated latest\\n' >> "$f"
+  cp "$c" "$e/golden-$kind-before.checkpoint"
+  status_open_decisions "$f" > "$e/golden-$kind-seeded.output"
+  cp "$c" "$e/golden-$kind-after.checkpoint"
+  mv "$c" "$c.saved"
+  status_open_decisions "$f" > "$e/golden-$kind-unseeded.output"
+  mv "$c.saved" "$c"
+done
+# Carry preserves the live checkpoint; append after its endpoint exercises a seeded tail read.
+f="$s/golden-secondmate.status"
+ident=$(_fm_open_decisions_file_ident "$f")
+cp "$f" "$s/captured.status"
+printf 'kind=secondmate\\n' > "$s/captured.meta"
+cp "$s/.golden-secondmate.open-decisions-cursor" "$e/carry-live-before.checkpoint"
+status_open_decisions_checkpoint_carry "$f" "$s/captured.status" "$ident"
+cp "$s/.golden-secondmate.open-decisions-cursor" "$e/carry-live-after.checkpoint"
+cp "$s/.captured.open-decisions-cursor" "$e/carry-copy-before.checkpoint"
+status_open_decisions "$s/captured.status" > "$e/carry-copy-seeded.output"
+cp "$s/.captured.open-decisions-cursor" "$e/carry-copy-after.checkpoint"
+mv "$s/.captured.open-decisions-cursor" "$s/.captured.open-decisions-cursor.saved"
+status_open_decisions "$s/captured.status" > "$e/carry-copy-unseeded.output"
+mv "$s/.captured.open-decisions-cursor.saved" "$s/.captured.open-decisions-cursor"
+status_open_decisions "$f" > "$e/carry-live-readonly.output"
+cp "$s/.golden-secondmate.open-decisions-cursor" "$e/carry-live-readonly-after.checkpoint"
+''')
+    save('library-cases/command-source.txt',library.read_bytes())
+    p,t=run('library-cases',['/bin/bash',str(library),str(ROOT),str(lh/'state'),str(ld)],le)
+    pr=[r for r in probe_rows(lp) if r[0]==str(locale_status)]
+    loc_outputs=[(ld/f'locale-{i}.output').read_bytes() for i in (1,2,3)]
+    loc_checkpoints=[(ld/f'locale-{i}.checkpoint').read_text().splitlines()[0] for i in (1,2,3)]
+    record('locale C to installed en_US.UTF-8 to C invalidates and refolds',p.returncode==0 and len(pr)==3 and all(int(r[1])==locale_status.stat().st_size for r in pr) and len(set(loc_outputs))==1 and all((ld/f'locale-{i}.readonly-output').read_bytes()==loc_outputs[i-1] for i in (1,2,3)) and 'ctype=C:collate=C' in loc_checkpoints[0] and 'ctype=en_US.UTF-8:collate=en_US.UTF-8' in loc_checkpoints[1] and loc_checkpoints[2]==loc_checkpoints[0],{'log_bytes':locale_status.stat().st_size,'probe_rows':pr,'checkpoint_versions':loc_checkpoints,'outputs':'library-cases/locale-*.output'})
+    for kind in ('ship','scout','secondmate'):
+        seeded=(ld/f'golden-{kind}-seeded.output').read_bytes(); unseeded=(ld/f'golden-{kind}-unseeded.output').read_bytes()
+        expected=b'delta\tneeds-decision\tfinal open\n'
+        if kind=='secondmate':expected=b'beta\tblocked\tretained\npending-reply-abcd\tneeds-decision\tpending-reply-missed: response absent\n'+expected
+        same_cp=(ld/f'golden-{kind}-before.checkpoint').read_bytes()==(ld/f'golden-{kind}-after.checkpoint').read_bytes()
+        record('golden '+kind+' seeded versus unseeded exact equality',p.returncode==0 and seeded==unseeded and seeded.rstrip(b'\n')==expected.rstrip(b'\n') and same_cp,{'seeded_output':seeded.decode(),'unseeded_output':unseeded.decode(),'read_only_checkpoint_unchanged':same_cp,'evidence':'library-cases/golden-'+kind+'-*'})
+    live_before=(ld/'carry-live-before.checkpoint').read_bytes(); copy_before=(ld/'carry-copy-before.checkpoint').read_bytes(); seeded=(ld/'carry-copy-seeded.output').read_bytes()
+    record('snapshot checkpoint carry and read-only no mutation',p.returncode==0 and live_before==(ld/'carry-live-after.checkpoint').read_bytes()==(ld/'carry-live-readonly-after.checkpoint').read_bytes() and copy_before==(ld/'carry-copy-after.checkpoint').read_bytes() and seeded==(ld/'carry-copy-unseeded.output').read_bytes()==(ld/'carry-live-readonly.output').read_bytes() and live_before!=copy_before,{'live_checkpoint_unchanged':live_before==(ld/'carry-live-readonly-after.checkpoint').read_bytes(),'captured_checkpoint_unchanged':copy_before==(ld/'carry-copy-after.checkpoint').read_bytes(),'captured_identity_differs':live_before!=copy_before,'output':seeded.decode(),'evidence':'library-cases/carry-*'})
+    results.append({'scenario':'private d7 corpus parity/performance','live':False,'result':'untested','reason':'Private d7 log not available/provided; generated synthetic secondmate log used as explicit surrogate. No operator private records accessed.'})
+except Exception as ex:
+    save('driver-exception.txt',traceback.format_exc())
+    results.append({'scenario':'driver completion','live':False,'result':'FAIL','reason':str(ex)})
+finally:
+    save('commands.json',json.dumps(commands,indent=2))
+    shutil.rmtree(F)
+    pathlib.Path(__file__).unlink()
+    save('cleanup.json',json.dumps({'fixture_directory_removed':not F.exists(),'throwaway_driver_removed':not pathlib.Path(__file__).exists(),'production_edits':False},indent=2))
+    save('scenarios.json',json.dumps(results,indent=2))
+    print(json.dumps({'evidence':str(E),'scenarios':results,'commands':'commands.json','cleanup':'cleanup.json'},indent=2))

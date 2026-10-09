@@ -1,0 +1,4 @@
+beta	blocked	retained
+pending-reply-abcd	needs-decision	pending-reply-missed: response absent
+gamma	needs-decision	after terminal
+delta	needs-decision	final open

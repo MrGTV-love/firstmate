@@ -1,0 +1,36 @@
+{
+  "scope": "Checkpoint-only fold, F8, F10; captain-split restart/race work excluded",
+  "runtimeVersions": {
+    "omp": "18.8.1",
+    "pi": "1.0.2"
+  },
+  "productEvidence": [
+    "Real wake-drain growth/resolution and adversarial checkpoint invalidation",
+    "1,406,009-byte synthetic log; fourteen loaded production fold timings: 0.018-0.034 seconds",
+    "Real CLI C -> C.UTF-8 -> C with EM SPACE: default -> api -> default; 41 bytes refolded each time",
+    "Real seeded/unseeded drain equality for ship, scout and secondmate",
+    "Real fleet snapshot --json in private tmux preserves four secondmate decisions and live checkpoint",
+    "Real omp: duplicate factories retain one arm, missing successor self-heals, shutdown/start avoids double arm",
+    "Real omp advisor tail and retained context: recovery/status wakes start real turns and invoke wake-drain while draft remains unsent",
+    "Real omp lifecycle rotation and frozen-child shutdown expiry",
+    "Real Pi CLI: duplicate entries, three reloads, failed reload retains handoff marker and logs successor-missing",
+    "Real omp arm readiness 12000ms, host readiness 30000ms, unready retirement 1000ms",
+    "Real Pi arm readiness 12000ms, unready retirement 1000ms, Ctrl-D shutdown retirement 1000ms"
+  ],
+  "targetedChecks": "targeted-check-ledger.json; all final selectors and exhaustive golden task-kind shards passed",
+  "workarounds": [
+    "Vendor TypeBox loading required disposable top-level production extension copy with only lifecycle-event injection seam",
+    "Short marked fm-lab homes and private 120x40 tmux sockets",
+    "Stock-layout shell gateway removes extension-generated overrides; no gate-refusal bypass",
+    "SDK-only Pi attempt did not complete; genuine Pi CLI did",
+    "Final CLIs selected isolated local lab/m1 provider instead of ambient provider that returned quota error",
+    "Corrected disposable one-shot PID, stopped-child TERM and log-newline-window oracles",
+    "Monolithic golden selector exceeded 300s command deadline; identical assertions passed task-kind shards without reducing offsets or changing product bounds",
+    "Snapshot home-input correctly excludes secondmates; final projection proof used --json"
+  ],
+  "visualEvidence": "PNG screenshots of exact captured ANSI grids, with raw ANSI and rendered HTML; not native desktop screenshots or reconstructed mock UI",
+  "limitation": "Private d7 corpus/RCA report absent; larger synthetic surrogate driven live",
+  "cleanup": "final-cleanup.json verifies no matching owned product processes and all created worktree fixtures/local dependencies/test runners removed; lab homes removed by driver finally blocks",
+  "phaseBoundary": "No full repository suite, lint/format/static analysis, pipeline control, push, PR or CI; no retained production/source edits",
+  "evidenceWriteNote": "Specialized write returned Internal error twice without creating ledger; reported tool issue and used existing Node evidence-writing route"
+}

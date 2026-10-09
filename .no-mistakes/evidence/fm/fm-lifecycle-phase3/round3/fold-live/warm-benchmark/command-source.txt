@@ -1,0 +1,10 @@
+#!/bin/bash
+. "$1/bin/fm-classify-lib.sh"
+TIMEFORMAT='%R'
+printf '%s\n' "$$" > "$3/loaded-bash.pid"
+for func in status_open_decisions_incremental status_open_decisions; do
+  for sample in 1 2 3 4 5 6 7; do
+    { time "$func" "$2" > "$3/${func}-${sample}.output"; } 2> "$3/${func}-${sample}.seconds"
+    printf '%s\n' "$?" > "$3/${func}-${sample}.rc"
+  done
+done

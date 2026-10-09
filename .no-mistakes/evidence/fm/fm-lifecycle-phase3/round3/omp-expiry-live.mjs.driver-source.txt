@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync,cpSync} from 'node:fs';
+import {join} from 'node:path';import {spawnSync} from 'node:child_process';import {createServer} from 'node:http';
+const root=process.cwd(), evidence=process.env.FM_TEST_EVIDENCE, work=join(root,'.phase3-live/omp-expiry');mkdirSync(work,{recursive:true});
+const home=mkdtempSync(join(process.env.TMPDIR||'/tmp','fm-lab.')), agent=join(work,'agent');mkdirSync(agent,{recursive:true});
+const run=(cmd,args,extra={})=>{const r=spawnSync(cmd,args,{cwd:root,env:env,encoding:'utf8',...extra});if(r.status!==0)throw new Error(`${cmd} ${args.join(' ')}: ${r.stderr}${r.stdout}`);return r.stdout.trimEnd()};
+const env={...process.env};for(const key of ['NO_MISTAKES_GATE','FM_GATE_REFUSE_BYPASS','FM_ROOT_OVERRIDE','FM_STATE_OVERRIDE','FM_DATA_OVERRIDE','FM_CONFIG_OVERRIDE','FM_PROJECTS_OVERRIDE','FM_HOME','TMUX','HERDR_ENV','HERDR_PANE_ID','HERDR_SESSION','HERDR_SOCKET_PATH'])delete env[key];
+run('bin/fm-lab-home.sh',['create',home]);mkdirSync(join(home,'tmux'));
+writeFileSync(join(home,'config/x-mode.env'),'unset FM_ROOT_OVERRIDE FM_CONFIG_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE\n');
+Object.assign(env,{FM_HOME:home,TMUX_TMPDIR:join(home,'tmux'),PI_CODING_AGENT_DIR:agent,OMP_SKIP_SETUP:'1',FM_POLL:'1',FM_SIGNAL_GRACE:'0',FM_HEARTBEAT:'600'});
+env.PATH=join(root,'.phase3-live/stock-bash')+':'+env.PATH;
+const observations=[], requests=[], ownedFrozen=new Set();let advised=false;
+const texts=m=>typeof m.content==='string'?m.content:Array.isArray(m.content)?m.content.filter(p=>p.type==='text').map(p=>p.text).join(' '):'';
+const server=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;const payload=JSON.parse(raw||'{}');const messages=payload.messages||[];const toolnames=(payload.tools||[]).map(t=>t.function?.name);const advise=!advised&&toolnames.includes('advise')&&messages.some(m=>texts(m).includes('LIVE-ADVISE'));advised ||= advise;requests.push({at:new Date().toISOString(),advise,user:messages.filter(m=>m.role==='user').map(texts),hasAdvisorNote:messages.some(m=>texts(m).includes('LIVE-ADVISOR-NOTE'))});const delta=advise?{role:'assistant',tool_calls:[{index:0,id:'call_live_advisor',type:'function',function:{name:'advise',arguments:JSON.stringify({note:'LIVE-ADVISOR-NOTE verify before finishing.',severity:'concern'})}}]}:{role:'assistant',content:'ack'};res.writeHead(200,{'content-type':'text/event-stream'});const base={id:'lab',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'m1'};for(const d of [delta,{}])res.write('data: '+JSON.stringify({...base,choices:[{index:0,delta:d,finish_reason:Object.keys(d).length?null:advise?'tool_calls':'stop'}]})+'\n\n');res.end('data: [DONE]\n\n');});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));
+writeFileSync(join(agent,'config.yml'),'setupVersion: 2\nmodelRoles:\n  default: lab/m1\n  tiny: lab/m1\n  advisor: lab/m1\nadvisor:\n  enabled: true\n');
+writeFileSync(join(agent,'models.yml'),`providers:\n  lab:\n    baseUrl: http://127.0.0.1:${server.address().port}/v1\n    apiKey: lab-key\n    api: openai-completions\n    models:\n      - id: m1\n        contextWindow: 200000\n        maxTokens: 4096\n`);
+const wrapper=join(work,'.omp/extensions/fm-primary-omp-watch.ts'), duplicate=join(work,'duplicate.ts');
+writeFileSync(duplicate,`export {default} from './.omp/extensions/fm-primary-omp-watch.ts';\n`);
+const tmux=(...args)=>run('tmux',['-L','fm-lab',...args]);
+const screen=()=>tmux('capture-pane','-p','-t','primary');
+const saveScreen=name=>{writeFileSync(join(evidence,name+'.txt'),screen());writeFileSync(join(evidence,name+'.ansi'),tmux('capture-pane','-p','-e','-t','primary'));};
+const logPath=join(home,'state/extensions/omp-primary-watch/lifecycle.log');const log=()=>existsSync(logPath)?readFileSync(logPath,'utf8'):'';
+const pid=()=>{try{return Number(readFileSync(join(home,'state/.watch.lock/pid'),'utf8').trim())}catch{return 0}};
+const alive=p=>{if(!p)return false;try{process.kill(p,0);return true}catch{return false}};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));async function waitFor(fn,label,ms=90000){for(let n=0;n<ms/100;n++){if(fn())return;await sleep(100)}throw new Error(`timeout: ${label}\n${screen()}\n${log()}`)}
+async function command(text){tmux('send-keys','-t','primary','C-u');tmux('send-keys','-t','primary','-l',text);tmux('send-keys','-t','primary','Enter');await sleep(700)}
+const processRows=()=>run('ps',['-axo','pid=,ppid=,command=']).split('\n').map(l=>{const m=l.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);return m?{pid:+m[1],ppid:+m[2],command:m[3]}:null}).filter(Boolean);
+let started=false;
+try{
+ tmux('new-session','-d','-s','primary','-x','120','-y','40','-c',root,'-e',`FM_HOME=${home}`,`env PATH='${env.PATH}' omp --no-session --no-extensions --no-skills --no-rules --no-lsp --no-title --auto-approve --model lab/m1 --thinking off -e '${wrapper}'`);started=true;
+ await waitFor(()=>existsSync(join(home,'state/.omp-watch-extension-loaded'))&&alive(pid()),'real initial watcher');await sleep(2500);
+ writeFileSync(join(home,'config/x-mode.env'),'unset FM_ROOT_OVERRIDE FM_CONFIG_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE\nif [ -f "$FM_HOME/state/pause-start" ]; then rm "$FM_HOME/state/pause-start"; printf "%s\\n" "$$" > "$FM_HOME/state/paused-start-pid"; trap "" TERM; kill -STOP "$$"; fi\n');
+ for(const mode of ['arm','host']){
+  if(mode==='host')writeFileSync(join(home,'config/supervision-host'),'');
+  const before=log().trimEnd().split('\n').length, requestBefore=requests.length;
+  writeFileSync(join(home,'state/pause-start'),'');writeFileSync(join(home,`state/expiry-${mode}.meta`),'kind=secondmate\n');writeFileSync(join(home,`state/expiry-${mode}.status`),`needs-decision [key=expiry-${mode}]: real readiness expiry wake\n`);
+  await waitFor(()=>existsSync(join(home,'state/paused-start-pid')),mode+' startup process freeze',20000);
+  const frozen=Number(readFileSync(join(home,'state/paused-start-pid'),'utf8').trim());ownedFrozen.add(frozen);
+  const rows=()=>log().split('\n').slice(before);await waitFor(()=>rows().some(l=>l.includes('waited-on=unready-arm-close')),mode+' readiness and retirement expiry',55000);
+  const readiness=rows().filter(l=>l.includes('waited-on='+ (mode==='host'?'supervision-host-readiness':'arm-readiness'))), retirement=rows().filter(l=>l.includes('waited-on=unready-arm-close'));
+  assert.equal(readiness.length,1);assert.match(readiness[0],new RegExp('waiter=omp-watch-extension.*bound='+ (mode==='host'?30000:12000)+'ms.*actual=\\d+ms'));assert.equal(retirement.length,1);assert.match(retirement[0],/bound=1000ms.*actual=\d+ms/);
+  await waitFor(()=>requests.slice(requestBefore).some(r=>r.user.some(t=>t.includes('unready successor arm did not exit within 1000ms'))),'failure wake rendered to actual model');
+  observations.push({scenario:mode+' default readiness and retirement expiry',frozen,readiness,retirement,modelSawFailure:true});saveScreen('omp-'+mode+'-default-expiry');
+  process.kill(frozen,'SIGKILL');ownedFrozen.delete(frozen);rmSync(join(home,'state/paused-start-pid'),{force:true});
+  if(mode==='arm'){writeFileSync(join(home,`state/expiry-${mode}.status`),`resolved [key=expiry-${mode}]: settled\n`);run('bin/fm-wake-drain.sh',[]);await command('/lab-with-start');await waitFor(()=>alive(pid()),'new ready watcher');await sleep(2500)}
+ }
+ console.log(JSON.stringify(observations,null,2));
+}finally{
+ writeFileSync(join(evidence,'omp-default-expiry-observations.json'),JSON.stringify(observations,null,2)+'\n');writeFileSync(join(evidence,'omp-default-expiry-model-requests.json'),JSON.stringify(requests,null,2)+'\n');writeFileSync(join(evidence,'omp-default-expiry-lifecycle.log'),log());
+ if(started){try{saveScreen('omp-default-expiry-terminal')}catch{}try{tmux('kill-server')}catch{}}for(const p of ownedFrozen){try{process.kill(p,'SIGKILL')}catch{}}try{run('bin/fm-watch-arm.sh',['--stop'])}catch{}
+ await new Promise(r=>server.close(r));rmSync(home,{recursive:true,force:true});
+}

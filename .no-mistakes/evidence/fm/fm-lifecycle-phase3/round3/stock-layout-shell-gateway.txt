@@ -1,0 +1,12 @@
+#!/bin/bash
+# Disposable gate fixture: carry only the marked home's stock layout into real
+# scripts. Never bypass gate refusal or replace a Firstmate implementation.
+if [ "${1:-}" != -lc ]; then
+  for name in "${!FM_@}"; do
+    case "$name" in *_OVERRIDE) unset "$name" ;; esac
+  done
+  if [ -n "${FM_HOME:-}" ] && [ -f "$FM_HOME/.fm-lab-home" ]; then
+    printf 'shell-gateway pid=%s script=%s\n' "$$" "${1:-}" >> "$FM_HOME/state/shell-gateway.log"
+  fi
+fi
+exec /bin/bash "$@"

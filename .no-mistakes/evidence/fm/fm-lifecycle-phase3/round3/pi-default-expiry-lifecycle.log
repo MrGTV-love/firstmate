@@ -1,0 +1,7 @@
+2026-10-09T12:49:11.069Z pid=7957 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T12:49:11.070Z pid=7957 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T12:49:11.070Z pid=7957 instance=1 event=factory-bind generation=1
+2026-10-09T12:49:11.894Z pid=7957 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T12:49:11.895Z pid=7957 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T12:50:00.678Z pid=7957 instance=1 event=bound-expired waiter=pi-watch-extension waited-on=arm-readiness bound=12000ms actual=12002ms
+2026-10-09T12:50:01.681Z pid=7957 instance=1 event=bound-expired waiter=pi-watch-extension waited-on=unready-arm-close bound=1000ms actual=1003ms

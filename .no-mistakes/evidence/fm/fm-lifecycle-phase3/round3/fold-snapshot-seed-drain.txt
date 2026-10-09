@@ -1,0 +1,6 @@
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=beta] blocked: retained
+task [key=pending-reply-abcd] needs-decision: pending-reply-missed: response absent
+task [key=gamma] needs-decision: after terminal
+task [key=delta] needs-decision: final open
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

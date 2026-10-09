@@ -1,0 +1,35 @@
+[
+  {
+    "scenario": "actual ship seeded and unseeded drain equivalence",
+    "keys": [
+      "delta"
+    ],
+    "rows": [
+      "task [key=delta] needs-decision: final open"
+    ]
+  },
+  {
+    "scenario": "actual scout seeded and unseeded drain equivalence",
+    "keys": [
+      "delta"
+    ],
+    "rows": [
+      "task [key=delta] needs-decision: final open"
+    ]
+  },
+  {
+    "scenario": "actual secondmate seeded and unseeded drain equivalence",
+    "keys": [
+      "beta",
+      "delta",
+      "gamma",
+      "pending-reply-abcd"
+    ],
+    "rows": [
+      "task [key=beta] blocked: retained",
+      "task [key=delta] needs-decision: final open",
+      "task [key=gamma] needs-decision: after terminal",
+      "task [key=pending-reply-abcd] needs-decision: pending-reply-missed: response absent"
+    ]
+  }
+]

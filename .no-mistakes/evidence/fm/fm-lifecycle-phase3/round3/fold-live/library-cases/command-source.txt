@@ -1,0 +1,37 @@
+#!/bin/bash
+. "$1/bin/fm-classify-lib.sh"
+s=$2; e=$3
+for loc in C en_US.UTF-8 C; do
+  i=$(( ${i:-0} + 1 ))
+  export LC_ALL=$loc
+  status_open_decisions_incremental "$s/locale.status" > "$e/locale-$i.output"
+  cp "$s/.locale.open-decisions-cursor" "$e/locale-$i.checkpoint"
+  status_open_decisions "$s/locale.status" > "$e/locale-$i.readonly-output"
+done
+for kind in ship scout secondmate; do
+  f="$s/golden-$kind.status"; c="$s/.golden-$kind.open-decisions-cursor"
+  status_open_decisions_incremental "$f" > "$e/golden-$kind-prefix.output"
+  printf 'needs-decision [key=delta]: final open\nworking: unrelated latest\n' >> "$f"
+  cp "$c" "$e/golden-$kind-before.checkpoint"
+  status_open_decisions "$f" > "$e/golden-$kind-seeded.output"
+  cp "$c" "$e/golden-$kind-after.checkpoint"
+  mv "$c" "$c.saved"
+  status_open_decisions "$f" > "$e/golden-$kind-unseeded.output"
+  mv "$c.saved" "$c"
+done
+# Carry preserves the live checkpoint; append after its endpoint exercises a seeded tail read.
+f="$s/golden-secondmate.status"
+ident=$(_fm_open_decisions_file_ident "$f")
+cp "$f" "$s/captured.status"
+printf 'kind=secondmate\n' > "$s/captured.meta"
+cp "$s/.golden-secondmate.open-decisions-cursor" "$e/carry-live-before.checkpoint"
+status_open_decisions_checkpoint_carry "$f" "$s/captured.status" "$ident"
+cp "$s/.golden-secondmate.open-decisions-cursor" "$e/carry-live-after.checkpoint"
+cp "$s/.captured.open-decisions-cursor" "$e/carry-copy-before.checkpoint"
+status_open_decisions "$s/captured.status" > "$e/carry-copy-seeded.output"
+cp "$s/.captured.open-decisions-cursor" "$e/carry-copy-after.checkpoint"
+mv "$s/.captured.open-decisions-cursor" "$s/.captured.open-decisions-cursor.saved"
+status_open_decisions "$s/captured.status" > "$e/carry-copy-unseeded.output"
+mv "$s/.captured.open-decisions-cursor.saved" "$s/.captured.open-decisions-cursor"
+status_open_decisions "$f" > "$e/carry-live-readonly.output"
+cp "$s/.golden-secondmate.open-decisions-cursor" "$e/carry-live-readonly-after.checkpoint"

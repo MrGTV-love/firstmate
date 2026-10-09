@@ -1,0 +1,123 @@
+[
+  {
+    "scenario": "duplicate entrypoints retain one live arm",
+    "primary": 47750,
+    "watcher": 60985,
+    "arms": [
+      {
+        "pid": 60558,
+        "ppid": 47750,
+        "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.phase3-live/omp/bin/fm-watch-arm.sh --restart"
+      }
+    ]
+  },
+  {
+    "scenario": "shutdown without successor self-heals",
+    "predecessor": 60985,
+    "successor": 21120,
+    "expiry": [
+      "2026-10-09T12:45:15.855Z pid=47750 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=session_start bound=15000ms actual=15001ms outcome=self-heal"
+    ]
+  },
+  {
+    "scenario": "shutdown then start never double arms",
+    "predecessor": 21120,
+    "initialSuccessor": 36035,
+    "currentWatcher": 54832,
+    "activeArms": [
+      {
+        "pid": 54365,
+        "ppid": 47750,
+        "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.phase3-live/omp/bin/fm-watch-arm.sh --restart"
+      }
+    ]
+  },
+  {
+    "scenario": "recovered idle wake behind advisor tail preserves draft",
+    "wakeRequests": [
+      {
+        "at": "2026-10-09T12:46:14.113Z",
+        "advise": false,
+        "drain": true,
+        "user": [
+          "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B'. Do not repeat this information in your reply.\n</system-reminder> ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+          "<system-notice>\nUser interjection during work: priority; supersedes conflicting prior instructions. Re-read; ensure current work reflects user intent.\n</system-notice>\nLIVE-ADVISE reply ack",
+          "<advisory severity=\"concern\" guidance=\"weigh, don't blindly obey\">\nLIVE-ADVISOR-NOTE verify before finishing.\n</advisory>",
+          "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+        ],
+        "hasAdvisorNote": true
+      },
+      {
+        "at": "2026-10-09T12:46:19.456Z",
+        "advise": false,
+        "drain": false,
+        "user": [
+          "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B'. Do not repeat this information in your reply.\n</system-reminder> ### Session update\n\n**user**:\n⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.\n",
+          "**agent**:\n→ bash(bin/fm-wake-drain.sh) ⇒ ok · 5 lines\nTool result:\n```text\n1791549898\t1\tcheck\topen-loop-ledger\tcheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36035.1791549922.dCJnJ5\n\n\nWall time: 9.24 seconds\n```\n\n\n---\n\n[in progress — more steps follow]",
+          "### Session update\n\n**agent**:\nack\n",
+          "### Session update\n\n**user**:\nLIVE-ADVISE reply ack\n",
+          "**agent**:\nack\n",
+          "### Session update\n\n**user**:\n⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.\n",
+          "**agent**:\n→ bash(bin/fm-wake-drain.sh) ⇒ ok · 16 lines\nTool result:\n```text\n1791549898\t1\tcheck\topen-loop-ledger\tcheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36035.1791549922.dCJnJ5\nOPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nlive-wake [key=live-recovered] needs-decision: prove recovered wake\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n●  WATCHER DOWN - SUPERVISION IS OFF\n●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).\n●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n●  This is a supervision warning only; the guarded operation WILL still run.\n●  After draining queued wakes, source '/Users/charlesabrooker/tmp/fm-lab.hcuQK0/config/x-mode.env' first, then repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n\n\nWall time: 5.31 seconds\n```\n\n\n---\n\n[in progress — more steps follow]"
+        ],
+        "hasAdvisorNote": false
+      },
+      {
+        "at": "2026-10-09T12:46:19.460Z",
+        "advise": false,
+        "drain": false,
+        "user": [
+          "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B'. Do not repeat this information in your reply.\n</system-reminder> ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+          "<system-notice>\nUser interjection during work: priority; supersedes conflicting prior instructions. Re-read; ensure current work reflects user intent.\n</system-notice>\nLIVE-ADVISE reply ack",
+          "<advisory severity=\"concern\" guidance=\"weigh, don't blindly obey\">\nLIVE-ADVISOR-NOTE verify before finishing.\n</advisory>",
+          "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+        ],
+        "hasAdvisorNote": true
+      },
+      {
+        "at": "2026-10-09T12:46:19.675Z",
+        "advise": false,
+        "drain": false,
+        "user": [
+          "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B'. Do not repeat this information in your reply.\n</system-reminder> ### Session update\n\n**user**:\n⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.\n",
+          "**agent**:\n→ bash(bin/fm-wake-drain.sh) ⇒ ok · 5 lines\nTool result:\n```text\n1791549898\t1\tcheck\topen-loop-ledger\tcheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36035.1791549922.dCJnJ5\n\n\nWall time: 9.24 seconds\n```\n\n\n---\n\n[in progress — more steps follow]",
+          "### Session update\n\n**agent**:\nack\n",
+          "### Session update\n\n**user**:\nLIVE-ADVISE reply ack\n",
+          "**agent**:\nack\n",
+          "### Session update\n\n**user**:\n⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.\n",
+          "**agent**:\n→ bash(bin/fm-wake-drain.sh) ⇒ ok · 16 lines\nTool result:\n```text\n1791549898\t1\tcheck\topen-loop-ledger\tcheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36035.1791549922.dCJnJ5\nOPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\nlive-wake [key=live-recovered] needs-decision: prove recovered wake\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n●  WATCHER DOWN - SUPERVISION IS OFF\n●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).\n●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n●  This is a supervision warning only; the guarded operation WILL still run.\n●  After draining queued wakes, source '/Users/charlesabrooker/tmp/fm-lab.hcuQK0/config/x-mode.env' first, then repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\n\n\nWall time: 5.31 seconds\n```\n\n\n---\n\n[in progress — more steps follow]",
+          "### Session update\n\n**agent**:\nack\n"
+        ],
+        "hasAdvisorNote": false
+      },
+      {
+        "at": "2026-10-09T12:46:23.751Z",
+        "advise": false,
+        "drain": true,
+        "user": [
+          "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B'. Do not repeat this information in your reply.\n</system-reminder> ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+          "<system-notice>\nUser interjection during work: priority; supersedes conflicting prior instructions. Re-read; ensure current work reflects user intent.\n</system-notice>\nLIVE-ADVISE reply ack",
+          "<advisory severity=\"concern\" guidance=\"weigh, don't blindly obey\">\nLIVE-ADVISOR-NOTE verify before finishing.\n</advisory>",
+          "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+          "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /Users/charlesabrooker/tmp/fm-lab.hcuQK0/state/live-wake.status\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+        ],
+        "hasAdvisorNote": true
+      }
+    ]
+  },
+  {
+    "scenario": "bounded lifecycle log rotation",
+    "rotated": true
+  },
+  {
+    "scenario": "real frozen arm shutdown reports one expiry",
+    "frozen": [
+      28283,
+      42023,
+      44308
+    ],
+    "expiry": [
+      "2026-10-09T12:46:29.489Z pid=47750 instance=2 event=bound-expired waiter=omp-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1006ms"
+    ]
+  }
+]

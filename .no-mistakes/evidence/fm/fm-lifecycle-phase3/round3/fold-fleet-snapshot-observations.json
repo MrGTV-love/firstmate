@@ -1,0 +1,12 @@
+[
+  {
+    "scenario": "actual fleet snapshot preserves all open secondmate decisions and live checkpoint",
+    "keys": [
+      "beta",
+      "delta",
+      "gamma",
+      "pending-reply-abcd"
+    ],
+    "checkpointUnchanged": true
+  }
+]

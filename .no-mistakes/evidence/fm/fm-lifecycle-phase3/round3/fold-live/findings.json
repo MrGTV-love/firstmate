@@ -1,0 +1,30 @@
+{
+  "production_findings": [],
+  "validation_driver_findings": [
+    {
+      "result": "oracle error, corrected from captured evidence without product rerun",
+      "description": "The driver expected secondmate failed: to clear gamma, contradicting the documented secondmate contract. Seeded and unseeded live outputs both correctly retained gamma and were byte-identical. scenarios.json preserves initial FAIL and correction; executed driver-source.txt is unchanged."
+    }
+  ],
+  "performance": {
+    "loaded_bash_pid": 89128,
+    "log_bytes": 1406009,
+    "status_open_decisions_incremental_seconds": [0.025, 0.021, 0.020, 0.025, 0.029, 0.034, 0.026],
+    "status_open_decisions_seconds": [0.020, 0.024, 0.021, 0.018, 0.024, 0.027, 0.019],
+    "function_under_one_second_acceptance": "pass, all 14 actual samples",
+    "real_drain_bootstrap_wall_seconds": 4.279194667004049,
+    "real_drain_unchanged_wall_seconds": 2.4635875420062803,
+    "timing_scope_note": "Under-one-second acceptance is for warmed loaded-library function calls, not the complete drain CLI."
+  },
+  "corpus": "Synthetic surrogate only: 1,404,739-byte initial secondmate log; 1,406,009-byte final log. Private d7 corpus untested because not provided; no private records accessed.",
+  "commands": {
+    "driver": "python3 .round3-fold-live-driver.py",
+    "real_drain": "bin/fm-wake-drain.sh",
+    "loaded_function_driver": "/bin/bash .round3-fold-live-fixtures/loaded-warm-bench.sh <worktree> <synthetic-secondmate.status> <evidence/warm-benchmark>",
+    "locale_golden_snapshot_driver": "/bin/bash .round3-fold-live-fixtures/library-cases.sh <worktree> <disposable-library-state> <evidence/library-cases>",
+    "exact_argv_and_environment": "commands.json",
+    "executed_source": "driver-source.txt; warm-benchmark/command-source.txt; library-cases/command-source.txt"
+  },
+  "cleanup": "Both worktree throwaway driver and fixture tree removed in driver finally block; cleanup.json records removal. No production edits, suites, lint, static analysis, no-mistakes, axi, or lifecycle commands requiring marked lab.",
+  "recommended_parent_targeted_check": "tests/fm-wake-drain-open-decisions-cursor.test.sh; this worker did not run repository tests."
+}

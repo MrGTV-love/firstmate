@@ -1,0 +1,14 @@
+[
+  {
+    "scenario": "real Pi terminal shutdown with frozen unretirable arm logs one default expiry",
+    "primary": 49702,
+    "frozen": [
+      50599,
+      51104,
+      54324
+    ],
+    "expiry": [
+      "2026-10-09T12:55:59.029Z pid=49702 instance=1 event=bound-expired waiter=pi-watch-extension waited-on=shutdown-arm-close bound=1000ms actual=1003ms"
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "schema": "fm-fleet-home-input.v1",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-lab.7IDy7M",
+  "backlog": {
+    "path": "/Users/charlesabrooker/tmp/fm-lab.7IDy7M/data/backlog.md",
+    "present": false,
+    "records": []
+  },
+  "tasks": []
+}

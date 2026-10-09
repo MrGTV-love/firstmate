@@ -1,0 +1,40 @@
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.6 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ LAB: shutdown and successor
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-wake-drain.sh                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1791549898   1   check   open-loop-ledger   check: open-loop-ledger (1 overdue assigned obligations; read            │
+│ state/open-loops.json)                                                                                               │
+│ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation           │
+│ 36035.1791549922.dCJnJ5                                                                                              │
+│ ⟦Wall: 9.24s | Timeout: 300s⟧                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ack
+
+
+ LIVE-ADVISE reply ack
+
+
+ ack
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ LIVE-ADVISOR-NOTE verify before finishing.
+
+ LAB: shutdown without successor
+
+ π > ⬢ m1 🙈 > 🌳 32d18ed9638d/01M4EYP71G0F1N9FSDAAWHXV2B > ⑂ detached ?5 ▶────10%───────────────────────╎───┃─────200K─
+╰─ operator draft kept

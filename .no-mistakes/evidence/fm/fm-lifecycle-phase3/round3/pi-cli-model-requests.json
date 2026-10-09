@@ -1,0 +1,30 @@
+[
+  {
+    "at": "2026-10-09T12:40:07.544Z",
+    "user": [
+      [
+        {
+          "type": "text",
+          "text": "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+        }
+      ]
+    ]
+  },
+  {
+    "at": "2026-10-09T12:40:09.035Z",
+    "user": [
+      [
+        {
+          "type": "text",
+          "text": "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+        }
+      ],
+      [
+        {
+          "type": "text",
+          "text": "⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+        }
+      ]
+    ]
+  }
+]

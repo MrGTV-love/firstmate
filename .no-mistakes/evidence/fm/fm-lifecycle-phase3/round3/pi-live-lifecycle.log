@@ -1,0 +1,36 @@
+2026-10-09T12:34:23.319Z pid=41322 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-09T12:34:23.321Z pid=41322 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-09T12:34:23.322Z pid=41322 instance=1 event=factory-bind generation=1
+2026-10-09T12:34:23.328Z pid=41322 instance=1 event=duplicate-load-ignored
+2026-10-09T12:34:23.358Z pid=41322 instance=1 event=session_start generation=1 stopping=false
+2026-10-09T12:34:23.358Z pid=41322 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-09T12:34:25.800Z pid=41322 instance=1 event=session_shutdown generation=1 reason=reload
+2026-10-09T12:34:25.801Z pid=41322 instance=1 event=generation-stop generation=1 replacement=true
+2026-10-09T12:34:25.837Z pid=41322 instance=2 event=generation-create generation=2 cause=factory-bind
+2026-10-09T12:34:25.837Z pid=41322 instance=2 event=generation-activate generation=2 cause=factory-bind
+2026-10-09T12:34:25.837Z pid=41322 instance=2 event=factory-bind generation=2 superseded=1
+2026-10-09T12:34:25.838Z pid=41322 instance=1 event=instance-retired generation=1 by=2
+2026-10-09T12:34:25.840Z pid=41322 instance=1 event=generation-stop generation=1 cause=factory-retire
+2026-10-09T12:34:25.848Z pid=41322 instance=2 event=duplicate-load-ignored
+2026-10-09T12:34:25.849Z pid=41322 instance=2 event=session_start generation=2 stopping=false
+2026-10-09T12:34:25.849Z pid=41322 instance=2 event=generation-activate generation=2 cause=session_start
+2026-10-09T12:34:27.092Z pid=41322 instance=2 event=session_shutdown generation=2 reason=reload
+2026-10-09T12:34:27.094Z pid=41322 instance=2 event=generation-stop generation=2 replacement=true
+2026-10-09T12:34:27.141Z pid=41322 instance=3 event=generation-create generation=3 cause=factory-bind
+2026-10-09T12:34:27.141Z pid=41322 instance=3 event=generation-activate generation=3 cause=factory-bind
+2026-10-09T12:34:27.141Z pid=41322 instance=3 event=factory-bind generation=3 superseded=2
+2026-10-09T12:34:27.141Z pid=41322 instance=2 event=instance-retired generation=2 by=3
+2026-10-09T12:34:27.142Z pid=41322 instance=2 event=generation-stop generation=2 cause=factory-retire
+2026-10-09T12:34:27.149Z pid=41322 instance=3 event=duplicate-load-ignored
+2026-10-09T12:34:27.150Z pid=41322 instance=3 event=session_start generation=3 stopping=false
+2026-10-09T12:34:27.150Z pid=41322 instance=3 event=generation-activate generation=3 cause=session_start
+2026-10-09T12:34:43.172Z pid=41322 instance=3 event=session_shutdown generation=3 reason=reload
+2026-10-09T12:34:43.178Z pid=41322 instance=3 event=generation-stop generation=3 replacement=true
+2026-10-09T12:34:43.214Z pid=41322 instance=4 event=generation-create generation=4 cause=factory-bind
+2026-10-09T12:34:43.214Z pid=41322 instance=4 event=generation-activate generation=4 cause=factory-bind
+2026-10-09T12:34:43.214Z pid=41322 instance=4 event=factory-bind generation=4 superseded=3
+2026-10-09T12:34:43.215Z pid=41322 instance=3 event=instance-retired generation=3 by=4
+2026-10-09T12:34:43.215Z pid=41322 instance=3 event=generation-stop generation=3 cause=factory-retire
+2026-10-09T12:34:43.222Z pid=41322 instance=4 event=duplicate-load-ignored
+2026-10-09T12:34:43.223Z pid=41322 instance=4 event=session_start generation=4 stopping=false
+2026-10-09T12:34:43.223Z pid=41322 instance=4 event=generation-activate generation=4 cause=session_start

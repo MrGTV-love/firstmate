@@ -1,0 +1,60 @@
+[
+  {
+    "selector": "test_watch_instance_rebind_releases_predecessors",
+    "result": "pass"
+  },
+  {
+    "selector": "test_pi_missing_successor_reports_without_rearming",
+    "result": "pass"
+  },
+  {
+    "selector": "test_pi_factory_replacement_retires_and_hands_off",
+    "result": "pass"
+  },
+  {
+    "selector": "test_pi_lifecycle_deadline_diagnostics",
+    "result": "pass"
+  },
+  {
+    "selector": "test_watch_extension_heals_a_generation_stopped_without_a_successor",
+    "result": "pass"
+  },
+  {
+    "selector": "test_watch_extension_is_single_instance_per_home",
+    "result": "pass"
+  },
+  {
+    "selector": "test_watch_lifecycle_deadline_diagnostics",
+    "result": "pass"
+  },
+  {
+    "selector": "test_checkpoint_rejects_a_previous_parsing_locale",
+    "result": "pass"
+  },
+  {
+    "selector": "test_utf8_whitespace_uses_full_fold_locale",
+    "result": "pass"
+  },
+  {
+    "selector": "test_seeded_whole_file_fold_matches_a_fold_from_line_one",
+    "initial": "300-second command deadline exceeded",
+    "workaround": "Same original assertion loop split by ship, scout, and secondmate; every line boundary and split offset retained",
+    "shards": [
+      {
+        "kind": "ship",
+        "result": "pass",
+        "wallSeconds": 157.07
+      },
+      {
+        "kind": "scout",
+        "result": "pass",
+        "wallSeconds": 156.78
+      },
+      {
+        "kind": "secondmate",
+        "result": "pass",
+        "wallSeconds": 157.44
+      }
+    ]
+  }
+]

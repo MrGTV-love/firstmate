@@ -1,0 +1,5 @@
+version=11:secondmate:ctype=C:collate=C
+offset=1404806
+ident=strong:16777232:168259086:1791549035.093639252
+api-shape	needs-decision	choose REST or RPC
+anchor	blocked	independent decision remains open
