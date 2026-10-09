@@ -1158,14 +1158,15 @@ if command == 'gh' and '/pulls?' in sys.argv[-1]:
     sys.exit(0)
 attempts = Path(os.environ['FM_HOME']) / 'attempts'
 with attempts.open('a') as stream:
-    stream.write(command + '\n')
+    stream.write(json.dumps([command, *sys.argv[1:]]) + '\n')
 if len(attempts.read_text().splitlines()) == 2:
+    (attempts.parent / 'deadline-trigger').write_text(json.dumps([command, *sys.argv[1:]]))
     os.kill(int((attempts.parent / 'collector-pid').read_text()), signal.SIGALRM)
 time.sleep(0.7)
 print('source command failure', file=sys.stderr)
 sys.exit(1)
 '''
-    for command in ('git', 'gh', 'cat'):
+    for command in (('git', 'gh', 'cat') if reader == 'questions' else ('git', 'gh')):
         script(deadline_bin / command, driver)
     deadline_env = dict(env, FM_HOME=str(deadline_home), DEADLINE_READER=reader,
                         PATH=f'{deadline_bin}:{env["PATH"]}')
@@ -1173,10 +1174,17 @@ sys.exit(1)
                                     env=deadline_env, timeout=60))
     assert not deadline_report['complete'] and len(rows(deadline_report, 'coverage')) == 1, deadline_report
     assert 'collection exceeded its deadline' in rows(deadline_report, 'coverage')['ledger degraded']['evidence']
-    attempts = (deadline_home / 'attempts').read_text().splitlines()
-    # The real overall deadline may expire before the injected second-attempt
-    # alarm on a loaded host; neither path may start a third source command.
-    assert len(attempts) <= 2, (reader, attempts)
+    attempts = [json.loads(line) for line in (deadline_home / 'attempts').read_text().splitlines()]
+    expected_requests = {
+        'origins': [['git', '-C', str(deadline_home / 'projects' / str(i)),
+                     'config', '--get', 'remote.origin.url'] for i in range(24)],
+        'pr-checks': [['gh', 'api', '-i',
+                       'repos/test/project/commits/' + 'a' * 40 + '/check-runs?per_page=100']],
+        'pr-state': [['gh', 'api', '-i', 'repos/test/project/pulls/' + str(i)] for i in range(24)],
+        'questions': [['cat', str(deadline_home / 'state' / (str(i) + '.status'))] for i in range(24)],
+    }
+    assert len(attempts) == 2 and all(request in expected_requests[reader] for request in attempts), (reader, attempts)
+    assert json.loads((deadline_home / 'deadline-trigger').read_text()) == attempts[-1], (reader, attempts)
     assert json.loads((deadline_home / 'state/open-loops.json').read_text()) == deadline_report
     print('PASS: deadline escapes ' + reader + ' source recovery', flush=True)
 # Conditional reads and the quota floor: a repeated run over unchanged forge data is answered with 304s, and a run
