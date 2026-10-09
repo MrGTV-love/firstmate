@@ -1650,8 +1650,8 @@ test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files() {
 }
 
 test_claude_worker_exclusion_survives_special_characters_in_the_home_path() {
-  nested_claude_excludes nested-odd "odd [home] it's {x}"
-  printf '%s\n' "$NESTED_EXCLUDES" | grep -Fxq "$CASE_DIR/odd \\[home\\] it's \\{x\\}/CLAUDE.md" \
+  nested_claude_excludes nested-odd "odd R&D [home] it's {x}"
+  printf '%s\n' "$NESTED_EXCLUDES" | grep -Fxq "$CASE_DIR/odd R&D \\[home\\] it's \\{x\\}/CLAUDE.md" \
     || fail "glob metacharacters in the home path were not escaped for picomatch; got: $NESTED_EXCLUDES"
   pass "a home path with glob and quote characters reaches the launch as an escaped, intact exclusion"
 }
@@ -1691,8 +1691,8 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
       read_case_record "$rec"
       fm_test_fake_teamclaude "$FAKEBIN_DIR"
       [ "$launcher" != teamclaude ] || printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
-      make_firstmate_home_shape "$CASE_DIR/firstmate home"
-      wt="$CASE_DIR/firstmate home/projects/proj/.claude/worktrees/task"
+      make_firstmate_home_shape "$CASE_DIR/firstmate R&D home it's [x]"
+      wt="$CASE_DIR/firstmate R&D home it's [x]/projects/proj/.claude/worktrees/task"
       mkdir -p "$(dirname "$wt")"
       git -C "$PROJ_DIR" worktree add --quiet -b "$id" "$wt"
       WT_DIR=$wt
@@ -1724,7 +1724,7 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
         || fail "raw launch lost its model arguments: $(cat "$env_out.args")"
       [ "$(printf '%s' "$brief" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
         || fail "raw launch lost its brief doorbell"
-      printf '%s' "$settings" | jq -e --arg home "$CASE_DIR/firstmate home" \
+      printf '%s' "$settings" | jq -e --arg home "$CASE_DIR/firstmate R&D home it's \\[x\\]" \
         '.claudeMdExcludes | contains([$home + "/CLAUDE.md", $home + "/CLAUDE.local.md", $home + "/AGENTS.md", $home + "/.claude/CLAUDE.md", $home + "/.claude/rules/**"])' >/dev/null \
         || fail "$launcher raw launch did not exclude ancestor supervisor memory: $settings"
       if [ "$source" != none ]; then

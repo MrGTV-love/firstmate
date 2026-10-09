@@ -73,6 +73,7 @@ make_case() {
 spawn_ship() {
   SPAWN_OUT=$(FM_CLAUDE_START_POLLS="${FM_CLAUDE_START_POLLS:-6}" \
     FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
+    FM_FAKE_CAPTURE_HISTORY_FILE="$CASE_DIR/history" \
     fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$1" "$PROJ_DIR" --mode no-mistakes --yolo off)
   SPAWN_RC=$?
 }
@@ -105,17 +106,26 @@ test_a_worker_parked_on_a_startup_dialog_is_reported() {
 }
 
 test_a_worker_with_proof_of_a_started_turn_is_not_reported() {
-  local id=started-z1 out
-  make_case started "$id"
-  printf '%s\n' "$COMPOSER_SCREEN" > "$CASE_DIR/screen"
-  # The hook a real worker's UserPromptSubmit fires once its prompt is in.
-  FM_FAKE_CAPTURE_HOOK="'$ROOT/bin/fm-busy-event.sh' apply '$HOME_DIR/state' '$id' busy --current-gen --source claude-hook --event UserPromptSubmit" \
-    spawn_ship "$id"
-  expect_code 0 "$SPAWN_RC" "a started worker spawns cleanly: $SPAWN_OUT"
-  case "$SPAWN_OUT" in *"startup dialog"*) fail "a started worker was reported as parked: $SPAWN_OUT" ;; esac
-  out=$(status_lines "$id")
-  case "$out" in *blocked*) fail "a started worker got a blocked event: $out" ;; esac
-  pass "a worker whose turn demonstrably started gets no report"
+  local id out pair name screen state event
+  for pair in "imports|$IMPORTS_SCREEN" "trust|$TRUST_SCREEN" \
+    "bypass|$BYPASS_SCREEN" "apikey|$APIKEY_SCREEN"; do
+    name=${pair%%|*}
+    screen=${pair#*|}
+    for state in busy idle; do
+      id="started-$name-$state-z1"
+      make_case "started-$name-$state" "$id"
+      printf '%s\n%s\n' "$screen" "$COMPOSER_SCREEN" > "$CASE_DIR/screen"
+      event=UserPromptSubmit
+      [ "$state" != idle ] || event=Stop
+      FM_FAKE_CAPTURE_HOOK="'$ROOT/bin/fm-busy-event.sh' apply '$HOME_DIR/state' '$id' busy --current-gen --source claude-hook --event UserPromptSubmit; '$ROOT/bin/fm-busy-event.sh' apply '$HOME_DIR/state' '$id' '$state' --current-gen --source claude-hook --event '$event'" \
+        spawn_ship "$id"
+      expect_code 0 "$SPAWN_RC" "a $state worker spawns cleanly: $SPAWN_OUT"
+      case "$SPAWN_OUT" in *"startup dialog"*) fail "a $state worker was reported as parked on historical $name text: $SPAWN_OUT" ;; esac
+      out=$(status_lines "$id")
+      case "$out" in *blocked*) fail "a $state worker got a blocked event: $out" ;; esac
+    done
+  done
+  pass "verified active and completed turns override all four historical dialog signatures"
 }
 
 test_a_pane_with_no_dialog_and_no_proof_is_not_reported() {
@@ -136,6 +146,7 @@ test_a_dialog_answered_during_the_window_is_not_reported() {
   make_case answered "$id"
   printf '%s\n' "$IMPORTS_SCREEN" > "$CASE_DIR/screen"
   printf '%s\n' "$COMPOSER_SCREEN" > "$CASE_DIR/composer"
+  printf '%s\n' "$IMPORTS_SCREEN" > "$CASE_DIR/history"
   counter="$CASE_DIR/captures"
   : > "$counter"
   # The third capture finds the composer where the dialog was.
@@ -151,13 +162,15 @@ test_a_dialog_answered_during_the_window_is_not_reported() {
 # A pane the spawn cannot read must end the wait at once rather than burn the
 # whole window on a screen it can never judge.
 test_an_unreadable_pane_does_not_stall_the_spawn() {
-  local id=blank-z1 started
+  local id=blank-z1 counter
   make_case blank "$id"
   rm -f "$CASE_DIR/screen"
-  started=$SECONDS
-  FM_CLAUDE_START_POLLS=8 FM_CLAUDE_START_POLL_INTERVAL=5 spawn_ship "$id"
+  counter="$CASE_DIR/captures"
+  : > "$counter"
+  FM_FAKE_CAPTURE_HOOK="echo x >> '$counter'" \
+    FM_CLAUDE_START_POLLS=8 spawn_ship "$id"
   expect_code 0 "$SPAWN_RC" "a blank pane spawns cleanly: $SPAWN_OUT"
-  [ $((SECONDS - started)) -lt 20 ] || fail "an unreadable pane stalled the spawn for $((SECONDS - started))s"
+  [ "$(wc -l < "$counter")" -lt 8 ] || fail "an unreadable pane exhausted the start polling window"
   pass "an unreadable pane ends the start wait immediately"
 }
 

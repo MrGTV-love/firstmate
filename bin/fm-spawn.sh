@@ -4734,7 +4734,16 @@ claude_confirm_start() {
   local pane i=0 max=${FM_CLAUDE_START_POLLS:-40} interval=${FM_CLAUDE_START_POLL_INTERVAL:-0.5}
   local parked=0 blank=0 verdict dialog
   while [ "$i" -lt "$max" ]; do
-    pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null || true)
+    if fm_backend_visible_capture_supported "$BACKEND"; then
+      pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null || true)
+    else
+      pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null || true)
+    fi
+    verdict=$(fm_busy_classify "$BACKEND" "$T" "$HARNESS" "$ID" "$STATE" "$pane")
+    case "$verdict" in
+      "busy fm-spawn") ;;
+      busy* | "idle claude-hook") return 0 ;;
+    esac
     # A pane that stays unreadable cannot be judged either way.
     if [ -z "$(printf '%s' "$pane" | tr -d '[:space:]')" ]; then
       blank=$((blank + 1))
@@ -4746,11 +4755,6 @@ claude_confirm_start() {
       parked=$((parked + 1))
     else
       parked=0
-      verdict=$(fm_busy_classify "$BACKEND" "$T" "$HARNESS" "$ID" "$STATE" "$pane")
-      case "$verdict" in
-        "busy fm-spawn") ;;
-        busy*) return 0 ;;
-      esac
     fi
     i=$((i + 1))
     [ "$i" -ge "$max" ] || if [ "$blank" -gt 0 ]; then sleep 0.1; else sleep "$interval"; fi
@@ -5728,7 +5732,7 @@ else
 fi
 case "$LAUNCH" in
 *__CLAUDEMDEXCLUDES__*)
-  LAUNCH=${LAUNCH//__CLAUDEMDEXCLUDES__/$(fm_claude_md_excludes_json "$WT")}
+  LAUNCH=${LAUNCH//__CLAUDEMDEXCLUDES__/"$(fm_claude_md_excludes_json "$WT")"}
   ;;
 esac
 if [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ]; then

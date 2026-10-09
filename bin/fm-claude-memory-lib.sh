@@ -45,7 +45,8 @@ fm_claude_md_excludes_json() {
     done
   done
   [ -n "$list" ] || return 0
-  printf ',"claudeMdExcludes":[%s]' "${list//\'/$sq}"
+  list=${list//\'/"$sq"}
+  printf ',"claudeMdExcludes":[%s]' "$list"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

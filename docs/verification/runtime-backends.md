@@ -806,6 +806,10 @@ A Claude task copy nested under a firstmate home (`<home>/projects/<project>/.cl
 `tests/fm-claude-nested-home-live-e2e.test.sh` drives the installed binary in a scratch config with no prompt submitted and no dialog answered, so it spends no model tokens: a copy outside any home reaches the composer, the nested copy without the exclusion parks on the imports dialog, and the same copy with the production fragment reaches the composer with no dialog.
 `tests/fm-spawn-dispatch-profile.test.sh` executes canonical and raw launches to verify the delivered settings for nested copies, while copies outside a home and panes at the home root retain their own memory. Focused argv probes passed for direct and TeamClaude raw commands with absent, inline, and file-based settings: the exclusions merge without dropping caller keys or exclusions, and the model arguments, brief doorbell, environment assignments, and TeamClaude proxy remain intact.
 
+Focused model-free launch probes on Bash 3.2 also passed with ampersands, apostrophes, and glob metacharacters in the ancestor-home path, for canonical launches and both raw launchers with all three settings forms. Exclusion substitution treats the fragment and shell-quote replacement as literal data; the shell-quote substitution uses an assignment to preserve Bash 3.2 compatibility. Bash 5.2+'s `patsub_replacement` option was not exercised locally because that shell was unavailable on PATH.
+
+`tests/fm-spawn-claude-start-confirm.test.sh` passed all four parked-dialog cases and active/completed hook-progress cases with retained dialog text, plus a cleared dialog retained in scrollback, a quiet pane, and early termination of unreadable captures. Startup confirmation checks generation-bound semantic progress before dialog text and uses viewport-only capture on supported backends.
+
 Verified 2026-10-08 on Claude Code 2.1.294.
 
 ```sh

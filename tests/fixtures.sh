@@ -129,6 +129,10 @@ case "${1:-}" in
     # FM_FAKE_CAPTURE_HOOK (a command run on every capture, standing in for
     # whatever changes the screen or the harness's records over time).
     [ -z "${FM_FAKE_CAPTURE_HOOK:-}" ] || eval "$FM_FAKE_CAPTURE_HOOK" >/dev/null 2>&1
+    case " $* " in
+      *" -S -0 "*) ;;
+      *) [ -z "${FM_FAKE_CAPTURE_HISTORY_FILE:-}" ] || [ ! -f "$FM_FAKE_CAPTURE_HISTORY_FILE" ] || cat "$FM_FAKE_CAPTURE_HISTORY_FILE" ;;
+    esac
     [ -z "${FM_FAKE_CAPTURE_FILE:-}" ] || [ ! -f "$FM_FAKE_CAPTURE_FILE" ] || cat "$FM_FAKE_CAPTURE_FILE"
     exit 0
     ;;
