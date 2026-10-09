@@ -5654,20 +5654,71 @@ test_private_nm_launch_agent_is_retired_before_teardown() {
   pass "a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes"
 }
 
+test_private_nm_launch_agent_equivalent_roots_are_retired() {
+  local spelling case_dir wt root pid label rc
+  for spelling in dot separators parent symlink; do
+    case_dir=$(make_case "private-nm-agent-$spelling")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    add_fake_launchctl "$case_dir"
+    wt=$(cd "$case_dir/wt" && pwd -P)
+    mkdir -p "$wt/.no-mistakes/h" "$wt/.no-mistakes/staging"
+    ln -s "$wt/.no-mistakes/h" "$case_dir/private-home"
+    case "$spelling" in
+      dot) root="$wt/./.no-mistakes/h" ;;
+      separators) root="$wt//.no-mistakes//h/" ;;
+      parent) root="$wt/.no-mistakes/staging/../h" ;;
+      symlink) root="$case_dir/private-home" ;;
+    esac
+    teardown_fixture_start "$wt/.no-mistakes/h" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    label="$NM_AGENT_PREFIX.3baa54c9"
+    add_nm_launch_agent "$case_dir" 3baa54c9 "$root" "$pid"
+
+    rc=0
+    FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if kill -0 "$pid" 2>/dev/null; then
+      teardown_fixture_stop "$pid"
+      fail "private-nm-agent-$spelling: the private daemon survived teardown"
+    fi
+    expect_code 0 "$rc" "private-nm-agent-$spelling: teardown must finish"
+    assert_absent "$case_dir/launchctl-loaded/$label" \
+      "private-nm-agent-$spelling: the agent is still loaded"
+    assert_absent "$case_dir/launchagents/$label.plist" \
+      "private-nm-agent-$spelling: the plist is still installed"
+    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
+      "private-nm-agent-$spelling: the plist was not archived"
+    assert_absent "$case_dir/state/task-x1.meta" \
+      "private-nm-agent-$spelling: the task record survived teardown"
+  done
+  pass "equivalent private roots unload their agents and allow teardown to finish"
+}
+
 # Every agent whose root is not inside THIS task's copy stays loaded and
 # installed: the shared ~/.no-mistakes agent, another task's agent, a sibling
 # directory that only shares a name prefix, and a root that climbs out with `..`.
 test_foreign_nm_launch_agents_are_left_alone() {
-  local case_dir rc wt calls
+  local case_dir rc wt calls hash
   case_dir=$(make_case foreign-nm-agents)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   add_fake_launchctl "$case_dir"
   wt=$(cd "$case_dir/wt" && pwd -P)
+  printf '%s\n' '.no-mistakes/' >> "$(git -C "$wt" rev-parse --git-path info/exclude)"
   add_nm_launch_agent "$case_dir" 00000001 "$case_dir/home/.no-mistakes" 999991
   add_nm_launch_agent "$case_dir" 00000002 "$case_dir/other-wt/.no-mistakes/h" 999992
   add_nm_launch_agent "$case_dir" 00000003 "$wt-sibling/.no-mistakes/h" 999993
   add_nm_launch_agent "$case_dir" 00000004 "$wt/../escape/.no-mistakes/h" 999994
+  mkdir -p "$case_dir/escape/h" "$wt/.no-mistakes"
+  ln -s "$case_dir/escape" "$wt/.no-mistakes/outside"
+  add_nm_launch_agent "$case_dir" 00000006 "$wt/missing/../../escape/.no-mistakes/h"
+  add_nm_launch_agent "$case_dir" 00000007 "$wt/.no-mistakes/outside/h"
+  add_nm_launch_agent "$case_dir" 00000008 "$wt/.no-mistakes/outside/../.no-mistakes/h"
+  add_nm_launch_agent "$case_dir" 00000009 "$wt/missing/../.no-mistakes/outside/h"
+  for hash in 00000006 00000007 00000008 00000009; do
+    : > "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.$hash"
+  done
   mkdir -p "$case_dir/launchagents"
   printf '%s\n' 'not a plist' > "$case_dir/launchagents/com.kunchenguid.no-mistakes.daemon.00000005.plist"
   printf '%s\n' unrelated > "$case_dir/launchagents/com.example.other.plist"
@@ -5675,11 +5726,15 @@ test_foreign_nm_launch_agents_are_left_alone() {
   rc=0
   FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "foreign-nm-agents: teardown should be unaffected by other agents"
+  expect_code 0 "$rc" "foreign-nm-agents: teardown should be unaffected by other agents: $(cat "$case_dir/stderr")"
   calls=$(cat "$case_dir/launchctl-calls")
   assert_not_contains "$calls" "bootout" "foreign-nm-agents: teardown unloaded an agent that is not this task's"
-  [ "$(find "$case_dir/launchagents" -name '*.plist' | wc -l | tr -d ' ')" = 6 ] \
+  [ "$(find "$case_dir/launchagents" -name '*.plist' | wc -l | tr -d ' ')" = 10 ] \
     || fail "foreign-nm-agents: an installed plist was moved or removed"
+  for hash in 00000001 00000002 00000003 00000004 00000006 00000007 00000008 00000009; do
+    assert_present "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.$hash" \
+      "foreign-nm-agents: an outside-root agent was unloaded"
+  done
   assert_absent "$case_dir/data/task-x1/launchagent-backup" \
     "foreign-nm-agents: something was archived for a task that owned no agent"
   assert_grep "leaving unreadable no-mistakes launch agent $case_dir/launchagents/$NM_AGENT_PREFIX.00000005.plist as found" "$case_dir/stderr" \
@@ -5719,21 +5774,28 @@ test_private_nm_launch_agent_bootout_failure_refuses() {
 # A plist left behind by a reboot or a manual bootout has no loaded service; it
 # still brings the daemon back at next login, so it is archived too.
 test_private_nm_launch_agent_not_loaded_is_archived() {
-  local case_dir rc label
+  local case_dir rc label wt root hash=0
   case_dir=$(make_case private-nm-agent-unloaded)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   add_fake_launchctl "$case_dir"
-  label="$NM_AGENT_PREFIX.3baa54c9"
-  add_nm_launch_agent "$case_dir" 3baa54c9 "$(cd "$case_dir/wt" && pwd -P)/.no-mistakes/h"
+  wt=$(cd "$case_dir/wt" && pwd -P)
+  for root in "$wt/.no-mistakes/h" "$wt/./.no-mistakes/h" "$wt//.no-mistakes//h/" \
+    "$wt/missing/../.no-mistakes/h" "$wt/missing/./h" "$wt/missing/h/.." "$wt/."; do
+    hash=$((hash + 1))
+    add_nm_launch_agent "$case_dir" "$hash" "$root"
+  done
 
   rc=0
   FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "private-nm-agent-unloaded: teardown should finish"
-  assert_absent "$case_dir/launchagents/$label.plist" "private-nm-agent-unloaded: plist still installed"
-  assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
-    "private-nm-agent-unloaded: plist not archived"
+  for hash in 1 2 3 4 5 6 7; do
+    label="$NM_AGENT_PREFIX.$hash"
+    assert_absent "$case_dir/launchagents/$label.plist" "private-nm-agent-unloaded: plist still installed"
+    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
+      "private-nm-agent-unloaded: plist not archived"
+  done
   pass "a private no-mistakes plist with no loaded service is still archived"
 }
 
@@ -6113,6 +6175,7 @@ test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_private_nm_launch_agent_is_retired_before_teardown
+test_private_nm_launch_agent_equivalent_roots_are_retired
 test_foreign_nm_launch_agents_are_left_alone
 test_private_nm_launch_agent_bootout_failure_refuses
 test_private_nm_launch_agent_not_loaded_is_archived

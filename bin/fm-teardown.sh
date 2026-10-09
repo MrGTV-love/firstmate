@@ -301,8 +301,8 @@
 #     retire_task_private_nm_launch_agents reads every such plist in
 #     $FM_LAUNCH_AGENTS_DIR (default ~/Library/LaunchAgents) and acts only on
 #     one whose Label matches its file name and whose `--root` is the task copy
-#     or inside it after canonicalization (`..` and `.` segments, and lookalike
-#     prefixes such as <copy>-x, never match). It then runs `launchctl bootout
+#     or inside it after resolving symlinks and normalizing path segments and
+#     separators; lookalike prefixes such as <copy>-x never match. It runs `launchctl bootout
 #     gui/<uid>/<label>`, requires `launchctl print` to report the service gone
 #     (exit 113), and moves the plist to data/<id>/launchagent-backup/. The
 #     shared daemon's agent (root ~/.no-mistakes), another task's agent, and any
@@ -2514,8 +2514,26 @@ retire_task_private_nm_launch_agents() {  # <worktree>
     root=${fields#*$'\t'}
     [ "$plist" = "$dir/$label.plist" ] || continue
     case "$root" in /*) ;; *) continue ;; esac
-    case "$root/" in */../*|*/./*|*//*) continue ;; esac
-    canon_root=$(task_canonical_path "$root") || continue
+    canon_root=$(perl -MCwd=abs_path -e '
+      my $path = "/";
+      for my $part (split m{/+}, $ARGV[0]) {
+        next if $part eq "" || $part eq ".";
+        if ($part eq "..") {
+          $path =~ s{/[^/]+$}{};
+          $path = "/" if $path eq "";
+          next;
+        }
+        my $next = ($path eq "/" ? "" : $path) . "/$part";
+        if (-d $next) {
+          $path = abs_path($next);
+          defined $path or exit 1;
+        } else {
+          exit 1 if -e $next || -l $next;
+          $path = $next;
+        }
+      }
+      print "$path\n";
+    ' "$root") || continue
     case "$canon_root" in "$canon_wt"|"$canon_wt"/*) ;; *) continue ;; esac
     if ! command -v launchctl >/dev/null 2>&1; then
       echo "REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable, so it cannot be unloaded; preserving the worktree and $plist." >&2
