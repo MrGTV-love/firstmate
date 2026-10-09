@@ -64,6 +64,9 @@ case "${1:-}" in
       fm_lab_home_error "refusing '$dir': a lab marker is only ever stamped on a fresh empty dir"
       exit 1
     }
+    FM_STATE_OVERRIDE="$dir" . "$SCRIPT_DIR/fm-wake-lib.sh"
+    owner_identity=$(fm_pid_identity "$PPID") || { fm_lab_home_error "cannot identify the lab owner"; exit 1; }
+    printf 'owner_pid=%s\nowner_identity=%s\n' "$PPID" "$owner_identity" >> "$dir/.fm-lab-home" || exit 1
     mkdir -p "$dir/state" "$dir/data" "$dir/config" "$dir/projects" || exit 1
     printf '%s\n' "$dir"
     ;;

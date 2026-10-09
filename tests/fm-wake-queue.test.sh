@@ -2776,7 +2776,7 @@ test_lock_wait_ends_when_the_lock_directory_is_gone() {
     sleep 0.05
   done
   [ -e "$dir/holder.ready" ] || { kill "$holder_pid" 2>/dev/null || true; fail "lock holder did not acquire"; }
-  FM_LOCK_PARENT_GONE_GRACE_SECONDS=1 FM_STATE_OVERRIDE="$state" bash -c '
+  FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     fm_lock_acquire_wait "$2"
     printf "%s\n" "$?" > "$3"
@@ -2804,7 +2804,7 @@ test_lock_wait_ends_when_the_lock_directory_is_gone() {
   # A parent that returns inside the grace is an ordinary wait, not an abandonment.
   mkdir -p "$state"
   rm -f "$dir/waiter.rc"
-  FM_LOCK_PARENT_GONE_GRACE_SECONDS=30 FM_STATE_OVERRIDE="$state" bash -c '
+  FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     rm -rf "$2"
     ( sleep 1; mkdir -p "$2" ) &
@@ -3768,6 +3768,11 @@ SH
   [ ! -s "$dir/tmux.log" ] || fail "an unreachable remote probe touched a local endpoint"
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
+
+if [ "${1:-}" = --orphan-review ]; then
+  test_lock_wait_ends_when_the_lock_directory_is_gone
+  exit 0
+fi
 
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking

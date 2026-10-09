@@ -674,7 +674,7 @@ clear_retired_meta_busy_gen() {  # <gen>
     . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
   fi
   lock=$(fm_meta_lock_path "$meta") || return 1
-  fm_lock_acquire_wait "$lock"
+  fm_lock_acquire_wait "$lock" || return 1
   current=$(fm_meta_get "$meta" busy_gen)
   if [ "$current" != "$gen" ]; then
     fm_lock_release "$lock"

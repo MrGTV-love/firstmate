@@ -2043,13 +2043,20 @@ SH
 # runs its cleanup trap, so a stub it started outlives it. The runner sweeps the
 # leftovers its fixture marker proves are the dead run's after each script.
 test_runner_reaps_stubs_a_killed_script_left_behind() {
-  local tmp repo runner leak stub_pid_file stub rc
+  local tmp repo runner leak stub_pid_file stub rc waited
   tmp=$(mktemp -d)
   repo="$tmp/repo"
   leak=tests/fm-leak-fixture.test.sh
   mkdir -p "$repo/tests"
   cp -R "$ROOT/bin" "$repo/bin"
   cp "$ROOT/tests/lib.sh" "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  cp "$repo/bin/fm-test-reap-orphans.sh" "$repo/bin/fm-test-reap-fixture.sh"
+  cat > "$repo/bin/fm-test-reap-orphans.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "$#" -eq 0 ]; then set -- --tmpdir "${TMPDIR:?}"; fi
+exec "$(dirname "${BASH_SOURCE[0]}")/fm-test-reap-fixture.sh" "$@"
+SH
+  chmod +x "$repo/bin/fm-test-reap-orphans.sh"
   runner="$repo/bin/fm-test-run.sh"
   stub_pid_file="$tmp/stub.pid"
   cat >"$repo/$leak" <<'SH'
@@ -2065,7 +2072,10 @@ while [ ! -e "$1" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 2
   n=$((n + 1))
 done
 STUB
-( bash "$root/stub.sh" "$root/release" >/dev/null 2>&1 & echo $! >"$FM_LEAK_PIDFILE" )
+(
+  bash "$root/stub.sh" "$root/release" >/dev/null 2>&1 &
+  fm_test_record_process "$FM_LEAK_PIDFILE" "$!" || exit 1
+) || exit 1
 kill -KILL "$$"
 SH
   chmod +x "$runner" "$repo/$leak"
@@ -2077,14 +2087,14 @@ SH
   set -e
   [ "$rc" -ne 0 ] || fail "a script killed outright must fail the run: $(cat "$tmp/out")"
   [ -s "$stub_pid_file" ] || fail "the killed script never started its stub: $(cat "$tmp/out" "$tmp/err")"
-  stub=$(cat "$stub_pid_file")
+  IFS=$'\t' read -r stub _ < "$stub_pid_file"
   waited=0
-  while kill -0 "$stub" 2>/dev/null && [ "$waited" -lt 100 ]; do
+  while fm_test_process_alive "$stub_pid_file" /stub.sh && [ "$waited" -lt 100 ]; do
     sleep 0.1
     waited=$((waited + 1))
   done
-  if kill -0 "$stub" 2>/dev/null; then
-    kill -KILL "$stub" 2>/dev/null || true
+  if fm_test_process_alive "$stub_pid_file" /stub.sh; then
+    fm_test_process_alive "$stub_pid_file" /stub.sh && kill -KILL "$FM_TEST_PROCESS_PID" 2>/dev/null || true
     fail "the runner left the killed script's stub $stub running"
   fi
   grep -Fq "reaped after $leak:" "$tmp/err" \
@@ -2408,6 +2418,11 @@ assert len(doc["scripts"])==3
   rm -rf "$tmp"
   pass "aggregate-json merges lane timing artifacts"
 }
+
+if [ "${1:-}" = --orphan-review ]; then
+  test_runner_reaps_stubs_a_killed_script_left_behind
+  exit 0
+fi
 
 test_list_all_exact_suite_coverage
 test_family_selection

@@ -495,6 +495,9 @@ cmd_up() {
     mkdir -p "$root" || die "cannot create '$root'"
   fi
   ROOT=$(real_dir "$root")
+  FM_STATE_OVERRIDE="$ROOT" . "$SCRIPT_DIR/fm-wake-lib.sh"
+  local owner_identity
+  owner_identity=$(fm_pid_identity "$$") || die "cannot identify the lab creator"
   LAB="$ROOT/home"
   HARNESS=$harness EXPECT_HOST=$expect_host WANT_MATE=$mate WANT_WORKER=$worker
   NONCE=$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')
@@ -504,6 +507,7 @@ cmd_up() {
   treehouse_listing | sort > "$ROOT/.treehouse-before"
   {
     echo "$RECORD_TOKEN"
+    printf 'owner_pid=%s\nowner_identity=%s\n' "$$" "$owner_identity"
     echo "harness=$harness"
     echo "home=$LAB"
     echo "expect_host=$expect_host"

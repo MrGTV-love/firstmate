@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# fm-test-reap-orphans.sh - stop processes that an ended test run left behind.
+# fm-test-reap-orphans.sh - stop processes that an ended lab or test run left behind.
 #
 # Usage:
-#   fm-test-reap-orphans.sh [--dry-run] [--tmpdir DIR]...
-#   fm-test-reap-orphans.sh [--dry-run] --owner-pid PID --root DIR...
+#   fm-test-reap-orphans.sh [--tmpdir DIR]...
+#   fm-test-reap-orphans.sh --owner-pid PID --root DIR...
 #   fm-test-reap-orphans.sh --help
 #
 # Why it exists: a test fixture's stubs (a lock holder, a polling fake, a
@@ -12,14 +12,14 @@
 # kept running for hours at ten to a hundred forks a second each (observed
 # 2026-10-08: seven CPU-minutes in one lock-holder stub alone).
 #
-# Ownership proof. tests/lib.sh stamps every fixture root it creates with a
-# `.fm-test-fixture` marker naming the owning shell's pid and birth identity.
+# Ownership proof. Test and lab markers name the owning process's pid and birth
+# identity; live-lab launch records and private tmux activity retain ownership.
 # A process is reaped only when ALL of these hold:
-#   1. its command line names a fixture root (the root, or a path below it);
+#   1. its command line or working directory names a marked root or a path below it;
 #   2. that root's marker proves the owner: either the owner is dead (its pid is
 #      gone or now has a different birth identity) in the default scan, or the
 #      owner is the caller (--owner-pid names this process or an ancestor of it
-#      and the marker names the same pid) in the owner-exit sweep;
+#      and the marker names the same pid and identity) in the owner-exit sweep;
 #   3. it has no live parent that could still want it: it is the child of init
 #      or a subreaper, or, in the owner-exit sweep, a descendant of the owner.
 # Its descendants go with it. A command line that merely mentions a path, such as
@@ -27,7 +27,7 @@
 # touched. A fixture whose marker is gone (already removed) proves nothing and is
 # left alone; the sweep therefore runs BEFORE the root is removed.
 #
-# Matching never uses a process name, an environment tag, or file descriptors.
+# Matching never uses a process name, an environment tag, or unrelated open files.
 # Environment tags were rejected because macOS hides the environment of Apple
 # signed binaries such as /bin/bash and /bin/sleep (measured 2026-10-08: a tag on
 # /bin/bash and /bin/sleep was unreadable, on python3 it was readable), and bash
@@ -38,7 +38,6 @@
 # first; a survivor of the 2 second grace gets KILL.
 #
 # Options:
-#   --dry-run       print what would be reaped and signal nothing.
 #   --tmpdir DIR    directory holding fixture roots to scan (repeatable). The
 #                   default scan covers $TMPDIR (when set) and /tmp.
 #   --owner-pid PID with --root, the caller's own pid: reap what this owner left
@@ -46,7 +45,7 @@
 #                   one of its ancestors.
 #   --root DIR      a fixture root the owner made (repeatable, needs --owner-pid).
 #
-# Prints one `reaped` (or `would reap`) line per process and nothing otherwise.
+# Prints one `reaped` line per process and nothing otherwise.
 # Exits 0 unless it was misused or the process list could not be read, so a
 # caller can sweep without risking its own outcome.
 set -u
@@ -56,13 +55,11 @@ GRACE_TICKS=20
 
 usage() { sed -n '2,/^set -u$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; }
 
-DRY_RUN=0
 OWNER_PID=
 TMPDIRS=()
 ROOTS=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1 ;;
     --tmpdir) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; TMPDIRS+=("$2"); shift ;;
     --owner-pid) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; OWNER_PID=$2; shift ;;
     --root) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; ROOTS+=("$2"); shift ;;
@@ -111,17 +108,83 @@ fi
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-reap.XXXXXX" 2>/dev/null) || WORK=$(mktemp -d /tmp/fm-test-reap.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT
 
-# marker_owner_dead <marker>: 0 when the marker's owner no longer exists.
+marker_owner() {
+  local marker=$1 token
+  [ -f "$marker" ] && [ ! -L "$marker" ] && [ -O "$marker" ] || return 1
+  case "$marker" in
+    */.fm-test-fixture)
+      MARKER_PID=$(sed -n '1p' "$marker") || return 1
+      MARKER_IDENTITY=$(sed -n '2,$p' "$marker") || return 1
+      ;;
+    */.fm-lab-home|*/.fm-live-lab)
+      token=$(sed -n '1p' "$marker") || return 1
+      case "$marker:$token" in
+        */.fm-lab-home:"fm-lab-home v1"|*/.fm-live-lab:"fm-live-lab v1") ;;
+        *) return 1 ;;
+      esac
+      MARKER_PID=$(sed -n 's/^owner_pid=//p' "$marker") || return 1
+      MARKER_IDENTITY=$(sed -n 's/^owner_identity=//p' "$marker") || return 1
+      ;;
+    *) return 1 ;;
+  esac
+  case "$MARKER_PID" in ''|*[!0-9]*|0|1) return 1 ;; esac
+  [ -n "$MARKER_IDENTITY" ]
+}
+
 marker_owner_dead() {
-  local marker=$1 owner_pid owner_identity current
-  owner_pid=$(sed -n '1p' "$marker" 2>/dev/null) || return 1
-  owner_identity=$(sed -n '2,$p' "$marker" 2>/dev/null) || return 1
-  case "$owner_pid" in ''|*[!0-9]*) return 1 ;; esac
-  [ -n "$owner_identity" ] || return 1
-  kill -0 "$owner_pid" 2>/dev/null || return 0
+  local current
+  marker_owner "$1" || return 1
+  kill -0 "$MARKER_PID" 2>/dev/null || return 0
   identity_ready
-  current=$(fm_pid_identity "$owner_pid" 2>/dev/null) || return 1
-  [ "$current" != "$owner_identity" ]
+  current=$(fm_pid_identity "$MARKER_PID" 2>/dev/null) || return 1
+  [ "$current" != "$MARKER_IDENTITY" ]
+}
+
+tmux_dir_inactive() {
+  local dir=$1 socket probe
+  [ -d "$dir" ] || return 1
+  for socket in "$dir"/tmux-*/*; do
+    [ -e "$socket" ] || [ -L "$socket" ] || continue
+    probe=$(tmux -S "$socket" list-sessions 2>&1 >/dev/null) && return 1
+    case "$probe" in *"no server running"*) ;; *) return 1 ;; esac
+  done
+}
+
+lab_inactive() {
+  local root=$1 marker=$1/.fm-live-lab line pid= start current dir
+  if [ -f "$marker" ]; then
+    while IFS= read -r line; do
+      case "$line" in
+        launch_pid=*) pid=${line#*=} ;;
+        launch_start=*)
+          start=${line#*=}
+          [ -n "$start" ] || return 1
+          case "$pid" in ''|*[!0-9]*|0|1) return 1 ;; esac
+          if kill -0 "$pid" 2>/dev/null; then
+            current=$(LC_ALL=C ps -o lstart= -p "$pid" 2>/dev/null) || return 1
+            current=$(printf '%s\n' "$current" | awk '{$1=$1; print}')
+            [ -n "$current" ] && [ "$current" != "$start" ] || return 1
+          fi
+          pid=
+          ;;
+        tmux_dir=*)
+          dir=${line#*=}
+          [ -n "$dir" ] || return 1
+          tmux_dir_inactive "$dir" || return 1
+          ;;
+      esac
+    done < "$marker"
+    [ -z "$pid" ] || return 1
+  fi
+  if [ -f "$root/state/.fm-lab-tmux-dir" ]; then
+    dir=$(cat "$root/state/.fm-lab-tmux-dir") || return 1
+    [ -n "$dir" ] || return 1
+    tmux_dir_inactive "$dir" || return 1
+  fi
+  if [ -f "$root/../.fm-live-lab" ]; then
+    marker_owner_dead "$root/../.fm-live-lab" || return 1
+    lab_inactive "$root/.." || return 1
+  fi
 }
 
 physical_dir() { CDPATH='' cd -P -- "$1" 2>/dev/null && pwd -P; }
@@ -141,16 +204,25 @@ add_root() {  # <physical-root>
 if [ -n "$OWNER_PID" ]; then
   for root in "${ROOTS[@]}"; do
     root=$(physical_dir "$root") || continue
-    [ "$(sed -n '1p' "$root/.fm-test-fixture" 2>/dev/null)" = "$OWNER_PID" ] || continue
-    add_root "$root"
+    for marker in "$root/.fm-test-fixture" "$root/.fm-lab-home" "$root/.fm-live-lab"; do
+      marker_owner "$marker" || continue
+      [ "$MARKER_PID" = "$OWNER_PID" ] || continue
+      identity_ready
+      [ "$(fm_pid_identity "$OWNER_PID" 2>/dev/null)" = "$MARKER_IDENTITY" ] || continue
+      case "$marker" in */.fm-test-fixture) ;; *) lab_inactive "$root" || continue ;; esac
+      add_root "$root"
+      break
+    done
   done
 else
   for dir in "${TMPDIRS[@]}"; do
     dir=$(physical_dir "$dir") || continue
-    for marker in "$dir"/fm-*/.fm-test-fixture; do
+    for marker in "$dir"/fm-*/.fm-test-fixture "$dir"/fm-*/.fm-lab-home "$dir"/fmlab.*/.fm-live-lab; do
       [ -f "$marker" ] || continue
       marker_owner_dead "$marker" || continue
-      add_root "$(dirname "$marker")"
+      root=$(dirname "$marker")
+      case "$marker" in */.fm-test-fixture) ;; *) lab_inactive "$root" || continue ;; esac
+      add_root "$root"
     done
   done
 fi
@@ -159,10 +231,28 @@ fi
 COLUMNS=10000 LC_ALL=C ps -U "$(id -u)" -ww -o pid= -o ppid= -o lstart= -o command= > "$WORK/ps" 2>/dev/null \
   || { echo "fm-test-reap-orphans: cannot read the process list" >&2; exit 1; }
 
-# One pass over the snapshot picks the targets: processes naming a proven root
-# that have no live parent, plus everything below them, minus this process and
+: > "$WORK/cwds"
+if [ -d /proc/self ]; then
+  while read -r pid rest; do
+    cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null) || continue
+    printf '%s\t%s\n' "$pid" "$cwd" >> "$WORK/cwds"
+  done < "$WORK/ps"
+elif command -v lsof >/dev/null 2>&1; then
+  if lsof -a -u "$(id -u)" -d cwd -Fpn > "$WORK/lsof" 2>/dev/null; then
+    pid=
+    while IFS= read -r line; do
+      case "$line" in
+        p*) pid=${line#p} ;;
+        n*) [ -z "$pid" ] || printf '%s\t%s\n' "$pid" "${line#n}" >> "$WORK/cwds" ;;
+      esac
+    done < "$WORK/lsof"
+  fi
+fi
+
+# One pass over the snapshots picks root-attributed processes with no live
+# parent, plus everything below them, minus this process and
 # its ancestors. The first output line lists those ancestors.
-awk -v self="$SELF" -v owner="${OWNER_PID:-}" -v rootsfile="$WORK/roots" '
+awk -v self="$SELF" -v owner="${OWNER_PID:-}" -v rootsfile="$WORK/roots" -v cwdsfile="$WORK/cwds" '
 function names(cmd, v,   off, rest, pos, before, after) {
   off = 0
   rest = cmd
@@ -199,6 +289,10 @@ BEGIN {
     variant[nroots] = f[1]
     canon[nroots] = f[2]
   }
+  while ((getline line < cwdsfile) > 0) {
+    split(line, f, "\t")
+    cwd[f[1]] = f[2]
+  }
 }
 {
   line = $0
@@ -227,7 +321,7 @@ END {
     pid = order[i]
     if (pid in protected) continue
     for (r = 1; r <= nroots; r++) {
-      if (!names(cmd[pid], variant[r])) continue
+      if (!names(cmd[pid], variant[r]) && cwd[pid] != variant[r] && index(cwd[pid], variant[r] "/") != 1) continue
       if (initlike(parent[pid]) || (owner != "" && descends(pid, owner + 0))) {
         target[pid] = canon[r]
       }
@@ -283,14 +377,9 @@ i=0
 while [ "$i" -lt "${#PIDS[@]}" ]; do
   short=${CMDS[$i]}
   [ "${#short}" -le 100 ] || short="${short:0:100}..."
-  if [ "$DRY_RUN" -eq 1 ]; then
-    printf 'would reap pid=%s root=%s cmd=%s\n' "${PIDS[$i]}" "${ROOTS_OF[$i]}" "$short"
-  else
-    printf 'reaped pid=%s root=%s cmd=%s\n' "${PIDS[$i]}" "${ROOTS_OF[$i]}" "$short"
-  fi
+  printf 'reaped pid=%s root=%s cmd=%s\n' "${PIDS[$i]}" "${ROOTS_OF[$i]}" "$short"
   i=$((i + 1))
 done
-[ "$DRY_RUN" -eq 0 ] || exit 0
 
 # A stopped process cannot act on TERM until it continues.
 for i in "${!PIDS[@]}"; do
