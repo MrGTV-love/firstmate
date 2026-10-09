@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Suggest GitHub reviewers from recent authorship of a pull request's files.
 #
-# This is a read-only advisory command. It reads the pull request's exact file
+# This advisory command is read-only over GitHub. It reads the pull request's exact file
 # list, then the most recent 100 commits on its base commit for each path. A
 # commit is counted once even when it touched multiple changed paths. Candidates
 # use GitHub's own commit author.login mapping; names and email addresses are

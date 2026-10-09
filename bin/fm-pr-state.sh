@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Report the blockers this command can see on one GitHub pull request.
 #
-# This is a one-shot, read-only command. It reads the current pull request,
+# This is a one-shot command, read-only over GitHub. It reads the current pull request,
 # reported checks, submitted reviews, and review decision from GitHub at
 # invocation time. It never posts, requests, approves, or merges.
 # It reports on checks that have reported. A required context that has never
