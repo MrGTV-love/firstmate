@@ -2151,7 +2151,7 @@ contribution_tasks_json() {
     meta_value_to "$meta" pr_head head
     rows+=("$id" "$task_kind" "$url" "$head")
   done
-  # One jq for every task; the rows ride as positional arguments, four per task.
+  # One jq for the entire task inventory; four positional arguments per task.
   jq -n --arg merge_authority "$merge_authority" \
     '[ $ARGS.positional as $rows
        | range(0; $rows | length; 4)
