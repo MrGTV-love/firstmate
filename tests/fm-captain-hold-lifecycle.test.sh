@@ -1766,16 +1766,20 @@ test_keyed_answer_releases_a_live_work_item() {
   write_origin_meta "$home" "$id" ship
   run_captain "$home" hold "$id" --reason "captain design pick needed" >/dev/null \
     || fail "could not hold the live work item for the captain"
-  tasks_in "$home" add sample-live-done-ship "Ship the second live sample" --kind ship --repo sample --start >/dev/null \
-    || fail "could not create the second in-flight work item"
+  tasks_in "$home" add sample-live-done-ship "Ship the second live sample" --kind ship --repo sample >/dev/null \
+    || fail "could not create the second work item"
   write_origin_meta "$home" sample-live-done-ship ship
   run_captain "$home" hold sample-live-done-ship --reason "captain design pick needed" >/dev/null \
     || fail "could not hold the second live work item"
+  tasks_in "$home" add sample-live-row-only "Ship the row-only sample" --kind ship --repo sample --start >/dev/null \
+    || fail "could not create the in-flight row-only work item"
+  run_captain "$home" hold sample-live-row-only --reason "captain design pick needed" >/dev/null \
+    || fail "could not hold the row-only work item"
   run_captain "$home" hold sample-plain-question --title "Captain call: plain" \
     --reason "captain choice pending" --repo sample >/dev/null \
     || fail "could not hold the plain question"
 
-  out=$(printf '%s\tgo-b\tOption B\n%s\tgo-b\tOption B\tdone\nsample-plain-question\tyes\tYes\n' \
+  out=$(printf '%s\tgo-b\tOption B\n%s\tgo-b\tOption B\tdone\nsample-live-row-only\tgo-b\tOption B\tdone\nsample-plain-question\tyes\tYes\n' \
     "$id" sample-live-done-ship \
     | run_captain "$home" answers --source "live work fixture" 2>&1) \
     || fail "answers on live work items failed: $out"
@@ -1787,6 +1791,10 @@ test_keyed_answer_releases_a_live_work_item() {
     assert_contains "$show" "Option B" "the answer on $id lost the captain's words"
     assert_present "$home/state/$id.meta" "the answer removed the live task record for $id"
   done
+  show=$(tasks_in "$home" show sample-live-row-only --full)
+  assert_contains "$show" "state: in_flight" "a keyed answer completed row-only in-flight work"
+  assert_contains "$show" "held: no" "a keyed answer left row-only work held"
+  assert_contains "$show" "Resolution mode: released" "row-only work did not record a release"
   show=$(tasks_in "$home" show sample-plain-question --full)
   assert_contains "$show" "state: done" "a question with no worker stopped closing"
 
@@ -1794,6 +1802,11 @@ test_keyed_answer_releases_a_live_work_item() {
     | run_captain "$home" answers --source "live work fixture" 2>&1) \
     || fail "an identical live-work answer was not idempotent: $out"
   rm -f "$home/state/sample-live-ship.meta"
+  tasks_in "$home" reopen sample-live-ship >/dev/null \
+    || fail "could not queue the released work item after its worker ended"
+  show=$(tasks_in "$home" show sample-live-ship --full)
+  assert_contains "$show" "state: queued" "the late replay fixture is not queued"
+  assert_contains "$show" "held: no" "the late replay fixture is still held"
   set +e
   out=$(printf 'sample-live-ship\tgo-b\tOption B\n' \
     | run_captain "$home" answers --source "live work fixture" 2>&1)
@@ -1801,8 +1814,92 @@ test_keyed_answer_releases_a_live_work_item() {
   set -e
   [ "$rc" -eq 0 ] || fail "replaying a release after the worker ended was refused: $out"
   show=$(tasks_in "$home" show sample-live-ship --full)
-  assert_not_contains "$show" "state: done" "a late replay completed the released work item"
+  assert_contains "$show" "state: queued" "a late replay changed the queued work item's state"
+  assert_contains "$show" "held: no" "a late replay re-held the released work item"
+  assert_contains "$show" "Resolution mode: released" "a late replay lost its recorded release"
   pass "a keyed answer releases a live work item and still closes a question"
+}
+
+test_keyed_answer_waits_for_cleanup_before_selecting_its_mode() {
+  local home id mode teardown_pid answer_pid teardown_rc answer_rc show
+  local real_perl real_sleep
+  real_perl=$(command -v perl)
+  real_sleep=$(command -v sleep)
+  for mode in default done; do
+    home=$(make_home "answer-waits-for-cleanup-$mode")
+    id=sample-answer-cleanup-race
+    mkdir -p "$home/data/$id" "$home/projects/$id" "$home/projects/sample"
+    tasks_in "$home" add "$id" "Investigate the cleanup race" --kind scout \
+      --repo sample --start >/dev/null || fail "could not create the cleanup-race task"
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$home/projects/$id" \
+      "project=$home/projects/sample" "harness=codex" "kind=scout" \
+      "mode=scout" "spawn_gen=fixture-$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Cleanup race report\n' > "$home/data/$id/report.md"
+    run_captain "$home" hold "$id" --reason "captain report choice pending" >/dev/null \
+      || fail "could not hold the cleanup-race task"
+    install_reused_task_barriers "$home"
+    cat > "$home/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+: > "$FM_HOME/teardown-ready"
+while [ ! -e "$FM_HOME/teardown-release" ] \
+    && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+  sleep 0.01
+done
+exit 0
+SH
+    chmod +x "$home/fakebin/treehouse"
+    PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+      FM_CONFIG_OVERRIDE="$home/config" FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+      "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
+      > "$home/teardown.out" 2> "$home/teardown.err" &
+    teardown_pid=$!
+    if ! wait_for_test_file "$home/teardown-ready" "$teardown_pid"; then
+      : > "$home/teardown-release"
+      wait "$teardown_pid" 2>/dev/null || true
+      fail "cleanup did not reach its locked worktree return: $(cat "$home/teardown.err")"
+    fi
+    (
+      if [ "$mode" = default ]; then
+        printf '%s\tgo\tProceed\n' "$id"
+      else
+        printf '%s\tgo\tProceed\tdone\n' "$id"
+      fi | FM_TEST_REUSE_MERGE=1 FM_TEST_REUSE_MERGE_ONCE="$home/answer-once" \
+        FM_TEST_REUSE_MERGE_READY="$home/answer-ready" \
+        FM_TEST_REUSE_MERGE_RELEASE="$home/answer-release" \
+        FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+        run_captain "$home" answers --source "cleanup race fixture"
+    ) > "$home/answer.out" 2> "$home/answer.err" &
+    answer_pid=$!
+    if ! wait_for_test_file "$home/answer-ready" "$answer_pid"; then
+      : > "$home/teardown-release"
+      : > "$home/answer-release"
+      wait "$teardown_pid" 2>/dev/null || true
+      wait "$answer_pid" 2>/dev/null || true
+      fail "the keyed answer did not wait behind cleanup"
+    fi
+    : > "$home/teardown-release"
+    teardown_rc=0
+    wait "$teardown_pid" || teardown_rc=$?
+    show=$(tasks_in "$home" show "$id" --full)
+    : > "$home/answer-release"
+    answer_rc=0
+    wait "$answer_pid" || answer_rc=$?
+    [ "$teardown_rc" -eq 0 ] || fail "cleanup failed: $(cat "$home/teardown.err")"
+    assert_contains "$show" "state: queued" "cleanup did not queue its finished held task"
+    assert_contains "$show" "held: yes" "cleanup released its finished held task"
+    assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+    [ "$answer_rc" -eq 0 ] || fail "the waiting keyed answer failed: $(cat "$home/answer.err")"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "a stale release reopened finished work"
+    assert_contains "$show" "Resolution mode: answered" "the answer recorded a stale release"
+    assert_contains "$show" "Answer: go" "the waiting answer lost the captain's words"
+    assert_contains "$show" "Deliverable of the finished work: report data/$id/report.md" \
+      "the waiting answer lost cleanup's report"
+  done
+  pass "default and done keyed answers choose their mode after cleanup releases the lock"
 }
 
 # Answer-time closure is opt-in per source. A channel with no binding must behave
@@ -3033,56 +3130,72 @@ SH
 }
 
 test_answer_before_cleanup_replay_preserves_the_retained_report() {
-  local home id wt rc bootstrap json
-  home=$(make_home answer-before-cleanup-replay)
-  id=sample-answer-before-cleanup-replay
-  wt="$home/projects/$id"
-  mkdir -p "$home/data/$id" "$wt" "$home/projects/sample"
-  tasks_in "$home" add "$id" "Investigate answer before cleanup replay" --kind scout \
-    --repo sample --start >/dev/null || fail "could not create the answer-before-replay fixture"
-  fm_write_meta "$home/state/$id.meta" \
-    "window=firstmate:fm-$id" "worktree=$wt" "project=$home/projects/sample" \
-    "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
-  printf 'done: report complete\n' > "$home/state/$id.status"
-  printf '# Interrupted cleanup\n\nThe captain call remains open.\n' > "$home/data/$id/report.md"
-  run_captain "$home" hold "$id" --reason "captain must choose after interrupted cleanup" \
-    >/dev/null || fail "could not hold the answer-before-replay fixture"
-  complete_through_sibling "$home" "$id" >/dev/null \
-    || fail "completion gate failed for the answer-before-replay fixture"
-  cat > "$home/fakebin/treehouse" <<'SH'
+  local home id wt rc bootstrap json intake show
+  for intake in direct keyed keyed-without-meta; do
+    home=$(make_home "answer-before-cleanup-replay-$intake")
+    id=sample-answer-before-cleanup-replay
+    wt="$home/projects/$id"
+    mkdir -p "$home/data/$id" "$wt" "$home/projects/sample"
+    tasks_in "$home" add "$id" "Investigate answer before cleanup replay" --kind scout \
+      --repo sample --start >/dev/null || fail "could not create the answer-before-replay fixture"
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$wt" "project=$home/projects/sample" \
+      "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Interrupted cleanup\n\nThe captain call remains open.\n' > "$home/data/$id/report.md"
+    run_captain "$home" hold "$id" --reason "captain must choose after interrupted cleanup" \
+      >/dev/null || fail "could not hold the answer-before-replay fixture"
+    complete_through_sibling "$home" "$id" >/dev/null \
+      || fail "completion gate failed for the answer-before-replay fixture"
+    cat > "$home/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
 exit 1
 SH
-  chmod +x "$home/fakebin/treehouse"
+    chmod +x "$home/fakebin/treehouse"
 
-  set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
-  assert_present "$home/state/$id.backlog-close" \
-    "the interrupted cleanup lost its retained-artifact record"
+    set +e
+    PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+      FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
+      > "$home/teardown.out" 2> "$home/teardown.err"
+    rc=$?
+    set -e
+    [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
+    assert_present "$home/state/$id.backlog-close" \
+      "the interrupted cleanup lost its retained-artifact record"
 
-  printf 'Proceed with the reported result.\n' > "$home/answer.txt"
-  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null \
-    || fail "the captain could not answer before cleanup replay"
-  fm_fake_exit0 "$home/fakebin" treehouse
-  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
-    "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
-    || fail "session start could not replay cleanup after the answer: $bootstrap"
-  assert_absent "$home/state/$id.meta" "session start left the interrupted task record behind"
-  assert_absent "$home/state/$id.backlog-close" "session start left the pending record behind"
-  json=$(run_bearings "$home") || fail "Bearings failed after the answer-before-replay lifecycle"
-  printf '%s' "$json" | jq -e \
-    --arg id "$id" --arg report "data/$id/report.md" \
-    '.landed | any(.id == $id and .artifact == $report)' >/dev/null \
-    || fail "the retained report disappeared when the captain answered before replay: $json"
-  pass "an answer before cleanup replay preserves the retained report"
+    if [ "$intake" = direct ]; then
+      printf 'Proceed with the reported result.\n' > "$home/answer.txt"
+      run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null \
+        || fail "the captain could not answer before cleanup replay"
+    else
+      printf '%s\tgo\tProceed with the reported result.\n' "$id" \
+        | run_captain "$home" answers --source "interrupted cleanup fixture" >/dev/null \
+        || fail "the captain could not release work before cleanup replay"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: in_flight" "the keyed answer completed work before replay"
+      assert_contains "$show" "held: no" "the keyed answer left the work held before replay"
+      assert_contains "$show" "Resolution mode: released" "the keyed answer did not record its release"
+      [ "$intake" != keyed-without-meta ] || rm -f "$home/state/$id.meta"
+    fi
+    fm_fake_exit0 "$home/fakebin" treehouse
+    bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+      FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
+      "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
+      || fail "session start could not replay cleanup after the answer: $bootstrap"
+    assert_absent "$home/state/$id.meta" "session start left the interrupted task record behind"
+    assert_absent "$home/state/$id.backlog-close" "session start left the pending record behind"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "cleanup replay reopened finished, answered work"
+    assert_contains "$show" "Proceed with the reported result." "cleanup replay lost the captain's words"
+    json=$(run_bearings "$home") || fail "Bearings failed after the answer-before-replay lifecycle"
+    printf '%s' "$json" | jq -e \
+      --arg id "$id" --arg report "data/$id/report.md" \
+      '.landed | any(.id == $id and .artifact == $report)' >/dev/null \
+      || fail "the retained report disappeared when the captain answered before replay: $json"
+  done
+  pass "cleanup replay closes answered work and preserves the report after direct or keyed answers"
 }
 
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change() {
@@ -4751,6 +4864,7 @@ test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
 test_keyed_answer_releases_a_live_work_item
+test_keyed_answer_waits_for_cleanup_before_selecting_its_mode
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open

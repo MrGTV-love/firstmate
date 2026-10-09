@@ -201,9 +201,11 @@ The optional mode column carries a card-declared close:
 | Any other value | Skipped. |
 
 The live task record overrides the column.
-A task whose worker still owns it, shown by a live runtime record or an In flight backlog row, is always released, whatever mode the card declared.
-Completing it would record a landing that has not happened, so only cleanup closes it.
-A replay of that answer after the worker has ended stays a release.
+The answer path chooses the automatic mode from fresh state under the task control lock shared with teardown.
+A task whose worker still owns it, shown by a live runtime record or an In flight backlog row, is released rather than completed.
+If teardown finishes first and returns the held item to Queued without a runtime record, the answer closes it.
+Completing live work would record a landing that has not happened, so only cleanup closes it; interrupted cleanup replay closes the finished item once its captain hold has been resolved.
+A replay of that answer on an unheld, open item after the worker has ended stays a release.
 
 Each key is reported as follows:
 

@@ -1396,6 +1396,8 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
     row_state=$FM_BACKLOG_ROW_STATE
     if [ "${row_state%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       mode=retain
+    elif [ "${row_state%% *}" != "done" ]; then
+      mode=close
     fi
   else
     if [ "$FM_BACKLOG_ROW_RESULT" != not_found ]; then
