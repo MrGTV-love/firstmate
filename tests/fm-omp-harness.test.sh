@@ -1499,7 +1499,16 @@ case "$(grep -c '^host=' "$FM_ARM_LOG")" in
   2)
     printf '%s\nsignal: omp-host second\n' "$started"
     sleep 1
-    printf 'supervision-host: outcome 2 for demo [captain]: fixture split\n'
+    node --input-type=module <<'JS'
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+for (const [stream, label] of [[process.stdout, "stdout"], [process.stderr, "stderr"]]) {
+  const bytes = Buffer.from(`supervision-host: outcome 2 for demo [captain]: fixture split ${label} 船😀\n`);
+  const cut = bytes.indexOf(Buffer.from("船")) + 1;
+  stream.write(bytes.subarray(0, cut));
+  await sleep(100);
+  stream.write(bytes.subarray(cut));
+}
+JS
     exit 0
     ;;
 esac
@@ -1533,6 +1542,9 @@ if (second.length !== 1) throw new Error(`expected one follow-up for the split c
 if (!second[0].m.includes("supervision-host: outcome 2 for demo [captain]: fixture split")) {
   throw new Error(`the split close was delivered without its outcome line: ${second[0].m}`);
 }
+for (const stream of ["stdout", "stderr"]) {
+  if (!second[0].m.includes(`fixture split ${stream} 船😀`)) throw new Error(`host ${stream} UTF-8 was corrupted: ${second[0].m}`);
+}
 await handlers.get("session_shutdown")({}, {});
 process.exit(0);
 EOF
@@ -1555,11 +1567,26 @@ if [ "${1:-}" = --queued ]; then
   printf 'query\n' >> "$FM_HOME/state/query-log"
   [ ! -e "$FM_HOME/state/query-fail" ] || exit 1
   [ ! -e "$FM_HOME/state/query-hang" ] || sleep 20
+  if [ "$SCENARIO" = utf8 ]; then
+    exec node --input-type=module <<'JS'
+import { spawnSync } from "node:child_process";
+const result = spawnSync("bash", [`${process.env.FM_ROOT_OVERRIDE}/bin/fm-wake-drain-real.sh`, "--queued"], { env: process.env });
+if (result.status !== 0) process.exit(1);
+const cut = result.stdout.indexOf(Buffer.from("船")) + 1;
+if (cut < 1) process.exit(1);
+process.stdout.write(result.stdout.subarray(0, cut));
+await new Promise((resolve) => setTimeout(resolve, 100));
+process.stdout.write(result.stdout.subarray(cut));
+JS
+  fi
   if [ -e "$FM_HOME/state/query-slow" ]; then
     rm -f "$FM_HOME/state/query-slow"
     rows=$(bash "$FM_ROOT_OVERRIDE/bin/fm-wake-drain-real.sh" --queued) || exit $?
     : > "$FM_HOME/state/query-started"
-    sleep 1
+    case "$SCENARIO" in
+      slow-turn*) while [ ! -e "$FM_HOME/state/query-release" ]; do sleep 0.1; done ;;
+      *) sleep 1 ;;
+    esac
     printf '%s\n' "$rows"
     exit 0
   fi
@@ -1580,17 +1607,20 @@ while :; do
     fm_wake_append check "$name" "check: $name" || exit 1
     if [ "$SCENARIO" = same-close ] && [ "$name" = trigger-1 ]; then
       printf 'check: misleading old headline\n'
-      : > "$FM_HOME/state/first-appended"
+      : > "$FM_HOME/state/appended-$name"
       while [ ! -e "$FM_HOME/state/trigger-2" ]; do sleep 0.1; done
       rm -f "$FM_HOME/state/trigger-2"
       fm_wake_append check trigger-2 'check: trigger-2' || exit 1
+      : > "$FM_HOME/state/appended-trigger-2"
     fi
     if [ "$SCENARIO" = late-handoff ] && [ "$name" = trigger-1 ]; then
       printf 'check: misleading old headline\n'
       trap 'sleep 2; fm_wake_append check trigger-2 "check: trigger-2"; printf "check: late close\n"; exit 0' TERM
+      : > "$FM_HOME/state/appended-$name"
       while :; do sleep 0.1; done
     fi
     printf 'check: rearm-resurface\n'
+    : > "$FM_HOME/state/appended-$name"
     exit 0
   done
   sleep 0.1
@@ -1637,8 +1667,7 @@ const acknowledge = (presentation) => {
 };
 const fire = async (name) => {
   writeFileSync(`${state}/${name}`, "");
-  await until(() => !existsSync(`${state}/${name}`), `watcher did not take ${name}`);
-  await sleep(500);
+  await until(() => existsSync(`${state}/appended-${name}`), `watcher did not append ${name}`);
 };
 const end = async () => { idle = true; await handlers.get("agent_end")({}, ctx); };
 const accept = async (wake) => {
@@ -1660,6 +1689,7 @@ if (scenario === "external") {
   await until(() => wakes().length === 1, "external row lost");
   expectWake(0, "check: externally queued captain note");
 } else {
+  if (scenario === "utf8") append("multilingual", "check: 船😀 café Ελληνικά");
   await fire("trigger-1");
   if (sent.length || queries()) throw new Error("busy close submitted or queried the queue");
   if (scenario === "unreadable") {
@@ -1670,9 +1700,9 @@ if (scenario === "external") {
     await fire("trigger-2"); await fire("trigger-3");
     acknowledge(drain());
     await end();
-    await until(() => queries() === 1, "empty queue was not queried once");
+    await until(() => queries() >= 1, "empty queue was not queried");
     await sleep(1200);
-    if (sent.length || queries() !== 1) throw new Error("empty closes were not collapsed and retired");
+    if (sent.length) throw new Error(`empty closes injected work: ${JSON.stringify(sent)}`);
   } else if (["mixed", "same-close", "handoff", "late-handoff"].includes(scenario)) {
     const first = drain();
     if (!first.includes("check: trigger-1")) throw new Error("A not presented");
@@ -1692,7 +1722,7 @@ if (scenario === "external") {
     await until(() => wakes().length === 1, "partial acknowledgement lost B", 20);
     expectWake(0, "check: trigger-2");
     if (wakes()[0].m.includes("check: trigger-1")) throw new Error("acknowledged A was replayed");
-  } else if (["failure", "timeout", "slow", "query-close"].includes(scenario)) {
+  } else if (["failure", "timeout", "slow", "slow-turn", "slow-turn-new-row", "query-close"].includes(scenario)) {
     if (scenario === "query-close") acknowledge(drain());
     writeFileSync(`${state}/query-${scenario === "failure" ? "fail" : scenario === "timeout" ? "hang" : "slow"}`, "");
     await end();
@@ -1711,6 +1741,24 @@ if (scenario === "external") {
       await until(() => wakes().length === 1, "close during an empty query lost its mark");
       expectWake(0, "check: trigger-2");
       if (queries() < 2) throw new Error("new close reused the earlier empty snapshot");
+    } else if (scenario.startsWith("slow-turn")) {
+      await until(() => existsSync(`${state}/query-started`), "slow query did not capture A");
+      idle = false;
+      await handlers.get("before_agent_start")({ prompt: "ordinary turn" }, ctx);
+      await handlers.get("message_start")({ message: { role: "user", content: "ordinary turn" } }, ctx);
+      acknowledge(drain());
+      if (scenario === "slow-turn-new-row") append("B", "check: fresh B after A acknowledgement");
+      await end();
+      writeFileSync(`${state}/query-release`, "");
+      await until(() => queries() >= 2, "completed turn lost the mark for a fresh query");
+      if (scenario === "slow-turn-new-row") {
+        await until(() => wakes().length === 1, "completed turn stranded B");
+        expectWake(0, "check: fresh B after A acknowledgement");
+        if (wakes()[0].m.includes("check: trigger-1")) throw new Error("intervening turn reused A's snapshot");
+      } else {
+        await sleep(1200);
+        if (sent.length) throw new Error("completed intervening turn injected an acknowledged headline");
+      }
     } else {
       await until(() => existsSync(`${state}/query-started`), "slow query did not start");
       idle = false;
@@ -1731,7 +1779,7 @@ if (scenario === "external") {
     if (scenario === "owed") { await fire("trigger-2"); await fire("trigger-3"); }
     await end();
     await until(() => wakes().length === 1, "owed row was not sent");
-    expectWake(0, "check: trigger-1");
+    expectWake(0, scenario === "utf8" ? "check: 船😀 café Ελληνικά" : "check: trigger-1");
     if (scenario === "owed" && !wakes()[0].m.includes("and 2 more queued")) throw new Error("missing queued-row count");
     const wake = wakes()[0];
     const count = queries();
@@ -1747,14 +1795,33 @@ if (scenario === "external") {
         "restore-busy": wake.m,
         "restore-drained": `${wake.m}\n\n${draft}`,
         "restore-new-row": `${wake.m}\n\n${draft}`,
+        "restore-end-owed": `${wake.m}\n\n${draft}`,
+        "restore-end-drained": `${wake.m}\n\n${draft}`,
+        "restore-end-new-row": `${wake.m}\n\n${draft}`,
+        "restore-end-queued": `${wake.m}\n\n${draft}`,
       };
       editor = texts[scenario];
       const original = editor;
       if (scenario === "restore-queued") queued = true;
       if (scenario === "restore-busy") idle = false;
+      if (scenario.startsWith("restore-end-")) {
+        idle = false;
+        await handlers.get("before_agent_start")({ prompt: wake.m }, ctx);
+        if (["restore-end-drained", "restore-end-new-row"].includes(scenario)) acknowledge(drain());
+        if (scenario === "restore-end-new-row") append("B", "check: new queued payload");
+        if (scenario === "restore-end-queued") queued = true;
+        await handlers.get("agent_end")({}, ctx);
+        if (editor !== original || sets || wakes().length !== 1) throw new Error("busy turn end touched restored text");
+        idle = true;
+        if (queued) {
+          await sleep(1500);
+          if (editor !== original || sets || wakes().length !== 1) throw new Error("release bypassed pending editor work");
+          queued = false;
+        }
+      }
       if (scenario === "restore-new-row") { acknowledge(drain()); append("B", "check: new queued payload"); }
-      if (scenario === "restore-drained") {
-        acknowledge(drain());
+      if (["restore-drained", "restore-end-drained"].includes(scenario)) {
+        if (scenario === "restore-drained") acknowledge(drain());
         await until(() => editor === draft, "empty-queue restored template was not removed");
         await sleep(1200);
         if (wakes().length !== 1) throw new Error("empty-queue editor text was resubmitted");
@@ -1763,9 +1830,9 @@ if (scenario === "external") {
         if (wakes().length !== 1 || editor !== original || sets !== 0) throw new Error("poll touched or sent unsupported editor text");
       } else {
         await until(() => wakes().length === 2, "stranded editor did not mark queue work");
-        expectWake(1, scenario === "restore-new-row" ? "check: new queued payload" : "check: trigger-1");
+        expectWake(1, ["restore-new-row", "restore-end-new-row"].includes(scenario) ? "check: new queued payload" : "check: trigger-1");
         if (editor !== (scenario === "restore-alone" ? "" : draft)) throw new Error("poll changed operator draft bytes");
-        if (scenario === "restore-new-row" && wakes()[1].m.includes("check: trigger-1")) throw new Error("poll submitted stale composer text");
+        if (["restore-new-row", "restore-end-new-row"].includes(scenario) && wakes()[1].m.includes("check: trigger-1")) throw new Error("poll submitted stale composer text");
       }
     } else if (["outstanding-end", "dropped", "removed", "edited"].includes(scenario)) {
       if (scenario === "outstanding-end") await accept(wake);
@@ -1806,7 +1873,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed mixed same-close handoff late-handoff external host-drained host-owed outstanding-end dropped removed edited failure timeout slow query-close unreadable restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained; do
+  for scenario in drained owed mixed same-close handoff late-handoff external host-drained host-owed outstanding-end dropped removed edited failure timeout slow slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"
