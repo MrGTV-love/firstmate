@@ -172,11 +172,14 @@ lab_env_base() {
   [ -z "${CLAUDE_DIR:-}" ] || printf '%s\n' "CLAUDE_CONFIG_DIR=$CLAUDE_DIR"
 }
 
+# Every lab process starts under bin/fm-proc-budget.sh, so a runaway process tree
+# in the lab (the private tmux server carries the budget to every pane) stops at
+# its own limit instead of starving the user's other sessions of fork.
 lab_run() {  # [NAME=VALUE...] <command...>: run in the lab's clean environment
   local -a base=()
   local line
   while IFS= read -r line; do base+=("$line"); done < <(lab_env_base)
-  env -i "${base[@]}" "$@"
+  "$SCRIPT_DIR/fm-proc-budget.sh" -- env -i "${base[@]}" "$@"
 }
 
 # window_id <name>: the tmux id of the lab window with exactly this name, or

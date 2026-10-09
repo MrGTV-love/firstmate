@@ -134,6 +134,13 @@
 # The marker must be a nonnegative decimal integer or execution exits 125;
 # 0 denotes degraded work and imposes no budget.
 # Without python3 or the pool tool beside it, scripts run directly.
+#
+# Every executed script also runs under a per-tree process budget
+# (bin/fm-proc-budget.sh owns it): a script that forks without bound stops at its
+# own limit instead of filling the user's process table for every other lane.
+# The budget is taken when the script starts, after any pass wait. FM_PROC_BUDGET=off
+# disables it, FM_PROC_BUDGET_EXTRA sizes it, and a host that cannot set one runs
+# scripts without it and says so on stderr.
 # With a usable pool, --jobs above its size still starts that many workers,
 # but only pool-size scripts run at once.
 #
@@ -849,6 +856,7 @@ tests/fm-pr-check-security.test.sh 300675
 tests/fm-pr-reviewers.test.sh 273
 tests/fm-pr-state-live-e2e.test.sh 47
 tests/fm-pr-state.test.sh 531
+tests/fm-proc-budget.test.sh 8000
 tests/fm-procevent-quota.test.sh 2459
 tests/fm-procevent-when.test.sh 25674
 tests/fm-procevent.test.sh 370820
@@ -2467,6 +2475,13 @@ elif ! command -v python3 >/dev/null 2>&1; then
   CPU_PASS_ACTIVE=0
   log "running without CPU passes: python3 not found"
 fi
+PROC_BUDGET_ACTIVE=1
+if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ] || [ "${FM_PROC_BUDGET:-}" = off ]; then
+  PROC_BUDGET_ACTIVE=0
+elif ! proc_budget_note=$("$ROOT/bin/fm-proc-budget.sh" --check 2>&1); then
+  PROC_BUDGET_ACTIVE=0
+  log "running without process budgets: $proc_budget_note"
+fi
 if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
   SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"
 fi
@@ -2646,6 +2661,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
     cmd=(bash -c 'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out")
   else
     cmd=(bash "$script")
+  fi
+  if [ "$PROC_BUDGET_ACTIVE" -eq 1 ]; then
+    # Innermost, so the budget is taken when the script starts, not before a
+    # pass wait or after another script has already grown the process count.
+    cmd=("$ROOT/bin/fm-proc-budget.sh" -- "${cmd[@]}")
   fi
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
     # The bound runs inside the pass holder so the pass wait stays outside it.

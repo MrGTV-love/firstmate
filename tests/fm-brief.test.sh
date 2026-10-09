@@ -1512,11 +1512,46 @@ test_crewmate_scaffolds_require_stopping_private_services() {
   pass "fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line"
 }
 
+# A runaway scratch tree fills the user's whole process table and costs every
+# lane its forks (the 2026-10-08 fork-EAGAIN incident), and only the worker's
+# own brief reaches an ad-hoc shim, lab, or measurement script. Every crewmate
+# scaffold carries the one-line rule that routes such a script through
+# bin/fm-proc-budget.sh; the emitted line must be identical for ship and scout.
+test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget() {
+  local home="$TMP_ROOT/proc-budget-home" mode brief ship_rule scout_rule
+  mkdir -p "$home/data"
+  for mode in no-mistakes direct-PR local-only; do
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "brief-budget-$mode" alpha --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh --mode $mode exited non-zero"
+    brief="$home/data/brief-budget-$mode/brief.md"
+    assert_grep "9. Run any shim, lab, or measurement script through" "$brief" \
+      "$mode ship brief lacks the process-budget rule"
+    assert_grep "$ROOT/bin/fm-proc-budget.sh" "$brief" \
+      "$mode ship brief does not name the process-budget wrapper by path"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-budget-scout alpha --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh --scout exited non-zero"
+  brief="$home/data/brief-budget-scout/brief.md"
+  assert_grep "9. Run any shim, lab, or measurement script through" "$brief" \
+    "scout brief lacks the process-budget rule"
+  ship_rule=$(grep '^9\. Run any shim' "$home/data/brief-budget-no-mistakes/brief.md")
+  scout_rule=$(grep '^9\. Run any shim' "$brief")
+  [ -n "$ship_rule" ] && [ "$ship_rule" = "$scout_rule" ] \
+    || fail "ship and scout process-budget rules have drifted apart"
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-budget-mate --secondmate alpha >/dev/null 2>&1 \
+    || fail "fm-brief.sh --secondmate exited non-zero"
+  assert_no_grep "fm-proc-budget.sh" "$home/data/brief-budget-mate/brief.md" \
+    "a secondmate charter is not a crewmate scratch-script rule"
+  pass "fm-brief.sh: every crewmate scaffold routes scratch scripts through the process budget"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs
 test_ship_mode_is_required_and_closed_set
+test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget
 test_ship_mode_is_explicit_not_registry
 test_delivery_flags_are_refused_where_they_do_not_apply
 test_faster_paths_use_configured_authority_without_stacked_review

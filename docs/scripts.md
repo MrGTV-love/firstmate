@@ -55,6 +55,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
+| `fm-proc-budget.sh`      | Run a command tree under a per-tree process budget so a runaway tree stops at its own limit instead of filling the user's process table |
 | `fm-load-report.sh`      | Record host load and judge it with pipeline agent durations ([recipe](cpu-pass-pool.md#judging-the-pool)) |
 | `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
 | `fm-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
