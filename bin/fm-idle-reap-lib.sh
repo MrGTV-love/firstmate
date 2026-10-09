@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 
 FM_IDLE_REAP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-wake-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-classify-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-classify-lib.sh"
+# shellcheck source=bin/fm-backend.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-backend.sh"
+# shellcheck source=bin/fm-busy-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-pr-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-pr-lib.sh"
 
 fm_idle_reap_terminal_age() {
@@ -127,6 +132,7 @@ fm_idle_reap_classify() {
   fi
   fm_epoch_seconds_to now
   age=$(fm_idle_reap_terminal_age "$IDLE_REAP_LAST" "$evidence" "$now")
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   IDLE_REAP_AGE=$age
   if [ "$age" -lt 1800 ]; then
     IDLE_REAP_CLASS=wait-grace
@@ -137,6 +143,8 @@ fm_idle_reap_classify() {
     IDLE_REAP_CLASS=refused
     return 0
   fi
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   IDLE_REAP_CLASS=reap
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   IDLE_REAP_DETAIL="finished and idle"
 }

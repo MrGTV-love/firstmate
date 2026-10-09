@@ -569,6 +569,7 @@ if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
   if [ -n "$FORCE" ] || ! (
     trap - EXIT
     teardown_require_source "$SCRIPT_DIR/fm-idle-reap-lib.sh"
+    # shellcheck source=/dev/null # Analyzed separately as a canonical lint root; this re-source is subshell-only.
     . "$SCRIPT_DIR/fm-idle-reap-lib.sh"
     fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
     if [ "$IDLE_REAP_CLASS" != reap ]; then

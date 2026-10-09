@@ -484,9 +484,12 @@ test_admission_reads_after_metadata_lock() {
     wait "$pid"
   ) || rc=$?
   expect_code 1 "$rc" "late instruction refuses teardown"
+  # shellcheck disable=SC2031 # The parent fixture path is unchanged by the subshell.
   out=$(cat "$home/teardown.out")
   case "$out" in *"automatic reap ineligible: steer-pending"*) ;; *) fail "admission must read after acquiring metadata lock: $out" ;; esac
+  # shellcheck disable=SC2031 # The parent fixture path is unchanged by the subshell.
   assert_present "$home/state/worker.meta" "task survives locked race"
+  # shellcheck disable=SC2031 # The parent fixture path is unchanged by the subshell.
   assert_present "$home/state/worker.inbox/007.msg" "instruction survives locked race"
   pass "automatic admission observes inbox delivery before the metadata lock is released"
 }

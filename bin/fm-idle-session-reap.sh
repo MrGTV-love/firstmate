@@ -68,6 +68,7 @@ REAP_DIR="$STATE/.idle-reap"
 REPORT="$STATE/idle-sessions.report"
 LOCK="$STATE/.idle-reap.lock"
 
+# shellcheck source=bin/fm-idle-reap-lib.sh
 . "$SCRIPT_DIR/fm-idle-reap-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
