@@ -5939,12 +5939,12 @@ test_docker_all_failure_channels_retain_forced_tasks_until_retry() {
 printf '%s\n' returned >> "$case_dir/retired"
 EOF
     chmod +x "$case_dir/fakebin/treehouse"
-    fail_operation= ps_fail= rm_error= network_fail= volume_fail=
+    fail_operation='' ps_fail='' rm_error='' network_fail='' volume_fail=''
     case "$channel" in
-      initial-ps) fail_operation=ps ;;
+      initial-ps) fail_operation='ps' ;;
       verify-ps) ps_fail=2 ;;
       final-ps) ps_fail=3 ;;
-      container-rm) fail_operation=rm ;;
+      container-rm) fail_operation='rm' ;;
       container-rm-error) rm_error=1 ;;
       network-ls) fail_operation=network-ls ;;
       volume-ls) fail_operation=volume-ls ;;

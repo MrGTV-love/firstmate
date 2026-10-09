@@ -3495,6 +3495,22 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
   return 1
 }
 
+# Keep the child's task context function-local while its cleanup runs in a subshell.
+quiesce_firstmate_home_child() {
+  local ID=$1 KIND=$2 STATE=$3 PROJ=$4 WT=$5 TASK_TMP
+  TASK_TMP=$(meta_value "$6" tasktmp)
+  local FM_HOME=$7 FM_STATE_OVERRIDE=$3 FM_DATA_OVERRIDE="$7/data" FM_CONFIG_OVERRIDE="$7/config"
+  (
+    export FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE
+    if [ "$8" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+      reap_task_worktree_processes tasktmp "$TASK_TMP" || exit 1
+    else
+      conclude_task_no_mistakes_run "$WT" forced-child || exit 1
+      reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
+    fi
+  )
+}
+
 cleanup_firstmate_home_children() {
   local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i
   sub_state="$home/state"
@@ -3559,17 +3575,8 @@ cleanup_firstmate_home_children() {
       [ -n "$child_home" ] || child_home=$child_wt
       cleanup_firstmate_home_process_events "$child_home" "child firstmate home" || return 1
     else
-      (
-        ID=$child_id KIND=$child_kind STATE=$sub_state PROJ=$child_proj
-        WT=$child_wt TASK_TMP=$(meta_value "$child_meta" tasktmp)
-        export FM_HOME="$home" FM_STATE_OVERRIDE="$sub_state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config"
-        if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
-          reap_task_worktree_processes tasktmp "$TASK_TMP" || exit 1
-        else
-          conclude_task_no_mistakes_run "$WT" forced-child || exit 1
-          reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
-        fi
-      ) || return 1
+      quiesce_firstmate_home_child "$child_id" "$child_kind" "$sub_state" "$child_proj" \
+        "$child_wt" "$child_meta" "$home" "$child_owner_rc" || return 1
     fi
     if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
       teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1
