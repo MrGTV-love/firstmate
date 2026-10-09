@@ -1,0 +1,22 @@
+[
+  {
+    "command": [
+      "node",
+      "-e",
+      "console.log(\"node-ready\")"
+    ],
+    "exit": 0,
+    "elapsed": 4.448,
+    "output": "node-ready\n"
+  },
+  {
+    "command": [
+      "bash",
+      "-c",
+      "source bin/fm-timeout-lib.sh; exec 3<&0; fm_run_timed 3 bash -c 'exec \"$@\" <&3' _ \"$(command -v node)\" --input-type=module -; code=$?; printf \"validator_exit=%s\\n\" \"$code\"; exit \"$code\""
+    ],
+    "exit": 124,
+    "elapsed": 8.595,
+    "output": "validator_exit=124\n"
+  }
+]

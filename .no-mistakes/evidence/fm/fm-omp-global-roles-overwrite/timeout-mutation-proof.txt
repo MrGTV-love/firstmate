@@ -1,0 +1,11 @@
+nested-quantifier-mutant
+command: bash tests/.nm-omp-mutation.sh
+exit=1; elapsed=76.757s
+not ok - a long literal prefix ending in a glob must classify within three seconds
+
+
+fixed-linear-validator
+command: bash tests/.nm-omp-long-glob.sh
+exit=1; elapsed=146.606s
+not ok - a long literal prefix ending in a glob must classify within three seconds
+

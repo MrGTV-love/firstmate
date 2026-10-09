@@ -1,0 +1,9 @@
+{
+  "localEndpointStopped": true,
+  "disposableWorktreeFixturesRemoved": true,
+  "temporaryMutationRemoved": true,
+  "temporaryRunnersRemoved": true,
+  "ownedTaskTempsRemoved": true,
+  "markedLabsStoppedAndRemoved": true,
+  "intentionalSourceChanges": false
+}

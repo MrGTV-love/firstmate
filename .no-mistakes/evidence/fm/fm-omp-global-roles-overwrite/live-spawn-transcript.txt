@@ -1,0 +1,590 @@
+
+SCENARIO: missing-default
+exit=1; elapsed=42.722s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+error: omp modelRoles.default is not set in the shared omp config, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model
+
+config byte-identical before/after admission=True; task metadata exists=False
+result=pass
+
+
+SCENARIO: unlisted-default
+exit=1; elapsed=94.959s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+error: omp modelRoles.default 'apple/definitely-missing-model:high' is not listed by 'omp models --json' although provider 'apple' is, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model
+
+config byte-identical before/after admission=True; task metadata exists=False
+result=pass
+
+
+SCENARIO: project-cannot-mask-global
+exit=1; elapsed=52.641s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+error: omp modelRoles.default is not set in the shared omp config, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model
+
+config byte-identical before/after admission=True; task metadata exists=False
+result=pass
+
+
+SCENARIO: literal-raw-refused
+exit=1; elapsed=101.342s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+error: omp modelRoles.default is not set in the shared omp config, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model
+
+config byte-identical before/after admission=True; task metadata exists=False
+result=pass
+
+
+SCENARIO: long-glob-pass-through
+exit=0; elapsed=177.588s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+skill selection for nm-long-glob-pass-through: undelivered - raw launch command has no supported brief transport
+spawned nm-long-glob-pass-through harness=omp kind=scout window=primary:fm-nm-long-glob-pass-through worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+
+config byte-identical before/after admission=True; task metadata exists=True
+window=primary:fm-nm-long-glob-pass-through
+endpoint_task_id=nm-long-glob-pass-through
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live-project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-nm-long-glob-pass-through
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+busy_gen=g1791530403.23682.24308
+spawn_gen=s1791530421.77255.4413
+
+PANE:
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/1/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/1/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-long-glob-pass-through/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-long-glob-pass-through
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-long-glob-pass-through+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.s179153042
+1.77255.4413.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+result=pass
+
+
+SCENARIO: explicit-model-overrides-missing
+exit=0; elapsed=165.275s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+skill selection for nm-explicit-model-overrides-missing: unavailable - no TypeSafe or OpenRouter key
+spawned nm-explicit-model-overrides-missing harness=omp kind=scout window=primary:fm-nm-explicit-model-overrides-missing worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+
+config byte-identical before/after admission=True; task metadata exists=True
+window=primary:fm-nm-explicit-model-overrides-missing
+endpoint_task_id=nm-explicit-model-overrides-missing
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live-project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-nm-explicit-model-overrides-missing
+model=apple/on-device
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791530620.40451.7908
+spawn_gen=s1791530637.97372.218
+
+PANE:
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/1/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/1/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-explicit-model-overrides-missing/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-explicit-model-overrides-missing
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-explicit-model-overrides-missing+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.
+s1791530637.97372.218.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+result=pass
+
+
+SCENARIO: listed-thinking-suffix
+exit=0; elapsed=63.314s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for nm-listed-thinking-suffix: unavailable - no TypeSafe or OpenRouter key
+spawned nm-listed-thinking-suffix harness=omp kind=scout window=primary:fm-nm-listed-thinking-suffix worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+
+config byte-identical before/after admission=True; task metadata exists=True
+window=primary:fm-nm-listed-thinking-suffix
+endpoint_task_id=nm-listed-thinking-suffix
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live-project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-nm-listed-thinking-suffix
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791530712.27958.26535
+spawn_gen=s1791530715.19232.26893
+
+PANE:
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/1/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/1/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-listed-thinking-suffix/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-listed-thinking-suffix
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-listed-thinking-suffix+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.s179153071
+5.19232.26893.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+result=pass
+
+
+SCENARIO: raw-native-model-pin
+exit=0; elapsed=43.84s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for nm-raw-native-model-pin: undelivered - raw launch command has no supported brief transport
+spawned nm-raw-native-model-pin harness=omp kind=scout window=primary:fm-nm-raw-native-model-pin worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/2/live-project
+
+config byte-identical before/after admission=True; task metadata exists=True
+window=primary:fm-nm-raw-native-model-pin
+endpoint_task_id=nm-raw-native-model-pin
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/2/live-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live-project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-nm-raw-native-model-pin
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+busy_gen=g1791530738.70244.14329
+spawn_gen=s1791530749.42356.25757
+
+PANE:
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+
+[Showing lines 1-295 of 589. Use :296 to continue]A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/2/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/2/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-raw-native-model-pin/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-raw-native-model-pin
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-raw-native-model-pin+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.s1791530749.
+42356.25757.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+result=pass
+
+
+SCENARIO: unknown-provider-notice
+exit=0; elapsed=91.422s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+notice: omp provider 'fixture-extension' is not in 'omp models --json' (extension-registered providers are never listed); launching 'fixture-extension/model:high' unvalidated
+skill selection for nm-unknown-provider-notice: undelivered - raw launch command has no supported brief transport
+spawned nm-unknown-provider-notice harness=omp kind=scout window=primary:fm-nm-unknown-provider-notice worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+
+config byte-identical before/after admission=True; task metadata exists=True
+window=primary:fm-nm-unknown-provider-notice
+endpoint_task_id=nm-unknown-provider-notice
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live-project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-nm-unknown-provider-notice
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+busy_gen=g1791530842.99811.9112
+spawn_gen=s1791530850.28838.2869
+
+PANE:
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/1/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/1/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-unknown-provider-notice/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-unknown-provider-notice
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-unknown-provider-notice+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.s17915308
+50.28838.2869.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+result=pass
+
+
+SCENARIO: bare-fuzzy-pattern
+exit=0; elapsed=54.18s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for nm-bare-fuzzy-pattern: undelivered - raw launch command has no supported brief transport
+spawned nm-bare-fuzzy-pattern harness=omp kind=scout window=primary:fm-nm-bare-fuzzy-pattern worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+
+config byte-identical before/after admission=True; task metadata exists=True
+window=primary:fm-nm-bare-fuzzy-pattern
+endpoint_task_id=nm-bare-fuzzy-pattern
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live-project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-nm-bare-fuzzy-pattern
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+busy_gen=g1791530895.24274.8418
+spawn_gen=s1791530902.42451.22286
+
+PANE:
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/1/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/1/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-bare-fuzzy-pattern/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-bare-fuzzy-pattern
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-bare-fuzzy-pattern+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.s1791530902.42
+451.22286.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+result=pass
+
+
+SCENARIO: malformed-config-pass-through
+exit=0; elapsed=76.211s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zds2s_pu
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for nm-malformed-config-pass-through: undelivered - raw launch command has no supported brief transport
+spawned nm-malformed-config-pass-through harness=omp kind=scout window=primary:fm-nm-malformed-config-pass-through worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+
+config byte-identical before/after admission=True; task metadata exists=True
+window=primary:fm-nm-malformed-config-pass-through
+endpoint_task_id=nm-malformed-config-pass-through
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-project-6625d6/1/live-project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live-project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-nm-malformed-config-pass-through
+model=default
+effort=default
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+busy_gen=g1791530964.69793.25889
+spawn_gen=s1791530977.63433.13084
+
+PANE:
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/1/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/1/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-malformed-config-pass-through/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-malformed-config-pass-through
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-malformed-config-pass-through+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.s17
+91530977.63433.13084.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+result=pass
+
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/live.py", line 110, in <module>
+    shutil.rmtree(lab)
+    ~~~~~~~~~~~~~^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/shutil.py", line 763, in rmtree
+    _rmtree_safe_fd(stack, onexc)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/shutil.py", line 707, in _rmtree_safe_fd
+    onexc(func, path, err)
+    ~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/shutil.py", line 700, in _rmtree_safe_fd
+    onexc(os.unlink, fullname, err)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/shutil.py", line 696, in _rmtree_safe_fd
+    os.unlink(entry.name, dir_fd=topfd)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/Users/charlesabrooker/tmp/fm-lab.zds2s_pu/state/nm-raw-native-model-pin.git-hooks'
+
+
+Wall time: 1003.28 seconds
+
+Command exited with code 1

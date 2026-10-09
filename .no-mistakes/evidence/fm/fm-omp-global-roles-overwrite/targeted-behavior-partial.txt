@@ -1,0 +1,14 @@
+Command: env TMPDIR="$PWD/.nm-omp-validation/tmp" FM_TEST_SKIP_ORPHAN_REAP=1 bash tests/.nm-omp-targeted.sh
+Outer deadline: 1200 seconds (reached)
+
+selector: test_spawn_model_validation_scoped_to_listed_providers
+ok - fm-spawn: omp model validation is scoped to providers the listing can prove
+elapsed 126.431 seconds
+selector: test_spawn_refuses_a_missing_or_unlisted_default_role
+ok - fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy
+elapsed 549.228 seconds
+selector: test_spawn_global_config_is_read_only_and_unlayered
+ok - fm-spawn: global role inspection is read-only, unlayered, and honors PI_CODING_AGENT_DIR
+elapsed 298.286 seconds
+selector: test_spawn_raw_omp_guard_uses_the_launch_model
+(no completed result before outer deadline)

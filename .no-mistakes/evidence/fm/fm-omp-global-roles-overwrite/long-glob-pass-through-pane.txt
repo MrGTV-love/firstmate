@@ -1,0 +1,48 @@
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehouse/.treehouse/live-projec
+t-6625d6/1/live-project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:live-project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXEQ168BN8K184P4R3DTM9/.nm-omp-validation/treehou
+se/.treehouse/live-project-6625d6/1/live-project'
+Mac-Studio:live-project charlesabrooker$ export GOTMPDIR=/tmp/fm-nm-long-glob-pass-through/gotmp
+Mac-Studio:live-project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:live-project charlesabrooker$ export FM_TASK_ID=nm-long-glob-pass-through
+Mac-Studio:live-project charlesabrooker$ . '/tmp/fm-nm-long-glob-pass-through+25dc40c07fbe82ae37a4e2c91abde8f4dc7339c23f9653ef3d8ecead60a4dd69/launch.s179153042
+1.77255.4413.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

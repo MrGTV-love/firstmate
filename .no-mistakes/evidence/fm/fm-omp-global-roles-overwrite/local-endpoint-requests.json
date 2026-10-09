@@ -1,0 +1,13 @@
+{
+  "endpoint": "disposable localhost model catalog",
+  "requests": [
+    "/v1/models",
+    "/v1/models",
+    "/v1/models",
+    "/v1/models",
+    "/v1/models",
+    "/v1/models",
+    "/v1/models"
+  ],
+  "modelCompletionRequests": 0
+}

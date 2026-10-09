@@ -1,0 +1,11 @@
+fixed-original-3-second-bound
+command: bash tests/.nm-omp-long-glob.sh (original unchanged 3-second bound; serial run)
+exit=0; elapsed=56.662s
+ok - fm-spawn: any expanded raw token passes through unchanged without evaluating it or probing the default-role catalog
+
+
+mutant-original-3-second-bound
+command: bash tests/.nm-omp-mutation.sh (original unchanged 3-second bound; serial run)
+exit=1; elapsed=28.101s
+not ok - a long literal prefix ending in a glob must classify within three seconds
+

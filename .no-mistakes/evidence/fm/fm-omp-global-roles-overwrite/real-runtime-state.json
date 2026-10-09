@@ -1,0 +1,34 @@
+[
+  {
+    "scenario": "colon",
+    "command": "get_state",
+    "success": true,
+    "model": {
+      "provider": "lab-local",
+      "id": "qwen3:8b",
+      "baseUrl": "http://127.0.0.1:62996/v1"
+    },
+    "thinkingLevel": "high",
+    "isSettled": true,
+    "messageCount": 0,
+    "configByteIdentical": true,
+    "catalogProbe": true,
+    "extraction": "Selected complete fields from captured real RPC response; full frame exceeds tmux capture depth."
+  },
+  {
+    "scenario": "long-glob",
+    "command": "get_state",
+    "success": true,
+    "model": {
+      "provider": "lab-local",
+      "id": "qwen3:8b",
+      "baseUrl": "http://127.0.0.1:62996/v1"
+    },
+    "thinkingLevel": "high",
+    "isSettled": true,
+    "messageCount": 0,
+    "configByteIdentical": true,
+    "catalogProbe": false,
+    "extraction": "Selected complete fields from captured real RPC response; full frame exceeds tmux capture depth."
+  }
+]

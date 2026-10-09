@@ -1,0 +1,3 @@
+Command: env TMPDIR="$PWD/.nm-omp-validation/tmp" FM_TEST_SKIP_ORPHAN_REAP=1 bash tests/.nm-omp-literal.sh
+Exit: 0
+ok - fm-spawn: unquoted, single-quoted, and double-quoted literal evidence still refuses invalid defaults

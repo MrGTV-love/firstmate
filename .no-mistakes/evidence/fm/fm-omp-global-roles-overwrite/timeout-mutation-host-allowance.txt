@@ -1,0 +1,11 @@
+old-regex-with-startup-allowance
+command: bash tests/.nm-omp-mutation.sh (disposable 30-second wrapper only)
+exit=1; elapsed=194.97s
+not ok - a long literal prefix ending in a glob must classify within the diagnostic 30-second host allowance
+
+
+fixed-regex-with-startup-allowance
+command: bash tests/.nm-omp-long-glob.sh (disposable 30-second wrapper only)
+exit=0; elapsed=144.903s
+ok - fm-spawn: any expanded raw token passes through unchanged without evaluating it or probing the default-role catalog
+

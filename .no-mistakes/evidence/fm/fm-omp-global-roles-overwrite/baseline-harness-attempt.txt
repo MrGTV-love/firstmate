@@ -1,0 +1,5 @@
+Command: bash tests/fm-omp-harness.test.sh
+Exit: 1
+not ok - 'ompd' merely contains omp and must not detect as omp
+
+The suite stopped before reaching changed spawn scenarios. The changed spawn tests were subsequently selected in a disposable runner.

@@ -1,0 +1,100 @@
+[
+  {
+    "name": "missing-default",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "unlisted-default",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "project-cannot-mask-global",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "literal-raw-refused",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "long-glob-pass-through",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "explicit-model-overrides-missing",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "listed-thinking-suffix",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "raw-native-model-pin",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "unknown-provider-notice",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "bare-fuzzy-pattern",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "malformed-config-pass-through",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-spawn-transcript.txt",
+    "reason": ""
+  },
+  {
+    "name": "colon-and-thinking-suffix-runtime",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/real-runtime-state.json",
+    "reason": ""
+  },
+  {
+    "name": "unreadable-catalog-pass-through",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/live-omp-unreadable-rpc.txt",
+    "reason": ""
+  },
+  {
+    "name": "original-timeout-test-discriminates-old-and-fixed",
+    "result": "pass",
+    "live": false,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4EXEQ168BN8K184P4R3DTM9/timeout-mutation-serial.txt",
+    "reason": "Behavioral fixture regression, not a live vendor scenario; exact three-second bound passed fixed code and timed out the temporary old-regex executable after serializing checks."
+  }
+]
