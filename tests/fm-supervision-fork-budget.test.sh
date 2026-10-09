@@ -20,20 +20,14 @@
 # watchers added +221/second on main versus +37/second on the branch on average
 # (-83%). Live homes have no after sample until rollout.
 #
-# A loaded host pays for every process a bash loop starts, and the loops that
-# run all day (the watcher's signal scan and its per-task checks, the crew
-# current-state read, the owner watchdog tick) used to start one process or
-# more per log line, per ledger row, or per task: a quiet watcher cycle over 35
-# tasks started about 2,000, one crew-state read about 330, and one owner tick
-# about 38. Each case here runs the loop over a fixture that grows with the
-# fleet and counts the subshells it enters (every $( ) and pipeline stage; the
-# count a wall clock cannot give on a busy CI host), so a per-row or per-task
-# subshell shows up as a count that scales with the fixture and fails its bound.
+# These fixtures guard against per-row and per-task subshell growth in the hot
+# helpers; they do not reproduce the whole-cycle measurements above.
 #
-# The fork-free helpers must also answer exactly as the pipelines they replace
-# did, because the same functions gate teardown and liveness decisions. Each of
-# those cases embeds the replaced pipeline as the reference and compares both on
-# the same inputs under every available Bash and both a C and a UTF-8 locale.
+# The optimized helpers must also answer exactly as the pipelines they replace
+# did, because the same functions gate teardown and liveness decisions. The
+# equivalence cases embed the replaced pipelines as references and compare both
+# on the same inputs under the distinct Bash versions selected below, in C and
+# an available UTF-8 locale.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -79,10 +73,10 @@ run_everywhere() {  # <label> <script> [args...]
   done < <(test_interpreters)
 }
 
-# The subshell counter. A measured script sources this after its setup: the
-# DEBUG trap (inherited by functions and subshells) appends one byte to
-# $FMB_LOG each time the shell is one subshell deeper than the command before,
-# so the log length is the number of subshells that ran at least one command.
+# The counter mechanism for the helper-level budgets described in the header.
+# A measured script sources this after setup. The inherited DEBUG trap appends
+# one byte to $FMB_LOG whenever BASH_SUBSHELL exceeds that shell's previous
+# observed depth; the log length counts those transitions, not process starts.
 COUNTER="$TMP_ROOT/counter.sh"
 cat > "$COUNTER" <<'SH'
 set -T
@@ -90,7 +84,7 @@ _FMB_PREV=0
 trap '_fmb_d=$BASH_SUBSHELL; [ "$_fmb_d" -le "$_FMB_PREV" ] || printf x >> "$FMB_LOG"; _FMB_PREV=$_fmb_d' DEBUG
 SH
 
-# Run <script> once and print how many subshells it entered while measured.
+# Run <script> once and print its measured subshell-depth transition count.
 subshells_of() {  # <script> [args...]
   local script=$1 log="$TMP_ROOT/fmb.log" out
   shift

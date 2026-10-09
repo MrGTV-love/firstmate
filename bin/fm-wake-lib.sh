@@ -2452,8 +2452,8 @@ fm_wake_signal_sig() {  # <file> -> reported-state signature
   esac
 }
 
-# The same signature assigned to <out-var>, so the per-file scan pays for the
-# stat alone and not also for a command substitution around it.
+# Assigning the signature avoids an outer command substitution in per-file
+# scans; status_observed_signature_to owns the status-path reads and encoding.
 fm_wake_signal_sig_to() {  # <out-var> <file>
   local _fm_ws_sig
   case "$2" in
