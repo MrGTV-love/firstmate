@@ -227,6 +227,17 @@ $objects
 EOF
   fm_task_docker_remove_networks "$id" "$ambiguous" "$protected" "$projects" "$foreign_projects" || return 1
   fm_task_docker_remove_volumes "$id" "$ambiguous" || return 1
+  if ! objects=$(fm_task_docker_containers "$id" "$siblings" "$ambiguous" "$protected" "$@"); then
+    echo "warning: Docker could not be listed after cleaning the stacks owned by $id, so cleanup is unverified" >&2
+    return 1
+  fi
+  while IFS="$sep" read -r cid nname project supabase why; do
+    [ -n "$cid" ] && [ -n "$why" ] || continue
+    echo "error: Docker container owned by $id is still present after stack cleanup: $nname" >&2
+    return 1
+  done <<EOF
+$objects
+EOF
   return 0
 }
 

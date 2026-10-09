@@ -202,11 +202,18 @@ task-id project label. An explicit network marker does not depend on heuristic
 project ownership. Named volumes require the task marker.
 
 Teardown completes only after Docker listing, container removal and post-removal
-listing, network removal, and volume removal succeed. Any listing or removal
-failure retains task identity records and prevents destructive worktree retirement;
-`--force` does not waive Docker cleanup. Standalone secondmate retirement skips
-its own Docker cleanup. Forced secondmate and Orca cleanup applies each child's
-own metadata before retiring the child, including recursive secondmate descendants.
+listing, network removal, volume removal, and a final container listing succeed.
+Any listing or removal failure retains task identity records and prevents
+destructive worktree retirement; `--force` does not waive Docker cleanup.
+Standalone secondmate retirement skips its own Docker cleanup. Forced secondmate
+cleanup first closes each child's endpoint, concludes its own parked task pipeline,
+and reaps its owned worktree and temporary-directory processes before taking the
+Docker snapshot. Reassigned worktree slots are not reaped or used for pipeline
+cleanup. Nested secondmate process events are swept before Docker cleanup and
+recursive descendant retirement. Docker cleanup uses each child's own metadata;
+failures retain that identity and worktree for retry even though its endpoint and
+processes have already stopped. A final listing refuses completion if an owned
+container appears during network or volume cleanup.
 Before removing containers, teardown retains their derived Compose/Supabase
 project identities in the task's `docker_projects` metadata field. Retries read
 that field even after the containers are gone; task-record retirement removes it.
