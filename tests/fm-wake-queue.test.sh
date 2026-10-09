@@ -2485,7 +2485,16 @@ test_interruption_before_and_after_raw_commit() {
 # announced (no wake), while ANY unannounced byte - a pending foreign line, a
 # missing cursor, a later different note - reads as wake-worthy.
 test_self_announced_append_guards() {
-  local dir state status folded rc=0
+  local dir state status folded annotations candidate utf8_locale='' LC_ALL rc=0
+  # Exercise locale-preserving checkpoint reuse even when the suite starts in C.
+  for candidate in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+    if locale -a 2>/dev/null | grep -qx "$candidate"; then utf8_locale=$candidate; break; fi
+  done
+  if [ -n "$utf8_locale" ]; then
+    LC_ALL=$utf8_locale; export LC_ALL
+  else
+    printf 'SKIP: UTF-8 self-announced append locale: no UTF-8 locale is installed\n'
+  fi
   dir=$(make_case self-announced-append)
   state="$dir/state"
   status="$state/t.status"
@@ -2557,10 +2566,17 @@ test_self_announced_append_guards() {
   ' _ "$ROOT/bin/fm-classify-lib.sh" "$folded" \
     || fail "could not fold the open decision"
   run_wake_lib fm_wake_status_append_self_announced "$state" "$folded" \
-    'resolved [key=k3]: answered: folded close' \
+    "$(printf 'resolved [key=k3]: answered: caf\xc3\xa9 rentr\xc3\xa9e')" \
     || fail "a close after an OPEN DECISIONS fold was not self-announced (rc=$?)"
   run_wake_lib fm_wake_signal_seen_current "$state" "$folded" \
     || fail "the folded close left unannounced bytes behind"
+  annotations=$(FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"; . "$2"
+    fm_wake_print_annotations "$(printf "0\t1\tsignal\tfolded.status\tfixture")"
+  ' _ "$ROOT/bin/fm-classify-lib.sh" "$ROOT/bin/fm-wake-lib.sh") \
+    || fail "could not annotate the folded close"
+  assert_not_contains "$annotations" 'needs-decision' "annotation replayed the already-folded opening"
+  assert_contains "$annotations" "$(printf 'caf\xc3\xa9 rentr\xc3\xa9e')" "annotation hid the unread bookkeeping close"
   printf 'blocked: worker still needs help\n' >> "$folded"
   run_wake_lib fm_wake_signal_seen_current "$state" "$folded" \
     && fail "a later worker line after a folded close was swallowed"

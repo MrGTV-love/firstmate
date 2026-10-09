@@ -2,9 +2,63 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { performance } from "node:perf_hooks";
+
+async function testMonotonicDeadline(root) {
+  const { setLifecycleDeadline } = await import(pathToFileURL(`${root}/.pi/extensions/lib/fm-watch-lifecycle.ts`).href);
+  const originalNow = Object.getOwnPropertyDescriptor(performance, "now");
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  const originalDateNow = Date.now;
+  const timers = [];
+  let now = 1000;
+  let wallNow = 1000;
+  try {
+    Object.defineProperty(performance, "now", { configurable: true, value: () => now });
+    Date.now = () => wallNow;
+    globalThis.setTimeout = (callback, delay) => {
+      const timer = { callback, delay, cancelled: false, unreferenced: false, unref() { this.unreferenced = true; } };
+      timers.push(timer);
+      return timer;
+    };
+    globalThis.clearTimeout = (timer) => { timer.cancelled = true; };
+    const actual = [];
+    const deadline = setLifecycleDeadline(() => actual.push(deadline.elapsedMs()), 60);
+    deadline.unref();
+    now = 1059.25;
+    timers[0].callback();
+    assert.deepEqual(actual, [], "an early callback must not expire the wait");
+    assert.equal(timers[1].delay, 1, "retry only the remaining deadline, rounded up");
+    assert.ok(timers[1].unreferenced, "a rescheduled deadline must retain unref");
+    now = 1059.75;
+    timers[1].callback();
+    assert.deepEqual(actual, [], "a second early callback must still wait");
+    now = 1060.1;
+    wallNow = -5000;
+    timers[2].callback();
+    assert.deepEqual(actual, [60], "elapsed evidence must use the monotonic clock");
+    now = 1087.9;
+    assert.equal(deadline.elapsedMs(), 87, "actual elapsed time must not be clamped to the bound");
+    const cancelled = setLifecycleDeadline(() => assert.fail("cancelled deadline expired"), 60);
+    now += 59;
+    timers[3].callback();
+    cancelled.cancel();
+    assert.ok(timers[4].cancelled, "cancel must clear the rescheduled timer");
+    const ordinary = setLifecycleDeadline(() => assert.fail("ordinary completion expired"), 60);
+    ordinary.cancel();
+    assert.ok(timers[5].cancelled, "ordinary completion must cancel the original timer");
+  } finally {
+    if (originalNow) Object.defineProperty(performance, "now", originalNow);
+    else delete performance.now;
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+    Date.now = originalDateNow;
+  }
+}
 
 const [kind, root, scenario] = process.argv.slice(2);
 if (!scenario) {
+  await testMonotonicDeadline(root);
   for (const name of ["shutdown", "unready", ...(kind === "omp" ? ["host-unready"] : [])]) {
     const result = spawnSync(process.execPath, [process.argv[1], kind, root, name], { encoding: "utf8" });
     assert.equal(result.status, 0, `${kind}/${name}: ${result.stderr}${result.stdout}`);
@@ -95,6 +149,6 @@ for (const [waitedOn, bound] of expected) {
   assert.equal(matches.length, 1, `one expiry record is required for ${waitedOn}: ${log}`);
   assert.equal(matches[0].waiter, `${kind}-watch-extension`);
   assert.equal(matches[0].bound, `${bound}ms`);
-  assert.ok(/^\d+ms$/.test(matches[0].actual) && parseInt(matches[0].actual) >= bound, "expiry must record actual elapsed time");
+  assert.ok(/^\d+ms$/.test(matches[0].actual) && parseInt(matches[0].actual) >= bound, `expiry must record actual elapsed time for ${kind}/${scenario}/${waitedOn}: ${log}`);
 }
 process.exit(0);

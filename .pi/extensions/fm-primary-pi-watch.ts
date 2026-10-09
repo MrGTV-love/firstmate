@@ -66,7 +66,7 @@ import {
   FIRSTMATE_CALM_PRESENTATION_EVENT,
 } from "./lib/fm-calm-visibility.ts";
 import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.ts";
-import { bindWatchInstance, createLifecycleLog } from "./lib/fm-watch-lifecycle.ts";
+import { bindWatchInstance, createLifecycleLog, setLifecycleDeadline } from "./lib/fm-watch-lifecycle.ts";
 
 type ArmResult = {
   ok: boolean;
@@ -576,19 +576,18 @@ async function waitForGenerationChildClose(
   if (!armChild) return;
   const closed = armClose.get(armChild);
   if (!closed) return;
-  const startedAt = Date.now();
   await new Promise<void>((resolveWait) => {
-    const timer = setTimeout(() => {
+    const timer = setLifecycleDeadline(() => {
       lifecycle("bound-expired", {
         waiter: "pi-watch-extension",
         "waited-on": "shutdown-arm-close",
         bound: `${armRetireTimeoutMs}ms`,
-        actual: `${Date.now() - startedAt}ms`,
+        actual: `${timer.elapsedMs()}ms`,
       });
       resolveWait();
     }, armRetireTimeoutMs);
     void closed.then(() => {
-      clearTimeout(timer);
+      timer.cancel();
       resolveWait();
     });
   });
@@ -675,7 +674,7 @@ export default function (pi: ExtensionAPI) {
   activateGeneration(generation);
   lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
   let generationStopped: Promise<void> = Promise.resolve();
-  let successorTimer: ReturnType<typeof setTimeout> | null = null;
+  let successorTimer: ReturnType<typeof setLifecycleDeadline> | null = null;
   let recoveryPending = false;
   lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
   if (instance.previous?.api) {
@@ -689,16 +688,15 @@ export default function (pi: ExtensionAPI) {
   instance.previous = null;
 
   function clearSuccessorTimer(): void {
-    if (successorTimer) clearTimeout(successorTimer);
+    successorTimer?.cancel();
     successorTimer = null;
   }
 
   function scheduleSuccessorExpiry(stopped: SessionGeneration): void {
     if (!instance.isCurrent() || generation !== stopped || !recoveryPending) return;
     clearSuccessorTimer();
-    const shutdownAt = Date.now();
     const retirement = generationStopped;
-    const timer = setTimeout(async () => {
+    const timer = setLifecycleDeadline(async () => {
       if (successorTimer === timer) successorTimer = null;
       try {
         await retirement;
@@ -707,7 +705,7 @@ export default function (pi: ExtensionAPI) {
           waiter: "pi-watch-extension",
           "waited-on": "session_start",
           bound: `${successorGraceMs}ms`,
-          actual: `${Date.now() - shutdownAt}ms`,
+          actual: `${timer.elapsedMs()}ms`,
           outcome: "successor-missing",
         });
         lifecycle("successor-missing", {
@@ -1083,20 +1081,19 @@ export default function (pi: ExtensionAPI) {
   function waitForReadiness(armChild: ChildProcess): Promise<boolean> {
     const readiness = armReadiness.get(armChild);
     if (!readiness) return Promise.resolve(false);
-    const startedAt = Date.now();
     return new Promise((resolveReady) => {
-      const timer = setTimeout(() => {
+      const timer = setLifecycleDeadline(() => {
         lifecycle("bound-expired", {
           waiter: "pi-watch-extension",
           "waited-on": "arm-readiness",
           bound: `${armReadyTimeoutMs}ms`,
-          actual: `${Date.now() - startedAt}ms`,
+          actual: `${timer.elapsedMs()}ms`,
         });
         resolveReady(false);
       }, armReadyTimeoutMs);
       timer.unref();
       void readiness.then((ready) => {
-        clearTimeout(timer);
+        timer.cancel();
         resolveReady(ready);
       });
     });
@@ -1108,20 +1105,19 @@ export default function (pi: ExtensionAPI) {
     armChild.kill("SIGTERM");
     const closed = armClose.get(armChild);
     if (!closed) return false;
-    const startedAt = Date.now();
     return new Promise((resolveRetired) => {
-      const timer = setTimeout(() => {
+      const timer = setLifecycleDeadline(() => {
         lifecycle("bound-expired", {
           waiter: "pi-watch-extension",
           "waited-on": "unready-arm-close",
           bound: `${armRetireTimeoutMs}ms`,
-          actual: `${Date.now() - startedAt}ms`,
+          actual: `${timer.elapsedMs()}ms`,
         });
         resolveRetired(false);
       }, armRetireTimeoutMs);
       timer.unref();
       void closed.then(() => {
-        clearTimeout(timer);
+        timer.cancel();
         resolveRetired(true);
       });
     });

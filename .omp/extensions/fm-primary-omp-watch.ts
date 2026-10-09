@@ -91,7 +91,7 @@ import { Type } from "typebox";
 // resolves bin/fm-operational-input.sh relative to its own location, which is
 // the same repository root this file lives in.
 import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/fm-operational-input.ts";
-import { bindWatchInstance, createLifecycleLog } from "../../.pi/extensions/lib/fm-watch-lifecycle.ts";
+import { bindWatchInstance, createLifecycleLog, setLifecycleDeadline } from "../../.pi/extensions/lib/fm-watch-lifecycle.ts";
 
 // The omp extension API surface this file uses. omp is a Pi fork and ships no
 // separately installable type package, so the contract is declared locally
@@ -544,19 +544,18 @@ async function waitForGenerationChildClose(
   if (!armChild) return;
   const closed = armClose.get(armChild);
   if (!closed) return;
-  const startedAt = Date.now();
   await new Promise<void>((resolveWait) => {
-    const timer = setTimeout(() => {
+    const timer = setLifecycleDeadline(() => {
       lifecycle("bound-expired", {
         waiter: "omp-watch-extension",
         "waited-on": "shutdown-arm-close",
         bound: `${armRetireTimeoutMs}ms`,
-        actual: `${Date.now() - startedAt}ms`,
+        actual: `${timer.elapsedMs()}ms`,
       });
       resolveWait();
     }, armRetireTimeoutMs);
     void closed.then(() => {
-      clearTimeout(timer);
+      timer.cancel();
       resolveWait();
     });
   });
@@ -630,7 +629,7 @@ export default function (pi: ExtensionAPI) {
   // The stop of the latest generation, so a self-heal never races the child
   // retirement that stop is still waiting on.
   let generationStopped: Promise<void> = Promise.resolve();
-  let healTimer: ReturnType<typeof setTimeout> | null = null;
+  let healTimer: ReturnType<typeof setLifecycleDeadline> | null = null;
   let recoveryPending = false;
   let latestContext: any = null;
   lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
@@ -645,7 +644,7 @@ export default function (pi: ExtensionAPI) {
   instance.previous = null;
 
   function clearHealTimer(): void {
-    if (healTimer) clearTimeout(healTimer);
+    healTimer?.cancel();
     healTimer = null;
   }
 
@@ -665,9 +664,8 @@ export default function (pi: ExtensionAPI) {
   function scheduleSelfHeal(stopped: SessionGeneration): void {
     if (!instance.isCurrent() || generation !== stopped || !recoveryPending) return;
     clearHealTimer();
-    const shutdownAt = Date.now();
     const retirement = generationStopped;
-    const timer = setTimeout(async () => {
+    const timer = setLifecycleDeadline(async () => {
       if (healTimer === timer) healTimer = null;
       try {
         await retirement;
@@ -677,7 +675,7 @@ export default function (pi: ExtensionAPI) {
           waiter: "omp-watch-extension",
           "waited-on": "session_start",
           bound: `${successorGraceMs}ms`,
-          actual: `${Date.now() - shutdownAt}ms`,
+          actual: `${timer.elapsedMs()}ms`,
           outcome: owned ? "self-heal" : "lock-not-owned",
         });
         if (!owned) return;
@@ -1072,20 +1070,19 @@ export default function (pi: ExtensionAPI) {
     const readiness = armReadiness.get(armChild);
     if (!readiness) return Promise.resolve(false);
     const timeout = armHostMode.get(armChild) ? hostReadyTimeoutMs : armReadyTimeoutMs;
-    const startedAt = Date.now();
     return new Promise((resolveReady) => {
-      const timer = setTimeout(() => {
+      const timer = setLifecycleDeadline(() => {
         lifecycle("bound-expired", {
           waiter: "omp-watch-extension",
           "waited-on": armHostMode.get(armChild) ? "supervision-host-readiness" : "arm-readiness",
           bound: `${timeout}ms`,
-          actual: `${Date.now() - startedAt}ms`,
+          actual: `${timer.elapsedMs()}ms`,
         });
         resolveReady(false);
       }, timeout);
       timer.unref();
       void readiness.then((ready) => {
-        clearTimeout(timer);
+        timer.cancel();
         resolveReady(ready);
       });
     });
@@ -1097,20 +1094,19 @@ export default function (pi: ExtensionAPI) {
     armChild.kill("SIGTERM");
     const closed = armClose.get(armChild);
     if (!closed) return false;
-    const startedAt = Date.now();
     return new Promise((resolveRetired) => {
-      const timer = setTimeout(() => {
+      const timer = setLifecycleDeadline(() => {
         lifecycle("bound-expired", {
           waiter: "omp-watch-extension",
           "waited-on": "unready-arm-close",
           bound: `${armRetireTimeoutMs}ms`,
-          actual: `${Date.now() - startedAt}ms`,
+          actual: `${timer.elapsedMs()}ms`,
         });
         resolveRetired(false);
       }, armRetireTimeoutMs);
       timer.unref();
       void closed.then(() => {
-        clearTimeout(timer);
+        timer.cancel();
         resolveRetired(true);
       });
     });

@@ -22,6 +22,33 @@
 // through a chain of predecessor APIs.
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { dirname } from "node:path";
+import { performance } from "node:perf_hooks";
+
+// Timer callbacks can arrive before their nominal delay. Expire only after the
+// monotonic deadline, and retain measured elapsed time for lifecycle evidence.
+export function setLifecycleDeadline(callback: () => void, boundMs: number) {
+  const startedAt = performance.now();
+  let unreferenced = false;
+  let timer: ReturnType<typeof setTimeout>;
+  function expire(): void {
+    const remaining = boundMs - (performance.now() - startedAt);
+    if (remaining > 0) {
+      timer = setTimeout(expire, Math.ceil(remaining));
+      if (unreferenced) timer.unref();
+      return;
+    }
+    callback();
+  }
+  timer = setTimeout(expire, boundMs);
+  return {
+    elapsedMs: () => Math.floor(performance.now() - startedAt),
+    cancel: () => clearTimeout(timer),
+    unref: () => {
+      unreferenced = true;
+      timer.unref();
+    },
+  };
+}
 
 export type LifecycleFields = Record<string, string | number | boolean | null | undefined>;
 export type LifecycleLog = (event: string, fields?: LifecycleFields) => void;
