@@ -1405,8 +1405,60 @@ SH
   pass "remote guarded pairs preserve routing while notifying unrelated writes and retrying pending delivery"
 }
 
+# The per-user process pile-up detector is host-wide, so only a primary home that
+# is not read-only arms it, and a refusal to arm on an unmeasurable host stays silent.
+test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
+  local case_dir fakebin home sm lab out
+  case_dir="$TMP_ROOT/pileup-detector-arm"
+  home="$case_dir/home"
+  sm="$case_dir/sm"
+  lab="$case_dir/lab"
+  mkdir -p "$home/config" "$home/state" "$sm/config" "$sm/state" "$lab/config" "$lab/state"
+  printf '%s\n' manual > "$home/config/backlog-backend"
+  printf '%s\n' manual > "$sm/config/backlog-backend"
+  printf '%s\n' manual > "$lab/config/backlog-backend"
+  printf '%s\n' sm > "$sm/.fm-secondmate-home"
+  printf '%s\n' 'fm-lab-home v1' > "$lab/.fm-lab-home"
+  fakebin=$(make_fake_toolchain "$case_dir")
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_not_contains "$out" "pile-up detector" "a read-only bootstrap reported on the detector"
+  assert_absent "$home/state/procevent/proc-guard.source" "a read-only bootstrap armed the detector"
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$sm" FM_ROOT_OVERRIDE="$sm" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_not_contains "$out" "pile-up detector" "a secondmate bootstrap reported on the detector"
+  assert_absent "$sm/state/procevent/proc-guard.source" "a secondmate home armed the host-wide detector"
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$lab" FM_ROOT_OVERRIDE="$lab" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_not_contains "$out" "pile-up detector" "a lab bootstrap reported on the detector"
+  assert_absent "$lab/state/procevent/proc-guard.source" "a disposable lab home armed the host-wide detector"
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_not_contains "$out" "pile-up detector" "arming the detector was not silent"
+  assert_present "$home/state/procevent/proc-guard.source" "the primary home did not arm the detector"
+  PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" >/dev/null \
+    || fail "a second bootstrap failed over the armed detector"
+
+  rm -rf "$home/state/procevent"
+  mkdir -p "$case_dir/no-python"
+  for tool in bash dirname env cat awk sed grep tr date mkdir rm mv chmod ln touch cksum wc sort uname git jq; do
+    command -v "$tool" >/dev/null 2>&1 && ln -sf "$(command -v "$tool")" "$case_dir/no-python/$tool"
+  done
+  out=$(PATH="$fakebin:$case_dir/no-python" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" 2>&1)
+  assert_not_contains "$out" "pile-up detector" "an unmeasurable host was reported instead of staying silent"
+  assert_absent "$home/state/procevent/proc-guard.source" "an unmeasurable host still armed the detector"
+  pass "bootstrap arms the process pile-up detector in a primary home only, silently, and not when read-only, a secondmate, a lab, or unmeasurable"
+}
+
 test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap
+test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only
 test_bootstrap_reporting
 test_no_mistakes_min_version
 test_gh_axi_min_version

@@ -1670,6 +1670,16 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     "$SCRIPT_DIR/fm-contributions.sh" arm --if-owned >/dev/null \
       || echo "MISSING: contribution observation could not be armed; coverage is unconfirmed"
   fi
+  # The per-user process pile-up detector is host-wide and its source has one
+  # machine-wide owner, so only a primary home arms it, never a secondmate or a
+  # disposable lab that would hold the claim away from it. Exit 3 is a host the
+  # guard cannot measure and stays silent. The adapter always resolves beside
+  # this script, never under a fake code root.
+  if local_phase && [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] \
+    && [ -x "$SCRIPT_DIR/fm-procevent-proc.sh" ]; then
+    FM_ROOT_OVERRIDE='' "$SCRIPT_DIR/fm-procevent-proc.sh" arm >/dev/null 2>&1 || [ "$?" -eq 3 ] \
+      || echo "MISSING: process pile-up detector could not be armed; coverage is unconfirmed"
+  fi
   if [ -n "$fleet_sync_pid" ]; then
     wait "$fleet_sync_pid" || true
     cat "$fleet_sync_out"

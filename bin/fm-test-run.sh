@@ -1548,7 +1548,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-watch-open-loops.test.sh"
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
-    bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)
+    bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh|bin/fm-supervision-lib.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     bin/fm-afk*)
@@ -1600,6 +1600,10 @@ families_for_changed_path() {
       ;;
     bin/fm-procevent-quota.sh)
       printf '%s\n' "__script__:fm-procevent-quota.test.sh"
+      ;;
+    bin/fm-proc-guard.*|bin/fm-procevent-proc.sh)
+      printf '%s\n' "__script__:fm-proc-guard.test.sh"
+      printf '%s\n' "__script__:fm-procevent-proc.test.sh"
       ;;
     bin/fm-quota-choose.sh)
       printf '%s\n' "__script__:fm-quota-choose.test.sh"

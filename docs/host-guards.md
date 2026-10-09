@@ -14,6 +14,10 @@ Each family ships as a pair plus its tests.
 The memory family is `fm-mem-guard`; its engine header owns Linux/macOS sources, metric interpretation, and command budget.
 It makes no Jev, model, or network call, so its former `fm-jev-mem-guard` name has been removed rather than kept as an alias.
 
+The process family is `fm-proc-guard`; its engine header owns the count semantics, thresholds, and census document.
+Its `check` and `census` commands follow the one-shot contract below.
+Its `watch` command is the one long-running mode: it samples without forking so it keeps working when the user is at the process cap, and `bin/fm-procevent-proc.sh` runs it as a standing process-event source that the primary home arms at bootstrap.
+
 ## Engine contract
 
 - Read-only diagnostics: a guard never writes to the system it measures and never mutates agent, session, or repository state.

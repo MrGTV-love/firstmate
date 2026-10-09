@@ -24,7 +24,8 @@ fm_sup_stat_mtime() {
 # fm_supervision_status <state-dir> [grace-seconds]
 # Populates, for the state dir at $1:
 #   FM_SUP_IN_FLIGHT      count of state/*.meta (in-flight tasks)
-#   FM_SUP_SOURCES        count of registered process-to-event sources
+#   FM_SUP_SOURCES        count of registered process-to-event sources, not counting the
+#                         standing process pile-up detector
 #   FM_SUP_CHECKS         count of registered custom checks: a state/<id>.check.sh
 #                         with the state/<id>.check-trust binding that
 #                         bin/fm-check-register.sh writes. Task PR polls carry no
@@ -59,6 +60,10 @@ fm_supervision_status() {
   FM_SUP_SOURCES=0
   for source in "$state"/procevent/*.source; do
     [ -e "$source" ] || continue
+    # The standing process pile-up detector (bin/fm-procevent-proc.sh) restarts
+    # itself and waits on nothing a session must be present for, so it alone
+    # never makes an otherwise idle home need a watcher.
+    [ "${source##*/}" != proc-guard.source ] || continue
     FM_SUP_SOURCES=$((FM_SUP_SOURCES + 1))
   done
   FM_SUP_CHECKS=0
