@@ -61,17 +61,21 @@
 # run holds at most JOBS concurrent ShellCheck processes. Diagnostics replay
 # in stable shard/root order. FM_LINT_JOBS=1 changes concurrency, not diagnostics
 # or exit selection.
-# That bound is per run, so every root also holds one host-wide ShellCheck slot
-# (flock files under FM_LINT_SLOT_DIR, default
-# ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots; "off" disables) and
-# many concurrent runs queue instead of each adding workers. FM_LINT_HOST_SLOTS
-# sets the slot count, default half the cores and at least two. The full cap is
-# available until 1-minute load exceeds two times the cores; only the excess
-# load is subtracted from the cap, down to a floor of two (one run's own workers),
-# so a lone run is never throttled and queued roots always make progress. Queue time
-# is excluded from the root deadline and the recorded root duration. The pool
-# is shared by every worktree and home of the same user. A slot directory that
-# cannot be used is reported and lint runs ungated; it never fails lint.
+# That bound is per run; the host-wide pool admits each root only while total
+# slot occupancy is below the current load allowance. FM_LINT_SLOT_DIR defaults
+# to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots; "off" disables the pool.
+# Runs share a pool only when they use the same slot directory, so different
+# homes or overrides must select the same directory to share the host bound.
+# FM_LINT_HOST_SLOTS sets the cap; unset or empty uses max(2, floor(ncpu/2)).
+# A nonempty value must be a positive decimal integer without leading zeros,
+# or lint exits 2, even with the pool off. The load allowance is the cap minus
+# any 1-minute load above two times ncpu, rounded to the nearest integer and
+# clamped between min(2, cap) and cap. Thus a lone default two-worker run keeps
+# both workers unless an explicit cap of one is selected.
+# Waiting roots queue rather than fail; queue time consumes neither the root
+# deadline nor its retry budget. Slot directory, file, or locking failures
+# warn and run ungated rather than failing lint. The private gate's locking
+# and process-lifetime invariants live in bin/fm-lint-cache.pl.
 # --partition 1of2/2of2 splits the entire canonical inventory across
 # two CI runners, each with those same concurrency-limited workers.
 # Partitions are complete, disjoint, and byte-weight balanced; --list-files
@@ -96,7 +100,8 @@
 # named error, so a required-bounds run never lints uncapped. Without
 # FM_LINT_REQUIRE_BOUNDS (a local developer lint, where hosts like macOS
 # cannot apply the address-space limit at all) each root still runs in its
-# own ShellCheck process with identical diagnostics, just unbounded.
+# own ShellCheck process with identical diagnostics and no deadline or memory
+# limit; the host-wide concurrency pool remains enabled unless disabled above.
 #
 # If a source-following root exits with a memory failure, it is retried once
 # without --external-sources under the same memory limit and only the time
@@ -107,6 +112,9 @@
 # Other findings and failed retries still fail lint. The retry's diagnostics
 # replace the failed attempt's output; peak RSS is the maximum of both attempts.
 #
+# Root timestamps use Perl's high-resolution clock even on stock macOS Bash.
+# Start/end span the queue wait; recorded duration subtracts waits from both
+# the initial attempt and any retry.
 # Per-root evidence is incremental: workers append begin/end records (root,
 # mode, shard, start, end, duration, final exit status, reason, peak RSS when
 # measured, and whether the final attempt followed sources) to a roots log
@@ -1056,8 +1064,7 @@ if [ "${FM_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
   fi
 fi
 
-# Host-wide ShellCheck slot pool (see the header and fm-lint-cache.pl gate mode).
-# FM_LINT_SLOT_DIR=off disables it; an unset pool lives beside the lint cache.
+# Host-wide pool configuration; the header owns its public controls.
 SLOT_DIR=${FM_LINT_SLOT_DIR:-${XDG_CACHE_HOME:-${HOME:-${TMPDIR:-/tmp}}/.cache}/firstmate/lint-slots}
 case "${FM_LINT_HOST_SLOTS:-1}" in
   ''|0*|*[!0-9]*)

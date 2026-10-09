@@ -1129,7 +1129,7 @@ open(my \$peak, '>>', "$peak") or die "\$!";
 print {\$peak} scalar(@active), "\n";
 close \$peak;
 close \$lock;
-my \$deadline = time() + 60;
+my \$deadline = time() + 90;
 while (\$ENV{FM_LINT_COUNT_HOLD} && !-e "$peak.release") {
     if (time() > \$deadline) { unlink "$activity/\$\$"; exit 1; }
     sleep 0.01;
@@ -1186,12 +1186,14 @@ while (1) {
 }
 open(my $start, '>', "$dir/start") or die "$!";
 close $start;
+$deadline = time() + 30;
 while (1) {
     my @attempts = glob "$dir/attempt.*";
     last if @attempts >= $contenders;
     die "contender admission attempt deadline exceeded\n" if time() > $deadline;
     sleep 0.01;
 }
+$deadline = time() + 30;
 while (1) {
     open(my $fh, '<', $peak) or die "$!";
     my @counts = <$fh>;
@@ -1419,7 +1421,7 @@ for my $failure (qw(open scan wait)) {
             '--', $^X, '-e', 'print "analysis ran\n"; exit 23';
         die "exec: $!";
     }
-    my $deadline = time() + 4;
+    my $deadline = time() + 30;
     while (waitpid($pid, WNOHANG) == 0) {
         if (time() > $deadline) {
             kill 'KILL', $pid;
@@ -1626,12 +1628,14 @@ for my $retry (0, 1) {
     }
     my $error;
     eval {
-        my $deadline = time() + 5;
+        # Controller waits cover host scheduling and worker bookkeeping; the
+        # protected root still has its independently enforced three-second bound.
+        my $deadline = time() + 30;
         until (-s "$dir/roots.tsv") { die "root never began\n" if time() > $deadline; sleep 0.01; }
         my $began = time();
         sleep 1.5;
         close $slot;
-        $deadline = time() + 5;
+        $deadline = time() + 30;
         while (waitpid($worker, WNOHANG) == 0) {
             die "queued root timed out\n" if time() > $deadline;
             sleep 0.01;

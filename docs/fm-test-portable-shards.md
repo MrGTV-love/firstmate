@@ -136,9 +136,7 @@ CI requires its per-root bounds, so an unenforceable deadline or address-space l
 Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, changed-source selection, shared-cache invalidation, initial analysis flags, fallback reporting, and seeded finding parity.
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, or paid runner provisioning is part of this layout.
-The host-wide ShellCheck slot pool queues while total occupancy meets the current load allowance; waiting gates recheck load no more than once every two seconds, including after lock wakeups. Slot-file or locking failures warn and run ungated.
-Protected commands inherit their slot descriptors, so gate death cannot release capacity while their descendants still run.
-Root timestamps and queue accounting use Perl's high-resolution clock, including on stock macOS Bash, and exclude queue time from analysis durations and retry budgets.
+The [lint script header](../bin/fm-lint.sh) owns host-wide slot controls and queue-time accounting; `tests/fm-lint.test.sh` covers concurrent admission, load boundaries, ungated fallback, inherited-slot lifetime, and queued-root timing.
 
 The [lint script header](../bin/fm-lint.sh) owns local dependency discovery, conservative unresolved-import selection, and successful-result cache controls; these do not replace full joint source analysis.
 Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.

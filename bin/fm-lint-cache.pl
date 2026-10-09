@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
-# fm-lint-cache.pl - private dependency selection and successful-result cache for fm-lint.sh.
+# fm-lint-cache.pl - private dependency selection, success cache, and host-slot gate for fm-lint.sh.
 # Usage: perl fm-lint-cache.pl select <root> <NUL-separated changes on stdin>
 #        perl fm-lint-cache.pl check <cache-dir|off> <root> <shellcheck> <args> -- <file>
 # ShellCheck retains source-aware extended analysis; only identical successful checks
-# are reused. flock serializes identical misses across worktrees, not unrelated roots.
+# are reused. Cache-key flock serializes identical misses, independently of host slots.
 #
 use Cwd qw(abs_path);
 use strict;
@@ -13,16 +13,16 @@ use Fcntl qw(:flock F_SETFD);
 use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
 
-# gate mode: hold one host-wide ShellCheck slot while the command runs, so many
-# concurrent fm-lint.sh runs queue instead of each adding its own workers.
+# Private gate protocol; bin/fm-lint.sh's header owns the public pool controls.
 # Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <wait-file> -- <command...>
-# Slots are flock files, so the kernel frees one when its holder dies. The slot
-# count is FM_LINT_HOST_SLOTS, else half the cores, but never below two (one
-# run's default workers). The full cap is available until 1-minute load exceeds
-# two times the cores; only the excess load is subtracted from the cap, down
-# to the two-slot floor. A slot directory that cannot be used lets the command
-# run ungated. The wait is written in milliseconds to <wait-file> so the caller
-# can keep queue time out of its own timings.
+# Commands inherit the flock descriptor across exec, so killing the gate cannot
+# release capacity while a protected descendant still holds it; the kernel
+# releases the slot when the last inherited descriptor closes.
+# After any lock wakeup, rescan total occupancy before admitting a command.
+# Waiting gates probe load no more than once every two seconds, including after
+# wakeups, to avoid spawning frequent sysctl readers on an overloaded macOS host.
+# The high-resolution wait is written in milliseconds to <wait-file> before
+# launch so the caller can account for queue time separately.
 if (($ARGV[0] // '') eq 'gate') {
     require POSIX;
     require Time::HiRes;
