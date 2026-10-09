@@ -3646,11 +3646,6 @@ cleanup_firstmate_home_children() {
       require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
       child_owner_rc=0
     fi
-    if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
-      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1
-    else
-      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 0 || return 1
-    fi
     if [ -n "$child_t" ]; then
       if [ "$child_backend" = herdr ]; then
         fm_backend_herdr_parse_target "$child_t" || return 1
@@ -3677,6 +3672,26 @@ cleanup_firstmate_home_children() {
     if [ "$child_kind" = secondmate ]; then
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
+      cleanup_firstmate_home_process_events "$child_home" "child firstmate home" || return 1
+    else
+      (
+        ID=$child_id KIND=$child_kind STATE=$sub_state PROJ=$child_proj
+        WT=$child_wt TASK_TMP=$(meta_value "$child_meta" tasktmp)
+        export FM_HOME="$home" FM_STATE_OVERRIDE="$sub_state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config"
+        if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+          reap_task_worktree_processes tasktmp "$TASK_TMP" || exit 1
+        else
+          conclude_task_no_mistakes_run "$WT" || exit 1
+          reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
+        fi
+      ) || return 1
+    fi
+    if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1
+    else
+      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 0 || return 1
+    fi
+    if [ "$child_kind" = secondmate ]; then
       if [ -n "$child_home" ] && [ -d "$child_home" ]; then
         cleanup_firstmate_home_children "$child_home" || return $?
         remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
