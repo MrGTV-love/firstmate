@@ -268,6 +268,7 @@ case "${1:-}" in
         printf '%s\n' "${FM_FAKE_AXI_OVERVIEW:-}" ;;
       status)
         shift
+        [ "${FM_FAKE_NM_STATUS_FAIL:-0}" != 1 ] || exit 1
         run_id=""
         if [ "${1:-}" = --run ]; then run_id=${2:-}; fi
         if [ -n "${FM_FAKE_NM_ABORT_LOG:-}" ] \
@@ -300,6 +301,7 @@ case "${1:-}" in
     ;;
   runs)
     [ -z "${FM_FAKE_NM_RUNS_LOG:-}" ] || printf 'runs %s\n' "$*" >> "$FM_FAKE_NM_RUNS_LOG"
+    [ "${FM_FAKE_NM_RUNS_FAIL:-0}" != 1 ] || exit 1
     printf '%s\n' "${FM_FAKE_NM_RUNS_LIST:-}" ;;
 esac
 exit 0
@@ -6431,6 +6433,12 @@ case "\${1:-} \${2:-}" in
         not-found) printf 'error: "run \\\\"%s\\\\" not found"\n' "\$child-run" >&2; exit 1 ;;
       esac
     fi
+    if [ "\${3:-}" != --run ]; then
+      case "\${FM_FAKE_CHILD_QUERY_RESULT:-success}" in
+        initial-error) exit 1 ;;
+        initial-timeout) sleep 30; exit 1 ;;
+      esac
+    fi
     if [ -e "$case_dir/\$child-pipeline-aborted" ]; then
       printf 'run:\n  id: "%s-run"\n  outcome: cancelled\n' "\$child"
     else
@@ -6444,9 +6452,76 @@ case "\${1:-} \${2:-}" in
       terminal|not-found) : > "$case_dir/\$child-pipeline-aborted" ;;
     esac
     ;;
+  "runs --limit")
+    printf '%s\n' "\$*" >> "$case_dir/pipeline-ledger.log"
+    [ "\${FM_FAKE_CHILD_QUERY_RESULT:-success}" != ledger-error ] || exit 1
+    cat "$case_dir/\$child-pipeline-ledger"
+    ;;
 esac
 EOF
   chmod +x "$case_dir/fakebin/no-mistakes"
+}
+
+assert_forced_child_discovery_failures_retain_records() {
+  local case_dir=$1 child=$2 meta=$3 wt=$4 store=$5 clone head advanced out result rc before row
+  clone="$case_dir/$child-pipeline-clone"
+  git clone -q "$case_dir/project" "$clone"
+  git -C "$clone" checkout -q "fm/$child"
+  git -C "$clone" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "pipeline fix round"
+  advanced=$(git -C "$clone" rev-parse --short=7 HEAD)
+  head=$(git -C "$wt" rev-parse HEAD)
+  assert_head_absent_from_worktree "$wt" "$advanced" "$child discovery"
+  out=$(cat "$case_dir/$child-pipeline-status")
+  printf '%s\n' "${out/$head/$advanced}" > "$case_dir/$child-pipeline-status"
+  {
+    ledger_row running "fm/$child" "$advanced" 2026-09-03 07:55
+    ledger_row failed "fm/$child" "${head:0:7}" 2026-09-02 06:36
+  } > "$case_dir/$child-pipeline-ledger"
+  before=$(cat "$store")
+  for result in initial-error initial-timeout ledger-error; do
+    rc=0
+    FM_FAKE_CHILD_QUERY_RESULT="$result" FM_TEARDOWN_NM_TIMEOUT=1 \
+      FM_FAKE_DOCKER_STORE="$store" FM_FAKE_HERDR_CONFIRMED_GONE=1 \
+      FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/discovery-$result.stdout" 2> "$case_dir/discovery-$result.stderr" || rc=$?
+    expect_code 1 "$rc" "$child: $result allowed retirement"
+    assert_present "$meta" "$child: $result retired child metadata"
+    assert_present "${meta%.meta}.status" "$child: $result retired child status"
+    assert_present "$case_dir/state/task-x1.meta" "$child: $result retired parent metadata"
+    assert_present "$wt" "$child: $result removed child worktree"
+    while IFS= read -r row; do
+      grep -Fxq -- "$row" "$store" || fail "$child: $result removed an existing Docker resource"
+    done <<< "$before"
+    assert_absent "$case_dir/pipeline-abort.log" "$child: $result authorized an abort"
+    assert_grep "cannot establish no-mistakes pipeline state for child $child" \
+      "$case_dir/discovery-$result.stderr" "$child: $result did not explain refusal"
+  done
+  assert_present "$case_dir/pipeline-ledger.log" "$child: ledger failure was not exercised"
+}
+
+test_top_level_pipeline_discovery_failures_remain_best_effort() {
+  local case_dir failure rc advanced out
+  for failure in status ledger; do
+    case_dir=$(make_case "top-level-query-$failure")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    advanced=$(make_unfetched_pipeline_heads "$case_dir")
+    out=$(parked_axi_status_toon fm/task-x1 "$advanced")
+    rc=0
+    FM_FAKE_AXI_STATUS="$out" FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+      FM_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
+      FM_FAKE_NM_STATUS_FAIL="$([ "$failure" != status ] || printf 1)" \
+      FM_FAKE_NM_RUNS_FAIL="$([ "$failure" != ledger ] || printf 1)" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "top-level $failure query failure blocked teardown"
+    assert_absent "$case_dir/state/task-x1.meta" "top-level $failure failure retained task"
+    assert_absent "$case_dir/nm-abort.log" "top-level $failure failure authorized an abort"
+    if [ "$failure" = ledger ]; then
+      assert_present "$case_dir/nm-runs.log" "top-level ledger failure was not exercised"
+    fi
+  done
+  pass "top-level status and ledger query failures remain best effort"
 }
 
 assert_forced_child_docker_cleanup_and_retry() {
@@ -6531,6 +6606,8 @@ esac
 printf '%s\n' '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}'
 EOF
   chmod +x "$case_dir/fakebin/child-boundary" "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse" "$case_dir/fakebin/orca"
+  assert_forced_child_discovery_failures_retain_records "$case_dir" child-a \
+    "$home/state/child-a.meta" "$case_dir/child-a-wt" "$store"
   for result in active wrong-run empty error; do
     rc=0
     FM_FAKE_CHILD_ABORT_RESULT="$result" FM_FAKE_DOCKER_STORE="$store" \
@@ -6631,6 +6708,8 @@ test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_ret
   docker_store_add "$store" container c-foreign foreign-grandchild "fm.task=other" ""
   docker_store_add "$store" network n-grandchild grandchild-network "fm.task=grandchild-herdr"
   docker_store_add "$store" volume grandchild-volume "fm.task=grandchild-herdr"
+  assert_forced_child_discovery_failures_retain_records "$case_dir" grandchild-herdr \
+    "$nested_home/state/grandchild-herdr.meta" "$grandchild_wt" "$store"
   rc=0
   FM_FAKE_CHILD_ABORT_RESULT=active FM_FAKE_DOCKER_STORE="$store" FM_FAKE_HERDR_CONFIRMED_GONE=1 \
     FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
@@ -7049,6 +7128,7 @@ test_mismatched_run_after_abort_refuses_unconfirmed
 test_empty_status_after_abort_refuses_unconfirmed
 test_not_found_status_after_abort_confirms_completion
 test_another_branchs_parked_run_is_never_touched
+test_top_level_pipeline_discovery_failures_remain_best_effort
 test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped

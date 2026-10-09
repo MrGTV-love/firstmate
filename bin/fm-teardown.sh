@@ -334,6 +334,8 @@
 #     evidence, only the task's own label and names.
 #     Forced descendants also abort their attributed running, fixing, or ci
 #     pipeline and confirm it terminal or not found before Docker cleanup.
+#     Initial status or required ledger query failures refuse forced child
+#     retirement with its identity records kept; top-level queries stay best effort.
 #     Residual: top-level teardown leaves autonomous pipelines and the endpoint
 #     live; a still-live producer can create a stack after the final listing.
 #     Snapshot cleanup cannot stop a live producer.
@@ -2086,7 +2088,9 @@ task_status_is_own_run_to_conclude() {
     # abort here must never fire for a run that already ended).
     [ -n "$run_head" ] || return 1
     [ -z "$(fm_nm_resolve_commit "$wt" "$run_head")" ] || return 1
-    ledger=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" runs --limit "$NM_TEARDOWN_RUNS_LIMIT")
+    ledger=$(fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" runs --limit "$NM_TEARDOWN_RUNS_LIMIT") || {
+      [ "$scope" != forced-child ] || return 2
+    }
     [ "$(fm_nm_runs_status_for_worktree "$wt" "$branch" "$ledger" "$run_head")" = running ] || return 1
   fi
   case "$status" in
@@ -2106,9 +2110,9 @@ task_status_is_own_run_to_conclude() {
 
 task_run_is_own_run_to_conclude() {
   local wt=$1 scope=${2:-parked} out
-  # Accepted best-effort residual: query failures stay fail-open because making
-  # no-mistakes availability a prerequisite would block ship tasks with no run.
-  out=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" axi status)
+  out=$(fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" axi status) || {
+    [ "$scope" != forced-child ] || return 2
+  }
   task_status_is_own_run_to_conclude "$wt" "$out" "$scope"
 }
 
@@ -2136,11 +2140,19 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
 # worktree (scouts and secondmates never do, mirroring bin/fm-crew-state.sh);
 # a run not attributed to this exact branch+head is left completely alone.
 conclude_task_no_mistakes_run() {  # <worktree>
-  local wt=$1 scope=${2:-parked} out run_id state_description="parked at a gate" refusal_state=parked
+  local wt=$1 scope=${2:-parked} out run_id query_rc state_description="parked at a gate" refusal_state=parked
   [ "$KIND" = ship ] || return 0
   [ -d "$wt" ] || return 0
   command -v no-mistakes >/dev/null 2>&1 || return 0
-  task_run_is_own_run_to_conclude "$wt" "$scope" || return 0
+  query_rc=0
+  task_run_is_own_run_to_conclude "$wt" "$scope" || query_rc=$?
+  if [ "$query_rc" -ne 0 ]; then
+    if [ "$scope" = forced-child ] && [ "$query_rc" -eq 2 ]; then
+      echo "REFUSED: cannot establish no-mistakes pipeline state for child $ID; retaining its records until status and ledger queries succeed." >&2
+      return 1
+    fi
+    return 0
+  fi
   run_id=$TASK_RUN_ID
   if [ "$scope" = forced-child ]; then
     state_description=active
