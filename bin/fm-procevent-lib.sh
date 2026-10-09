@@ -1249,6 +1249,58 @@ fm_procevent_pending() {
   done | sort -n -k1,1 -k2,2 | cut -f2-
 }
 
+fm_procevent_inbox_facts() {
+  local state=$1
+  shift
+  perl -MErrno=ENOENT -e '
+    use strict; use warnings;
+    my ($inbox, @ids) = @ARGV;
+    my (@files, $error);
+    if (opendir my $dir, $inbox) {
+      local $! = 0;
+      @files = readdir $dir;
+      $error = "inbox cannot be enumerated: $!" if $!;
+      closedir $dir or $error = "inbox cannot be closed: $!";
+    } elsif ($! != ENOENT) {
+      $error = "inbox cannot be opened: $!";
+    }
+    for my $id (@ids) {
+      my ($activity, $pending, $unknown) = (0, 0, $error);
+      unless ($unknown) {
+        for my $name (grep { /\A\Q$id\E\./ } @files) {
+          my $path = "$inbox/$name";
+          my @entry = lstat $path;
+          unless (@entry) {
+            next if $! == ENOENT;
+            $unknown = "inbox entry cannot be checked: $!";
+            last;
+          }
+          my $symlink = -l _;
+          my @stat = $symlink ? stat($path) : @entry;
+          unless (@stat) {
+            next if $! == ENOENT;
+            $unknown = "inbox entry cannot be checked: $!";
+            last;
+          }
+          $activity = $stat[9] if $stat[9] > $activity;
+          next unless !$symlink && -f _ && $name =~ /\A\Q$id\E\.[0-9]+\.result\z/;
+          (my $handled = $path) =~ s/\.result\z/.handled/;
+          my @handled = stat $handled;
+          if (!@handled) {
+            if ($! == ENOENT) {
+              $pending = 1;
+            } else {
+              $unknown = "inbox acknowledgement cannot be checked: $!";
+              last;
+            }
+          }
+        }
+      }
+      print join("\t", $id, $activity, $pending, $unknown || "-"), "\n";
+    }
+  ' "$(fm_procevent_inbox_dir "$state")" "$@"
+}
+
 # fm_procevent_event_line <adapter> <source-id> <sequence>
 # The complete normalized event. Bounded by construction: a fixed verb, a
 # validated adapter name, and a validated id. No source output, path, or

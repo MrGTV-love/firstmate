@@ -2442,6 +2442,12 @@ This start-to-start governor is a no-op after a normally blocking poll but caps 
 Real feedback, ended and missing sessions, any other `SERVER_ERROR`, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
 An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
 
+**Retire finished Lavish listeners**
+
+Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
+For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
+The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
+
 ### Crew-hosted Lavish review boards
 
 **Arm and confirm a listener**
