@@ -239,18 +239,18 @@ _fm_decision_key() {  # <status-line> [<keyless>] -> key slug, or <keyless> (def
 }
 # Drop the record for <key> from a newline-terminated "<key>\t<verb>\t<note>" set.
 # Portable (no associative arrays) so the fold runs on bash 3.2 as well as 4+.
-_fm_decision_drop() {  # <open-set> <key>
-  local set=$1 key=$2 line out=''
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    case "$line" in
-      "$key"$'\t'*) : ;;
-      *) out="${out}${line}"$'\n' ;;
+_fm_decision_drop() {  # <open-set> <key> <out-var>
+  local __fm_drop_line __fm_drop_out=''
+  while IFS= read -r __fm_drop_line || [ -n "$__fm_drop_line" ]; do
+    [ -n "$__fm_drop_line" ] || continue
+    case "$__fm_drop_line" in
+      "$2"$'\t'*) : ;;
+      *) __fm_drop_out+="${__fm_drop_line}"$'\n' ;;
     esac
   done <<EOF
-$set
+$1
 EOF
-  printf '%s' "$out"
+  printf -v "$3" '%s' "${__fm_drop_out%$'\n'}"
 }
 # Fold ONE status line into an existing "<key>\t<verb>\t<note>\n"-per-line open
 # set, applying the same needs-decision/blocked-opens, resolved/captain-held-closes
@@ -319,8 +319,10 @@ _fm_status_kind() {  # <status-file> [<kind>] [<out-var>]
   if [ -n "${3:-}" ]; then printf -v "$3" '%s' "$__fm_kind"; else printf '%s' "$__fm_kind"; fi
 }
 
-_fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb> <kind>
-  local open=$1 line=$2 resolve=$3 held=$4 kind=$5 verb key note unstamped
+_fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb> <kind> <out-var>
+  local __fm_fold_open=$1 __fm_fold_verb __fm_fold_key __fm_fold_note __fm_fold_unstamped
+  # Initialize the caller's result for every non-transition early return.
+  printf -v "$6" '%s' "$1"
   # Both colon tests below ask where the head ends, the same question the note
   # and key readers ask, so they read the same unstamped copy those readers do.
   # A worker-written time tag must never decide whether a decision opens or
@@ -328,7 +330,7 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
   # prose look like a transition, or make a keyless line open a phantom
   # decision no later line could close. The stored and surfaced bytes stay the
   # caller's own.
-  _fm_status_unstamped "$line" unstamped
+  _fm_status_unstamped "$2" __fm_fold_unstamped
   # Declaration guard. A transition's verb ends at a colon, or - in the colonless
   # form _fm_decision_key still accepts above - at a complete "[key=...]" token.
   # A line holding neither is continuation prose, a bare word, or blank, and can
@@ -336,34 +338,31 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
   # equivalent parameter expansion costs tens of milliseconds per line under bash
   # 3.2's global bracket-class substitution, which is the whole per-line cost of
   # both folds on a status log of ordinary width. Same verdict, bounded cost.
-  case "$unstamped" in
+  case "$__fm_fold_unstamped" in
     *:*|*\[key=*\]*) ;;
-    *) printf '%s' "$open"; return 0 ;;
+    *) return 0 ;;
   esac
-  status_line_verb "$line" verb
-  case "$unstamped" in
-    *:*) case "$verb:$kind" in done:ship|done:scout|failed:ship|failed:scout) return 0 ;; esac ;;
+  status_line_verb "$2" __fm_fold_verb
+  case "$__fm_fold_unstamped" in
+    *:*) case "$__fm_fold_verb:$5" in
+      done:ship|done:scout|failed:ship|failed:scout) printf -v "$6" '%s' ''; return 0 ;;
+    esac ;;
   esac
-  case "$verb" in
-    needs-decision|blocked|"$resolve"|"$held") ;;
-    *) printf '%s' "$open"; return 0 ;;
+  case "$__fm_fold_verb" in
+    needs-decision|blocked|"$3"|"$4") ;;
+    *) return 0 ;;
   esac
-  key=$(_fm_decision_key "$line") || { printf '%s' "$open"; return 0; }
-  _fm_decision_key_transition_allowed "$key" "$(status_line_note "$line")" \
-    || { printf '%s' "$open"; return 0; }
-  case "$verb" in
+  _fm_decision_key_into "$2" default __fm_fold_key || return 0
+  status_line_note "$2" __fm_fold_note
+  _fm_decision_key_transition_allowed "$__fm_fold_key" "$__fm_fold_note" || return 0
+  _fm_decision_drop "$__fm_fold_open" "$__fm_fold_key" __fm_fold_open
+  case "$__fm_fold_verb" in
     needs-decision|blocked)
-      note=$(status_line_note "$line")
-      open=$(_fm_decision_drop "$open" "$key")
-      [ -n "$open" ] && open="${open}"$'\n'
-      open="${open}${key}"$'\t'"${verb}"$'\t'"${note}"$'\n'
-      ;;
-    "$resolve"|"$held")
-      open=$(_fm_decision_drop "$open" "$key")
-      [ -n "$open" ] && open="${open}"$'\n'
+      [ -n "$__fm_fold_open" ] && __fm_fold_open+=$'\n'
+      __fm_fold_open+="${__fm_fold_key}"$'\t'"${__fm_fold_verb}"$'\t'"${__fm_fold_note}"
       ;;
   esac
-  printf '%s' "$open"
+  printf -v "$6" '%s' "$__fm_fold_open"
 }
 
 # Fold the WHOLE status stream into the set of decisions still open. Prints one
@@ -417,7 +416,7 @@ status_open_decisions() {  # <status-file> [<kind>]
         status_line_verb "$line" verb
         case "$verb" in
           needs-decision|blocked|done|failed|"$resolve"|"$held")
-            open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+            _fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind" open
             ;;
         esac
       done <<EOF
@@ -432,7 +431,7 @@ EOF
     status_line_verb "$line" verb
     case "$verb" in
       needs-decision|blocked|done|failed|"$resolve"|"$held")
-        open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+        _fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind" open
         ;;
     esac
   done < "$f"
@@ -477,7 +476,7 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
     while IFS= read -r line || [ -n "$line" ]; do
       status_line_verb "$line" line_verb
       [ "$line_verb" = "$verb" ] || continue
-      line_open=$(_fm_decision_fold_line '' "$line" "$resolve" "$held" "$kind")
+      _fm_decision_fold_line '' "$line" "$resolve" "$held" "$kind" line_open
       _fm_open_set_has "$line_open" "$key" || continue
       opened=$(status_line_at_epoch "$line" 2>/dev/null || true)
     done < "$f"
