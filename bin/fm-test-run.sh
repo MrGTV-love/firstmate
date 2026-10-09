@@ -922,6 +922,7 @@ tests/fm-startup-network.test.sh 72106
 tests/fm-stat-shadowing.test.sh 75
 tests/fm-stow-cascade.test.sh 3058
 tests/fm-supervision-events.test.sh 673
+tests/fm-supervision-fork-budget.test.sh 7400
 tests/fm-supervision-host-attended-live-e2e.test.sh 49
 tests/fm-supervision-host-live-e2e.test.sh 75
 tests/fm-supervision-host-hook.test.sh 70651
