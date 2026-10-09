@@ -1903,9 +1903,18 @@ SH
 }
 
 test_interrupted_keyed_release_closes_after_teardown() {
-  local home id mode row show out
+  local home parent channel id mode row show out open published
   for mode in default done; do
     home=$(make_home "interrupted-keyed-release-$mode")
+    parent=$(make_home "interrupted-keyed-release-parent-$mode")
+    printf 'interrupted-release-mate\n' > "$home/.fm-secondmate-home"
+    printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+      > "$home/.fm-secondmate-parent"
+    printf -- '- interrupted-release-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+      "$home" > "$parent/data/secondmates.md"
+    fm_write_secondmate_meta "$parent/state/interrupted-release-mate.meta" "$home" \
+      "firstmate:fm-interrupted-release-mate" sample
+    channel="$parent/state/interrupted-release-mate.status"
     id=sample-interrupted-keyed-release
     tasks_in "$home" add "$id" "Investigate interrupted answer recovery" \
       --kind scout --repo sample --start >/dev/null || fail "could not create the interrupted release task"
@@ -1917,12 +1926,20 @@ test_interrupted_keyed_release_closes_after_teardown() {
       || fail "could not hold the interrupted release task"
     complete_through_sibling "$home" "$id" >/dev/null \
       || fail "could not complete the interrupted release task's inventory"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-1" "the original parent decision did not open"
     cat > "$home/fakebin/tasks-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = unhold ] && [ "${2:-}" = sample-interrupted-keyed-release ] \
   && [ ! -e "$FM_HOME/unhold-failed-once" ]; then
   : > "$FM_HOME/unhold-failed-once"
   exit 93
+fi
+if [ "${1:-}" = done ] && [ "${2:-}" = sample-interrupted-keyed-release ] \
+  && [ ! -e "$FM_HOME/done-failed-once" ]; then
+  : > "$FM_HOME/done-failed-once"
+  exit 94
 fi
 exec "$REAL_TASKS_AXI" "$@"
 SH
@@ -1952,6 +1969,18 @@ SH
     fi
     assert_contains "$(cat "$home/direct.err")" "retry with --release" \
       "the explicit close lost its strict mode check"
+    if printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" > "$home/retry.out" 2> "$home/retry.err"; then
+      fail "the interrupted completion reported success"
+    fi
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: queued" "the failed completion changed the finished work's state"
+    assert_contains "$show" "held: yes" "the failed completion released the finished work"
+    assert_contains "$show" 'Resolution mode: answered\n' "the failed completion lost its corrected close"
+    assert_not_contains "$show" "Resolution mode: released" "the correction kept a duplicate release record"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-1" "the failed completion resolved the parent decision early"
     out=$(printf '%s\n' "$row" | run_captain "$home" answers \
       --source "interrupted release fixture" 2>&1) \
       || fail "the automatic retry did not close finished held work: $out"
@@ -1962,11 +1991,22 @@ SH
     assert_contains "$show" "Answer: go" "the retry lost the captain's answer"
     assert_contains "$show" "Deliverable of the finished work: report data/$id/report.md" \
       "the retry lost the finished report"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the original parent decision remained unresolved"
+    published=$(cat "$channel")
+    assert_contains "$published" "resolved [key=captain-hold-$id-1]" \
+      "the corrected close did not resolve the original occurrence"
+    assert_not_contains "$published" "captain-hold-$id-2" "the corrected close invented a second occurrence"
+    run_captain "$home" answer "$id" --decision-file "$home/decision.txt" >/dev/null \
+      || fail "the direct replay of the corrected close failed"
+    assert_equals "$published" "$(cat "$channel")" "the direct replay changed the parent resolution"
     out=$(printf '%s\n' "$row" | run_captain "$home" answers \
       --source "interrupted release fixture" 2>&1) \
       || fail "the closed automatic retry was not idempotent: $out"
     assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
       "replaying the reconciled close changed the finished work"
+    assert_equals "$published" "$(cat "$channel")" "the keyed replay changed the parent resolution"
   done
   pass "interrupted default and done releases close finished work while explicit mode checks stay strict"
 }

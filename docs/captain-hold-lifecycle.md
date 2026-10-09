@@ -206,7 +206,7 @@ A task whose worker still owns it, shown by a live runtime record or an In fligh
 If teardown finishes first and returns the held item to Queued without a runtime record, the answer closes it.
 Completing live work would record a landing that has not happened, so only cleanup closes it; interrupted cleanup replay closes the finished item once its captain hold has been resolved.
 A replay of that answer on an unheld, open item after the worker has ended stays a release.
-If a release was recorded but interrupted before lifting the hold, an automatic retry after teardown records a close and completes the finished held item instead; explicit direct-answer callers still require matching modes.
+If a release was recorded but interrupted before lifting the hold, an automatic retry after teardown corrects the newest resolution record in place and completes the finished held item instead, preserving the original hold occurrence and parent decision key across retries; explicit direct-answer callers still require matching modes.
 
 Each key is reported as follows:
 

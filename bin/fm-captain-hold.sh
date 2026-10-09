@@ -1113,7 +1113,7 @@ remove_interrupted_answer_stamp() {  # <task-id>
 }
 
 command_answer() {
-  local id=${1:-} decision_file='' release=0 auto_release=0 show state hold_kind body outcome recorded_mode occurrence
+  local id=${1:-} decision_file='' release=0 auto_release=0 show state hold_kind body outcome recorded_mode occurrence corrected_body tmp
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -1191,8 +1191,17 @@ command_answer() {
         released)
           if [ "$release" = 0 ]; then
             [ "$auto_release" = 1 ] || fail "task $id records this answer as a release; retry with --release"
-            write_resolution_record "$id" "$outcome" "$body"
-            occurrence=$((occurrence + 1))
+            corrected_body=$(decode_shown_value "$body") \
+              || fail "could not decode the existing body for $id"
+            corrected_body=${corrected_body/$'\nResolution mode: released\n'/$'\nResolution mode: answered\n'}
+            tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-body.XXXXXX") \
+              || fail "cannot stage the corrected resolution record"
+            if ! printf '%s\n' "$corrected_body" > "$tmp" \
+              || ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
+              rm -f -- "$tmp"
+              fail "could not correct the captain decision on $id"
+            fi
+            rm -f -- "$tmp"
           fi
           ;;
         answered|routed) [ "$release" = 0 ] || fail "task $id records this answer as a close; retry without --release" ;;
